@@ -42,8 +42,6 @@ class WsSim:
 
     Attributes:
         base: Hosting action server.
-        config_dict: ``params`` block from the server config.
-        world_config: Full world configuration.
         scale_map: Per-series multiplier (1, 2, 5, 10, 50, 100).
         event_loop: Reference to the running asyncio loop.
         polling_task: Background task running :meth:`poll_data_loop`.
@@ -56,8 +54,6 @@ class WsSim:
             action_serv: Action server hosting this driver.
         """
         self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        self.world_config = action_serv.world_cfg
         self.scale_map = {
             f"series_{i}": v for i, v in enumerate([1, 2, 5, 10, 50, 100])
         }
