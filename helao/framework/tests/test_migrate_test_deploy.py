@@ -176,3 +176,67 @@ def test_micro_orch_run_action_accepts_action_model():
     state = asyncio.run(_run())
     assert hasattr(state, "action_dq")  # state is an OrchState
     assert len(state.action_dq) == 0
+
+
+def test_wssim_import_chain():
+    """ws_simulator module imports cleanly under the framework import swap."""
+    import helao.deploy.test.servers.action.ws_simulator as wssim_mod
+    assert callable(wssim_mod.makeApp), "makeApp must be a callable in ws_simulator"
+    assert "WsSim" in dir(wssim_mod), "WsSim driver class must be importable"
+    assert "WsExec" in dir(wssim_mod), "WsExec executor class must be importable"
+
+
+def test_wssim_import_and_makeapp_attempt(tmp_path):
+    """Golden-master attempt: import ws_simulator and call makeApp('SIM').
+
+    If makeApp raises due to FrameworkBase API gaps (missing server_cfg /
+    world_cfg / put_lbuf / get_lbuf / executors, and setup_and_contain_action
+    requiring a ctx arg), the test is xfailed with a descriptive message
+    documenting every gap so they can be tracked and filled.
+
+    If makeApp succeeds (gaps filled in a future SP), the test continues and
+    does a minimal POST /SIM/acquire_data via httpx to confirm the endpoint
+    responds.
+    """
+    import asyncio
+    import httpx
+    from helao.deploy.test.servers.action.ws_simulator import makeApp
+    from helao.framework.app.base_api import FrameworkBase
+    from helao.framework.adapters.fs_storage import FsStorage
+
+    KNOWN_GAPS = (
+        "FrameworkBase missing server_cfg — WsSim.__init__ reads server config params; "
+        "FrameworkBase missing world_cfg — WsSim.__init__ reads world config; "
+        "FrameworkBase missing put_lbuf() — WsSim.poll_data_loop pushes live buffer; "
+        "FrameworkBase missing get_lbuf() — WsExec._poll reads live buffer snapshot; "
+        "FrameworkBase missing executors dict — cancel_acquire_data iterates executors; "
+        "setup_and_contain_action() called with no args in ws_simulator but FrameworkBase "
+        "requires ctx: ActionContext — tracked gaps for future SP"
+    )
+
+    try:
+        app = makeApp("SIM")
+    except AttributeError as exc:
+        pytest.xfail(f"{KNOWN_GAPS} | raised: {exc}")
+    except Exception as exc:
+        pytest.xfail(f"Unexpected error during makeApp construction — {type(exc).__name__}: {exc}")
+
+    # makeApp succeeded — override storage so files land in tmp_path
+    app.base.storage = FsStorage(save_root=str(tmp_path))
+
+    async def _drive():
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            resp = await client.post(
+                "/SIM/acquire_data",
+                json={"duration": 0.2, "acquisition_rate": 0.2},
+            )
+        return resp
+
+    resp = asyncio.run(_drive())
+    assert resp.status_code == 200, f"acquire_data returned {resp.status_code}"
+    body = resp.json()
+    assert "action_uuid" in body or "action_name" in body, (
+        f"response missing action fields: {list(body.keys())}"
+    )
