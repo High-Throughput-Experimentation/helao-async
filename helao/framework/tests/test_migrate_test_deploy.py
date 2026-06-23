@@ -92,6 +92,40 @@ def test_experiment_decorator_inherits_ctx_when_unset():
         EXPERIMENT_CTX.reset(token)
 
 
+class _LegacyExperimentStub:
+    """Duck-typed stand-in for a legacy ``Experiment`` the live orch passes."""
+
+    def __init__(self):
+        self.experiment_name = "legacy_exp"
+        self.experiment_params = {}
+
+
+def test_experiment_decorator_accepts_legacy_experiment_positional():
+    """Strangler-fig: the legacy orch dispatches `exp_func(legacy_experiment,
+    **supplied_params)`; the legacy experiment is NOT a framework RunExperiment.
+    The wrapper must still strip it as the parent (not collide with a real
+    param of the same position). Regression for the live
+    `got multiple values for argument 'wait_time'` crash.
+    """
+    captured = {}
+
+    @experiment()
+    def TEST_sub(experiment, wait_time: float = 0.0):
+        captured["exp"] = experiment
+        captured["ctx"] = EXPERIMENT_CTX.get(None)
+        captured["wait_time"] = wait_time
+        return wait_time
+
+    legacy = _LegacyExperimentStub()
+    # mirrors orch.loop_task_dispatch_experiment: experiment positional + kwargs
+    result = TEST_sub(legacy, wait_time=5.0)
+    assert result == 5.0
+    assert captured["exp"] is legacy          # legacy experiment captured, not None
+    assert captured["ctx"] is legacy          # and published on the ctx
+    assert captured["wait_time"] == 5.0       # no positional/keyword collision
+    assert EXPERIMENT_CTX.get(None) is None    # reset after
+
+
 def test_sequence_decorator_tags_version_without_wrapping():
     @sequence(version=3)
     def MY_seq(foo: float = 1.0):

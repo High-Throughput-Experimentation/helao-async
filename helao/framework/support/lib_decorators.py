@@ -55,6 +55,21 @@ def _declares_experiment_param(sig: inspect.Signature) -> bool:
     return first.name == "experiment"
 
 
+def _is_experiment(obj) -> bool:
+    """Return True if ``obj`` is a parent experiment to be captured.
+
+    Recognizes a framework :class:`RunExperiment` and, during the strangler-fig
+    migration, a *legacy* ``Experiment`` instance: the live (legacy)
+    orchestrator dispatches migrated experiment-library functions passing its
+    own ``helao.core``/``helao.helpers`` ``Experiment`` as the first positional
+    argument, which is not a ``RunExperiment``. Duck-typed on ``experiment_name``
+    so the support layer need not import ``helao.core``/``helao.helpers``; a
+    real library parameter value (float/int/str/list) never carries that
+    attribute.
+    """
+    return isinstance(obj, RunExperiment) or hasattr(obj, "experiment_name")
+
+
 def experiment(version: int = 1):
     """Tag an experiment-library function and supply its parent experiment.
 
@@ -88,9 +103,9 @@ def experiment(version: int = 1):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             exp = None
-            if args and isinstance(args[0], RunExperiment):
+            if args and _is_experiment(args[0]):
                 exp, args = args[0], args[1:]
-            if isinstance(kwargs.get("experiment"), RunExperiment):
+            if _is_experiment(kwargs.get("experiment")):
                 exp = kwargs.pop("experiment")
             if exp is None:
                 exp = EXPERIMENT_CTX.get(None)
