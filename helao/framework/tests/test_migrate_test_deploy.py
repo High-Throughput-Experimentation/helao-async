@@ -174,5 +174,5 @@ def test_micro_orch_run_action_accepts_action_model():
         return await micro.run_action(action)
 
     state = asyncio.run(_run())
-    # state is OrchState — just assert it doesn't raise
-    assert state is not None
+    assert hasattr(state, "action_dq")  # state is an OrchState
+    assert len(state.action_dq) == 0
