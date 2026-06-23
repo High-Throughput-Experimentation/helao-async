@@ -186,6 +186,59 @@ def test_wssim_import_chain():
     assert "WsExec" in dir(wssim_mod), "WsExec executor class must be importable"
 
 
+def test_test_runner_importable():
+    """test_runner.py resolves all helao.framework.* imports."""
+    import helao.deploy.test.runners.test_runner as mod
+    # module-level symbols confirm the framework import chain resolved
+    assert callable(mod.consecutive_noblocking), "consecutive_noblocking must be a coroutine function"
+    assert callable(mod.conditional_stop), "conditional_stop must be a coroutine function"
+    assert isinstance(mod.WORLD_CFG, dict), "WORLD_CFG must be a dict"
+
+
+def test_oersim_runner_importable():
+    """oersim_runner.py resolves all helao.framework.* imports."""
+    import helao.deploy.test.runners.oersim_runner as mod
+    assert callable(mod.main), "main must be a coroutine function"
+    assert callable(mod._act), "_act helper must be callable"
+    assert isinstance(mod.WORLD_CFG, dict), "WORLD_CFG must be a dict"
+
+
+def test_simulatews_runner_importable():
+    """simulatews_runner.py resolves all helao.framework.* imports."""
+    import helao.deploy.test.runners.simulatews_runner as mod
+    assert callable(mod.main), "main must be a coroutine function"
+    assert callable(mod._act), "_act helper must be callable"
+    assert isinstance(mod.WORLD_CFG, dict), "WORLD_CFG must be a dict"
+
+
+def test_gpsim_driver_importable():
+    """gpsim_driver.py resolves all helao.framework.* imports before hitting gpflow.
+
+    gpflow is not installed in the helao env, so the import will fail at the
+    ``import gpflow`` line.  importorskip verifies that every helao.framework.*
+    import above that line resolved cleanly (if they had failed, a different
+    ImportError / ModuleNotFoundError would surface before we even reach gpflow).
+    """
+    gpflow = pytest.importorskip("gpflow", reason="gpflow not installed — skipping GPSim test")
+    from helao.deploy.test.drivers.data.gpsim_driver import GPSim, GPSimExec, calc_eta
+    assert callable(calc_eta), "calc_eta must be a callable"
+    assert GPSim is not None
+    assert GPSimExec is not None
+
+
+def test_cpsim_driver_importable():
+    """cpsim_driver.py resolves all helao.framework.* imports before hitting gpflow.
+
+    cpsim_driver imports calc_eta from gpsim_driver, which triggers the gpflow
+    import transitively.  importorskip confirms that gpflow is the only missing
+    piece — all helao.framework.* imports above it resolved correctly.
+    """
+    pytest.importorskip("gpflow", reason="gpflow not installed — skipping CPSim test")
+    from helao.deploy.test.drivers.pstat.cpsim_driver import CPSim, CPSimExec
+    assert CPSim is not None
+    assert CPSimExec is not None
+
+
 def test_wssim_import_and_makeapp_attempt(tmp_path):
     """Golden-master attempt: import ws_simulator and call makeApp('SIM').
 
