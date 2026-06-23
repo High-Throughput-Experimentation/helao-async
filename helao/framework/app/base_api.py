@@ -407,43 +407,57 @@ class FrameworkBase:
                 LOGGER.exception("could not rehydrate status payload to ActionModel")
                 continue
 
-            name = status_msg.action_name
-            if name not in self.actionservermodel.endpoints:
-                self.actionservermodel.endpoints[name] = EndpointModel(
-                    endpoint_name=name
-                )
-            self.actionservermodel.endpoints[name].active_dict[
-                status_msg.action_uuid
-            ] = status_msg
-            self.actionservermodel.last_action_uuid = status_msg.action_uuid
-            self.actionservermodel.endpoints[name].sort_status()
-
-            if len(self.status_clients) == 0 and self.orch_key is not None:
-                await self.attach_client(
-                    self.orch_key, self.orch_host, self.orch_port
-                )
-
-            for combo_key in self.status_clients.copy():
-                client_servkey, client_host, client_port = combo_key
-                for _ in range(retry_limit):
-                    response, error_code = await self.send_statuspackage(
-                        action_name=name,
-                        client_servkey=client_servkey,
-                        client_host=client_host,
-                        client_port=client_port,
+            # Guard the whole per-message body: a failure pushing one status
+            # update (e.g. a transient dispatcher error or a malformed endpoint)
+            # must NOT kill the drain task — that would silently stop ALL status
+            # push and hang every sequence. Ports legacy log_status_task's
+            # loop-level try/except (base.py:824-827) but per-message so the
+            # loop keeps draining.
+            try:
+                name = status_msg.action_name
+                if name not in self.actionservermodel.endpoints:
+                    self.actionservermodel.endpoints[name] = EndpointModel(
+                        endpoint_name=name
                     )
-                    if response and error_code == ErrorCodes.none:
-                        break
-                # cooperative yield (legacy slept 0.3s between clients)
-                await asyncio.sleep(0)
-            self.actionservermodel.endpoints[name].clear_finished()
+                self.actionservermodel.endpoints[name].active_dict[
+                    status_msg.action_uuid
+                ] = status_msg
+                self.actionservermodel.last_action_uuid = status_msg.action_uuid
+                self.actionservermodel.endpoints[name].sort_status()
 
-            # WS-E: drain the collision queues now that this endpoint may be
-            # idle. Ports the legacy status-loop queue block (base.py:802-820)
-            # that WS-A deliberately omitted. "Active non-queued" actions are
-            # those NOT parked on this server (queued_on_actserv) unless they
-            # have since been (re)launched (queued_launch).
-            await self._drain_queues(name)
+                if len(self.status_clients) == 0 and self.orch_key is not None:
+                    await self.attach_client(
+                        self.orch_key, self.orch_host, self.orch_port
+                    )
+
+                for combo_key in self.status_clients.copy():
+                    client_servkey, client_host, client_port = combo_key
+                    for _ in range(retry_limit):
+                        response, error_code = await self.send_statuspackage(
+                            action_name=name,
+                            client_servkey=client_servkey,
+                            client_host=client_host,
+                            client_port=client_port,
+                        )
+                        if response and error_code == ErrorCodes.none:
+                            break
+                    # cooperative yield (legacy slept 0.3s between clients)
+                    await asyncio.sleep(0)
+                self.actionservermodel.endpoints[name].clear_finished()
+
+                # WS-E: drain the collision queues now that this endpoint may be
+                # idle. Ports the legacy status-loop queue block (base.py:802-820)
+                # that WS-A deliberately omitted. "Active non-queued" actions are
+                # those NOT parked on this server (queued_on_actserv) unless they
+                # have since been (re)launched (queued_launch).
+                await self._drain_queues(name)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.exception(
+                    f"status push failed for action {status_msg.action_uuid} "
+                    f"on {self.server.server_name}; continuing drain."
+                )
 
     def _active_nonqueued(self) -> Dict[str, list]:
         """Per-endpoint UUIDs of actions actively occupying the server.
