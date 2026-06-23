@@ -17,6 +17,9 @@ DOMAIN_FORBIDDEN: set[str] = {
     "bokeh",
     "panel",
     "aiofiles",
+    "boto3",
+    "shutil",
+    "ruamel",
     "helao.framework.adapters",
     "helao.framework.app",
 }
