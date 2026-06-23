@@ -227,7 +227,7 @@ def test_unsync_dir_reverts_all_ymls():
     engine = SyncEngine(store, _config())
     engine.unsync_dir(sync_dir)
     # unsync_dir calls reset_sync for each parent dir
-    assert len(store.moved) >= 1
+    assert len(store.moved) == 2
 
 
 def test_cleanup_root_removes_empty_dirs():
@@ -237,7 +237,7 @@ def test_cleanup_root_removes_empty_dirs():
     engine = SyncEngine(store, _config())
     engine.cleanup_root(root)
     # cleanup_root sorts by depth (reverse) and tries to remove empty dirs
-    assert len(store.removed_dirs) >= 0  # May or may not remove depending on state
+    assert len(store.removed_dirs) >= 1
 
 
 def test_sync_one_with_s3_enabled_uploads():
@@ -299,7 +299,6 @@ def test_seq_key_without_runs_prefix_returns_full_path():
     store = FakeSyncStorage()
     engine = SyncEngine(store, _config())
     # Path without RUNS_ prefix
-    yml = HelaoYml(_act_path())
     # Manually create a path without RUNS_ prefix
     weird_path = Path("/some/other/path/file.yml")
     # Create a mock yml object
