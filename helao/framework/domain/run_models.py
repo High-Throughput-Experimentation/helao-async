@@ -153,3 +153,61 @@ class RunAction(ActionModel):
     # --- shared run-level global-param snapshots ---
     initial_global_params: dict = Field(default_factory=dict)
     finished_global_params: dict = Field(default_factory=dict)
+
+    # --- legacy-orch compatibility shims ---
+
+    def get_act(self) -> ActionModel:
+        """Return an ActionModel snapshot of this RunAction (compat with old orch list_actions)."""
+        return ActionModel(**{k: v for k, v in self.model_dump().items() if k in ActionModel.model_fields})
+
+    def get_action_dir(self) -> str:
+        """Return the relative output path for this action's files."""
+        return "/".join([
+            str(self.experiment_output_dir),
+            f"{self.orch_submit_order}__{self.action_split}"
+            f"__{self.action_server.server_name}__{self.action_name}",
+        ])
+
+    def init_act(self, time_offset: float = 0, force: bool = False) -> None:
+        """Initialise action identity; compat port of legacy Action.init_act.
+
+        Generates sequence/experiment provenance when missing (manual run path),
+        then stamps action-level timestamp, UUID, status, and output directory.
+        """
+        from helao.helpers.time_utils import set_time, gen_uuid as _gen_uuid
+
+        if self.sequence_timestamp is None or self.experiment_timestamp is None:
+            self.manual_action = True
+            self.access = "manual"
+            now = set_time(offset=time_offset)
+            manual_suffix = self.action_name or "unknown"
+            if self.sequence_name is None:
+                self.sequence_name = f"seq--{manual_suffix}"
+            if self.sequence_label is None or self.sequence_label == "noLabel":
+                self.sequence_label = "manual"
+            if self.sequence_timestamp is None:
+                self.sequence_timestamp = now
+            if self.sequence_uuid is None:
+                self.sequence_uuid = _gen_uuid()
+            if self.sequence_output_dir is None:
+                seq_ts = self.sequence_timestamp.strftime("%y%m%d.%H%M%S")
+                self.sequence_output_dir = Path(f"{seq_ts}__{self.sequence_name}")
+            if self.experiment_name is None:
+                self.experiment_name = f"exp--{manual_suffix}"
+            if self.experiment_timestamp is None:
+                self.experiment_timestamp = now
+            if self.experiment_uuid is None:
+                self.experiment_uuid = _gen_uuid()
+            if self.experiment_output_dir is None:
+                exp_ts = self.experiment_timestamp.strftime("%y%m%d.%H%M%S")
+                self.experiment_output_dir = Path(
+                    str(self.sequence_output_dir) + f"/{exp_ts}__{self.experiment_name}"
+                )
+        if force or self.action_timestamp is None:
+            self.action_timestamp = set_time(offset=time_offset)
+        if force or self.action_uuid is None:
+            self.action_uuid = _gen_uuid()
+        if force or not self.action_status:
+            self.action_status = [HloStatus.active]
+        if force or self.action_output_dir is None:
+            self.action_output_dir = Path(self.get_action_dir())
