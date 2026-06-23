@@ -17,8 +17,8 @@ from helao.framework.domain.plan_makers import ActionPlanMaker
 from helao.framework.models.machine import MachineModel as MM
 from helao.framework.support.lib_decorators import experiment
 
-# from helao.core.models.action_start_condition import ActionStartCondition
-# from helao.core.models.process_contrib import ProcessContrib
+# from helao.framework.models.action_start_condition import ActionStartCondition
+# from helao.framework.models.process_contrib import ProcessContrib
 
 
 EXPERIMENTS = __all__
