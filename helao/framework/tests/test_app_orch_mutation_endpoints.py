@@ -71,7 +71,7 @@ def test_append_and_insert_experiment(tmp_path):
 
 def test_add_split_sequences_fallback(tmp_path):
     client, driver = _client(tmp_path)
-    body = client.post("/add_split_sequences", json={"sequence": _seq_dict("s")}).json()
+    body = client.post("/append_split_sequences", json={"sequence": _seq_dict("s")}).json()
     assert isinstance(body, list) and len(body) == 1
     assert _names(driver.state.sequence_dq) == ["s"]
 
@@ -93,5 +93,31 @@ def test_control_aliases_at_root(tmp_path):
     # no work queued: start returns immediately with a loop_state
     assert "loop_state" in client.post("/start").json()
     assert "loop_intent" in client.post("/stop").json()
-    assert "loop_state" in client.post("/estop").json()
+    assert "loop_state" in client.post("/estop_orch").json()
     assert "loop_state" in client.post("/clear_estop").json()
+    assert "loop_intent" in client.post("/skip_experiment").json()
+
+
+def test_endpoint_names_match_remote_backend(tmp_path):
+    """Assert the three previously-mismatched routes return 200 at the consumer strings."""
+    client, driver = _client(tmp_path)
+
+    # /skip_experiment — RemoteBackend.skip calls _call("skip_experiment")
+    resp = client.post("/skip_experiment")
+    assert resp.status_code == 200, f"/skip_experiment returned {resp.status_code}"
+    assert "loop_intent" in resp.json()
+
+    # /estop_orch — RemoteBackend.estop calls _call("estop_orch")
+    resp = client.post("/estop_orch")
+    assert resp.status_code == 200, f"/estop_orch returned {resp.status_code}"
+    assert "loop_state" in resp.json()
+
+    # clear estop so subsequent state checks are clean
+    client.post("/clear_estop")
+
+    # /append_split_sequences — RemoteBackend.add_split_sequences calls _call("append_split_sequences")
+    resp = client.post("/append_split_sequences", json={"sequence": _seq_dict("s")})
+    assert resp.status_code == 200, f"/append_split_sequences returned {resp.status_code}"
+    body = resp.json()
+    assert isinstance(body, list) and len(body) == 1
+    assert _names(driver.state.sequence_dq) == ["s"]

@@ -627,7 +627,7 @@ def makeOrchApp(
         orch.remove_sequence(driver.state, idx)
         return {"n_sequences": len(driver.state.sequence_dq)}
 
-    @app.post("/add_split_sequences")
+    @app.post("/append_split_sequences")
     async def add_split_sequences(sequence: dict = Body(..., embed=True)) -> list:
         # split-by-seq-param config is not present in OrchPorts; fall back to a
         # plain append (faithful to the legacy no-split branch). Real splitting
@@ -675,12 +675,12 @@ def makeOrchApp(
         await driver.stop()
         return {"loop_intent": driver.state.loop_intent.value}
 
-    @app.post("/skip")
+    @app.post("/skip_experiment")
     async def skip_root() -> dict:
         await driver.skip()
         return {"loop_intent": driver.state.loop_intent.value}
 
-    @app.post("/estop")
+    @app.post("/estop_orch")
     async def estop_root(reason: str = "") -> dict:
         await driver.estop(reason=reason)
         return {"loop_state": driver.state.loop_state.value}
