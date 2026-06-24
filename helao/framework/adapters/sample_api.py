@@ -30,7 +30,7 @@ from uuid import UUID
 from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.helpers.plate_api import HTEPlateAPI  # gap: plate_api not yet in framework
+from helao.framework.adapters.plate_api import HTEPlateAPI
 from helao.framework.models.sample import (
     AssemblySample,
     LiquidSample,

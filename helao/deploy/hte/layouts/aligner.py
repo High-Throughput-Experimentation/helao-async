@@ -36,7 +36,7 @@ from bokeh.models import FileInput
 
 from helao.helpers import helao_logging as logging
 from helao.core.servers.vis import Vis
-from helao.helpers.plate_api import HTEPlateAPI
+from helao.framework.adapters.plate_api import HTEPlateAPI
 from helao.core.models.data import DataModel
 from helao.core.error import ErrorCodes
 
