@@ -63,7 +63,6 @@ def test_vis_raises_without_root(tmp_path):
         config_loader.CONFIG = prev
 
 
-@pytest.mark.skip(reason="depends on Task 3 vis_subscriber.mount_visualizers")
 def test_makebokehapp_returns_doc_with_roots(cfg):
     doc = FakeDoc()
     out = makeBokehApp(doc, "demo", "VIS", "/repo/root")
