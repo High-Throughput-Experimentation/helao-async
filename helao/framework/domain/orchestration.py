@@ -62,6 +62,35 @@ __all__ = [
     "register_obj_uuid",
     "register_action_uuid",
     "track_action_uuid",
+    # read-side ops (Task 2)
+    "histories_payload",
+    "status_summary_payload",
+    "step_flags_payload",
+    "set_step_flag",
+    "queue_counts",
+    "queue_object_payload",
+    "list_sequences",
+    "list_experiments",
+    "list_actions",
+    "orch_state_payload",
+    "get_active_sequence",
+    "get_active_experiment",
+    "get_last_sequence",
+    "get_last_experiment",
+    "latest_sequence_uuids",
+    "latest_experiment_uuids",
+    "latest_action_uuids",
+    # mutation ops (Task 3)
+    "move_sequence",
+    "remove_sequence",
+    "prepend_sequences",
+    "append_sequence",
+    "insert_sequence",
+    "append_experiment",
+    "insert_experiment",
+    "clear_sequences",
+    "clear_experiments",
+    "clear_actions",
 ]
 
 from dataclasses import dataclass, field
@@ -136,6 +165,9 @@ class OrchState:
         step_thru_experiments: Pause after each experiment when True.
         step_thru_sequences: Pause after each sequence when True.
         nonblocking: Tracked ``(server_key, exec_id, host, port)`` tuples.
+        status_summary: Last-seen ``{server_key: (server_status, driver_status)}``
+            snapshot. Populated by the network heartbeat (out of scope here);
+            read by :func:`status_summary_payload`.
     """
 
     sequence_dq: List[RunSequence] = field(default_factory=list)
@@ -158,6 +190,7 @@ class OrchState:
     action_history: dict = field(default_factory=dict)
     experiment_history: dict = field(default_factory=dict)
     sequence_history: dict = field(default_factory=dict)
+    status_summary: dict = field(default_factory=dict)
 
     last_action_uuid: Optional[UUID] = None
     current_stop_message: str = ""
@@ -248,6 +281,215 @@ def track_action_uuid(state: OrchState, action_uuid: Optional[UUID]) -> OrchStat
     Ports ``Orch.track_action_uuid``.
     """
     state.last_action_uuid = action_uuid
+    return state
+
+
+# --- read-side ops (Task 2: payloads, lists, getters) -------------------------
+
+
+def histories_payload(state: OrchState) -> dict:
+    """Action/experiment/sequence history as (uuid, dict) item lists. Ports orch_api._histories_payload."""
+    return {
+        "action": list(state.action_history.items()),
+        "experiment": list(state.experiment_history.items()),
+        "sequence": list(state.sequence_history.items()),
+    }
+
+
+def status_summary_payload(state: OrchState) -> dict:
+    """{server: [server_status, driver_status]} from state.status_summary. Ports orch_api._status_summary_payload."""
+    return {k: list(v) for k, v in state.status_summary.items()}
+
+
+_STEP_FLAG_ATTR = {
+    "actions": "step_thru_actions",
+    "experiments": "step_thru_experiments",
+    "sequences": "step_thru_sequences",
+}
+
+
+def step_flags_payload(state: OrchState) -> dict:
+    """The three step-through flags. Ports orch_api._step_flags_payload."""
+    return {
+        "actions": state.step_thru_actions,
+        "experiments": state.step_thru_experiments,
+        "sequences": state.step_thru_sequences,
+    }
+
+
+def set_step_flag(state: OrchState, kind: str, value: bool) -> dict:
+    """Set one step flag by kind. Raises KeyError on unknown kind. Ports orch_api._set_step_flag."""
+    attr = _STEP_FLAG_ATTR[kind]
+    setattr(state, attr, bool(value))
+    return {kind: getattr(state, attr)}
+
+
+def queue_counts(state: OrchState) -> dict:
+    """True queue lengths. Ports orch_api._queue_counts."""
+    return {
+        "n_sequences": len(state.sequence_dq),
+        "n_experiments": len(state.experiment_dq),
+        "n_actions": len(state.action_dq),
+    }
+
+
+def queue_object_payload(state: OrchState, kind: str, idx: int) -> dict:
+    """Full dict for the queued item of kind at idx, or {} (snapshot-safe). Ports orch_api._queue_object_payload."""
+    dq = {
+        "sequence": state.sequence_dq,
+        "experiment": state.experiment_dq,
+        "action": state.action_dq,
+    }.get(kind)
+    if dq is None:
+        return {}
+    try:
+        return dq[idx].as_dict()
+    except (IndexError, KeyError, AttributeError):
+        return {}
+
+
+def list_sequences(state: OrchState, limit: int = 10) -> list:
+    """At most `limit` sequence summaries from the front of the deque. Ports Orch.list_sequences."""
+    return [state.sequence_dq[i].get_seq()
+            for i in range(min(len(state.sequence_dq), limit))]
+
+
+def list_experiments(state: OrchState, limit: int = 10) -> list:
+    """At most `limit` experiment summaries. Ports Orch.list_experiments."""
+    return [state.experiment_dq[i].get_exp()
+            for i in range(min(len(state.experiment_dq), limit))]
+
+
+def list_actions(state: OrchState, limit: int = 10) -> list:
+    """At most `limit` action summaries. Ports Orch.list_actions."""
+    return [state.action_dq[i].get_act()
+            for i in range(min(len(state.action_dq), limit))]
+
+
+def orch_state_payload(state: OrchState) -> dict:
+    """{loop_state, n_*, current_stop_message} — the shape RemoteBackend.get_orch_state consumes."""
+    return {
+        "loop_state": state.loop_state,
+        "n_sequences": len(state.sequence_dq),
+        "n_experiments": len(state.experiment_dq),
+        "n_actions": len(state.action_dq),
+        "current_stop_message": state.current_stop_message,
+    }
+
+
+def _obj_dict(obj) -> dict:
+    """Serialize an active/last sequence|experiment object to a dict, or {}."""
+    if obj is None:
+        return {}
+    try:
+        return obj.as_dict()
+    except AttributeError:
+        return {}
+
+
+def get_active_sequence(state: OrchState) -> dict:
+    return _obj_dict(state.active_sequence)
+
+
+def get_active_experiment(state: OrchState) -> dict:
+    return _obj_dict(state.active_experiment)
+
+
+def get_last_sequence(state: OrchState) -> dict:
+    return _obj_dict(state.last_sequence)
+
+
+def get_last_experiment(state: OrchState) -> dict:
+    return _obj_dict(state.last_experiment)
+
+
+def latest_sequence_uuids(state: OrchState) -> list:
+    """UUIDs of recently registered sequences (history keys)."""
+    return list(state.sequence_history.keys())
+
+
+def latest_experiment_uuids(state: OrchState) -> list:
+    return list(state.experiment_history.keys())
+
+
+def latest_action_uuids(state: OrchState) -> list:
+    return list(state.action_history.keys())
+
+
+# --- mutation ops (Task 3: queue-mutation functions) ----------------------------
+
+
+def move_sequence(state: OrchState, from_idx: int, to_idx: int) -> OrchState:
+    """Move the queued sequence at from_idx to to_idx; out-of-range is a no-op. Ports Orch.move_sequence."""
+    dq = state.sequence_dq
+    n = len(dq)
+    if 0 <= from_idx < n and 0 <= to_idx < n:
+        seq = dq.pop(from_idx)
+        dq.insert(to_idx, seq)
+    return state
+
+
+def remove_sequence(state: OrchState, idx: int) -> OrchState:
+    """Drop the queued sequence at idx; out-of-range no-op. Ports Orch.remove_sequence."""
+    if 0 <= idx < len(state.sequence_dq):
+        del state.sequence_dq[idx]
+    return state
+
+
+def prepend_sequences(state: OrchState, sequences: list) -> list:
+    """Insert sequences at the front preserving order; return their sequence_uuids.
+
+    Pure insert only — run_id/codehash stamping is the app layer's job (SP-ORCH-2).
+    Empty list is a no-op returning []. Ports the queue half of Orch.prepend_sequences.
+    """
+    if not sequences:
+        return []
+    uuids = []
+    for i, sequence in enumerate(sequences):
+        state.sequence_dq.insert(i, sequence)
+        uuids.append(sequence.sequence_uuid)
+    return uuids
+
+
+def append_sequence(state: OrchState, sequence) -> OrchState:
+    """Append a sequence to the back of the queue."""
+    state.sequence_dq.append(sequence)
+    return state
+
+
+def insert_sequence(state: OrchState, sequence, idx: int) -> OrchState:
+    """Insert a sequence at idx."""
+    state.sequence_dq.insert(idx, sequence)
+    return state
+
+
+def append_experiment(state: OrchState, experiment) -> OrchState:
+    """Append an experiment to the back of the queue."""
+    state.experiment_dq.append(experiment)
+    return state
+
+
+def insert_experiment(state: OrchState, experiment, idx: int) -> OrchState:
+    """Insert an experiment at idx."""
+    state.experiment_dq.insert(idx, experiment)
+    return state
+
+
+def clear_sequences(state: OrchState) -> OrchState:
+    """Empty the sequence queue. Ports Orch.clear_sequences."""
+    state.sequence_dq.clear()
+    return state
+
+
+def clear_experiments(state: OrchState) -> OrchState:
+    """Empty the experiment queue. Ports Orch.clear_experiments."""
+    state.experiment_dq.clear()
+    return state
+
+
+def clear_actions(state: OrchState) -> OrchState:
+    """Empty the action queue. Ports Orch.clear_actions."""
+    state.action_dq.clear()
     return state
 
 
