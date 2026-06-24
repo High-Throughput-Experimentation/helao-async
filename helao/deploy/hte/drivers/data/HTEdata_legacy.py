@@ -13,7 +13,7 @@ __all__ = ["HTEdata"]
 
 
 from helao.framework.app.base_api import Base
-from helao.helpers.plate_api import HTEPlateAPI
+from helao.framework.adapters.plate_api import HTEPlateAPI
 
 
 # class LocalDataHandler:

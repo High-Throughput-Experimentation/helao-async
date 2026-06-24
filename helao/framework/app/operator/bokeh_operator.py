@@ -175,7 +175,7 @@ class BokehOperator:
         self.dataAPI = None
         plate_api_name = self.config_dict.get("plate_api")
         if plate_api_name == "HTEPlateAPI":
-            from helao.helpers.plate_api import HTEPlateAPI
+            from helao.framework.adapters.plate_api import HTEPlateAPI
             self.dataAPI = HTEPlateAPI()
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
