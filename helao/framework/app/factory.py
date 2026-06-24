@@ -45,6 +45,7 @@ def makeApp(
     sequence_lib: Optional[Mapping[str, Callable]] = None,
     experiment_lib: Optional[Mapping[str, Callable]] = None,
     postprocessors=None,
+    action_servers=None,
 ) -> FastAPI:
     """Build the FastAPI app for ``server_key`` per ``group``.
 
@@ -59,6 +60,8 @@ def makeApp(
         sequence_lib: Sequence name -> factory map (orchestrator only).
         experiment_lib: Experiment name -> factory map (orchestrator only).
         postprocessors: HLO post-processor names (passed to the ports).
+        action_servers: Map of server_key -> {host, port, ...} for heartbeat
+            pings (orchestrator only).
 
     Returns:
         A configured :class:`fastapi.FastAPI` instance.
@@ -71,6 +74,7 @@ def makeApp(
             sequence_lib=sequence_lib,
             experiment_lib=experiment_lib,
             postprocessors=postprocessors,
+            action_servers=action_servers,
         )
     return makeActionApp(server_key, save_root)
 
@@ -83,6 +87,7 @@ def makeOrchestratorApp(
     sequence_lib: Optional[Mapping[str, Callable]] = None,
     experiment_lib: Optional[Mapping[str, Callable]] = None,
     postprocessors=None,
+    action_servers=None,
 ) -> FastAPI:
     """Assemble the orchestrator FastAPI app (an :class:`OrchDriver`).
 
@@ -105,6 +110,7 @@ def makeOrchestratorApp(
         sequence_lib=sequence_lib,
         experiment_lib=experiment_lib,
         postprocessors=postprocessors,
+        action_servers=action_servers,
     )
     app = makeOrchApp(server_key, ports=ports)
     app.state.save_root = save_root
