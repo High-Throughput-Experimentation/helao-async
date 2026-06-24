@@ -41,7 +41,16 @@ __all__ = [
     "BaseAPI",
     "ActionAPIRoute",
     "wrap_action_endpoint",
+    "action_version",
+    "ACTION_VERSION_ATTR",
+    "DEFAULT_ACTION_VERSION",
+    "Active",
 ]
+
+# Compatibility alias: hte action servers import ``Active`` from the legacy base.
+# The framework equivalent is ``ActionSession``; this alias lets those imports
+# resolve without modifying the hte code until full migration is complete.
+Active = ActionSession
 
 
 @dataclass
@@ -757,6 +766,36 @@ LOGGER = (
     logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 )
 
+#: Attribute used to carry a per-endpoint action_version set via the
+#: :func:`action_version` decorator until :func:`wrap_action_endpoint` reads it.
+ACTION_VERSION_ATTR = "__helao_action_version__"
+
+#: Default action schema version injected when an endpoint declares none.
+DEFAULT_ACTION_VERSION = 1
+
+
+def action_version(version: int) -> Callable:
+    """Declare the schema version for a ``tags=["action"]`` endpoint.
+
+    Stamps ``ACTION_VERSION_ATTR`` on the decorated function; the value is
+    injected as the endpoint's ``action_version`` parameter by
+    :func:`wrap_action_endpoint`, so it appears in the request schema and on
+    the recorded action. Endpoints that still declare ``action_version`` inline
+    keep that value and ignore this decorator.
+
+    Args:
+        version: The action schema version to advertise for the endpoint.
+
+    Returns:
+        A decorator that stamps ``version`` onto the endpoint function.
+    """
+
+    def decorator(fn: Callable) -> Callable:
+        setattr(fn, ACTION_VERSION_ATTR, version)
+        return fn
+
+    return decorator
+
 
 def _build_action_from_kwargs(
     kwargs: dict, default_params: Optional[dict] = None
@@ -842,14 +881,14 @@ def _is_action_param(param: "inspect.Parameter") -> bool:
 
 
 def _build_action_endpoint_signature(fn: Callable, sig: "inspect.Signature"):
-    """Augment ``fn``'s signature with an injected ``action`` param when absent.
+    """Augment ``fn``'s signature with injected ``action``/``action_version`` params.
 
-    Ports the action-injection half of ``base_api.py``'s
-    ``_build_action_endpoint_signature`` (SP7 subset: no ``action_version``
-    decorator wiring — that's SP8). When the endpoint omits an explicit
-    ``RunAction``-typed param we synthesize one (``action: RunAction =
-    Body({}, embed=True)``) so FastAPI builds the request body schema and the
-    wrapper can recover the action from kwargs.
+    Ports ``base_api.py:_build_action_endpoint_signature`` (complete — including
+    ``action_version`` decorator wiring added in hte recon T2). When the endpoint
+    omits an explicit ``RunAction``-typed param we synthesize one (``action:
+    RunAction = Body({}, embed=True)``). When the endpoint omits ``action_version``
+    we inject it with the value from :func:`action_version` decorator if present,
+    otherwise :data:`DEFAULT_ACTION_VERSION`.
 
     Returns:
         Tuple ``(exposed_sig, accepts_var_keyword, accepted_names)``.
@@ -867,18 +906,32 @@ def _build_action_endpoint_signature(fn: Callable, sig: "inspect.Signature"):
         and p.kind is not inspect.Parameter.VAR_POSITIONAL
     }
     has_action = any(_is_action_param(p) for p in params)
+    has_version = "action_version" in sig.parameters
 
-    if has_action:
+    injected = []
+    if not has_action:
+        injected.append(
+            inspect.Parameter(
+                "action",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=Body({}, embed=True),
+                annotation=RunAction,
+            )
+        )
+    if not has_version:
+        version = getattr(fn, ACTION_VERSION_ATTR, DEFAULT_ACTION_VERSION)
+        injected.append(
+            inspect.Parameter(
+                "action_version",
+                kind=inspect.Parameter.KEYWORD_ONLY,
+                default=version,
+                annotation=int,
+            )
+        )
+
+    if not injected:
         return sig, accepts_var_keyword, accepted_names
 
-    injected = [
-        inspect.Parameter(
-            "action",
-            kind=inspect.Parameter.KEYWORD_ONLY,
-            default=Body({}, embed=True),
-            annotation=RunAction,
-        )
-    ]
     # KEYWORD_ONLY injected params must precede any VAR_KEYWORD (**kwargs) param.
     non_var = [p for p in params if p.kind is not inspect.Parameter.VAR_KEYWORD]
     var_kw = [p for p in params if p.kind is inspect.Parameter.VAR_KEYWORD]
