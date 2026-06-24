@@ -10,9 +10,9 @@ __all__ = ["makeApp"]
 
 from typing import List, Union
 from fastapi import Body
-from helao.helpers.premodels import Action
-from helao.core.servers.base_api import BaseAPI
-from helao.core.models.sample import (
+from helao.framework.domain.run_models import Action
+from helao.framework.app.base_api import BaseAPI
+from helao.framework.models.sample import (
     AssemblySample,
     LiquidSample,
     GasSample,

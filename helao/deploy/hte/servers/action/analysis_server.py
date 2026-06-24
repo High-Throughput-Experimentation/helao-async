@@ -11,8 +11,8 @@ models.
 
 __all__ = ["makeApp"]
 
-from helao.core.servers.base_api import BaseAPI
-from helao.core.drivers.data.analysis_driver import make_analysis_app
+from helao.framework.app.base_api import BaseAPI
+from helao.framework.app.analysis_driver import make_analysis_app
 
 
 def makeApp(server_key) -> BaseAPI:

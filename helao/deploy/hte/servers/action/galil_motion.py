@@ -48,10 +48,10 @@ from ...drivers.motion.galil_motion_driver import (
     TransformationModes,
     Galil,
 )
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.premodels import Action
-from helao.core.error import ErrorCodes
+from helao.framework.app.base_api import BaseAPI
+from helao.framework.support.make_str_enum import make_str_enum
+from helao.framework.domain.run_models import Action
+from helao.framework.models.errors import ErrorCodes
 
 
 async def galil_dyn_endpoints(app: BaseAPI):

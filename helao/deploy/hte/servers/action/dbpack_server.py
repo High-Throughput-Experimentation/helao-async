@@ -9,8 +9,8 @@ runs.
 
 __all__ = ["makeApp"]
 
-from helao.core.servers.base_api import BaseAPI
-from helao.core.drivers.data.sync_driver import HelaoSyncer
+from helao.framework.app.base_api import BaseAPI
+from helao.core.drivers.data.sync_driver import HelaoSyncer  # seam: HelaoSyncer not yet ported to framework
 
 
 def makeApp(server_key) -> BaseAPI:

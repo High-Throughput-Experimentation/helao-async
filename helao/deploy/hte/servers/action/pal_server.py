@@ -18,7 +18,7 @@ from time import strftime
 from fastapi import Body, Query
 from typing import Optional, List, Union
 
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.framework.app.base_api import BaseAPI, action_version
 from ...drivers.robot.pal_driver import (
     PAL,
     Spacingmethod,
@@ -31,7 +31,7 @@ from ...drivers.robot.pal_driver import (
 )
 from ...drivers.data.archive_driver import ScanDirection, ScanOperator
 
-from helao.core.models.sample import (
+from helao.framework.models.sample import (
     SampleType,
     LiquidSample,
     GasSample,
@@ -43,11 +43,11 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.models.data import DataModel
-from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.premodels import Action
+from helao.framework.models.data import DataModel
+from helao.framework.support.make_str_enum import make_str_enum
+from helao.framework.domain.run_models import Action
 
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.framework.support import helao_logging as logging  # get LOGGER from BaseAPI instance
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

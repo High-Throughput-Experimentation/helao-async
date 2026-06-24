@@ -23,23 +23,23 @@ import numpy as np
 import pandas as pd
 from fastapi import Body, Query
 
-from helao.core.error import ErrorCodes
-from helao.core.models.sample import (
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.models.sample import (
     AssemblySample,
     LiquidSample,
     GasSample,
     SolidSample,
     NoneSample,
 )
-from helao.core.models.hlostatus import HloStatus
-from helao.core.models.file import HloFileGroup
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.models.file import HloFileGroup
 
-from helao.core.servers.base_api import BaseAPI, action_version
-from helao.helpers.premodels import Action
-from helao.helpers.executor import Executor
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
-from helao.helpers.yml_tools import yml_dumps
-from helao.helpers.bubble_detection import bubble_detection
+from helao.framework.app.base_api import BaseAPI, action_version
+from helao.framework.domain.run_models import Action
+from helao.framework.domain.executor import Executor
+from helao.framework.support import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.framework.support.yml_tools import yml_dumps
+from helao.framework.support.bubble_detection import bubble_detection
 from ...drivers.pstat.gamry.driver import GamryDriver, DriverStatus, ControlMode, GamryPoller
 from ...drivers.pstat.gamry.technique import (
     GamryTechnique,
