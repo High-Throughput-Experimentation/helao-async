@@ -8,20 +8,20 @@ from dotenv import load_dotenv
 from pathlib import Path
 from pprint import pprint
 
-from helao.core.servers.operator.helao_operator import HelaoOperator
+from helao.framework.adapters.helao_operator import HelaoOperator
 
 import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
-from helao.helpers.premodels import Sequence
-from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.time_utils import gen_uuid
+from helao.framework.domain.run_models import Sequence
+from helao.framework.support.dispatcher import private_dispatcher
+from helao.framework.support.time_utils import gen_uuid
 from ...sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from ...sequences.ECHEUVIS_seq import (
     ECHEUVIS_multiCA_led,
     ECHEUVIS_postseq,
     ECHEUVIS_diagnostic_CV,
 )
-from helao.core.models.orchstatus import LoopStatus
+from helao.framework.models.orchstatus import LoopStatus
 
 TEST = False
 SPEC_INT_MS = 35

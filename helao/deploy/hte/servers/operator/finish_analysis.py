@@ -7,17 +7,17 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from pathlib import Path
 
-from helao.core.servers.operator.helao_operator import HelaoOperator
+from helao.framework.adapters.helao_operator import HelaoOperator
 
 # from helao.helpers.gcld_client import DataRequestsClient
 from data_request_client.client import DataRequestsClient
-from helao.helpers.premodels import Sequence
-from helao.helpers.dispatcher import private_dispatcher
-from helao.helpers.config_loader import CONFIG
-from helao.helpers.time_utils import gen_uuid
+from helao.framework.domain.run_models import Sequence
+from helao.framework.support.dispatcher import private_dispatcher
+from helao.framework.support.config_loader import CONFIG
+from helao.framework.support.time_utils import gen_uuid
 from ...sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
 from ...sequences.ECHEUVIS_seq import ECHEUVIS_postseq
-from helao.core.models.orchstatus import LoopStatus
+from helao.framework.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = 6083
