@@ -1,8 +1,16 @@
 """Orchestrator /ws_status WebSocket relay."""
+import pickle
+
+import pyzstd
 from fastapi.testclient import TestClient
 
 from helao.framework.app.factory import makeApp
 from helao.framework.ports.eventsink import STATUS_CHANNEL
+
+
+def _recv(ws):
+    """Decode a zstd-pickle frame the way WsSubscriber.subscriber_loop does."""
+    return pickle.loads(pyzstd.decompress(ws.receive_bytes()))
 
 
 def _app(tmp_path):
@@ -16,7 +24,7 @@ def test_ws_status_forwards_global_status(tmp_path):
             # emit a global-status payload through the orchestrator's eventsink
             eventsink = app.state.driver.ports.eventsink
             client.portal.call(eventsink.emit_global_status, {"loop_state": "started"})
-            msg = ws.receive_json()
+            msg = _recv(ws)
             assert msg == {"loop_state": "started"}
 
 
@@ -28,7 +36,7 @@ def test_ws_status_real_transition_emits(tmp_path):
     2. Checking the eventsink's history to confirm a global_status item was emitted.
     3. Separately confirming the relay forwards it when a subscriber is open.
 
-    The reason for not combining the estop + ws.receive_json() in one block is
+    The reason for not combining the estop + _recv(ws) in one block is
     that Starlette's TestClient sync→async bridge deadlocks when the relay's
     send_json() runs within the portal.call() window (the test thread is blocked
     by portal.call while the relay tries to push to the WS send queue that the
@@ -47,7 +55,7 @@ def test_ws_status_real_transition_emits(tmp_path):
         # Confirm the relay does forward global_status emissions to a subscriber.
         with client.websocket_connect("/ws_status") as ws:
             client.portal.call(eventsink.emit_global_status, {"loop_state": "estopped"})
-            msg = ws.receive_json()
+            msg = _recv(ws)
             assert "loop_state" in msg
 
 
@@ -59,7 +67,7 @@ def test_ws_status_ignores_non_global_channel(tmp_path):
             # emit on the plain status channel (not global) then a global one
             client.portal.call(eventsink.emit_status, {"ignored": True})
             client.portal.call(eventsink.emit_global_status, {"loop_state": "stopped"})
-            msg = ws.receive_json()
+            msg = _recv(ws)
             assert msg == {"loop_state": "stopped"}  # status-channel msg was filtered out
 
 
@@ -103,3 +111,19 @@ def test_remote_backend_ws_loop_fires_on_change():
 
     _asyncio.run(_drive())
     assert calls, "on_change was not fired on a ws message"
+
+
+def test_ws_status_wire_format_matches_consumer(tmp_path):
+    """Prove a forwarded frame decodes exactly as WsSubscriber.subscriber_loop would.
+
+    This is the real-consumer-path round-trip: receive raw bytes from the relay
+    and decode them with the identical pickle+zstd path used by WsSubscriber.
+    """
+    app = makeApp("ORCH", save_root=str(tmp_path), group="orchestrator")
+    with TestClient(app) as client:
+        with client.websocket_connect("/ws_status") as ws:
+            eventsink = app.state.driver.ports.eventsink
+            client.portal.call(eventsink.emit_global_status, {"loop_state": "started"})
+            raw = ws.receive_bytes()
+            decoded = pickle.loads(pyzstd.decompress(raw))
+            assert decoded == {"loop_state": "started"}

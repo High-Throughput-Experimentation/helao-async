@@ -25,9 +25,12 @@ resulting commands are executed (parent spec §6).
 """
 from __future__ import annotations
 
+import pickle
 import uuid as _uuid
 from datetime import datetime
 from typing import Any, Callable, List, Mapping, Optional
+
+import pyzstd
 
 from helao.framework.models.errors import ErrorCodes
 from helao.framework.models.hlostatus import HloStatus
@@ -507,7 +510,7 @@ async def _orch_ws_relay(websocket, eventsink, channel: str) -> None:
                 item_channel, payload = channel, item
             if item_channel != channel:
                 continue
-            await websocket.send_json(payload)
+            await websocket.send_bytes(pyzstd.compress(pickle.dumps(payload)))
     except WebSocketDisconnect:
         return
     except Exception:
