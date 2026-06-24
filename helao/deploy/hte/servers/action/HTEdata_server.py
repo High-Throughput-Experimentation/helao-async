@@ -10,8 +10,8 @@ __all__ = ["makeApp"]
 
 from typing import Optional
 from fastapi import Body
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
+from helao.framework.app.base_api import BaseAPI
+from helao.framework.domain.run_models import Action
 from ....drivers.data.HTEdata_legacy import HTEdata
 
 

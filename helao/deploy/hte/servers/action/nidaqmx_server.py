@@ -28,18 +28,18 @@ from fastapi import Body, Query
 from typing import List, Union
 
 
-from helao.core.servers.base_api import BaseAPI
+from helao.framework.app.base_api import BaseAPI
 from ...drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
-from helao.core.models.sample import (
+from helao.framework.models.sample import (
     AssemblySample,
     LiquidSample,
     GasSample,
     SolidSample,
     NoneSample,
 )
-from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.premodels import Action
-from helao.core.error import ErrorCodes
+from helao.framework.support.make_str_enum import make_str_enum
+from helao.framework.domain.run_models import Action
+from helao.framework.models.errors import ErrorCodes
 
 
 def makeApp(server_key) -> BaseAPI:
