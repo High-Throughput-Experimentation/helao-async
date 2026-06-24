@@ -14,7 +14,7 @@ import sys
 sys.coinit_flags = 0x0
 
 # save a default log file system temp
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import comtypes
@@ -26,7 +26,7 @@ from copy import copy
 
 import numpy as np
 
-from helao.core.drivers.helao_driver import (
+from helao.framework.ports.driver import (
     HelaoDriver,
     DriverResponse,
     DriverStatus,

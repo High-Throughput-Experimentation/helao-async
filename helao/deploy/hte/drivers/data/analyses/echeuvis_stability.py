@@ -21,16 +21,16 @@ from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
-from helao.core.version import get_filehash
-from helao.helpers.time_utils import gen_uuid
+from helao.framework.support.version import get_filehash
+from helao.framework.support.time_utils import gen_uuid
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
-from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.models.run_use import RunUse
-from helao.core.drivers.data.loaders.helao_loader import HelaoProcess, HelaoAction
+from helao.framework.domain.analysis.base_analysis import BaseAnalysis
+from helao.framework.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.framework.models.run_use import RunUse
+from helao.framework.adapters.loaders.hlo_loader import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],

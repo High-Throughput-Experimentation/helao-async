@@ -12,8 +12,8 @@ __all__ = ["HTEdata"]
 # import aiofiles
 
 
-from helao.core.servers.base import Base
-from helao.core.drivers.data import HTEPlateAPI
+from helao.framework.app.base_api import Base
+from helao.helpers.plate_api import HTEPlateAPI
 
 
 # class LocalDataHandler:

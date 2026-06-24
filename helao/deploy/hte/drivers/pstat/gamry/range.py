@@ -12,7 +12,7 @@ passed to ``SetIERange``.
 from typing import Union
 from enum import StrEnum
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
