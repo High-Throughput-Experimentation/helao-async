@@ -25,6 +25,7 @@ resulting commands are executed (parent spec §6).
 """
 from __future__ import annotations
 
+import asyncio
 import pickle
 import uuid as _uuid
 from datetime import datetime
@@ -80,6 +81,7 @@ class OrchPorts:
         sequence_lib: Map of sequence name -> factory (returns experiments).
         experiment_lib: Map of experiment name -> factory (returns actions).
         postprocessors: Names of HLO post-processors (passed through to storage).
+        action_servers: Map of server_key -> {host, port, ...} for heartbeat pings.
     """
 
     def __init__(
@@ -92,6 +94,7 @@ class OrchPorts:
         sequence_lib: Optional[Mapping[str, Callable]] = None,
         experiment_lib: Optional[Mapping[str, Callable]] = None,
         postprocessors: Optional[List[str]] = None,
+        action_servers: Optional[Mapping[str, dict]] = None,
     ) -> None:
         self.transport = transport
         self.storage = storage
@@ -100,6 +103,7 @@ class OrchPorts:
         self.sequence_lib: Mapping[str, Callable] = dict(sequence_lib or {})
         self.experiment_lib: Mapping[str, Callable] = dict(experiment_lib or {})
         self.postprocessors: List[str] = list(postprocessors or [])
+        self.action_servers: dict = dict(action_servers or {})
 
     def now(self) -> datetime:
         """Wall-clock ``datetime`` from the injected clock port."""
@@ -325,6 +329,9 @@ class OrchDriver:
         self.server_key = server_key
         self.ports = ports
         self.state = state if state is not None else OrchState()
+        self.action_servers = dict(getattr(ports, "action_servers", {}) or {})
+        self.heartbeat_interval = 5.0
+        self._heartbeat_task = None
 
     # --- command execution + draining --------------------------------------
 
@@ -377,6 +384,45 @@ class OrchDriver:
         """Fold a remote action-server status into state and execute reactions."""
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
+
+    # --- heartbeat -----------------------------------------------------------
+
+    async def _heartbeat_once(self) -> None:
+        """One ping pass: dispatch get_status to each pingable server, fold into status_summary."""
+        for server_key, host, port in orch.pingable_servers(self.action_servers):
+            target = DispatchTarget(
+                server_key=server_key, host=host, port=port, endpoint="get_status"
+            )
+            result = await self.ports.transport.dispatch(
+                target, {"client_servkey": self.server_key}
+            )
+            self.state.status_summary[server_key] = orch.parse_status_response(
+                result.response, result.error == ErrorCodes.none
+            )
+
+    async def _heartbeat_loop(self) -> None:
+        """Refresh status_summary every heartbeat_interval until cancelled."""
+        while True:
+            try:
+                await self._heartbeat_once()
+            except Exception as exc:  # a transient ping failure must not kill the loop
+                LOGGER.warning(f"heartbeat pass failed: {exc!r}")
+            await asyncio.sleep(self.heartbeat_interval)
+
+    def start_heartbeat(self) -> None:
+        """Start the background heartbeat task (no-op if no servers / already running)."""
+        if not self.action_servers:
+            return
+        if self._heartbeat_task is not None and not self._heartbeat_task.done():
+            return
+        self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+
+    def stop_heartbeat(self) -> None:
+        """Cancel the heartbeat task if running (idempotent)."""
+        task = self._heartbeat_task
+        if task is not None and not task.done():
+            task.cancel()
+        self._heartbeat_task = None
 
     # --- enqueue -------------------------------------------------------------
 
@@ -543,6 +589,14 @@ def makeOrchApp(
     driver = OrchDriver(server_key, ports=ports, state=state)
     app = FastAPI(title=f"{server_key} (framework orchestrator SP5)")
     app.state.driver = driver
+
+    @app.on_event("startup")
+    async def _start_heartbeat() -> None:
+        driver.start_heartbeat()
+
+    @app.on_event("shutdown")
+    async def _stop_heartbeat() -> None:
+        driver.stop_heartbeat()
 
     @app.post(f"/{server_key}/start")
     async def start() -> dict:
