@@ -1,7 +1,7 @@
 """Unit tests for the framework Bokeh visualizer host (app/vis.py)."""
 import pytest
 
-from helao.framework.support import config_loader
+from helao.framework.support import config_loader, helao_logging
 from helao.framework.app import vis as vis_mod
 from helao.framework.app.vis import HelaoVis, Vis, makeBokehApp
 
@@ -28,6 +28,7 @@ class FakeDoc:
 def cfg(tmp_path):
     """Install a minimal world config on config_loader.CONFIG, restore after."""
     prev = config_loader.CONFIG
+    prev_logger = helao_logging.LOGGER
     config_loader.CONFIG = {
         "root": str(tmp_path / "INST"),
         "loaded_config_path": "/configs/demo.yml",
@@ -37,6 +38,7 @@ def cfg(tmp_path):
     }
     yield config_loader.CONFIG
     config_loader.CONFIG = prev
+    helao_logging.LOGGER = prev_logger
 
 
 def test_helaovis_builds(cfg):
@@ -52,6 +54,7 @@ def test_helaovis_builds(cfg):
 
 def test_vis_raises_without_root(tmp_path):
     prev = config_loader.CONFIG
+    prev_logger = helao_logging.LOGGER
     config_loader.CONFIG = {
         "loaded_config_path": "/configs/noroot.yml",
         "servers": {"VIS": {"host": "h", "port": 1, "params": {}}},
@@ -61,6 +64,7 @@ def test_vis_raises_without_root(tmp_path):
             HelaoVis(server_key="VIS", doc=FakeDoc())
     finally:
         config_loader.CONFIG = prev
+        helao_logging.LOGGER = prev_logger
 
 
 def test_makebokehapp_returns_doc_with_roots(cfg):
