@@ -36,7 +36,7 @@ from helao.framework.models.server import ActionServerModel, EndpointModel
 from helao.framework.domain import expansion
 from helao.framework.domain import orchestration as orch
 from helao.framework.domain.orchestration import OrchState
-from helao.framework.domain.run_models import RunAction, RunExperiment
+from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
 from helao.framework.domain.commands import (
     BroadcastGlobalStatus,
     DispatchAction,
@@ -287,6 +287,11 @@ def _as_run_experiment(exp: Any) -> RunExperiment:
     return RunExperiment(**exp.model_dump())
 
 
+def _as_run_sequence(d: dict) -> RunSequence:
+    """Build a RunSequence from a posted dict (filter to model fields)."""
+    return RunSequence(**{k: v for k, v in d.items() if k in RunSequence.model_fields})
+
+
 # --------------------------------------------------------------------------- #
 # the async driver
 # --------------------------------------------------------------------------- #
@@ -527,5 +532,67 @@ def makeOrchApp(
     @app.get(f"/{server_key}/globstat")
     async def globstat() -> dict:
         return driver.state.globalstatusmodel.as_json()
+
+    # --- operator-facing private endpoints (ROOT path, matching ----------
+    # --- async_private_dispatcher: http://host:port/{action}) ------------
+
+    @app.post("/get_histories")
+    async def get_histories() -> dict:
+        return orch.histories_payload(driver.state)
+
+    @app.post("/get_status_summary")
+    async def get_status_summary() -> dict:
+        return orch.status_summary_payload(driver.state)
+
+    @app.post("/get_step_flags")
+    async def get_step_flags() -> dict:
+        return orch.step_flags_payload(driver.state)
+
+    @app.post("/set_step_flag")
+    async def set_step_flag(kind: str, value: bool) -> dict:
+        return orch.set_step_flag(driver.state, kind, value)
+
+    @app.post("/get_orch_state")
+    async def get_orch_state() -> dict:
+        payload = orch.orch_state_payload(driver.state)
+        payload["active_sequence"] = orch.get_active_sequence(driver.state)
+        payload["active_experiment"] = orch.get_active_experiment(driver.state)
+        return payload
+
+    @app.post("/list_sequences")
+    async def list_sequences(limit: int = 10) -> list:
+        return [s.as_dict() for s in orch.list_sequences(driver.state, limit)]
+
+    @app.post("/list_experiments")
+    async def list_experiments(limit: int = 10) -> list:
+        return [e.as_dict() for e in orch.list_experiments(driver.state, limit)]
+
+    @app.post("/list_actions")
+    async def list_actions(limit: int = 10) -> list:
+        return [a.as_dict() for a in orch.list_actions(driver.state, limit)]
+
+    @app.post("/get_queue_object")
+    async def get_queue_object(kind: str, idx: int) -> dict:
+        return orch.queue_object_payload(driver.state, kind, idx)
+
+    @app.post("/get_active_sequence")
+    async def get_active_sequence() -> dict:
+        return orch.get_active_sequence(driver.state)
+
+    @app.post("/get_active_experiment")
+    async def get_active_experiment() -> dict:
+        return orch.get_active_experiment(driver.state)
+
+    @app.post("/latest_sequence_uuids")
+    async def latest_sequence_uuids() -> list:
+        return [str(u) for u in orch.latest_sequence_uuids(driver.state)]
+
+    @app.post("/latest_experiment_uuids")
+    async def latest_experiment_uuids() -> list:
+        return [str(u) for u in orch.latest_experiment_uuids(driver.state)]
+
+    @app.post("/latest_action_uuids")
+    async def latest_action_uuids() -> list:
+        return [str(u) for u in orch.latest_action_uuids(driver.state)]
 
     return app
