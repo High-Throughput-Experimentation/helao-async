@@ -70,3 +70,36 @@ def test_ws_status_clean_disconnect(tmp_path):
             pass  # immediate close
     # reaching here without exception = clean teardown
     assert True
+
+
+def test_remote_backend_ws_loop_fires_on_change():
+    """RemoteBackend._ws_loop calls on_change() when a ws message arrives."""
+    import asyncio as _asyncio
+    from helao.framework.adapters.operator_backend import RemoteBackend
+
+    calls = []
+
+    class _FakeWss:
+        def __init__(self):
+            self._sent = False
+
+        async def read_messages(self):
+            if not self._sent:
+                self._sent = True
+                return [{"loop_state": "started"}]
+            return []
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be._wss = _FakeWss()
+
+    async def _drive():
+        task = _asyncio.create_task(be._ws_loop(lambda: calls.append(1)))
+        await _asyncio.sleep(0.1)
+        task.cancel()
+        try:
+            await task
+        except _asyncio.CancelledError:
+            pass
+
+    _asyncio.run(_drive())
+    assert calls, "on_change was not fired on a ws message"
