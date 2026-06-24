@@ -80,6 +80,17 @@ __all__ = [
     "latest_sequence_uuids",
     "latest_experiment_uuids",
     "latest_action_uuids",
+    # mutation ops (Task 3)
+    "move_sequence",
+    "remove_sequence",
+    "prepend_sequences",
+    "append_sequence",
+    "insert_sequence",
+    "append_experiment",
+    "insert_experiment",
+    "clear_sequences",
+    "clear_experiments",
+    "clear_actions",
 ]
 
 from dataclasses import dataclass, field
@@ -403,6 +414,83 @@ def latest_experiment_uuids(state: OrchState) -> list:
 
 def latest_action_uuids(state: OrchState) -> list:
     return list(state.action_history.keys())
+
+
+# --- mutation ops (Task 3: queue-mutation functions) ----------------------------
+
+
+def move_sequence(state: OrchState, from_idx: int, to_idx: int) -> OrchState:
+    """Move the queued sequence at from_idx to to_idx; out-of-range is a no-op. Ports Orch.move_sequence."""
+    dq = state.sequence_dq
+    n = len(dq)
+    if 0 <= from_idx < n and 0 <= to_idx < n:
+        seq = dq.pop(from_idx)
+        dq.insert(to_idx, seq)
+    return state
+
+
+def remove_sequence(state: OrchState, idx: int) -> OrchState:
+    """Drop the queued sequence at idx; out-of-range no-op. Ports Orch.remove_sequence."""
+    if 0 <= idx < len(state.sequence_dq):
+        del state.sequence_dq[idx]
+    return state
+
+
+def prepend_sequences(state: OrchState, sequences: list) -> list:
+    """Insert sequences at the front preserving order; return their sequence_uuids.
+
+    Pure insert only — run_id/codehash stamping is the app layer's job (SP-ORCH-2).
+    Empty list is a no-op returning []. Ports the queue half of Orch.prepend_sequences.
+    """
+    if not sequences:
+        return []
+    uuids = []
+    for i, sequence in enumerate(sequences):
+        state.sequence_dq.insert(i, sequence)
+        uuids.append(sequence.sequence_uuid)
+    return uuids
+
+
+def append_sequence(state: OrchState, sequence) -> OrchState:
+    """Append a sequence to the back of the queue."""
+    state.sequence_dq.append(sequence)
+    return state
+
+
+def insert_sequence(state: OrchState, sequence, idx: int) -> OrchState:
+    """Insert a sequence at idx."""
+    state.sequence_dq.insert(idx, sequence)
+    return state
+
+
+def append_experiment(state: OrchState, experiment) -> OrchState:
+    """Append an experiment to the back of the queue."""
+    state.experiment_dq.append(experiment)
+    return state
+
+
+def insert_experiment(state: OrchState, experiment, idx: int) -> OrchState:
+    """Insert an experiment at idx."""
+    state.experiment_dq.insert(idx, experiment)
+    return state
+
+
+def clear_sequences(state: OrchState) -> OrchState:
+    """Empty the sequence queue. Ports Orch.clear_sequences."""
+    state.sequence_dq.clear()
+    return state
+
+
+def clear_experiments(state: OrchState) -> OrchState:
+    """Empty the experiment queue. Ports Orch.clear_experiments."""
+    state.experiment_dq.clear()
+    return state
+
+
+def clear_actions(state: OrchState) -> OrchState:
+    """Empty the action queue. Ports Orch.clear_actions."""
+    state.action_dq.clear()
+    return state
 
 
 # --- decide_next ---------------------------------------------------------------
