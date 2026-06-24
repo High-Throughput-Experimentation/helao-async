@@ -26,7 +26,7 @@ Purity: this module imports only from ``helao.framework.models`` and
 ``helao.framework.support`` (``time_utils`` for the legacy-compat identity init).
 """
 
-__all__ = ["RunSequence", "RunExperiment", "RunAction"]
+__all__ = ["RunSequence", "RunExperiment", "RunAction", "Action", "Experiment", "Sequence"]
 
 from datetime import datetime
 from pathlib import Path
@@ -255,3 +255,9 @@ class RunAction(ActionModel):
             self.action_status = [HloStatus.active]
         if force or self.action_output_dir is None:
             self.action_output_dir = self.get_action_dir()
+
+
+# --- legacy-name aliases for HTE symbol reconciliation ---
+Action = RunAction
+Experiment = RunExperiment
+Sequence = RunSequence
