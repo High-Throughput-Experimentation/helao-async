@@ -261,7 +261,7 @@ def pingable_servers(servers_cfg: dict) -> list:
             continue
         if not isinstance(cfg, dict):
             continue
-        if (cfg.get("params") or {}).get("ignore_heartbeats"):
+        if "ignore_heartbeats" in (cfg.get("params") or {}):
             continue
         if "bokeh" in cfg or "demovis" in cfg:
             continue

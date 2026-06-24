@@ -11,6 +11,8 @@ def test_pingable_servers_skip_rules():
         "VIS": {"host": "h", "port": 5, "bokeh": "x"},        # skip bokeh UI
         "LIVE": {"host": "h", "port": 6, "demovis": "y"},     # skip demovis UI
         "QUIET": {"host": "h", "port": 7, "params": {"ignore_heartbeats": True}},
+        # legacy parity: skip on KEY PRESENCE regardless of value (even falsy)
+        "QUIET2": {"host": "h", "port": 8, "params": {"ignore_heartbeats": False}},
     }
     out = orch.pingable_servers(cfg)
     assert sorted(out) == [("MOTOR", "h1", 1), ("PSTAT", "h2", 2)]
