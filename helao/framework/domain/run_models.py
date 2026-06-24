@@ -54,6 +54,10 @@ class RunSequence(SequenceModel):
 
     dispatched_experiments: List[ExperimentModel] = Field(default_factory=list)
 
+    def get_seq(self) -> "SequenceModel":
+        """Return a plain :class:`SequenceModel` snapshot. Mirrors ``RunAction.get_act``."""
+        return SequenceModel(**self.model_dump())
+
 
 class RunExperiment(ExperimentModel):
     """Runtime experiment object held by the orchestrator.
@@ -67,6 +71,10 @@ class RunExperiment(ExperimentModel):
     """
 
     dispatched_actions: List[ActionModel] = Field(default_factory=list)
+
+    def get_exp(self) -> "ExperimentModel":
+        """Return a plain :class:`ExperimentModel` snapshot. Mirrors ``RunAction.get_act``."""
+        return ExperimentModel(**self.model_dump())
 
 
 class RunAction(ActionModel):
