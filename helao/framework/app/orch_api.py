@@ -586,17 +586,50 @@ def makeOrchApp(
     """
     from fastapi import FastAPI
 
+    from helao.core.rpc import RPCDispatcher, derive_rpc_port
+
     driver = OrchDriver(server_key, ports=ports, state=state)
     app = FastAPI(title=f"{server_key} (framework orchestrator SP5)")
     app.state.driver = driver
+    # Co-located ZMQ-RPC dispatcher mirroring the legacy HelaoFastAPI: POST routes
+    # are registered as RPC methods at startup so async_private_dispatcher's fast
+    # path resolves instead of paying its ~3s RPC-probe timeout per call (the
+    # framework orch is a plain FastAPI, so without this every operator/client
+    # private dispatch would fall through to the slow HTTP path).
+    app.state.rpc_dispatcher = RPCDispatcher(server_key=server_key)
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
         driver.start_heartbeat()
 
+    @app.on_event("startup")
+    async def _start_rpc() -> None:
+        # Walk POST routes (defined below) and mirror them into the dispatcher,
+        # then bind the ROUTER socket on the derived RPC port. Guarded: without a
+        # config slice (in-process runners / unit tests) we skip the bind.
+        from fastapi.routing import APIRoute
+
+        from helao.framework.support import config_loader
+
+        cfg = config_loader.CONFIG or {}
+        server_cfg = (cfg.get("servers") or {}).get(server_key)
+        if not server_cfg or server_cfg.get("port") is None:
+            return
+        for route in app.routes:
+            if isinstance(route, APIRoute) and "POST" in route.methods:
+                app.state.rpc_dispatcher.register(route.path, route.endpoint)
+        await app.state.rpc_dispatcher.serve(
+            host=server_cfg.get("host", "127.0.0.1"),
+            port=derive_rpc_port(server_cfg["port"]),
+        )
+
     @app.on_event("shutdown")
     async def _stop_heartbeat() -> None:
         driver.stop_heartbeat()
+
+    @app.on_event("shutdown")
+    async def _stop_rpc() -> None:
+        await app.state.rpc_dispatcher.close()
 
     @app.post(f"/{server_key}/start")
     async def start() -> dict:
