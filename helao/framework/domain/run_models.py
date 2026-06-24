@@ -22,7 +22,8 @@ provenance explicit:
 Behaviour (init / output-dir / split) is NOT a method here; it lives as pure
 functions in :mod:`helao.framework.domain.lifecycle`.
 
-Purity: this module imports only from ``helao.framework.models``.
+Purity: this module imports only from ``helao.framework.models`` and
+``helao.framework.support`` (``time_utils`` for the legacy-compat identity init).
 """
 
 __all__ = ["RunSequence", "RunExperiment", "RunAction"]
@@ -38,6 +39,7 @@ from helao.framework.models.action import ActionModel, ShortActionModel
 from helao.framework.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.framework.models.sequence import SequenceModel
 from helao.framework.models.hlostatus import HloStatus
+from helao.framework.support.time_utils import set_time, gen_uuid
 
 
 class RunSequence(SequenceModel):
@@ -153,3 +155,95 @@ class RunAction(ActionModel):
     # --- shared run-level global-param snapshots ---
     initial_global_params: dict = Field(default_factory=dict)
     finished_global_params: dict = Field(default_factory=dict)
+
+    # --- legacy-compat identity init (strangler-fig: the live legacy
+    # orchestrator drives a framework RunAction through these). Ports
+    # helao.helpers.premodels.Action.{init_act,get_act,get_action_dir} and the
+    # Sequence/Experiment.{init_seq,init_exp,get_*_dir} it delegates to. ---
+
+    def get_act(self) -> ActionModel:
+        """Return a plain :class:`ActionModel` snapshot. Ports ``Action.get_act``."""
+        return ActionModel(**self.model_dump())
+
+    def get_sequence_dir(self) -> str:
+        """``YY.WW/MMDD/HHMMSS__name__label`` (forward slashes). Ports ``Sequence.get_sequence_dir``."""
+        HMS = self.sequence_timestamp.strftime("%H%M%S")
+        year_week = self.sequence_timestamp.strftime("%y.%U")
+        sequence_day = self.sequence_timestamp.strftime("%m%d")
+        return "/".join(
+            [
+                year_week,
+                sequence_day,
+                f"{HMS}__{self.sequence_name}__{self.sequence_label}",
+            ]
+        )
+
+    def init_seq(self, time_offset: float = 0, force: Optional[bool] = False) -> None:
+        """Fill sequence timestamp/uuid/status/dir if unset. Ports ``Sequence.init_seq``."""
+        if force is None:
+            force = False
+        if force or self.sequence_timestamp is None:
+            self.sequence_timestamp = set_time(offset=time_offset)
+        if force or self.sequence_uuid is None:
+            self.sequence_uuid = gen_uuid()
+        if force or not self.sequence_status:
+            self.sequence_status = [HloStatus.active]
+        if force or self.sequence_output_dir is None:
+            self.sequence_output_dir = self.get_sequence_dir()
+
+    def get_experiment_dir(self) -> str:
+        """``sequence_dir/YYMMDD.HHMMSS__experiment_name``. Ports ``Experiment.get_experiment_dir``."""
+        experiment_time = self.experiment_timestamp.strftime("%y%m%d.%H%M%S")
+        return "/".join(
+            [str(self.sequence_output_dir), f"{experiment_time}__{self.experiment_name}"]
+        )
+
+    def init_exp(self, time_offset: float = 0, force: Optional[bool] = False) -> None:
+        """Fill experiment timestamp/uuid/status/dir if unset. Ports ``Experiment.init_exp``."""
+        if force is None:
+            force = False
+        if force or self.experiment_timestamp is None:
+            self.experiment_timestamp = set_time(offset=time_offset)
+        if force or self.experiment_uuid is None:
+            self.experiment_uuid = gen_uuid()
+        if force or not self.experiment_status:
+            self.experiment_status = [HloStatus.active]
+        if force or self.experiment_output_dir is None:
+            self.experiment_output_dir = self.get_experiment_dir()
+
+    def get_action_dir(self) -> str:
+        """``experiment_dir/{order}__{split}__{server}__{name}``. Ports ``Action.get_action_dir``."""
+        return "/".join(
+            [
+                str(self.experiment_output_dir),
+                f"{self.orch_submit_order}__"
+                f"{self.action_split}__"
+                f"{self.action_server.server_name}__{self.action_name}",
+            ]
+        )
+
+    def init_act(self, time_offset: float = 0, force: Optional[bool] = False) -> None:
+        """Initialise action identity, promoting to a manual run if unparented.
+
+        Ports ``Action.init_act``: with no parent sequence/experiment timestamps
+        the action is flagged manual and synthetic seq/exp identities are
+        generated; then action timestamp/uuid/status/output_dir are filled.
+        """
+        if self.sequence_timestamp is None or self.experiment_timestamp is None:
+            self.manual_action = True
+            self.access = "manual"
+            manual_suffix = self.action_name
+            self.sequence_name = f"seq--{manual_suffix}"
+            self.sequence_label = "manual"
+            self.init_seq(time_offset=time_offset)
+            self.experiment_name = f"exp--{manual_suffix}"
+            self.init_exp(time_offset=time_offset)
+
+        if force or self.action_timestamp is None:
+            self.action_timestamp = set_time(offset=time_offset)
+        if force or self.action_uuid is None:
+            self.action_uuid = gen_uuid()
+        if force or not self.action_status:
+            self.action_status = [HloStatus.active]
+        if force or self.action_output_dir is None:
+            self.action_output_dir = self.get_action_dir()
