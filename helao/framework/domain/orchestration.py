@@ -62,6 +62,9 @@ __all__ = [
     "register_obj_uuid",
     "register_action_uuid",
     "track_action_uuid",
+    # heartbeat helpers (Task 1)
+    "pingable_servers",
+    "parse_status_response",
     # read-side ops (Task 2)
     "histories_payload",
     "status_summary_payload",
@@ -241,6 +244,53 @@ def _broadcast(state: OrchState) -> BroadcastGlobalStatus:
     issued so subscribers see the new state.
     """
     return BroadcastGlobalStatus(payload=state.globalstatusmodel.as_json())
+
+
+# --- heartbeat helpers (Task 1) ------------------------------------------------
+
+
+def pingable_servers(servers_cfg: dict) -> list:
+    """Return (server_key, host, port) for each pingable action server.
+
+    Mirrors the legacy ping_action_servers filter: skip DB/ANA, skip entries with
+    ``params.ignore_heartbeats``, and skip UI servers (a ``bokeh``/``demovis`` key).
+    """
+    out = []
+    for server_key, cfg in (servers_cfg or {}).items():
+        if server_key in ("DB", "ANA"):
+            continue
+        if not isinstance(cfg, dict):
+            continue
+        if (cfg.get("params") or {}).get("ignore_heartbeats"):
+            continue
+        if "bokeh" in cfg or "demovis" in cfg:
+            continue
+        host = cfg.get("host")
+        port = cfg.get("port")
+        if host is None or port is None:
+            continue
+        out.append((server_key, host, port))
+    return out
+
+
+def parse_status_response(response, error_ok: bool) -> tuple:
+    """Parse a get_status response into (status_str, driver_status).
+
+    ``("unreachable", "unknown")`` when ``error_ok`` is False or ``response`` is
+    None. Otherwise ``driver_status = response["_driver_status"]`` (default
+    ``"unknown"``) and ``status_str`` is ``"busy [<eps>]"`` for endpoints whose
+    ``active_dict`` is truthy, else ``"idle"``. Mirrors legacy ping parsing.
+    """
+    if not error_ok or response is None:
+        return ("unreachable", "unknown")
+    driver_status = response.get("_driver_status", "unknown")
+    busy = [
+        name
+        for name, ep in (response.get("endpoints") or {}).items()
+        if ep.get("active_dict")
+    ]
+    status_str = f"busy [{', '.join(busy)}]" if busy else "idle"
+    return (status_str, driver_status)
 
 
 # --- history maps (pure dict ops) ----------------------------------------------
