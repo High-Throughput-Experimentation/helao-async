@@ -12,11 +12,13 @@ servers:
     host: 127.0.0.1
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params: {}
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: 127.0.0.1
     port: 5001
     params:
@@ -32,6 +34,7 @@ servers:
     host: 127.0.0.1
     port: 5003
     group: visualizer
-    bokeh: sim_visualizer
+    bokeh: live_visualizer
+    deployment: framework
     params:
       doc_name: Websocket Live Visualizer

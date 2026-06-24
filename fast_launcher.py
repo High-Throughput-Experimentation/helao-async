@@ -44,6 +44,23 @@ from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
 
 
+def resolve_app_module_path(deployment: str, group: str, name: str) -> str:
+    """Resolve the app module import path. ``deployment == "framework"`` selects the
+    deployment-agnostic framework app under ``helao.framework.app.servers``; any
+    other value uses the per-deployment path (unchanged default)."""
+    if deployment == "framework":
+        return f"helao.framework.app.servers.{name}"
+    return f"helao.deploy.{deployment}.servers.{group}.{name}"
+
+
+def bridge_framework_config() -> None:
+    """Point the framework config global at the launcher-loaded legacy CONFIG so
+    framework apps (HelaoVis, orchestrator entry, operator backend autoload) see it."""
+    from helao.helpers import config_loader as _legacy
+    from helao.framework.support import config_loader as _fw
+    _fw.CONFIG = _legacy.CONFIG
+
+
 if __name__ == "__main__":
     log_root = "."
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -109,9 +126,9 @@ if __name__ == "__main__":
                 f"Could not find deployment for {server_config['fast']} in {server_config['group']}"
             )
     CONFIG["deployment"] = deployment
-
+    bridge_framework_config()
     makeApp = import_module(
-        f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['fast']}"
+        resolve_app_module_path(deployment, server_config["group"], server_config["fast"])
     ).makeApp
     app = makeApp(server_key)
     root = CONFIG.get("root", None)
