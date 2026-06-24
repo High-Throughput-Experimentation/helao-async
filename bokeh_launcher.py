@@ -49,6 +49,23 @@ from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
 
 
+def resolve_app_module_path(deployment: str, group: str, name: str) -> str:
+    """Resolve the app module import path. ``deployment == "framework"`` selects the
+    deployment-agnostic framework app under ``helao.framework.app.servers``; any
+    other value uses the per-deployment path (unchanged default)."""
+    if deployment == "framework":
+        return f"helao.framework.app.servers.{name}"
+    return f"helao.deploy.{deployment}.servers.{group}.{name}"
+
+
+def bridge_framework_config() -> None:
+    """Point the framework config global at the launcher-loaded legacy CONFIG so
+    framework apps (HelaoVis, orchestrator entry, operator backend autoload) see it."""
+    from helao.helpers import config_loader as _legacy
+    from helao.framework.support import config_loader as _fw
+    _fw.CONFIG = _legacy.CONFIG
+
+
 if __name__ == "__main__":
     log_root = "."
     colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
@@ -125,10 +142,15 @@ if __name__ == "__main__":
             )
     # CONFIG["deployment"] tracks the config's own deployment so generic
     # visualizers resolve per-server vis modules starting from the right place.
-    CONFIG["deployment"] = server_config.get("deployment", detected_deployment)
-
+    # For framework apps, keep the detected deployment so per-instrument vis
+    # modules resolve from the real deployment.
+    if app_deployment == "framework":
+        CONFIG["deployment"] = detected_deployment
+    else:
+        CONFIG["deployment"] = server_config.get("deployment", detected_deployment)
+    bridge_framework_config()
     makeApp = import_module(
-        f"helao.deploy.{app_deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
+        resolve_app_module_path(app_deployment, server_config["group"], server_config["bokeh"])
     ).makeBokehApp
     root = CONFIG.get("root", None)
     if root is not None:
