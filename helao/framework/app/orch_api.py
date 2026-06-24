@@ -52,7 +52,7 @@ from helao.framework.domain.commands import (
 )
 
 from helao.framework.ports.clock import Clock
-from helao.framework.ports.eventsink import EventSink
+from helao.framework.ports.eventsink import EventSink, GLOBAL_STATUS_CHANNEL
 from helao.framework.ports.storage import Storage
 from helao.framework.ports.transport import DispatchTarget, Transport
 
@@ -478,6 +478,43 @@ class OrchDriver:
 
 
 # --------------------------------------------------------------------------- #
+# WebSocket relay (module-level so tests can import it directly)
+# --------------------------------------------------------------------------- #
+
+
+async def _orch_ws_relay(websocket, eventsink, channel: str) -> None:
+    """Accept a websocket and forward eventsink items on ``channel`` as JSON.
+
+    Subscribes a fresh per-client queue from the (multisubscriber) eventsink and
+    forwards the payload of every ``(channel, payload)`` tuple whose channel
+    matches. Mirrors ``BaseAPI._ws_relay`` (SP8); JSON wire format. Ends cleanly
+    on client disconnect or any send/recv error.
+    """
+    from starlette.websockets import WebSocketDisconnect
+
+    await websocket.accept()
+    subscribe = getattr(eventsink, "subscribe", None)
+    if not callable(subscribe):
+        await websocket.close()
+        return
+    queue = subscribe()
+    try:
+        while True:
+            item = await queue.get()
+            if isinstance(item, tuple) and len(item) == 2:
+                item_channel, payload = item
+            else:
+                item_channel, payload = channel, item
+            if item_channel != channel:
+                continue
+            await websocket.send_json(payload)
+    except WebSocketDisconnect:
+        return
+    except Exception:
+        return
+
+
+# --------------------------------------------------------------------------- #
 # FastAPI assembly (thin wrappers over the driver control surface)
 # --------------------------------------------------------------------------- #
 
@@ -689,5 +726,20 @@ def makeOrchApp(
     async def clear_estop_root() -> dict:
         await driver.clear_estop()
         return {"loop_state": driver.state.loop_state.value}
+
+    # --- WebSocket status relay (operator RemoteBackend.subscribe) ---------
+
+    from fastapi import WebSocket as _WebSocket  # noqa: F401
+    # Publish WebSocket into this module's globals so FastAPI can resolve the
+    # ``websocket: WebSocket`` annotation on the route handler at decoration
+    # time. FastAPI uses the handler's __globals__ (this module's dict) to
+    # evaluate the annotation string; a function-local import is not visible
+    # there. Mirrors the same pattern in base_api.py (line ~994).
+    import sys as _sys
+    _sys.modules[__name__].__dict__.setdefault("WebSocket", _WebSocket)
+
+    @app.websocket("/ws_status")
+    async def ws_status(websocket: "WebSocket") -> None:
+        await _orch_ws_relay(websocket, ports.eventsink, GLOBAL_STATUS_CHANNEL)
 
     return app
