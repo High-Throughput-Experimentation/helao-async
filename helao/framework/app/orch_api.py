@@ -36,7 +36,7 @@ from helao.framework.models.server import ActionServerModel, EndpointModel
 from helao.framework.domain import expansion
 from helao.framework.domain import orchestration as orch
 from helao.framework.domain.orchestration import OrchState
-from helao.framework.domain.run_models import RunAction, RunExperiment
+from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
 from helao.framework.domain.commands import (
     BroadcastGlobalStatus,
     DispatchAction,
@@ -287,6 +287,11 @@ def _as_run_experiment(exp: Any) -> RunExperiment:
     return RunExperiment(**exp.model_dump())
 
 
+def _as_run_sequence(d: dict) -> RunSequence:
+    """Build a RunSequence from a posted dict (filter to model fields)."""
+    return RunSequence(**{k: v for k, v in d.items() if k in RunSequence.model_fields})
+
+
 # --------------------------------------------------------------------------- #
 # the async driver
 # --------------------------------------------------------------------------- #
@@ -527,5 +532,162 @@ def makeOrchApp(
     @app.get(f"/{server_key}/globstat")
     async def globstat() -> dict:
         return driver.state.globalstatusmodel.as_json()
+
+    # --- operator-facing private endpoints (ROOT path, matching ----------
+    # --- async_private_dispatcher: http://host:port/{action}) ------------
+
+    @app.post("/get_histories")
+    async def get_histories() -> dict:
+        return orch.histories_payload(driver.state)
+
+    @app.post("/get_status_summary")
+    async def get_status_summary() -> dict:
+        return orch.status_summary_payload(driver.state)
+
+    @app.post("/get_step_flags")
+    async def get_step_flags() -> dict:
+        return orch.step_flags_payload(driver.state)
+
+    @app.post("/set_step_flag")
+    async def set_step_flag(kind: str, value: bool) -> dict:
+        return orch.set_step_flag(driver.state, kind, value)
+
+    @app.post("/get_orch_state")
+    async def get_orch_state() -> dict:
+        payload = orch.orch_state_payload(driver.state)
+        payload["active_sequence"] = orch.get_active_sequence(driver.state)
+        payload["active_experiment"] = orch.get_active_experiment(driver.state)
+        return payload
+
+    @app.post("/list_sequences")
+    async def list_sequences(limit: int = 10) -> list:
+        return [s.as_dict() for s in orch.list_sequences(driver.state, limit)]
+
+    @app.post("/list_experiments")
+    async def list_experiments(limit: int = 10) -> list:
+        return [e.as_dict() for e in orch.list_experiments(driver.state, limit)]
+
+    @app.post("/list_actions")
+    async def list_actions(limit: int = 10) -> list:
+        return [a.as_dict() for a in orch.list_actions(driver.state, limit)]
+
+    @app.post("/get_queue_object")
+    async def get_queue_object(kind: str, idx: int) -> dict:
+        return orch.queue_object_payload(driver.state, kind, idx)
+
+    @app.post("/get_active_sequence")
+    async def get_active_sequence() -> dict:
+        return orch.get_active_sequence(driver.state)
+
+    @app.post("/get_active_experiment")
+    async def get_active_experiment() -> dict:
+        return orch.get_active_experiment(driver.state)
+
+    @app.post("/latest_sequence_uuids")
+    async def latest_sequence_uuids() -> list:
+        return [str(u) for u in orch.latest_sequence_uuids(driver.state)]
+
+    @app.post("/latest_experiment_uuids")
+    async def latest_experiment_uuids() -> list:
+        return [str(u) for u in orch.latest_experiment_uuids(driver.state)]
+
+    @app.post("/latest_action_uuids")
+    async def latest_action_uuids() -> list:
+        return [str(u) for u in orch.latest_action_uuids(driver.state)]
+
+    # --- mutation endpoints (ROOT path) ------------------------------------
+
+    from fastapi import Body
+
+    @app.post("/append_sequence")
+    async def append_sequence(sequence: dict = Body(..., embed=True)) -> dict:
+        seq = _as_run_sequence(sequence)
+        orch.append_sequence(driver.state, seq)
+        return {"sequence_uuid": str(seq.sequence_uuid)}
+
+    @app.post("/insert_sequence")
+    async def insert_sequence(idx: int, sequence: dict = Body(..., embed=True)) -> dict:
+        seq = _as_run_sequence(sequence)
+        orch.insert_sequence(driver.state, seq, idx)
+        return {"sequence_uuid": str(seq.sequence_uuid)}
+
+    @app.post("/prepend_sequences")
+    async def prepend_sequences(sequences: list = Body(..., embed=True)) -> list:
+        seqs = [_as_run_sequence(d) for d in sequences]
+        uuids = orch.prepend_sequences(driver.state, seqs)
+        return [str(u) for u in uuids]
+
+    @app.post("/move_sequence")
+    async def move_sequence(from_idx: int, to_idx: int) -> dict:
+        orch.move_sequence(driver.state, from_idx, to_idx)
+        return {"n_sequences": len(driver.state.sequence_dq)}
+
+    @app.post("/remove_sequence")
+    async def remove_sequence(idx: int) -> dict:
+        orch.remove_sequence(driver.state, idx)
+        return {"n_sequences": len(driver.state.sequence_dq)}
+
+    @app.post("/append_split_sequences")
+    async def add_split_sequences(sequence: dict = Body(..., embed=True)) -> list:
+        # split-by-seq-param config is not present in OrchPorts; fall back to a
+        # plain append (faithful to the legacy no-split branch). Real splitting
+        # is a documented follow-up.
+        seq = _as_run_sequence(sequence)
+        orch.append_sequence(driver.state, seq)
+        return [str(seq.sequence_uuid)]
+
+    @app.post("/append_experiment")
+    async def append_experiment(experiment: dict = Body(..., embed=True)) -> dict:
+        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        orch.append_experiment(driver.state, exp)
+        return {"experiment_uuid": str(exp.experiment_uuid)}
+
+    @app.post("/insert_experiment")
+    async def insert_experiment(idx: int, experiment: dict = Body(..., embed=True)) -> dict:
+        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        orch.insert_experiment(driver.state, exp, idx)
+        return {"experiment_uuid": str(exp.experiment_uuid)}
+
+    @app.post("/clear_sequences")
+    async def clear_sequences() -> dict:
+        orch.clear_sequences(driver.state)
+        return {"n_sequences": 0}
+
+    @app.post("/clear_experiments")
+    async def clear_experiments() -> dict:
+        orch.clear_experiments(driver.state)
+        return {"n_experiments": 0}
+
+    @app.post("/clear_actions")
+    async def clear_actions() -> dict:
+        orch.clear_actions(driver.state)
+        return {"n_actions": 0}
+
+    # --- control aliases at root (share the driver control surface) ------
+
+    @app.post("/start")
+    async def start_root() -> dict:
+        await driver.start()
+        return {"loop_state": driver.state.loop_state.value}
+
+    @app.post("/stop")
+    async def stop_root() -> dict:
+        await driver.stop()
+        return {"loop_intent": driver.state.loop_intent.value}
+
+    @app.post("/skip_experiment")
+    async def skip_root() -> dict:
+        await driver.skip()
+        return {"loop_intent": driver.state.loop_intent.value}
+
+    @app.post("/estop_orch")
+    async def estop_root(reason: str = "") -> dict:
+        await driver.estop(reason=reason)
+        return {"loop_state": driver.state.loop_state.value}
+
+    @app.post("/clear_estop")
+    async def clear_estop_root() -> dict:
+        await driver.clear_estop()
+        return {"loop_state": driver.state.loop_state.value}
 
     return app
