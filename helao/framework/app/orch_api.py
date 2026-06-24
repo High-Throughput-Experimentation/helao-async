@@ -595,4 +595,99 @@ def makeOrchApp(
     async def latest_action_uuids() -> list:
         return [str(u) for u in orch.latest_action_uuids(driver.state)]
 
+    # --- mutation endpoints (ROOT path) ------------------------------------
+
+    from fastapi import Body
+
+    @app.post("/append_sequence")
+    async def append_sequence(sequence: dict = Body(..., embed=True)) -> dict:
+        seq = _as_run_sequence(sequence)
+        orch.append_sequence(driver.state, seq)
+        return {"sequence_uuid": str(seq.sequence_uuid)}
+
+    @app.post("/insert_sequence")
+    async def insert_sequence(idx: int, sequence: dict = Body(..., embed=True)) -> dict:
+        seq = _as_run_sequence(sequence)
+        orch.insert_sequence(driver.state, seq, idx)
+        return {"sequence_uuid": str(seq.sequence_uuid)}
+
+    @app.post("/prepend_sequences")
+    async def prepend_sequences(sequences: list = Body(..., embed=True)) -> list:
+        seqs = [_as_run_sequence(d) for d in sequences]
+        uuids = orch.prepend_sequences(driver.state, seqs)
+        return [str(u) for u in uuids]
+
+    @app.post("/move_sequence")
+    async def move_sequence(from_idx: int, to_idx: int) -> dict:
+        orch.move_sequence(driver.state, from_idx, to_idx)
+        return {"n_sequences": len(driver.state.sequence_dq)}
+
+    @app.post("/remove_sequence")
+    async def remove_sequence(idx: int) -> dict:
+        orch.remove_sequence(driver.state, idx)
+        return {"n_sequences": len(driver.state.sequence_dq)}
+
+    @app.post("/add_split_sequences")
+    async def add_split_sequences(sequence: dict = Body(..., embed=True)) -> list:
+        # split-by-seq-param config is not present in OrchPorts; fall back to a
+        # plain append (faithful to the legacy no-split branch). Real splitting
+        # is a documented follow-up.
+        seq = _as_run_sequence(sequence)
+        orch.append_sequence(driver.state, seq)
+        return [str(seq.sequence_uuid)]
+
+    @app.post("/append_experiment")
+    async def append_experiment(experiment: dict = Body(..., embed=True)) -> dict:
+        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        orch.append_experiment(driver.state, exp)
+        return {"experiment_uuid": str(exp.experiment_uuid)}
+
+    @app.post("/insert_experiment")
+    async def insert_experiment(idx: int, experiment: dict = Body(..., embed=True)) -> dict:
+        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        orch.insert_experiment(driver.state, exp, idx)
+        return {"experiment_uuid": str(exp.experiment_uuid)}
+
+    @app.post("/clear_sequences")
+    async def clear_sequences() -> dict:
+        orch.clear_sequences(driver.state)
+        return {"n_sequences": 0}
+
+    @app.post("/clear_experiments")
+    async def clear_experiments() -> dict:
+        orch.clear_experiments(driver.state)
+        return {"n_experiments": 0}
+
+    @app.post("/clear_actions")
+    async def clear_actions() -> dict:
+        orch.clear_actions(driver.state)
+        return {"n_actions": 0}
+
+    # --- control aliases at root (share the driver control surface) ------
+
+    @app.post("/start")
+    async def start_root() -> dict:
+        await driver.start()
+        return {"loop_state": driver.state.loop_state.value}
+
+    @app.post("/stop")
+    async def stop_root() -> dict:
+        await driver.stop()
+        return {"loop_intent": driver.state.loop_intent.value}
+
+    @app.post("/skip")
+    async def skip_root() -> dict:
+        await driver.skip()
+        return {"loop_intent": driver.state.loop_intent.value}
+
+    @app.post("/estop")
+    async def estop_root(reason: str = "") -> dict:
+        await driver.estop(reason=reason)
+        return {"loop_state": driver.state.loop_state.value}
+
+    @app.post("/clear_estop")
+    async def clear_estop_root() -> dict:
+        await driver.clear_estop()
+        return {"loop_state": driver.state.loop_state.value}
+
     return app
