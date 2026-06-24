@@ -1,0 +1,1360 @@
+"""SQLite-backed sample database APIs for HELAO sample tracking.
+
+Provides per-sample-type APIs (liquid, gas, solid, assembly) sharing a common
+:class:`SampleModelAPI` base, a :class:`UnifiedSampleDataAPI` dispatcher that
+routes by ``sample_type``, a legacy CSV/JSON :class:`OldLiquidSampleAPI`
+adapter, and helpers for unpacking assemblies and updating volumes.
+"""
+
+__all__ = [
+    "LiquidSampleAPI",
+    "GasSampleAPI",
+    "AssemblySampleAPI",
+    "UnifiedSampleDataAPI",
+    "OldLiquidSampleAPI",
+    "unpack_samples_helper",
+    "update_vol",
+]
+
+import asyncio
+import json
+import os
+import sqlite3
+from socket import gethostname
+import pandas as pd
+from typing import List, Tuple, Union
+import aiofiles
+import shortuuid
+from uuid import UUID
+
+from helao.framework.support import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.helpers.plate_api import HTEPlateAPI  # gap: plate_api not yet in framework
+from helao.framework.models.sample import (
+    AssemblySample,
+    LiquidSample,
+    GasSample,
+    SolidSample,
+    NoneSample,
+    object_to_sample,
+    SampleType,
+)
+from helao.framework.support.file_utils import file_in_use
+
+
+class SampleModelAPI:
+    """SQLite-backed CRUD API for a single Helao sample type.
+
+    Builds a per-host sqlite database file under the server's ``db_root`` with
+    a fixed common schema plus a per-subclass ``extra_columns`` string. JSON
+    columns are serialized on write and deserialized on read.
+
+    Attributes:
+        extra_columns: Subclass-specific column definitions appended to the
+            shared schema.
+        columns: Full schema column DDL string used to create the table.
+        column_names: List of column names in declaration order.
+        column_types: Mapping of column name to lowercased SQL type.
+        column_notNULL: Mapping of column name to NOT NULL flag.
+        column_count: Total number of columns.
+        ready: True once :meth:`init_db` has completed.
+    """
+
+    def __init__(self, sampleclass, Serv_class, extra_columns: str):
+        """Build the schema and resolve the sqlite db file path.
+
+        Args:
+            sampleclass: An instance of the sample pydantic model whose
+                ``sample_type`` selects the database/table name.
+            Serv_class: The owning ``Base`` server instance (used for paths,
+                machine/server names, NTP-corrected timestamps).
+            extra_columns: SQL fragment appended to the shared column list to
+                add subclass-specific columns.
+        """
+        self.extra_columns = extra_columns
+        self.columns = f"""hlo_version TEXT,
+              global_label TEXT NOT NULL,
+              sample_type VARCHAR(255) NOT NULL,
+              sample_no INTEGER NOT NULL,
+              sample_creation_timecode INTEGER NOT NULL,
+              sample_position VARCHAR(255),
+              machine_name VARCHAR(255) NOT NULL,
+              sample_hash VARCHAR(255),
+              last_update INTEGER NOT NULL,
+              inheritance TEXT,
+              status TEXT,
+              action_uuid TEXT,
+              sample_creation_experiment_uuid VARCHAR(255),
+              sample_creation_action_uuid VARCHAR(255),
+              server_name VARCHAR(255),
+              chemical TEXT,
+              partial_molarity TEXT,
+              supplier TEXT,
+              lot_number TEXT,
+              source TEXT,
+              prep_date TEXT,
+              comment TEXT,
+              {self.extra_columns}"""
+
+        self.column_names = self.columns.replace("\n", "").strip().split(",")
+        self.column_types = {}
+        self.column_notNULL = {}
+        for i, name in enumerate(self.column_names):
+            self.column_names[i] = name.strip().split(" ")[0]
+            self.column_types.update(
+                {self.column_names[i]: name.strip().split(" ")[1].lower()}
+            )
+            self.column_notNULL.update(
+                {self.column_names[i]: (len(name.strip().split(" ")) > 2)}
+            )
+        self.column_count = len(self.column_names)
+
+        self._sampleclass = sampleclass
+        self._sample_type = f"{sampleclass.sample_type.value}_sample"
+        self._dbfilename = gethostname().lower() + f"__{self._sample_type}.db"
+        self._base = Serv_class
+        self._dbfilepath = self._base.helaodirs.db_root
+        self._db = os.path.join(self._dbfilepath, self._dbfilename)
+        self._con = None
+        self._cur = None
+        # convert these to json when saving them to the db
+        self._jsonkeys = [
+            "chemical",
+            "partial_molarity",
+            "supplier",
+            "lot_number",
+            "source",
+            "status",
+            "action_uuid",
+        ]
+        self.ready = False
+
+    async def _open_db(self):
+        """Opens sqlite db file, retries if in use, and assigns connection & cursor."""
+        while file_in_use(self._db):
+            LOGGER.info("db already in use, waiting")
+            await asyncio.sleep(1)
+        self._con = sqlite3.connect(self._db)
+        self._cur = self._con.cursor()
+        LOGGER.info(f"opened db: {self._db}")
+
+    def _close_db(self):
+        """Commits changes to sqlite db and closes connection and cursor."""
+        if self._con is not None:
+            # commit any changes
+            self._con.commit()
+            self._con.close()
+            LOGGER.info(f"closed db: {self._db}")
+            self._con = None
+            self._cur = None
+
+    def _df_to_sample(self, df):
+        """Convert the last row of a query DataFrame to a sample model.
+
+        Args:
+            df: Result of a sqlite query; the last row is materialized.
+
+        Returns:
+            A sample model instance, or :class:`NoneSample` for empty input.
+
+        Raises:
+            ValueError: If ``idx`` does not match ``sample_no`` (integrity check).
+        """
+
+        if df.size == 0:
+            return NoneSample()
+        sampledict = dict(df.iloc[-1, :])
+
+        for key in self._jsonkeys:
+            sampledict.update({key: json.loads(sampledict[key])})
+
+        if sampledict["idx"] != sampledict["sample_no"]:  # integrity check
+            raise ValueError(
+                f"sampledict['idx'] != sampledict['sample_no']: {sampledict['idx']} != {sampledict['sample_no']}"
+            )
+
+        return object_to_sample(sampledict)
+
+    def _df_to_samples(self, df):
+        """Convert every row of a query DataFrame to a sample model list.
+
+        Args:
+            df: Result of a sqlite query.
+
+        Returns:
+            A list of sample model instances; a single :class:`NoneSample`
+            for empty input.
+
+        Raises:
+            ValueError: If any row's ``idx`` does not match its ``sample_no``.
+        """
+
+        if df.size == 0:
+            return [NoneSample()]
+        else:
+            sample_list = []
+            for i in range(df.shape[0]):
+                sampledict = dict(df.iloc[i, :])
+
+                for key in self._jsonkeys:
+                    sampledict.update({key: json.loads(sampledict[key])})
+
+                if sampledict["idx"] != sampledict["sample_no"]:  # integrity check
+                    raise ValueError(
+                        f"sampledict['idx'] != sampledict['sample_no']: {sampledict['idx']} != {sampledict['sample_no']}"
+                    )
+                sample_list.append(object_to_sample(sampledict))
+
+        return sample_list
+
+    def _create_init_db(self):
+        """Create the sample table with an autoincrementing ``idx`` PK."""
+        self._cur.execute(
+            f"""CREATE TABLE {self._sample_type}(
+              idx INTEGER PRIMARY KEY AUTOINCREMENT,
+              {self.columns}
+              );"""
+        )
+
+        LOGGER.info(f"{self._sample_type} table created")
+        # commit changes
+        self._con.commit()
+
+    async def _append_sample(
+        self,
+        sample: Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
+    ) -> Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]:
+        """Assign ``sample_no``, fill server metadata, and insert a new row.
+
+        Args:
+            sample: The sample to persist. Mutated to add missing fields
+                (``sample_no``, machine/server names, timestamps, label).
+
+        Returns:
+            The persisted sample as read back from the database.
+        """
+        await asyncio.sleep(0.01)
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+            self._cur.execute(f"select count(idx) from {self._sample_type};")
+            counts = self._cur.fetchone()[0]
+            sample.sample_no = counts + 1
+            if sample.machine_name is None:
+                sample.machine_name = self._base.server.machine_name
+            if sample.server_name is None:
+                sample.server_name = self._base.server.server_name
+            # if sample.action_timestamp is None:
+            #     atime = datetime.fromtimestamp(datetime.now().timestamp() + self._base.ntp_offset)
+            #     sample.action_timestamp = atime.strftime("%y%m%d.%H%M%S%f")
+            if sample.sample_creation_timecode is None:
+                sample.sample_creation_timecode = self._base.get_realtime_nowait()
+            if sample.last_update is None:
+                sample.last_update = self._base.get_realtime_nowait()
+            sample.global_label = sample.get_global_label()
+
+            dfdict = sample.as_dict()
+            for key in self._jsonkeys:
+                dfdict.update({key: [json.dumps(dfdict[key])]})
+
+            keys_to_deletes = []
+            for key, val in dfdict.items():
+                if isinstance(val, UUID):
+                    dfdict[key] = str(val)
+
+                if key not in self.column_names:
+                    LOGGER.warning(
+                        f"Invalid {self._sample_type} data key '{key}', skipping it."
+                    )
+                    keys_to_deletes.append(key)
+
+            for key in keys_to_deletes:
+                del dfdict[key]
+
+            df = pd.DataFrame(data=dfdict)
+            df.to_sql(
+                name=self._sample_type, con=self._con, if_exists="append", index=False
+            )
+
+            # now read back the sample and compare and return it
+            retdf = pd.read_sql_query(
+                f"""select * from {self._sample_type} ORDER BY idx DESC LIMIT 1;""",
+                con=self._con,
+            )
+            self._close_db()
+            retsample = self._df_to_sample(retdf)
+            return retsample
+
+    async def _key_checks(self, sample):
+        """Hook for subclasses to normalize required fields before write."""
+        return sample
+
+    async def new_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Insert new samples of this API's sample type into the database.
+
+        Samples whose runtime type does not match this API's sample class are
+        logged and skipped rather than raising.
+
+        Args:
+            samples: Candidate samples to persist.
+
+        Returns:
+            The successfully appended samples as read back from the database.
+        """
+        while not self.ready:
+            LOGGER.info("db not ready")
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
+        ret_samples = []
+
+        for i, sample in enumerate(samples):
+            if isinstance(sample, type(self._sampleclass)):
+                await asyncio.sleep(0.01)
+                sample = await self._key_checks(sample)
+                added_sample = await self._append_sample(sample=sample)
+                if added_sample.sample_type is not None:
+                    ret_samples.append(added_sample)
+                else:
+                    LOGGER.error(
+                        "crtitical error, new_sample got NoneSample back from dn"
+                    )
+            else:
+                LOGGER.info(
+                    f"wrong sample type {type(sample)}!={self._sample_type}, skipping it"
+                )
+                # ret_samples.append(NoneSample())
+
+        return ret_samples
+
+    async def init_db(self):
+        """Create the sample table if absent and mark the API ready."""
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+            # check if table exists
+            listOfTables = self._cur.execute(
+                f"""SELECT name FROM sqlite_master WHERE type='table'
+              AND name='{self._sample_type}';"""
+            ).fetchall()
+
+            if listOfTables == []:
+                LOGGER.error(f"{self._sample_type} table not found, creating it.")
+                self._create_init_db()
+            else:
+                LOGGER.info(f"{self._sample_type} table found!")
+            self._close_db()
+        LOGGER.info(f"'{self._sample_type}' db initialized")
+        self.ready = True
+        await self.count_samples()  # has also a separate lock
+
+    async def count_samples(self) -> int:
+        """Return the current row count in the sample table."""
+        while not self.ready:
+            LOGGER.info("db not ready")
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+            self._cur.execute(f"select count(idx) from {self._sample_type};")
+            counts = self._cur.fetchone()[0]
+            LOGGER.info(f"sqlite db {self._sample_type} count: {counts}")
+            self._close_db()
+            return counts
+
+    async def get_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Look up samples by ``sample_no`` and return populated models.
+
+        Negative ``sample_no`` values index from the most recent record; positive
+        values are absolute. Zero is unsupported. The caller is expected to pass
+        a homogeneous list of this API's sample type.
+
+        Args:
+            samples: Sparse sample stubs carrying at least ``sample_no``.
+
+        Returns:
+            Fully populated sample models for entries that exist in the db.
+        """
+        while not self.ready:
+            LOGGER.info("db not ready")
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
+        ret_samples = []
+
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+
+            for i, sample in enumerate(samples):
+                if sample.sample_no < 0:  # get sample from back
+                    self._cur.execute(f"select count(idx) from {self._sample_type};")
+                    counts = self._cur.fetchone()[0]
+                    if counts > abs(sample.sample_no):
+                        LOGGER.info(
+                            f"getting sample: {self._sample_type} {counts+sample.sample_no+1}"
+                        )
+                        await asyncio.sleep(0.01)
+                        retdf = pd.read_sql_query(
+                            f"""select * from {self._sample_type} where idx={counts+sample.sample_no+1};""",
+                            con=self._con,
+                        )
+                        retsample = self._df_to_sample(retdf)
+                        LOGGER.info(retsample)
+                        if sample.sample_type is not None:
+                            ret_samples.append(retsample)
+                        else:
+                            LOGGER.info(
+                                f"sample '{sample.sample_no}' does not exist yet"
+                            )
+                    else:
+                        LOGGER.info(f"sample '{sample.sample_no}' does not exist yet")
+                        # ret_samples.append(NoneSample())
+                elif sample.sample_no > 0:  # get sample from front
+                    LOGGER.info(
+                        f"getting sample: {self._sample_type} {sample.sample_no}"
+                    )
+                    await asyncio.sleep(0.01)
+                    retdf = pd.read_sql_query(
+                        f"""select * from {self._sample_type} where idx={sample.sample_no};""",
+                        con=self._con,
+                    )
+                    retsample = self._df_to_sample(retdf)
+                    if retsample.sample_type is not None:
+                        ret_samples.append(retsample)
+                    else:
+                        LOGGER.info(f"sample '{sample.sample_no}' does not exist yet")
+                else:
+                    LOGGER.info("zero sample_no is not supported")
+            self._close_db()
+        return ret_samples
+
+    async def list_new_samples(
+        self, limit: int = 10, give_only: bool = False
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Return the most recently created samples as dicts.
+
+        Args:
+            limit: Maximum number of rows to return, ordered by descending
+                ``sample_creation_timecode``.
+            give_only: If True, restrict to samples whose ``inheritance`` is
+                ``"give_only"``.
+
+        Returns:
+            List of sample dicts (only entries with a non-None sample type).
+        """
+        while not self.ready:
+            LOGGER.info("db not ready")
+            await asyncio.sleep(0.1)
+        await asyncio.sleep(0.01)
+        ret_samples = []
+        inherit = 'WHERE inheritance = "give_only"' if give_only else ""
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+            LOGGER.info(f"getting {limit} samples of type {self._sample_type}")
+            await asyncio.sleep(0.01)
+            retdf = pd.read_sql_query(
+                f"""
+                SELECT 
+                    *
+                FROM
+                    {self._sample_type}
+                {inherit}
+                ORDER BY
+                    sample_creation_timecode DESC
+                LIMIT
+                    {limit};
+                """,
+                con=self._con,
+            )
+            retdf.fillna("")
+            retsample_list = self._df_to_samples(retdf)
+            for retsample in retsample_list:
+                if retsample.sample_type is not None:
+                    ret_samples.append(retsample.as_dict())
+            self._close_db()
+            # print('\n\n', ret_samples, '\n\n')
+        return ret_samples
+
+    def _update(self, sample_dfdict):
+        """Issue UPDATE statements for each known column in ``sample_dfdict``.
+
+        Args:
+            sample_dfdict: Dict containing ``idx`` plus the columns to write.
+                Unknown keys are logged and skipped.
+        """
+        idx = sample_dfdict["idx"]
+        for key, val in sample_dfdict.items():
+            if key in self.column_types and key != "idx":
+                col_type = self.column_types[key]
+                if not (self.column_notNULL[key] and val is None):
+                    if col_type in ["integer", "real"]:
+                        if val is None:
+                            cmd = f"""UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};"""
+                        else:
+                            cmd = f"""UPDATE {self._sample_type} SET {key} = {val} WHERE idx = {idx};"""
+                        LOGGER.info(f"dbcommand: {cmd}")
+                        self._cur.execute(cmd)
+                    else:
+                        if val is not None:
+                            # val = val.replace('"', '""')
+                            # val = val.replace("'", "''")
+                            val = val.strip("'").strip('"')
+                            cmd = f"""UPDATE {self._sample_type} SET {key} = '{val}' WHERE idx = {idx};"""
+                        else:
+                            cmd = f"""UPDATE {self._sample_type} SET {key} = NULL WHERE idx = {idx};"""
+                        LOGGER.info(f"dbcommand: {cmd}")
+                        self._cur.execute(cmd)
+
+            else:
+                if key != "idx":
+                    LOGGER.error(f"unknown key '{key}' for updating sample")
+
+    async def update_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ):
+        """Update existing rows for the given samples after safety checks.
+
+        Each sample must have a positive ``sample_no``, a ``global_label``, and
+        must match the previously stored ``global_label`` and ``sample_type``;
+        rows failing any check are logged and skipped.
+
+        Args:
+            samples: Samples carrying the updated field values to persist.
+        """
+        while not self.ready:
+            LOGGER.info("db not ready")
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.01)
+
+        lock = asyncio.Lock()
+        async with lock:
+            await self._open_db()
+
+            for sample in samples:
+                LOGGER.info(
+                    f"updating sample '{self._sample_type}' '{sample.sample_no}'"
+                )
+                if sample.global_label is None:
+                    LOGGER.info("No global_label. Skipping sample.")
+                    continue
+
+                if sample.sample_no < 1:
+                    LOGGER.info(f"Cannot update sample '{sample.sample_no}'")
+                    continue
+
+                sample = await self._key_checks(sample)
+
+                # get the current info from db so we can perform some checks
+                LOGGER.info(f"getting sample {self._sample_type} {sample.sample_no}")
+                await asyncio.sleep(0.01)
+                retdf = pd.read_sql_query(
+                    f"""select * from {self._sample_type} where idx={sample.sample_no};""",
+                    con=self._con,
+                )
+                prev_sample = self._df_to_sample(retdf)
+
+                if prev_sample.sample_type is None:
+                    LOGGER.error("update_samples: invalid sample")
+                    continue
+
+                # some safety checks
+                if sample.global_label != prev_sample.global_label:
+                    LOGGER.error(
+                        f"Cannot update sample '{sample.sample_no}', not the same 'global_label'"
+                    )
+                    continue
+
+                if sample.sample_type != prev_sample.sample_type:
+                    LOGGER.error(
+                        f"Cannot update sample '{sample.sample_no}', not the same 'sample_type'"
+                    )
+                    continue
+
+                # update the last_update timecode
+                sample.last_update = self._base.get_realtime_nowait()
+
+                # update the old sample now
+                dfdict = sample.as_dict()
+                for key in self._jsonkeys:
+                    # fdict.update({key: [json.dumps(dfdict[key])]})
+                    dfdict.update({key: json.dumps(dfdict[key])})
+
+                keys_to_deletes = []
+                for key in dfdict.keys():
+                    if key not in self.column_names:
+                        LOGGER.warning(
+                            f"Invalid {self._sample_type} data key '{key}', skipping it."
+                        )
+                        keys_to_deletes.append(key)
+
+                for key in keys_to_deletes:
+                    del dfdict[key]
+
+                dfdict.update({"idx": sample.sample_no})
+                self._update(dfdict)
+                # df = pd.DataFrame(data=dfdict)
+                # df.to_sql(name=self._sample_type, con=self._con, if_exists="append", index=False, index_label="idx")
+            self._close_db()
+
+    async def get_platemap(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[list]:
+        """Return platemaps for the given samples; unsupported for non-solid types."""
+        LOGGER.error(f"not supported for {self._sample_type}")
+        return []
+
+    async def get_samples_xy(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Tuple[float, float]]:
+        """Return ``(x, y)`` coordinates per sample; unsupported for non-solid types."""
+        LOGGER.error(f"not supported for {self._sample_type}")
+        return []
+
+
+class LiquidSampleAPI(SampleModelAPI):
+    """Sample API for liquid samples with volume, pH, and dilution columns."""
+
+    def __init__(self, Serv_class):
+        super().__init__(
+            sampleclass=LiquidSample(),
+            Serv_class=Serv_class,
+            extra_columns="volume_ml REAL NOT NULL, ph REAL, dilution_factor REAL NOT NULL, electrolyte TEXT",
+        )
+
+    async def _key_checks(self, sample):
+        """Default ``volume_ml`` to 0.0 and ``dilution_factor`` to 1.0 when missing."""
+        if sample.volume_ml is None:
+            sample.volume_ml = 0.0
+        if sample.dilution_factor is None:
+            sample.dilution_factor = 1.0
+        return sample
+
+    async def old_jsondb_to_sqlitedb(self):
+        """Migrate every row from the legacy JSON/CSV liquid db into this sqlite db."""
+        old_liquid_sample_db = OldLiquidSampleAPI(self._base)
+        counts = await old_liquid_sample_db.count_samples()
+        LOGGER.info(f"old db sample count: {counts}")
+        for i in range(counts):
+            sample = LiquidSample(
+                **{"sample_no": i + 1, "machine_name": gethostname().lower()}
+            )
+            sample = await old_liquid_sample_db.get_samples(sample)
+            sample.server_name = "PAL"
+            sample.machine_name = gethostname().lower()
+            sample.global_label = sample.get_global_label()
+            sample.sample_creation_timecode = 0
+            # sample.action_timestamp = "00000000.000000000000"
+            await self.new_samples([sample])
+
+
+class GasSampleAPI(SampleModelAPI):
+    """Sample API for gas samples with volume and dilution columns."""
+
+    def __init__(self, Serv_class):
+        super().__init__(
+            sampleclass=GasSample(),
+            Serv_class=Serv_class,
+            extra_columns="volume_ml REAL NOT NULL, dilution_factor REAL NOT NULL",
+        )
+
+    async def _key_checks(self, sample):
+        """Default ``volume_ml`` to 0.0 and ``dilution_factor`` to 1.0 when missing."""
+        if sample.volume_ml is None:
+            sample.volume_ml = 0.0
+        if sample.dilution_factor is None:
+            sample.dilution_factor = 1.0
+        return sample
+
+
+class AssemblySampleAPI(SampleModelAPI):
+    """Sample API for assembly samples that contain a JSON-serialized parts list."""
+
+    def __init__(self, Serv_class):
+        super().__init__(
+            sampleclass=AssemblySample(),
+            Serv_class=Serv_class,
+            extra_columns="parts TEXT",
+        )
+        self._jsonkeys.append("parts")
+
+
+class SolidSampleAPI(SampleModelAPI):
+    """Sample API for solid samples backed by the legacy plate database.
+
+    Read-only with respect to insertion: ``new_samples`` is a no-op.
+    Lookups resolve plate/position via :class:`HTEPlateAPI`.
+    """
+
+    def __init__(self, Serv_class):
+        super().__init__(
+            sampleclass=SolidSample(),
+            Serv_class=Serv_class,
+            extra_columns="plate_id INTEGER NOT NULL",
+        )
+        self.legacyAPI = HTEPlateAPI()
+
+    async def get_platemap(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[list]:
+        """Return the legacy platemap entry list for each sample's plate."""
+        pmlist = []
+        for sample in samples:
+            pmmap = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+            if not pmmap:
+                LOGGER.error("invalid plate_id")
+            pmlist.append(pmmap)
+        return pmlist
+
+    async def get_samples_xy(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Tuple[float, float]]:
+        """Return ``[x, y]`` coordinates per sample from the legacy platemap."""
+        xylist = []
+        for sample in samples:
+            pmdata = self.legacyAPI.get_platemap_plateid(plateid=sample.plate_id)
+            if (sample.sample_no - 1) > len(pmdata) or (sample.sample_no - 1) < 0:
+                LOGGER.warning(
+                    f"get_xy: invalid sample no '{sample.sample_no}' on plate {sample.plate_id}"
+                )
+                xylist.append([None, None])
+            else:
+                platex = pmdata[sample.sample_no - 1]["x"]
+                platey = pmdata[sample.sample_no - 1]["y"]
+                xylist.append([platex, platey])
+        return xylist
+
+    async def new_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Unsupported for solid samples; returns an empty list."""
+        LOGGER.error("new_sample is not supported yet for solid sample")
+        await asyncio.sleep(0.01)
+        ret_samples = []
+
+        return ret_samples
+
+    async def get_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Resolve solid samples via the legacy platemap (validates legacy entries by xy)."""
+        await asyncio.sleep(0.01)
+        ret_samples = []
+
+        for i, sample in enumerate(samples):
+            LOGGER.info(
+                f"getting sample {self._sample_type} {sample.sample_no} on plate {sample.plate_id}"
+            )
+            await asyncio.sleep(0.01)
+            if sample.machine_name == "legacy":
+                # verify legacy sample by getting its xy coordinates
+                xylist = await self.get_samples_xy(samples=[sample])
+                if xylist != [(None, None)]:
+                    ret_samples.append(
+                        SolidSample(
+                            plate_id=sample.plate_id,
+                            sample_no=sample.sample_no,
+                            machine_name="legacy",
+                        )
+                    )
+                else:
+                    LOGGER.warning(
+                        f"invalid legacy sample no '{sample.sample_no}' on plate {sample.plate_id}"
+                    )
+            else:
+                ret_samples.append(
+                    SolidSample(
+                        plate_id=sample.plate_id,
+                        sample_no=sample.sample_no,
+                        machine_name=sample.machine_name,
+                    )
+                )
+                LOGGER.info(
+                    "loading non-legacy solid sample"
+                )
+
+        return ret_samples
+
+    async def update_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """No-op update for solid samples: revalidates and returns the samples."""
+        # self._base.print_message("Update is not supported yet "
+        #                          "for solid sample", error=True)
+        await asyncio.sleep(0.01)
+        # only check if its a valid sample
+        return await self.get_samples(samples=samples)
+
+
+class OldLiquidSampleAPI:
+    """Legacy CSV+per-sample-JSON liquid sample database (predecessor format).
+
+    Used solely to read existing records for migration into :class:`LiquidSampleAPI`.
+    """
+
+    def __init__(self, Serv_class):
+        self._base = Serv_class
+
+        self._dbfile = "liquid_ID_database.csv"
+        self._dbfilepath = self._base.helaodirs.db_root
+        self.fdb = None
+        self.headerlines = 0
+        # create folder first if it not exist
+        if not os.path.exists(self._dbfilepath):
+            os.makedirs(self._dbfilepath)
+
+        if not os.path.exists(os.path.join(self._dbfilepath, self._dbfile)):
+            # file does not exists, create file
+            f = open(os.path.join(self._dbfilepath, self._dbfile), "w")
+            f.close()
+
+        LOGGER.info(
+            f"liquid sample no database is: {os.path.join(self._dbfilepath, self._dbfile)}"
+        )
+
+    async def _open_db(self, mode) -> bool:
+        """Open the legacy CSV index file in the requested mode.
+
+        Args:
+            mode: ``aiofiles.open`` mode string.
+
+        Returns:
+            True if the file was opened, False if the db directory is missing.
+        """
+        if os.path.exists(self._dbfilepath):
+            self.fdb = await aiofiles.open(
+                os.path.join(self._dbfilepath, self._dbfile), mode
+            )
+            return True
+        else:
+            return False
+
+    async def _close_db(self):
+        """Close the legacy CSV index file handle."""
+        await self.fdb.close()
+
+    async def count_samples(self) -> int:
+        """Return the number of liquid sample rows in the legacy CSV index."""
+        _ = await self._open_db("a+")
+        counter = 0
+        await self.fdb.seek(0)
+        async for line in self.fdb:
+            counter += 1
+        await self._close_db()
+        return counter - self.headerlines
+
+    async def new_samples(self, new_sample: LiquidSample) -> LiquidSample:
+        """Append a new liquid sample row to the legacy CSV and per-sample JSON file.
+
+        Args:
+            new_sample: Sample to persist; ``sample_no`` is assigned from the
+                current row count.
+
+        Returns:
+            The same sample with ``sample_no`` populated.
+        """
+        async def write_sample_no_jsonfile(filename, datadict):
+            """Write a per-sample JSON sidecar next to the CSV index."""
+            self.fjson = await aiofiles.open(
+                os.path.join(self._dbfilepath, filename), "a+"
+            )
+            await self.fjson.write(json.dumps(datadict))
+            await self.fjson.close()
+
+        async def add_line(line):
+            if not line.endswith("\n"):
+                line += "\n"
+            await self.fdb.write(line)
+
+        LOGGER.info(f"new entry dict: {new_sample.model_dump()}")
+        new_sample.sample_no = await self.count_samples() + 1
+        LOGGER.info(f"new liquid sample no: {new_sample.sample_no}")
+        # dump dict to separate json file
+        await write_sample_no_jsonfile(
+            f"{new_sample.sample_no:08d}__{new_sample.sample_creation_experiment_uuid}__{new_sample.sample_creation_action_uuid}.json",
+            new_sample.model_dump(),
+        )
+        # add newid to db csv
+        await self._open_db("a+")
+        await add_line(
+            f"{new_sample.sample_no},{new_sample.sample_creation_experiment_uuid},{new_sample.sample_creation_action_uuid}"
+        )
+        await self._close_db()
+        return new_sample
+
+    async def get_samples(self, sample: LiquidSample):
+        """Read and normalize one legacy liquid sample record.
+
+        Accepts a sample stub with at least ``sample_no`` and
+        ``machine_name`` matching the local host; reads the corresponding
+        legacy JSON sidecar and migrates old field names (``id``,
+        ``sample_id``, ``AUID``, ``DUID``, ``volume_mL``, ``source``).
+
+        Args:
+            sample: Sample stub used to locate the record.
+
+        Returns:
+            Populated :class:`LiquidSample` or ``None`` if the record is
+            missing or the host check fails.
+        """
+
+        async def load_json_file(filename, linenr=1):
+            async with aiofiles.open(
+                os.path.join(self._dbfilepath, filename), "r+"
+            ) as f:
+                counter = 0
+                retval = ""
+                await f.seek(0)
+                async for line in f:
+                    counter += 1
+                    if counter == linenr:
+                        retval = line
+                retval = json.loads(retval)
+                return retval
+
+        async def get_sample_details(sample_no):
+            # need to add headerline count
+            sample_no = sample_no + self.headerlines
+            await self._open_db("r+")
+            counter = 0
+            retval = ""
+            await self.fdb.seek(0)
+            async for line in self.fdb:
+                counter += 1
+                if counter == sample_no:
+                    retval = line
+                    break
+            await self._close_db()
+            return retval
+
+        # for now it only checks against local samples
+        if sample.machine_name != gethostname().lower():
+            LOGGER.error(f"can only load from local db, got {sample.machine_name}")
+            return None  # return default empty one
+
+        data = await get_sample_details(sample.sample_no)
+        if data != "":
+            data = data.strip("\n").split(",")
+            fileID = int(data[0])
+            sample_creation_experiment_uuid = data[1]
+            sample_creation_action_uuid = data[2]
+            filename = f"{fileID:08d}__{sample_creation_experiment_uuid}__{sample_creation_action_uuid}.json"
+            LOGGER.info(f"data json file: {filename}")
+
+            liquid_sample_jsondict = await load_json_file(filename, 1)
+            # fix for old db version
+
+            comment = "old_comment:" + liquid_sample_jsondict.get("comment", "")
+            comment += "; plate_id:" + str(liquid_sample_jsondict.get("plate_id", ""))
+            comment += "; sample_no:" + str(liquid_sample_jsondict.get("sample_no", ""))
+            liquid_sample_jsondict.update({"comment": comment})
+
+            # the action time was something different and doesn't map
+            # to any new fields
+            # del liquid_sample_jsondict["action_time"]
+            # liquid_sample_jsondict.update({"action_timestamp":liquid_sample_jsondict.get("action_time","00000000.000000000000")})
+
+            volume_mL = liquid_sample_jsondict.get("volume_mL", 0.0)
+            liquid_sample_jsondict.update({"volume_ml": volume_mL})
+            source = liquid_sample_jsondict.get("source", [])
+            new_source = []
+            for src in source:
+                if src != "":
+                    new_source.append(f"{gethostname().lower()}__liquid__{src}")
+
+            liquid_sample_jsondict.update({"source": new_source})
+
+            if "id" in liquid_sample_jsondict:  # old v1
+                # liquid_sample_jsondict["plate_sample_no"] = liquid_sample_jsondict["sample_no"]
+                liquid_sample_jsondict["sample_no"] = liquid_sample_jsondict["id"]
+                del liquid_sample_jsondict["id"]
+                if "plate_id" in liquid_sample_jsondict:
+                    del liquid_sample_jsondict["plate_id"]
+
+            if "sample_id" in liquid_sample_jsondict:
+                liquid_sample_jsondict["sample_no"] = liquid_sample_jsondict[
+                    "sample_id"
+                ]
+                del liquid_sample_jsondict["sample_id"]
+
+            if "AUID" in liquid_sample_jsondict:
+                liquid_sample_jsondict["sample_creation_action_uuid"] = (
+                    shortuuid.decode(liquid_sample_jsondict["AUID"])
+                )
+                del liquid_sample_jsondict["AUID"]
+
+            if "DUID" in liquid_sample_jsondict:
+                liquid_sample_jsondict["sample_creation_experiment_uuid"] = (
+                    shortuuid.decode(liquid_sample_jsondict["DUID"])
+                )
+                del liquid_sample_jsondict["DUID"]
+
+            ret_liquid_sample = LiquidSample(**liquid_sample_jsondict)
+            LOGGER.info(f"data json content: {ret_liquid_sample.model_dump()}")
+
+            return ret_liquid_sample
+        else:
+            return None  # will be default empty one
+
+
+class UnifiedSampleDataAPI:
+    """Sample API dispatcher that routes operations by :class:`SampleType`.
+
+    Owns one :class:`SampleModelAPI` instance per sample type and forwards
+    requests to the appropriate backend. Assemblies are walked recursively so
+    contained ``parts`` are resolved or updated alongside the parent.
+
+    Attributes:
+        solidAPI: Solid sample backend.
+        liquidAPI: Liquid sample backend.
+        gasAPI: Gas sample backend.
+        assemblyAPI: Assembly sample backend.
+        ready: True after :meth:`init_db` completes for all backends.
+    """
+
+    def __init__(self, Serv_class):
+        self._base = Serv_class
+        self._dbfilepath = self._base.helaodirs.db_root
+
+        self.solidAPI = SolidSampleAPI(self._base)
+        self.liquidAPI = LiquidSampleAPI(self._base)
+        self.gasAPI = GasSampleAPI(self._base)
+        self.assemblyAPI = AssemblySampleAPI(self._base)
+        self.ready = False
+
+    async def init_db(self) -> None:
+        """Initialize all per-type backends and mark the dispatcher ready."""
+        await self.solidAPI.init_db()
+        await self.liquidAPI.init_db()
+        await self.gasAPI.init_db()
+        await self.assemblyAPI.init_db()
+        LOGGER.info("unified db initialized")
+        self.ready = True
+
+    async def new_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Dispatch ``new_samples`` to the appropriate per-type backend.
+
+        Args:
+            samples: Mixed-type sample inputs; each is routed by ``sample_type``.
+
+        Returns:
+            Concatenated list of persisted samples from every backend touched.
+        """
+        retval = []
+
+        for sample_ in samples:
+            sample = object_to_sample(sample_)
+            if sample.sample_type == SampleType.liquid:
+                tmp = await self.liquidAPI.new_samples(samples=[sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.solid:
+                tmp = await self.solidAPI.new_samples(samples=[sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.gas:
+                tmp = await self.gasAPI.new_samples(samples=[sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.assembly:
+                tmp = await self.assemblyAPI.new_samples(samples=[sample])
+                for t in tmp:
+                    retval.append(t)
+
+        return retval
+
+    async def get_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+        """Dispatch ``get_samples`` per sample type; recurse into assembly parts.
+
+        Args:
+            samples: Stubs identifying the records to resolve.
+
+        Returns:
+            Concatenated list of populated samples; assemblies have their
+            ``parts`` resolved recursively.
+        """
+        retval = []
+
+        for i, sample_ in enumerate(samples):
+            # print("sample", i, ":", sample_)
+            sample = object_to_sample(sample_)
+            LOGGER.info(
+                f"retrieving sample {sample.get_global_label()} of sample_type {sample.sample_type}"
+            )
+            if sample.sample_type == SampleType.liquid:
+                tmp = await self.liquidAPI.get_samples([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.solid:
+                tmp = await self.solidAPI.get_samples([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.gas:
+                tmp = await self.gasAPI.get_samples([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.assembly:
+                tmp = await self.assemblyAPI.get_samples([sample])
+                # first need to get the most recent part info
+                for t in tmp:
+                    t.parts = await self.get_samples(samples=t.parts)
+                    # and then add the assembly to the return list
+                    retval.append(t)
+            elif sample.sample_type is None:
+                LOGGER.info("got None sample")
+            else:
+                LOGGER.error(
+                    f"validation error, type '{type(sample)}' is not a valid sample model"
+                )
+
+        return retval
+
+    async def list_new_samples(
+        self, limit: int = 10
+    ) -> dict:
+        """Return a per-type dict of the most recent samples (up to ``limit`` each)."""
+        retdict = {
+            "liquid": await self.liquidAPI.list_new_samples(limit),
+            "solid": await self.solidAPI.list_new_samples(limit),
+            "gas": await self.gasAPI.list_new_samples(limit),
+            "assembly": await self.assemblyAPI.list_new_samples(limit),
+        }
+        return retdict
+
+    async def update_samples(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> None:
+        """Dispatch ``update_samples`` per sample type; recurse into assembly parts."""
+        for sample_ in samples:
+            sample = object_to_sample(sample_)
+            LOGGER.info(
+                f"updating sample: {sample.global_label} of sample_type {sample.sample_type}"
+            )
+            if sample.sample_type == SampleType.liquid:
+                await self.liquidAPI.update_samples([sample])
+            elif sample.sample_type == SampleType.solid:
+                await self.solidAPI.update_samples([sample])
+            elif sample.sample_type == SampleType.gas:
+                await self.gasAPI.update_samples([sample])
+            elif sample.sample_type == SampleType.assembly:
+                # update also the parts
+                await self.update_samples(sample.parts)
+                await self.assemblyAPI.update_samples([sample])
+            elif sample.sample_type is None:
+                LOGGER.info("got None sample")
+            else:
+                LOGGER.error(
+                    f"validation error, type '{type(sample)}' is not a valid sample model"
+                )
+
+    async def get_samples_xy(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> list:
+        """Dispatch ``get_samples_xy`` per sample type and concatenate results."""
+        retval = []
+        for sample_ in samples:
+            sample = object_to_sample(sample_)
+            LOGGER.info(
+                f"getting sample_xy for: {sample.global_label} of sample_type {sample.sample_type}"
+            )
+            if sample.sample_type == SampleType.liquid:
+                tmp = await self.liquidAPI.get_samples_xy([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.solid:
+                tmp = await self.solidAPI.get_samples_xy([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.gas:
+                tmp = await self.gasAPI.get_samples_xy([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.assembly:
+                tmp = await self.assemblyAPI.get_samples_xy([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type is None:
+                LOGGER.info("got None sample")
+            else:
+                LOGGER.error(
+                    f"validation error, type '{type(sample)}' is not a valid sample model"
+                )
+        return retval
+
+    async def get_platemap(
+        self,
+        samples: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = [],
+    ) -> list:
+        """Dispatch ``get_platemap`` per sample type and concatenate results."""
+        retval = []
+        for sample_ in samples:
+            sample = object_to_sample(sample_)
+            LOGGER.info(
+                f"getting platemap for: {sample.global_label} of sample_type {sample.sample_type}"
+            )
+            if sample.sample_type == SampleType.liquid:
+                tmp = await self.liquidAPI.get_platemap([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.solid:
+                tmp = await self.solidAPI.get_platemap([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.gas:
+                tmp = await self.gasAPI.get_platemap([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type == SampleType.assembly:
+                tmp = await self.assemblyAPI.get_platemap([sample])
+                for t in tmp:
+                    retval.append(t)
+            elif sample.sample_type is None:
+                LOGGER.info("got None sample")
+            else:
+                LOGGER.error(
+                    f"validation error, type '{type(sample)}' is not a valid sample model"
+                )
+        return retval
+
+
+def unpack_samples_helper(
+    samples: List[
+        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+    ] = [],
+) -> Tuple[
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+]:
+    """Split a sample list by primitive type, flattening any assemblies.
+
+    Assembly samples are walked recursively so all leaf parts end up in the
+    matching primitive bucket.
+
+    Args:
+        samples: Sample list that may include assemblies.
+
+    Returns:
+        ``(liquid_list, solid_list, gas_list)``.
+    """
+    liquid_list = []
+    solid_list = []
+    gas_list = []
+
+    for sample in samples:
+        if sample.sample_type == SampleType.assembly:
+            for part in sample.parts:
+                if part.sample_type == SampleType.assembly:
+                    tmp_liquid_list, tmp_solid_list, tmp_gas_list = (
+                        unpack_samples_helper(samples=[part])
+                    )
+                    for s in tmp_liquid_list:
+                        liquid_list.append(s)
+                    for s in tmp_gas_list:
+                        gas_list.append(s)
+                    for s in tmp_solid_list:
+                        solid_list.append(s)
+                elif part.sample_type == SampleType.solid:
+                    solid_list.append(part)
+                elif part.sample_type == SampleType.liquid:
+                    liquid_list.append(part)
+                elif part.sample_type == SampleType.gas:
+                    gas_list.append(part)
+
+        elif sample.sample_type == SampleType.solid:
+            solid_list.append(sample)
+        elif sample.sample_type == SampleType.liquid:
+            liquid_list.append(sample)
+        elif sample.sample_type == SampleType.gas:
+            gas_list.append(sample)
+
+    return liquid_list, solid_list, gas_list
+
+
+def update_vol(BS, delta_vol_ml: float, dilute: bool):
+    """Apply a volume delta to a sample, optionally rescaling its dilution factor.
+
+    If the new total volume is non-positive, the sample is zeroed and marked
+    destroyed. When ``dilute`` is set, the dilution factor is rescaled so the
+    concentration before mixing is preserved (negative sentinel when the old
+    volume was non-positive).
+
+    Args:
+        BS: Sample model with ``volume_ml`` (and optionally ``dilution_factor``).
+        delta_vol_ml: Signed change in volume, in milliliters.
+        dilute: When True, recompute ``dilution_factor`` from the new volume.
+    """
+    if hasattr(BS, "volume_ml"):
+        old_vol = BS.volume_ml
+        tot_vol = old_vol + delta_vol_ml
+        if tot_vol <= 0:
+            LOGGER.error(
+                "new volume is <= 0, setting it to zero and setting status to destroyed"
+            )
+            BS.zero_volume()
+            tot_vol = 0
+        BS.volume_ml = tot_vol
+        if dilute:
+            if hasattr(BS, "dilution_factor"):
+                old_df = BS.dilution_factor
+                if old_vol <= 0:
+                    LOGGER.error("previous volume is <= 0, setting new df to 0.")
+                    new_df = -1
+                else:
+                    new_df = tot_vol / (old_vol / old_df)
+                BS.dilution_factor = new_df
+                LOGGER.info(f"updated sample dilution-factor: {BS.dilution_factor}")
