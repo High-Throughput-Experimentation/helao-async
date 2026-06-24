@@ -238,6 +238,30 @@ class ActionSession:
                 continue
             await self.storage.append_hlo(handle, json.dumps(row))
 
+    async def enqueue_data_dflt(self, datadict: dict) -> None:
+        """Enqueue datadict against the default file-conn key as an active DataModel.
+
+        Ports legacy ``Active.enqueue_data_dflt``. Assumes
+        ``self.action.file_conn_keys`` is non-empty (legacy invariant: a default
+        key is always opened at setup). Raises ``IndexError`` if the key list is
+        empty — matching legacy behaviour.
+        """
+        await self.enqueue_data({self.action.file_conn_keys[0]: datadict})
+
+    def enqueue_data_nowait(self, datamodel, action=None) -> None:
+        """Non-awaiting enqueue. Schedule the async enqueue on the running loop.
+
+        Ports ``Active.enqueue_data_nowait`` intent. In the legacy code this
+        called ``data_q.put_nowait`` on a sync queue; the framework has no sync
+        data queue — every emit is async through ``eventsink``. The "nowait"
+        contract (caller does not await) is preserved by scheduling the coroutine
+        as a fire-and-forget task via ``asyncio.ensure_future``. The caller must
+        be running inside an event loop; the enqueue completes on the next loop
+        iteration (``await asyncio.sleep(0)`` is sufficient to drain it in tests).
+        """
+        import asyncio
+        asyncio.ensure_future(self.enqueue_data(datamodel, action))
+
     async def _enqueue_phase_data(self, data: dict) -> None:
         """Enqueue executor-phase ``data`` keyed by the action's first file conn."""
         if not data:

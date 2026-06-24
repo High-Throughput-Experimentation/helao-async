@@ -44,7 +44,13 @@ __all__ = [
     "action_version",
     "ACTION_VERSION_ATTR",
     "DEFAULT_ACTION_VERSION",
+    "Active",
 ]
+
+# Compatibility alias: hte action servers import ``Active`` from the legacy base.
+# The framework equivalent is ``ActionSession``; this alias lets those imports
+# resolve without modifying the hte code until full migration is complete.
+Active = ActionSession
 
 
 @dataclass
