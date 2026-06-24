@@ -9,7 +9,7 @@ no measurement is in progress.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.framework.support import helao_logging as logging  # get LOGGER from BaseAPI instance
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 class GamryDtaqSink:

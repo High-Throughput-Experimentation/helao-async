@@ -9,7 +9,7 @@ recognized by the PAL software.
 from enum import Enum
 from pydantic import BaseModel
 from typing import Optional
-from helao.core.models.sample import SampleType
+from helao.framework.models.sample import SampleType
 
 
 class _cam(BaseModel):

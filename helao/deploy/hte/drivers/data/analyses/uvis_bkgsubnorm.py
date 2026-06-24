@@ -18,12 +18,12 @@ from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
-from helao.core.version import get_filehash
-from helao.helpers.time_utils import gen_uuid
+from helao.framework.support.version import get_filehash
+from helao.framework.support.time_utils import gen_uuid
 
-from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
-from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.drivers.data.loaders.helao_loader import HelaoProcess, HelaoAction
+from helao.framework.domain.analysis.base_analysis import BaseAnalysis
+from helao.framework.models.analysis import AnalysisDataModel, AnalysisInput
+from helao.framework.adapters.loaders.hlo_loader import HelaoProcess, HelaoAction
 from .echeuvis_stability import refadjust, parse_spechlo
 
 ANALYSIS_DEFAULTS = {

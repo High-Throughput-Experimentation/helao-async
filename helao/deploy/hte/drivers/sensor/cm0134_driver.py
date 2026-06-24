@@ -12,11 +12,11 @@ import asyncio
 import serial
 import minimalmodbus
 
-from helao.helpers import helao_logging as logging
-from helao.core.error import ErrorCodes
-from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base import Base
-from helao.helpers.executor import Executor
+from helao.framework.support import helao_logging as logging
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.app.base_api import Base
+from helao.framework.domain.executor import Executor
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

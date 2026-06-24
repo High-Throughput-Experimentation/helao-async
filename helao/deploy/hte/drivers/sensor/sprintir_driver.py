@@ -15,17 +15,17 @@ from typing import Any
 
 import serial
 
-from helao.helpers import helao_logging as logging
-from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
-from helao.helpers.executor import Executor
-from helao.core.models.data import DataModel
-from helao.core.models.file import FileConnParams, HloHeaderModel
-from helao.core.models.sample import SampleInheritance, SampleStatus
-from helao.core.models.hlostatus import HloStatus
-from helao.helpers.premodels import Action
-from helao.helpers.active_params import ActiveParams
-from helao.helpers.sample_api import UnifiedSampleDataAPI
+from helao.framework.support import helao_logging as logging
+from helao.framework.models.errors import ErrorCodes
+from helao.framework.app.base_api import Base
+from helao.framework.domain.executor import Executor
+from helao.framework.models.data import DataModel
+from helao.framework.models.file import FileConnParams, HloHeaderModel
+from helao.framework.models.sample import SampleInheritance, SampleStatus
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.domain.run_models import Action
+from helao.framework.models.active_params import ActiveParams
+from helao.framework.adapters.sample_api import UnifiedSampleDataAPI
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
