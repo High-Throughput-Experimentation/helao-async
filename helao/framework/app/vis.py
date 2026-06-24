@@ -47,6 +47,8 @@ class HelaoVis:
         self.server = MachineModel(
             server_name=self.helao_srv,
             machine_name=gethostname().lower(),
+            hostname=self.server_cfg["host"],
+            port=self.server_cfg["port"],
         )
         self.doc_name = self.server_params.get("doc_name", f"{self.helao_srv} Bokeh App")
         self.doc = doc

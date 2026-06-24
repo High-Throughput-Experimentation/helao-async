@@ -50,6 +50,9 @@ def test_helaovis_builds(cfg):
     assert doc.title == "Demo Vis"
     assert isinstance(app.vis, Vis)
     assert str(app.vis.helaodirs.root) == cfg["root"]
+    # spec §4.1: host/port propagated onto server identity
+    assert app.server.hostname == "127.0.0.1"
+    assert app.server.port == 5001
 
 
 def test_vis_raises_without_root(tmp_path):
