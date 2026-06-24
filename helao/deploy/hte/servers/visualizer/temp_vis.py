@@ -11,11 +11,11 @@ from bokeh.models.widgets import DataTable, TableColumn
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.vis import Vis
-from helao.core.servers.vis_subscriber import LiveVisualizer
+from helao.framework.app.vis import Vis
+from helao.framework.adapters.vis_subscriber import LiveVisualizer
 
 
 class C_vis(LiveVisualizer):

@@ -6,12 +6,12 @@ from pathlib import Path
 from pprint import pprint
 
 from gcld_operator import seq_constructor, gen_ts, wait_for_orch, num_uploads
-from helao.core.servers.operator.helao_operator import HelaoOperator
+from helao.framework.adapters.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
-from helao.helpers.config_loader import CONFIG
+from helao.framework.support.config_loader import CONFIG
 from ...sequences.TEST_seq import TEST_consecutive_noblocking
-from helao.core.models.orchstatus import LoopStatus
+from helao.framework.models.orchstatus import LoopStatus
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])

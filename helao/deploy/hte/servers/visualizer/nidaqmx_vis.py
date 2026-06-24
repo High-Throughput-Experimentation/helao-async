@@ -11,12 +11,12 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.vis import Vis
-from helao.core.servers.vis_subscriber import ActionVisualizer
+from helao.framework.models.hlostatus import HloStatus
+from helao.framework.app.vis import Vis
+from helao.framework.adapters.vis_subscriber import ActionVisualizer
 
 VALID_DATA_STATUS = (
     None,

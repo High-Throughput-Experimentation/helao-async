@@ -13,14 +13,14 @@ from bokeh.models import ColumnDataSource
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 
-from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.models.hlostatus import HloStatus
+from helao.framework.models.hlostatus import HloStatus
 
-from helao.core.servers.vis import Vis
-from helao.core.servers.vis_subscriber import ActionVisualizer
-from helao.helpers.dispatcher import private_dispatcher
+from helao.framework.app.vis import Vis
+from helao.framework.adapters.vis_subscriber import ActionVisualizer
+from helao.framework.support.dispatcher import private_dispatcher
 
 
 VALID_DATA_STATUS = (
