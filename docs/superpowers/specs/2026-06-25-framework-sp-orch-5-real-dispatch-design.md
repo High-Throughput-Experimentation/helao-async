@@ -84,11 +84,16 @@ registered. Add a test asserting the registered RPC method set == the app's POST
 ### Part (b) — Real status ingestion
 
 **b1. Status subscriber.** On orch startup, for each action server in the CONFIG `servers`
-map (group==action), start a `WsSubscriber` (`helao.helpers.ws_utils.WsSubscriber`, the
-accepted seam — same class the operator/vis reuse) against `ws_status`. Decode each
-message into an `ActionServerModel` and call `await driver.on_status_update(asm)` (already
-exists, `orch_api.py:383`). One long-lived asyncio task per server, cancelled on shutdown;
-a dropped/reconnecting socket must not kill the orch (log + retry).
+map (group==action), start a long-lived task subscribing to that server's `/ws_status`.
+**WIRE FORMAT (verified):** framework `BaseAPI._ws_relay` sends `/ws_status` as **JSON**
+(`send_json`, SP8 WS-B) — NOT `WsSubscriber`'s zstd+pickle. So decode with a JSON websocket
+reader (model it on the Task-1 fixture's `_JsonWsReader` / `websockets.connect`+`json.loads`),
+NOT `helao.helpers.ws_utils.WsSubscriber`. Rebuild each JSON payload into an
+`ActionServerModel` and call `await driver.on_status_update(asm)` (exists, `orch_api.py:383`).
+One task per server, cancelled on shutdown; a dropped/reconnecting socket must not kill the
+orch (log + retry). (Known split, out of scope here: the orch's OWN `/ws_status` relay sends
+zstd+pickle for the operator's `WsSubscriber` consumer; only the action-server→orch leg is
+JSON.)
 
 **b2. Stop faking completion for real dispatch.** Gate `_synthesize_finished_status`: only
 synthesize when the transport is a `FakeTransport` (in-process/test). With `HttpTransport`,
