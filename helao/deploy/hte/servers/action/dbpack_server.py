@@ -10,7 +10,7 @@ runs.
 __all__ = ["makeApp"]
 
 from helao.framework.app.base_api import BaseAPI
-from helao.core.drivers.data.sync_driver import HelaoSyncer  # seam: HelaoSyncer not yet ported to framework
+from helao.core.drivers.data.sync_driver import HelaoSyncer  # seam: framework HelaoSyncer exists (helao.framework.app.sync_driver) but the switch is deferred to DB-server bring-up so it can be verified against real S3 (production data-shipping path)
 
 
 def makeApp(server_key) -> BaseAPI:

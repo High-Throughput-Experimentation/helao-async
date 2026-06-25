@@ -49,7 +49,7 @@ from helao.framework.support.async_utils import AsyncRWLock
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-__all__ = ["SyncDriver"]
+__all__ = ["SyncDriver", "HelaoSyncer"]
 
 # Legacy 1GiB threshold above which an hlo file is converted to parquet rather
 # than uploaded as json (sync_driver.py line 1124: ``fp.stat().st_size < 1024**3``).
@@ -736,3 +736,55 @@ def _json_bytes(payload: dict) -> bytes:
     import json
 
     return json.dumps(payload, default=str).encode("utf-8")
+
+
+class HelaoSyncer(SyncDriver):
+    """``SyncDriver`` wired from a running HELAO ``Base`` server.
+
+    Framework port of legacy ``helao.core.drivers.data.sync_driver.HelaoSyncer``.
+    Pulls syncer config from the action server's own ``server_cfg["params"]``,
+    falling back to the global ``servers[db_server_name]["params"]`` block when no
+    local ``aws_config_path`` is set. Constructs the framework sync ports the base
+    ``SyncDriver`` requires (WIRING OBLIGATION): a :class:`FsSyncStorage` and a
+    cloud sink — :class:`S3CloudSink` when AWS is configured, else a
+    :class:`NoopCloudSink` so the syncer runs without S3 (and is unit-testable).
+
+    Duck-typed on the server (``server_cfg`` / ``world_cfg`` / ``helaodirs``) so
+    this module need not import ``BaseAPI`` (avoids an app-layer import cycle).
+
+    Args:
+        action_serv: The action/orchestrator server hosting this syncer.
+        db_server_name: Server key to borrow params from when local config lacks
+            an ``aws_config_path``. Defaults to ``"DB"``.
+    """
+
+    def __init__(self, action_serv, db_server_name: str = "DB"):
+        # Lazy adapter imports: keep importing this module dependency-light (and
+        # avoid pulling boto3 unless an S3 sink is actually built).
+        from helao.framework.adapters.fs_sync_storage import FsSyncStorage
+        from helao.framework.adapters.noop_cloud_sink import NoopCloudSink
+
+        self.base = action_serv
+        config = dict((action_serv.server_cfg or {}).get("params", {}) or {})
+        world = action_serv.world_cfg or {}
+        # Mirror legacy: when no local AWS path, borrow the DB server's params.
+        if not config.get("aws_config_path") and db_server_name in (world.get("servers") or {}):
+            config = dict((world["servers"][db_server_name] or {}).get("params", {}) or {})
+
+        sync_storage = FsSyncStorage()
+        if config.get("aws_config_path") or config.get("aws_bucket"):
+            from helao.framework.adapters.s3_cloud_sink import S3CloudSink
+            cloud_sink = S3CloudSink(config)
+        else:
+            cloud_sink = NoopCloudSink()
+
+        LOGGER.info(
+            "HelaoSyncer: initializing SyncDriver (cloud_sink=%s)",
+            type(cloud_sink).__name__,
+        )
+        super().__init__(
+            sync_storage,
+            cloud_sink,
+            config,
+            getattr(action_serv, "helaodirs", None),
+        )
