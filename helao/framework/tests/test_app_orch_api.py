@@ -127,11 +127,10 @@ def test_full_sequence_loop_dispatches_both_actions():
     asyncio.run(driver.start())
 
     # Both actions must have been dispatched
-    dispatched_endpoints = [t.endpoint for t, _ in transport.dispatched]
-    # dispatch goes to "run_action" endpoint (built by _dispatch_target_for)
-    run_action_calls = [e for e in dispatched_endpoints if e == "run_action"]
-    assert len(run_action_calls) == 2, (
-        f"expected 2 run_action dispatches, got {run_action_calls}"
+    # dispatch endpoint is action_name (e.g. "act_alpha", "act_beta") since
+    # _dispatch_target_for uses action.action_name for all server types.
+    assert len(transport.dispatched) == 2, (
+        f"expected 2 dispatches, got {len(transport.dispatched)}"
     )
 
     # Sequence and experiment meta written
@@ -162,7 +161,7 @@ def test_full_sequence_loop_action_names_recorded():
     asyncio.run(driver.start())
 
     dispatched_names = [
-        payload.get("action_name")
+        (payload.get("action_name") or (payload.get("action") or {}).get("action_name"))
         for _, payload in transport.dispatched
         if isinstance(payload, dict)
     ]
@@ -183,8 +182,7 @@ def test_experiment_direct_loop_dispatches_two_actions():
     driver.enqueue_experiment(exp)
     asyncio.run(driver.start())
 
-    run_action_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
-    assert len(run_action_calls) == 2
+    assert len(transport.dispatched) == 2
 
     meta_keys = list(storage.meta_docs.keys())
     exp_metas = [k for k in meta_keys if k.endswith("-exp.yml")]
@@ -203,7 +201,7 @@ def test_single_action_dispatched_via_start():
     driver.state.action_dq.append(action)
     asyncio.run(driver.start())
 
-    assert any(t.endpoint == "run_action" for t, _ in transport.dispatched)
+    assert transport.dispatched, "single action was not dispatched"
 
 
 # ---------------------------------------------------------------------------
@@ -243,8 +241,7 @@ def test_estop_during_queued_run_halts_before_dispatch():
     assert driver.state.loop_state == LoopStatus.estopped
 
     # Nothing dispatched to run_action
-    run_action_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
-    assert run_action_calls == []
+    assert transport.dispatched == [], "estop before start must prevent all dispatch"
 
 
 # ---------------------------------------------------------------------------
@@ -465,7 +462,7 @@ def test_execute_commands_dispatch_action_success():
     action.action_status = [HloStatus.active]
     cmd = DispatchAction(action=action, nonblocking=False)
     asyncio.run(execute_commands(state, [cmd], ports=ports))
-    assert any(t.endpoint == "run_action" for t, _ in transport.dispatched)
+    assert transport.dispatched, "DispatchAction must reach transport"
 
 
 def test_execute_commands_dispatch_action_failure_stops_loop():
@@ -560,8 +557,9 @@ def test_make_orch_app_start_endpoint_with_sequence():
     body = resp.json()
     assert "loop_state" in body
     # both actions must have been dispatched
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
-    assert len(run_calls) == 2
+    assert len(transport.dispatched) == 2, (
+        f"expected 2 dispatches, got {len(transport.dispatched)}"
+    )
     # FSM reached IDLE (work all done)
     from helao.framework.domain.orchestration import decide_next
     from helao.framework.domain.commands import OrchDecision

@@ -49,9 +49,11 @@ from typing import NamedTuple
 import pytest
 import uvicorn
 
+from fastapi import Body as _Body
+
 from helao.core.rpc import RPCDispatcher, derive_rpc_port
 from helao.core.rpc.zmq_rpc import RPC_PORT_OFFSET
-from helao.framework.app.base_api import BaseAPI
+from helao.framework.app.base_api import ACTION_CTX, BaseAPI
 from helao.framework.domain.executor import Executor
 from helao.framework.models.errors import ErrorCodes
 
@@ -107,15 +109,6 @@ class SleepExecutor(Executor):
 
 def _make_fake_action_app(server_key: str, save_root: str) -> "BaseAPI":
     """Build a ``BaseAPI`` with one ``run_for`` action and a co-located RPC dispatcher."""
-    import uuid as _uuid
-    from datetime import datetime
-    from fastapi import Body
-
-    from helao.framework.app.base_api import ActionContext
-    from helao.framework.domain.run_models import RunAction
-    from helao.framework.models.machine import MachineModel
-    from helao.framework.models.hlostatus import HloStatus
-
     app = BaseAPI(server_key=server_key, save_root=save_root)
 
     # Attach the (initially unbound) RPC dispatcher — mirrors orch_api pattern.
@@ -123,98 +116,33 @@ def _make_fake_action_app(server_key: str, save_root: str) -> "BaseAPI":
     app.state.rpc_dispatcher = rpc
 
     # --- run_for action endpoint -------------------------------------------
-    # NOTE: this endpoint is tagged ``["private"]`` (NOT ``["action"]``) so that
-    # ``ActionAPIRoute`` does NOT auto-wrap it with ``wrap_action_endpoint``.
-    # That wrapper synthesises a ``RunAction`` from the parsed kwargs but does
-    # not assign ``action_uuid`` / ``action_output_dir`` / timestamps, so the
-    # downstream ``DataPackageModel`` construction in ``action_loop_task`` would
-    # fail with ``action_uuid=None``.
-    #
-    # Instead we build a fully-initialised ``RunAction`` here (mirroring
-    # ``makeActionApp``'s pattern) and pass it as an explicit ``ActionContext``.
-    # This gives ``action_loop_task`` a complete, valid action to work with.
+    # Tagged ``["action"]`` so ``ActionAPIRoute`` auto-wraps it via
+    # ``wrap_action_endpoint``, which injects ``action: RunAction = Body(embed=True)``
+    # and populates ACTION_CTX.  The orch dispatch payload
+    # ``{**action_params, "action": action.as_dict()}`` feeds both the flat
+    # ``duration`` param and the embedded RunAction through this wrapper.
+    # ``init_act()`` fills missing uuid/timestamps for direct test calls that
+    # send only ``{"duration": x}`` without an embedded ``"action"`` key.
 
-    @app.post(f"/{server_key}/run_for", tags=["private"])
-    async def run_for(duration: float = Body(0.05, embed=True)) -> dict:
+    @app.post(f"/{server_key}/run_for", tags=["action"])
+    async def run_for(duration: float = _Body(-1, embed=True)) -> dict:
         """Sleep ``duration`` seconds then finish.
 
-        Builds a fully-initialised ``RunAction`` and drives it through
-        ``setup_and_contain_action`` → ``SleepExecutor`` → ``start_executor``.
-        Returns immediately (the executor loop runs in the background) so the
-        /ws_status feed carries real started → finished updates.
+        Driven through ``ACTION_CTX`` → ``setup_and_contain_action`` →
+        ``SleepExecutor`` → ``start_executor``.  Returns immediately; the
+        executor loop runs in the background so ``/ws_status`` carries real
+        started → finished updates.
         """
-        now = datetime.now()
-        action_uuid = _uuid.uuid4()
-        action = RunAction(
-            action_name="run_for",
-            action_uuid=action_uuid,
-            action_timestamp=now,
-            sequence_timestamp=now,
-            experiment_timestamp=now,
-            sequence_name="fake_seq",
-            experiment_name="fake_exp",
-            action_output_dir=str(action_uuid),
-            action_server=MachineModel(server_name=server_key),
-            action_params={"duration": duration},
-            action_status=[HloStatus.active],
-            save_act=False,
-            save_data=False,
-        )
-        active = await app.base.setup_and_contain_action(
-            ActionContext(action=action, endpoint_name="run_for"),
-        )
-        executor = SleepExecutor(active=active)
-        # start_executor fires the action loop as a background task (non-blocking).
-        active.start_executor(executor)
-        return {"action_uuid": str(action_uuid), "status": "active"}
-
-    @app.post(f"/{server_key}/run_action", tags=["private"])
-    async def run_action(action_dict: dict = Body(None)) -> dict:
-        """Generic run_action endpoint accepting a full RunAction dict.
-
-        This mirrors the convention real action servers use: the orchestrator
-        dispatches via ``/{server_key}/run_action`` with the full
-        ``RunAction.as_dict()`` body.  The fake server extracts ``duration``
-        from ``action_params`` and delegates to :class:`SleepExecutor`.
-
-        Added for SP-ORCH-5c so end-to-end orch dispatch (which targets
-        ``run_action``) reaches the SleepExecutor path.
-        """
-        body = action_dict or {}
-        action_params = body.get("action_params") or {}
-        duration = float(action_params.get("duration", 0.05))
-
-        # Reuse the uuid from the dispatched action when present.
-        now = datetime.now()
-        if body.get("action_uuid"):
-            try:
-                action_uuid = _uuid.UUID(str(body["action_uuid"]))
-            except (ValueError, AttributeError):
-                action_uuid = _uuid.uuid4()
-        else:
-            action_uuid = _uuid.uuid4()
-
-        action = RunAction(
-            action_name=body.get("action_name", "run_action"),
-            action_uuid=action_uuid,
-            action_timestamp=now,
-            sequence_timestamp=now,
-            experiment_timestamp=now,
-            sequence_name=body.get("sequence_name", "fake_seq"),
-            experiment_name=body.get("experiment_name", "fake_exp"),
-            action_output_dir=str(action_uuid),
-            action_server=MachineModel(server_name=server_key),
-            action_params={"duration": duration},
-            action_status=[HloStatus.active],
-            save_act=False,
-            save_data=False,
-        )
-        active = await app.base.setup_and_contain_action(
-            ActionContext(action=action, endpoint_name="run_action"),
-        )
+        ctx = ACTION_CTX.get(None)
+        if ctx is None:
+            return {"error": "no ACTION_CTX"}
+        ctx.action.action_name = ctx.action.action_name or "run_for"
+        ctx.action.init_act()
+        active = await app.base.setup_and_contain_action(ctx)
+        active.action.action_params["duration"] = duration
         executor = SleepExecutor(active=active)
         active.start_executor(executor)
-        return {"action_uuid": str(action_uuid), "status": "active"}
+        return {"action_uuid": str(active.action.action_uuid), "status": "active", "duration": duration}
 
     # --- RPC startup: register all POST routes and bind ROUTER socket --------
 

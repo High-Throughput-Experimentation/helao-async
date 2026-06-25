@@ -151,17 +151,30 @@ def _dispatch_target_for(
     2. The action's :class:`MachineModel` ``hostname``/``host``/``port`` fields.
     3. Defaults: ``127.0.0.1``:8000.
 
+    The dispatch endpoint is always ``action.action_name`` (e.g. ``"run_for"``,
+    ``"wait"``), falling back to the ``endpoint`` arg only when ``action_name``
+    is unset.  HELAO action servers and orchestrators both register routes at
+    ``/{server_key}/{action_name}``, matching legacy ``orch.py`` convention.
+
     ``servers_map`` is the complete ``CONFIG["servers"]`` dict injected via
     :class:`OrchPorts`; it is ``None``/empty in unit-tests and in-process runners
     (falls through to the MachineModel path).
-
-    SP-ORCH-5c note: when the target server is an orchestrator (``group ==
-    "orchestrator"``), the dispatch endpoint is the action's own ``action_name``
-    (e.g. ``"wait"``), NOT the default ``"run_action"``.  Orchestrators host
-    named built-in endpoints, not a generic ``run_action`` handler.
     """
     server = action.action_server
     server_key = getattr(server, "server_name", None) or "action"
+
+    # The dispatch endpoint is the action's own ``action_name`` — HELAO action
+    # servers (and the orchestrator's own built-ins) register routes at
+    # ``/{server_key}/{action_name}`` (e.g. ``/SIM/acquire_data``, ``/ORCH/wait``),
+    # matching legacy ``orch.py`` (``endpoint_name=A.action_name``). The
+    # ``endpoint`` arg is only a fallback for actions with no ``action_name``.
+    resolved_endpoint = getattr(action, "action_name", None) or endpoint
+    if not getattr(action, "action_name", None):
+        LOGGER.debug(
+            "_dispatch_target_for: action for %r has no action_name; "
+            "falling back to endpoint %r",
+            server_key, endpoint,
+        )
 
     # Priority 1: config servers map
     if servers_map:
@@ -169,22 +182,6 @@ def _dispatch_target_for(
         if cfg_entry and isinstance(cfg_entry, dict):
             host = cfg_entry.get("host") or cfg_entry.get("hostname") or "127.0.0.1"
             port = cfg_entry.get("port") or 8000
-            # For orchestrator self-dispatch use the action_name as endpoint.
-            resolved_endpoint = endpoint
-            if cfg_entry.get("group") == "orchestrator":
-                action_name = getattr(action, "action_name", None)
-                if action_name:
-                    resolved_endpoint = action_name
-                else:
-                    # MINOR-7: orchestrator-group target with no action_name to
-                    # resolve to a hosted endpoint — there is no generic
-                    # ``run_action`` handler on an orch, so this dispatch will
-                    # almost certainly 404. Log it so it is diagnosable.
-                    LOGGER.debug(
-                        "_dispatch_target_for: orchestrator-group target %r has no "
-                        "action_name; no registered endpoint to resolve (will use %r)",
-                        server_key, endpoint,
-                    )
             return DispatchTarget(
                 server_key=server_key, host=host, port=int(port), endpoint=resolved_endpoint
             )
@@ -193,7 +190,7 @@ def _dispatch_target_for(
     host = getattr(server, "hostname", None) or getattr(server, "host", None) or "127.0.0.1"
     port = getattr(server, "port", None) or 8000
     return DispatchTarget(
-        server_key=server_key, host=host, port=int(port), endpoint=endpoint
+        server_key=server_key, host=host, port=int(port), endpoint=resolved_endpoint
     )
 
 
@@ -257,7 +254,7 @@ async def execute_commands(
         elif isinstance(cmd, DispatchAction):
             action = cmd.action
             target = _dispatch_target_for(action, servers_map=ports.servers_map)
-            result = await ports.transport.dispatch(target, action.as_dict())
+            result = await ports.transport.dispatch(target, {**(action.action_params or {}), "action": action.as_dict()})
             result_action = action if result.error == ErrorCodes.none else None
             _st, fb = orch.on_dispatch_result(state, result_action, result.error)
             followups.extend(fb)
@@ -1093,13 +1090,18 @@ def makeOrchApp(
         # Using Body({}) + isinstance guard ensures we always have a plain dict.
         body = action_dict if isinstance(action_dict, dict) else {}
 
-        # Extract waittime from the body — support both calling conventions.
-        if "action_params" in body and isinstance(body["action_params"], dict):
-            waittime_val = body["action_params"].get("waittime")
-        elif "waittime" in body:
+        # Extract waittime from the body — support three calling conventions:
+        # 1. Orch dispatch (new):  {waittime: x, "action": {action_uuid: ..., ...}}
+        # 2. Direct/test calls:    {"waittime": x}
+        # 3. Legacy orch dispatch: {"action_params": {"waittime": x}}
+        if "waittime" in body:
             waittime_val = body["waittime"]
+        elif "action_params" in body and isinstance(body["action_params"], dict):
+            waittime_val = body["action_params"].get("waittime")
         else:
-            waittime_val = None
+            _nested_action = body.get("action") or {}
+            _nested_params = _nested_action.get("action_params") or {}
+            waittime_val = _nested_params.get("waittime")
 
         # A payload-less call (empty body, no waittime signal) is a probe /
         # handshake — never start a spurious wait; return a benign no-op ack.
@@ -1113,10 +1115,16 @@ def makeOrchApp(
 
         # Reuse the uuid from the dispatched action when present so status
         # correlates back to the FSM's tracked action uuid.
+        # With the new payload {**action_params, "action": action.as_dict()},
+        # action_uuid sits nested under body["action"]["action_uuid"].
         now = datetime.now()
-        if "action_uuid" in body and body["action_uuid"]:
+        _raw_uuid = (
+            body.get("action_uuid")
+            or (body.get("action") or {}).get("action_uuid")
+        )
+        if _raw_uuid:
             try:
-                action_uuid = _uuid.UUID(str(body["action_uuid"]))
+                action_uuid = _uuid.UUID(str(_raw_uuid))
             except (ValueError, AttributeError):
                 action_uuid = _uuid.uuid4()
         else:

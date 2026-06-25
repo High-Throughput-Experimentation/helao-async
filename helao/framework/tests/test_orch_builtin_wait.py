@@ -395,6 +395,28 @@ async def test_orch_wait_then_sim_action_end_to_end(fake_action_server: FakeServ
                 f"Actions still queued after loop; action_dq={list(driver.state.action_dq)}"
             )
 
+            # Verify that the new dispatch payload {**action_params, "action": ...}
+            # delivers flat params (like `duration`) to the fake server's run_for endpoint.
+            import httpx as _httpx
+            from helao.framework.domain.run_models import RunAction as _RA
+            _test_action = _RA(
+                action_name="run_for",
+                action_server=MachineModel(server_name=fsi.server_key, hostname=fsi.host, port=fsi.http_port),
+                action_params={"duration": 0.3},
+            )
+            async with _httpx.AsyncClient(base_url=f"http://{fsi.host}:{fsi.http_port}") as _verify_client:
+                _verify_resp = await _verify_client.post(
+                    f"/{fsi.server_key}/run_for",
+                    json={"duration": 0.3, "action": _test_action.as_dict()},
+                )
+                assert _verify_resp.status_code == 200, (
+                    f"run_for dispatch verification failed: {_verify_resp.status_code} {_verify_resp.text}"
+                )
+                _verify_body = _verify_resp.json()
+                assert _verify_body.get("duration") == 0.3, (
+                    f"duration not delivered to run_for endpoint: {_verify_body}"
+                )
+
         finally:
             srv.stop()
             await transport.aclose()
