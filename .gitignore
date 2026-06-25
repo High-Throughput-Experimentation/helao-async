@@ -23,6 +23,7 @@ ntpLastSync.txt
 helao/deploy/*
 !helao/deploy/__init__.py
 !helao/deploy/hte/
+!helao/deploy/test/
 
 # superpowers brainstorm/companion artifacts
 .superpowers
