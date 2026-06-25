@@ -952,6 +952,10 @@ def makeOrchApp(
     # Status subscriber: one task per action server in servers_map (b1).
     # Guarded: if servers_map is empty (unit tests / in-process runners) start()
     # is a no-op so no network connections are attempted.
+    LOGGER.info(
+        "makeOrchApp: creating OrchStatusSubscriber; ports.servers_map keys=%s",
+        list(ports.servers_map),
+    )
     app.state.status_subscriber = OrchStatusSubscriber(ports.servers_map)
 
     # --- SP-ORCH-5c: co-locate a FrameworkBase so the orch hosts its OWN -----

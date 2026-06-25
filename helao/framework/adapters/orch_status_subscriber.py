@@ -116,12 +116,28 @@ class OrchStatusSubscriber:
             driver: An :class:`~helao.framework.app.orch_api.OrchDriver` whose
                 ``on_status_update`` coroutine is called for each frame.
         """
+        # DIAGNOSTIC (SP-ORCH-5 live bring-up): log the raw map unconditionally so
+        # a non-starting subscriber is traceable to an empty/mis-typed servers_map.
+        LOGGER.info(
+            "OrchStatusSubscriber.start(): servers_map has %d entries: %s",
+            len(self._servers_map),
+            {
+                k: {"type": type(v).__name__, "group": (v.get("group") if isinstance(v, dict) else None)}
+                for k, v in self._servers_map.items()
+            },
+        )
         action_servers = {
             key: cfg
             for key, cfg in self._servers_map.items()
             if isinstance(cfg, dict) and cfg.get("group") == "action"
         }
         if not action_servers:
+            LOGGER.warning(
+                "OrchStatusSubscriber.start(): NO action-group servers found in servers_map "
+                "(%d total entries) — NO /ws_status subscriptions will be created; the orch "
+                "will never hear external action completion.",
+                len(self._servers_map),
+            )
             return
         for server_key, cfg in action_servers.items():
             host = cfg.get("host") or cfg.get("hostname") or "127.0.0.1"
