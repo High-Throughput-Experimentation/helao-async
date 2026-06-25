@@ -1075,7 +1075,7 @@ def makeOrchApp(
     from helao.framework.models.machine import MachineModel as _MachineModel
 
     @app.post(f"/{server_key}/wait")
-    async def wait(action_dict: dict = _Body(None)) -> dict:
+    async def wait(action_dict: dict = _Body({})) -> dict:
         """Start a timed wait action backed by WaitExec. Returns immediately; executor runs in background.
 
         Accepts two calling conventions:
@@ -1083,15 +1083,33 @@ def makeOrchApp(
            ``execute_commands`` → ``transport.dispatch``). ``waittime`` is read from
            ``body["action_params"]["waittime"]``.
         2. Direct / test calls: body is ``{"waittime": <float>}`` or ``{"action_params": {"waittime": <float>}}``.
+
+        Empty-args calls (RPC reachability probes / handshakes) return a benign
+        no-op ack dict without starting a WaitExec.  A real orch self-dispatch
+        always includes ``action_params.waittime`` and is never payload-less.
         """
-        body = action_dict or {}
+        # Guard: over RPC, an empty-args call (probe/handshake) leaves action_dict
+        # as the fastapi.params.Body sentinel if the default is Body(None).
+        # Using Body({}) + isinstance guard ensures we always have a plain dict.
+        body = action_dict if isinstance(action_dict, dict) else {}
+
         # Extract waittime from the body — support both calling conventions.
         if "action_params" in body and isinstance(body["action_params"], dict):
-            waittime = float(body["action_params"].get("waittime", 10.0))
+            waittime_val = body["action_params"].get("waittime")
         elif "waittime" in body:
-            waittime = float(body["waittime"])
+            waittime_val = body["waittime"]
         else:
-            waittime = 10.0
+            waittime_val = None
+
+        # A payload-less call (empty body, no waittime signal) is a probe /
+        # handshake — never start a spurious wait; return a benign no-op ack.
+        if waittime_val is None:
+            LOGGER.debug(
+                "/wait called with no waittime (likely RPC probe/handshake) — no-op"
+            )
+            return {"status": "noop", "reason": "no waittime in request"}
+
+        waittime = float(waittime_val)
 
         # Reuse the uuid from the dispatched action when present so status
         # correlates back to the FSM's tracked action uuid.
