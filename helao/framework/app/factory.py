@@ -47,6 +47,7 @@ def makeApp(
     postprocessors=None,
     action_servers=None,
     servers_map=None,
+    synthesize_completion: bool = True,
 ) -> FastAPI:
     """Build the FastAPI app for ``server_key`` per ``group``.
 
@@ -65,6 +66,8 @@ def makeApp(
             pings (orchestrator only; action-group subset of servers_map).
         servers_map: Full CONFIG ``servers`` map (all groups) for config-driven
             target resolution including ORCH self-dispatch (orchestrator only).
+        synthesize_completion: Passed to :class:`OrchPorts`; False disables
+            synthesized completion so the loop waits for real /ws_status.
 
     Returns:
         A configured :class:`fastapi.FastAPI` instance.
@@ -79,6 +82,7 @@ def makeApp(
             postprocessors=postprocessors,
             action_servers=action_servers,
             servers_map=servers_map,
+            synthesize_completion=synthesize_completion,
         )
     return makeActionApp(server_key, save_root)
 
@@ -93,6 +97,7 @@ def makeOrchestratorApp(
     postprocessors=None,
     action_servers=None,
     servers_map=None,
+    synthesize_completion: bool = True,
 ) -> FastAPI:
     """Assemble the orchestrator FastAPI app (an :class:`OrchDriver`).
 
@@ -106,6 +111,10 @@ def makeOrchestratorApp(
             target resolution including ORCH self-dispatch. ``None``/empty keeps
             the existing MachineModel-based fallback behaviour (unit tests and
             in-process runners pass nothing here).
+        synthesize_completion: When False (real transport path), the orch does
+            not synthesize finished status after dispatch; it waits for genuine
+            status from the /ws_status subscriber. Default True preserves
+            FakeTransport / in-process runner behaviour.
     """
     from helao.framework.app.orch_api import OrchPorts, makeOrchApp
 
@@ -123,6 +132,7 @@ def makeOrchestratorApp(
         postprocessors=postprocessors,
         action_servers=action_servers,
         servers_map=servers_map,
+        synthesize_completion=synthesize_completion,
     )
     app = makeOrchApp(server_key, ports=ports)
     app.state.save_root = save_root

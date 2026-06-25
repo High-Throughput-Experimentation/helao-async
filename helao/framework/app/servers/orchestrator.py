@@ -57,13 +57,19 @@ def makeApp(server_key):
     # SP-ORCH-5 Part (a2): wire HttpTransport(use_rpc=True) in production when
     # CONFIG provides a non-empty servers map. FakeTransport is the fallback
     # (factory default) when servers_map is empty (no real deployment config).
+    # SP-ORCH-5 Part (b2): when a real transport is wired, disable synthesized
+    # completion so the loop waits for genuine finished status from the
+    # /ws_status subscriber instead of immediately marking actions done.
     transport = None
+    synthesize_completion = True  # default: preserve FakeTransport / in-process behaviour
     if servers_map:
         from helao.framework.adapters.http_transport import HttpTransport
         transport = HttpTransport(use_rpc=True)
+        synthesize_completion = False  # real transport: wait for real status
         LOGGER.info(
             "orchestrator '%s': wiring HttpTransport(use_rpc=True) "
-            "with %d config servers", server_key, len(servers_map)
+            "with %d config servers; synthesize_completion=False",
+            server_key, len(servers_map)
         )
 
     return _make_framework_app(
@@ -74,4 +80,5 @@ def makeApp(server_key):
         experiment_lib=experiment_lib,
         action_servers=action_servers,
         servers_map=servers_map,
+        synthesize_completion=synthesize_completion,
     )
