@@ -18,11 +18,13 @@ servers:
     host: hte-eche-08.htejcap.caltech.edu
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params: {}
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: hte-eche-08.htejcap.caltech.edu
     port: 5002
     params:
@@ -109,6 +111,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: framework
     params:
       doc_name: ECHE8 Visualizer
   DB:

@@ -36,7 +36,8 @@ servers:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params:
       seqspec_parser_path: helao\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
@@ -44,6 +45,7 @@ servers:
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: hte-adss-01.htejcap.caltech.edu
     port: 5002
     params:
@@ -208,6 +210,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: framework
     params: {}
   WORKSYRINGE:
     host: hte-adss-01.htejcap.caltech.edu
@@ -236,6 +239,7 @@ servers:
     port: 5004
     group: visualizer
     bokeh: live_visualizer
+    deployment: framework
     params:
       doc_name: Sensor Visualizer
   DB:
