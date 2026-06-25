@@ -5,7 +5,7 @@ Defines short experiments that combine ``wait``/``add_global_param``/
 non-blocking dispatch and conditional sequence termination.
 """
 
-__all__ = ["TEST_sub_noblocking", "TEST_sub_conditional_stop"]
+__all__ = ["TEST_sub_noblocking", "TEST_sub_conditional_stop", "TEST_sub_wait_acquire"]
 
 
 from socket import gethostname
@@ -26,6 +26,7 @@ EXPERIMENTS = __all__
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
+SIM_server = MM(server_name="SIM", machine_name=gethostname().lower()).as_dict()
 
 
 @experiment(version=1)
@@ -86,4 +87,35 @@ def TEST_sub_conditional_stop(
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
+    return apm.experiment
+
+
+@experiment(version=1)
+def TEST_sub_wait_acquire(
+    wait_time_s: float = 2.0,
+    acq_duration_s: float = 3.0,
+    acquisition_rate: float = 0.2,
+):
+    """Short SP-ORCH-5 smoke experiment: an ORCH ``wait`` then a SIM recording.
+
+    Dispatches a blocking ``wait`` on the orchestrator itself, then an
+    ``acquire_data`` recording action on the ``SIM`` (``ws_simulator``) action
+    server. Exercises the framework orchestrator's real dispatch + status
+    ingestion (the SIM action) and its built-in ``wait`` action.
+
+    Args:
+        wait_time_s: Seconds for the ORCH ``wait`` action.
+        acq_duration_s: Seconds for the SIM ``acquire_data`` recording.
+        acquisition_rate: SIM data acquisition period (seconds per sample).
+
+    Returns:
+        The configured ``Experiment``.
+    """
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "wait", {"waittime": wait_time_s})
+    apm.add(
+        SIM_server,
+        "acquire_data",
+        {"duration": acq_duration_s, "acquisition_rate": acquisition_rate},
+    )
     return apm.experiment
