@@ -817,6 +817,18 @@ class ActionSession:
             if not action.manual_action:
                 await self._relocate_run_dir(action)
 
+        # IMPORTANT-4: deregister the finished executor from base.executors so the
+        # registry does not leak (start_executor registered it by exec_id; nothing
+        # removed it before, so cancel_wait iterated ghosts and memory grew). Keyed
+        # by the executor's own exec_id; guarded so a session without an executor
+        # (or base) is a no-op.
+        executor = getattr(self, "executor", None)
+        base = getattr(self, "base", None)
+        if executor is not None and base is not None:
+            exec_id = getattr(executor, "exec_id", None)
+            if exec_id is not None:
+                base.executors.pop(exec_id, None)
+
         return self.action
 
     #: synced-tree prefix the finished run dir is relocated under (legacy

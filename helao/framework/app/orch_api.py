@@ -26,7 +26,10 @@ resulting commands are executed (parent spec §6).
 from __future__ import annotations
 
 import asyncio
+import os
 import pickle
+import tempfile
+import time
 import uuid as _uuid
 from datetime import datetime
 from typing import Any, Callable, List, Mapping, Optional
@@ -64,7 +67,7 @@ from helao.framework.support import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-__all__ = ["OrchPorts", "execute_commands", "OrchDriver", "makeOrchApp"]
+__all__ = ["OrchPorts", "execute_commands", "OrchDriver", "makeOrchApp", "WaitExec", "OwnStatusIngestor"]
 
 
 class OrchPorts:
@@ -151,6 +154,11 @@ def _dispatch_target_for(
     ``servers_map`` is the complete ``CONFIG["servers"]`` dict injected via
     :class:`OrchPorts`; it is ``None``/empty in unit-tests and in-process runners
     (falls through to the MachineModel path).
+
+    SP-ORCH-5c note: when the target server is an orchestrator (``group ==
+    "orchestrator"``), the dispatch endpoint is the action's own ``action_name``
+    (e.g. ``"wait"``), NOT the default ``"run_action"``.  Orchestrators host
+    named built-in endpoints, not a generic ``run_action`` handler.
     """
     server = action.action_server
     server_key = getattr(server, "server_name", None) or "action"
@@ -161,8 +169,24 @@ def _dispatch_target_for(
         if cfg_entry and isinstance(cfg_entry, dict):
             host = cfg_entry.get("host") or cfg_entry.get("hostname") or "127.0.0.1"
             port = cfg_entry.get("port") or 8000
+            # For orchestrator self-dispatch use the action_name as endpoint.
+            resolved_endpoint = endpoint
+            if cfg_entry.get("group") == "orchestrator":
+                action_name = getattr(action, "action_name", None)
+                if action_name:
+                    resolved_endpoint = action_name
+                else:
+                    # MINOR-7: orchestrator-group target with no action_name to
+                    # resolve to a hosted endpoint — there is no generic
+                    # ``run_action`` handler on an orch, so this dispatch will
+                    # almost certainly 404. Log it so it is diagnosable.
+                    LOGGER.debug(
+                        "_dispatch_target_for: orchestrator-group target %r has no "
+                        "action_name; no registered endpoint to resolve (will use %r)",
+                        server_key, endpoint,
+                    )
             return DispatchTarget(
-                server_key=server_key, host=host, port=int(port), endpoint=endpoint
+                server_key=server_key, host=host, port=int(port), endpoint=resolved_endpoint
             )
 
     # Priority 2: MachineModel fields
@@ -381,6 +405,14 @@ class OrchDriver:
         self.action_servers = dict(getattr(ports, "action_servers", {}) or {})
         self.heartbeat_interval = 5.0
         self._heartbeat_task = None
+        # --- SP-ORCH-5c: single Event-driven dispatch loop ---------------------
+        # Exactly ONE long-lived dispatch-loop task ever drains the queues. It is
+        # parked on ``self._wake`` whenever it reaches a WAIT / no-progress point
+        # and resumed by ``on_status_update`` / ``start`` calling ``self._wake.set()``.
+        # ``_loop_task`` is the single drainer; it is (re)created lazily by
+        # ``_ensure_loop_task`` so concurrent pops are impossible (no second loop).
+        self._wake: asyncio.Event = asyncio.Event()
+        self._loop_task: Optional[asyncio.Task] = None
 
     # --- command execution + draining --------------------------------------
 
@@ -401,9 +433,82 @@ class OrchDriver:
         await self._execute(cmds)
 
     async def start(self) -> None:
-        """Move the loop to ``started`` (if there is work) and run it."""
+        """Move the loop to ``started`` (if there is work) and run the single loop.
+
+        SP-ORCH-5c: there is exactly ONE dispatch-loop task. ``start`` applies the
+        ``start`` intent, then either
+
+        * runs the loop **inline to completion** when the in-process synthesize
+          path is active (``ports.synthesize_completion`` — micro_orch / unit
+          tests / FakeTransport callers): every successful dispatch immediately
+          folds finished status so the loop never parks at WAIT and drains to a
+          terminal IDLE in one pass; ``await start()`` therefore returns once the
+          queues are drained, preserving the legacy synchronous-drain contract; or
+        * ensures the single long-lived background loop task is running and sets
+          the wake event (real transport / production): the HTTP ``/start`` handler
+          returns immediately while the loop parks on ``self._wake`` at WAIT and is
+          resumed by ``on_status_update``.
+        """
         await self._intent("start")
-        await self.run_dispatch_loop()
+        if getattr(self.ports, "synthesize_completion", True):
+            # In-process: drain inline so ``await start()`` blocks until done.
+            self._wake.set()
+            await self.run_dispatch_loop()
+            return
+        # Production: a single background drainer; start() returns immediately.
+        self._wake.set()
+        self._ensure_loop_task()
+
+    def _ensure_loop_task(self) -> None:
+        """Create the single background dispatch-loop task if not already alive.
+
+        Only ONE ``run_dispatch_loop`` task ever exists, so concurrent pops of the
+        same queue are impossible. A done-callback escalates any unexpected loop
+        exception to estop (IMPORTANT-6) instead of letting the task die silently.
+        """
+        task = self._loop_task
+        if task is not None and not task.done():
+            return
+        self._loop_task = asyncio.create_task(
+            self.run_dispatch_loop(), name=f"orch_dispatch_loop_{self.server_key}"
+        )
+        self._loop_task.add_done_callback(self._on_loop_task_done)
+
+    def _on_loop_task_done(self, task: "asyncio.Task") -> None:
+        """Done-callback: surface a crashed loop task and escalate to estop.
+
+        A clean exit (terminal IDLE) or a cancellation at shutdown is expected and
+        ignored; any other exception is logged ERROR and the FSM is driven to
+        estopped so the failure is operator-visible rather than a swallowed
+        "Task exception never retrieved" (IMPORTANT-6).
+        """
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is None:
+            return
+        LOGGER.error(f"dispatch loop task crashed: {exc!r}; escalating to estop")
+        try:
+            _st, cmds = orch.apply_intent(
+                self.state, "estop", reason=f"dispatch loop task crashed: {exc}"
+            )
+            # schedule the estop command execution on the running loop
+            asyncio.ensure_future(self._execute(cmds))
+        except Exception as inner:  # pragma: no cover - defensive
+            LOGGER.error(f"failed to escalate crashed loop task to estop: {inner!r}")
+
+    async def shutdown(self) -> None:
+        """Cancel the single dispatch-loop task cleanly (idempotent)."""
+        task = self._loop_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # pragma: no cover - defensive
+                pass
+        self._loop_task = None
 
     async def stop(self) -> None:
         """Request a graceful stop of the dispatch loop."""
@@ -430,9 +535,32 @@ class OrchDriver:
         await self._intent(f"clear_{which}")
 
     async def on_status_update(self, asm: Optional[ActionServerModel]) -> None:
-        """Fold a remote action-server status into state and execute reactions."""
+        """Fold a remote action-server status into state and execute reactions.
+
+        SP-ORCH-5c: this NEVER spawns a dispatch loop. After folding status and
+        executing its reactions it simply wakes the single long-lived dispatch
+        loop task (``self._wake.set()``) so the (one) drainer re-evaluates
+        ``decide_next`` and advances past a WAIT it was parked on. Because the
+        loop clears the event BEFORE parking, a set that lands mid-step is
+        remembered and consumed when it next parks — no lost wakeup, and exactly
+        one task ever pops the queues.
+
+        If the loop task is not currently alive (e.g. it exited at a terminal
+        IDLE and new work folded in via this status), it is (re)created so the
+        wake is not lost.
+        """
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
+        self._wake.set()
+        # In production (background loop) a status arriving after the loop exited
+        # at IDLE must respawn the single drainer so the wake is honoured. The
+        # in-process synthesize path drives the loop inline from start(), so it is
+        # never resurrected here.
+        if not getattr(self.ports, "synthesize_completion", True):
+            from helao.framework.models.orchstatus import LoopStatus
+
+            if self.state.loop_state == LoopStatus.started:
+                self._ensure_loop_task()
 
     # --- heartbeat -----------------------------------------------------------
 
@@ -490,13 +618,30 @@ class OrchDriver:
     # --- the loop ------------------------------------------------------------
 
     async def run_dispatch_loop(self, *, max_steps: int = 10_000) -> None:
-        """Drive the FSM to a natural stop/idle, realising commands via ports.
+        """The SINGLE long-lived dispatch drainer driven by ``self._wake``.
 
         Each iteration consults :func:`orchestration.decide_next` and, for the
         seq/exp dispatch decisions, pre-expands through the library maps so the
-        pure dispatch step receives its ``expand_result``. The single ``app/``
-        exception boundary wraps the body: an unexpected exception logs, drives
-        the FSM to ``estopped``, executes the estop commands, and breaks.
+        pure dispatch step receives its ``expand_result``.
+
+        SP-ORCH-5c parking semantics (kills the spawn-on-status races): instead of
+        ``break``-ing at a WAIT / no-progress point, the loop **parks on the wake
+        event** — ``self._wake.clear(); await self._wake.wait()`` — and then
+        continues. The event is cleared BEFORE awaiting so a ``set`` that lands
+        mid-step is remembered and consumed at the next park (no lost wakeup).
+        ``on_status_update`` / ``start`` set the event; because there is only ever
+        one loop task, concurrent pops are impossible.
+
+        The loop EXITS the task only on a genuine terminal:
+
+        * STOP (stop/estop intent or estopped state), or
+        * IDLE with all queues empty and no active experiment/sequence (a clean
+          drain; a later enqueue + ``start`` / wake recreates the task), or
+        * cancellation at shutdown.
+
+        The single ``app/`` exception boundary wraps the step body: an unexpected
+        exception logs, drives the FSM to ``estopped``, executes the estop
+        commands, and exits.
         """
         from helao.framework.models.orchstatus import LoopStatus
 
@@ -504,10 +649,18 @@ class OrchDriver:
         while steps < max_steps:
             steps += 1
             if self.state.loop_state != LoopStatus.started:
-                break
+                break  # STOP/estopped/stopped — terminal, exit the task
             decision = orch.decide_next(self.state)
             if decision in (OrchDecision.STOP, OrchDecision.IDLE):
-                break
+                break  # terminal: nothing left to drain
+            if decision == OrchDecision.WAIT:
+                # Park: clear BEFORE awaiting so a concurrent set is not lost.
+                self._wake.clear()
+                # Re-check after clearing in case decide_next changed between the
+                # clear and the await (a set that already happened is consumed).
+                if orch.decide_next(self.state) == OrchDecision.WAIT:
+                    await self._wake.wait()
+                continue
             try:
                 progressed = await self._step(decision)
             except Exception as exc:  # the single app/ exception boundary
@@ -518,8 +671,17 @@ class OrchDriver:
                 await self._execute(cmds)
                 break
             if not progressed:
-                # WAIT with nothing externally driving us forward: avoid a spin.
-                break
+                # No in-process progress (e.g. a start-condition re-queue): park
+                # on the wake event rather than spin or exit, so an external
+                # status update can advance us. Clear before awaiting (no lost
+                # wakeup). The in-process synthesize path never reaches here
+                # because each dispatch folds finished status immediately.
+                self._wake.clear()
+                if not orch.decide_next(self.state) in (
+                    OrchDecision.STOP,
+                    OrchDecision.IDLE,
+                ):
+                    await self._wake.wait()
 
     async def _step(self, decision: OrchDecision) -> bool:
         """Execute one dispatch decision. Returns True if the loop progressed."""
@@ -580,6 +742,143 @@ class OrchDriver:
 
 
 # --------------------------------------------------------------------------- #
+# WaitExec — polled timing executor for the orchestrator's built-in wait action
+# --------------------------------------------------------------------------- #
+
+
+class WaitExec:
+    """Executor implementing the orchestrator's ``wait`` built-in action.
+
+    Ported from :class:`helao.core.servers.orch_api.WaitExec` onto the
+    framework's :mod:`~helao.framework.domain.executor.Executor` contract.
+
+    Placement: ``app/`` layer because it uses :func:`asyncio.sleep` and
+    :func:`time.time` (I/O primitives that are fine in ``app/`` but are
+    excluded from the pure ``domain/`` layer).
+
+    ``waittime`` is read from ``active.action.action_params``; ``-1`` means
+    indefinite (the executor runs until :meth:`stop_action_task` is called).
+    """
+
+    def __init__(self, active, **kwargs):
+        from helao.framework.domain.executor import Executor as _Executor
+
+        # Reuse Executor's exec_id stamping logic without inheriting from it
+        # to avoid requiring the full Executor ABC in the app/ layer.  We duck-
+        # type the interface: ``oneoff=False`` (poll loop), ``poll_rate``,
+        # ``exec_id``, ``start_time``, ``concurrent``, ``stop_action_task``.
+        self.active = active
+        self.oneoff = False
+        self.poll_rate = 0.01
+        self.concurrent = True
+        self.exec_id = f"{active.action.action_name} {active.action.action_uuid}"
+        self.active.action.exec_id = self.exec_id
+        self.start_time = time.time()
+        self.duration = self.active.action.action_params.get("waittime", -1)
+        self.print_every_secs = kwargs.get("print_every_secs", 5)
+        self.last_print_time = self.start_time
+        LOGGER.info("WaitExec initialized.")
+
+    async def _pre_exec(self) -> dict:
+        """No-op setup phase."""
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self) -> dict:
+        """Log the wait duration; poll loop handles timing."""
+        LOGGER.info(f" ... wait action: {self.duration}")
+        return {"data": {}, "error": ErrorCodes.none}
+
+    async def _poll(self) -> dict:
+        """Track elapsed time, log progress, and finish once the wait expires."""
+        check_time = time.time()
+        elapsed = check_time - self.start_time
+        if check_time - self.last_print_time > self.print_every_secs - 0.01:
+            LOGGER.info(f" ... orch waited {elapsed:.1f}s / {self.duration:.1f}s")
+            self.last_print_time = check_time
+        if self.duration < 0 or elapsed < self.duration:
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        await asyncio.sleep(0.001)
+        return {"error": ErrorCodes.none, "status": status}
+
+    async def _post_exec(self) -> dict:
+        """Log completion."""
+        LOGGER.info(" ... wait action done")
+        return {"error": ErrorCodes.none}
+
+    async def _manual_stop(self) -> dict:
+        """No-op manual stop."""
+        return {"error": ErrorCodes.none}
+
+    def stop_action_task(self) -> None:
+        """Signal the action loop to exit on its next iteration."""
+        LOGGER.info("WaitExec stop_action_task called.")
+        self.active.manual_stop = True
+        self.active.action_loop_running = False
+
+
+# --------------------------------------------------------------------------- #
+# OwnStatusIngestor — in-process self-status subscriber for the orch base
+# --------------------------------------------------------------------------- #
+
+
+class OwnStatusIngestor:
+    """In-process subscriber that feeds the orch base's action status into driver.on_status_update.
+
+    The orch's WaitExec emits status via base.eventsink (STATUS_CHANNEL). This
+    ingestor subscribes to that eventsink's queue and calls driver.on_status_update
+    for each emission, so the FSM sees the wait's finished status and advances.
+    """
+
+    def __init__(self, base) -> None:
+        from helao.framework.app.base_api import FrameworkBase  # local to avoid circ
+
+        self._base = base
+        self._task: Optional[asyncio.Task] = None
+
+    def start(self, driver: "OrchDriver") -> None:
+        """Start the ingestion background task."""
+        self._task = asyncio.create_task(
+            self._ingest_loop(driver),
+            name=f"own_status_ingestor_{self._base.server_key}",
+        )
+
+    def stop(self) -> None:
+        """Cancel the ingestion task (idempotent)."""
+        if self._task and not self._task.done():
+            self._task.cancel()
+        self._task = None
+
+    async def _ingest_loop(self, driver: "OrchDriver") -> None:
+        """Subscribe to base.eventsink and forward status updates to driver.on_status_update."""
+        from helao.framework.adapters.orch_status_subscriber import asm_from_action_dict
+        from helao.framework.ports.eventsink import STATUS_CHANNEL
+
+        subscribe = getattr(self._base.eventsink, "subscribe", None)
+        if not callable(subscribe):
+            LOGGER.warning("OwnStatusIngestor: eventsink has no subscribe(); ingestor inactive")
+            return
+        queue = subscribe()
+        while True:
+            try:
+                item = await queue.get()
+                if isinstance(item, tuple) and len(item) == 2:
+                    channel, payload = item
+                    if channel != STATUS_CHANNEL:
+                        continue
+                else:
+                    payload = item
+                asm = asm_from_action_dict(payload)
+                if asm is not None:
+                    await driver.on_status_update(asm)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                LOGGER.warning(f"OwnStatusIngestor: error processing status: {exc!r}")
+
+
+# --------------------------------------------------------------------------- #
 # WebSocket relay (module-level so tests can import it directly)
 # --------------------------------------------------------------------------- #
 
@@ -626,6 +925,7 @@ def makeOrchApp(
     *,
     ports: OrchPorts,
     state: Optional[OrchState] = None,
+    save_root: Optional[str] = None,
 ):
     """Build a FastAPI app wrapping an :class:`OrchDriver`.
 
@@ -656,6 +956,71 @@ def makeOrchApp(
     # Guarded: if servers_map is empty (unit tests / in-process runners) start()
     # is a no-op so no network connections are attempted.
     app.state.status_subscriber = OrchStatusSubscriber(ports.servers_map)
+
+    # --- SP-ORCH-5c: co-locate a FrameworkBase so the orch hosts its OWN -----
+    # --- action endpoints (wait/cancel_wait/interrupt) and feeds its OWN     ----
+    # --- action status back into the FSM via OwnStatusIngestor.              ----
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.adapters.ntp_clock import NtpClock as _NtpClock
+    from helao.framework.adapters.queue_eventsink import QueueEventSink as _QueueEventSink
+    from helao.framework.app.base_api import ActionContext, FrameworkBase
+
+    # Determine save_root (IMPORTANT-5): an explicit caller-supplied ``save_root``
+    # wins (the caller owns the dir and its lifecycle); else CONFIG; else a
+    # tempfile.mkdtemp that WE own and clean up in the shutdown hook (tracked on
+    # ``app.state._owned_tempdir``).
+    _save_root = save_root
+    if _save_root is None:
+        try:
+            from helao.framework.support import config_loader as _cl
+            _cfg = _cl.CONFIG or {}
+            _root = _cfg.get("root") or _cfg.get("save_root")
+            if _root:
+                _save_root = os.path.join(_root, "RUNS_HLO", server_key)
+        except Exception:
+            pass
+    app.state._owned_tempdir = None
+    if _save_root is None:
+        _save_root = tempfile.mkdtemp(prefix=f"helao_{server_key}_")
+        app.state._owned_tempdir = _save_root  # we created it -> we remove it
+    os.makedirs(_save_root, exist_ok=True)
+
+    # SEPARATE eventsink for the base — carries action STATUS_CHANNEL events.
+    # Must NOT be the same as ports.eventsink (which carries GLOBAL_STATUS_CHANNEL);
+    # mixing them would cause OwnStatusIngestor to receive global-status noise.
+    _base_eventsink = _QueueEventSink()
+
+    base = FrameworkBase(
+        server_key=server_key,
+        storage=FsStorage(save_root=_save_root),
+        eventsink=_base_eventsink,
+        clock=_NtpClock(),
+    )
+    app.state.base = base
+
+    # OwnStatusIngestor: feeds the orch base's action status into driver.on_status_update
+    # so the FSM advances when the wait executor finishes.
+    app.state.own_status_ingestor = OwnStatusIngestor(base)
+
+    @app.on_event("startup")
+    async def _start_base() -> None:
+        """Start FrameworkBase background tasks + register action endpoints."""
+        await base.myinit()
+        await base.init_endpoint_status(app.routes)
+        app.state.own_status_ingestor.start(driver)
+
+    @app.on_event("shutdown")
+    async def _stop_base() -> None:
+        """Stop FrameworkBase + OwnStatusIngestor + dispatch loop; clean owned tempdir."""
+        app.state.own_status_ingestor.stop()
+        # SP-ORCH-5c: cancel the single long-lived dispatch-loop task cleanly.
+        await driver.shutdown()
+        await base.shutdown()
+        # IMPORTANT-5: remove the tempdir we created (no-op for caller/CONFIG roots).
+        owned = getattr(app.state, "_owned_tempdir", None)
+        if owned:
+            import shutil
+            shutil.rmtree(owned, ignore_errors=True)
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
@@ -699,6 +1064,100 @@ def makeOrchApp(
     @app.on_event("shutdown")
     async def _stop_rpc() -> None:
         await app.state.rpc_dispatcher.close()
+
+    # --- SP-ORCH-5c: built-in action endpoints --------------------------------
+    # These endpoints are backed by a FrameworkBase so the orch hosts its own
+    # action lifecycle (WaitExec runs as a background task and emits status
+    # via base.eventsink; OwnStatusIngestor folds that into driver.on_status_update).
+
+    from fastapi import Body as _Body
+    from helao.framework.domain.run_models import RunAction as _RunAction
+    from helao.framework.models.machine import MachineModel as _MachineModel
+
+    @app.post(f"/{server_key}/wait")
+    async def wait(action_dict: dict = _Body(None)) -> dict:
+        """Start a timed wait action backed by WaitExec. Returns immediately; executor runs in background.
+
+        Accepts two calling conventions:
+        1. Orchestrator self-dispatch: body is a full ``RunAction.as_dict()`` (from
+           ``execute_commands`` → ``transport.dispatch``). ``waittime`` is read from
+           ``body["action_params"]["waittime"]``.
+        2. Direct / test calls: body is ``{"waittime": <float>}`` or ``{"action_params": {"waittime": <float>}}``.
+        """
+        body = action_dict or {}
+        # Extract waittime from the body — support both calling conventions.
+        if "action_params" in body and isinstance(body["action_params"], dict):
+            waittime = float(body["action_params"].get("waittime", 10.0))
+        elif "waittime" in body:
+            waittime = float(body["waittime"])
+        else:
+            waittime = 10.0
+
+        # Reuse the uuid from the dispatched action when present so status
+        # correlates back to the FSM's tracked action uuid.
+        now = datetime.now()
+        if "action_uuid" in body and body["action_uuid"]:
+            try:
+                action_uuid = _uuid.UUID(str(body["action_uuid"]))
+            except (ValueError, AttributeError):
+                action_uuid = _uuid.uuid4()
+        else:
+            action_uuid = _uuid.uuid4()
+
+        action = _RunAction(
+            action_name="wait",
+            action_uuid=action_uuid,
+            action_timestamp=now,
+            sequence_timestamp=now,
+            experiment_timestamp=now,
+            sequence_name=body.get("sequence_name", "orch_builtin"),
+            experiment_name=body.get("experiment_name", "orch_builtin"),
+            action_output_dir=str(action_uuid),
+            action_server=_MachineModel(server_name=server_key),
+            # MINOR-8 (PRODUCTION-CRITICAL): stamp this self-hosted action's
+            # ``orchestrator`` to the orch's OWN GSM identity. ``server.py``'s
+            # ``_sort_status`` only removes a finished UUID from ``active_dict``
+            # when ``statusmodel.orchestrator == self.orchestrator``. Under a real
+            # config the GSM orchestrator is the real server identity; if the wait
+            # action kept the default ``MachineModel()`` the equality would fail
+            # and the finished wait would never leave ``active_dict`` → permanent
+            # WAIT stall. Stamping it here keeps self-status folding correct.
+            orchestrator=driver.state.globalstatusmodel.orchestrator,
+            action_params={"waittime": waittime},
+            action_status=[HloStatus.active],
+            save_act=False,
+            save_data=False,
+        )
+        active = await app.state.base.setup_and_contain_action(
+            ActionContext(action=action, endpoint_name="wait"),
+        )
+        executor = WaitExec(active=active)
+        result = active.start_executor(executor)
+        if isinstance(result, dict):
+            return result
+        return {"action_uuid": str(action_uuid), "status": "active"}
+
+    @app.post(f"/{server_key}/cancel_wait")
+    async def cancel_wait() -> dict:
+        """Cancel any running wait executors on this orchestrator."""
+        _base = app.state.base
+        stopped = []
+        for exec_id, executor in list(_base.executors.items()):
+            if exec_id.split()[0] == "wait":
+                stop_fn = getattr(executor, "stop_action_task", None)
+                if callable(stop_fn):
+                    stop_fn()
+                    stopped.append(exec_id)
+        return {"stopped": stopped}
+
+    @app.post(f"/{server_key}/interrupt")
+    async def interrupt(reason: str = _Body("interrupt", embed=True)) -> dict:
+        """Graceful stop of the orch dispatch loop."""
+        await driver.stop()
+        return {"stopped": True, "reason": reason}
+
+    # Note: /{server_key}/estop already exists below (FSM-level estop).
+    # We extend its body via the existing endpoint — no duplicate registered here.
 
     @app.post(f"/{server_key}/start")
     async def start() -> dict:
