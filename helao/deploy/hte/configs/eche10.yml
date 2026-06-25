@@ -37,13 +37,15 @@ servers:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params:
       seqspec_parser_path: helao\deploy\hte\specifications\last3months.py
       seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: hte-eche-10.htejcap.caltech.edu
     port: 5002
     params:
@@ -152,6 +154,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: framework
     params:
       doc_name: ECHE10 Visualizer
   DB:

@@ -14,11 +14,13 @@ servers:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params: {}
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 5002
     params:

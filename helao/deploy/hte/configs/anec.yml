@@ -18,11 +18,13 @@ servers:
     host: hte-anec-03.htejcap.caltech.edu
     port: 8001
     group: orchestrator
-    fast: async_orch2
+    fast: orchestrator
+    deployment: framework
     params: {}
   OPERATOR:
     group: operator
     bokeh: standalone_operator
+    deployment: framework
     host: hte-anec-03.htejcap.caltech.edu
     port: 5002
     params:
@@ -156,6 +158,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: framework
     params:
       doc_name: ANEC Visualizer
   DB:
@@ -180,5 +183,6 @@ servers:
     port: 5004
     group: visualizer
     bokeh: live_visualizer
+    deployment: framework
     params:
       doc_name: Sensor Visualizer

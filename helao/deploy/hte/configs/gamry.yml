@@ -20,6 +20,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: framework
     params:
       doc_name: 'PSTAT Visualizer'
       launch_browser: true
