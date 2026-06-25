@@ -246,6 +246,32 @@ def _broadcast(state: OrchState) -> BroadcastGlobalStatus:
     return BroadcastGlobalStatus(payload=state.globalstatusmodel.as_json())
 
 
+def complete_idle(state: OrchState) -> Tuple[OrchState, List[Any]]:
+    """Natural-completion transition: queues drained -> ``loop_state = stopped``.
+
+    When :func:`decide_next` returns ``IDLE`` (every queue empty, no active
+    experiment/sequence, no active actions) the loop has finished all queued
+    work. Legacy ``Orch`` stopped the loop at this point; the framework loop
+    previously just broke out while leaving ``loop_state == started``, so
+    subscribers (the operator) kept showing the orchestrator as "running" after
+    a sequence completed. This transitions the loop to ``stopped`` and resets any
+    lingering intent, emitting a :class:`BroadcastGlobalStatus` so the operator
+    reflects completion. A later ``start`` intent (with new work queued) returns
+    the loop to ``started``.
+
+    Returns:
+        ``(state, commands)`` with ``state`` mutated in place. Emits the
+        broadcast only when an actual ``started -> stopped`` transition occurs.
+    """
+    gsm = state.globalstatusmodel
+    cmds: List[Any] = []
+    if gsm.loop_state == LoopStatus.started:
+        gsm.loop_state = LoopStatus.stopped
+        gsm.loop_intent = LoopIntent.none
+        cmds.append(_broadcast(state))
+    return state, cmds
+
+
 # --- heartbeat helpers (Task 1) ------------------------------------------------
 
 
