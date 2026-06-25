@@ -24,11 +24,12 @@ __all__ = [
 from typing import Optional
 from socket import gethostname
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.core.models.action_start_condition import ActionStartCondition
-from helao.core.models.sample import SolidSample, LiquidSample, GasSample
-from helao.core.models.machine import MachineModel
-from helao.core.models.process_contrib import ProcessContrib
+from helao.framework.domain.run_models import RunExperiment as Experiment
+from helao.framework.domain.plan_makers import ActionPlanMaker
+from helao.framework.models.action_start_condition import ActionStartCondition
+from helao.framework.models.sample import SolidSample, LiquidSample, GasSample
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.process_contrib import ProcessContrib
 
 from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     MoveModes,
@@ -40,8 +41,8 @@ from helao.deploy.hte.experiments.ADSS_exp import (
     ADSS_sub_OCV,
 )
 
-from helao.core.models.run_use import RunUse
-from helao.helpers.lib_decorators import experiment
+from helao.framework.models.run_use import RunUse
+from helao.framework.support.lib_decorators import experiment
 
 
 EXPERIMENTS = __all__

@@ -2,8 +2,8 @@ __all__ = [
     "ICPMS_postseq",
 ]
 
-from helao.helpers.premodels import ExperimentPlanMaker
-from helao.helpers.lib_decorators import sequence
+from helao.framework.domain.plan_makers import ExperimentPlanMaker
+from helao.framework.support.lib_decorators import sequence
 
 
 SEQUENCES = __all__

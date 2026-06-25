@@ -203,6 +203,13 @@ class ActionPlanMaker:
         action_dict.update(kwargs)
         if "run_use" not in kwargs:
             action_dict["run_use"] = self._experiment.run_use
+        # RunAction.orchestrator is non-Optional (default_factory=MachineModel).
+        # ExperimentModel/RunExperiment carry orchestrator=None when the experiment
+        # was built outside a live orch (e.g. headless test or pre-dispatch staging).
+        # Passing None explicitly overrides the default_factory; drop the key so
+        # Pydantic uses the factory instead.
+        if action_dict.get("orchestrator") is None:
+            action_dict.pop("orchestrator", None)
         self.planned_actions.append(RunAction(**action_dict))
 
     @property

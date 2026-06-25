@@ -47,13 +47,14 @@ __all__ = [
 from socket import gethostname
 from typing import Union
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
-from helao.core.models.action_start_condition import ActionStartCondition as asc
-from helao.core.models.sample import SolidSample, LiquidSample, GasSample
-from helao.core.models.machine import MachineModel
-from helao.core.models.process_contrib import ProcessContrib
+from helao.framework.domain.run_models import RunExperiment as Experiment
+from helao.framework.domain.plan_makers import ActionPlanMaker
+from helao.framework.models.action_start_condition import ActionStartCondition as asc
+from helao.framework.models.sample import SolidSample, LiquidSample, GasSample
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.process_contrib import ProcessContrib
 from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.helpers.lib_decorators import experiment
+from helao.framework.support.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__
