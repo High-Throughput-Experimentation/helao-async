@@ -81,7 +81,19 @@ class OrchPorts:
         sequence_lib: Map of sequence name -> factory (returns experiments).
         experiment_lib: Map of experiment name -> factory (returns actions).
         postprocessors: Names of HLO post-processors (passed through to storage).
-        action_servers: Map of server_key -> {host, port, ...} for heartbeat pings.
+        action_servers: Map of server_key -> {host, port, ...} for heartbeat pings
+            (action-group servers only; subset of servers_map).
+        servers_map: Full CONFIG ``servers`` map (all groups including orchestrator
+            itself). Used by :func:`_dispatch_target_for` for config-driven target
+            resolution including ORCH self-dispatch. Distinct from ``action_servers``
+            which is the heartbeat-only subset. None/{} in unit tests / in-process
+            runners.
+        synthesize_completion: When True (default), a successful dispatch
+            immediately calls ``_synthesize_finished_status`` so in-process /
+            FakeTransport callers can advance without a real status subscriber.
+            Set False when a real transport is wired (e.g. ``HttpTransport``) so
+            the loop waits for genuine finished status from the action server's
+            ``/ws_status`` feed (Part b).
     """
 
     def __init__(
@@ -95,6 +107,8 @@ class OrchPorts:
         experiment_lib: Optional[Mapping[str, Callable]] = None,
         postprocessors: Optional[List[str]] = None,
         action_servers: Optional[Mapping[str, dict]] = None,
+        servers_map: Optional[Mapping[str, dict]] = None,
+        synthesize_completion: bool = True,
     ) -> None:
         self.transport = transport
         self.storage = storage
@@ -104,6 +118,8 @@ class OrchPorts:
         self.experiment_lib: Mapping[str, Callable] = dict(experiment_lib or {})
         self.postprocessors: List[str] = list(postprocessors or [])
         self.action_servers: dict = dict(action_servers or {})
+        self.servers_map: dict = dict(servers_map or {})
+        self.synthesize_completion: bool = synthesize_completion
 
     def now(self) -> datetime:
         """Wall-clock ``datetime`` from the injected clock port."""
@@ -118,10 +134,38 @@ class OrchPorts:
 # --------------------------------------------------------------------------- #
 
 
-def _dispatch_target_for(action: RunAction, endpoint: str = "run_action") -> DispatchTarget:
-    """Build a :class:`DispatchTarget` from an action's action-server identity."""
+def _dispatch_target_for(
+    action: RunAction,
+    endpoint: str = "run_action",
+    *,
+    servers_map: Optional[Mapping[str, dict]] = None,
+) -> DispatchTarget:
+    """Build a :class:`DispatchTarget` from an action's action-server identity.
+
+    Resolution order (a1 — config-driven target resolution):
+    1. ``servers_map[server_key]`` — full CONFIG ``servers`` map entry (covers
+       both action servers AND the orchestrator's own entry for self-dispatch).
+    2. The action's :class:`MachineModel` ``hostname``/``host``/``port`` fields.
+    3. Defaults: ``127.0.0.1``:8000.
+
+    ``servers_map`` is the complete ``CONFIG["servers"]`` dict injected via
+    :class:`OrchPorts`; it is ``None``/empty in unit-tests and in-process runners
+    (falls through to the MachineModel path).
+    """
     server = action.action_server
     server_key = getattr(server, "server_name", None) or "action"
+
+    # Priority 1: config servers map
+    if servers_map:
+        cfg_entry = servers_map.get(server_key)
+        if cfg_entry and isinstance(cfg_entry, dict):
+            host = cfg_entry.get("host") or cfg_entry.get("hostname") or "127.0.0.1"
+            port = cfg_entry.get("port") or 8000
+            return DispatchTarget(
+                server_key=server_key, host=host, port=int(port), endpoint=endpoint
+            )
+
+    # Priority 2: MachineModel fields
     host = getattr(server, "hostname", None) or getattr(server, "host", None) or "127.0.0.1"
     port = getattr(server, "port", None) or 8000
     return DispatchTarget(
@@ -188,17 +232,21 @@ async def execute_commands(
 
         elif isinstance(cmd, DispatchAction):
             action = cmd.action
-            target = _dispatch_target_for(action)
+            target = _dispatch_target_for(action, servers_map=ports.servers_map)
             result = await ports.transport.dispatch(target, action.as_dict())
             result_action = action if result.error == ErrorCodes.none else None
             _st, fb = orch.on_dispatch_result(state, result_action, result.error)
             followups.extend(fb)
             if result.error == ErrorCodes.none and not cmd.nonblocking:
-                # fold the (now finished) action back in, as a status push would
-                _st2, status_cmds = orch.on_status_update(
-                    state, _synthesize_finished_status(action)
-                )
-                followups.extend(status_cmds)
+                # Synthesize completion only when the flag says so (default: True).
+                # With a real transport (HttpTransport), synthesize_completion is
+                # False and the loop waits for the real finished status pushed by
+                # the action server's /ws_status subscriber (Part b).
+                if ports.synthesize_completion:
+                    _st2, status_cmds = orch.on_status_update(
+                        state, _synthesize_finished_status(action)
+                    )
+                    followups.extend(status_cmds)
 
         elif isinstance(cmd, EstopServers):
             # fan estop out to every known action server
@@ -588,6 +636,8 @@ def makeOrchApp(
 
     from helao.core.rpc import RPCDispatcher, derive_rpc_port
 
+    from helao.framework.adapters.orch_status_subscriber import OrchStatusSubscriber
+
     driver = OrchDriver(server_key, ports=ports, state=state)
     app = FastAPI(title=f"{server_key} (framework orchestrator SP5)")
     app.state.driver = driver
@@ -597,10 +647,19 @@ def makeOrchApp(
     # framework orch is a plain FastAPI, so without this every operator/client
     # private dispatch would fall through to the slow HTTP path).
     app.state.rpc_dispatcher = RPCDispatcher(server_key=server_key)
+    # Status subscriber: one task per action server in servers_map (b1).
+    # Guarded: if servers_map is empty (unit tests / in-process runners) start()
+    # is a no-op so no network connections are attempted.
+    app.state.status_subscriber = OrchStatusSubscriber(ports.servers_map)
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
         driver.start_heartbeat()
+
+    @app.on_event("startup")
+    async def _start_status_subscriber() -> None:
+        """Start JSON /ws_status subscriber tasks for each action server (b1)."""
+        app.state.status_subscriber.start(driver)
 
     @app.on_event("startup")
     async def _start_rpc() -> None:
@@ -626,6 +685,11 @@ def makeOrchApp(
     @app.on_event("shutdown")
     async def _stop_heartbeat() -> None:
         driver.stop_heartbeat()
+
+    @app.on_event("shutdown")
+    async def _stop_status_subscriber() -> None:
+        """Cancel all /ws_status subscriber tasks on shutdown (b1)."""
+        app.state.status_subscriber.stop()
 
     @app.on_event("shutdown")
     async def _stop_rpc() -> None:
