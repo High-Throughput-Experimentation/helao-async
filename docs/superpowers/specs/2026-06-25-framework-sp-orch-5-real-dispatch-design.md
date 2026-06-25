@@ -161,3 +161,39 @@ has no I/O (asyncio.sleep only) else `adapters/`; place per the boundary test.
 - Headless fake-action-server tests cover all three parts; full suite + boundary green.
 - After merge: the user re-launches the canary for a genuine Gate B (real `orch_sub_wait`
   and a real POWER_SUPPLY action both dispatch + complete).
+
+## 8. Part (a) addendum — private-endpoint addressing + action-server RPC (canary-surfaced)
+
+Launching `test` with parts a+b: SIM logged a **404 every ~8s** → SIM's
+`_estop_http_exception_handler` (base_api ~1623) converts any 404 on a `/{server_key}/`
+path into **estop SIM**, so `SIM/acquire_data` never dispatched. Root cause:
+
+1. **Private endpoints are mis-addressed.** Framework private/admin endpoints
+   (`get_status`, `stop_executor`, `list_executors`, …) are registered at ROOT
+   (`/get_status`) — only actions/estop/stop are `/{server_key}/...` (SP8 commit 74338348).
+   `HttpTransport` builds BOTH the HTTP URL and the RPC method as `{server_key}/{endpoint}`,
+   so the heartbeat's `get_status` → RPC method `SIM/get_status` (miss; SIM registered
+   `get_status`) → 3s probe → HTTP `/SIM/get_status` → 404 → estop (path starts with `SIM/`).
+2. **Action servers have no RPC server.** `base_api`/`makeActionApp` never co-locate an
+   `RPCDispatcher` (only `makeOrchApp` does), so every orch→action RPC call hits a closed
+   port → 3s probe → HTTP fallback (the ~8s cycle = 5s heartbeat sleep + 3s probe).
+
+**Fix:**
+- `DispatchTarget` gains `private: bool = False`. When `private`, `HttpTransport` uses RPC
+  method `{endpoint}` and HTTP URL `http://host:port/{endpoint}` (root); else the current
+  `{server_key}/{endpoint}` for both. (`register()` strips a leading `/`, so root method
+  name = `endpoint`, action method name = `{server_key}/{endpoint}` — verified.)
+- `orch_api`: mark the heartbeat `get_status` target and the `StopExecutor` `stop_executor`
+  target `private=True`. `estop`/actions stay action-prefixed.
+- `makeActionApp`/`BaseAPI`: co-locate an `RPCDispatcher` mirroring `makeOrchApp` (register
+  every POST route by `route.path`, serve on `derive_rpc_port(port)`, guarded on a real
+  config slice; start/stop on FastAPI startup/shutdown). Satisfies "RPC for every endpoint"
+  on action servers too and removes the 3s probe. Reconcile with the Task-1 fixture's manual
+  RPC wiring (the fixture can now lean on the real base_api RPC).
+- Verify via the fake action server: heartbeat `get_status` resolves over RPC at method
+  `get_status` (no probe), HTTP fallback hits `/get_status` (200, not 404), SIM is NOT
+  estopped; `acquire_data` still dispatches action-prefixed.
+
+NOTE (not changed here): `_estop_http_exception_handler` estopping on ANY 404 to a
+`/{server_key}/` path is aggressive (a stray/mistyped probe kills the server). Left as
+legacy-parity behavior; correct addressing avoids triggering it. Flag for a later review.
