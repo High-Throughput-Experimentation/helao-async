@@ -1034,8 +1034,19 @@ def makeOrchApp(
     async def _start_status_subscriber() -> None:
         """Start JSON /ws_status subscriber tasks for each action server (b1)."""
         LOGGER.info("[startup-hook] _start_status_subscriber firing")
-        app.state.status_subscriber.start(driver)
-        LOGGER.info("[startup-hook] _start_status_subscriber done")
+        # DIAGNOSTIC via orch_api logger (reliably lands in orch_api.log): show the
+        # subscriber's raw map + each entry's type/group, and the action-group filter
+        # result — so we can see why start() creates no tasks.
+        sub = app.state.status_subscriber
+        smap = getattr(sub, "_servers_map", {})
+        LOGGER.info(
+            "[startup-hook] subscriber map detail: %s",
+            {k: {"type": type(v).__name__, "group": (v.get("group") if isinstance(v, dict) else f"NOT-DICT({type(v).__name__})")} for k, v in smap.items()},
+        )
+        action_group = [k for k, v in smap.items() if isinstance(v, dict) and v.get("group") == "action"]
+        LOGGER.info("[startup-hook] action-group servers the subscriber will subscribe to: %s", action_group)
+        sub.start(driver)
+        LOGGER.info("[startup-hook] _start_status_subscriber done; subscriber tasks=%d", len(getattr(sub, "_tasks", [])))
 
     @app.on_event("startup")
     async def _start_rpc() -> None:
