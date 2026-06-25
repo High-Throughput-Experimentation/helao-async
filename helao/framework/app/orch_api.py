@@ -268,6 +268,7 @@ async def execute_commands(
                 host=cmd.host or "127.0.0.1",
                 port=int(cmd.port or 8000),
                 endpoint="stop_executor",
+                private=True,  # /stop_executor is at root, not /{server_key}/stop_executor
             )
             await ports.transport.dispatch(target, {"executor_id": cmd.executor_id})
 
@@ -439,7 +440,11 @@ class OrchDriver:
         """One ping pass: dispatch get_status to each pingable server, fold into status_summary."""
         for server_key, host, port in orch.pingable_servers(self.action_servers):
             target = DispatchTarget(
-                server_key=server_key, host=host, port=port, endpoint="get_status"
+                server_key=server_key,
+                host=host,
+                port=port,
+                endpoint="get_status",
+                private=True,  # /get_status is at root, not /{server_key}/get_status
             )
             result = await self.ports.transport.dispatch(
                 target, {"client_servkey": self.server_key}

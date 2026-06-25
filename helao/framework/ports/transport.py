@@ -55,12 +55,19 @@ class DispatchTarget:
         port: HTTP port of the peer (the adapter derives any RPC port from it).
         endpoint: Endpoint/action path, without a leading slash and without
             the ``server_key`` prefix (e.g. ``"run_action"``).
+        private: When ``True``, the endpoint is a framework private/admin
+            endpoint registered at ROOT (e.g. ``/get_status``) rather than
+            under the server-key prefix (e.g. ``/SIM/get_status``).  The
+            adapter uses RPC method ``{endpoint}`` and HTTP URL
+            ``http://host:port/{endpoint}`` instead of the prefixed form.
+            Default ``False`` preserves existing action-dispatch behaviour.
     """
 
     server_key: str
     host: str
     port: int
     endpoint: str
+    private: bool = False
 
 
 @dataclass(frozen=True)

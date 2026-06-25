@@ -174,7 +174,13 @@ class HttpTransport(Transport):
 
         # --- ZMQ RPC fast-path ---
         if self.use_rpc:
-            rpc_method = f"{target.server_key}/{target.endpoint}"
+            # private endpoints are registered at ROOT on the RPC dispatcher
+            # (method = "{endpoint}"); action endpoints are prefixed
+            # (method = "{server_key}/{endpoint}").
+            if target.private:
+                rpc_method = target.endpoint
+            else:
+                rpc_method = f"{target.server_key}/{target.endpoint}"
             try:
                 client = await self._get_rpc_client(target.host, target.port)
                 result = await client.call(
@@ -188,10 +194,15 @@ class HttpTransport(Transport):
                 pass
 
         # --- HTTP fallback (bounded retry with linear backoff) ---
-        url = (
-            f"http://{target.host}:{target.port}/"
-            f"{target.server_key}/{target.endpoint}"
-        )
+        # private endpoints are at root (/endpoint); actions are prefixed
+        # (/{server_key}/{endpoint}).
+        if target.private:
+            url = f"http://{target.host}:{target.port}/{target.endpoint}"
+        else:
+            url = (
+                f"http://{target.host}:{target.port}/"
+                f"{target.server_key}/{target.endpoint}"
+            )
         response: Mapping[str, Any] | None = None
         error_code = ErrorCodes.unspecified
         retry_count = 0

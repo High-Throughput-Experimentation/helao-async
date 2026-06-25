@@ -142,6 +142,18 @@ def makeOrchestratorApp(
 def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
     """Build a FastAPI app exposing one dummy-executor action endpoint.
 
+    Co-locates a ZMQ-RPC ``RPCDispatcher`` (mirroring ``makeOrchApp``) so that
+    every POST route is RPC-reachable: the orchestrator heartbeat can call
+    ``get_status`` over RPC (method ``get_status``, not ``{server_key}/get_status``)
+    without falling back to a 3 s probe and then a mis-addressed HTTP POST that
+    would 404 the server into an estop.
+
+    The ``RPCDispatcher`` is attached to ``app.state.rpc_dispatcher``.  Its
+    startup hook walks all POST routes, registers them, and binds the ROUTER
+    socket on ``derive_rpc_port(port)``.  The bind is guarded: if no real
+    CONFIG slice is present (unit tests / in-process runners) the hook returns
+    without binding so tests never attempt network I/O.
+
     Args:
         server_key: Server identifier (used in the route prefix and stamped on
             actions).
@@ -153,6 +165,8 @@ def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
         ``/{server_key}/run_dummy`` runs a oneoff dummy executor end-to-end and
         returns ``{"action_uuid", "status"}``.
     """
+    from helao.core.rpc import RPCDispatcher, derive_rpc_port
+
     if save_root is None:
         save_root = tempfile.mkdtemp(prefix="helao_framework_")
     os.makedirs(save_root, exist_ok=True)
@@ -168,6 +182,9 @@ def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
     app = FastAPI(title=f"{server_key} (framework SP4)")
     app.state.base = base
     app.state.save_root = save_root
+    # Co-located ZMQ-RPC dispatcher — mirrors makeOrchApp pattern.  Attach now
+    # so tests can inspect the object before startup fires.
+    app.state.rpc_dispatcher = RPCDispatcher(server_key=server_key)
 
     @app.post(f"/{server_key}/run_dummy")
     async def run_dummy(value: int = Body(0, embed=True)) -> dict:
@@ -209,5 +226,31 @@ def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
             else str(result.action_status)
         )
         return {"action_uuid": str(result.action_uuid), "status": status}
+
+    @app.on_event("startup")
+    async def _start_rpc() -> None:
+        # Walk POST routes (defined above) and register them into the dispatcher,
+        # then bind the ROUTER socket on the derived RPC port.  Guarded: without a
+        # config slice (in-process runners / unit tests) we skip the bind so no
+        # network I/O is attempted in tests that don't need a live server.
+        from fastapi.routing import APIRoute
+
+        from helao.framework.support import config_loader
+
+        cfg = config_loader.CONFIG or {}
+        server_cfg = (cfg.get("servers") or {}).get(server_key)
+        if not server_cfg or server_cfg.get("port") is None:
+            return
+        for route in app.routes:
+            if isinstance(route, APIRoute) and "POST" in (route.methods or set()):
+                app.state.rpc_dispatcher.register(route.path, route.endpoint)
+        await app.state.rpc_dispatcher.serve(
+            host=server_cfg.get("host", "127.0.0.1"),
+            port=derive_rpc_port(server_cfg["port"]),
+        )
+
+    @app.on_event("shutdown")
+    async def _stop_rpc() -> None:
+        await app.state.rpc_dispatcher.close()
 
     return app
