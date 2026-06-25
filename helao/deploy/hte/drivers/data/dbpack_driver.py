@@ -42,7 +42,7 @@ from helao.framework.support.time_utils import gen_uuid
 from helao.framework.adapters.loaders.hlo_loader import read_hlo
 from helao.framework.support.yml_tools import yml_load, yml_dumps
 from helao.framework.support.file_utils import zip_dir
-from helao.core.drivers.data.enum import YmlType
+from helao.framework.models.run_use import YmlType
 
 modmap = {
     "action": Action,

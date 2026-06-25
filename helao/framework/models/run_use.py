@@ -1,7 +1,17 @@
 """Enum tagging how an action's produced data is intended to be used."""
 
-__all__ = ["RunUse"]
+__all__ = ["RunUse", "YmlType"]
 from enum import Enum
+
+
+class YmlType(str, Enum):
+    """Top-level kinds of HELAO YAML records (ports legacy
+    ``helao.core.drivers.data.enum.YmlType``). Used by the data-packing driver to
+    branch on whether a `.yml` record is an action / experiment / sequence."""
+
+    action = "action"
+    experiment = "experiment"
+    sequence = "sequence"
 
 
 class RunUse(str, Enum):

@@ -19,9 +19,9 @@ their enums:
   :class:`ShortAnalysisModel` / :class:`AnalysisModel` — including the
   custom ``__init__`` that auto-stamps ``analysis_timestamp``.
 
-The legacy ``YmlType`` section is intentionally omitted: ``YmlType`` lives in
-``helao.core.drivers.data.enum`` (a driver enum), which is out of scope for
-the framework ``models/`` layer and has no framework equivalent.
+``YmlType`` (ported from ``helao.core.drivers.data.enum``) now lives in the
+framework at ``helao.framework.models.run_use`` and is covered by
+:func:`test_yml_type_members`.
 """
 from datetime import datetime
 from pathlib import Path
@@ -303,3 +303,10 @@ def test_analysis_model_preserves_inputs_and_outputs():
 def test_analysis_model_as_dict_round_trips_analysis_params():
     am = _make_analysis_model()
     assert am.as_dict()["analysis_params"] == {"window": 5}
+
+
+def test_yml_type_members():
+    """YmlType ported from legacy helao.core.drivers.data.enum -> framework run_use."""
+    from helao.framework.models.run_use import YmlType
+    assert [m.value for m in YmlType] == ["action", "experiment", "sequence"]
+    assert YmlType.sequence == "sequence"  # str-enum value equality (used by dbpack_driver)
