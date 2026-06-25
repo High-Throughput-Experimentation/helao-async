@@ -12,7 +12,7 @@ from typing import Optional
 from fastapi import Body
 from helao.framework.app.base_api import BaseAPI
 from helao.framework.domain.run_models import Action
-from ....drivers.data.HTEdata_legacy import HTEdata
+from helao.deploy.hte.drivers.data.HTEdata_legacy import HTEdata
 
 
 def makeApp(server_key) -> BaseAPI:
