@@ -3,12 +3,14 @@
 .qodo
 .claude
 .ropeproject
-.vscode/*
-.vs/*
+.vscode
+.vs
+.pytest_cache
+.understand-anything
 pyrightconfig.json
 
 # cache
-__pycache__/*
+__pycache__
 *.pyc
 */.DS_Store
 .DS_Store
@@ -28,3 +30,6 @@ helao/deploy/*
 .superpowers/
 .framework-cov.json
 .coverage
+
+# linux build artifacts
+C:\\INST_hlo
