@@ -395,6 +395,7 @@ class OrchDriver:
         self.action_servers = dict(getattr(ports, "action_servers", {}) or {})
         self.heartbeat_interval = 5.0
         self._heartbeat_task = None
+        self._retrigger_task: Optional[asyncio.Task] = None
 
     # --- command execution + draining --------------------------------------
 
@@ -456,12 +457,18 @@ class OrchDriver:
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
         # Re-trigger the loop if it was stalled at WAIT and can now progress.
+        # Guard: only spawn a new loop task when the previous one is done (no
+        # concurrent dispatch of the same action queue from two loop instances).
+        _decision = orch.decide_next(self.state)
         if (
             self.state.loop_state == LoopStatus.started
-            and orch.decide_next(self.state) != OrchDecision.WAIT
-            and orch.decide_next(self.state) not in (OrchDecision.STOP, OrchDecision.IDLE)
+            and _decision not in (OrchDecision.WAIT, OrchDecision.STOP, OrchDecision.IDLE)
         ):
-            asyncio.create_task(self.run_dispatch_loop(), name="orch_loop_retrigger")
+            existing = self._retrigger_task
+            if existing is None or existing.done():
+                self._retrigger_task = asyncio.create_task(
+                    self.run_dispatch_loop(), name="orch_loop_retrigger"
+                )
 
     # --- heartbeat -----------------------------------------------------------
 
