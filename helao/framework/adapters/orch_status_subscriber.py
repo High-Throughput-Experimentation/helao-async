@@ -177,9 +177,33 @@ class OrchStatusSubscriber:
                                 "OrchStatusSubscriber[%s]: non-JSON frame — %s", server_key, exc
                             )
                             continue
+                        # DIAGNOSTIC (SP-ORCH-5 live bring-up): log every frame so a
+                        # stuck-orch can be traced to received / parsed / folded.
+                        LOGGER.info(
+                            "OrchStatusSubscriber[%s]: frame action_name=%r status=%r uuid=%r orchestrator=%r",
+                            server_key,
+                            payload.get("action_name"),
+                            payload.get("action_status"),
+                            payload.get("action_uuid"),
+                            payload.get("orchestrator"),
+                        )
                         asm = asm_from_action_dict(payload)
                         if asm is not None:
+                            before = list(driver.state.globalstatusmodel.active_dict.keys())
                             await driver.on_status_update(asm)
+                            after = list(driver.state.globalstatusmodel.active_dict.keys())
+                            LOGGER.info(
+                                "OrchStatusSubscriber[%s]: folded frame; gsm.orchestrator=%r active_dict %r -> %r",
+                                server_key,
+                                driver.state.globalstatusmodel.orchestrator,
+                                before,
+                                after,
+                            )
+                        else:
+                            LOGGER.warning(
+                                "OrchStatusSubscriber[%s]: asm_from_action_dict returned None (frame dropped)",
+                                server_key,
+                            )
             except asyncio.CancelledError:
                 LOGGER.info("OrchStatusSubscriber: task cancelled for %s", server_key)
                 raise
