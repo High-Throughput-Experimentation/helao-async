@@ -168,6 +168,54 @@ def _make_fake_action_app(server_key: str, save_root: str) -> "BaseAPI":
         active.start_executor(executor)
         return {"action_uuid": str(action_uuid), "status": "active"}
 
+    @app.post(f"/{server_key}/run_action", tags=["private"])
+    async def run_action(action_dict: dict = Body(None)) -> dict:
+        """Generic run_action endpoint accepting a full RunAction dict.
+
+        This mirrors the convention real action servers use: the orchestrator
+        dispatches via ``/{server_key}/run_action`` with the full
+        ``RunAction.as_dict()`` body.  The fake server extracts ``duration``
+        from ``action_params`` and delegates to :class:`SleepExecutor`.
+
+        Added for SP-ORCH-5c so end-to-end orch dispatch (which targets
+        ``run_action``) reaches the SleepExecutor path.
+        """
+        body = action_dict or {}
+        action_params = body.get("action_params") or {}
+        duration = float(action_params.get("duration", 0.05))
+
+        # Reuse the uuid from the dispatched action when present.
+        now = datetime.now()
+        if body.get("action_uuid"):
+            try:
+                action_uuid = _uuid.UUID(str(body["action_uuid"]))
+            except (ValueError, AttributeError):
+                action_uuid = _uuid.uuid4()
+        else:
+            action_uuid = _uuid.uuid4()
+
+        action = RunAction(
+            action_name=body.get("action_name", "run_action"),
+            action_uuid=action_uuid,
+            action_timestamp=now,
+            sequence_timestamp=now,
+            experiment_timestamp=now,
+            sequence_name=body.get("sequence_name", "fake_seq"),
+            experiment_name=body.get("experiment_name", "fake_exp"),
+            action_output_dir=str(action_uuid),
+            action_server=MachineModel(server_name=server_key),
+            action_params={"duration": duration},
+            action_status=[HloStatus.active],
+            save_act=False,
+            save_data=False,
+        )
+        active = await app.base.setup_and_contain_action(
+            ActionContext(action=action, endpoint_name="run_action"),
+        )
+        executor = SleepExecutor(active=active)
+        active.start_executor(executor)
+        return {"action_uuid": str(action_uuid), "status": "active"}
+
     # --- RPC startup: register all POST routes and bind ROUTER socket --------
 
     @app.on_event("startup")
