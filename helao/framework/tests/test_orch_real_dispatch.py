@@ -115,8 +115,9 @@ async def test_rpc_dispatch_arrives_at_configured_port(fake_action_server: FakeS
         )
         assert target.host == fsi.host
 
-        # Actually dispatch via the transport to verify RPC arrives
-        payload = action.as_dict()
+        # Actually dispatch via the transport to verify RPC arrives.
+        # Use the new payload contract: {**action_params, "action": action.as_dict()}
+        payload = {**(action.action_params or {}), "action": action.as_dict()}
         result = await transport.dispatch(target, payload)
         assert result.error.value == "none", (
             f"Dispatch failed: {result.error}. "
@@ -307,3 +308,49 @@ def test_orch_ports_servers_map_distinct_from_action_servers():
     assert "ORCH" in ports.servers_map
     assert "ORCH" not in ports.action_servers
     assert ports.servers_map is not ports.action_servers
+
+
+# ---------------------------------------------------------------------------
+# Test 7: execute_commands dispatch payload contains both flat params and action
+# ---------------------------------------------------------------------------
+
+
+def test_execute_commands_dispatch_payload_contains_params_and_action():
+    """execute_commands must dispatch {**action_params, \"action\": action.as_dict()}.
+
+    Both the flat params (e.g. ``duration``) and the embedded ``RunAction``
+    dict must be present so ``wrap_action_endpoint`` can populate the endpoint
+    function's declared kwargs AND give FastAPI the full RunAction object.
+    """
+    from helao.framework.ports.transport import DispatchResult
+    from helao.framework.models.errors import ErrorCodes
+
+    captured: List[Any] = []
+
+    class SpyTransport(FakeTransport):
+        async def dispatch(self, target, payload):
+            captured.append((target, payload))
+            return DispatchResult(response={}, error=ErrorCodes.none)
+
+    spy = SpyTransport()
+    action = _make_action_targeting("ACT", "127.0.0.1", 9001, action_name="run_for")
+    action.action_params = {"duration": 0.05}
+
+    exp_lib = {"fake_exp": _exp_factory_for(action)}
+
+    exp = RunExperiment(experiment_name="fake_exp")
+    from helao.framework.runners.micro_orch import run_experiment
+    run_experiment(exp, experiment_lib=exp_lib, transport=spy)
+
+    assert len(captured) >= 1, "SpyTransport captured no dispatches"
+    _, payload = captured[0]
+    assert isinstance(payload, dict), f"payload is not a dict: {type(payload)}"
+    assert "action" in payload, (
+        f"'action' key missing from dispatch payload — got keys: {list(payload.keys())}"
+    )
+    assert "duration" in payload, (
+        f"flat 'duration' param missing from dispatch payload — got keys: {list(payload.keys())}"
+    )
+    assert isinstance(payload["action"], dict), (
+        f"payload['action'] should be a RunAction dict, got {type(payload['action'])}"
+    )

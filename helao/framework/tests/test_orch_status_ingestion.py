@@ -108,9 +108,8 @@ async def test_loop_waits_for_real_status_ingestion(fake_action_server: FakeServ
 
     Design note
     -----------
-    The orch dispatch path always uses ``/run_action``, but the fake server's
-    only executor-backed endpoint is ``/run_for``.  We dispatch directly via
-    the transport (not the orch loop) to the correct endpoint.  The key
+    The test dispatches directly via the transport (not the orch loop) to the
+    ``run_for`` endpoint on the fake server.  The key
     invariant is the subscriber pathway: ``active`` → ``finished`` status from
     the real ``/ws_status`` feed is ingested by ``on_status_update`` without
     ``_synthesize_finished_status`` firing.

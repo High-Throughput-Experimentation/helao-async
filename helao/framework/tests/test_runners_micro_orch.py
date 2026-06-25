@@ -83,7 +83,7 @@ def test_run_sequence_dispatches_both_actions():
         experiment_lib=EXP_LIB,
         transport=transport,
     )
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 2, f"expected 2 dispatches, got {len(run_calls)}"
     # After a complete run the loop exits via IDLE; loop_state stays 'started'
     # (only transitions on explicit stop/estop). Assert FSM is at IDLE instead.
@@ -97,7 +97,7 @@ def test_run_sequence_action_names_in_dispatched_payloads():
     seq = RunSequence(sequence_name="micro_seq")
     run_sequence(seq, sequence_lib=SEQ_LIB, experiment_lib=EXP_LIB, transport=transport)
     names = [
-        p.get("action_name")
+        (p.get("action_name") or (p.get("action") or {}).get("action_name"))
         for _, p in transport.dispatched
         if isinstance(p, dict)
     ]
@@ -113,7 +113,7 @@ def test_run_experiment_dispatches_two_actions():
     transport = FakeTransport()
     exp = RunExperiment(experiment_name="micro_exp")
     state = run_experiment(exp, experiment_lib=EXP_LIB, transport=transport)
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 2
 
 
@@ -135,7 +135,7 @@ def test_run_action_dispatches_single_action():
     transport = FakeTransport()
     action = _make_action("solo")
     state = run_action(action, transport=transport)
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 1
 
 
@@ -155,7 +155,7 @@ def test_micro_orch_async_run_sequence():
     micro = MicroOrch(sequence_lib=SEQ_LIB, experiment_lib=EXP_LIB, transport=transport)
     seq = RunSequence(sequence_name="micro_seq")
     state = asyncio.run(micro.run_sequence(seq))
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 2
     from helao.framework.domain.orchestration import decide_next
     from helao.framework.domain.commands import OrchDecision
@@ -171,7 +171,7 @@ def test_micro_orch_async_run_experiment():
     micro = MicroOrch(experiment_lib=EXP_LIB, transport=transport)
     exp = RunExperiment(experiment_name="micro_exp")
     state = asyncio.run(micro.run_experiment(exp))
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 2
 
 
@@ -184,7 +184,7 @@ def test_micro_orch_async_run_action():
     micro = MicroOrch(transport=transport)
     action = _make_action("async_solo")
     state = asyncio.run(micro.run_action(action))
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 1
 
 
@@ -243,7 +243,7 @@ def test_micro_orch_default_temp_dir():
     micro = MicroOrch(transport=transport)
     action = _make_action("temp_dir_act")
     state = asyncio.run(micro.run_action(action))
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert len(run_calls) == 1
 
 
@@ -261,7 +261,7 @@ def test_run_sequence_unknown_name_completes_without_dispatch():
         experiment_lib=EXP_LIB,
         transport=transport,
     )
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert run_calls == []
     from helao.framework.domain.orchestration import decide_next
     from helao.framework.domain.commands import OrchDecision
@@ -277,7 +277,7 @@ def test_run_experiment_unknown_name_no_actions():
         experiment_lib=EXP_LIB,
         transport=transport,
     )
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     assert run_calls == []
 
 
@@ -291,7 +291,7 @@ def test_two_sequences_dispatched_in_order():
     micro.driver.enqueue_sequence(RunSequence(sequence_name="micro_seq"))
     micro.driver.enqueue_sequence(RunSequence(sequence_name="micro_seq"))
     state = asyncio.run(micro.driver.start())
-    run_calls = [t for t, _ in transport.dispatched if t.endpoint == "run_action"]
+    run_calls = list(transport.dispatched)
     # 2 sequences x 1 experiment x 2 actions = 4 dispatches
     assert len(run_calls) == 4
 
