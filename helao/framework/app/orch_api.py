@@ -546,8 +546,23 @@ class OrchDriver:
         IDLE and new work folded in via this status), it is (re)created so the
         wake is not lost.
         """
+        # DIAGNOSTIC (orch_api logger -> orch_api.log, reliably visible): every
+        # status fold, so we can see whether the /ws_status subscriber is feeding
+        # frames at all and whether the fold clears the orch's active_dict.
+        _before = list(self.state.globalstatusmodel.active_dict.keys())
+        _srv = getattr(getattr(asm, "action_server", None), "server_name", None) if asm else None
+        _eps = list(asm.endpoints) if asm and getattr(asm, "endpoints", None) else []
+        LOGGER.info(
+            "on_status_update: asm server=%r endpoints=%r; active_dict before=%r",
+            _srv, _eps, _before,
+        )
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
+        LOGGER.info(
+            "on_status_update: active_dict after=%r (gsm.orchestrator=%r)",
+            list(self.state.globalstatusmodel.active_dict.keys()),
+            self.state.globalstatusmodel.orchestrator,
+        )
         self._wake.set()
         # In production (background loop) a status arriving after the loop exited
         # at IDLE must respawn the single drainer so the wake is honoured. The
