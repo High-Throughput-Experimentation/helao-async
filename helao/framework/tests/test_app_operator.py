@@ -671,3 +671,41 @@ def test_layout_is_stretch_width():
     assert op.sequence_table.sizing_mode == "stretch_width"
     op.cleanup_session(None)
     print("test_layout_is_stretch_width PASS")
+
+
+def test_history_tables_equal_length_with_missing_keys():
+    """Regression: history rows missing campaign_name/sequence_label must NOT make
+    the ColumnDataSource columns unequal length (Bokeh refuses to render an
+    unequal CDS -> the history tabs appeared empty on the operator)."""
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+
+    class _HistBackend(_MockBackend):
+        async def get_histories(self):
+            # Each row carries only the always-present keys — campaign_name and
+            # sequence_label are ABSENT (the live-deploy case that broke render).
+            return {
+                "action": [("a" * 16, {
+                    "action_server": "SIM", "action_name": "acquire_data",
+                    "action_timestamp": 1.0, "action_finished_timestamp": 2.0,
+                    "action_status": ["finished"]})],
+                "experiment": [("e" * 16, {
+                    "experiment_name": "exp0", "experiment_timestamp": 1.0,
+                    "experiment_status": ["finished"]})],
+                "sequence": [("s" * 16, {
+                    "sequence_name": "seq0", "sequence_timestamp": 1.0,
+                    "sequence_status": ["finished"]})],
+            }
+
+    op = BokehOperator(_FakeVisOp(Document()), _HistBackend())
+    asyncio.run(op.get_history())
+    for label, src in (
+        ("action", op.action_history_source),
+        ("experiment", op.experiment_history_source),
+        ("sequence", op.sequence_history_source),
+    ):
+        lengths = {k: len(v) for k, v in src.data.items()}
+        assert len(set(lengths.values())) == 1, f"{label} CDS columns unequal: {lengths}"
+        assert all(v == 1 for v in lengths.values()), f"{label}: {lengths}"
+    op.cleanup_session(None)
+    print("test_history_tables_equal_length_with_missing_keys PASS")

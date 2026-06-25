@@ -1476,11 +1476,15 @@ class BokehOperator:
             )
             self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
             self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
+            # Append to EVERY column once per row (default "" when the key is
+            # missing) so all ColumnDataSource columns stay equal length —
+            # otherwise Bokeh refuses to render the table ("columns must be of
+            # the same length") and the history tab appears empty.
             for k in ["action_status", "experiment_name", "sequence_label"]:
-                if k in actdict:
-                    self.action_history_lists[k].append(
-                        actdict[k][-1] if isinstance(actdict[k], list) else actdict[k]
-                    )
+                val = actdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.action_history_lists[k].append("" if val is None else val)
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
         for expuuid, expdict in sorted(hist["experiment"], key=lambda x: x[0])[::-1]:
@@ -1490,10 +1494,10 @@ class BokehOperator:
             self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
             self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
             for k in ["experiment_status", "sequence_label", "campaign_name"]:
-                if k in expdict:
-                    self.experiment_history_lists[k].append(
-                        expdict[k][-1] if isinstance(expdict[k], list) else expdict[k]
-                    )
+                val = expdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.experiment_history_lists[k].append("" if val is None else val)
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
         for sequuid, seqdict in sorted(hist["sequence"], key=lambda x: x[0])[::-1]:
@@ -1503,10 +1507,10 @@ class BokehOperator:
             self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
             self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
             for k in ["sequence_status", "sequence_label", "campaign_name"]:
-                if k in seqdict:
-                    self.sequence_history_lists[k].append(
-                        seqdict[k][-1] if isinstance(seqdict[k], list) else seqdict[k]
-                    )
+                val = seqdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.sequence_history_lists[k].append("" if val is None else val)
         self.action_history_source.data = self.action_history_lists
         self.experiment_history_source.data = self.experiment_history_lists
         self.sequence_history_source.data = self.sequence_history_lists
