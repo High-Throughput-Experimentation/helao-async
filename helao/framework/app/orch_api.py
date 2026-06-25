@@ -1006,9 +1006,11 @@ def makeOrchApp(
     @app.on_event("startup")
     async def _start_base() -> None:
         """Start FrameworkBase background tasks + register action endpoints."""
+        LOGGER.info("[startup-hook] _start_base firing")
         await base.myinit()
         await base.init_endpoint_status(app.routes)
         app.state.own_status_ingestor.start(driver)
+        LOGGER.info("[startup-hook] _start_base done")
 
     @app.on_event("shutdown")
     async def _stop_base() -> None:
@@ -1025,15 +1027,19 @@ def makeOrchApp(
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
+        LOGGER.info("[startup-hook] _start_heartbeat firing")
         driver.start_heartbeat()
 
     @app.on_event("startup")
     async def _start_status_subscriber() -> None:
         """Start JSON /ws_status subscriber tasks for each action server (b1)."""
+        LOGGER.info("[startup-hook] _start_status_subscriber firing")
         app.state.status_subscriber.start(driver)
+        LOGGER.info("[startup-hook] _start_status_subscriber done")
 
     @app.on_event("startup")
     async def _start_rpc() -> None:
+        LOGGER.info("[startup-hook] _start_rpc firing")
         # Walk POST routes (defined below) and mirror them into the dispatcher,
         # then bind the ROUTER socket on the derived RPC port. Guarded: without a
         # config slice (in-process runners / unit tests) we skip the bind.
