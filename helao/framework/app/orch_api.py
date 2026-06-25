@@ -664,6 +664,19 @@ class OrchDriver:
                 break  # STOP/estopped/stopped — terminal, exit the task
             decision = orch.decide_next(self.state)
             if decision in (OrchDecision.STOP, OrchDecision.IDLE):
+                # DIAGNOSTIC: why are we terminating? Shows whether an unfinished
+                # experiment/sequence is being abandoned (IDLE despite active work).
+                LOGGER.info(
+                    "dispatch loop terminal: decision=%s loop_state=%s "
+                    "active_experiment=%s active_sequence=%s "
+                    "n_action_dq=%d n_exp_dq=%d n_seq_dq=%d active_dict=%r",
+                    decision,
+                    self.state.loop_state,
+                    None if self.state.active_experiment is None else getattr(self.state.active_experiment, "experiment_name", "?"),
+                    None if self.state.active_sequence is None else getattr(self.state.active_sequence, "sequence_name", "?"),
+                    len(self.state.action_dq), len(self.state.experiment_dq), len(self.state.sequence_dq),
+                    list(self.state.globalstatusmodel.active_dict.keys()),
+                )
                 break  # terminal: nothing left to drain
             if decision == OrchDecision.WAIT:
                 # Park: clear BEFORE awaiting so a concurrent set is not lost.
@@ -697,6 +710,7 @@ class OrchDriver:
 
     async def _step(self, decision: OrchDecision) -> bool:
         """Execute one dispatch decision. Returns True if the loop progressed."""
+        LOGGER.info("dispatch loop _step: decision=%s", decision)
         now = self.ports.now()
         uuid = _uuid.uuid4()
 
