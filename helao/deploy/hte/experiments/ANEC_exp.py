@@ -45,19 +45,20 @@ __all__ = [
 from socket import gethostname
 from typing import Optional
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.framework.domain.run_models import RunExperiment as Experiment
+from helao.framework.domain.plan_makers import ActionPlanMaker
 from helao.deploy.hte.drivers.robot.pal_driver import PALtools
-from helao.core.models.sample import SolidSample, LiquidSample
-from helao.core.models.machine import MachineModel
-from helao.core.models.action_start_condition import ActionStartCondition
-from helao.core.models.process_contrib import ProcessContrib
-from helao.helpers.constants import REF_TABLE
+from helao.framework.models.sample import SolidSample, LiquidSample
+from helao.framework.models.machine import MachineModel
+from helao.framework.models.action_start_condition import ActionStartCondition
+from helao.framework.models.process_contrib import ProcessContrib
+from helao.framework.support.constants import REF_TABLE
 from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     MoveModes,
     TransformationModes,
 )
 from helao.deploy.hte.drivers.io.enum import TriggerType
-from helao.helpers.lib_decorators import experiment
+from helao.framework.support.lib_decorators import experiment
 
 # list valid experiment functions
 EXPERIMENTS = __all__

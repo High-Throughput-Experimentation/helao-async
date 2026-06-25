@@ -282,18 +282,22 @@ def test_action_plan_maker_experiment_property_attaches_planned_actions():
     assert len(exp.planned_actions) == 1
 
 
-def test_blank_experiment_add_raises_due_to_orchestrator_divergence():
-    """Documents the framework-model divergence: blank RunExperiment.add fails.
+def test_blank_experiment_add_uses_default_orchestrator():
+    """ActionPlanMaker.add succeeds even when RunExperiment.orchestrator is None.
 
-    ``ExperimentModel.orchestrator`` defaults to ``None`` but
-    ``ActionModel.orchestrator`` is non-Optional, so feeding a blank
-    experiment's ``as_dict()`` into ``RunAction`` is a validation error. A real
-    run always has the orchestrator set.
+    ``ExperimentModel.orchestrator`` defaults to ``None`` while
+    ``ActionModel.orchestrator`` is non-Optional (``default_factory=MachineModel``).
+    The fix in ``plan_makers.add`` drops the key when it is ``None`` so Pydantic
+    uses the field's ``default_factory`` instead of raising a validation error.
+    A real run sets the orchestrator; headless/test scenarios use the default.
     """
 
     def experiment_func(value):
         return ActionPlanMaker()
 
     apm = experiment_func(value=1)
-    with pytest.raises(Exception):
-        apm.add("dev", "act", {})
+    # Must not raise; the None orchestrator is dropped so default_factory applies.
+    apm.add("dev", "act", {})
+    assert len(apm.planned_actions) == 1
+    from helao.framework.models.machine import MachineModel
+    assert isinstance(apm.planned_actions[0].orchestrator, MachineModel)
