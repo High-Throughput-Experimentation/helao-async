@@ -81,7 +81,13 @@ class OrchPorts:
         sequence_lib: Map of sequence name -> factory (returns experiments).
         experiment_lib: Map of experiment name -> factory (returns actions).
         postprocessors: Names of HLO post-processors (passed through to storage).
-        action_servers: Map of server_key -> {host, port, ...} for heartbeat pings.
+        action_servers: Map of server_key -> {host, port, ...} for heartbeat pings
+            (action-group servers only; subset of servers_map).
+        servers_map: Full CONFIG ``servers`` map (all groups including orchestrator
+            itself). Used by :func:`_dispatch_target_for` for config-driven target
+            resolution including ORCH self-dispatch. Distinct from ``action_servers``
+            which is the heartbeat-only subset. None/{} in unit tests / in-process
+            runners.
     """
 
     def __init__(
@@ -95,6 +101,7 @@ class OrchPorts:
         experiment_lib: Optional[Mapping[str, Callable]] = None,
         postprocessors: Optional[List[str]] = None,
         action_servers: Optional[Mapping[str, dict]] = None,
+        servers_map: Optional[Mapping[str, dict]] = None,
     ) -> None:
         self.transport = transport
         self.storage = storage
@@ -104,6 +111,7 @@ class OrchPorts:
         self.experiment_lib: Mapping[str, Callable] = dict(experiment_lib or {})
         self.postprocessors: List[str] = list(postprocessors or [])
         self.action_servers: dict = dict(action_servers or {})
+        self.servers_map: dict = dict(servers_map or {})
 
     def now(self) -> datetime:
         """Wall-clock ``datetime`` from the injected clock port."""
@@ -118,10 +126,38 @@ class OrchPorts:
 # --------------------------------------------------------------------------- #
 
 
-def _dispatch_target_for(action: RunAction, endpoint: str = "run_action") -> DispatchTarget:
-    """Build a :class:`DispatchTarget` from an action's action-server identity."""
+def _dispatch_target_for(
+    action: RunAction,
+    endpoint: str = "run_action",
+    *,
+    servers_map: Optional[Mapping[str, dict]] = None,
+) -> DispatchTarget:
+    """Build a :class:`DispatchTarget` from an action's action-server identity.
+
+    Resolution order (a1 — config-driven target resolution):
+    1. ``servers_map[server_key]`` — full CONFIG ``servers`` map entry (covers
+       both action servers AND the orchestrator's own entry for self-dispatch).
+    2. The action's :class:`MachineModel` ``hostname``/``host``/``port`` fields.
+    3. Defaults: ``127.0.0.1``:8000.
+
+    ``servers_map`` is the complete ``CONFIG["servers"]`` dict injected via
+    :class:`OrchPorts`; it is ``None``/empty in unit-tests and in-process runners
+    (falls through to the MachineModel path).
+    """
     server = action.action_server
     server_key = getattr(server, "server_name", None) or "action"
+
+    # Priority 1: config servers map
+    if servers_map:
+        cfg_entry = servers_map.get(server_key)
+        if cfg_entry and isinstance(cfg_entry, dict):
+            host = cfg_entry.get("host") or cfg_entry.get("hostname") or "127.0.0.1"
+            port = cfg_entry.get("port") or 8000
+            return DispatchTarget(
+                server_key=server_key, host=host, port=int(port), endpoint=endpoint
+            )
+
+    # Priority 2: MachineModel fields
     host = getattr(server, "hostname", None) or getattr(server, "host", None) or "127.0.0.1"
     port = getattr(server, "port", None) or 8000
     return DispatchTarget(
@@ -188,7 +224,7 @@ async def execute_commands(
 
         elif isinstance(cmd, DispatchAction):
             action = cmd.action
-            target = _dispatch_target_for(action)
+            target = _dispatch_target_for(action, servers_map=ports.servers_map)
             result = await ports.transport.dispatch(target, action.as_dict())
             result_action = action if result.error == ErrorCodes.none else None
             _st, fb = orch.on_dispatch_result(state, result_action, result.error)
