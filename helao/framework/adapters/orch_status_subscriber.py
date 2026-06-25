@@ -116,26 +116,18 @@ class OrchStatusSubscriber:
             driver: An :class:`~helao.framework.app.orch_api.OrchDriver` whose
                 ``on_status_update`` coroutine is called for each frame.
         """
-        # DIAGNOSTIC (SP-ORCH-5 live bring-up): log the raw map unconditionally so
-        # a non-starting subscriber is traceable to an empty/mis-typed servers_map.
-        LOGGER.info(
-            "OrchStatusSubscriber.start(): servers_map has %d entries: %s",
-            len(self._servers_map),
-            {
-                k: {"type": type(v).__name__, "group": (v.get("group") if isinstance(v, dict) else None)}
-                for k, v in self._servers_map.items()
-            },
-        )
         action_servers = {
             key: cfg
             for key, cfg in self._servers_map.items()
             if isinstance(cfg, dict) and cfg.get("group") == "action"
         }
         if not action_servers:
+            # A real misconfiguration signal: no action servers => the orch can
+            # never hear external action completion. Warn (not silent) so it's
+            # diagnosable, but do not raise.
             LOGGER.warning(
-                "OrchStatusSubscriber.start(): NO action-group servers found in servers_map "
-                "(%d total entries) — NO /ws_status subscriptions will be created; the orch "
-                "will never hear external action completion.",
+                "OrchStatusSubscriber.start(): no action-group servers in servers_map "
+                "(%d entries) — no /ws_status subscriptions created.",
                 len(self._servers_map),
             )
             return
@@ -193,28 +185,9 @@ class OrchStatusSubscriber:
                                 "OrchStatusSubscriber[%s]: non-JSON frame — %s", server_key, exc
                             )
                             continue
-                        # DIAGNOSTIC (SP-ORCH-5 live bring-up): log every frame so a
-                        # stuck-orch can be traced to received / parsed / folded.
-                        LOGGER.info(
-                            "OrchStatusSubscriber[%s]: frame action_name=%r status=%r uuid=%r orchestrator=%r",
-                            server_key,
-                            payload.get("action_name"),
-                            payload.get("action_status"),
-                            payload.get("action_uuid"),
-                            payload.get("orchestrator"),
-                        )
                         asm = asm_from_action_dict(payload)
                         if asm is not None:
-                            before = list(driver.state.globalstatusmodel.active_dict.keys())
                             await driver.on_status_update(asm)
-                            after = list(driver.state.globalstatusmodel.active_dict.keys())
-                            LOGGER.info(
-                                "OrchStatusSubscriber[%s]: folded frame; gsm.orchestrator=%r active_dict %r -> %r",
-                                server_key,
-                                driver.state.globalstatusmodel.orchestrator,
-                                before,
-                                after,
-                            )
                         else:
                             LOGGER.warning(
                                 "OrchStatusSubscriber[%s]: asm_from_action_dict returned None (frame dropped)",

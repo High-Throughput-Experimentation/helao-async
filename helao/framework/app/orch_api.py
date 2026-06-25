@@ -546,23 +546,8 @@ class OrchDriver:
         IDLE and new work folded in via this status), it is (re)created so the
         wake is not lost.
         """
-        # DIAGNOSTIC (orch_api logger -> orch_api.log, reliably visible): every
-        # status fold, so we can see whether the /ws_status subscriber is feeding
-        # frames at all and whether the fold clears the orch's active_dict.
-        _before = list(self.state.globalstatusmodel.active_dict.keys())
-        _srv = getattr(getattr(asm, "action_server", None), "server_name", None) if asm else None
-        _eps = list(asm.endpoints) if asm and getattr(asm, "endpoints", None) else []
-        LOGGER.info(
-            "on_status_update: asm server=%r endpoints=%r; active_dict before=%r",
-            _srv, _eps, _before,
-        )
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
-        LOGGER.info(
-            "on_status_update: active_dict after=%r (gsm.orchestrator=%r)",
-            list(self.state.globalstatusmodel.active_dict.keys()),
-            self.state.globalstatusmodel.orchestrator,
-        )
         self._wake.set()
         # In production (background loop) a status arriving after the loop exited
         # at IDLE must respawn the single drainer so the wake is honoured. The
@@ -709,7 +694,6 @@ class OrchDriver:
 
     async def _step(self, decision: OrchDecision) -> bool:
         """Execute one dispatch decision. Returns True if the loop progressed."""
-        LOGGER.info("dispatch loop _step: decision=%s", decision)
         now = self.ports.now()
         uuid = _uuid.uuid4()
 
@@ -980,10 +964,6 @@ def makeOrchApp(
     # Status subscriber: one task per action server in servers_map (b1).
     # Guarded: if servers_map is empty (unit tests / in-process runners) start()
     # is a no-op so no network connections are attempted.
-    LOGGER.info(
-        "makeOrchApp: creating OrchStatusSubscriber; ports.servers_map keys=%s",
-        list(ports.servers_map),
-    )
     app.state.status_subscriber = OrchStatusSubscriber(ports.servers_map)
 
     # --- SP-ORCH-5c: co-locate a FrameworkBase so the orch hosts its OWN -----
@@ -1034,11 +1014,9 @@ def makeOrchApp(
     @app.on_event("startup")
     async def _start_base() -> None:
         """Start FrameworkBase background tasks + register action endpoints."""
-        LOGGER.info("[startup-hook] _start_base firing")
         await base.myinit()
         await base.init_endpoint_status(app.routes)
         app.state.own_status_ingestor.start(driver)
-        LOGGER.info("[startup-hook] _start_base done")
 
     @app.on_event("shutdown")
     async def _stop_base() -> None:
@@ -1055,30 +1033,15 @@ def makeOrchApp(
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
-        LOGGER.info("[startup-hook] _start_heartbeat firing")
         driver.start_heartbeat()
 
     @app.on_event("startup")
     async def _start_status_subscriber() -> None:
         """Start JSON /ws_status subscriber tasks for each action server (b1)."""
-        LOGGER.info("[startup-hook] _start_status_subscriber firing")
-        # DIAGNOSTIC via orch_api logger (reliably lands in orch_api.log): show the
-        # subscriber's raw map + each entry's type/group, and the action-group filter
-        # result — so we can see why start() creates no tasks.
-        sub = app.state.status_subscriber
-        smap = getattr(sub, "_servers_map", {})
-        LOGGER.info(
-            "[startup-hook] subscriber map detail: %s",
-            {k: {"type": type(v).__name__, "group": (v.get("group") if isinstance(v, dict) else f"NOT-DICT({type(v).__name__})")} for k, v in smap.items()},
-        )
-        action_group = [k for k, v in smap.items() if isinstance(v, dict) and v.get("group") == "action"]
-        LOGGER.info("[startup-hook] action-group servers the subscriber will subscribe to: %s", action_group)
-        sub.start(driver)
-        LOGGER.info("[startup-hook] _start_status_subscriber done; subscriber tasks=%d", len(getattr(sub, "_tasks", [])))
+        app.state.status_subscriber.start(driver)
 
     @app.on_event("startup")
     async def _start_rpc() -> None:
-        LOGGER.info("[startup-hook] _start_rpc firing")
         # Walk POST routes (defined below) and mirror them into the dispatcher,
         # then bind the ROUTER socket on the derived RPC port. Guarded: without a
         # config slice (in-process runners / unit tests) we skip the bind.
