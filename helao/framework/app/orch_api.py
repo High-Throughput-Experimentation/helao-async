@@ -175,6 +175,16 @@ def _dispatch_target_for(
                 action_name = getattr(action, "action_name", None)
                 if action_name:
                     resolved_endpoint = action_name
+                else:
+                    # MINOR-7: orchestrator-group target with no action_name to
+                    # resolve to a hosted endpoint — there is no generic
+                    # ``run_action`` handler on an orch, so this dispatch will
+                    # almost certainly 404. Log it so it is diagnosable.
+                    LOGGER.debug(
+                        "_dispatch_target_for: orchestrator-group target %r has no "
+                        "action_name; no registered endpoint to resolve (will use %r)",
+                        server_key, endpoint,
+                    )
             return DispatchTarget(
                 server_key=server_key, host=host, port=int(port), endpoint=resolved_endpoint
             )
@@ -395,7 +405,14 @@ class OrchDriver:
         self.action_servers = dict(getattr(ports, "action_servers", {}) or {})
         self.heartbeat_interval = 5.0
         self._heartbeat_task = None
-        self._retrigger_task: Optional[asyncio.Task] = None
+        # --- SP-ORCH-5c: single Event-driven dispatch loop ---------------------
+        # Exactly ONE long-lived dispatch-loop task ever drains the queues. It is
+        # parked on ``self._wake`` whenever it reaches a WAIT / no-progress point
+        # and resumed by ``on_status_update`` / ``start`` calling ``self._wake.set()``.
+        # ``_loop_task`` is the single drainer; it is (re)created lazily by
+        # ``_ensure_loop_task`` so concurrent pops are impossible (no second loop).
+        self._wake: asyncio.Event = asyncio.Event()
+        self._loop_task: Optional[asyncio.Task] = None
 
     # --- command execution + draining --------------------------------------
 
@@ -416,9 +433,82 @@ class OrchDriver:
         await self._execute(cmds)
 
     async def start(self) -> None:
-        """Move the loop to ``started`` (if there is work) and run it."""
+        """Move the loop to ``started`` (if there is work) and run the single loop.
+
+        SP-ORCH-5c: there is exactly ONE dispatch-loop task. ``start`` applies the
+        ``start`` intent, then either
+
+        * runs the loop **inline to completion** when the in-process synthesize
+          path is active (``ports.synthesize_completion`` — micro_orch / unit
+          tests / FakeTransport callers): every successful dispatch immediately
+          folds finished status so the loop never parks at WAIT and drains to a
+          terminal IDLE in one pass; ``await start()`` therefore returns once the
+          queues are drained, preserving the legacy synchronous-drain contract; or
+        * ensures the single long-lived background loop task is running and sets
+          the wake event (real transport / production): the HTTP ``/start`` handler
+          returns immediately while the loop parks on ``self._wake`` at WAIT and is
+          resumed by ``on_status_update``.
+        """
         await self._intent("start")
-        await self.run_dispatch_loop()
+        if getattr(self.ports, "synthesize_completion", True):
+            # In-process: drain inline so ``await start()`` blocks until done.
+            self._wake.set()
+            await self.run_dispatch_loop()
+            return
+        # Production: a single background drainer; start() returns immediately.
+        self._wake.set()
+        self._ensure_loop_task()
+
+    def _ensure_loop_task(self) -> None:
+        """Create the single background dispatch-loop task if not already alive.
+
+        Only ONE ``run_dispatch_loop`` task ever exists, so concurrent pops of the
+        same queue are impossible. A done-callback escalates any unexpected loop
+        exception to estop (IMPORTANT-6) instead of letting the task die silently.
+        """
+        task = self._loop_task
+        if task is not None and not task.done():
+            return
+        self._loop_task = asyncio.create_task(
+            self.run_dispatch_loop(), name=f"orch_dispatch_loop_{self.server_key}"
+        )
+        self._loop_task.add_done_callback(self._on_loop_task_done)
+
+    def _on_loop_task_done(self, task: "asyncio.Task") -> None:
+        """Done-callback: surface a crashed loop task and escalate to estop.
+
+        A clean exit (terminal IDLE) or a cancellation at shutdown is expected and
+        ignored; any other exception is logged ERROR and the FSM is driven to
+        estopped so the failure is operator-visible rather than a swallowed
+        "Task exception never retrieved" (IMPORTANT-6).
+        """
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is None:
+            return
+        LOGGER.error(f"dispatch loop task crashed: {exc!r}; escalating to estop")
+        try:
+            _st, cmds = orch.apply_intent(
+                self.state, "estop", reason=f"dispatch loop task crashed: {exc}"
+            )
+            # schedule the estop command execution on the running loop
+            asyncio.ensure_future(self._execute(cmds))
+        except Exception as inner:  # pragma: no cover - defensive
+            LOGGER.error(f"failed to escalate crashed loop task to estop: {inner!r}")
+
+    async def shutdown(self) -> None:
+        """Cancel the single dispatch-loop task cleanly (idempotent)."""
+        task = self._loop_task
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:  # pragma: no cover - defensive
+                pass
+        self._loop_task = None
 
     async def stop(self) -> None:
         """Request a graceful stop of the dispatch loop."""
@@ -447,28 +537,30 @@ class OrchDriver:
     async def on_status_update(self, asm: Optional[ActionServerModel]) -> None:
         """Fold a remote action-server status into state and execute reactions.
 
-        SP-ORCH-5c: after folding status, if the FSM was stalled at WAIT and
-        is now actionable (e.g. actions_idle became True after a wait executor
-        finished), re-run the dispatch loop so the loop advances to the next
-        action / experiment / finish step without requiring an external trigger.
-        """
-        from helao.framework.models.orchstatus import LoopStatus
+        SP-ORCH-5c: this NEVER spawns a dispatch loop. After folding status and
+        executing its reactions it simply wakes the single long-lived dispatch
+        loop task (``self._wake.set()``) so the (one) drainer re-evaluates
+        ``decide_next`` and advances past a WAIT it was parked on. Because the
+        loop clears the event BEFORE parking, a set that lands mid-step is
+        remembered and consumed when it next parks — no lost wakeup, and exactly
+        one task ever pops the queues.
 
+        If the loop task is not currently alive (e.g. it exited at a terminal
+        IDLE and new work folded in via this status), it is (re)created so the
+        wake is not lost.
+        """
         _st, cmds = orch.on_status_update(self.state, asm)
         await self._execute(cmds)
-        # Re-trigger the loop if it was stalled at WAIT and can now progress.
-        # Guard: only spawn a new loop task when the previous one is done (no
-        # concurrent dispatch of the same action queue from two loop instances).
-        _decision = orch.decide_next(self.state)
-        if (
-            self.state.loop_state == LoopStatus.started
-            and _decision not in (OrchDecision.WAIT, OrchDecision.STOP, OrchDecision.IDLE)
-        ):
-            existing = self._retrigger_task
-            if existing is None or existing.done():
-                self._retrigger_task = asyncio.create_task(
-                    self.run_dispatch_loop(), name="orch_loop_retrigger"
-                )
+        self._wake.set()
+        # In production (background loop) a status arriving after the loop exited
+        # at IDLE must respawn the single drainer so the wake is honoured. The
+        # in-process synthesize path drives the loop inline from start(), so it is
+        # never resurrected here.
+        if not getattr(self.ports, "synthesize_completion", True):
+            from helao.framework.models.orchstatus import LoopStatus
+
+            if self.state.loop_state == LoopStatus.started:
+                self._ensure_loop_task()
 
     # --- heartbeat -----------------------------------------------------------
 
@@ -526,13 +618,30 @@ class OrchDriver:
     # --- the loop ------------------------------------------------------------
 
     async def run_dispatch_loop(self, *, max_steps: int = 10_000) -> None:
-        """Drive the FSM to a natural stop/idle, realising commands via ports.
+        """The SINGLE long-lived dispatch drainer driven by ``self._wake``.
 
         Each iteration consults :func:`orchestration.decide_next` and, for the
         seq/exp dispatch decisions, pre-expands through the library maps so the
-        pure dispatch step receives its ``expand_result``. The single ``app/``
-        exception boundary wraps the body: an unexpected exception logs, drives
-        the FSM to ``estopped``, executes the estop commands, and breaks.
+        pure dispatch step receives its ``expand_result``.
+
+        SP-ORCH-5c parking semantics (kills the spawn-on-status races): instead of
+        ``break``-ing at a WAIT / no-progress point, the loop **parks on the wake
+        event** — ``self._wake.clear(); await self._wake.wait()`` — and then
+        continues. The event is cleared BEFORE awaiting so a ``set`` that lands
+        mid-step is remembered and consumed at the next park (no lost wakeup).
+        ``on_status_update`` / ``start`` set the event; because there is only ever
+        one loop task, concurrent pops are impossible.
+
+        The loop EXITS the task only on a genuine terminal:
+
+        * STOP (stop/estop intent or estopped state), or
+        * IDLE with all queues empty and no active experiment/sequence (a clean
+          drain; a later enqueue + ``start`` / wake recreates the task), or
+        * cancellation at shutdown.
+
+        The single ``app/`` exception boundary wraps the step body: an unexpected
+        exception logs, drives the FSM to ``estopped``, executes the estop
+        commands, and exits.
         """
         from helao.framework.models.orchstatus import LoopStatus
 
@@ -540,10 +649,18 @@ class OrchDriver:
         while steps < max_steps:
             steps += 1
             if self.state.loop_state != LoopStatus.started:
-                break
+                break  # STOP/estopped/stopped — terminal, exit the task
             decision = orch.decide_next(self.state)
             if decision in (OrchDecision.STOP, OrchDecision.IDLE):
-                break
+                break  # terminal: nothing left to drain
+            if decision == OrchDecision.WAIT:
+                # Park: clear BEFORE awaiting so a concurrent set is not lost.
+                self._wake.clear()
+                # Re-check after clearing in case decide_next changed between the
+                # clear and the await (a set that already happened is consumed).
+                if orch.decide_next(self.state) == OrchDecision.WAIT:
+                    await self._wake.wait()
+                continue
             try:
                 progressed = await self._step(decision)
             except Exception as exc:  # the single app/ exception boundary
@@ -554,8 +671,17 @@ class OrchDriver:
                 await self._execute(cmds)
                 break
             if not progressed:
-                # WAIT with nothing externally driving us forward: avoid a spin.
-                break
+                # No in-process progress (e.g. a start-condition re-queue): park
+                # on the wake event rather than spin or exit, so an external
+                # status update can advance us. Clear before awaiting (no lost
+                # wakeup). The in-process synthesize path never reaches here
+                # because each dispatch folds finished status immediately.
+                self._wake.clear()
+                if not orch.decide_next(self.state) in (
+                    OrchDecision.STOP,
+                    OrchDecision.IDLE,
+                ):
+                    await self._wake.wait()
 
     async def _step(self, decision: OrchDecision) -> bool:
         """Execute one dispatch decision. Returns True if the loop progressed."""
@@ -799,6 +925,7 @@ def makeOrchApp(
     *,
     ports: OrchPorts,
     state: Optional[OrchState] = None,
+    save_root: Optional[str] = None,
 ):
     """Build a FastAPI app wrapping an :class:`OrchDriver`.
 
@@ -838,18 +965,24 @@ def makeOrchApp(
     from helao.framework.adapters.queue_eventsink import QueueEventSink as _QueueEventSink
     from helao.framework.app.base_api import ActionContext, FrameworkBase
 
-    # Determine save_root: prefer from CONFIG, fall back to a temp dir.
-    _save_root = None
-    try:
-        from helao.framework.support import config_loader as _cl
-        _cfg = _cl.CONFIG or {}
-        _root = _cfg.get("root") or _cfg.get("save_root")
-        if _root:
-            _save_root = os.path.join(_root, "RUNS_HLO", server_key)
-    except Exception:
-        pass
+    # Determine save_root (IMPORTANT-5): an explicit caller-supplied ``save_root``
+    # wins (the caller owns the dir and its lifecycle); else CONFIG; else a
+    # tempfile.mkdtemp that WE own and clean up in the shutdown hook (tracked on
+    # ``app.state._owned_tempdir``).
+    _save_root = save_root
+    if _save_root is None:
+        try:
+            from helao.framework.support import config_loader as _cl
+            _cfg = _cl.CONFIG or {}
+            _root = _cfg.get("root") or _cfg.get("save_root")
+            if _root:
+                _save_root = os.path.join(_root, "RUNS_HLO", server_key)
+        except Exception:
+            pass
+    app.state._owned_tempdir = None
     if _save_root is None:
         _save_root = tempfile.mkdtemp(prefix=f"helao_{server_key}_")
+        app.state._owned_tempdir = _save_root  # we created it -> we remove it
     os.makedirs(_save_root, exist_ok=True)
 
     # SEPARATE eventsink for the base — carries action STATUS_CHANNEL events.
@@ -878,9 +1011,16 @@ def makeOrchApp(
 
     @app.on_event("shutdown")
     async def _stop_base() -> None:
-        """Stop FrameworkBase background tasks + OwnStatusIngestor."""
+        """Stop FrameworkBase + OwnStatusIngestor + dispatch loop; clean owned tempdir."""
         app.state.own_status_ingestor.stop()
+        # SP-ORCH-5c: cancel the single long-lived dispatch-loop task cleanly.
+        await driver.shutdown()
         await base.shutdown()
+        # IMPORTANT-5: remove the tempdir we created (no-op for caller/CONFIG roots).
+        owned = getattr(app.state, "_owned_tempdir", None)
+        if owned:
+            import shutil
+            shutil.rmtree(owned, ignore_errors=True)
 
     @app.on_event("startup")
     async def _start_heartbeat() -> None:
@@ -974,6 +1114,15 @@ def makeOrchApp(
             experiment_name=body.get("experiment_name", "orch_builtin"),
             action_output_dir=str(action_uuid),
             action_server=_MachineModel(server_name=server_key),
+            # MINOR-8 (PRODUCTION-CRITICAL): stamp this self-hosted action's
+            # ``orchestrator`` to the orch's OWN GSM identity. ``server.py``'s
+            # ``_sort_status`` only removes a finished UUID from ``active_dict``
+            # when ``statusmodel.orchestrator == self.orchestrator``. Under a real
+            # config the GSM orchestrator is the real server identity; if the wait
+            # action kept the default ``MachineModel()`` the equality would fail
+            # and the finished wait would never leave ``active_dict`` → permanent
+            # WAIT stall. Stamping it here keeps self-status folding correct.
+            orchestrator=driver.state.globalstatusmodel.orchestrator,
             action_params={"waittime": waittime},
             action_status=[HloStatus.active],
             save_act=False,

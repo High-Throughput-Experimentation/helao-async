@@ -266,7 +266,10 @@ def _make_orch_app(
         experiment_lib={"builtin_exp": exp_factory},
         synthesize_completion=False,
     )
-    app = makeOrchApp(orch_key, ports=ports)
+    # IMPORTANT-5: thread the caller-owned save_root into makeOrchApp so the
+    # orch writes under the test's TemporaryDirectory (previously dead) instead of
+    # leaking its own tempfile.mkdtemp.
+    app = makeOrchApp(orch_key, ports=ports, save_root=save_root)
     return app, transport
 
 
@@ -339,15 +342,22 @@ async def test_orch_wait_then_sim_action_end_to_end(fake_action_server: FakeServ
                 f"No 'wait' executor found; executors: {exec_ids}"
             )
 
-            # Assert (ii): the loop is still running (wait not done yet)
-            # WaitExec takes 0.3s, we just detected it started — should still be active
+            # Assert (ii): the loop is still running (wait not done yet).
+            # WaitExec takes 0.3s, we just detected it started — should still be
+            # active. IMPORTANT-4: do NOT use base.executors non-emptiness as the
+            # "running" proxy (finished executors are now removed, but more
+            # importantly a leaked entry would falsely pass). Assert on the actual
+            # action status instead: the wait action must be in the GSM active_dict.
             await asyncio.sleep(0.05)  # tiny buffer
-            # We expect actions are still in flight (wait is executing)
+            from helao.framework.domain import status as _status_facade
+
             gsm = driver.state.globalstatusmodel
-            # The global status should show the wait action as active (not idle)
-            # This is flexible — we just check the loop hasn't instantly finished
             assert driver.state.loop_state == LoopStatus.started, (
                 "Loop exited prematurely — wait should still be running"
+            )
+            assert not _status_facade.actions_idle(gsm), (
+                "wait action should be active (not idle) while WaitExec is running; "
+                f"active_dict={list(gsm.active_dict.keys())}"
             )
 
             # Assert (iii): wait for OwnStatusIngestor to fold finished status

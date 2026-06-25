@@ -286,6 +286,11 @@ def test_start_executor_registers_and_spawns_task():
         finished = await session.action_task
         assert finished is session.action
         assert HloStatus.finished in session.action.action_status
+        # IMPORTANT-4: once finished, the executor must be deregistered from
+        # base.executors (no registry leak / ghost entries for cancel_wait).
+        assert executor.exec_id not in base.executors, (
+            "finished executor was not removed from base.executors (registry leak)"
+        )
 
     asyncio.run(_run())
 
