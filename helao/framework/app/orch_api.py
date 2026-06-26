@@ -358,10 +358,16 @@ def _stage_actions(state: OrchState, actions: List[RunAction]) -> None:
 
 
 def _as_run_experiment(exp: Any) -> RunExperiment:
-    """Coerce a planned :class:`ExperimentModel` into a :class:`RunExperiment`."""
-    if isinstance(exp, RunExperiment):
-        return exp
-    return RunExperiment(**exp.model_dump())
+    """Coerce a planned :class:`ExperimentModel` into a :class:`RunExperiment`.
+
+    Stamps ``experiment_uuid`` if unset so a sequence's staged experiments carry a
+    uuid while queued (the operator's experiment-queue table shows it). Mirrors
+    ``_as_run_sequence`` / ``_as_run_experiment_dict``; dispatch reuses the uuid.
+    """
+    run_exp = exp if isinstance(exp, RunExperiment) else RunExperiment(**exp.model_dump())
+    if run_exp.experiment_uuid is None:
+        run_exp.experiment_uuid = _uuid.uuid4()
+    return run_exp
 
 
 def _extract_nonblocking(body: dict) -> bool:
@@ -432,8 +438,35 @@ class OrchDriver:
         # ``_ensure_loop_task`` so concurrent pops are impossible (no second loop).
         self._wake: asyncio.Event = asyncio.Event()
         self._loop_task: Optional[asyncio.Task] = None
+        #: optional backref to the co-located FrameworkBase (set by makeOrchApp).
+        #: Used to stop the orch's OWN nonblocking executors in-process at
+        #: experiment finish — a StopExecutor RPC to the orch's own /stop_executor
+        #: would deadlock this single dispatch loop.
+        self.base = None
 
     # --- command execution + draining --------------------------------------
+
+    async def _stop_nonblocking_executors(self, nb_cmds: List[Any]) -> None:
+        """Stop tracked nonblocking executors at experiment finish.
+
+        Executors hosted on THIS orchestrator's co-located base are stopped
+        IN-PROCESS (dispatching StopExecutor to the orch's own /stop_executor over
+        RPC deadlocks the single dispatch loop — the loop would await a response it
+        must itself produce). Genuinely remote executors are dispatched over the
+        transport, exactly as before.
+        """
+        local_execs = getattr(self.base, "executors", {}) or {}
+        remote: List[Any] = []
+        for cmd in nb_cmds:
+            executor = local_execs.get(getattr(cmd, "executor_id", None))
+            if executor is not None:
+                stop_fn = getattr(executor, "stop_action_task", None)
+                if callable(stop_fn):
+                    stop_fn()
+            else:
+                remote.append(cmd)
+        if remote:
+            await self._execute(remote)
 
     async def _execute(self, commands: List[Any]) -> None:
         """Execute ``commands`` and drain any follow-ups they produce."""
@@ -779,13 +812,10 @@ class OrchDriver:
             # Stop any nonblocking action executors still running for this
             # experiment before finishing it (ports finish_active_experiment's
             # clear_nonblocking loop, orch.py:2110). Blocking actions are already
-            # idle (FINISH_EXPERIMENT only fires when actions_idle). Each
-            # StopExecutor makes the action server stop its executor, which then
-            # reports finished via send_nonblocking_status -> on_nonblocking,
-            # removing it from state.nonblocking.
+            # idle (FINISH_EXPERIMENT only fires when actions_idle).
             _st, nb_cmds = orch.clear_nonblocking(self.state)
             if nb_cmds:
-                await self._execute(nb_cmds)
+                await self._stop_nonblocking_executors(nb_cmds)
                 # Best-effort teardown: legacy finish_active_experiment LOOPED
                 # clear_nonblocking with sleeps until the list drained (waiting for
                 # each executor's finish report). The single-pass FSM instead fires
@@ -1076,6 +1106,9 @@ def makeOrchApp(
     # is redundant with OwnStatusIngestor). The in-process sink avoids the HTTP/RPC
     # self-loop entirely; action SERVERS (which DO set orch_key) keep the HTTP path.
     base.nonblocking_sink = driver.on_nonblocking
+    # Backref so the driver stops the orch's OWN nonblocking executors in-process
+    # at experiment finish (a StopExecutor self-RPC would deadlock the loop).
+    driver.base = base
 
     # OwnStatusIngestor: feeds the orch base's action status into driver.on_status_update
     # so the FSM advances when the wait executor finishes.

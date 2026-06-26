@@ -763,3 +763,67 @@ def test_orch_base_uses_in_process_nonblocking_sink_not_self_push(monkeypatch):
     action.action_status = [HloStatus.active]
     asyncio.run(base.send_nonblocking_status(action))
     assert any(t[1] == "wait exec1" for t in state.nonblocking)
+
+
+def test_finish_experiment_stops_local_nonblocking_executor_in_process():
+    """The orch's OWN nonblocking executors must be stopped IN-PROCESS at finish.
+
+    Dispatching StopExecutor to the orch's own /stop_executor over RPC deadlocks
+    the single dispatch loop (it would await a response it must itself produce).
+    Local executors (in base.executors) are stopped via stop_action_task directly;
+    no transport dispatch is issued for them.
+    """
+    class _FakeExec:
+        def __init__(self):
+            self.stopped = False
+        def stop_action_task(self):
+            self.stopped = True
+
+    class _FakeBase:
+        def __init__(self, ex):
+            self.executors = {"wait exec1": ex}
+
+    transport = FakeTransport()
+    driver = _make_driver(transport=transport)
+    ex = _FakeExec()
+    driver.base = _FakeBase(ex)
+    driver.state.nonblocking.append(("ORCH", "wait exec1", "127.0.0.1", 8001))
+    driver.enqueue_experiment(RunExperiment(experiment_name="test_exp"))
+    asyncio.run(driver.start())
+
+    assert ex.stopped is True  # stopped in-process
+    # no stop_executor was dispatched over the transport for the local executor
+    stop_dispatched = [
+        t for t, _ in transport.dispatched
+        if getattr(t, "endpoint", None) == "stop_executor"
+    ]
+    assert stop_dispatched == []
+    assert driver.state.nonblocking == []
+
+
+def test_finish_experiment_dispatches_remote_nonblocking_stop():
+    """A nonblocking executor NOT on the orch's base is dispatched over transport."""
+    transport = FakeTransport()
+    driver = _make_driver(transport=transport)
+
+    class _EmptyBase:
+        executors = {}
+
+    driver.base = _EmptyBase()
+    driver.state.nonblocking.append(("SIM", "acq exec9", "127.0.0.1", 8002))
+    driver.enqueue_experiment(RunExperiment(experiment_name="test_exp"))
+    asyncio.run(driver.start())
+
+    stop_dispatched = [
+        (t, p) for t, p in transport.dispatched
+        if getattr(t, "endpoint", None) == "stop_executor"
+    ]
+    assert stop_dispatched, "remote nonblocking executor should be stopped via transport"
+    assert any(p.get("executor_id") == "acq exec9" for _, p in stop_dispatched)
+
+
+def test_as_run_experiment_stamps_uuid_for_queued_display():
+    """Sequence-staged experiments must carry a uuid while queued (operator table)."""
+    from helao.framework.app.orch_api import _as_run_experiment
+    exp = _as_run_experiment(ExperimentModel(experiment_name="te"))
+    assert exp.experiment_uuid is not None
