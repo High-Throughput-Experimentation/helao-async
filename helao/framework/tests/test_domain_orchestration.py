@@ -783,3 +783,35 @@ def test_on_nonblocking_dedups_duplicate_active_reports():
     am.action_status = [HloStatus.finished]
     orch.on_nonblocking(st, am, "h", 9)
     assert not any(t[1] == "nb exec1" for t in st.nonblocking)
+
+
+# --------------------------------------------------------------------------- #
+# BUG: experiments must run SERIALLY — finish the active experiment before
+# dispatching the next queued one (decide_next prioritises FINISH_EXPERIMENT).
+# Previously the next experiment dispatched as soon as actions were idle,
+# overwriting active_experiment so prior experiments never finished.
+# --------------------------------------------------------------------------- #
+def test_decide_next_finishes_active_experiment_before_next_queued():
+    st = _state(active_experiment=RunExperiment(), experiment_dq=[RunExperiment()])
+    # actions idle, active experiment present, more experiments queued ->
+    # FINISH the active one first (not DISPATCH the next)
+    assert orch.decide_next(st) == OrchDecision.FINISH_EXPERIMENT
+
+
+def test_decide_next_dispatches_next_experiment_after_active_cleared():
+    st = _state(active_experiment=None, experiment_dq=[RunExperiment()])
+    assert orch.decide_next(st) == OrchDecision.DISPATCH_EXPERIMENT
+
+
+def test_decide_next_finishes_active_sequence_before_next_queued():
+    st = _state(active_sequence=RunSequence(), sequence_dq=[RunSequence()])
+    # no active/queued experiments -> finish the active sequence before the next
+    assert orch.decide_next(st) == OrchDecision.FINISH_SEQUENCE
+
+
+def test_decide_next_active_experiment_waits_while_actions_busy():
+    st = _state(active_experiment=RunExperiment(), experiment_dq=[RunExperiment()])
+    active = _action([HloStatus.active])
+    st.globalstatusmodel.update_global_with_acts(_server_model(active))
+    # busy -> WAIT regardless of the finish/dispatch priority
+    assert orch.decide_next(st) == OrchDecision.WAIT

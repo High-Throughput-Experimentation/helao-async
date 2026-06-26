@@ -1068,14 +1068,14 @@ def makeOrchApp(
     )
     app.state.base = base
 
-    # The orch hosts its OWN nonblocking actions (e.g. a nonblocking /wait). Point
-    # the co-located base's orch coords at this server so send_nonblocking_status
-    # reports them back to this orch's /update_nonblocking (the ORCH config entry
-    # carries no orch_key — only action servers do).
-    if base.orch_key is None:
-        base.orch_key = server_key
-        base.orch_host = base.orch_host or base.server_cfg.get("host")
-        base.orch_port = base.orch_port or base.server_cfg.get("port")
+    # The orch hosts its OWN nonblocking actions (e.g. a nonblocking /wait). Route
+    # their status reports STRAIGHT to the driver in-process — do NOT set the base's
+    # orch_key, which would make the base auto-attach itself as a regular status
+    # client (base_api.py:496) and try to RPC-push every status to itself (the ORCH
+    # config entry has no orch_host/orch_port -> derive_rpc_port(None) crash, and it
+    # is redundant with OwnStatusIngestor). The in-process sink avoids the HTTP/RPC
+    # self-loop entirely; action SERVERS (which DO set orch_key) keep the HTTP path.
+    base.nonblocking_sink = driver.on_nonblocking
 
     # OwnStatusIngestor: feeds the orch base's action status into driver.on_status_update
     # so the FSM advances when the wait executor finishes.

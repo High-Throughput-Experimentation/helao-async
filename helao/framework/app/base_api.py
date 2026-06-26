@@ -18,7 +18,7 @@ import os
 import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import UUID
 
 from helao.framework.domain.action_session import ActionSession
@@ -169,6 +169,11 @@ class FrameworkBase:
         self.orch_key = self.server_cfg.get("orch_key")
         self.orch_host = self.server_cfg.get("orch_host")
         self.orch_port = self.server_cfg.get("orch_port")
+        #: optional in-process hook for nonblocking-action reports. Set by the
+        #: orchestrator (makeOrchApp) to driver.on_nonblocking so the orch's OWN
+        #: nonblocking actions are routed straight to the FSM without an HTTP/RPC
+        #: self-loop. Action servers leave this None and push to the orch over RPC.
+        self.nonblocking_sink: Optional[Callable] = None
         #: background drain handle for the status-push loop (started by myinit).
         self._status_task: Optional[asyncio.Task] = None
 
@@ -377,7 +382,20 @@ class FrameworkBase:
         at experiment finish. Targets the union of registered status_clients and
         the configured orchestrator so delivery does not depend on the (lazy /
         WS-superseded) auto-attach path.
+
+        When ``nonblocking_sink`` is set (the orchestrator's own co-located base),
+        the report is routed IN-PROCESS to ``driver.on_nonblocking`` instead — no
+        HTTP/RPC self-loop, and no regular-status self-attach. The host/port handed
+        to the sink are this server's own, so the resulting ``stop_executor`` at
+        experiment finish targets this orchestrator.
         """
+        sink = getattr(self, "nonblocking_sink", None)
+        if callable(sink):
+            host = self.server_cfg.get("host")
+            port = self.server_cfg.get("port")
+            await sink(action, host, int(port) if port is not None else 0)
+            return
+
         targets = set(self.status_clients)
         orch_coords = self._resolve_orch_coords()
         if orch_coords is not None:

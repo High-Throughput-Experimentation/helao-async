@@ -719,3 +719,47 @@ def test_finish_experiment_stops_tracked_nonblocking_executors():
     # tracking is dropped at finish so a stale entry is not re-stopped on later
     # experiment finishes (best-effort teardown, no leak)
     assert driver.state.nonblocking == []
+
+
+def test_multiple_queued_experiments_finish_serially():
+    """Each queued experiment must be FINISHED before the next dispatches.
+
+    Regression for the decide_next bug where queued experiments dispatched
+    back-to-back (active_experiment overwritten) so only the last finished.
+    """
+    transport = FakeTransport()
+    storage = FakeStorage()
+    driver = _make_driver(transport=transport, storage=storage)
+    for _ in range(3):
+        driver.enqueue_experiment(RunExperiment(experiment_name="test_exp"))
+    asyncio.run(driver.start())
+
+    exp_metas = [k for k in storage.meta_docs if k.endswith("-exp.yml")]
+    assert len(exp_metas) == 3, (
+        f"expected 3 finished experiments, got {len(exp_metas)}: {exp_metas}"
+    )
+    assert driver.state.active_experiment is None
+
+
+def test_orch_base_uses_in_process_nonblocking_sink_not_self_push(monkeypatch):
+    """makeOrchApp must NOT set base.orch_key (would self-attach + crash on None
+    coords); it wires an in-process nonblocking_sink to driver.on_nonblocking."""
+    ports = _make_ports()
+    state = OrchState()
+    app = makeOrchApp("myorch", ports=ports, state=state)
+    base = app.state.base
+    # no regular-status self-attach
+    assert base.orch_key is None
+    # nonblocking reports route in-process to the driver
+    assert callable(base.nonblocking_sink)
+
+    # exercise the sink: a nonblocking action reported through the base reaches
+    # the driver's FSM tracking without any HTTP/RPC dispatch
+    base.server_cfg.setdefault("host", "127.0.0.1")
+    base.server_cfg.setdefault("port", 8001)
+    action = _make_action("wait")
+    action.action_uuid = uuid4()
+    action.exec_id = "wait exec1"
+    action.action_status = [HloStatus.active]
+    asyncio.run(base.send_nonblocking_status(action))
+    assert any(t[1] == "wait exec1" for t in state.nonblocking)

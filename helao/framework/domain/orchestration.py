@@ -603,20 +603,25 @@ def decide_next(state: OrchState) -> OrchDecision:
         return OrchDecision.DISPATCH_ACTION
 
     idle = status_facade.actions_idle(gsm)
-
-    if state.experiment_dq:
-        return OrchDecision.DISPATCH_EXPERIMENT if idle else OrchDecision.WAIT
-
-    if state.sequence_dq:
-        return OrchDecision.DISPATCH_SEQUENCE if idle else OrchDecision.WAIT
-
-    # all queues empty: wrap up actives, gated on actions idle
     if not idle:
         return OrchDecision.WAIT
+
+    # Actions are idle and none are queued. Experiments run SERIALLY: the active
+    # experiment must be FINISHED before the next queued one is dispatched —
+    # otherwise dispatch_experiment overwrites active_experiment and the prior
+    # experiment is never finished (no FinishExperiment meta, no clear_nonblocking
+    # teardown). Ports the legacy dispatch loop, which finished each experiment
+    # before dequeuing the next. Same rule for sequences below.
     if state.active_experiment is not None:
         return OrchDecision.FINISH_EXPERIMENT
+    if state.experiment_dq:
+        return OrchDecision.DISPATCH_EXPERIMENT
+    # No active or queued experiments: a finished sequence wraps up before the
+    # next sequence is dispatched.
     if state.active_sequence is not None:
         return OrchDecision.FINISH_SEQUENCE
+    if state.sequence_dq:
+        return OrchDecision.DISPATCH_SEQUENCE
     return OrchDecision.IDLE
 
 
