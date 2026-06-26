@@ -732,6 +732,81 @@ def apply_intent(
 # --- status reactions ----------------------------------------------------------
 
 
+def _fmt_ts(ts: Any) -> Optional[str]:
+    """Format an action timestamp like legacy ``f"{ts: %m-%d %H:%M:%S}"`` or None."""
+    if ts is None:
+        return None
+    try:
+        return f"{ts: %m-%d %H:%M:%S}"
+    except (TypeError, ValueError):
+        return str(ts)
+
+
+def _register_server_actions(
+    state: OrchState, actionservermodel: ActionServerModel
+) -> None:
+    """Register every action carried in ``actionservermodel`` into ``action_history``.
+
+    Ports the registration block of legacy ``Orch.update_status``
+    (orch.py:475-531). Unlike the legacy code — which only registered the single
+    ``last_action_uuid`` — this registers every action present in the snapshot's
+    endpoint buckets (active + nonactive). ``register_action_uuid`` is an
+    update-or-insert, so an action seen first ``active`` then ``finished`` simply
+    has its entry updated (gaining ``action_finished_timestamp``). The
+    experiment/sequence context is attributed only when the action belongs to the
+    orch's currently active experiment, matching legacy.
+    """
+    endpoints = getattr(actionservermodel, "endpoints", None)
+    if not endpoints:
+        return
+    for endpoint_model in endpoints.values():
+        act_models: dict = {}
+        act_models.update(getattr(endpoint_model, "active_dict", {}) or {})
+        for bucket in (getattr(endpoint_model, "nonactive_dict", {}) or {}).values():
+            act_models.update(bucket or {})
+        for act_uuid, act_model in act_models.items():
+            matching_experiment = (
+                state.active_experiment is not None
+                and state.active_experiment.experiment_uuid == act_model.experiment_uuid
+            )
+            register_action_uuid(
+                state,
+                act_uuid,
+                {
+                    "action_name": act_model.action_name,
+                    "action_status": act_model.action_status,
+                    "action_server": act_model.action_server.server_name,
+                    "action_timestamp": _fmt_ts(
+                        getattr(act_model, "action_timestamp", None)
+                    ),
+                    "action_finished_timestamp": _fmt_ts(
+                        getattr(act_model, "action_finished_timestamp", None)
+                    ),
+                    "experiment_name": (
+                        state.active_experiment.experiment_name
+                        if matching_experiment
+                        else None
+                    ),
+                    "experiment_uuid": act_model.experiment_uuid,
+                    "sequence_name": (
+                        state.active_sequence.sequence_name
+                        if state.active_sequence is not None and matching_experiment
+                        else None
+                    ),
+                    "sequence_label": (
+                        state.active_sequence.sequence_label
+                        if state.active_sequence is not None and matching_experiment
+                        else None
+                    ),
+                    "sequence_uuid": (
+                        state.active_sequence.sequence_uuid
+                        if state.active_sequence is not None and matching_experiment
+                        else None
+                    ),
+                },
+            )
+
+
 def on_status_update(
     state: OrchState, actionservermodel: Optional[ActionServerModel]
 ) -> Tuple[OrchState, List[Command]]:
@@ -757,6 +832,13 @@ def on_status_update(
 
     gsm = state.globalstatusmodel
     cmds: List[Command] = []
+
+    # Record every action this snapshot carries into ``action_history`` BEFORE
+    # the merge folds finished actions away. Ports the registration block of
+    # legacy ``Orch.update_status`` (orch.py:475-531), which the SP-ORCH-5 port
+    # dropped — without it the operator's Action history table is always empty
+    # (experiments/sequences register at dispatch; actions never did).
+    _register_server_actions(state, actionservermodel)
 
     status_facade.merge_server_status(gsm, actionservermodel)
 

@@ -705,3 +705,67 @@ def test_on_dispatch_result_happy_folds_globals():
     assert st.global_params["gk"] == 99
     assert exp.dispatched_actions == [a]
     assert cmds == []
+
+
+# --------------------------------------------------------------------------- #
+# BUG A regression: on_status_update registers actions into action_history
+# (legacy Orch.update_status did this; the SP-ORCH-5 port dropped it, so the
+# operator's Action history table was always empty).
+# --------------------------------------------------------------------------- #
+def test_on_status_update_registers_finished_action_in_history():
+    st = _state()
+    st.loop_state = LoopStatus.started
+    auuid = uuid4()
+    finished = _action(
+        [HloStatus.finished],
+        action_uuid=auuid,
+        action_name="acquire_data",
+        action_timestamp=NOW,
+    )
+    ep = EndpointModel(
+        endpoint_name="acquire_data",
+        active_dict={},
+        nonactive_dict={HloStatus.finished: {auuid: finished}},
+    )
+    asm = ActionServerModel(action_server=SRV, endpoints={"acquire_data": ep})
+    orch.on_status_update(st, asm)
+    assert auuid in st.action_history
+    entry = st.action_history[auuid]
+    assert entry["action_name"] == "acquire_data"
+    assert entry["action_server"] == "act"
+    assert entry["action_timestamp"] is not None
+
+
+def test_on_status_update_registers_active_then_updates_on_finish():
+    st = _state()
+    st.loop_state = LoopStatus.started
+    auuid = uuid4()
+    active = _action([HloStatus.active], action_uuid=auuid, action_name="acquire_data")
+    orch.on_status_update(st, _server_model(active, endpoint_name="acquire_data"))
+    assert auuid in st.action_history  # active actions appear too
+    finished = _action(
+        [HloStatus.finished],
+        action_uuid=auuid,
+        action_name="acquire_data",
+        action_timestamp=NOW,
+        action_finished_timestamp=NOW,
+    )
+    ep = EndpointModel(
+        endpoint_name="acquire_data",
+        active_dict={},
+        nonactive_dict={HloStatus.finished: {auuid: finished}},
+    )
+    orch.on_status_update(st, ActionServerModel(action_server=SRV, endpoints={"acquire_data": ep}))
+    # update-or-insert: same uuid, now carrying a finished timestamp
+    assert st.action_history[auuid]["action_finished_timestamp"] is not None
+
+
+def test_on_status_update_attributes_experiment_context_when_matching():
+    exp_uuid = uuid4()
+    exp = RunExperiment(experiment_uuid=exp_uuid, experiment_name="te")
+    st = _state(active_experiment=exp)
+    st.loop_state = LoopStatus.started
+    auuid = uuid4()
+    act = _action([HloStatus.active], action_uuid=auuid, exp_uuid=exp_uuid, action_name="x")
+    orch.on_status_update(st, _server_model(act, endpoint_name="x"))
+    assert st.action_history[auuid]["experiment_name"] == "te"
