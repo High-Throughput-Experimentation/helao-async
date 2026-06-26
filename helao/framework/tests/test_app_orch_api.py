@@ -38,6 +38,8 @@ from helao.framework.app.orch_api import (
     OrchPorts,
     execute_commands,
     makeOrchApp,
+    _as_run_sequence,
+    _extract_nonblocking,
 )
 from helao.framework.domain.commands import (
     BroadcastGlobalStatus,
@@ -603,3 +605,52 @@ def test_loop_exception_boundary_estops():
 
     asyncio.run(driver.start())
     assert driver.state.loop_state == LoopStatus.estopped
+
+
+# ---------------------------------------------------------------------------
+# BUG 3 regression: /wait must honor the dispatched action's nonblocking flag.
+# The orch dispatch payload nests the action under body["action"]; if the flag
+# is dropped the self-hosted wait blocks the loop (TEST_consecutive_noblocking
+# "takes too long").
+# ---------------------------------------------------------------------------
+def test_extract_nonblocking_from_dispatch_payload():
+    body = {"waittime": 30.0, "action": {"action_uuid": "x", "nonblocking": True}}
+    assert _extract_nonblocking(body) is True
+
+
+def test_extract_nonblocking_top_level_flag():
+    assert _extract_nonblocking({"waittime": 1.0, "nonblocking": True}) is True
+
+
+def test_extract_nonblocking_defaults_false():
+    assert _extract_nonblocking({"waittime": 1.0}) is False
+    assert _extract_nonblocking({"waittime": 1.0, "action": {"action_uuid": "x"}}) is False
+
+
+# ---------------------------------------------------------------------------
+# BUG B regression: queued items must carry a uuid at enqueue (operator queue
+# table showed a blank uuid because stamping was deferred to dispatch).
+# ---------------------------------------------------------------------------
+def test_as_run_sequence_stamps_uuid_at_enqueue():
+    seq = _as_run_sequence({"sequence_name": "te"})
+    assert seq.sequence_uuid is not None
+
+
+def test_as_run_sequence_preserves_supplied_uuid():
+    from uuid import uuid4
+    u = uuid4()
+    seq = _as_run_sequence({"sequence_name": "te", "sequence_uuid": str(u)})
+    assert seq.sequence_uuid == u
+
+
+def test_append_experiment_endpoint_returns_uuid():
+    ports = _make_ports()
+    state = OrchState()
+    app = makeOrchApp("myorch", ports=ports, state=state)
+    client = TestClient(app)
+    resp = client.post("/append_experiment", json={"experiment": {"experiment_name": "te"}})
+    assert resp.status_code == 200
+    euuid = resp.json()["experiment_uuid"]
+    assert euuid and euuid != "None"
+    # the queued experiment carries the same uuid (so the operator can show it)
+    assert str(state.experiment_dq[0].experiment_uuid) == euuid

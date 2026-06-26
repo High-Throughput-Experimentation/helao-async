@@ -364,9 +364,31 @@ def _as_run_experiment(exp: Any) -> RunExperiment:
     return RunExperiment(**exp.model_dump())
 
 
+def _extract_nonblocking(body: dict) -> bool:
+    """Read the ``nonblocking`` flag from a /wait request body.
+
+    The orch dispatch payload is ``{**action_params, "action": action.as_dict()}``
+    so the flag sits under ``body["action"]["nonblocking"]``; direct/test calls may
+    pass it top-level. Returns ``False`` when absent. Lives at module scope so the
+    propagation can be unit-tested without standing up the FastAPI app.
+    """
+    return bool(
+        body.get("nonblocking")
+        or (body.get("action") or {}).get("nonblocking")
+    )
+
+
 def _as_run_sequence(d: dict) -> RunSequence:
-    """Build a RunSequence from a posted dict (filter to model fields)."""
-    return RunSequence(**{k: v for k, v in d.items() if k in RunSequence.model_fields})
+    """Build a RunSequence from a posted dict (filter to model fields).
+
+    Stamps ``sequence_uuid`` at enqueue (legacy ``Orch._prep_sequence_meta``,
+    orch.py:1685) so queued items show a uuid in the operator immediately —
+    timestamp/output_dir stay deferred to ``dispatch_sequence``, matching legacy.
+    """
+    seq = RunSequence(**{k: v for k, v in d.items() if k in RunSequence.model_fields})
+    if seq.sequence_uuid is None:
+        seq.sequence_uuid = _uuid.uuid4()
+    return seq
 
 
 # --------------------------------------------------------------------------- #
@@ -1142,9 +1164,17 @@ def makeOrchApp(
         else:
             action_uuid = _uuid.uuid4()
 
+        # Propagate the dispatched action's ``nonblocking`` flag (see
+        # _extract_nonblocking). Without it the self-hosted wait defaults
+        # nonblocking=False, its "active" status is broadcast, folded into
+        # gsm.active_dict, and the orch BLOCKS on it — defeating a nonblocking
+        # wait (TEST_consecutive_noblocking then runs serially / "too long").
+        _nonblocking = _extract_nonblocking(body)
+
         action = _RunAction(
             action_name="wait",
             action_uuid=action_uuid,
+            nonblocking=_nonblocking,
             action_timestamp=now,
             sequence_timestamp=now,
             experiment_timestamp=now,
@@ -1329,15 +1359,28 @@ def makeOrchApp(
         orch.append_sequence(driver.state, seq)
         return [str(seq.sequence_uuid)]
 
+    def _as_run_experiment_dict(experiment: dict) -> RunExperiment:
+        """Build a RunExperiment from a posted dict, stamping experiment_uuid at enqueue.
+
+        Mirrors ``_as_run_sequence``: a queued experiment must carry a uuid so the
+        operator's queue table shows it (legacy stamped at add, not dispatch).
+        """
+        exp = RunExperiment(
+            **{k: v for k, v in experiment.items() if k in RunExperiment.model_fields}
+        )
+        if exp.experiment_uuid is None:
+            exp.experiment_uuid = _uuid.uuid4()
+        return exp
+
     @app.post("/append_experiment")
     async def append_experiment(experiment: dict = Body(..., embed=True)) -> dict:
-        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        exp = _as_run_experiment_dict(experiment)
         orch.append_experiment(driver.state, exp)
         return {"experiment_uuid": str(exp.experiment_uuid)}
 
     @app.post("/insert_experiment")
     async def insert_experiment(idx: int, experiment: dict = Body(..., embed=True)) -> dict:
-        exp = RunExperiment(**{k: v for k, v in experiment.items() if k in RunExperiment.model_fields})
+        exp = _as_run_experiment_dict(experiment)
         orch.insert_experiment(driver.state, exp, idx)
         return {"experiment_uuid": str(exp.experiment_uuid)}
 
