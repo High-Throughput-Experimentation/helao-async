@@ -581,6 +581,26 @@ class OrchDriver:
             if self.state.loop_state == LoopStatus.started:
                 self._ensure_loop_task()
 
+    async def on_nonblocking(self, actionmodel, host: str, port: int) -> None:
+        """Record a nonblocking action transition and wake the dispatch loop.
+
+        Fed by the ``/update_nonblocking`` endpoint when an action server reports
+        a nonblocking action's active/finished transition. Delegates to domain
+        :func:`orchestration.on_nonblocking` (tracks the executor in
+        ``state.nonblocking``, registers it in ``action_history`` — never touches
+        ``active_dict``), executes the resulting broadcast, and wakes the single
+        drainer so an experiment parked waiting on nonblocking teardown advances.
+        Mirrors :meth:`on_status_update`'s loop-resurrection guard.
+        """
+        _st, cmds = orch.on_nonblocking(self.state, actionmodel, host, port)
+        await self._execute(cmds)
+        self._wake.set()
+        if not getattr(self.ports, "synthesize_completion", True):
+            from helao.framework.models.orchstatus import LoopStatus
+
+            if self.state.loop_state == LoopStatus.started:
+                self._ensure_loop_task()
+
     # --- heartbeat -----------------------------------------------------------
 
     async def _heartbeat_once(self) -> None:
@@ -756,6 +776,25 @@ class OrchDriver:
 
         if decision == OrchDecision.FINISH_EXPERIMENT:
             exp = self.state.active_experiment
+            # Stop any nonblocking action executors still running for this
+            # experiment before finishing it (ports finish_active_experiment's
+            # clear_nonblocking loop, orch.py:2110). Blocking actions are already
+            # idle (FINISH_EXPERIMENT only fires when actions_idle). Each
+            # StopExecutor makes the action server stop its executor, which then
+            # reports finished via send_nonblocking_status -> on_nonblocking,
+            # removing it from state.nonblocking.
+            _st, nb_cmds = orch.clear_nonblocking(self.state)
+            if nb_cmds:
+                await self._execute(nb_cmds)
+                # Best-effort teardown: legacy finish_active_experiment LOOPED
+                # clear_nonblocking with sleeps until the list drained (waiting for
+                # each executor's finish report). The single-pass FSM instead fires
+                # stop_executor once and drops the tracking entries now, so a lost /
+                # never-arriving finish report cannot (a) hang the orch nor (b) leave
+                # a stale tuple that gets re-stopped at every later experiment finish.
+                # A finish report that does still arrive is a harmless no-op (the
+                # entry is gone) and its action_history update is unaffected.
+                self.state.nonblocking.clear()
             await self._execute([FinishExperiment(experiment_uuid=exp.experiment_uuid)])
             self.state.last_experiment = exp
             self.state.active_experiment = None
@@ -1028,6 +1067,15 @@ def makeOrchApp(
         clock=_NtpClock(),
     )
     app.state.base = base
+
+    # The orch hosts its OWN nonblocking actions (e.g. a nonblocking /wait). Point
+    # the co-located base's orch coords at this server so send_nonblocking_status
+    # reports them back to this orch's /update_nonblocking (the ORCH config entry
+    # carries no orch_key — only action servers do).
+    if base.orch_key is None:
+        base.orch_key = server_key
+        base.orch_host = base.orch_host or base.server_cfg.get("host")
+        base.orch_port = base.orch_port or base.server_cfg.get("port")
 
     # OwnStatusIngestor: feeds the orch base's action status into driver.on_status_update
     # so the FSM advances when the wait executor finishes.
@@ -1383,6 +1431,27 @@ def makeOrchApp(
         exp = _as_run_experiment_dict(experiment)
         orch.insert_experiment(driver.state, exp, idx)
         return {"experiment_uuid": str(exp.experiment_uuid)}
+
+    @app.post("/update_nonblocking", tags=["private"])
+    async def update_nonblocking(
+        actionmodel: dict = Body(..., embed=True),
+        server_host: str = "",
+        server_port: int = 0,
+    ) -> dict:
+        """Receive a nonblocking action transition from an action server.
+
+        Counterpart of ``FrameworkBase.send_nonblocking_status``. Rehydrates the
+        posted action dict and routes it to :meth:`OrchDriver.on_nonblocking`,
+        which tracks the executor and registers it in the action history. Ports
+        legacy ``Orch.update_nonblocking`` (orch.py:357).
+        """
+        from helao.framework.models.action import ActionModel
+
+        am = ActionModel(
+            **{k: v for k, v in actionmodel.items() if k in ActionModel.model_fields}
+        )
+        await driver.on_nonblocking(am, server_host, int(server_port or 0))
+        return {"success": True}
 
     @app.post("/clear_sequences")
     async def clear_sequences() -> dict:

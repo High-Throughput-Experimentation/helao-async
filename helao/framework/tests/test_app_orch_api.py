@@ -654,3 +654,68 @@ def test_append_experiment_endpoint_returns_uuid():
     assert euuid and euuid != "None"
     # the queued experiment carries the same uuid (so the operator can show it)
     assert str(state.experiment_dq[0].experiment_uuid) == euuid
+
+
+# ---------------------------------------------------------------------------
+# Nonblocking action parity: update_nonblocking ingestion + experiment-finish
+# teardown (legacy Orch.update_nonblocking / clear_nonblocking).
+# ---------------------------------------------------------------------------
+def test_driver_on_nonblocking_tracks_then_removes_and_registers_history():
+    ports = _make_ports()
+    state = OrchState()
+    driver = OrchDriver("test_orch", ports=ports, state=state)
+    action = _make_action("nb_act")
+    action.action_uuid = uuid4()
+    action.exec_id = "nb_act exec1"
+    action.action_status = [HloStatus.active]
+
+    asyncio.run(driver.on_nonblocking(action, "127.0.0.1", 8002))
+    assert any(t[1] == "nb_act exec1" for t in state.nonblocking)
+    assert action.action_uuid in state.action_history  # registered in history
+
+    action.action_status = [HloStatus.finished]
+    asyncio.run(driver.on_nonblocking(action, "127.0.0.1", 8002))
+    assert not any(t[1] == "nb_act exec1" for t in state.nonblocking)  # removed on finish
+
+
+def test_update_nonblocking_endpoint_routes_to_driver():
+    ports = _make_ports()
+    state = OrchState()
+    app = makeOrchApp("myorch", ports=ports, state=state)
+    client = TestClient(app)
+    action = _make_action("nb_act")
+    action.action_uuid = uuid4()
+    action.exec_id = "nb_act exec1"
+    action.action_status = [HloStatus.active]
+
+    resp = client.post(
+        "/update_nonblocking",
+        json={"actionmodel": action.as_dict()},
+        params={"server_host": "127.0.0.1", "server_port": 8002},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["success"] is True
+    assert any(t[1] == "nb_act exec1" for t in state.nonblocking)
+
+
+def test_finish_experiment_stops_tracked_nonblocking_executors():
+    transport = FakeTransport()
+    driver = _make_driver(transport=transport)
+    # a nonblocking executor is still tracked when the experiment finishes
+    driver.state.nonblocking.append(("act_srv", "nb exec1", "127.0.0.1", 8002))
+    driver.enqueue_experiment(RunExperiment(experiment_name="test_exp"))
+    asyncio.run(driver.start())
+
+    stop_dispatched = [
+        (t, p)
+        for t, p in transport.dispatched
+        if getattr(t, "endpoint", None) == "stop_executor"
+    ]
+    assert stop_dispatched, (
+        "no stop_executor dispatched at experiment finish; endpoints="
+        f"{[getattr(t, 'endpoint', None) for t, _ in transport.dispatched]}"
+    )
+    assert any(p.get("executor_id") == "nb exec1" for _, p in stop_dispatched)
+    # tracking is dropped at finish so a stale entry is not re-stopped on later
+    # experiment finishes (best-effort teardown, no leak)
+    assert driver.state.nonblocking == []

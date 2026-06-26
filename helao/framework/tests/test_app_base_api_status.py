@@ -282,3 +282,60 @@ async def test_status_drain_pushes_finished_to_orch(tmp_path):
             base._status_task.cancel()
         if base._live_task is not None:
             base._live_task.cancel()
+
+
+# --- nonblocking status push (parity port) ----------------------------------
+
+
+def test_resolve_orch_coords_none_when_no_orch_key(tmp_path):
+    base = _make_base(tmp_path)
+    base.orch_key = None
+    assert base._resolve_orch_coords() is None
+
+
+def test_resolve_orch_coords_uses_explicit_host_port(tmp_path):
+    base = _make_base(tmp_path)
+    base.orch_key = "ORCH"
+    base.orch_host = "10.0.0.9"
+    base.orch_port = 8001
+    assert base._resolve_orch_coords() == ("ORCH", "10.0.0.9", 8001)
+
+
+def test_resolve_orch_coords_falls_back_to_config(tmp_path, monkeypatch):
+    from helao.framework.support import config_loader
+
+    base = _make_base(tmp_path)
+    base.orch_key = "ORCH"
+    base.orch_host = None
+    base.orch_port = None
+    monkeypatch.setattr(
+        config_loader,
+        "CONFIG",
+        {"servers": {"ORCH": {"host": "127.0.0.1", "port": 8001}}},
+    )
+    assert base._resolve_orch_coords() == ("ORCH", "127.0.0.1", 8001)
+
+
+def test_send_nonblocking_status_posts_to_orch(tmp_path, monkeypatch):
+    base = _make_base(tmp_path, host="10.0.0.5", port=9000)
+    base.orch_key = "ORCH"
+    base.orch_host = "127.0.0.1"
+    base.orch_port = 8001
+    mock = AsyncMock(return_value=({"success": True}, ErrorCodes.none))
+    monkeypatch.setattr(base_api_mod, "async_private_dispatcher", mock)
+
+    action = RunAction(action_name="nb", nonblocking=True)
+    asyncio.run(base.send_nonblocking_status(action))
+    assert mock.await_count == 1
+    _, kwargs = mock.await_args
+    assert kwargs["private_action"] == "update_nonblocking"
+    assert "actionmodel" in kwargs["json_dict"]
+
+
+def test_send_nonblocking_status_noop_without_orch_or_clients(tmp_path, monkeypatch):
+    base = _make_base(tmp_path)
+    base.orch_key = None  # no orch, no status_clients
+    mock = AsyncMock(return_value=({"success": True}, ErrorCodes.none))
+    monkeypatch.setattr(base_api_mod, "async_private_dispatcher", mock)
+    asyncio.run(base.send_nonblocking_status(RunAction(action_name="nb")))
+    assert mock.await_count == 0

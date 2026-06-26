@@ -769,3 +769,17 @@ def test_on_status_update_attributes_experiment_context_when_matching():
     act = _action([HloStatus.active], action_uuid=auuid, exp_uuid=exp_uuid, action_name="x")
     orch.on_status_update(st, _server_model(act, endpoint_name="x"))
     assert st.action_history[auuid]["experiment_name"] == "te"
+
+
+def test_on_nonblocking_dedups_duplicate_active_reports():
+    """A doubly-delivered active report must track the executor only once."""
+    st = _state()
+    am = _action([HloStatus.active], action_uuid=uuid4(), action_name="nb")
+    am.exec_id = "nb exec1"
+    orch.on_nonblocking(st, am, "h", 9)
+    orch.on_nonblocking(st, am, "h", 9)  # duplicate delivery
+    assert sum(1 for t in st.nonblocking if t[1] == "nb exec1") == 1
+    # a single finish report removes it cleanly (no orphan left behind)
+    am.action_status = [HloStatus.finished]
+    orch.on_nonblocking(st, am, "h", 9)
+    assert not any(t[1] == "nb exec1" for t in st.nonblocking)

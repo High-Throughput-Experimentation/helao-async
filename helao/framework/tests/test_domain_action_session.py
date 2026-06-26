@@ -349,3 +349,44 @@ def test_poll_executor_runs_until_terminal_then_finishes():
     assert calls["n"] == 3
     assert session.num_data_queued == session.num_data_written
     assert HloStatus.finished in session.action.action_status
+
+
+# --- nonblocking out-of-band status reporting (parity port) --------------------
+class _NBBase(_FakeBase):
+    """FakeBase that records send_nonblocking_status calls (action_status snapshots)."""
+
+    def __init__(self):
+        super().__init__()
+        self.nb_calls = []
+
+    async def send_nonblocking_status(self, action):
+        self.nb_calls.append(list(action.action_status))
+
+
+def test_action_loop_reports_nonblocking_at_start_and_finish():
+    async def _run():
+        base = _NBBase()
+        session, executor = _make_session_with_base(base, exec_data={"v": 1})
+        session.action.nonblocking = True
+        # production stamps active in setup_and_contain_action before the loop
+        session.action.action_status = [HloStatus.active]
+        await session.myinit()
+        await session.action_loop_task(executor)
+        return base.nb_calls
+
+    calls = asyncio.run(_run())
+    assert len(calls) == 2  # one at start (active), one after finish
+    assert HloStatus.active in calls[0]
+    assert HloStatus.finished in calls[1]
+
+
+def test_action_loop_does_not_report_nonblocking_for_blocking_action():
+    async def _run():
+        base = _NBBase()
+        session, executor = _make_session_with_base(base, exec_data={"v": 1})
+        session.action.nonblocking = False
+        await session.myinit()
+        await session.action_loop_task(executor)
+        return base.nb_calls
+
+    assert asyncio.run(_run()) == []

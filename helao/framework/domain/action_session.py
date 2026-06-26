@@ -593,6 +593,12 @@ class ActionSession:
         Returns:
             The action returned by :meth:`finish`.
         """
+        # Nonblocking actions are invisible to the regular WS status path
+        # (add_status skips them), so report their "active" transition to the
+        # orchestrator out-of-band BEFORE running. Ports Active.action_loop_task
+        # (base.py:2368). The orch tracks it separately (never in active_dict).
+        await self._report_nonblocking()
+
         LOGGER.info("action_loop_task started")
         # pre-action operations
         setup_state = await executor._pre_exec()
@@ -602,7 +608,7 @@ class ActionSession:
         else:
             LOGGER.info("Error encountered during executor setup.")
             self.action.error_code = setup_error
-            return await self.finish()
+            return await self._finish_and_report_nonblocking()
 
         # one-shot execution
         LOGGER.info("Running executor._exec() method")
@@ -651,7 +657,26 @@ class ActionSession:
         if cleanup_state.get("error", ErrorCodes.none) != ErrorCodes.none:
             LOGGER.info("Error encountered during executor cleanup.")
 
-        return await self.finish()
+        return await self._finish_and_report_nonblocking()
+
+    async def _report_nonblocking(self) -> None:
+        """Push this action's current state to the orch when nonblocking. No-op otherwise.
+
+        Delegates to the app-layer base's ``send_nonblocking_status`` (duck-typed;
+        ``base`` may be ``None`` in domain unit tests). The action's ``exec_id`` is
+        already stamped by the executor, so the orch can target ``stop_executor``.
+        """
+        if not self.action.nonblocking or self.base is None:
+            return
+        send = getattr(self.base, "send_nonblocking_status", None)
+        if callable(send):
+            await send(self.action)
+
+    async def _finish_and_report_nonblocking(self) -> RunAction:
+        """Finish the action, then push its (now finished) nonblocking status. Ports base.py:2457."""
+        retval = await self.finish()
+        await self._report_nonblocking()
+        return retval
 
     async def _sleep(self, seconds: float) -> None:
         """Cooperative yield between poll iterations (no wall-clock dependency).

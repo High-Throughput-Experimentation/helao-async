@@ -344,6 +344,65 @@ class FrameworkBase:
             json_dict=json_dict,
         )
 
+    def _resolve_orch_coords(self) -> Optional[tuple]:
+        """Resolve the orchestrator's ``(server_key, host, port)`` for nonblocking push.
+
+        Configs set ``orch_key`` on action servers but NOT ``orch_host``/
+        ``orch_port`` (the framework's regular status path is WS-based), so the
+        host/port are resolved from ``CONFIG["servers"][orch_key]``. Returns
+        ``None`` when no orchestrator is configured (e.g. unit tests / standalone).
+        """
+        if self.orch_key is None:
+            return None
+        host, port = self.orch_host, self.orch_port
+        if host is None or port is None:
+            from helao.framework.support import config_loader
+
+            cfg = config_loader.CONFIG or {}
+            orch_cfg = (cfg.get("servers") or {}).get(self.orch_key) or {}
+            host = host or orch_cfg.get("host")
+            port = port or orch_cfg.get("port")
+        if host is None or port is None:
+            return None
+        return (self.orch_key, host, int(port))
+
+    async def send_nonblocking_status(self, action, retry_limit: int = 3) -> None:
+        """Push a nonblocking action's status to the orchestrator. Ports base.py:2313.
+
+        Unlike :meth:`_status_push_task` (the regular WS-relayed status path that
+        ``ActionSession.add_status`` deliberately SKIPS for nonblocking actions),
+        this delivers a single action's state to the orch's ``update_nonblocking``
+        endpoint so the orch can track the nonblocking action separately (never in
+        ``active_dict``), register it in the action history, and stop its executor
+        at experiment finish. Targets the union of registered status_clients and
+        the configured orchestrator so delivery does not depend on the (lazy /
+        WS-superseded) auto-attach path.
+        """
+        targets = set(self.status_clients)
+        orch_coords = self._resolve_orch_coords()
+        if orch_coords is not None:
+            targets.add(orch_coords)
+        if not targets:
+            LOGGER.warning(
+                "send_nonblocking_status: no status clients / orch configured on "
+                f"{self.server.server_name}; nonblocking action not reported."
+            )
+            return
+        for client_servkey, client_host, client_port in targets:
+            for _ in range(retry_limit):
+                response, error_code = await self.send_nbstatuspackage(
+                    client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
+                    actionmodel=action,
+                )
+                if (
+                    isinstance(response, dict)
+                    and response.get("success", False)
+                    and error_code == ErrorCodes.none
+                ):
+                    break
+
     async def attach_client(
         self,
         client_servkey: str,

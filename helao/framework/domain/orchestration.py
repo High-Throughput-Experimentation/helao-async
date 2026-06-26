@@ -916,7 +916,12 @@ def on_nonblocking(
     server_key = actionmodel.action_server.server_name
     server_exec_id = (server_key, actionmodel.exec_id, host, port)
     if HloStatus.active in actionmodel.action_status:
-        state.nonblocking.append(server_exec_id)
+        # Idempotent: a status can be delivered more than once (e.g. the orch is
+        # both auto-attached AND resolved from CONFIG in send_nonblocking_status's
+        # target set). Guard so an executor is tracked at most once — otherwise the
+        # matching finish report removes only one copy and the orphan lingers.
+        if server_exec_id not in state.nonblocking:
+            state.nonblocking.append(server_exec_id)
     elif server_exec_id in state.nonblocking:
         state.nonblocking.remove(server_exec_id)
 
