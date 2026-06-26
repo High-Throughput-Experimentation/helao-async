@@ -58,7 +58,8 @@ class _UI:
         self.group_sel.on_change("active", self._on_group_change)
         self.scan_btn.on_click(self._on_scan)
 
-        control = row(self.group_sel, self.source_sel, self.date_start,
+        control = row(column(Spacer(height=18), self.group_sel),
+                      self.source_sel, self.date_start,
                       self.date_end, column(Spacer(height=18), self.scan_btn))
 
         # --- index (full width) ---
