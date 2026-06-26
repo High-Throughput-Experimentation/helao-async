@@ -826,6 +826,9 @@ class OrchDriver:
                 # entry is gone) and its action_history update is unaffected.
                 self.state.nonblocking.clear()
             await self._execute([FinishExperiment(experiment_uuid=exp.experiment_uuid)])
+            # Mark the experiment finished in state + history so the operator stops
+            # showing it as "active" (ports finish_active_experiment, orch.py:2176).
+            orch.complete_experiment(self.state, now)
             self.state.last_experiment = exp
             self.state.active_experiment = None
             return True
@@ -833,6 +836,9 @@ class OrchDriver:
         if decision == OrchDecision.FINISH_SEQUENCE:
             seq = self.state.active_sequence
             await self._execute([FinishSequence(sequence_uuid=seq.sequence_uuid)])
+            # Mark the sequence finished in state + history so the operator stops
+            # showing it as "active" (ports finish_active_sequence, orch.py:2084).
+            orch.complete_sequence(self.state, now)
             self.state.last_sequence = seq
             self.state.active_sequence = None
             return True

@@ -60,6 +60,8 @@ __all__ = [
     "dispatch_action",
     "on_dispatch_result",
     "register_obj_uuid",
+    "complete_experiment",
+    "complete_sequence",
     "register_action_uuid",
     "track_action_uuid",
     # heartbeat helpers (Task 1)
@@ -810,6 +812,70 @@ def _register_server_actions(
                     ),
                 },
             )
+
+
+def complete_experiment(state: OrchState, now: Any) -> OrchState:
+    """Mark the active experiment finished in state + history. Ports finish_active_experiment.
+
+    Stamps ``experiment_finished_timestamp``/``experiment_status`` on the active
+    experiment and updates its ``experiment_history`` entry to ``"finished"`` so the
+    operator's history table stops showing it as active (legacy orch.py:2176). No-op
+    when there is no active experiment.
+    """
+    exp = state.active_experiment
+    if exp is None:
+        return state
+    if exp.experiment_finished_timestamp is None:
+        exp.experiment_finished_timestamp = now
+    if HloStatus.finished not in exp.experiment_status:
+        exp.experiment_status.append(HloStatus.finished)
+    seq = state.active_sequence
+    register_obj_uuid(
+        state,
+        exp.experiment_uuid,
+        {
+            "experiment_name": exp.experiment_name,
+            "experiment_timestamp": _fmt_ts(exp.experiment_timestamp),
+            "experiment_finished_timestamp": _fmt_ts(exp.experiment_finished_timestamp),
+            "experiment_status": "finished",
+            "sequence_label": seq.sequence_label if seq is not None else None,
+            "campaign_name": (
+                seq.campaign_name if seq is not None and seq.campaign_name else None
+            ),
+        },
+        "experiment",
+    )
+    return state
+
+
+def complete_sequence(state: OrchState, now: Any) -> OrchState:
+    """Mark the active sequence finished in state + history. Ports finish_active_sequence.
+
+    Stamps ``sequence_finished_timestamp``/``sequence_status`` and updates the
+    ``sequence_history`` entry to ``"finished"`` (legacy orch.py:2084). No-op when
+    there is no active sequence.
+    """
+    seq = state.active_sequence
+    if seq is None:
+        return state
+    if seq.sequence_finished_timestamp is None:
+        seq.sequence_finished_timestamp = now
+    if HloStatus.finished not in seq.sequence_status:
+        seq.sequence_status.append(HloStatus.finished)
+    register_obj_uuid(
+        state,
+        seq.sequence_uuid,
+        {
+            "sequence_name": seq.sequence_name,
+            "sequence_timestamp": _fmt_ts(seq.sequence_timestamp),
+            "sequence_finished_timestamp": _fmt_ts(seq.sequence_finished_timestamp),
+            "sequence_status": "finished",
+            "sequence_label": seq.sequence_label,
+            "campaign_name": seq.campaign_name if seq.campaign_name else None,
+        },
+        "sequence",
+    )
+    return state
 
 
 def on_status_update(

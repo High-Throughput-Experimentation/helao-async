@@ -815,3 +815,33 @@ def test_decide_next_active_experiment_waits_while_actions_busy():
     st.globalstatusmodel.update_global_with_acts(_server_model(active))
     # busy -> WAIT regardless of the finish/dispatch priority
     assert orch.decide_next(st) == OrchDecision.WAIT
+
+
+# --------------------------------------------------------------------------- #
+# complete_experiment / complete_sequence update history status to "finished"
+# (operator history table showed dispatched exp/seq stuck as "active").
+# --------------------------------------------------------------------------- #
+def test_complete_experiment_marks_history_finished():
+    exp = RunExperiment(experiment_uuid=uuid4(), experiment_name="te")
+    st = _state(active_experiment=exp, active_sequence=RunSequence(sequence_label="lbl"))
+    # dispatch-time registration would have set "active"
+    orch.register_obj_uuid(st, exp.experiment_uuid, {"experiment_status": "active"}, "experiment")
+    orch.complete_experiment(st, NOW)
+    assert st.experiment_history[exp.experiment_uuid]["experiment_status"] == "finished"
+    assert st.experiment_history[exp.experiment_uuid]["experiment_finished_timestamp"] is not None
+    assert HloStatus.finished in exp.experiment_status
+
+
+def test_complete_sequence_marks_history_finished():
+    seq = RunSequence(sequence_uuid=uuid4(), sequence_name="ts")
+    st = _state(active_sequence=seq)
+    orch.register_obj_uuid(st, seq.sequence_uuid, {"sequence_status": "active"}, "sequence")
+    orch.complete_sequence(st, NOW)
+    assert st.sequence_history[seq.sequence_uuid]["sequence_status"] == "finished"
+    assert HloStatus.finished in seq.sequence_status
+
+
+def test_complete_experiment_noop_without_active():
+    st = _state(active_experiment=None)
+    orch.complete_experiment(st, NOW)  # must not raise
+    assert st.experiment_history == {}
