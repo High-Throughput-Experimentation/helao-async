@@ -93,7 +93,7 @@ servers:
     host: hte-eche-06.htejcap.caltech.edu
     port: 8004
     group: action
-    fast: gamry_server
+    fast: gamry_server2
     action_vis: gamry_vis
     params:
       allow_no_sample: true
