@@ -115,6 +115,7 @@ from helao.framework.models.server import ActionServerModel, GlobalStatusModel
 from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
 from helao.framework.domain import status as status_facade
 from helao.framework.domain import expansion
+from helao.framework.domain import lifecycle
 from helao.framework.domain.commands import (
     BroadcastGlobalStatus,
     DispatchAction,
@@ -1104,6 +1105,13 @@ def dispatch_sequence(
     if seq.sequence_timestamp is None:
         seq.sequence_timestamp = now
 
+    # stamp the nested output dir so Task 3's PersistMeta(kind="seq") writes the
+    # nested ``RUNS_ACTIVE/<seq_dir>/<ts>-seq.yml`` rather than the flat fallback.
+    # ``SequenceModel`` carries no ``get_sequence_dir`` method; the duck-typed
+    # ``lifecycle.sequence_output_dir`` reads timestamp/name/label/params off it.
+    if seq.sequence_output_dir is None:
+        seq.sequence_output_dir = lifecycle.sequence_output_dir(seq)
+
     # fold requested global params into sequence params
     seq.sequence_params = expansion.fold_in_global(
         seq.sequence_params, seq.from_global_seq_params, state.global_params
@@ -1191,6 +1199,19 @@ def dispatch_experiment(
     if exp.experiment_timestamp is None:
         exp.experiment_timestamp = now
 
+    # stamp the nested experiment output dir = ``<seq_dir>/<exp_ts>__<exp_name>``
+    # so Task 3's PersistMeta(kind="exp") and the downstream action-server write
+    # land under the correct nested tree (never ``RUNS_ACTIVE/None/...``).
+    # ``ExperimentModel`` declares no ``sequence_output_dir``/``get_experiment_dir``
+    # so the seq dir is threaded from ``state.active_sequence`` and folded in here.
+    seq = state.active_sequence
+    seq_dir = seq.sequence_output_dir if seq is not None else None
+    if exp.experiment_output_dir is None and seq_dir is not None:
+        exp_time = exp.experiment_timestamp.strftime("%y%m%d.%H%M%S")
+        exp.experiment_output_dir = "/".join(
+            [str(seq_dir), f"{exp_time}__{exp.experiment_name}"]
+        )
+
     # fold requested global params into experiment params
     exp.experiment_params = expansion.fold_in_global(
         exp.experiment_params, exp.from_global_exp_params, state.global_params
@@ -1227,6 +1248,27 @@ def dispatch_experiment(
                 # deterministic per-index uuid derived from the injected seed
                 act.action_uuid = UUID(int=(uuid.int + 1 + i) % (1 << 128))
             act.experiment_uuid = exp.experiment_uuid
+
+            # Thread parent identity so the action server (whose ``_get_action``
+            # does NOT call init_act / compute action_output_dir) receives a fully
+            # stamped action and writes to the correct nested tree (obs-789 fix).
+            if seq is not None:
+                act.sequence_uuid = seq.sequence_uuid
+                act.sequence_name = seq.sequence_name
+                act.sequence_label = seq.sequence_label
+                act.sequence_timestamp = seq.sequence_timestamp
+                act.sequence_output_dir = seq.sequence_output_dir
+            act.experiment_name = exp.experiment_name
+            act.experiment_timestamp = exp.experiment_timestamp
+            act.experiment_output_dir = exp.experiment_output_dir
+
+            # Keep an already-set/injected action_timestamp; only default to ``now``.
+            # Do NOT call act.init_act() — it uses internal set_time/gen_uuid and
+            # would clobber the deterministic injected now/uuid.
+            if act.action_timestamp is None:
+                act.action_timestamp = now
+            if act.action_output_dir is None:
+                act.action_output_dir = lifecycle.action_output_dir(act)
             state.action_dq.append(act)
 
     cmds.append(

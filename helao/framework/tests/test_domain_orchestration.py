@@ -582,6 +582,95 @@ def test_dispatch_experiment_retains_prior_as_last():
 
 
 # --------------------------------------------------------------------------- #
+# Task 5a — dispatch-time output-dir stamping (nested, deterministic)
+# --------------------------------------------------------------------------- #
+def _no_none_segment(path) -> bool:
+    return "None" not in str(path).split("/")
+
+
+def test_dispatch_sequence_stamps_nested_output_dir():
+    seq = RunSequence(sequence_name="myseq")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    assert seq.sequence_output_dir is not None
+    assert _no_none_segment(seq.sequence_output_dir)
+    # %y.%U/<date>/HHMMSS__name__label nested layout
+    assert str(seq.sequence_output_dir) == "26.25/0622/150000__myseq__noLabel"
+
+
+def test_dispatch_sequence_keeps_existing_output_dir():
+    seq = RunSequence(sequence_name="myseq", sequence_output_dir="preset/dir")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    assert str(seq.sequence_output_dir) == "preset/dir"
+
+
+def test_dispatch_experiment_stamps_nested_output_dirs_and_threads_parent():
+    seq = RunSequence(sequence_name="myseq")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+
+    exp = RunExperiment(experiment_name="myexp")
+    st.experiment_dq = [exp]
+    acts = [_action(action_name="a0"), _action(action_name="a1")]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+
+    # exp inherits seq identity (ExperimentModel has no sequence_output_dir field;
+    # the nested seq dir is folded into experiment_output_dir instead)
+    assert exp.sequence_uuid == seq.sequence_uuid
+    assert exp.experiment_output_dir is not None
+    assert str(exp.experiment_output_dir).startswith(str(seq.sequence_output_dir))
+    assert _no_none_segment(exp.experiment_output_dir)
+    assert str(exp.experiment_output_dir) == (
+        "26.25/0622/150000__myseq__noLabel/260622.150000__myexp"
+    )
+
+    # each staged action fully stamped with no None segment
+    for i, act in enumerate(st.action_dq):
+        assert act.sequence_output_dir == seq.sequence_output_dir
+        assert act.sequence_uuid == seq.sequence_uuid
+        assert act.experiment_output_dir == exp.experiment_output_dir
+        assert act.experiment_uuid == exp.experiment_uuid
+        assert act.action_timestamp == NOW
+        assert act.action_output_dir is not None
+        assert _no_none_segment(act.action_output_dir)
+        assert str(act.action_output_dir) == (
+            f"26.25/0622/150000__myseq__noLabel/260622.150000__myexp/"
+            f"{i}__0__act__a{i}"
+        )
+
+
+def test_dispatch_experiment_preserves_deterministic_action_uuid():
+    """Stamping output_dirs must not perturb the deterministic uuid/now seeding."""
+    seq = RunSequence(sequence_name="myseq")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    exp = RunExperiment(experiment_name="myexp")
+    st.experiment_dq = [exp]
+    acts = [
+        RunAction(action_uuid=None, orchestrator=ORCH, action_server=SRV, action_name="a0"),
+        RunAction(action_uuid=None, orchestrator=ORCH, action_server=SRV, action_name="a1"),
+    ]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+    # deterministic per-index uuid derived from the injected seed
+    assert st.action_dq[0].action_uuid == UUID(int=(SEED.int + 1 + 0) % (1 << 128))
+    assert st.action_dq[1].action_uuid == UUID(int=(SEED.int + 1 + 1) % (1 << 128))
+
+
+def test_dispatch_experiment_keeps_injected_action_timestamp():
+    """A pre-set action_timestamp must be preserved, not overwritten by `now`."""
+    seq = RunSequence(sequence_name="myseq")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    exp = RunExperiment(experiment_name="myexp")
+    st.experiment_dq = [exp]
+    preset = datetime(2020, 1, 1, 0, 0, 0)
+    acts = [_action(action_name="a0", action_timestamp=preset)]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+    assert st.action_dq[0].action_timestamp == preset
+
+
+# --------------------------------------------------------------------------- #
 # dispatch_action
 # --------------------------------------------------------------------------- #
 def test_dispatch_action_empty_noop():
