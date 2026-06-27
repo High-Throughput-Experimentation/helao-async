@@ -103,28 +103,94 @@ under `RUNS_DIAG` and is not relocated. Update any existing test that pinned the
 tempdir is used (current behavior preserved). Assert no `*.txt` log is zipped by
 Base construction (constraint 6).
 
-## Task 3 — orch exp/seq meta parity
+## Task 3 — orch exp/seq meta-WRITE parity (write only; relocation is Task 5)
 
-**Files:** `helao/framework/app/orch_api.py` (consumes Task 1 helpers).
+**Files:** `helao/framework/app/orch_api.py` (consumes Task 1 helpers, duck-typed).
 
-- FinishExperiment/FinishSequence (`:297-303`) and `PersistMeta` (`:252`): write
-  via `lifecycle.experiment_meta_relpath`/`sequence_meta_relpath` (nested dir +
-  timestamp stem + run-kind prefix) and `meta_doc("experiment"/"sequence", ...)`.
-  Drop the flat `{uuid}-exp.yml` at save-root-top.
-- The exp/seq dicts must carry the nested-dir + timestamp identity; reuse the
-  run-model output-dir fields already populated during expansion.
+The Task 1 helpers `experiment_meta_relpath`/`sequence_meta_relpath`/`run_kind`/
+`meta_doc` read only `.manual_action`, `.{experiment,sequence}_timestamp`,
+`.{experiment,sequence}_output_dir` — all present on `RunExperiment`/`RunSequence`,
+so they apply DUCK-TYPED to the exp/seq objects in `OrchState`.
 
-**TDD:** drive a FinishExperiment/FinishSequence command through `execute_commands`
-with a real `FsStorage(save_root=<tmp>)`; assert
-`<tmp>/RUNS_ACTIVE/<seq_dir>/<exp_dir>/<exp_ts>-exp.yml` and the seq `-seq.yml`
-exist with `file_type` wrappers.
+- `PersistMeta` (`:250-252`): resolve the object from state by kind
+  (`kind=="seq"` -> `state.active_sequence`; `kind=="exp"` ->
+  `state.active_experiment`); write via `sequence_meta_relpath(obj)` /
+  `experiment_meta_relpath(obj)` with `meta_doc("sequence"/"experiment", cmd.payload)`.
+  Drop the flat `{uuid}-{kind}.yml`.
+- FinishExperiment (`:296-299`): write `experiment_meta_relpath(state.active_experiment
+  or state.last_experiment)` + `meta_doc("experiment", _finish_exp_payload(state))`.
+- FinishSequence (`:301-304`): write `sequence_meta_relpath(state.active_sequence
+  or state.last_sequence)` + `meta_doc("sequence", _finish_seq_payload(state))`.
+- PersistMeta and Finish* MUST resolve to the SAME relpath for a given object so the
+  finish write overwrites the dispatch-time write (both nested + timestamp stem).
+- Do NOT change relocation here. (Action-leaf relocation already lands in Task 1;
+  exp/seq relocation + NOSYNC is Task 5.)
 
-## Task 4 — controller integration verification (not a subagent task)
+**TDD:** drive PersistMeta(kind="seq"/"exp") and FinishExperiment/FinishSequence
+through `execute_commands` with a real `FsStorage(save_root=<tmp>)` and an OrchState
+carrying populated active_sequence/active_experiment; assert
+`<tmp>/RUNS_ACTIVE/<seq_dir>/<exp_dir>/<exp_ts>-exp.yml` and
+`<tmp>/RUNS_ACTIVE/<seq_dir>/<seq_ts>-seq.yml` exist with leading `file_type`. Update
+the existing `test_app_orch_api.py:374,386` tests that pin the old `{uuid}-exp.yml`.
+
+## Task 4 — controller integration observation (not a subagent task)
 
 Done by the controller after Tasks 1-3:
-1. Live `test`-deploy run with `root=<clean tmp>`; assert on-disk tree under
-   `RUNS_ACTIVE`->`RUNS_FINISHED` has correct nested layout + legacy names + `.hlo`.
-2. Diff vs a legacy `test` run of the same sequence (structure + names + content
-   modulo uuid/timestamp). Capture the diff as the acceptance artifact.
-3. Confirm the framework `HelaoSyncer` enqueues the produced `RUNS_FINISHED` tree.
-4. Full suite green.
+1. Live `test`-deploy run with `root=<clean tmp>`; observe the on-disk tree.
+   ASSERT (the user-observable goal): artifacts now EXIST under `<root>/RUNS_ACTIVE`
+   with legacy names (`*-seq.yml`/`*-exp.yml`/`*-act.yml`/`*.hlo`) in the correct
+   nested layout, plus action-leaf dirs promoted to `RUNS_FINISHED` (Task 1).
+2. RECORD the actual end-state (which files land in ACTIVE vs FINISHED) to design
+   Task 5 against reality, not speculation.
+3. Diff a sample meta file vs a legacy `test` run (content modulo uuid/timestamp).
+
+## Task 5 — orch dispatch-stamping + relocation parity (scoped from Task 4 observation)
+
+**Task 4 observed:** action write+relocate WORKS (`RUNS_ACTIVE/<nested>/<ts>-act.yml`
++ `<name>-<conn>.hlo`, `file_type: action` leading; leaf dir promoted to
+`RUNS_FINISHED`; empty `RUNS_ACTIVE` parent dirs remain — syncer prunes). Two gaps
+remain, both orch-side:
+
+**5a. Stamp seq + exp + staged-action output-dirs/timestamps at dispatch.**
+`domain/orchestration.py` `dispatch_sequence` (~:1100-1146) and `dispatch_experiment`
+(~:1182-1235) stamp uuids/timestamps but NOT output_dirs. Three stamps needed:
+- `dispatch_sequence`: after `sequence_timestamp` is set, set
+  `seq.sequence_output_dir = seq.get_sequence_dir()` if None.
+- `dispatch_experiment`: thread `exp.sequence_output_dir =
+  state.active_sequence.sequence_output_dir` (+ sequence_timestamp/name/label as
+  needed), then after `experiment_timestamp` set, `exp.experiment_output_dir =
+  exp.get_experiment_dir()` if None.
+- `dispatch_experiment` STAGED ACTIONS (~:1223-1230): the action server's
+  `_get_action` does NOT call `init_act` or compute `action_output_dir`, so each
+  staged `act` must arrive fully stamped or it writes to `RUNS_ACTIVE/None/...`
+  (the old obs-789 bug). For each `act`: thread parent identity from seq+exp
+  (sequence_timestamp, sequence_output_dir, sequence_uuid, experiment_timestamp,
+  experiment_output_dir, experiment_uuid, names/label) and set
+  `act.action_timestamp` (keep injected `now` if already set) and
+  `act.action_output_dir = lifecycle.action_output_dir(act)` (needs
+  `act.action_server.server_name`, orch_submit_order — set by the loop). DO NOT call
+  `act.init_act()` (it uses internal set_time/gen_uuid and would break the
+  deterministic injected now/uuid the tests rely on); stamp fields directly.
+This makes Task 3's nested exp/seq write AND the action-server nested write fire.
+TDD: drive dispatch_sequence/dispatch_experiment with expand_result; assert the
+seq, exp, and each staged action carry non-None nested output_dirs (no `None/`
+segment), and that the deterministic action_uuid/now stamping is preserved.
+
+**5b. Relocate exp/seq on finish (port `move_dir`, unify with action).**
+Port `helpers/yml_tools.py:132` `move_dir` file-granular promotion as ONE storage
+mechanism used for action/exp/seq finishes: copy the object's files
+`RUNS_ACTIVE/<dir>` -> `RUNS_FINISHED/<dir>` (`.hlo` -> `RUNS_NOSYNC` when
+`sync_data=False`), then remove source. Reconcile with Task 1's action-leaf
+relocate (replace `relocate_dir`-to-FINISHED with the unified mechanism — one path,
+not two). Manual -> `RUNS_DIAG` (no FINISHED). Wire exp/seq relocation into the
+FinishExperiment/FinishSequence handlers (emit/execute the move after the meta
+write). May add a small storage move primitive (port + FsStorage + fakes) — decide
+in implementation; keep the ports contract clean. Failure logged + swallowed.
+TDD: full seq->exp->act tree ends under `RUNS_FINISHED` with legacy names; manual
+under `RUNS_DIAG`; `sync_data=False` `.hlo` under `RUNS_NOSYNC`.
+
+**5c. Sync pickup (controller verification after 5a/5b).**
+Confirm the framework `HelaoSyncer` (`app/sync_driver.py`) enqueues the produced
+`RUNS_FINISHED` tree (its `list_pending` scans `*-act/-exp/-seq.yml`, now matching).
+Full framework suite green. Then a real legacy-vs-framework on-disk diff is the
+acceptance artifact (spec §6).
