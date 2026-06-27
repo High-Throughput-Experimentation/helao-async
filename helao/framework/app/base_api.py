@@ -14,6 +14,7 @@ method names are preserved so deployment authors keep the same surface.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import os
 import time
 from contextvars import ContextVar
@@ -126,6 +127,7 @@ class FrameworkBase:
         self.postprocessors = list(postprocessors or [])
         self.actives: Dict[UUID, ActionSession] = {}
         self.history: Dict[UUID, RunAction] = {}
+        self._default_header: str = ""
 
         # --- server config surface (port Base.__init__ config wiring) --------
         if world_cfg is None:
@@ -756,6 +758,16 @@ class FrameworkBase:
         self._default_header = header
         return await self.contain_action(action)
 
+    def _dflt_file_conn_key(self) -> UUID:
+        """Return the legacy default file-connection UUID.
+
+        Ports ``Base.dflt_file_conn_key()`` / ``new_file_conn_key(str(None))``:
+        ``UUID(md5("None".encode("utf-8")).hexdigest())``.  The same deterministic
+        key is used here so on-disk ``.hlo`` filenames are byte-for-byte identical
+        to legacy output when no explicit ``file_conn_keys`` were supplied.
+        """
+        return UUID(hashlib.md5(str(None).encode("utf-8")).hexdigest())
+
     async def contain_action(self, action: RunAction) -> ActionSession:
         """Register ``action`` as active, substituting any prior session with the same UUID.
 
@@ -766,6 +778,14 @@ class FrameworkBase:
         """
         if action.action_uuid in self.actives:
             await self.actives[action.action_uuid].substitute()
+
+        # Inject the legacy default file-connection key when the dispatcher sent
+        # an empty file_conn_keys list but the action still wants data saved.
+        # Ports Base.setup_and_contain_action's dflt_file_conn_key() registration
+        # (helao/core/servers/base.py:435/992/976/1177).  Guard is on save_data
+        # (not save_act) so wait/no-data actions are unaffected.
+        if action.save_data and not action.file_conn_keys:
+            action.file_conn_keys.append(self._dflt_file_conn_key())
 
         from helao.framework.domain.executor import Executor
 
