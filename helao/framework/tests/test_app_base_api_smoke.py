@@ -96,8 +96,8 @@ def test_setup_and_contain_then_finish_writes_hlo(tmp_path):
     assert content.startswith("epoch_ns: 1\n%%\n")
     assert "signal" in content
 
-    # an .act meta file was written
-    assert list(tmp_path.rglob("*.act")), "no .act meta written"
+    # a <ts>-act.yml meta file was written (legacy filename)
+    assert list(tmp_path.rglob("*-act.yml")), "no *-act.yml meta written"
 
 
 def _make_base(tmp_path, **kwargs) -> FrameworkBase:

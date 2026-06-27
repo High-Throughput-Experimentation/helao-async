@@ -137,14 +137,15 @@ def test_explicit_header_preserved_verbatim():
 # --- 2. finish-time run-dir relocation -----------------------------------------
 
 
-def test_finish_relocates_run_dir_to_synced_for_non_manual():
+def test_finish_relocates_run_dir_to_finished_for_non_manual():
+    """Non-manual finish moves RUNS_ACTIVE/<out_dir> -> RUNS_FINISHED/<out_dir>."""
     session, storage = _make_session()
     out_dir = str(session.action.action_output_dir)
     asyncio.run(session.finish())
     assert len(storage.dir_relocations) == 1
     src, dst = storage.dir_relocations[0]
-    assert src == out_dir
-    assert dst == f"RUNS_SYNCED/{out_dir}"
+    assert src == f"RUNS_ACTIVE/{out_dir}"
+    assert dst == f"RUNS_FINISHED/{out_dir}"
 
 
 def test_finish_does_not_relocate_manual_action():

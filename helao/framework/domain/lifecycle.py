@@ -24,6 +24,15 @@ __all__ = [
     "experiment_output_dir",
     "sequence_output_dir",
     "split_action",
+    # --- Task 1: run-kind + relpath helpers (pure, no I/O) ---
+    "run_kind",
+    "action_meta_relpath",
+    "experiment_meta_relpath",
+    "sequence_meta_relpath",
+    "hlo_relpath",
+    "meta_doc",
+    "active_relpath",
+    "finished_relpath",
 ]
 
 import os
@@ -267,6 +276,79 @@ def split_action(
         open_file_conns=open_file_conns,
         close_file_conns=close_file_conns,
     )
+
+
+# --- Task 1: run-kind prefix helpers (pure, no I/O) ---------------------------
+
+
+def run_kind(action: RunAction) -> str:
+    """Return the RUNS_* kind string for ``action``.
+
+    Manual actions land under ``RUNS_DIAG`` (never synced); all other actions
+    land under ``RUNS_ACTIVE`` (relocated to ``RUNS_FINISHED`` on finish).
+    """
+    return "RUNS_DIAG" if action.manual_action else "RUNS_ACTIVE"
+
+
+def action_meta_relpath(action: RunAction) -> str:
+    """Relative path for this action's ``.act`` meta YAML.
+
+    Format (legacy parity): ``<run_kind>/<action_output_dir>/<ts>-act.yml``
+    where ``<ts>`` is ``action_timestamp.strftime('%y%m%d.%H%M%S%f')``.
+    """
+    kind = run_kind(action)
+    ts = action.action_timestamp.strftime("%y%m%d.%H%M%S%f")
+    return f"{kind}/{action.action_output_dir}/{ts}-act.yml"
+
+
+def experiment_meta_relpath(action: RunAction) -> str:
+    """Relative path for the experiment ``.exp`` meta YAML.
+
+    Format: ``<run_kind>/<experiment_output_dir>/<ts>-exp.yml``.
+    """
+    kind = run_kind(action)
+    ts = action.experiment_timestamp.strftime("%y%m%d.%H%M%S%f")
+    return f"{kind}/{action.experiment_output_dir}/{ts}-exp.yml"
+
+
+def sequence_meta_relpath(action: RunAction) -> str:
+    """Relative path for the sequence ``.seq`` meta YAML.
+
+    Format: ``<run_kind>/<sequence_output_dir>/<ts>-seq.yml``.
+    """
+    kind = run_kind(action)
+    ts = action.sequence_timestamp.strftime("%y%m%d.%H%M%S%f")
+    return f"{kind}/{action.sequence_output_dir}/{ts}-seq.yml"
+
+
+def hlo_relpath(action: RunAction, leaf: str) -> str:
+    """Relative path for a streaming HLO file with the given ``leaf`` filename.
+
+    Format: ``<run_kind>/<action_output_dir>/<leaf>``.
+    The leaf is ``<action_name>-<file_conn_key>.hlo`` by convention; this
+    helper only prepends the run-kind prefix.
+    """
+    kind = run_kind(action)
+    return f"{kind}/{action.action_output_dir}/{leaf}"
+
+
+def meta_doc(kind: str, body_dict: dict) -> dict:
+    """Wrap a body dict with a leading ``file_type`` key (legacy parity).
+
+    Returns ``{"file_type": kind, **body_dict}`` so the first YAML key is
+    always ``file_type``, matching ``helao.core.servers.base.write_act/exp/seq``.
+    """
+    return {"file_type": kind, **body_dict}
+
+
+def active_relpath(out_dir: str) -> str:
+    """Return ``RUNS_ACTIVE/<out_dir>``."""
+    return f"RUNS_ACTIVE/{out_dir}"
+
+
+def finished_relpath(out_dir: str) -> str:
+    """Return ``RUNS_FINISHED/<out_dir>`` (the relocation destination)."""
+    return f"RUNS_FINISHED/{out_dir}"
 
 
 def _derive_conn_key(base: UUID, index: int) -> UUID:

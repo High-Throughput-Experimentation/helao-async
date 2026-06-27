@@ -250,7 +250,7 @@ async def test_ws_simulator_runs_action_and_writes_hlo():
             await asyncio.sleep(0.5)  # let the bounded-duration executor finish
 
     hlo_files = list(save_root.rglob("*.hlo"))
-    act_files = list(save_root.rglob("*.act"))
+    act_files = list(save_root.rglob("*-act.yml"))  # legacy filename: <ts>-act.yml
     assert hlo_files, "migrated ws_simulator wrote no .hlo file"
     assert act_files, "migrated ws_simulator wrote no .act meta"
 

@@ -142,13 +142,14 @@ class ActionSession:
     # --- meta / output -------------------------------------------------------
 
     def _meta_relpath(self) -> str:
-        """Relpath for this action's ``.act`` meta file."""
-        return f"{self.action.action_output_dir}/{self.action.action_uuid}.act"
+        """Relpath for this action's ``.act`` meta file (run-kind prefixed, legacy filename)."""
+        return lifecycle.action_meta_relpath(self.action)
 
     async def update_act_file(self) -> None:
         """(Re)write the action's meta YAML to reflect the current state."""
         if self.action.save_act:
-            await self.storage.write_meta(self._meta_relpath(), self.action.as_dict())
+            doc = lifecycle.meta_doc("action", self.action.as_dict())
+            await self.storage.write_meta(self._meta_relpath(), doc)
 
     async def myinit(self) -> None:
         """Create the action output (meta), persist manual exp/seq, broadcast status.
@@ -162,12 +163,12 @@ class ActionSession:
             await self.update_act_file()
             if self.action.manual_action:
                 await self.storage.write_meta(
-                    f"{self.action.action_output_dir}/{self.action.sequence_uuid}.seq",
-                    self.action.as_dict(),
+                    lifecycle.sequence_meta_relpath(self.action),
+                    lifecycle.meta_doc("sequence", self.action.as_dict()),
                 )
                 await self.storage.write_meta(
-                    f"{self.action.action_output_dir}/{self.action.experiment_uuid}.exp",
-                    self.action.as_dict(),
+                    lifecycle.experiment_meta_relpath(self.action),
+                    lifecycle.meta_doc("experiment", self.action.as_dict()),
                 )
 
         LOGGER.info("init active: sending active data_stream_status package")
@@ -330,8 +331,8 @@ class ActionSession:
         )
 
     async def _relocate_aux_files(self, action: RunAction) -> None:
-        """Copy each tracked aux file into the action output dir. Ports ``relocate_files``."""
-        out_dir = str(action.action_output_dir or "")
+        """Copy each tracked aux file into the run-kind-prefixed action output dir. Ports ``relocate_files``."""
+        out_dir = lifecycle.hlo_relpath(action, "").rstrip("/")
         for src in action.aux_file_paths:
             dst = f"{out_dir}/{os.path.basename(str(src))}"
             if str(src) != dst:
@@ -340,10 +341,11 @@ class ActionSession:
     # --- file connections (streaming HLO handles) ----------------------------
 
     def _conn_relpath(self, file_conn_key: UUID, action: Optional[RunAction] = None) -> str:
-        """Relpath of the streaming HLO file for ``file_conn_key``."""
+        """Relpath of the streaming HLO file for ``file_conn_key`` (run-kind prefixed)."""
         if action is None:
             action = self.action
-        return f"{action.action_output_dir}/{action.action_name}-{file_conn_key}.hlo"
+        leaf = f"{action.action_name}-{file_conn_key}.hlo"
+        return lifecycle.hlo_relpath(action, leaf)
 
     def _default_hlo_header(self, action: RunAction) -> str:
         """Build the stamped HLO header string for an auto-opened connection.
@@ -507,10 +509,12 @@ class ActionSession:
             exp.dispatched_actions.append(deepcopy(action))
 
         await self.storage.write_meta(
-            f"{exp.action_output_dir}/{exp.experiment_uuid}.exp", exp.as_dict()
+            lifecycle.experiment_meta_relpath(exp),
+            lifecycle.meta_doc("experiment", exp.as_dict()),
         )
         await self.storage.write_meta(
-            f"{exp.action_output_dir}/{exp.sequence_uuid}.seq", exp.as_dict()
+            lifecycle.sequence_meta_relpath(exp),
+            lifecycle.meta_doc("sequence", exp.as_dict()),
         )
 
     # --- samples -------------------------------------------------------------
@@ -827,8 +831,8 @@ class ActionSession:
         for action in self.action_list:
             if action.save_act:
                 await self.storage.write_meta(
-                    f"{action.action_output_dir}/{action.action_uuid}.act",
-                    action.as_dict(),
+                    lifecycle.action_meta_relpath(action),
+                    lifecycle.meta_doc("action", action.as_dict()),
                 )
             await self.add_status(action=action)
             if not action.manual_action:
@@ -856,26 +860,24 @@ class ActionSession:
 
         return self.action
 
-    #: synced-tree prefix the finished run dir is relocated under (legacy
-    #: RUNS_ACTIVE -> RUNS_SYNCED promotion; the framework's action_output_dir
-    #: carries no RUNS_* segment, so we prefix the synced root segment here).
-    _SYNCED_ROOT = "RUNS_SYNCED"
-
     async def _relocate_run_dir(self, action: RunAction) -> None:
-        """Relocate ``action``'s output dir to the synced tree; swallow failures.
+        """Relocate ``action``'s whole output dir from RUNS_ACTIVE to RUNS_FINISHED.
 
-        Maps the active output dir (``<action_output_dir>``) to
-        ``RUNS_SYNCED/<action_output_dir>`` (see :attr:`_SYNCED_ROOT`). Ports the
-        legacy ``move_dir`` RUNS_ACTIVE->RUNS_FINISHED/synced promotion; a failure
-        is logged and never propagated so ``finish`` completes.
+        Maps ``RUNS_ACTIVE/<action_output_dir>`` -> ``RUNS_FINISHED/<action_output_dir>``
+        (legacy ``move_dir`` RUNS_ACTIVE->RUNS_FINISHED promotion). Manual actions are
+        NOT relocated (they live under RUNS_DIAG permanently). A failure is logged and
+        swallowed so ``finish`` never crashes on a transient FS error.
         """
+        if action.manual_action:
+            return
         out_dir = str(action.action_output_dir or "")
         if not out_dir:
             return
-        dst = f"{self._SYNCED_ROOT}/{out_dir}"
+        src = lifecycle.active_relpath(out_dir)
+        dst = lifecycle.finished_relpath(out_dir)
         try:
-            await self.storage.relocate_dir(out_dir, dst)
+            await self.storage.relocate_dir(src, dst)
         except Exception:
             LOGGER.error(
-                f"failed to relocate run dir {out_dir!r} -> {dst!r}", exc_info=True
+                f"failed to relocate run dir {src!r} -> {dst!r}", exc_info=True
             )

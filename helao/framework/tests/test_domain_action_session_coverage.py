@@ -273,8 +273,11 @@ def test_myinit_manual_action_writes_synthetic_meta():
     session, _ = _make_session(action)
     asyncio.run(session.myinit())
     keys = list(session.storage.meta_docs.keys())
-    assert any(k.endswith(".seq") for k in keys)
-    assert any(k.endswith(".exp") for k in keys)
+    # legacy filenames: <ts>-seq.yml, <ts>-exp.yml
+    assert any(k.endswith("-seq.yml") for k in keys), \
+        f"no *-seq.yml found in {keys}"
+    assert any(k.endswith("-exp.yml") for k in keys), \
+        f"no *-exp.yml found in {keys}"
 
 
 # --- append_sample edge branches -----------------------------------------------

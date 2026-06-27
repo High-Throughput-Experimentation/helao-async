@@ -101,8 +101,11 @@ def test_finish_drains_pending_data_counters_balance():
 def test_finish_writes_act_meta_and_emits_final_status():
     session, storage, eventsink, *_ = _make_session()
     asyncio.run(session.finish())
-    # .act meta written
-    assert any(k.endswith(".act") for k in storage.meta_docs)
+    # <ts>-act.yml meta written (legacy filename, run-kind-prefixed)
+    assert any(k.endswith("-act.yml") for k in storage.meta_docs)
+    # the written meta has a leading file_type: action key
+    act_key = next(k for k in storage.meta_docs if k.endswith("-act.yml"))
+    assert storage.meta_docs[act_key].get("file_type") == "action"
     # a finished status emitted
     assert any(
         HloStatus.finished.value in [str(s) for s in p.get("action_status", [])]
@@ -220,6 +223,8 @@ def test_finish_manual_action_writes_exp_seq_meta():
     session, storage, *_ = _make_session(action=action)
     asyncio.run(session.promote_manual())
     asyncio.run(session.finish())
-    suffixes = [k.rsplit(".", 1)[-1] for k in storage.meta_docs]
-    assert "exp" in suffixes
-    assert "seq" in suffixes
+    # legacy filenames: <ts>-exp.yml, <ts>-seq.yml (not uuid.exp / uuid.seq)
+    assert any(k.endswith("-exp.yml") for k in storage.meta_docs), \
+        f"no *-exp.yml found in {list(storage.meta_docs)}"
+    assert any(k.endswith("-seq.yml") for k in storage.meta_docs), \
+        f"no *-seq.yml found in {list(storage.meta_docs)}"

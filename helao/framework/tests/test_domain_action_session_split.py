@@ -211,10 +211,12 @@ def test_manual_action_writes_synthetic_exp_and_seq_meta():
     assert session.action.access == "manual"
 
     asyncio.run(session.finish_manual_action())
-    # synthetic .seq and .exp meta written for the manual run
-    suffixes = [relpath.rsplit(".", 1)[-1] for relpath in storage.meta_docs]
-    assert "seq" in suffixes
-    assert "exp" in suffixes
+    # synthetic <ts>-seq.yml and <ts>-exp.yml meta written for the manual run
+    keys = list(storage.meta_docs.keys())
+    assert any(k.endswith("-seq.yml") for k in keys), \
+        f"no *-seq.yml found in {keys}"
+    assert any(k.endswith("-exp.yml") for k in keys), \
+        f"no *-exp.yml found in {keys}"
 
 
 def test_finish_manual_action_noop_when_not_manual():

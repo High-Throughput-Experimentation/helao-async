@@ -130,10 +130,12 @@ def test_new_path_hlo_matches_legacy_golden_bytes(tmp_path):
 
 def test_new_path_writes_act_meta(tmp_path):
     _drive_new_path(str(tmp_path))
-    act_files = list(Path(tmp_path).rglob("*.act"))
-    assert len(act_files) == 1, f"expected exactly one .act meta, got {act_files}"
-    # the .act meta round-trips as YAML carrying this action's uuid
+    # legacy filename: <ts>-act.yml (not {uuid}.act)
+    act_files = list(Path(tmp_path).rglob("*-act.yml"))
+    assert len(act_files) == 1, f"expected exactly one *-act.yml meta, got {act_files}"
+    # the meta YAML carries the leading file_type key and this action's uuid
     text = act_files[0].read_text(encoding="utf-8")
+    assert "file_type: action" in text
     assert str(ACTION_UUID) in text
     assert "action_name: dummy_act" in text
 
