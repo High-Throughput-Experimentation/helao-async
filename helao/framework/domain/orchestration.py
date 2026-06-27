@@ -1201,7 +1201,7 @@ def dispatch_experiment(
     # sequence-driven flow is unchanged.
     synth_seq_cmds: List[Command] = []
     if state.active_sequence is None:
-        syn_uuid = UUID(int=(uuid.int + 1) % (1 << 128))
+        syn_uuid = UUID(int=(uuid.int - 1) % (1 << 128))
         syn_seq = RunSequence(
             sequence_uuid=syn_uuid,
             sequence_timestamp=now,

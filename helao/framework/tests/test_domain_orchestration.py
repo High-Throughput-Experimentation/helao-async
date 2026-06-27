@@ -726,6 +726,19 @@ def test_dispatch_experiment_parentless_seq_uuid_distinct_from_exp_uuid():
     assert st.active_sequence.sequence_uuid != exp.experiment_uuid
 
 
+def test_dispatch_experiment_parentless_syn_uuid_no_collision_with_actions():
+    """Regression: synthetic sequence uuid must not collide with the experiment uuid
+    OR with any staged action uuid when expand_result has >=1 action."""
+    exp = RunExperiment(experiment_name="bareexp")
+    acts = [_action(action_name="a0"), _action(action_name="a1")]
+    st = _state(experiment_dq=[exp])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+    syn_uuid = st.active_sequence.sequence_uuid
+    action_uuids = {act.action_uuid for act in st.action_dq}
+    assert syn_uuid != exp.experiment_uuid
+    assert syn_uuid not in action_uuids
+
+
 def test_dispatch_experiment_with_active_sequence_unchanged():
     """Regression: when active_sequence is already set, no extra synthesis occurs
     and output dirs nest under the existing sequence (unchanged behaviour)."""
