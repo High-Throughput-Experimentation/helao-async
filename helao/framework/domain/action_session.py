@@ -838,13 +838,13 @@ class ActionSession:
             if not action.manual_action:
                 await self._relocate_aux_files(action)
 
-        # promote each finished non-manual action's whole output dir to the synced
-        # location so HelaoSyncer ships it (ports base.py:2218 move_dir). Handles
-        # are already closed above; a relocation failure is logged and swallowed so
-        # finish never crashes on a transient FS error.
+        # promote each finished action's whole output dir out of RUNS_ACTIVE so
+        # HelaoSyncer ships it (file-granular port of yml_tools.move_dir). Manual
+        # actions promote to RUNS_DIAG, non-manual to RUNS_FINISHED; .hlo files
+        # for sync_data=False divert to RUNS_NOSYNC. Handles are already closed
+        # above; a failure is logged and swallowed so finish never crashes.
         for action in self.action_list:
-            if not action.manual_action:
-                await self._relocate_run_dir(action)
+            await self._relocate_run_dir(action)
 
         # IMPORTANT-4: deregister the finished executor from base.executors so the
         # registry does not leak (start_executor registered it by exec_id; nothing
@@ -861,23 +861,26 @@ class ActionSession:
         return self.action
 
     async def _relocate_run_dir(self, action: RunAction) -> None:
-        """Relocate ``action``'s whole output dir from RUNS_ACTIVE to RUNS_FINISHED.
+        """Promote ``action``'s whole output dir out of RUNS_ACTIVE.
 
-        Maps ``RUNS_ACTIVE/<action_output_dir>`` -> ``RUNS_FINISHED/<action_output_dir>``
-        (legacy ``move_dir`` RUNS_ACTIVE->RUNS_FINISHED promotion). Manual actions are
-        NOT relocated (they live under RUNS_DIAG permanently). A failure is logged and
+        File-granular port of legacy ``move_dir`` (yml_tools.move_dir): the
+        action leaf dir under ``RUNS_ACTIVE/<action_output_dir>`` is promoted to
+        ``RUNS_DIAG`` (manual) or ``RUNS_FINISHED`` (non-manual), with ``.hlo``
+        files diverted to ``RUNS_NOSYNC`` when ``sync_data`` is False. Done
+        recursively (the action leaf may hold subfiles). A failure is logged and
         swallowed so ``finish`` never crashes on a transient FS error.
         """
-        if action.manual_action:
-            return
         out_dir = str(action.action_output_dir or "")
         if not out_dir:
             return
-        src = lifecycle.active_relpath(out_dir)
-        dst = lifecycle.finished_relpath(out_dir)
         try:
-            await self.storage.relocate_dir(src, dst)
+            await self.storage.promote_run_dir(
+                out_dir,
+                manual=bool(action.manual_action),
+                sync_data=bool(getattr(action, "sync_data", True)),
+                recursive=True,
+            )
         except Exception:
             LOGGER.error(
-                f"failed to relocate run dir {src!r} -> {dst!r}", exc_info=True
+                f"failed to promote run dir {out_dir!r}", exc_info=True
             )

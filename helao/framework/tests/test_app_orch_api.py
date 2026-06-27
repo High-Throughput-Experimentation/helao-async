@@ -449,14 +449,22 @@ def test_execute_commands_finish_experiment():
         cmd = FinishExperiment(experiment_uuid=exp.experiment_uuid)
         asyncio.run(execute_commands(state, [cmd], ports=ports))
 
-        expected_relpath = experiment_meta_relpath(exp)
-        expected_path = os.path.join(tmp, expected_relpath)
-        assert os.path.exists(expected_path), (
-            f"exp finish meta not found at {expected_path}; "
+        # Task 5b: finish writes the meta to RUNS_ACTIVE then promotes the exp
+        # output dir to RUNS_FINISHED (file-granular move_dir port). The meta now
+        # lives under RUNS_FINISHED and the RUNS_ACTIVE copy is gone.
+        active_relpath = experiment_meta_relpath(exp)  # RUNS_ACTIVE/.../...-exp.yml
+        finished_relpath = active_relpath.replace("RUNS_ACTIVE", "RUNS_FINISHED", 1)
+        finished_path = os.path.join(tmp, finished_relpath)
+        active_path = os.path.join(tmp, active_relpath)
+        assert os.path.exists(finished_path), (
+            f"exp finish meta not promoted to {finished_path}; "
             f"meta_docs={list(fs.meta_docs.keys()) if hasattr(fs, 'meta_docs') else 'N/A'}"
         )
+        assert not os.path.exists(active_path), (
+            f"exp meta should be moved out of RUNS_ACTIVE; still at {active_path}"
+        )
         import yaml
-        with open(expected_path) as f:
+        with open(finished_path) as f:
             doc = yaml.safe_load(f)
         assert doc.get("file_type") == "experiment", (
             f"leading file_type key missing or wrong; got {doc.get('file_type')!r}"
@@ -483,14 +491,21 @@ def test_execute_commands_finish_sequence():
         cmd = FinishSequence(sequence_uuid=seq.sequence_uuid)
         asyncio.run(execute_commands(state, [cmd], ports=ports))
 
-        expected_relpath = sequence_meta_relpath(seq)
-        expected_path = os.path.join(tmp, expected_relpath)
-        assert os.path.exists(expected_path), (
-            f"seq finish meta not found at {expected_path}; "
+        # Task 5b: finish writes the meta to RUNS_ACTIVE then promotes the seq
+        # output dir to RUNS_FINISHED (file-granular move_dir port).
+        active_relpath = sequence_meta_relpath(seq)  # RUNS_ACTIVE/.../...-seq.yml
+        finished_relpath = active_relpath.replace("RUNS_ACTIVE", "RUNS_FINISHED", 1)
+        finished_path = os.path.join(tmp, finished_relpath)
+        active_path = os.path.join(tmp, active_relpath)
+        assert os.path.exists(finished_path), (
+            f"seq finish meta not promoted to {finished_path}; "
             f"meta_docs={list(fs.meta_docs.keys()) if hasattr(fs, 'meta_docs') else 'N/A'}"
         )
+        assert not os.path.exists(active_path), (
+            f"seq meta should be moved out of RUNS_ACTIVE; still at {active_path}"
+        )
         import yaml
-        with open(expected_path) as f:
+        with open(finished_path) as f:
             doc = yaml.safe_load(f)
         assert doc.get("file_type") == "sequence", (
             f"leading file_type key missing or wrong; got {doc.get('file_type')!r}"

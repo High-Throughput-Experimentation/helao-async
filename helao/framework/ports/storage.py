@@ -94,6 +94,34 @@ class Storage(Protocol):
         """
         ...
 
+    async def promote_run_dir(
+        self,
+        out_dir_relpath: str,
+        *,
+        manual: bool,
+        sync_data: bool,
+        recursive: bool,
+    ) -> None:
+        """Promote an object's run dir out of ``RUNS_ACTIVE`` (legacy ``move_dir``).
+
+        File-granular port of ``helao.helpers.yml_tools.move_dir``. ``out_dir_relpath``
+        is the object's output dir relative to the run-kind root (the same value
+        stamped into ``*_output_dir``); the source is ``RUNS_ACTIVE/<out_dir_relpath>``.
+
+        Destination base is ``RUNS_DIAG`` when ``manual`` else ``RUNS_FINISHED``.
+        Each source file's destination keeps the same relpath with ``RUNS_ACTIVE``
+        rewritten to ``RUNS_NOSYNC`` when the file ends with ``.hlo`` and
+        ``sync_data`` is ``False``, otherwise to the destination base.
+
+        ``recursive=True`` (actions) enumerates every file under the source tree;
+        ``recursive=False`` (experiments/sequences) enumerates only the immediate
+        files (children were already promoted by their own finishes). Non-NOSYNC
+        files are copied, NOSYNC files are moved; then sources are removed and the
+        emptied source dir is ``rmtree``'d. Missing/already-moved files are
+        tolerated and any failure is logged and swallowed so finish never crashes.
+        """
+        ...
+
     async def run_postprocessor(
         self, name: str, relpath: str, context: Mapping[str, Any]
     ) -> Sequence[Any]:

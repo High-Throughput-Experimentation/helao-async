@@ -31,6 +31,8 @@ class FakeStorage(Storage):
         self.relocations: list[tuple[str, str]] = []
         #: list of (src_relpath, dst_relpath) whole-dir relocations in order.
         self.dir_relocations: list[tuple[str, str]] = []
+        #: list of promote_run_dir calls: (out_dir, manual, sync_data, recursive).
+        self.promote_calls: list[tuple[str, bool, bool, bool]] = []
         #: list of (name, relpath, context) post-processor calls.
         self.postproc_calls: list[tuple[str, str, dict[str, Any]]] = []
 
@@ -86,6 +88,16 @@ class FakeStorage(Storage):
     async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
         self.dir_relocations.append((src_relpath, dst_relpath))
         return dst_relpath
+
+    async def promote_run_dir(
+        self,
+        out_dir_relpath: str,
+        *,
+        manual: bool,
+        sync_data: bool,
+        recursive: bool,
+    ) -> None:
+        self.promote_calls.append((out_dir_relpath, manual, sync_data, recursive))
 
     async def run_postprocessor(
         self, name: str, relpath: str, context: Mapping[str, Any]

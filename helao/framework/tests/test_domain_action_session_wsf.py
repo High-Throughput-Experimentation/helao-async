@@ -137,38 +137,48 @@ def test_explicit_header_preserved_verbatim():
 # --- 2. finish-time run-dir relocation -----------------------------------------
 
 
-def test_finish_relocates_run_dir_to_finished_for_non_manual():
-    """Non-manual finish moves RUNS_ACTIVE/<out_dir> -> RUNS_FINISHED/<out_dir>."""
+def test_finish_promotes_run_dir_recursive_for_non_manual():
+    """Task 5b: non-manual finish promotes the action leaf dir (recursive)
+    via the file-granular ``promote_run_dir`` primitive, resolving manual/
+    sync_data from the action (manual=False, sync_data=True here)."""
     session, storage = _make_session()
     out_dir = str(session.action.action_output_dir)
     asyncio.run(session.finish())
-    assert len(storage.dir_relocations) == 1
-    src, dst = storage.dir_relocations[0]
-    assert src == f"RUNS_ACTIVE/{out_dir}"
-    assert dst == f"RUNS_FINISHED/{out_dir}"
+    assert len(storage.promote_calls) == 1
+    called_out_dir, manual, sync_data, recursive = storage.promote_calls[0]
+    assert called_out_dir == out_dir
+    assert manual is False
+    assert sync_data is True
+    assert recursive is True
 
 
-def test_finish_does_not_relocate_manual_action():
+def test_finish_promotes_manual_action_to_diag():
+    """Task 5b: manual finish still calls promote_run_dir but with manual=True
+    (legacy move_dir routes manual to RUNS_DIAG, it does NOT skip)."""
     action = RunAction(action_name="manual_act", save_act=True, save_data=False)
     session, storage = _make_session(action=action)
     asyncio.run(session.promote_manual())
     asyncio.run(session.finish())
-    assert storage.dir_relocations == []
+    assert len(storage.promote_calls) == 1
+    _out_dir, manual, sync_data, recursive = storage.promote_calls[0]
+    assert manual is True
+    assert sync_data is True  # action only set save_data=False; sync_data default True
+    assert recursive is True
 
 
-def test_finish_swallows_relocation_failure():
+def test_finish_swallows_promotion_failure():
     class _BoomStorage(FakeStorage):
-        async def relocate_dir(self, src, dst):
+        async def promote_run_dir(self, out_dir, *, manual, sync_data, recursive):
             raise OSError("disk gone")
 
     session, storage = _make_session(storage=_BoomStorage())
-    # finish must complete despite the relocation raising
+    # finish must complete despite the promotion raising
     result = asyncio.run(session.finish())
     assert HloStatus.finished in result.action_status
 
 
-def test_finish_closes_handles_before_relocating():
-    """Open handles are closed before the dir is moved (no open files mid-move)."""
+def test_finish_closes_handles_before_promoting():
+    """Open handles are closed before the dir is promoted (no open files mid-move)."""
     order = []
 
     class _OrderStorage(FakeStorage):
@@ -176,12 +186,14 @@ def test_finish_closes_handles_before_relocating():
             order.append("close")
             await super().close_hlo(handle)
 
-        async def relocate_dir(self, src, dst):
-            order.append("relocate")
-            return await super().relocate_dir(src, dst)
+        async def promote_run_dir(self, out_dir, *, manual, sync_data, recursive):
+            order.append("promote")
+            return await super().promote_run_dir(
+                out_dir, manual=manual, sync_data=sync_data, recursive=recursive
+            )
 
     session, storage = _make_session(storage=_OrderStorage())
     asyncio.run(session.open_file(FILE_CONN, header=""))
     asyncio.run(session.finish())
-    assert "close" in order and "relocate" in order
-    assert order.index("close") < order.index("relocate")
+    assert "close" in order and "promote" in order
+    assert order.index("close") < order.index("promote")

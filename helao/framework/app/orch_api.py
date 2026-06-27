@@ -351,6 +351,18 @@ async def execute_commands(
             await ports.storage.write_meta(
                 relpath, meta_doc("experiment", _finish_exp_payload(state))
             )
+            # Task 5b: promote the experiment output dir out of RUNS_ACTIVE
+            # (immediate files only; the child actions promoted themselves at
+            # their own finish). recursive=False mirrors legacy move_dir for
+            # exp/seq. Failure is logged+swallowed inside the primitive.
+            out_dir = getattr(exp, "experiment_output_dir", None)
+            if out_dir:
+                await ports.storage.promote_run_dir(
+                    str(out_dir),
+                    manual=bool(getattr(exp, "manual_action", False)),
+                    sync_data=bool(getattr(exp, "sync_data", True)),
+                    recursive=False,
+                )
 
         elif isinstance(cmd, FinishSequence):
             seq = state.active_sequence or state.last_sequence
@@ -358,6 +370,16 @@ async def execute_commands(
             await ports.storage.write_meta(
                 relpath, meta_doc("sequence", _finish_seq_payload(state))
             )
+            # Task 5b: promote the sequence output dir out of RUNS_ACTIVE
+            # (immediate files only). recursive=False mirrors legacy move_dir.
+            out_dir = getattr(seq, "sequence_output_dir", None)
+            if out_dir:
+                await ports.storage.promote_run_dir(
+                    str(out_dir),
+                    manual=bool(getattr(seq, "manual_action", False)),
+                    sync_data=bool(getattr(seq, "sync_data", True)),
+                    recursive=False,
+                )
 
         elif isinstance(cmd, MoveRunDir):
             await ports.storage.relocate(cmd.src, cmd.dst)
