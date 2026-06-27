@@ -281,13 +281,19 @@ def split_action(
 # --- Task 1: run-kind prefix helpers (pure, no I/O) ---------------------------
 
 
-def run_kind(action: RunAction) -> str:
+def run_kind(action) -> str:
     """Return the RUNS_* kind string for ``action``.
 
     Manual actions land under ``RUNS_DIAG`` (never synced); all other actions
     land under ``RUNS_ACTIVE`` (relocated to ``RUNS_FINISHED`` on finish).
+
+    Duck-typed: works on ``RunAction``, ``RunSequence``, or ``RunExperiment`` —
+    any object that optionally carries a ``manual_action`` boolean.  Defaults
+    to ``False`` (RUNS_ACTIVE) when the attribute is absent (e.g.
+    ``RunExperiment``, which inherits from ``ExperimentModel`` and does not
+    declare ``manual_action``).
     """
-    return "RUNS_DIAG" if action.manual_action else "RUNS_ACTIVE"
+    return "RUNS_DIAG" if getattr(action, "manual_action", False) else "RUNS_ACTIVE"
 
 
 def action_meta_relpath(action: RunAction) -> str:
@@ -301,24 +307,32 @@ def action_meta_relpath(action: RunAction) -> str:
     return f"{kind}/{action.action_output_dir}/{ts}-act.yml"
 
 
-def experiment_meta_relpath(action: RunAction) -> str:
+def experiment_meta_relpath(obj) -> str:
     """Relative path for the experiment ``.exp`` meta YAML.
 
     Format: ``<run_kind>/<experiment_output_dir>/<ts>-exp.yml``.
+
+    Duck-typed: accepts any object with ``experiment_timestamp``,
+    ``experiment_output_dir``, and an optional ``manual_action`` attribute
+    (e.g. ``RunAction``, ``RunExperiment``).
     """
-    kind = run_kind(action)
-    ts = action.experiment_timestamp.strftime("%y%m%d.%H%M%S%f")
-    return f"{kind}/{action.experiment_output_dir}/{ts}-exp.yml"
+    kind = run_kind(obj)
+    ts = obj.experiment_timestamp.strftime("%y%m%d.%H%M%S%f")
+    return f"{kind}/{obj.experiment_output_dir}/{ts}-exp.yml"
 
 
-def sequence_meta_relpath(action: RunAction) -> str:
+def sequence_meta_relpath(obj) -> str:
     """Relative path for the sequence ``.seq`` meta YAML.
 
     Format: ``<run_kind>/<sequence_output_dir>/<ts>-seq.yml``.
+
+    Duck-typed: accepts any object with ``sequence_timestamp``,
+    ``sequence_output_dir``, and an optional ``manual_action`` attribute
+    (e.g. ``RunAction``, ``RunSequence``).
     """
-    kind = run_kind(action)
-    ts = action.sequence_timestamp.strftime("%y%m%d.%H%M%S%f")
-    return f"{kind}/{action.sequence_output_dir}/{ts}-seq.yml"
+    kind = run_kind(obj)
+    ts = obj.sequence_timestamp.strftime("%y%m%d.%H%M%S%f")
+    return f"{kind}/{obj.sequence_output_dir}/{ts}-seq.yml"
 
 
 def hlo_relpath(action: RunAction, leaf: str) -> str:

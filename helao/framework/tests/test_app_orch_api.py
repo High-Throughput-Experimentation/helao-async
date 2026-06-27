@@ -351,40 +351,150 @@ def test_execute_commands_broadcast_global_status():
     assert True
 
 
-def test_execute_commands_persist_meta():
+def test_execute_commands_persist_meta_fallback():
+    """PersistMeta with no active_sequence falls back to flat uuid-kind path."""
     storage = FakeStorage()
     ports = _make_ports(storage=storage)
     state = OrchState()
     uid = uuid4()
     cmd = PersistMeta(kind="seq", uuid=uid, payload={"sequence_name": "s"})
     asyncio.run(execute_commands(state, [cmd], ports=ports))
+    # No active_sequence -> flat fallback path
     relpath = f"{uid}-seq.yml"
     assert relpath in storage.meta_docs
     assert storage.meta_docs[relpath]["sequence_name"] == "s"
+    # file_type key must be present (meta_doc wraps with leading file_type)
+    assert storage.meta_docs[relpath]["file_type"] == "seq"
+
+
+def test_execute_commands_persist_meta_seq_nested():
+    """PersistMeta kind=seq with active_sequence writes to nested timestamp path with file_type."""
+    import tempfile, os
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.domain.lifecycle import sequence_meta_relpath
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fs = FsStorage(save_root=tmp)
+        ports = _make_ports(storage=fs)
+        state = OrchState()
+        seq = RunSequence(
+            sequence_name="test_seq",
+            sequence_uuid=uuid4(),
+            sequence_timestamp=NOW,
+            sequence_output_dir="26.25/0622/200000__test_seq__noLabel",
+        )
+        state.active_sequence = seq
+        uid = uuid4()
+        cmd = PersistMeta(kind="seq", uuid=uid, payload=seq.as_dict())
+        asyncio.run(execute_commands(state, [cmd], ports=ports))
+        expected_relpath = sequence_meta_relpath(seq)
+        expected_path = os.path.join(tmp, expected_relpath)
+        assert os.path.exists(expected_path), (
+            f"nested seq meta not found at {expected_path}"
+        )
+        import yaml
+        with open(expected_path) as f:
+            doc = yaml.safe_load(f)
+        assert doc.get("file_type") == "seq", f"file_type missing; got {doc}"
+
+
+def test_execute_commands_persist_meta_exp_nested():
+    """PersistMeta kind=exp with active_experiment writes to nested timestamp path with file_type."""
+    import tempfile, os
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.domain.lifecycle import experiment_meta_relpath
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fs = FsStorage(save_root=tmp)
+        ports = _make_ports(storage=fs)
+        state = OrchState()
+        exp = RunExperiment(
+            experiment_name="test_exp",
+            experiment_uuid=uuid4(),
+            experiment_timestamp=NOW,
+            experiment_output_dir="26.25/0622/200000__test_seq__noLabel/260622.200000__test_exp",
+        )
+        state.active_experiment = exp
+        uid = uuid4()
+        cmd = PersistMeta(kind="exp", uuid=uid, payload=exp.as_dict())
+        asyncio.run(execute_commands(state, [cmd], ports=ports))
+        expected_relpath = experiment_meta_relpath(exp)
+        expected_path = os.path.join(tmp, expected_relpath)
+        assert os.path.exists(expected_path), (
+            f"nested exp meta not found at {expected_path}"
+        )
+        import yaml
+        with open(expected_path) as f:
+            doc = yaml.safe_load(f)
+        assert doc.get("file_type") == "exp", f"file_type missing; got {doc}"
 
 
 def test_execute_commands_finish_experiment():
-    storage = FakeStorage()
-    ports = _make_ports(storage=storage)
-    state = OrchState()
-    exp = RunExperiment(experiment_name="e", experiment_uuid=uuid4())
-    state.active_experiment = exp
-    cmd = FinishExperiment(experiment_uuid=exp.experiment_uuid)
-    asyncio.run(execute_commands(state, [cmd], ports=ports))
-    exp_key = f"{exp.experiment_uuid}-exp.yml"
-    assert exp_key in storage.meta_docs
+    """FinishExperiment writes to the nested timestamp path with leading file_type key."""
+    import tempfile, os
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.domain.lifecycle import experiment_meta_relpath
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fs = FsStorage(save_root=tmp)
+        ports = _make_ports(storage=fs)
+        state = OrchState()
+        exp = RunExperiment(
+            experiment_name="test_exp",
+            experiment_uuid=uuid4(),
+            experiment_timestamp=NOW,
+            experiment_output_dir="26.25/0622/200000__test_seq__noLabel/260622.200000__test_exp",
+        )
+        state.active_experiment = exp
+        cmd = FinishExperiment(experiment_uuid=exp.experiment_uuid)
+        asyncio.run(execute_commands(state, [cmd], ports=ports))
+
+        expected_relpath = experiment_meta_relpath(exp)
+        expected_path = os.path.join(tmp, expected_relpath)
+        assert os.path.exists(expected_path), (
+            f"exp finish meta not found at {expected_path}; "
+            f"meta_docs={list(fs.meta_docs.keys()) if hasattr(fs, 'meta_docs') else 'N/A'}"
+        )
+        import yaml
+        with open(expected_path) as f:
+            doc = yaml.safe_load(f)
+        assert doc.get("file_type") == "experiment", (
+            f"leading file_type key missing or wrong; got {doc.get('file_type')!r}"
+        )
 
 
 def test_execute_commands_finish_sequence():
-    storage = FakeStorage()
-    ports = _make_ports(storage=storage)
-    state = OrchState()
-    seq = RunSequence(sequence_name="s", sequence_uuid=uuid4())
-    state.active_sequence = seq
-    cmd = FinishSequence(sequence_uuid=seq.sequence_uuid)
-    asyncio.run(execute_commands(state, [cmd], ports=ports))
-    seq_key = f"{seq.sequence_uuid}-seq.yml"
-    assert seq_key in storage.meta_docs
+    """FinishSequence writes to the nested timestamp path with leading file_type key."""
+    import tempfile, os
+    from helao.framework.adapters.fs_storage import FsStorage
+    from helao.framework.domain.lifecycle import sequence_meta_relpath
+
+    with tempfile.TemporaryDirectory() as tmp:
+        fs = FsStorage(save_root=tmp)
+        ports = _make_ports(storage=fs)
+        state = OrchState()
+        seq = RunSequence(
+            sequence_name="test_seq",
+            sequence_uuid=uuid4(),
+            sequence_timestamp=NOW,
+            sequence_output_dir="26.25/0622/200000__test_seq__noLabel",
+        )
+        state.active_sequence = seq
+        cmd = FinishSequence(sequence_uuid=seq.sequence_uuid)
+        asyncio.run(execute_commands(state, [cmd], ports=ports))
+
+        expected_relpath = sequence_meta_relpath(seq)
+        expected_path = os.path.join(tmp, expected_relpath)
+        assert os.path.exists(expected_path), (
+            f"seq finish meta not found at {expected_path}; "
+            f"meta_docs={list(fs.meta_docs.keys()) if hasattr(fs, 'meta_docs') else 'N/A'}"
+        )
+        import yaml
+        with open(expected_path) as f:
+            doc = yaml.safe_load(f)
+        assert doc.get("file_type") == "sequence", (
+            f"leading file_type key missing or wrong; got {doc.get('file_type')!r}"
+        )
 
 
 def test_execute_commands_move_run_dir():

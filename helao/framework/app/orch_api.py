@@ -44,6 +44,11 @@ from helao.framework.domain import expansion
 from helao.framework.domain import orchestration as orch
 from helao.framework.domain.orchestration import OrchState
 from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
+from helao.framework.domain.lifecycle import (
+    experiment_meta_relpath,
+    sequence_meta_relpath,
+    meta_doc,
+)
 from helao.framework.domain.commands import (
     BroadcastGlobalStatus,
     DispatchAction,
@@ -219,6 +224,39 @@ def _synthesize_finished_status(action: RunAction) -> ActionServerModel:
     )
 
 
+def _safe_exp_relpath(exp: Optional[Any], fallback_uuid: Any) -> str:
+    """Return the nested experiment meta relpath, or a flat uuid fallback.
+
+    The nested path requires both ``experiment_timestamp`` and
+    ``experiment_output_dir`` to be set on ``exp``.  When either is ``None``
+    (e.g. a ``RunExperiment`` not yet fully initialised) we fall back to the
+    flat ``{uuid}-exp.yml`` form so a missing timestamp never crashes the
+    finish write.
+    """
+    if (
+        exp is not None
+        and getattr(exp, "experiment_timestamp", None) is not None
+        and getattr(exp, "experiment_output_dir", None) is not None
+    ):
+        return experiment_meta_relpath(exp)
+    return f"{fallback_uuid}-exp.yml"
+
+
+def _safe_seq_relpath(seq: Optional[Any], fallback_uuid: Any) -> str:
+    """Return the nested sequence meta relpath, or a flat uuid fallback.
+
+    Falls back to flat ``{uuid}-seq.yml`` when ``sequence_timestamp`` or
+    ``sequence_output_dir`` is ``None`` on ``seq``.
+    """
+    if (
+        seq is not None
+        and getattr(seq, "sequence_timestamp", None) is not None
+        and getattr(seq, "sequence_output_dir", None) is not None
+    ):
+        return sequence_meta_relpath(seq)
+    return f"{fallback_uuid}-seq.yml"
+
+
 async def execute_commands(
     state: OrchState, commands: List[Any], *, ports: OrchPorts
 ) -> List[Any]:
@@ -248,8 +286,17 @@ async def execute_commands(
             await ports.eventsink.emit_global_status(dict(cmd.payload))
 
         elif isinstance(cmd, PersistMeta):
-            relpath = f"{cmd.uuid}-{cmd.kind}.yml"
-            await ports.storage.write_meta(relpath, dict(cmd.payload))
+            # Resolve the nested relpath from the live object in state so that
+            # PersistMeta and the corresponding Finish* write to the SAME path
+            # (finish overwrites dispatch-time meta, matching legacy behaviour).
+            if cmd.kind == "seq" and state.active_sequence is not None:
+                relpath = _safe_seq_relpath(state.active_sequence, cmd.uuid)
+            elif cmd.kind == "exp" and state.active_experiment is not None:
+                relpath = _safe_exp_relpath(state.active_experiment, cmd.uuid)
+            else:
+                # fallback: flat uuid-kind path (unknown kind or no active object)
+                relpath = f"{cmd.uuid}-{cmd.kind}.yml"
+            await ports.storage.write_meta(relpath, meta_doc(cmd.kind, dict(cmd.payload)))
 
         elif isinstance(cmd, DispatchAction):
             action = cmd.action
@@ -294,13 +341,17 @@ async def execute_commands(
             await ports.transport.dispatch(target, {"executor_id": cmd.executor_id})
 
         elif isinstance(cmd, FinishExperiment):
+            exp = state.active_experiment or state.last_experiment
+            relpath = _safe_exp_relpath(exp, cmd.experiment_uuid)
             await ports.storage.write_meta(
-                f"{cmd.experiment_uuid}-exp.yml", _finish_exp_payload(state)
+                relpath, meta_doc("experiment", _finish_exp_payload(state))
             )
 
         elif isinstance(cmd, FinishSequence):
+            seq = state.active_sequence or state.last_sequence
+            relpath = _safe_seq_relpath(seq, cmd.sequence_uuid)
             await ports.storage.write_meta(
-                f"{cmd.sequence_uuid}-seq.yml", _finish_seq_payload(state)
+                relpath, meta_doc("sequence", _finish_seq_payload(state))
             )
 
         elif isinstance(cmd, MoveRunDir):
