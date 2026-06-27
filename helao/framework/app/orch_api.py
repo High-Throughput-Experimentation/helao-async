@@ -1071,18 +1071,19 @@ def makeOrchApp(
     from helao.framework.adapters.queue_eventsink import QueueEventSink as _QueueEventSink
     from helao.framework.app.base_api import ActionContext, FrameworkBase
 
-    # Determine save_root (IMPORTANT-5): an explicit caller-supplied ``save_root``
-    # wins (the caller owns the dir and its lifecycle); else CONFIG; else a
-    # tempfile.mkdtemp that WE own and clean up in the shutdown hook (tracked on
+    # Determine save_root (IMPORTANT-5 / SP-ARTIFACT Task 2):
+    # An explicit caller-supplied ``save_root`` wins (the caller owns the dir
+    # and its lifecycle); else use the config root (the PARENT of RUNS_* dirs —
+    # Constraint 1); else a tempfile.mkdtemp that WE own (tracked on
     # ``app.state._owned_tempdir``).
     _save_root = save_root
     if _save_root is None:
         try:
             from helao.framework.support import config_loader as _cl
             _cfg = _cl.CONFIG or {}
-            _root = _cfg.get("root") or _cfg.get("save_root")
+            _root = _cfg.get("root")
             if _root:
-                _save_root = os.path.join(_root, "RUNS_HLO", server_key)
+                _save_root = _root
         except Exception:
             pass
     app.state._owned_tempdir = None

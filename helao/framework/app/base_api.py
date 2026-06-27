@@ -134,8 +134,14 @@ class FrameworkBase:
         self.helao_cfg = self.world_cfg  # legacy alias
         self.server_cfg: dict = server_cfg or {}
         self.server_params: dict = self.server_cfg.get("params", {}) or {}
-        # TODO(SP8): full helao_dirs wiring (RUNS_*/STATES/LOGS roots).
-        self.helaodirs = None
+        # SP-ARTIFACT Task 2: populate helaodirs when config has a root.
+        # Called WITHOUT server_name to avoid re-zipping logs on Base
+        # construction (the launcher already rotates logs — Constraint 6).
+        if self.world_cfg.get("root"):
+            from helao.framework.support.helao_dirs import helao_dirs as _helao_dirs
+            self.helaodirs = _helao_dirs(self.world_cfg)
+        else:
+            self.helaodirs = None
         self.helao_dirs = self.helaodirs  # legacy alias
 
         # --- executor registry (exec_id -> Executor) ------------------------
@@ -1196,11 +1202,17 @@ def _make_base_api_class():
             # auto-wrap tags=["action"] endpoints to populate ACTION_CTX
             self.router.route_class = ActionAPIRoute
 
-            if save_root is None:
-                save_root = tempfile.mkdtemp(prefix="helao_framework_baseapi_")
-            os.makedirs(save_root, exist_ok=True)
-
             world_cfg, server_cfg = self._load_server_cfg(server_key)
+
+            # SP-ARTIFACT Task 2: derive save_root from config root when not
+            # supplied explicitly. Tempdir is the fallback when no root key.
+            if save_root is None:
+                _root = world_cfg.get("root") if world_cfg else None
+                if _root:
+                    save_root = _root
+                else:
+                    save_root = tempfile.mkdtemp(prefix="helao_framework_baseapi_")
+            os.makedirs(save_root, exist_ok=True)
 
             base = FrameworkBase(
                 server_key=server_key,

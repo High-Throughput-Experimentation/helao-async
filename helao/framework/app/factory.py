@@ -118,8 +118,14 @@ def makeOrchestratorApp(
     """
     from helao.framework.app.orch_api import OrchPorts, makeOrchApp
 
+    # SP-ARTIFACT Task 2: derive save_root from config root when not explicit.
     if save_root is None:
-        save_root = tempfile.mkdtemp(prefix="helao_framework_orch_")
+        try:
+            from helao.framework.support.config_loader import CONFIG as _CFG
+            _root = (_CFG or {}).get("root") if _CFG else None
+        except Exception:
+            _root = None
+        save_root = _root if _root else tempfile.mkdtemp(prefix="helao_framework_orch_")
     os.makedirs(save_root, exist_ok=True)
 
     ports = OrchPorts(
@@ -167,8 +173,14 @@ def makeActionApp(server_key: str, save_root: Optional[str] = None) -> FastAPI:
     """
     from helao.core.rpc import RPCDispatcher, derive_rpc_port
 
+    # SP-ARTIFACT Task 2: derive save_root from config root when not explicit.
     if save_root is None:
-        save_root = tempfile.mkdtemp(prefix="helao_framework_")
+        try:
+            from helao.framework.support.config_loader import CONFIG as _CFG
+            _root = (_CFG or {}).get("root") if _CFG else None
+        except Exception:
+            _root = None
+        save_root = _root if _root else tempfile.mkdtemp(prefix="helao_framework_")
     os.makedirs(save_root, exist_ok=True)
 
     base = FrameworkBase(
