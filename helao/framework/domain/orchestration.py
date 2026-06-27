@@ -1190,14 +1190,47 @@ def dispatch_experiment(
     exp = state.experiment_dq.pop(0)
     state.active_experiment = exp
 
-    if state.active_sequence is not None:
-        exp.sequence_uuid = state.active_sequence.sequence_uuid
-    state.active_seq_exp_counter += 1
-
     if exp.experiment_uuid is None:
         exp.experiment_uuid = uuid
     if exp.experiment_timestamp is None:
         exp.experiment_timestamp = now
+
+    # C2: if no active_sequence exists (bare /append_experiment + /start flow),
+    # synthesize a minimal wrapper sequence so the nested output-dir tree is valid
+    # (never ``RUNS_ACTIVE/None/...``).  Guard strictly on None — normal
+    # sequence-driven flow is unchanged.
+    synth_seq_cmds: List[Command] = []
+    if state.active_sequence is None:
+        syn_uuid = UUID(int=(uuid.int + 1) % (1 << 128))
+        syn_seq = RunSequence(
+            sequence_uuid=syn_uuid,
+            sequence_timestamp=now,
+            sequence_name=exp.experiment_name,
+            sequence_label="noLabel",
+        )
+        syn_seq.sequence_output_dir = lifecycle.sequence_output_dir(syn_seq)
+        state.active_sequence = syn_seq
+        register_obj_uuid(
+            state,
+            syn_seq.sequence_uuid,
+            {
+                "sequence_name": syn_seq.sequence_name,
+                "sequence_status": "active",
+                "sequence_label": syn_seq.sequence_label,
+            },
+            "sequence",
+        )
+        synth_seq_cmds.append(
+            PersistMeta(
+                kind="seq",
+                uuid=syn_seq.sequence_uuid,
+                payload=syn_seq.as_dict(),
+            )
+        )
+
+    if state.active_sequence is not None:
+        exp.sequence_uuid = state.active_sequence.sequence_uuid
+    state.active_seq_exp_counter += 1
 
     # stamp the nested experiment output dir = ``<seq_dir>/<exp_ts>__<exp_name>``
     # so Task 3's PersistMeta(kind="exp") and the downstream action-server write
@@ -1274,7 +1307,8 @@ def dispatch_experiment(
     cmds.append(
         PersistMeta(kind="exp", uuid=exp.experiment_uuid, payload=exp.as_dict())
     )
-    return state, cmds
+    # prepend synthetic-sequence PersistMeta so seq yml is written before exp yml
+    return state, synth_seq_cmds + cmds
 
 
 def dispatch_action(

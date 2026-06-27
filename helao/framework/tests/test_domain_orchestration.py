@@ -671,6 +671,85 @@ def test_dispatch_experiment_keeps_injected_action_timestamp():
 
 
 # --------------------------------------------------------------------------- #
+# C2: parentless experiment (no active_sequence) synthesizes a sequence
+# --------------------------------------------------------------------------- #
+
+
+def test_dispatch_experiment_parentless_yields_non_none_exp_output_dir():
+    """When active_sequence is None, experiment_output_dir must be non-None and
+    must not contain a 'None' path segment."""
+    exp = RunExperiment(experiment_name="bareexp")
+    acts = [_action(action_name="a0"), _action(action_name="a1")]
+    st = _state(experiment_dq=[exp])
+    assert st.active_sequence is None
+    st, cmds = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+    assert exp.experiment_output_dir is not None
+    assert _no_none_segment(exp.experiment_output_dir)
+
+
+def test_dispatch_experiment_parentless_staged_actions_have_valid_output_dirs():
+    """Staged actions under a parentless experiment must have no 'None' in
+    action_output_dir."""
+    exp = RunExperiment(experiment_name="bareexp")
+    acts = [_action(action_name="a0"), _action(action_name="a1")]
+    st = _state(experiment_dq=[exp])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+    for act in st.action_dq:
+        assert act.action_output_dir is not None
+        assert _no_none_segment(act.action_output_dir)
+
+
+def test_dispatch_experiment_parentless_sets_active_sequence():
+    """A synthetic RunSequence must be created and set as active_sequence."""
+    exp = RunExperiment(experiment_name="bareexp")
+    st = _state(experiment_dq=[exp])
+    assert st.active_sequence is None
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert st.active_sequence is not None
+    assert st.active_sequence.sequence_output_dir is not None
+    assert _no_none_segment(st.active_sequence.sequence_output_dir)
+
+
+def test_dispatch_experiment_parentless_emits_persist_meta_seq():
+    """A PersistMeta(kind='seq') command must be among the returned commands."""
+    exp = RunExperiment(experiment_name="bareexp")
+    st = _state(experiment_dq=[exp])
+    st, cmds = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert any(isinstance(c, PersistMeta) and c.kind == "seq" for c in cmds)
+
+
+def test_dispatch_experiment_parentless_seq_uuid_distinct_from_exp_uuid():
+    """Synthetic sequence uuid must differ from the experiment uuid."""
+    exp = RunExperiment(experiment_name="bareexp")
+    st = _state(experiment_dq=[exp])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert st.active_sequence.sequence_uuid != exp.experiment_uuid
+
+
+def test_dispatch_experiment_with_active_sequence_unchanged():
+    """Regression: when active_sequence is already set, no extra synthesis occurs
+    and output dirs nest under the existing sequence (unchanged behaviour)."""
+    seq = RunSequence(sequence_name="myseq")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    seq_uuid_before = st.active_sequence.sequence_uuid
+
+    exp = RunExperiment(experiment_name="myexp")
+    st.experiment_dq = [exp]
+    acts = [_action(action_name="a0")]
+    st, cmds = orch.dispatch_experiment(st, now=NOW, uuid=SEED, expand_result=acts)
+
+    # same sequence — no new one synthesized
+    assert st.active_sequence.sequence_uuid == seq_uuid_before
+    # only one PersistMeta(kind="seq") must NOT appear (seq was already dispatched)
+    assert not any(isinstance(c, PersistMeta) and c.kind == "seq" for c in cmds)
+    # output dirs nest under the existing seq
+    assert str(exp.experiment_output_dir).startswith(str(seq.sequence_output_dir))
+    assert _no_none_segment(exp.experiment_output_dir)
+    assert _no_none_segment(st.action_dq[0].action_output_dir)
+
+
+# --------------------------------------------------------------------------- #
 # dispatch_action
 # --------------------------------------------------------------------------- #
 def test_dispatch_action_empty_noop():
