@@ -143,16 +143,6 @@ class TestMetaDoc:
         assert doc["file_type"] == "experiment"
 
 
-class TestActiveFinishedRelpath:
-    def test_active_relpath(self):
-        out_dir = "26.25/0622/seq/exp/act"
-        assert lifecycle.active_relpath(out_dir) == f"RUNS_ACTIVE/{out_dir}"
-
-    def test_finished_relpath(self):
-        out_dir = "26.25/0622/seq/exp/act"
-        assert lifecycle.finished_relpath(out_dir) == f"RUNS_FINISHED/{out_dir}"
-
-
 # ===== Part 2: ActionSession integration with real FsStorage ===================
 # These drive a session through init+data+finish and assert on-disk state.
 

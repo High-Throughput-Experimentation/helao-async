@@ -242,6 +242,10 @@ def _safe_exp_relpath(exp: Optional[Any], fallback_uuid: Any) -> str:
         and getattr(exp, "experiment_output_dir", None) is not None
     ):
         return experiment_meta_relpath(exp)
+    # Flat {uuid}-{kind}.yml is sync-INVISIBLE by design (no RUNS_* prefix /
+    # wrong depth); fires only as a crash-guard when timestamp/output_dir are
+    # unset — Task 5a stamps them in real dispatch so this branch is never hit
+    # under normal operation.
     return f"{fallback_uuid}-exp.yml"
 
 
@@ -257,6 +261,10 @@ def _safe_seq_relpath(seq: Optional[Any], fallback_uuid: Any) -> str:
         and getattr(seq, "sequence_output_dir", None) is not None
     ):
         return sequence_meta_relpath(seq)
+    # Flat {uuid}-{kind}.yml is sync-INVISIBLE by design (no RUNS_* prefix /
+    # wrong depth); fires only as a crash-guard when timestamp/output_dir are
+    # unset — Task 5a stamps them in real dispatch so this branch is never hit
+    # under normal operation.
     return f"{fallback_uuid}-seq.yml"
 
 

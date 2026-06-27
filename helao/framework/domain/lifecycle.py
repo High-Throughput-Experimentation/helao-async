@@ -31,8 +31,6 @@ __all__ = [
     "sequence_meta_relpath",
     "hlo_relpath",
     "meta_doc",
-    "active_relpath",
-    "finished_relpath",
 ]
 
 import os
@@ -353,16 +351,6 @@ def meta_doc(kind: str, body_dict: dict) -> dict:
     always ``file_type``, matching ``helao.core.servers.base.write_act/exp/seq``.
     """
     return {"file_type": kind, **body_dict}
-
-
-def active_relpath(out_dir: str) -> str:
-    """Return ``RUNS_ACTIVE/<out_dir>``."""
-    return f"RUNS_ACTIVE/{out_dir}"
-
-
-def finished_relpath(out_dir: str) -> str:
-    """Return ``RUNS_FINISHED/<out_dir>`` (the relocation destination)."""
-    return f"RUNS_FINISHED/{out_dir}"
 
 
 def _derive_conn_key(base: UUID, index: int) -> UUID:

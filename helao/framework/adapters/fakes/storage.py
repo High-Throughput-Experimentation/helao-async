@@ -29,8 +29,6 @@ class FakeStorage(Storage):
         self.meta_docs: dict[str, dict[str, Any]] = {}
         #: list of (src, dst) relocations recorded in order.
         self.relocations: list[tuple[str, str]] = []
-        #: list of (src_relpath, dst_relpath) whole-dir relocations in order.
-        self.dir_relocations: list[tuple[str, str]] = []
         #: list of promote_run_dir calls: (out_dir, manual, sync_data, recursive).
         self.promote_calls: list[tuple[str, bool, bool, bool]] = []
         #: list of (name, relpath, context) post-processor calls.
@@ -84,10 +82,6 @@ class FakeStorage(Storage):
     async def relocate(self, src: str, dst: str) -> str:
         self.relocations.append((src, dst))
         return dst
-
-    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
-        self.dir_relocations.append((src_relpath, dst_relpath))
-        return dst_relpath
 
     async def promote_run_dir(
         self,

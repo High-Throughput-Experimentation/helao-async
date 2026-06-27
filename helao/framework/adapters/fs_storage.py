@@ -136,18 +136,6 @@ class FsStorage(Storage):
             await aioshutil.copy(src, dst_path)
         return dst
 
-    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
-        src_path = self._abs(src_relpath)
-        dst_path = self._abs(dst_relpath)
-        if src_path == dst_path:
-            return dst_relpath
-        # nothing to move (e.g. save_data was off, no dir created) -> no-op.
-        if not os.path.isdir(src_path):
-            return dst_relpath
-        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-        await aioshutil.move(src_path, dst_path)
-        return dst_relpath
-
     async def promote_run_dir(
         self,
         out_dir_relpath: str,

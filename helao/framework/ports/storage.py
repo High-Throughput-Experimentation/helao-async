@@ -83,17 +83,6 @@ class Storage(Protocol):
         """Copy ``src`` to ``dst`` (relocating an aux file); return ``dst``."""
         ...
 
-    async def relocate_dir(self, src_relpath: str, dst_relpath: str) -> str:
-        """Move a whole run directory tree from ``src_relpath`` to ``dst_relpath``.
-
-        Ports legacy ``move_dir`` (base.py:2218 / yml_tools.move_dir): a finished,
-        non-manual action's output directory is promoted from the active location
-        to the synced location so ``HelaoSyncer`` ships it. Both paths are relpaths
-        beneath the storage root; the destination's parent is created on demand and
-        the source subtree is moved (not copied). Returns ``dst_relpath``.
-        """
-        ...
-
     async def promote_run_dir(
         self,
         out_dir_relpath: str,

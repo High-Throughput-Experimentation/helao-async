@@ -844,6 +844,8 @@ class ActionSession:
         # for sync_data=False divert to RUNS_NOSYNC. Handles are already closed
         # above; a failure is logged and swallowed so finish never crashes.
         for action in self.action_list:
+            # For manual actions this is a tolerant no-op: artifacts are written
+            # in-place under RUNS_DIAG, so RUNS_ACTIVE/<out_dir> never exists.
             await self._relocate_run_dir(action)
 
         # IMPORTANT-4: deregister the finished executor from base.executors so the
