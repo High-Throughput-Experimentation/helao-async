@@ -364,7 +364,7 @@ def test_execute_commands_persist_meta_fallback():
     assert relpath in storage.meta_docs
     assert storage.meta_docs[relpath]["sequence_name"] == "s"
     # file_type key must be present (meta_doc wraps with leading file_type)
-    assert storage.meta_docs[relpath]["file_type"] == "seq"
+    assert storage.meta_docs[relpath]["file_type"] == "sequence"
 
 
 def test_execute_commands_persist_meta_seq_nested():
@@ -395,7 +395,7 @@ def test_execute_commands_persist_meta_seq_nested():
         import yaml
         with open(expected_path) as f:
             doc = yaml.safe_load(f)
-        assert doc.get("file_type") == "seq", f"file_type missing; got {doc}"
+        assert doc.get("file_type") == "sequence", f"file_type missing; got {doc}"
 
 
 def test_execute_commands_persist_meta_exp_nested():
@@ -426,7 +426,7 @@ def test_execute_commands_persist_meta_exp_nested():
         import yaml
         with open(expected_path) as f:
             doc = yaml.safe_load(f)
-        assert doc.get("file_type") == "exp", f"file_type missing; got {doc}"
+        assert doc.get("file_type") == "experiment", f"file_type missing; got {doc}"
 
 
 def test_execute_commands_finish_experiment():

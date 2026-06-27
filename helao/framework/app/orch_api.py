@@ -224,6 +224,9 @@ def _synthesize_finished_status(action: RunAction) -> ActionServerModel:
     )
 
 
+_KIND_LONG: dict[str, str] = {"exp": "experiment", "seq": "sequence", "act": "action"}
+
+
 def _safe_exp_relpath(exp: Optional[Any], fallback_uuid: Any) -> str:
     """Return the nested experiment meta relpath, or a flat uuid fallback.
 
@@ -269,7 +272,9 @@ async def execute_commands(
     Command -> port mapping (parent spec §6):
 
     * :class:`BroadcastGlobalStatus` -> ``eventsink.emit_global_status``.
-    * :class:`PersistMeta` -> ``storage.write_meta`` (``-{kind}.yml`` relpath).
+    * :class:`PersistMeta` -> ``storage.write_meta`` (nested timestamp relpath when
+      an active object exists, else flat ``{uuid}-{kind}.yml`` fallback); the
+      ``file_type`` key is the long form (``experiment``/``sequence``/``action``).
     * :class:`DispatchAction` -> ``transport.dispatch`` then
       ``orchestration.on_dispatch_result``; on success the action's finished
       status is folded back via ``orchestration.on_status_update``.
@@ -296,7 +301,7 @@ async def execute_commands(
             else:
                 # fallback: flat uuid-kind path (unknown kind or no active object)
                 relpath = f"{cmd.uuid}-{cmd.kind}.yml"
-            await ports.storage.write_meta(relpath, meta_doc(cmd.kind, dict(cmd.payload)))
+            await ports.storage.write_meta(relpath, meta_doc(_KIND_LONG.get(cmd.kind, cmd.kind), dict(cmd.payload)))
 
         elif isinstance(cmd, DispatchAction):
             action = cmd.action
