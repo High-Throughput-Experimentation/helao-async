@@ -146,6 +146,18 @@ def test_short_sequence_model_round_trip():
     assert ShortSequenceModel(**ss.model_dump()).model_dump() == ss.model_dump()
 
 
+def test_sequence_model_has_sequence_order_default():
+    from helao.framework.models.sequence import SequenceModel
+    sm = SequenceModel()
+    assert sm.sequence_order == 0
+
+
+def test_sequence_order_round_trips():
+    from helao.framework.models.sequence import SequenceModel
+    sm = SequenceModel(sequence_name="s", sequence_order=4)
+    assert SequenceModel(**sm.model_dump()).sequence_order == 4
+
+
 # --------------------------------------------------------------------------- #
 # Regression: action.py has no premodels/runtime import
 # --------------------------------------------------------------------------- #

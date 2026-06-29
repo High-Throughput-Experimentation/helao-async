@@ -75,6 +75,7 @@ class SequenceModel(ShortSequenceModel):
         dispatched_experiments_abbr (List[ShortExperimentModel]): Short records of dispatched experiments.
         sync_data (bool): True to ship sequence data via the syncer.
         manual_action (bool): True if the sequence contains manual actions.
+        sequence_order (Optional[int]): Dispatch index of the sequence within its run_id grouping.
         initial_global_params (dict): Snapshot of global params at start.
         finished_global_params (dict): Snapshot of global params at end.
     """
@@ -100,5 +101,6 @@ class SequenceModel(ShortSequenceModel):
     )  # list of completed experiments (abbreviated) from dispatched_experiments
     sync_data: bool = True
     manual_action: bool = False
+    sequence_order: Optional[int] = 0
     initial_global_params: dict = Field(default_factory=dict)
     finished_global_params: dict = Field(default_factory=dict)
