@@ -233,7 +233,8 @@ class TestNonManualSessionArtifacts:
         a = _ready_nonmanual_action()
         _run_only_open_file(tmp_path, a)
         out_dir = str(a.action_output_dir)
-        expected = tmp_path / "RUNS_ACTIVE" / out_dir / f"myact-{FILE_CONN}.hlo"
+        # legacy filename: {abbr|name}-{submit}.{order}.{retry}.{split}__{filenum}.hlo
+        expected = tmp_path / "RUNS_ACTIVE" / out_dir / "myact-0.0.0.0__0.hlo"
         assert expected.exists(), f"Expected HLO at {expected}"
 
     def test_finish_moves_tree_to_runs_finished(self, tmp_path):
@@ -366,4 +367,5 @@ class TestConnRelpathUsesRunKind:
             transport=FakeTransport(),
         )
         rp = session._conn_relpath(FILE_CONN)
-        assert rp.endswith(f"myact-{FILE_CONN}.hlo"), f"Got: {rp}"
+        # legacy filename: {abbr|name}-{submit}.{order}.{retry}.{split}__{filenum}.hlo
+        assert rp.endswith("myact-0.0.0.0__0.hlo"), f"Got: {rp}"

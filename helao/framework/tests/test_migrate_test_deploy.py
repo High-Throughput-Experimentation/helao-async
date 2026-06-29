@@ -271,9 +271,26 @@ async def test_ws_simulator_runs_action_and_writes_hlo():
 
     parsed = ruamel.yaml.YAML(typ="safe").load(header_text)
     assert isinstance(parsed, dict), f"header did not parse to a dict: {header_text!r}"
-    assert parsed.get("action_name") == "acquire_data"
+    # legacy parity: the file is opened lazily on first data write (after the
+    # endpoint stamps action_abbr="WsSim"), so the header action_name carries the
+    # abbr — matching legacy log_data_set_output_file (base.py:1518-1525).
+    assert parsed.get("action_name") == "WsSim"
     assert isinstance(parsed.get("epoch_ns"), int)
     assert parsed.get("hlo_version")
+
+    # the .hlo must use the legacy filename convention
+    # {abbr}-{orch_submit_order}.{action_order}.{action_retry}.{action_split}__{filenum}.hlo
+    assert hlo_files[0].name.startswith("WsSim-") and "__0.hlo" in hlo_files[0].name, (
+        f"hlo filename not legacy-formatted: {hlo_files[0].name}"
+    )
+    # the .hlo must be recorded in the -act.yml files list
+    from helao.helpers.yml_tools import yml_load
+
+    act_doc = yml_load(str(act_files[0]))
+    recorded = [f.get("file_name") for f in (act_doc.get("files") or [])]
+    assert hlo_files[0].name in recorded, (
+        f"hlo {hlo_files[0].name!r} not recorded in -act.yml files: {recorded}"
+    )
 
 
 # ---------------------------------------------------------------------------

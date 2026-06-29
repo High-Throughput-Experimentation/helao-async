@@ -130,6 +130,10 @@ class ActionSession:
         # legacy Active.file_conn_dict open-file bookkeeping). substitute/finish
         # close these; split closes the prior ones and opens fresh ones.
         self._open_handles: dict[UUID, Any] = {}
+        # explicit header to use when the default connection is lazily opened on
+        # first data write (set by the host's contain_action when a non-empty
+        # header was passed to setup_and_contain_action); "" → stamp a default.
+        self._pending_open_header: str = ""
 
         # save defaults mirror Active.__init__: cannot save data without act
         if self.action.save_data is None:
@@ -236,7 +240,33 @@ class ActionSession:
         for key, row in datamodel.data.items():
             handle = self._open_handles.get(key)
             if handle is None:
-                continue
+                # Lazy open on first data write (legacy parity, base.py:1633-1647):
+                # the file is created only when data actually arrives, by which
+                # point the endpoint has stamped action_abbr — so the filename is
+                # legacy-correct. Only for declared keys of a save_data action;
+                # other keys are status-stream-only (skipped), as in legacy.
+                if (
+                    self.action.save_data
+                    and key is not None
+                    and key in self.action.file_conn_keys
+                ):
+                    data_keys = list(row.keys()) if isinstance(row, dict) else None
+                    handle = await self.open_file(
+                        key, header=self._pending_open_header, data_keys=data_keys
+                    )
+                else:
+                    continue
+            # Record the FileInfo on first write for this key (legacy parity:
+            # log_data_set_output_file appends FileInfo when the file is created
+            # on the first data row, base.py:1551). Idempotent — a no-op on
+            # subsequent rows. Done here, not in open_file, so a connection that
+            # is opened but never written (e.g. split's fresh conns) records no
+            # FileInfo, exactly as legacy.
+            self._record_conn_file(
+                key,
+                self.action,
+                data_keys=list(row.keys()) if isinstance(row, dict) else None,
+            )
             await self.storage.append_hlo(handle, json.dumps(row))
 
     async def enqueue_data_dflt(self, datadict: dict) -> None:
@@ -340,29 +370,79 @@ class ActionSession:
 
     # --- file connections (streaming HLO handles) ----------------------------
 
+    def _conn_filename(self, file_conn_key: UUID, action: RunAction) -> str:
+        """Legacy streaming-HLO filename for ``file_conn_key``.
+
+        Ports ``Base.init_datafile`` (base.py:1322):
+        ``{action_abbr}-{orch_submit_order}.{action_order}.{action_retry}.{action_split}__{filenum}.hlo``
+        where ``filenum`` is the connection key's index in ``file_conn_keys``.
+        ``action_abbr`` is preferred (it is the short label the endpoint stamps),
+        falling back to ``action_name`` when unset — matching legacy.
+        """
+        filenum = 0
+        if file_conn_key in action.file_conn_keys:
+            filenum = action.file_conn_keys.index(file_conn_key)
+        abbr = action.action_abbr if action.action_abbr is not None else action.action_name
+        return (
+            f"{abbr}-{action.orch_submit_order}.{action.action_order}."
+            f"{action.action_retry}.{action.action_split}__{filenum}.hlo"
+        )
+
     def _conn_relpath(self, file_conn_key: UUID, action: Optional[RunAction] = None) -> str:
         """Relpath of the streaming HLO file for ``file_conn_key`` (run-kind prefixed)."""
         if action is None:
             action = self.action
-        leaf = f"{action.action_name}-{file_conn_key}.hlo"
-        return lifecycle.hlo_relpath(action, leaf)
+        return lifecycle.hlo_relpath(action, self._conn_filename(file_conn_key, action))
 
-    def _default_hlo_header(self, action: RunAction) -> str:
+    def _record_conn_file(
+        self,
+        file_conn_key: UUID,
+        action: RunAction,
+        data_keys: Optional[List[str]] = None,
+    ) -> None:
+        """Append a :class:`FileInfo` for a streaming HLO connection.
+
+        Ports the ``output_action.files.append(file_info)`` half of legacy
+        ``log_data_set_output_file`` (base.py:1551): the file is recorded in the
+        action's ``files`` list so it lands in the ``-act.yml``. Idempotent — a
+        second call for the same file name is a no-op (reopen path).
+        """
+        fname = self._conn_filename(file_conn_key, action)
+        if any(f.file_name == fname for f in action.files):
+            return
+        server_name = getattr(action.action_server, "server_name", "") or ""
+        action.files.append(
+            FileInfo(
+                file_type=f"{server_name.lower()}_helao__file",
+                file_name=fname,
+                data_keys=list(data_keys or getattr(action, "json_data_keys", None) or []),
+                sample=list(getattr(action, "file_sample_label", None) or []),
+                action_uuid=action.action_uuid,
+                run_use=action.run_use,
+                nosync=not action.sync_data,
+            )
+        )
+
+    def _default_hlo_header(
+        self, action: RunAction, column_headings: Optional[List[str]] = None
+    ) -> str:
         """Build the stamped HLO header string for an auto-opened connection.
 
         Ports legacy ``Base.log_data_set_output_file`` (base.py:1517-1540): when the
         host auto-opens the default file connection with an empty header, stamp a
         full :class:`HloHeaderModel` carrying ``action_name`` (abbr preferred),
         ``epoch_ns`` from the injected clock, ``hlo_version`` (auto), and
-        ``column_headings`` from the action's ``json_data_keys`` if available.
+        ``column_headings`` (explicit ``column_headings`` arg, else the action's
+        ``json_data_keys`` if available).
         Serialization to YAML is delegated to the Storage port so the domain stays
         free of serialization libraries.
         """
         action_name = action.action_abbr or action.action_name
-        column_headings = list(getattr(action, "json_data_keys", None) or [])
+        if column_headings is None:
+            column_headings = list(getattr(action, "json_data_keys", None) or [])
         hloheader = HloHeaderModel(
             action_name=action_name,
-            column_headings=column_headings,
+            column_headings=list(column_headings),
             epoch_ns=self.clock.now_ns(),
         )
         return self.storage.serialize_hlo_header(hloheader.clean_dict())
@@ -372,24 +452,30 @@ class ActionSession:
         file_conn_key: UUID,
         header: str = "",
         action: Optional[RunAction] = None,
+        data_keys: Optional[List[str]] = None,
     ) -> Any:
         """Open a streaming HLO file connection and remember its handle.
 
         Ports the open-file half of the legacy ``Active.file_conn_dict``: the
         storage port writes the header + ``%%`` separator and returns an opaque
         handle, which is tracked under ``file_conn_key`` so ``split`` /
-        ``substitute`` / ``finish`` can close it later.
+        ``substitute`` / ``finish`` can close it later. The corresponding
+        :class:`FileInfo` is recorded on the first *data write* (see
+        :meth:`_write_live_rows` / :meth:`_record_conn_file`), not here — so a
+        connection opened but never written records no file, matching legacy.
 
-        When the caller passes an empty/blank ``header`` (the host's
-        ``contain_action`` auto-open path), a full :class:`HloHeaderModel` is
-        stamped (closing the SP7 empty-header gap). An explicit non-empty header
-        is preserved verbatim.
+        When the caller passes an empty/blank ``header`` (the lazy first-write
+        path), a full :class:`HloHeaderModel` is stamped (closing the SP7
+        empty-header gap). An explicit non-empty header is preserved verbatim.
+        ``data_keys`` (when supplied) seed the header ``column_headings`` and the
+        recorded ``FileInfo.data_keys`` — used by the lazy path to capture the
+        first data row's keys (legacy base.py:1635).
         """
         if action is None:
             action = self.action
         # blank/empty header -> stamp a full HloHeaderModel; explicit header kept.
         if not header.strip():
-            header = self._default_hlo_header(action)
+            header = self._default_hlo_header(action, column_headings=data_keys)
         # Close any handle already open for this key (e.g. a default connection
         # auto-opened by the host's contain_action) so reopening with an explicit
         # header doesn't leak the prior handle.

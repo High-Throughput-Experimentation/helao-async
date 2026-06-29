@@ -804,16 +804,15 @@ class FrameworkBase:
         )
         self.actives[action.action_uuid] = session
         await session.myinit()
-        # Auto-open the default file connection so a poll/streaming executor's
-        # data lands in an .hlo without the endpoint calling open_file itself.
-        # Ports the legacy default file connection (`dflt_file_conn_key()` +
-        # FileConnParams) that `Base.setup_and_contain_action` registers; the
-        # framework opens it eagerly here since there is no background data
-        # logger to open it lazily on first write.
-        if action.save_data and action.file_conn_keys:
-            await session.open_file(
-                action.file_conn_keys[0], header=self._default_header
-            )
+        # The default file connection is opened LAZILY on the first data write
+        # (see ActionSession._write_live_rows), faithfully porting legacy
+        # base.py:1633-1647: the .hlo is created only when data actually arrives,
+        # by which point the endpoint has stamped action_abbr — so the filename
+        # matches the legacy convention and an action that emits no data writes no
+        # .hlo at all. An explicit header passed to setup_and_contain_action is
+        # preserved for that lazy open.
+        if self._default_header and action.save_data and action.file_conn_keys:
+            session._pending_open_header = self._default_header
         self.history[action.action_uuid] = action.model_copy(deep=True)
         return session
 

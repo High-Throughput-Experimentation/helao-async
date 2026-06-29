@@ -1345,31 +1345,65 @@ def makeOrchApp(
         # wait (TEST_consecutive_noblocking then runs serially / "too long").
         _nonblocking = _extract_nonblocking(body)
 
-        action = _RunAction(
-            action_name="wait",
-            action_uuid=action_uuid,
-            nonblocking=_nonblocking,
-            action_timestamp=now,
-            sequence_timestamp=now,
-            experiment_timestamp=now,
-            sequence_name=body.get("sequence_name", "orch_builtin"),
-            experiment_name=body.get("experiment_name", "orch_builtin"),
-            action_output_dir=str(action_uuid),
-            action_server=_MachineModel(server_name=server_key),
-            # MINOR-8 (PRODUCTION-CRITICAL): stamp this self-hosted action's
-            # ``orchestrator`` to the orch's OWN GSM identity. ``server.py``'s
-            # ``_sort_status`` only removes a finished UUID from ``active_dict``
-            # when ``statusmodel.orchestrator == self.orchestrator``. Under a real
-            # config the GSM orchestrator is the real server identity; if the wait
-            # action kept the default ``MachineModel()`` the equality would fail
-            # and the finished wait would never leave ``active_dict`` → permanent
-            # WAIT stall. Stamping it here keeps self-status folding correct.
-            orchestrator=driver.state.globalstatusmodel.orchestrator,
-            action_params={"waittime": waittime},
-            action_status=[HloStatus.active],
-            save_act=False,
-            save_data=False,
-        )
+        # Prefer reconstructing the FULL dispatched action (the orch loop sends it
+        # as ``body["action"]`` = ``action.as_dict()``). It carries the nested
+        # ``action_output_dir`` (under <seq>/<exp>), submit/order counters, names
+        # and ``save_act`` — so the self-hosted wait writes a ``-act.yml`` under
+        # the correct action subdir, exactly like legacy ``/wait`` (which ran a
+        # normal ``save_act=True`` action). Falling back to a synthesized action
+        # only for bare direct/test calls (``{"waittime": x}``) which have no run
+        # context to nest under.
+        _action_payload = body.get("action")
+        if isinstance(_action_payload, dict) and _action_payload:
+            action = _RunAction(**_action_payload)
+            action.action_uuid = action_uuid
+            action.action_params = {
+                **(action.action_params or {}),
+                "waittime": waittime,
+            }
+            action.action_status = [HloStatus.active]
+            action.nonblocking = _nonblocking
+            # wait never produces data; force save_data off so no spurious .hlo is
+            # created, but keep save_act on so the -act.yml + action dir appear
+            # (legacy parity). Default action save_act is True already.
+            action.save_act = True
+            action.save_data = False
+            if action.action_abbr is None:
+                action.action_abbr = "wait"
+            # MINOR-8 (PRODUCTION-CRITICAL): ALWAYS stamp the orch's OWN GSM
+            # identity. The dispatched action carries a *default* MachineModel
+            # orchestrator (never None — obs-795), so a conditional "only if None"
+            # guard would leave the default in place and, under a non-default orch
+            # identity, ``_sort_status`` would never remove the finished wait from
+            # ``active_dict`` → permanent WAIT stall. Overwrite unconditionally.
+            action.orchestrator = driver.state.globalstatusmodel.orchestrator
+        else:
+            action = _RunAction(
+                action_name="wait",
+                action_uuid=action_uuid,
+                nonblocking=_nonblocking,
+                action_timestamp=now,
+                sequence_timestamp=now,
+                experiment_timestamp=now,
+                sequence_name=body.get("sequence_name", "orch_builtin"),
+                experiment_name=body.get("experiment_name", "orch_builtin"),
+                action_output_dir=str(action_uuid),
+                action_server=_MachineModel(server_name=server_key),
+                # MINOR-8 (PRODUCTION-CRITICAL): stamp this self-hosted action's
+                # ``orchestrator`` to the orch's OWN GSM identity. ``server.py``'s
+                # ``_sort_status`` only removes a finished UUID from ``active_dict``
+                # when ``statusmodel.orchestrator == self.orchestrator``. Under a real
+                # config the GSM orchestrator is the real server identity; if the wait
+                # action kept the default ``MachineModel()`` the equality would fail
+                # and the finished wait would never leave ``active_dict`` → permanent
+                # WAIT stall. Stamping it here keeps self-status folding correct.
+                orchestrator=driver.state.globalstatusmodel.orchestrator,
+                action_params={"waittime": waittime},
+                action_status=[HloStatus.active],
+                # bare direct/test call: no run context to nest a -act.yml under.
+                save_act=False,
+                save_data=False,
+            )
         active = await app.state.base.setup_and_contain_action(
             ActionContext(action=action, endpoint_name="wait"),
         )

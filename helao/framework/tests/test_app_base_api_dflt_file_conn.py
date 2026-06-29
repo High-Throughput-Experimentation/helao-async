@@ -46,6 +46,7 @@ def _save_data_action_empty_keys(**overrides) -> RunAction:
     """A save_data=True action with NO file_conn_keys (the bug trigger)."""
     kwargs = dict(
         action_name="data_act",
+        action_uuid=UUID("00000000-0000-0000-0000-0000000000d1"),
         action_timestamp=FIXED_NOW,
         sequence_timestamp=FIXED_NOW,
         experiment_timestamp=FIXED_NOW,
@@ -93,14 +94,19 @@ def _no_save_data_action() -> RunAction:
 async def test_contain_action_with_empty_file_conn_keys_writes_hlo(tmp_path):
     """POSITIVE: contain_action must inject the default key when file_conn_keys is empty.
 
-    Without the fix: no .hlo is written (the auto-open guard short-circuits).
-    After the fix: the default key is appended before the guard, so the .hlo appears.
+    Without the fix: the injected key is missing, so a subsequent data write has
+    no connection to land in and no .hlo is ever produced.
+    After the fix: the default key is appended, so data enqueued against it lands
+    in an .hlo. (The file is opened lazily on first write — legacy parity — so the
+    test enqueues one row before finishing.)
     """
     base = _base(tmp_path)
     action = _save_data_action_empty_keys()
 
     session = await base.contain_action(action)
-    # finish so any buffered writes are flushed
+    # data lands on the injected default key (file_conn_keys[0]); the .hlo is
+    # created lazily on this first write.
+    await session.enqueue_data({action.file_conn_keys[0]: {"epoch_s": 1.0, "v": 1}})
     await session.finish()
 
     # The .hlo must exist somewhere under the save_root

@@ -207,6 +207,7 @@ def test_full_tree_reaches_runs_finished(tmp_path):
     assert (seq_dir / f"{ts}-seq.yml").exists()
     assert (exp_dir / f"{ts}-exp.yml").exists()
     assert (act_dir / f"{ts}-act.yml").exists()
-    assert (act_dir / f"myact-{FILE_CONN}.hlo").exists()
+    # legacy filename: {abbr|name}-{submit}.{order}.{retry}.{split}__{filenum}.hlo
+    assert (act_dir / "myact-0.0.0.0__0.hlo").exists()
     # active sources gone
     assert not (tmp_path / "RUNS_ACTIVE" / a.sequence_output_dir).exists()
