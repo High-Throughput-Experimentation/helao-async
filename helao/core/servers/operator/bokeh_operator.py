@@ -2077,8 +2077,8 @@ class BokehOperator:
 
         Each param row is split into two columns: the input field on the left
         (fixed width) and, on the right, the parsed ``Args:`` description for
-        that field (from ``arg_descs``), revealed only while the field is the
-        active/focused widget via a ``:focus-within`` stylesheet.
+        that field (from ``arg_descs``), shown persistently regardless of input
+        focus.
 
         Special-cases plate-related parameters (``solid_plate_id``,
         ``solid_sample_no``, ``x_mm``/``y_mm``, custom positions, file
@@ -2151,30 +2151,17 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 spacing=5,
                 width=idx_col_w + input_w,
             )
-            # Right column: the parsed Args: description, hidden until this row's
-            # input has focus. ``:focus-within`` on the row host crosses the
-            # widget's shadow boundary, so focusing the input reveals only this
-            # field's description. ``visibility`` (not ``display``) keeps the
-            # column's width reserved so the input field width never shifts.
+            # Right column: the parsed Args: description, shown persistently
+            # beside the input field regardless of focus.
             desc_div = Div(
                 text=arg_descs.get(args[idx], ""),
                 sizing_mode="stretch_width",
                 styles={"color": "#566573", "margin-left": "12px"},
             )
-            # The focus-within rule (below) lives on the row's stylesheet and can
-            # only reach the row's *direct* children, so the toggled class goes on
-            # desc_col, not the nested desc_div.
             desc_col = column(
                 Spacer(height=name_div.height + 5),
                 desc_div,
                 sizing_mode="stretch_width",
-                css_classes=["param-desc"],
-            )
-            focus_sheet = InlineStyleSheet(
-                css=(
-                    ".param-desc { visibility: hidden; }"
-                    ":host(:focus-within) .param-desc { visibility: visible; }"
-                )
             )
             param_layout.append(
                 layout(
@@ -2184,7 +2171,6 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                             desc_col,
                             spacing=10,
                             sizing_mode="stretch_width",
-                            stylesheets=[focus_sheet],
                         ),
                         Spacer(height=10),
                     ],
