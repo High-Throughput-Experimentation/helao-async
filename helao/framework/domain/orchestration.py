@@ -160,6 +160,7 @@ class OrchState:
         last_experiment: The most recently completed experiment, or ``None``.
         active_seq_exp_counter: Count of experiments dispatched in the active seq.
         active_run_id: Run id attached to dispatched objects, or ``None``.
+        active_run_seq_counter: Dispatch index of the active sequence within the current run_id grouping.
         global_params: The run-scoped global-param store.
         globalstatusmodel: Aggregate action-server status + loop FSM enums.
         action_history: Action-uuid -> metadata dict.
@@ -187,6 +188,7 @@ class OrchState:
 
     active_seq_exp_counter: int = 0
     active_run_id: Optional[UUID] = None
+    active_run_seq_counter: int = 0
 
     global_params: dict = field(default_factory=dict)
     globalstatusmodel: GlobalStatusModel = field(
@@ -1121,11 +1123,22 @@ def dispatch_sequence(
         seq.sequence_params, seq.from_global_seq_params, state.global_params
     )
 
+    # capture the run id before re-derivation to detect a run grouping change
+    prior_run_id = state.active_run_id
     # derive the active run id from the sequence
     if getattr(seq, "run_id", None) is not None:
         state.active_run_id = seq.run_id
     elif state.active_run_id is None:
         state.active_run_id = seq.sequence_uuid
+
+    # sequence_order = 0-indexed position within the run_id grouping. Increment
+    # within the same run; reset to 0 when a new run_id begins (incl. the first
+    # sequence after a stop-with-reset / estop dropped active_run_id to None).
+    if state.active_run_id == prior_run_id:
+        state.active_run_seq_counter += 1
+    else:
+        state.active_run_seq_counter = 0
+    seq.sequence_order = state.active_run_seq_counter
 
     register_obj_uuid(
         state,

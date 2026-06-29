@@ -521,6 +521,37 @@ def test_dispatch_sequence_retains_prior_as_last():
     assert st.active_sequence is seq
 
 
+def test_dispatch_sequence_stamps_sequence_order_zero_first():
+    seq = RunSequence(sequence_name="s0")
+    st = _state(sequence_dq=[seq])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    assert seq.sequence_order == 0
+    assert st.active_run_seq_counter == 0
+
+
+def test_dispatch_sequence_order_increments_within_same_run():
+    s0 = RunSequence(sequence_name="s0")
+    s1 = RunSequence(sequence_name="s1")
+    st = _state(sequence_dq=[s0, s1])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)        # seeds active_run_id
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)        # same run -> increment
+    assert s0.sequence_order == 0
+    assert s1.sequence_order == 1
+
+
+def test_dispatch_sequence_order_resets_when_run_id_changes():
+    s0 = RunSequence(sequence_name="s0")
+    st = _state(sequence_dq=[s0])
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    assert s0.sequence_order == 0
+    # a stop-with-reset (or estop) drops active_run_id -> next seq is a new run
+    st.active_run_id = None
+    s1 = RunSequence(sequence_name="s1")
+    st.sequence_dq = [s1]
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    assert s1.sequence_order == 0
+
+
 # --------------------------------------------------------------------------- #
 # dispatch_experiment
 # --------------------------------------------------------------------------- #
