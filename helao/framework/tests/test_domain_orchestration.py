@@ -610,6 +610,25 @@ def test_dispatch_experiment_order_increments_then_resets_per_sequence():
     assert e2.experiment_order == 0
 
 
+def test_dispatch_experiment_parentless_resets_order_per_synth_sequence():
+    # A parentless experiment (no active_sequence) synthesizes a one-experiment
+    # wrapper sequence -> experiment_order 0.
+    e0 = RunExperiment(experiment_name="bare0")
+    st = _state(experiment_dq=[e0])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert e0.experiment_order == 0
+    assert st.active_seq_exp_counter == 1
+
+    # The next parentless experiment (active_sequence cleared, e.g. prior synth
+    # seq finished) synthesizes a FRESH wrapper sequence -> order resets to 0,
+    # not the stale counter value 1.
+    st.active_sequence = None
+    e1 = RunExperiment(experiment_name="bare1")
+    st.experiment_dq = [e1]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert e1.experiment_order == 0
+
+
 # --------------------------------------------------------------------------- #
 # Task 5a — dispatch-time output-dir stamping (nested, deterministic)
 # --------------------------------------------------------------------------- #

@@ -1215,6 +1215,10 @@ def dispatch_experiment(
         )
         syn_seq.sequence_output_dir = lifecycle.sequence_output_dir(syn_seq)
         state.active_sequence = syn_seq
+        # A freshly synthesized wrapper sequence is a new sequence, so reset the
+        # per-sequence experiment counter (parity with dispatch_sequence) — the
+        # experiment about to be stamped is index 0 within this wrapper.
+        state.active_seq_exp_counter = 0
         register_obj_uuid(
             state,
             syn_seq.sequence_uuid,
