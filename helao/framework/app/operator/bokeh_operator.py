@@ -471,6 +471,7 @@ class BokehOperator:
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
         )
+        self.reset_run_id_on_stop = CheckboxGroup(labels=["reset run_id"], active=[])
         self.button_skip_exp = self._make_button(
             "Skip exp", "danger", 70, self.callback_skip_exp
         )
@@ -478,7 +479,7 @@ class BokehOperator:
             "Update tables", "default", 120, self.callback_update_tables
         )
         self.button_clear_expplan = self._make_button(
-            "Clear expplan", "default", 100, self.callback_clear_expplan
+            "Clear plan", "default", 100, self.callback_clear_expplan
         )
         self.orch_status_button = Button(
             label="Disabled", disabled=False, button_type="danger",
@@ -774,9 +775,10 @@ class BokehOperator:
                             self.button_add_expplan,
                             self.button_add_smpseqs,
                             self.button_prepend_plan,
+                            self.button_clear_expplan,
                             self.button_start_orch,
                             self.button_stop_orch,
-                            self.button_clear_expplan,
+                            self.reset_run_id_on_stop,
                             spacing=4,
                             sizing_mode="stretch_width",
                         ),
@@ -1802,7 +1804,8 @@ class BokehOperator:
 
     def callback_stop_orch(self, event):
         LOGGER.info("stopping operator orch")
-        self.vis.doc.add_next_tick_callback(partial(self.backend.stop))
+        reset = 0 in self.reset_run_id_on_stop.active
+        self.vis.doc.add_next_tick_callback(partial(self.backend.stop, reset_run_id=reset))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):

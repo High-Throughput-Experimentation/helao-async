@@ -66,6 +66,7 @@ class _MockBackend:
         self.added = []
         self.split_added = []
         self.prepended = None
+        self.stop_calls = []
 
     def unpack_sequence(self, sequence_name, sequence_params):
         return self.sequence_lib[sequence_name](**sequence_params)
@@ -114,7 +115,9 @@ class _MockBackend:
     async def start(self):
         self.started = True
 
-    async def stop(self): ...
+    async def stop(self, reset_run_id: bool = False):
+        self.stop_calls.append(reset_run_id)
+
     async def skip(self): ...
     async def estop(self): ...
     async def clear_sequences(self): ...
@@ -709,3 +712,29 @@ def test_history_tables_equal_length_with_missing_keys():
         assert all(v == 1 for v in lengths.values()), f"{label}: {lengths}"
     op.cleanup_session(None)
     print("test_history_tables_equal_length_with_missing_keys PASS")
+
+
+def test_clear_button_renamed_to_clear_plan():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    assert op.button_clear_expplan.label == "Clear plan"
+
+
+def test_reset_checkbox_unchecked_by_default():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    assert op.reset_run_id_on_stop.active == []
+
+
+def test_stop_callback_forwards_checkbox_state():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    vis = _FakeVisOp(Document())
+    be = _MockBackend()
+    op = BokehOperator(vis, be)
+    op.reset_run_id_on_stop.active = [0]          # check the box
+    op.callback_stop_orch(None)
+    _drain_callbacks(vis.doc)
+    assert be.stop_calls and be.stop_calls[-1] is True
