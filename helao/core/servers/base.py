@@ -1664,7 +1664,9 @@ class Active:
                                 output_str = json.dumps(sample_data)
                             except TypeError:
                                 LOGGER.error("Data is not json serializable.")
-                                output_str = "Error: data was not serializable."
+                                output_str = json.dumps(
+                                    {"error": "data was not serializable"}
+                                )
                             await self.write_live_data(
                                 output_str=output_str,
                                 file_conn_key=file_conn_key,

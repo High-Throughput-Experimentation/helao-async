@@ -90,7 +90,7 @@ class HelaoDict:
         elif isinstance(val, list):
             return [self._serialize_item(val=item) for item in val]
         elif isinstance(val, tuple):
-            return (self._serialize_item(val=item) for item in val)
+            return [self._serialize_item(val=item) for item in val]
         elif isinstance(val, set):
             return {self._serialize_item(val=item) for item in val}
         elif isinstance(val, dict):
