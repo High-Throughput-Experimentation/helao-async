@@ -382,6 +382,7 @@ class Orch(Base):
             actionmodel.action_uuid,
             {
                 "action_name": actionmodel.action_name,
+                "action_params": actionmodel.action_params,
                 "action_status": actionmodel.action_status,
                 "action_server": actionmodel.action_server.server_name,
                 "action_timestamp": f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}",
@@ -493,6 +494,7 @@ class Orch(Base):
                                     act_uuid,
                                     {
                                         "action_name": act_model.action_name,
+                                        "action_params": act_model.action_params,
                                         "action_status": act_model.action_status,
                                         "action_server": act_model.action_server.server_name,
                                         "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
@@ -677,6 +679,7 @@ class Orch(Base):
                 self.active_sequence.sequence_uuid,
                 {
                     "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_params": self.active_sequence.sequence_params,
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "active",
                     "sequence_label": self.active_sequence.sequence_label,
@@ -862,6 +865,7 @@ class Orch(Base):
             self.active_experiment.experiment_uuid,
             {
                 "experiment_name": self.active_experiment.experiment_name,
+                "experiment_params": self.active_experiment.experiment_params,
                 "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
                 "experiment_status": "active",
                 "sequence_label": self.active_sequence.sequence_label,
@@ -2085,6 +2089,7 @@ class Orch(Base):
                 self.active_sequence.sequence_uuid,
                 {
                     "sequence_name": self.active_sequence.sequence_name,
+                    "sequence_params": self.active_sequence.sequence_params,
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
                     "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": "finished",
@@ -2177,6 +2182,7 @@ class Orch(Base):
                 self.active_experiment.experiment_uuid,
                 {
                     "experiment_name": self.active_experiment.experiment_name,
+                    "experiment_params": self.active_experiment.experiment_params,
                     "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
                     "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
                     "experiment_status": "finished",
