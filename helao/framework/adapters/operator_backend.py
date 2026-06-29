@@ -157,8 +157,8 @@ class RemoteBackend(OrchBackend):
     async def start(self):
         await self._call("start")
 
-    async def stop(self):
-        await self._call("stop")
+    async def stop(self, reset_run_id: bool = False):
+        await self._call("stop", params_dict={"reset_run_id": reset_run_id})
 
     async def skip(self):
         await self._call("skip_experiment")
