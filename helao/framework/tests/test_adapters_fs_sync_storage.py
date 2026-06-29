@@ -298,3 +298,14 @@ def test_misc_files_experiment_shallow(tmp_path, store):
     _touch(d / "x-exp.yml")  # excluded
     misc = set(store.misc_files(d, "exp"))
     assert misc == {aux_top}
+
+
+def test_write_process_meta_creates_parent_dirs_and_dumps_yaml(store, tmp_path):
+    target = tmp_path / "PROCESSES" / "26.25" / "0622" / "0__uuid__tn-prc.yml"
+    assert not target.parent.exists()
+
+    store.write_process_meta(target, {"process_uuid": "uuid", "technique_name": "tn"})
+
+    assert target.exists()
+    loaded = yml_load(target.read_text(encoding="utf-8"))
+    assert loaded == {"process_uuid": "uuid", "technique_name": "tn"}

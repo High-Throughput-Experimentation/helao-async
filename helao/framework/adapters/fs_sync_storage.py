@@ -136,6 +136,16 @@ class FsSyncStorage(SyncStorage):
         """
         Path(path).write_text(str(yml_dumps(data)), encoding="utf-8")
 
+    def write_process_meta(self, path: Path, data: dict) -> None:
+        """Write a process meta YAML at ``path``, creating parent dirs first.
+
+        Mirrors legacy ``sync_process`` (sync_driver.py 1559-1561):
+        ``os.makedirs(save_dir, exist_ok=True)`` then write ``yml_dumps(model)``.
+        """
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(str(yml_dumps(data)), encoding="utf-8")
+
     def read_prg(self, path: Path) -> dict:
         """Read the ``.prg`` progress doc at ``path``; ``{}`` if missing.
 

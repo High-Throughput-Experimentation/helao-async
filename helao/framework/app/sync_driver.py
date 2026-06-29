@@ -42,6 +42,7 @@ from helao.framework.domain.sync.decide import (
 )
 from helao.framework.domain.sync.process_fold import fold_action_into_process
 from helao.framework.domain.sync.progress import Progress, should_push_process
+from helao.framework.models.process import ProcessModel
 from helao.framework.ports.cloud_sink import CloudSink
 from helao.framework.ports.sync_storage import SyncStorage
 from helao.framework.support import helao_logging as logging
@@ -607,8 +608,14 @@ class SyncDriver:
                 continue
             if pidx not in metas:
                 continue
-            model = metas[pidx]
-            uuid_key = model["process_uuid"]
+            meta = metas[pidx]
+            uuid_key = meta["process_uuid"]
+            # legacy 1548: validate/coerce through ProcessModel and strip private
+            # (``_``-prefixed) keys before persisting or uploading.
+            model = ProcessModel(**meta).clean_dict(strip_private=True)
+            # legacy 1549-1561: write the local {pidx}__{uuid}__{technique}-prc.yml
+            # under process_root before the S3 push.
+            self._write_process_yml(exp_prog, pidx, uuid_key, meta, model)
             ok = await self.cloud_sink.upload_bytes(
                 _json_bytes(model), f"process/{uuid_key}.json"
             )
@@ -621,13 +628,38 @@ class SyncDriver:
         for pidx in api_unf:
             gids = groups.get(pidx, [])
             if all(i in actions_done for i in gids) and pidx in metas:
-                ok = await self.cloud_sink.register_api(metas[pidx], "process")
+                # legacy 1572: same ProcessModel coercion before API registration.
+                model = ProcessModel(**metas[pidx]).clean_dict(strip_private=True)
+                ok = await self.cloud_sink.register_api(model, "process")
                 if ok:
                     d["process_api"].append(pidx)
                     exp_prog = Progress.from_dict(exp_prog.yml_relpath, d)
                     if exp_yml is not None:
                         self._write_progress(exp_yml, exp_prog)
         return exp_prog
+
+    def _write_process_yml(
+        self, exp_prog: Progress, pidx, uuid_key, meta: dict, model: dict
+    ) -> None:
+        """Write the local ``{pidx}__{uuid}__{technique}-prc.yml`` (legacy 1549-1561).
+
+        The file lands under ``process_root`` mirroring the experiment's relative
+        directory (``dirname(process_root / exp_relpath)``). No-op when
+        ``process_root`` is unconfigured (e.g. tests with ``helaodirs=None``),
+        matching the optionality of the legacy ``helaodirs.process_root``.
+        """
+        process_root = (
+            getattr(self.helaodirs, "process_root", None) if self.helaodirs else None
+        )
+        if not process_root:
+            return
+        technique = meta.get("technique_name")
+        save_path = (
+            Path(process_root)
+            / Path(exp_prog.yml_relpath).parent
+            / f"{pidx}__{uuid_key}__{technique}-prc.yml"
+        )
+        self.sync_storage.write_process_meta(save_path, model)
 
     def _parent_yml(self, child_yml: Path, parent_abbr: str) -> Path:
         """Resolve the parent (exp/seq) yml path for a child yml on disk.

@@ -25,6 +25,7 @@ Coverage:
 from __future__ import annotations
 
 import asyncio
+import types
 from pathlib import Path
 
 import helao.framework.app.sync_driver as sd_mod
@@ -68,6 +69,7 @@ class FakeSyncStorage:
     def __init__(self) -> None:
         self.ymls: dict[str, dict] = {}
         self.prgs: dict[str, dict] = {}
+        self.process_metas_written: dict[str, dict] = {}
         self.children: dict[str, list[str]] = {}  # parent_dir -> [child yml path]
         self.hlo: dict[str, list[str]] = {}
         self.misc: dict[str, list[str]] = {}
@@ -110,6 +112,9 @@ class FakeSyncStorage:
 
     def write_yml(self, path, data):
         self.ymls[str(path)] = dict(data)
+
+    def write_process_meta(self, path, data):
+        self.process_metas_written[str(path)] = dict(data)
 
     def read_prg(self, path):
         return dict(self.prgs.get(str(path), {}))
@@ -498,3 +503,75 @@ def test_move_to_synced_retries_past_permission_error():
     assert isinstance(result, dict)
     assert _act_yml() in storage.moved  # eventually moved
     assert slept  # the retry loop slept at least once between attempts
+
+
+# --------------------------------------------------------------------------- #
+# sync_process: ProcessModel validation + local -prc.yml write (legacy parity)
+# --------------------------------------------------------------------------- #
+
+_PROC_UUID = "00000000-0000-0000-0000-0000000000aa"
+
+
+def _exp_prog_with_pending_process():
+    """An experiment Progress carrying one completable, un-pushed process group."""
+    d = {
+        "process_groups": {0: [0]},
+        "process_metas": {
+            0: {
+                "process_uuid": _PROC_UUID,
+                "technique_name": "tn",
+                "process_group_index": 0,
+            }
+        },
+        "process_s3": [],
+        "process_api": [],
+        "process_actions_done": {0: "act"},
+        "legacy_experiment": False,
+        "legacy_finisher_idxs": [],
+    }
+    return sd_mod.Progress.from_dict("26.25/0622/seqd/expd/x-exp.yml", d)
+
+
+def test_sync_process_validates_through_processmodel_and_writes_prc_yml():
+    storage, cloud = FakeSyncStorage(), FakeCloudSink()
+    drv = _driver(
+        storage, cloud, helaodirs=types.SimpleNamespace(process_root="/PROC")
+    )
+    exp_prog = _exp_prog_with_pending_process()
+
+    result = asyncio.run(
+        drv.sync_process(exp_prog, force=True, exp_yml=None)
+    )
+
+    # both legs recorded the process as pushed
+    rd = result.to_dict()
+    assert 0 in rd["process_s3"] and 0 in rd["process_api"]
+
+    # S3 leg uploaded the process doc under the canonical key
+    assert (f"process/{_PROC_UUID}.json", False) in cloud.upload_bytes_calls
+    # API leg received a ProcessModel-validated dict (technique_name survives)
+    assert ("process", "tn") in cloud.register_calls
+
+    # local -prc.yml written once, under process_root mirroring the exp dir,
+    # with the legacy {pidx}__{uuid}__{technique}-prc.yml filename
+    assert len(storage.process_metas_written) == 1
+    path, model = next(iter(storage.process_metas_written.items()))
+    assert path == f"/PROC/26.25/0622/seqd/expd/0__{_PROC_UUID}__tn-prc.yml"
+    # content went through ProcessModel: technique_name kept + model defaults added
+    assert model["technique_name"] == "tn"
+    assert model["process_uuid"] == _PROC_UUID
+    assert "hlo_version" in model  # ProcessModel default, absent from the raw meta
+
+
+def test_sync_process_skips_local_write_when_process_root_unset():
+    """With helaodirs=None the upload still happens but no -prc.yml is written."""
+    storage, cloud = FakeSyncStorage(), FakeCloudSink()
+    drv = _driver(storage, cloud)  # helaodirs defaults to None
+    exp_prog = _exp_prog_with_pending_process()
+
+    asyncio.run(
+        drv.sync_process(exp_prog, force=True, exp_yml=None)
+    )
+
+    assert (f"process/{_PROC_UUID}.json", False) in cloud.upload_bytes_calls
+    assert storage.process_metas_written == {}

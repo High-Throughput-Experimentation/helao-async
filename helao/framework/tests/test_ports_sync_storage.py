@@ -35,6 +35,9 @@ class DummySyncStorage:
     def write_yml(self, path: Path, data: dict) -> None:
         return None
 
+    def write_process_meta(self, path: Path, data: dict) -> None:
+        return None
+
     def read_prg(self, path: Path) -> dict:
         return {}
 

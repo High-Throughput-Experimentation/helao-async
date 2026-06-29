@@ -63,6 +63,15 @@ class SyncStorage(Protocol):
         """Write ``data`` as YAML at ``path``."""
         ...
 
+    def write_process_meta(self, path: Path, data: dict) -> None:
+        """Write a process meta YAML at an absolute ``path``, creating parent dirs.
+
+        Unlike :meth:`write_yml` (which writes into existing run-tree dirs), this
+        targets the PROCESSES root outside the RUNS trees, where the parent
+        directory may not yet exist.
+        """
+        ...
+
     def read_prg(self, path: Path) -> dict:
         """Read and return the ``.prg`` progress doc at ``path`` (``{}`` if missing)."""
         ...
