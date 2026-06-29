@@ -87,6 +87,16 @@ def test_experiment_model_defaults():
     assert em.hlo_version is not None
 
 
+def test_experiment_model_has_experiment_order_default():
+    em = ExperimentModel()
+    assert em.experiment_order == 0
+
+
+def test_experiment_order_round_trips():
+    em = ExperimentModel(experiment_name="exp", experiment_order=3)
+    assert ExperimentModel(**em.model_dump()).experiment_order == 3
+
+
 def test_experiment_model_round_trip():
     em = ExperimentModel(
         experiment_uuid=uuid4(),

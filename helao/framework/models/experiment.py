@@ -78,6 +78,7 @@ class ExperimentModel(ShortExperimentModel):
         experiment_codepath (Optional[str]): Source file path of the experiment.
         experiment_funcname (Optional[str]): Implementing function name.
         experiment_label (Optional[str]): Free-form label.
+        experiment_order (Optional[int]): Index of the experiment within its sequence (analog of action_order).
         experiment_finished_timestamp (Optional[datetime]): When the experiment finished.
         planned_actions (list): Planned action records prior to dispatch.
         dispatched_actions_abbr (List[ShortActionModel]): Short records of dispatched actions.
@@ -113,6 +114,7 @@ class ExperimentModel(ShortExperimentModel):
     experiment_codepath: Optional[str] = None
     experiment_funcname: Optional[str] = None
     experiment_label: Optional[str] = None
+    experiment_order: Optional[int] = 0
     experiment_finished_timestamp: Optional[datetime] = None
     planned_actions: list = Field(default_factory=list)
     dispatched_actions_abbr: List[ShortActionModel] = Field(default_factory=list)
