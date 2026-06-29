@@ -1,6 +1,6 @@
 """Mixin providing HELAO-aware dict and serialization helpers for pydantic models."""
 
-__all__ = ["HelaoDict"]
+__all__ = ["HelaoDict", "cleanup_dict", "cleanup_list"]
 
 from datetime import datetime, date
 from uuid import UUID
@@ -112,45 +112,61 @@ class HelaoDict:
 
     def clean_dict(self, strip_private: bool = False) -> dict:
         """Return `as_dict()` pruned of empty values, optionally dropping ``_``-prefixed keys."""
-        return self._cleanupdict(self.as_dict(), strip_private)
+        return cleanup_dict(self.as_dict(), strip_private)
 
     def _cleanupdict(self, d: dict, strip_private: bool = False) -> dict:
-        """Recursively drop `None`, empty strings/lists, and empty nested dicts from `d`."""
-        clean = {}
-        for k, v in d.items():
-            if str(k).startswith("_") and strip_private:
-                continue
-            if isinstance(v, types.GeneratorType):
-                print(f"!!! error on attribute {k}, value is a generator")
-            elif isinstance(v, dict):
-                nested = self._cleanupdict(v)
-                if len(nested.keys()) > 0:
-                    clean[k] = nested
-            elif v is not None:
-                if isinstance(v, Enum):
-                    clean[k] = v.name
-                elif isinstance(v, UUID):
-                    clean[k] = str(v)
-                elif isinstance(v, list):
-                    if len(v) != 0:
-                        clean[k] = self._cleanuplist(v)
-                elif isinstance(v, str):
-                    if len(v) != 0:
-                        clean[k] = v
-                elif math.isnan(v):
-                    clean[k] = None
-                else:
-                    clean[k] = v
-        return clean
+        """Backward-compatible instance wrapper around module-level `cleanup_dict`."""
+        return cleanup_dict(d, strip_private)
 
     def _cleanuplist(self, input_list) -> list:
-        """Recursively clean a list by passing dicts through `_cleanupdict` and stringifying UUIDs."""
-        clean_list = []
-        for list_item in input_list:
-            if isinstance(list_item, dict):
-                clean_list.append(self._cleanupdict(list_item))
-            elif isinstance(list_item, UUID):
-                clean_list.append(str(list_item))
+        """Backward-compatible instance wrapper around module-level `cleanup_list`."""
+        return cleanup_list(input_list)
+
+
+def cleanup_dict(d: dict, strip_private: bool = False) -> dict:
+    """Recursively drop `None`, empty strings/lists, and empty nested dicts from `d`.
+
+    Module-level so non-`HelaoDict` callers (e.g. ``lifecycle.meta_doc`` pruning an
+    already-serialized payload before it is written to a ``-act/-exp/-seq.yml``) get
+    identical semantics to ``HelaoDict.clean_dict`` — matching legacy
+    ``Base.write_act/exp/seq`` which serialized via ``clean_dict``.
+    """
+    clean = {}
+    for k, v in d.items():
+        if str(k).startswith("_") and strip_private:
+            continue
+        if isinstance(v, types.GeneratorType):
+            print(f"!!! error on attribute {k}, value is a generator")
+        elif isinstance(v, dict):
+            nested = cleanup_dict(v)
+            if len(nested.keys()) > 0:
+                clean[k] = nested
+        elif v is not None:
+            if isinstance(v, Enum):
+                clean[k] = v.name
+            elif isinstance(v, UUID):
+                clean[k] = str(v)
+            elif isinstance(v, list):
+                if len(v) != 0:
+                    clean[k] = cleanup_list(v)
+            elif isinstance(v, str):
+                if len(v) != 0:
+                    clean[k] = v
+            elif isinstance(v, float) and math.isnan(v):
+                clean[k] = None
             else:
-                clean_list.append(list_item)
-        return clean_list
+                clean[k] = v
+    return clean
+
+
+def cleanup_list(input_list) -> list:
+    """Recursively clean a list by passing dicts through `cleanup_dict` and stringifying UUIDs."""
+    clean_list = []
+    for list_item in input_list:
+        if isinstance(list_item, dict):
+            clean_list.append(cleanup_dict(list_item))
+        elif isinstance(list_item, UUID):
+            clean_list.append(str(list_item))
+        else:
+            clean_list.append(list_item)
+    return clean_list

@@ -19,6 +19,7 @@ from helao.framework.domain.lifecycle import (
     experiment_output_dir,
     sequence_output_dir,
     split_action,
+    meta_doc,
 )
 
 FIXED_NOW = datetime(2026, 6, 22, 14, 5, 6)
@@ -263,3 +264,51 @@ def test_split_action_no_prior_file_conns():
     assert result.open_file_conns == []
     assert result.close_file_conns == []
     assert result.new_action.file_conn_keys == []
+
+
+# --- meta_doc: strip null/empty attrs from exported yml (legacy clean_dict parity) ---
+
+
+def test_meta_doc_strips_null_and_empty_attributes():
+    """Exported -act/-exp/-seq.yml must carry no None / empty-list / empty-dict
+    / empty-string attributes (matches legacy Base.write_act/exp/seq clean_dict)."""
+    body = {
+        "action_name": "dummy_act",
+        "action_params": {"x": 1},
+        "none_attr": None,
+        "empty_list": [],
+        "empty_dict": {},
+        "empty_str": "",
+        "nested": {"keep": 1, "drop": None, "also_drop": []},
+        "all_empty_nested": {"a": None, "b": {}},
+    }
+    doc = meta_doc("action", body)
+
+    # file_type stays first and present
+    assert doc["file_type"] == "action"
+    # non-empty values survive
+    assert doc["action_name"] == "dummy_act"
+    assert doc["action_params"] == {"x": 1}
+    assert doc["nested"] == {"keep": 1}
+    # null / empty values are dropped entirely (keys absent)
+    for absent in (
+        "none_attr",
+        "empty_list",
+        "empty_dict",
+        "empty_str",
+        "all_empty_nested",
+    ):
+        assert absent not in doc, f"{absent} should have been stripped"
+
+
+def test_meta_doc_preserves_nonempty_collections():
+    """Lists/dicts with content are kept; dicts inside a kept list are cleaned."""
+    body = {
+        "files": [{"name": "a.hlo", "note": None}, {"name": "b.hlo"}],
+        "tags": ["x"],
+    }
+    doc = meta_doc("experiment", body)
+    assert doc["file_type"] == "experiment"
+    assert doc["tags"] == ["x"]
+    # the None inside the list's dict is pruned, but both list items remain
+    assert doc["files"] == [{"name": "a.hlo"}, {"name": "b.hlo"}]

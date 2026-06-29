@@ -40,6 +40,7 @@ from typing import Optional
 from uuid import UUID
 
 from helao.framework.models.hlostatus import HloStatus
+from helao.framework.models.helao_dict import cleanup_dict
 from helao.framework.domain.run_models import RunAction
 from helao.framework.domain.commands import ActionInit, SplitResult
 
@@ -347,10 +348,13 @@ def hlo_relpath(action: RunAction, leaf: str) -> str:
 def meta_doc(kind: str, body_dict: dict) -> dict:
     """Wrap a body dict with a leading ``file_type`` key (legacy parity).
 
-    Returns ``{"file_type": kind, **body_dict}`` so the first YAML key is
-    always ``file_type``, matching ``helao.core.servers.base.write_act/exp/seq``.
+    Returns ``{"file_type": kind, **cleanup_dict(body_dict)}`` so the first YAML
+    key is always ``file_type``, matching ``helao.core.servers.base.write_act/exp/seq``
+    — which also serialized via ``clean_dict``. ``cleanup_dict`` recursively drops
+    attributes whose value is ``None``, an empty string, an empty list, or an empty
+    dict, so exported ``-act/-exp/-seq.yml`` files carry no null/empty entries.
     """
-    return {"file_type": kind, **body_dict}
+    return {"file_type": kind, **cleanup_dict(body_dict)}
 
 
 def _derive_conn_key(base: UUID, index: int) -> UUID:
