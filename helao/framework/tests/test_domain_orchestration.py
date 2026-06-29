@@ -210,6 +210,28 @@ def test_intend_stop_unconditional():
     assert st.loop_intent == LoopIntent.stop
 
 
+def test_stop_default_keeps_run_id():
+    st = _state()
+    st.active_run_id = uuid4()
+    rid = st.active_run_id
+    st, _ = orch.apply_intent(st, "stop")
+    assert st.active_run_id == rid
+
+
+def test_stop_with_reset_clears_run_id():
+    st = _state()
+    st.active_run_id = uuid4()
+    st, _ = orch.apply_intent(st, "stop", reset_run_id=True)
+    assert st.active_run_id is None
+
+
+def test_intend_stop_with_reset_clears_run_id():
+    st = _state()
+    st.active_run_id = uuid4()
+    st, _ = orch.apply_intent(st, "intend_stop", reset_run_id=True)
+    assert st.active_run_id is None
+
+
 def test_skip_while_started_sets_intent():
     st = _state()
     st.loop_state = LoopStatus.started

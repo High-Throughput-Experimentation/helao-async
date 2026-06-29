@@ -634,7 +634,7 @@ def decide_next(state: OrchState) -> OrchDecision:
 
 
 def apply_intent(
-    state: OrchState, intent: str, *, reason: str = ""
+    state: OrchState, intent: str, *, reason: str = "", reset_run_id: bool = False
 ) -> Tuple[OrchState, List[Command]]:
     """Apply a control intent to the loop FSM. Ports the ``Orch`` intent methods.
 
@@ -644,7 +644,8 @@ def apply_intent(
       active sequence) move ``loop_state`` to ``started`` and clear the stop
       message; refuse (no-op) under ``estopped``.
     * ``"stop"`` -> ``stop`` / ``intend_stop``: set ``LoopIntent.stop`` while
-      started; no-op under estop/stopped.
+      started; no-op under estop/stopped. When ``reset_run_id=True``, additionally
+      drops ``active_run_id`` so the next sequence begins a new run grouping (default False).
     * ``"skip"`` -> ``skip`` / ``intend_skip``: set ``LoopIntent.skip`` while
       started; if not started, clear ``action_dq``.
     * ``"estop"`` -> ``estop_loop``: set ``loop_state=estopped``, drop
@@ -685,6 +686,8 @@ def apply_intent(
     elif intent in ("stop", "intend_stop"):
         if intent == "intend_stop" or gsm.loop_state == LoopStatus.started:
             gsm.loop_intent = LoopIntent.stop
+        if reset_run_id:
+            state.active_run_id = None
         cmds.append(_broadcast(state))
 
     elif intent in ("skip", "intend_skip"):
