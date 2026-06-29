@@ -581,6 +581,35 @@ def test_dispatch_experiment_retains_prior_as_last():
     assert st.last_experiment is prior
 
 
+def test_dispatch_experiment_stamps_experiment_order():
+    exp = RunExperiment(experiment_name="e0")
+    seq = RunSequence(sequence_uuid=uuid4())
+    st = _state(experiment_dq=[exp], active_sequence=seq)
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert exp.experiment_order == 0
+    assert st.active_seq_exp_counter == 1
+
+
+def test_dispatch_experiment_order_increments_then_resets_per_sequence():
+    seq_a = RunSequence(sequence_uuid=uuid4())
+    e0 = RunExperiment(experiment_name="e0")
+    e1 = RunExperiment(experiment_name="e1")
+    st = _state(experiment_dq=[e0, e1], active_sequence=seq_a)
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert e0.experiment_order == 0
+    assert e1.experiment_order == 1
+
+    # a new sequence resets the per-sequence counter -> order restarts at 0
+    seq_b = RunSequence(sequence_uuid=uuid4())
+    st.sequence_dq = [seq_b]
+    st, _ = orch.dispatch_sequence(st, now=NOW, uuid=SEED)
+    e2 = RunExperiment(experiment_name="e2")
+    st.experiment_dq = [e2]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert e2.experiment_order == 0
+
+
 # --------------------------------------------------------------------------- #
 # Task 5a — dispatch-time output-dir stamping (nested, deterministic)
 # --------------------------------------------------------------------------- #

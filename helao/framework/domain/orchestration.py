@@ -1236,6 +1236,9 @@ def dispatch_experiment(
 
     if state.active_sequence is not None:
         exp.sequence_uuid = state.active_sequence.sequence_uuid
+    # experiment_order = 0-indexed position within the sequence (analog of
+    # action_order); the counter resets per sequence in dispatch_sequence.
+    exp.experiment_order = state.active_seq_exp_counter
     state.active_seq_exp_counter += 1
 
     # stamp the nested experiment output dir = ``<seq_dir>/<exp_ts>__<exp_name>``
