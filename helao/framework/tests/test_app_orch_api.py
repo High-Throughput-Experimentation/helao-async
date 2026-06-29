@@ -952,3 +952,24 @@ def test_as_run_experiment_stamps_uuid_for_queued_display():
     from helao.framework.app.orch_api import _as_run_experiment
     exp = _as_run_experiment(ExperimentModel(experiment_name="te"))
     assert exp.experiment_uuid is not None
+
+
+# ---------------------------------------------------------------------------
+# Task 4: stop endpoint forwards reset_run_id
+# ---------------------------------------------------------------------------
+
+def test_driver_stop_default_keeps_run_id():
+    import uuid as _uuid
+    driver = _make_driver()
+    driver.state.active_run_id = _uuid.uuid4()
+    rid = driver.state.active_run_id
+    asyncio.run(driver.stop())
+    assert driver.state.active_run_id == rid
+
+
+def test_driver_stop_reset_clears_run_id():
+    import uuid as _uuid
+    driver = _make_driver()
+    driver.state.active_run_id = _uuid.uuid4()
+    asyncio.run(driver.stop(reset_run_id=True))
+    assert driver.state.active_run_id is None

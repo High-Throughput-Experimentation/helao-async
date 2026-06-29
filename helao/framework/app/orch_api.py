@@ -566,8 +566,8 @@ class OrchDriver:
 
     # --- control surface ----------------------------------------------------
 
-    async def _intent(self, intent: str, *, reason: str = "") -> None:
-        _st, cmds = orch.apply_intent(self.state, intent, reason=reason)
+    async def _intent(self, intent: str, *, reason: str = "", reset_run_id: bool = False) -> None:
+        _st, cmds = orch.apply_intent(self.state, intent, reason=reason, reset_run_id=reset_run_id)
         await self._execute(cmds)
 
     async def start(self) -> None:
@@ -648,9 +648,9 @@ class OrchDriver:
                 pass
         self._loop_task = None
 
-    async def stop(self) -> None:
-        """Request a graceful stop of the dispatch loop."""
-        await self._intent("stop")
+    async def stop(self, reset_run_id: bool = False) -> None:
+        """Request a graceful stop of the dispatch loop. ``reset_run_id`` also drops active_run_id."""
+        await self._intent("stop", reset_run_id=reset_run_id)
 
     async def skip(self) -> None:
         """Skip the remaining actions of the current experiment."""
@@ -1441,8 +1441,8 @@ def makeOrchApp(
         return {"loop_state": driver.state.loop_state.value}
 
     @app.post(f"/{server_key}/stop")
-    async def stop() -> dict:
-        await driver.stop()
+    async def stop(reset_run_id: bool = False) -> dict:
+        await driver.stop(reset_run_id=reset_run_id)
         return {"loop_intent": driver.state.loop_intent.value}
 
     @app.post(f"/{server_key}/skip")
@@ -1636,8 +1636,8 @@ def makeOrchApp(
         return {"loop_state": driver.state.loop_state.value}
 
     @app.post("/stop")
-    async def stop_root() -> dict:
-        await driver.stop()
+    async def stop_root(reset_run_id: bool = False) -> dict:
+        await driver.stop(reset_run_id=reset_run_id)
         return {"loop_intent": driver.state.loop_intent.value}
 
     @app.post("/skip_experiment")
