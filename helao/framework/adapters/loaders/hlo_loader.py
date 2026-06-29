@@ -95,7 +95,13 @@ def read_hlo_stream(
 
     for line in stream:
         if header_end:
-            line_dict = orjson.loads(line)
+            if not line.strip():
+                continue
+            try:
+                line_dict = orjson.loads(line)
+            except orjson.JSONDecodeError:
+                print(f"skipping unparseable hlo data line: {line[:80]!r}")
+                continue
             for k in line_dict:
                 if k in keep_keys or k not in omit_keys:
                     v = line_dict[k]

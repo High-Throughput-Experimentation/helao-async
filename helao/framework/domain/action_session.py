@@ -267,7 +267,12 @@ class ActionSession:
                 self.action,
                 data_keys=list(row.keys()) if isinstance(row, dict) else None,
             )
-            await self.storage.append_hlo(handle, json.dumps(row))
+            try:
+                output_str = json.dumps(row)
+            except TypeError:
+                LOGGER.error("data was not serializable, writing error placeholder")
+                output_str = json.dumps({"error": "data was not serializable"})
+            await self.storage.append_hlo(handle, output_str)
 
     async def enqueue_data_dflt(self, datadict: dict) -> None:
         """Enqueue datadict against the default file-conn key as an active DataModel.

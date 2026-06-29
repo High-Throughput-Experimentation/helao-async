@@ -80,6 +80,27 @@ def test_read_hlo_from_bytes(tmp_path):
     assert data_b == data_p
 
 
+def test_read_hlo_skips_blank_and_unparseable_lines(tmp_path):
+    # Regression (upstream 7013aaa6): a blank line or a non-JSON garbage line in
+    # the body must be skipped rather than aborting the whole file.
+    from helao.framework.support.yml_tools import yml_dumps
+
+    hlo_path = tmp_path / "dirty.hlo"
+    lines = [yml_dumps(HEADER).rstrip("\n"), "%%"]
+    lines.append(json.dumps({"t_s": 0.0, "Ewe_V": [0.1, 0.2]}))
+    lines.append("")  # blank line
+    lines.append("this is not json {{{")  # unparseable garbage
+    lines.append(json.dumps({"t_s": 1.0, "Ewe_V": [0.3, 0.4]}))
+    hlo_path.write_text("\n".join(lines) + "\n")
+
+    meta, data = read_hlo(str(hlo_path))
+
+    # Header still parses, and only the two good rows are returned.
+    assert meta["file_type"] == "helao__file"
+    assert data["t_s"] == [0.0, 1.0]
+    assert data["Ewe_V"] == [0.1, 0.2, 0.3, 0.4]
+
+
 def test_hlo_to_parquet_roundtrip(tmp_path):
     # Use a scalar-only body so each line maps to exactly one DataFrame row,
     # matching the column-aligned schema hlo_to_parquet produces.

@@ -782,6 +782,7 @@ def _register_server_actions(
                 act_uuid,
                 {
                     "action_name": act_model.action_name,
+                    "action_params": act_model.action_params,
                     "action_status": act_model.action_status,
                     "action_server": act_model.action_server.server_name,
                     "action_timestamp": _fmt_ts(
@@ -836,6 +837,7 @@ def complete_experiment(state: OrchState, now: Any) -> OrchState:
         exp.experiment_uuid,
         {
             "experiment_name": exp.experiment_name,
+            "experiment_params": exp.experiment_params,
             "experiment_timestamp": _fmt_ts(exp.experiment_timestamp),
             "experiment_finished_timestamp": _fmt_ts(exp.experiment_finished_timestamp),
             "experiment_status": "finished",
@@ -868,6 +870,7 @@ def complete_sequence(state: OrchState, now: Any) -> OrchState:
         seq.sequence_uuid,
         {
             "sequence_name": seq.sequence_name,
+            "sequence_params": seq.sequence_params,
             "sequence_timestamp": _fmt_ts(seq.sequence_timestamp),
             "sequence_finished_timestamp": _fmt_ts(seq.sequence_finished_timestamp),
             "sequence_status": "finished",
@@ -964,6 +967,7 @@ def on_nonblocking(
         actionmodel.action_uuid,
         {
             "action_name": actionmodel.action_name,
+            "action_params": actionmodel.action_params,
             "action_status": actionmodel.action_status,
             "action_server": actionmodel.action_server.server_name,
             "experiment_uuid": actionmodel.experiment_uuid,
@@ -1128,6 +1132,7 @@ def dispatch_sequence(
         seq.sequence_uuid,
         {
             "sequence_name": seq.sequence_name,
+            "sequence_params": seq.sequence_params,
             "sequence_status": "active",
             "sequence_label": seq.sequence_label,
         },
@@ -1215,6 +1220,7 @@ def dispatch_experiment(
             syn_seq.sequence_uuid,
             {
                 "sequence_name": syn_seq.sequence_name,
+                "sequence_params": syn_seq.sequence_params,
                 "sequence_status": "active",
                 "sequence_label": syn_seq.sequence_label,
             },
@@ -1260,6 +1266,7 @@ def dispatch_experiment(
         exp.experiment_uuid,
         {
             "experiment_name": exp.experiment_name,
+            "experiment_params": exp.experiment_params,
             "experiment_status": "active",
         },
         "experiment",

@@ -477,7 +477,7 @@ class LocalLoader:
             ):
                 if seq_dir and seq_dir in fn:
                     rel_seqzip_path = fn.split(seq_dir, 1)[-1].lstrip("/")
-                    rel_seqzip_path = f"{seq_dir}/{rel_seqzip_path}".rstrip("/")
+                    rel_seqzip_path = f"{rel_seqzip_path}".rstrip("/")
                     break
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()

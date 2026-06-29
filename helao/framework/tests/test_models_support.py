@@ -1,4 +1,5 @@
 """Tests for the ported support dependencies: ErrorCodes, HelaoDict, version."""
+import json
 import math
 from datetime import date, datetime
 from enum import Enum
@@ -174,11 +175,26 @@ def test_serialize_item_tuple_set_and_numpy_branches():
         pass
 
     c = _C()
-    # tuple -> generator (consumed), set -> set, numpy scalars
-    assert list(c._serialize_item(val=(1, 2))) == [1, 2]
+    # tuple -> list, set -> set, numpy scalars
+    assert c._serialize_item(val=(1, 2)) == [1, 2]
     assert c._serialize_item(val={1, 2}) == {1, 2}
     assert c._serialize_item(val=np.int64(9)) == 9
     assert c._serialize_item(val=np.float64(0.5)) == 0.5
+
+
+def test_serialize_item_tuple_is_json_serializable_list():
+    # Regression (upstream 7013aaa6): a tuple attribute must serialize to a
+    # plain list, not a generator. A generator embedded in the dict is not
+    # json-serializable and corrupts .hlo output.
+    class _TupleHolder(BaseModel, HelaoDict):
+        model_config = ConfigDict(arbitrary_types_allowed=True)
+        pair: tuple = (1, "two")
+
+    d = _TupleHolder().as_dict()
+    assert isinstance(d["pair"], list)
+    assert d["pair"] == [1, "two"]
+    # The whole as_dict() must be json-serializable.
+    assert json.loads(json.dumps(d))["pair"] == [1, "two"]
 
 
 def test_serialize_item_basemodel_without_as_dict():
