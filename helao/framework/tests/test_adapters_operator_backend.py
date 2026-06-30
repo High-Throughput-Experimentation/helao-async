@@ -152,3 +152,30 @@ def test_stop_forwards_reset_run_id_flag():
     assert calls[0] == ("stop", {"reset_run_id": False})
     assert calls[1] == ("stop", {"reset_run_id": True})
     print("test_stop_forwards_reset_run_id_flag PASS")
+
+
+def test_experiment_and_action_queue_calls():
+    from helao.framework.adapters.operator_backend import RemoteBackend
+    from helao.framework.models.errors import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict))
+        return {}, ErrorCodes.none
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+
+    asyncio.run(be.move_experiment(2, 0))
+    asyncio.run(be.remove_experiment(1))
+    asyncio.run(be.move_action(0, 3))
+    asyncio.run(be.remove_action(2))
+    assert calls[0] == ("move_experiment", {"from_idx": 2, "to_idx": 0})
+    assert calls[1] == ("remove_experiment", {"idx": 1})
+    assert calls[2] == ("move_action", {"from_idx": 0, "to_idx": 3})
+    assert calls[3] == ("remove_action", {"idx": 2})
+    print("test_experiment_and_action_queue_calls PASS")

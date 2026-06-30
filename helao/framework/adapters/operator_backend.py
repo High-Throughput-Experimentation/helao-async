@@ -154,6 +154,22 @@ class RemoteBackend(OrchBackend):
     async def remove_sequence(self, idx):
         await self._call("remove_sequence", params_dict={"idx": idx})
 
+    async def move_experiment(self, from_idx, to_idx):
+        await self._call(
+            "move_experiment", params_dict={"from_idx": from_idx, "to_idx": to_idx}
+        )
+
+    async def remove_experiment(self, idx):
+        await self._call("remove_experiment", params_dict={"idx": idx})
+
+    async def move_action(self, from_idx, to_idx):
+        await self._call(
+            "move_action", params_dict={"from_idx": from_idx, "to_idx": to_idx}
+        )
+
+    async def remove_action(self, idx):
+        await self._call("remove_action", params_dict={"idx": idx})
+
     async def start(self):
         await self._call("start")
 
