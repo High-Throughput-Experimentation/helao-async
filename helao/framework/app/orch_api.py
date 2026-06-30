@@ -1558,6 +1558,26 @@ def makeOrchApp(
         orch.remove_sequence(driver.state, idx)
         return {"n_sequences": len(driver.state.sequence_dq)}
 
+    @app.post("/move_experiment")
+    async def move_experiment(from_idx: int, to_idx: int) -> dict:
+        orch.move_experiment(driver.state, from_idx, to_idx)
+        return {"n_experiments": len(driver.state.experiment_dq)}
+
+    @app.post("/remove_experiment")
+    async def remove_experiment(idx: int) -> dict:
+        orch.remove_experiment(driver.state, idx)
+        return {"n_experiments": len(driver.state.experiment_dq)}
+
+    @app.post("/move_action")
+    async def move_action(from_idx: int, to_idx: int) -> dict:
+        orch.move_action(driver.state, from_idx, to_idx)
+        return {"n_actions": len(driver.state.action_dq)}
+
+    @app.post("/remove_action")
+    async def remove_action(idx: int) -> dict:
+        orch.remove_action(driver.state, idx)
+        return {"n_actions": len(driver.state.action_dq)}
+
     @app.post("/append_split_sequences")
     async def add_split_sequences(sequence: dict = Body(..., embed=True)) -> list:
         # split-by-seq-param config is not present in OrchPorts; fall back to a

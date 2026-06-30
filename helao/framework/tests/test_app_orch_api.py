@@ -54,6 +54,7 @@ from helao.framework.domain.commands import (
     StopExecutor,
 )
 from helao.framework.domain.orchestration import OrchState
+from helao.framework.domain import orchestration as orch
 from helao.framework.domain.run_models import RunAction, RunExperiment, RunSequence
 from helao.framework.models.action_start_condition import ActionStartCondition
 from helao.framework.models.errors import ErrorCodes
@@ -973,3 +974,27 @@ def test_driver_stop_reset_clears_run_id():
     driver.state.active_run_id = _uuid.uuid4()
     asyncio.run(driver.stop(reset_run_id=True))
     assert driver.state.active_run_id is None
+
+
+# ---------------------------------------------------------------------------
+# Task 2: move/remove experiment and action endpoints
+# ---------------------------------------------------------------------------
+
+def test_driver_move_and_remove_experiment_via_domain():
+    from helao.framework.domain.run_models import RunExperiment as _RE
+    driver = _make_driver()
+    driver.state.experiment_dq = [_RE(experiment_name="e0"), _RE(experiment_name="e1")]
+    orch.move_experiment(driver.state, 1, 0)
+    assert [e.experiment_name for e in driver.state.experiment_dq] == ["e1", "e0"]
+    orch.remove_experiment(driver.state, 0)
+    assert [e.experiment_name for e in driver.state.experiment_dq] == ["e0"]
+
+
+def test_driver_move_and_remove_action_via_domain():
+    from helao.framework.domain.run_models import RunAction as _RA
+    driver = _make_driver()
+    driver.state.action_dq = [_RA(action_name="a0"), _RA(action_name="a1")]
+    orch.move_action(driver.state, 0, 1)
+    assert [a.action_name for a in driver.state.action_dq] == ["a1", "a0"]
+    orch.remove_action(driver.state, 0)
+    assert [a.action_name for a in driver.state.action_dq] == ["a0"]
