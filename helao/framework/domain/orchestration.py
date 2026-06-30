@@ -88,6 +88,11 @@ __all__ = [
     # mutation ops (Task 3)
     "move_sequence",
     "remove_sequence",
+    # mutation ops (Task 1: experiment + action deque mutators)
+    "move_experiment",
+    "remove_experiment",
+    "move_action",
+    "remove_action",
     "prepend_sequences",
     "append_sequence",
     "insert_sequence",
@@ -514,6 +519,40 @@ def remove_sequence(state: OrchState, idx: int) -> OrchState:
     """Drop the queued sequence at idx; out-of-range no-op. Ports Orch.remove_sequence."""
     if 0 <= idx < len(state.sequence_dq):
         del state.sequence_dq[idx]
+    return state
+
+
+def move_experiment(state: OrchState, from_idx: int, to_idx: int) -> OrchState:
+    """Move the queued experiment at from_idx to to_idx; out-of-range is a no-op. Mirrors move_sequence."""
+    dq = state.experiment_dq
+    n = len(dq)
+    if 0 <= from_idx < n and 0 <= to_idx < n:
+        exp = dq.pop(from_idx)
+        dq.insert(to_idx, exp)
+    return state
+
+
+def remove_experiment(state: OrchState, idx: int) -> OrchState:
+    """Drop the queued experiment at idx; out-of-range no-op. Mirrors remove_sequence."""
+    if 0 <= idx < len(state.experiment_dq):
+        del state.experiment_dq[idx]
+    return state
+
+
+def move_action(state: OrchState, from_idx: int, to_idx: int) -> OrchState:
+    """Move the queued action at from_idx to to_idx; out-of-range is a no-op. Mirrors move_sequence."""
+    dq = state.action_dq
+    n = len(dq)
+    if 0 <= from_idx < n and 0 <= to_idx < n:
+        act = dq.pop(from_idx)
+        dq.insert(to_idx, act)
+    return state
+
+
+def remove_action(state: OrchState, idx: int) -> OrchState:
+    """Drop the queued action at idx; out-of-range no-op. Mirrors remove_sequence."""
+    if 0 <= idx < len(state.action_dq):
+        del state.action_dq[idx]
     return state
 
 

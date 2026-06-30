@@ -1172,3 +1172,42 @@ def test_complete_experiment_noop_without_active():
     st = _state(active_experiment=None)
     orch.complete_experiment(st, NOW)  # must not raise
     assert st.experiment_history == {}
+
+
+# --------------------------------------------------------------------------- #
+# Task 1: domain queue mutators (move_experiment, remove_experiment, move_action, remove_action)
+# --------------------------------------------------------------------------- #
+def test_move_experiment_reorders_queue():
+    e0, e1, e2 = RunExperiment(experiment_name="e0"), RunExperiment(experiment_name="e1"), RunExperiment(experiment_name="e2")
+    st = _state(experiment_dq=[e0, e1, e2])
+    orch.move_experiment(st, 2, 0)
+    assert [e.experiment_name for e in st.experiment_dq] == ["e2", "e0", "e1"]
+    orch.move_experiment(st, 5, 0)  # out of range -> no-op
+    assert [e.experiment_name for e in st.experiment_dq] == ["e2", "e0", "e1"]
+
+
+def test_remove_experiment_drops_item():
+    e0, e1 = RunExperiment(experiment_name="e0"), RunExperiment(experiment_name="e1")
+    st = _state(experiment_dq=[e0, e1])
+    orch.remove_experiment(st, 0)
+    assert [e.experiment_name for e in st.experiment_dq] == ["e1"]
+    orch.remove_experiment(st, 9)  # out of range -> no-op
+    assert [e.experiment_name for e in st.experiment_dq] == ["e1"]
+
+
+def test_move_action_reorders_queue():
+    a0, a1, a2 = _action(action_name="a0"), _action(action_name="a1"), _action(action_name="a2")
+    st = _state(action_dq=[a0, a1, a2])
+    orch.move_action(st, 0, 2)
+    assert [a.action_name for a in st.action_dq] == ["a1", "a2", "a0"]
+    orch.move_action(st, 0, 7)  # out of range -> no-op
+    assert [a.action_name for a in st.action_dq] == ["a1", "a2", "a0"]
+
+
+def test_remove_action_drops_item():
+    a0, a1 = _action(action_name="a0"), _action(action_name="a1")
+    st = _state(action_dq=[a0, a1])
+    orch.remove_action(st, 1)
+    assert [a.action_name for a in st.action_dq] == ["a0"]
+    orch.remove_action(st, -3)  # out of range -> no-op (negative)
+    assert [a.action_name for a in st.action_dq] == ["a0"]
