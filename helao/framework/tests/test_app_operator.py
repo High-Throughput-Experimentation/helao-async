@@ -738,3 +738,27 @@ def test_stop_callback_forwards_checkbox_state():
     op.callback_stop_orch(None)
     _drain_callbacks(vis.doc)
     assert be.stop_calls and be.stop_calls[-1] is True
+
+
+def test_manual_wrap_sets_manual_action():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequence_dropdown.value = "seq0"
+    op.populate_sequence(prepend=False)
+    assert len(op.plan) == 1
+    op.update_selector_layout("active", 0, 1)  # build the experiment panel + dropdown
+    op.append_experiment()
+    assert op.plan[-1].manual_action is True
+    op.prepend_experiment()
+    assert op.plan[0].manual_action is True
+    op.cleanup_session(None)
+
+
+def test_history_tab_order():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    titles = [t.title for t in op.planhistory_tabs.tabs]
+    assert titles == ["Plan", "Sequence History", "Experiment History", "Action History"]
+    op.cleanup_session(None)

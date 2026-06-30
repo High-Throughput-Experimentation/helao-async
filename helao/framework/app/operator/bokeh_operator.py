@@ -386,9 +386,9 @@ class BokehOperator:
         self.planhistory_tabs = Tabs(
             tabs=[
                 self.planner_tab,
-                self.action_history_tab,
-                self.experiment_history_tab,
                 self.sequence_history_tab,
+                self.experiment_history_tab,
+                self.action_history_tab,
             ],
             height_policy="min",
             sizing_mode="stretch_width",
@@ -1862,7 +1862,9 @@ class BokehOperator:
         """Wrap the current experiment selection as a manual sequence appended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
         seq = Sequence(
-            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+            sequence_name="manual_orch_seq",
+            planned_experiments=[experimentmodel],
+            manual_action=True,
         )
         self._capture_metadata(seq)
         self.plan.append(seq)
@@ -1871,7 +1873,9 @@ class BokehOperator:
         """Wrap the current experiment selection as a manual sequence prepended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
         seq = Sequence(
-            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+            sequence_name="manual_orch_seq",
+            planned_experiments=[experimentmodel],
+            manual_action=True,
         )
         self._capture_metadata(seq)
         self.plan.insert(0, seq)
