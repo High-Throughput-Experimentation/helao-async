@@ -1235,6 +1235,18 @@ def dispatch_experiment(
         # per-sequence experiment counter (parity with dispatch_sequence) — the
         # experiment about to be stamped is index 0 within this wrapper.
         state.active_seq_exp_counter = 0
+        # Derive the run grouping for the wrapper exactly as dispatch_sequence
+        # would: capture the prior run id, fall back to the wrapper's own uuid
+        # when no run is active, then update the run-seq counter and stamp
+        # sequence_order so the C2 path matches the sequence-driven path.
+        prior_run_id = state.active_run_id
+        if state.active_run_id is None:
+            state.active_run_id = syn_seq.sequence_uuid
+        if state.active_run_id == prior_run_id:
+            state.active_run_seq_counter += 1
+        else:
+            state.active_run_seq_counter = 0
+        syn_seq.sequence_order = state.active_run_seq_counter
         register_obj_uuid(
             state,
             syn_seq.sequence_uuid,

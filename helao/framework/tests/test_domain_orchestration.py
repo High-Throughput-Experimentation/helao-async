@@ -840,6 +840,51 @@ def test_dispatch_experiment_parentless_syn_uuid_no_collision_with_actions():
     assert syn_uuid not in action_uuids
 
 
+def test_dispatch_experiment_parentless_stamps_sequence_order_zero():
+    """The synthesized wrapper sequence gets sequence_order=0 and derives
+    active_run_id from its own uuid (parity with the sequence-driven path)."""
+    exp = RunExperiment(experiment_name="bareexp")
+    st = _state(experiment_dq=[exp])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert st.active_sequence.sequence_order == 0
+    assert st.active_run_seq_counter == 0
+    assert st.active_run_id == st.active_sequence.sequence_uuid
+
+
+def test_dispatch_experiment_parentless_order_increments_within_same_run():
+    """Two consecutive parentless wrappers in the same run (active_run_id held)
+    increment sequence_order: 0 then 1."""
+    exp0 = RunExperiment(experiment_name="bareexp0")
+    st = _state(experiment_dq=[exp0])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    seq0 = st.active_sequence
+    # finish the wrapper sequence so the next parentless exp synthesizes a fresh
+    # one, but keep active_run_id (mirrors a stop without reset_run_id)
+    st.active_sequence = None
+    exp1 = RunExperiment(experiment_name="bareexp1")
+    st.experiment_dq = [exp1]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=UUID(int=2000))
+    seq1 = st.active_sequence
+    assert seq0.sequence_order == 0
+    assert seq1.sequence_order == 1
+
+
+def test_dispatch_experiment_parentless_order_resets_after_run_reset():
+    """After active_run_id is dropped (stop-with-reset / estop), the next
+    parentless wrapper resets sequence_order to 0."""
+    exp0 = RunExperiment(experiment_name="bareexp0")
+    st = _state(experiment_dq=[exp0])
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=SEED)
+    assert st.active_sequence.sequence_order == 0
+    # stop-with-reset / estop drops both active_sequence and active_run_id
+    st.active_sequence = None
+    st.active_run_id = None
+    exp1 = RunExperiment(experiment_name="bareexp1")
+    st.experiment_dq = [exp1]
+    st, _ = orch.dispatch_experiment(st, now=NOW, uuid=UUID(int=2000))
+    assert st.active_sequence.sequence_order == 0
+
+
 def test_dispatch_experiment_with_active_sequence_unchanged():
     """Regression: when active_sequence is already set, no extra synthesis occurs
     and output dirs nest under the existing sequence (unchanged behaviour)."""
