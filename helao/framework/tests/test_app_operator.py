@@ -67,6 +67,8 @@ class _MockBackend:
         self.split_added = []
         self.prepended = None
         self.stop_calls = []
+        self.queue_calls = []
+        self.active_sequence = {}
 
     def unpack_sequence(self, sequence_name, sequence_params):
         return self.sequence_lib[sequence_name](**sequence_params)
@@ -96,9 +98,22 @@ class _MockBackend:
         return {"motor": ["idle", "ok"]}
 
     async def get_orch_state(self):
-        return {"loop_state": self.loop_state, "active_sequence": {}, "active_experiment": {},
+        return {"loop_state": self.loop_state, "active_sequence": self.active_sequence,
+                "active_experiment": {},
                 "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
                 "current_stop_message": ""}
+
+    async def move_experiment(self, from_idx, to_idx):
+        self.queue_calls.append(("move_experiment", from_idx, to_idx))
+
+    async def remove_experiment(self, idx):
+        self.queue_calls.append(("remove_experiment", idx))
+
+    async def move_action(self, from_idx, to_idx):
+        self.queue_calls.append(("move_action", from_idx, to_idx))
+
+    async def remove_action(self, idx):
+        self.queue_calls.append(("remove_action", idx))
 
     async def add_sequence(self, sequence):
         self.added.append(sequence)
@@ -762,3 +777,57 @@ def test_history_tab_order():
     titles = [t.title for t in op.planhistory_tabs.tabs]
     assert titles == ["Plan", "Sequence History", "Experiment History", "Action History"]
     op.cleanup_session(None)
+
+
+def test_exp_action_buttons_exist():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    for name in ("button_exp_move_up", "button_exp_move_down", "button_exp_remove",
+                 "button_act_move_up", "button_act_move_down", "button_act_remove"):
+        assert hasattr(op, name)
+
+
+def test_exp_remove_callback_dispatches(monkeypatch):
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    vis = _FakeVisOp(Document())
+    be = _MockBackend()
+    op = BokehOperator(vis, be)
+    op.experiment_source.selected.indices = [0]
+    op.experiment_source.data = {"experiment_name": ["e0", "e1"]}
+    op.callback_exp_remove(None)
+    _drain_callbacks(vis.doc)
+    assert ("remove_experiment", 0) in be.queue_calls
+
+
+def test_act_move_up_callback_dispatches():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    vis = _FakeVisOp(Document())
+    be = _MockBackend()
+    op = BokehOperator(vis, be)
+    op.action_source.selected.indices = [1]
+    op.action_source.data = {"action_name": ["a0", "a1"]}
+    op.callback_act_move_up(None)
+    _drain_callbacks(vis.doc)
+    assert ("move_action", 1, 0) in be.queue_calls
+
+
+def test_exp_action_buttons_gated_on_stopped_and_manual():
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    vis = _FakeVisOp(Document())
+    be = _MockBackend()
+    be.loop_state = "stopped"
+    be.active_sequence = {"manual_action": True}
+    op = BokehOperator(vis, be)
+    _drain_callbacks(vis.doc)
+    asyncio.run(op.update_tables())
+    assert op.button_exp_remove.disabled is False
+    assert op.button_act_remove.disabled is False
+
+    be.active_sequence = {}  # not manual
+    _drain_callbacks(vis.doc)
+    asyncio.run(op.update_tables())
+    assert op.button_exp_remove.disabled is True

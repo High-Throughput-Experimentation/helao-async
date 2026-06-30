@@ -468,6 +468,24 @@ class BokehOperator:
         self.button_seq_remove = self._make_button(
             "Queue ✕", "default", 70, self.callback_seq_remove, width_policy="min"
         )
+        self.button_exp_move_up = self._make_button(
+            "ExpQ ↑", "default", 70, self.callback_exp_move_up, width_policy="min"
+        )
+        self.button_exp_move_down = self._make_button(
+            "ExpQ ↓", "default", 70, self.callback_exp_move_down, width_policy="min"
+        )
+        self.button_exp_remove = self._make_button(
+            "ExpQ ✕", "default", 70, self.callback_exp_remove, width_policy="min"
+        )
+        self.button_act_move_up = self._make_button(
+            "ActQ ↑", "default", 70, self.callback_act_move_up, width_policy="min"
+        )
+        self.button_act_move_down = self._make_button(
+            "ActQ ↓", "default", 70, self.callback_act_move_down, width_policy="min"
+        )
+        self.button_act_remove = self._make_button(
+            "ActQ ✕", "default", 70, self.callback_act_remove, width_policy="min"
+        )
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
         )
@@ -857,6 +875,18 @@ class BokehOperator:
                             self.button_seq_move_up,
                             self.button_seq_move_down,
                             self.button_seq_remove,
+                            spacing=4,
+                        ),
+                        row(
+                            self.button_exp_move_up,
+                            self.button_exp_move_down,
+                            self.button_exp_remove,
+                            spacing=4,
+                        ),
+                        row(
+                            self.button_act_move_up,
+                            self.button_act_move_down,
+                            self.button_act_remove,
                             spacing=4,
                         ),
                         Spacer(height=10),
@@ -1784,6 +1814,62 @@ class BokehOperator:
             )
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
+    def callback_exp_move_up(self, event):
+        idxs = list(self.experiment_source.selected.indices)
+        if idxs and idxs[0] > 0:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_experiment, i, i - 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_exp_move_down(self, event):
+        idxs = list(self.experiment_source.selected.indices)
+        n = len(self.experiment_source.data.get("experiment_name", []))
+        if idxs and idxs[0] < n - 1:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_experiment, i, i + 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_exp_remove(self, event):
+        idxs = list(self.experiment_source.selected.indices)
+        if idxs:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.remove_experiment, i)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_act_move_up(self, event):
+        idxs = list(self.action_source.selected.indices)
+        if idxs and idxs[0] > 0:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_action, i, i - 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_act_move_down(self, event):
+        idxs = list(self.action_source.selected.indices)
+        n = len(self.action_source.data.get("action_name", []))
+        if idxs and idxs[0] < n - 1:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.move_action, i, i + 1)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def callback_act_remove(self, event):
+        idxs = list(self.action_source.selected.indices)
+        if idxs:
+            i = idxs[0]
+            self.vis.doc.add_next_tick_callback(
+                partial(self.backend.remove_action, i)
+            )
+            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
         self.vis.doc.add_next_tick_callback(
@@ -2644,6 +2730,14 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         self.button_seq_move_up.disabled = queue_disabled
         self.button_seq_move_down.disabled = queue_disabled
         self.button_seq_remove.disabled = queue_disabled
+        manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
+        exp_act_disabled = queue_disabled or not manual_seq
+        self.button_exp_move_up.disabled = exp_act_disabled
+        self.button_exp_move_down.disabled = exp_act_disabled
+        self.button_exp_remove.disabled = exp_act_disabled
+        self.button_act_move_up.disabled = exp_act_disabled
+        self.button_act_move_down.disabled = exp_act_disabled
+        self.button_act_remove.disabled = exp_act_disabled
         self.button_add_expplan.label = f"Add plan [{len(self.plan)}]"
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
