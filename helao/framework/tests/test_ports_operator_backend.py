@@ -16,7 +16,9 @@ def test_orchbackend_method_surface():
         "unpack_sequence", "get_step_flags", "set_step_flag", "list_sequences",
         "list_experiments", "list_actions", "get_queue_object", "get_histories",
         "get_status_summary", "get_orch_state", "add_sequence", "add_split_sequences",
-        "prepend_sequences", "move_sequence", "remove_sequence", "start", "stop",
+        "prepend_sequences", "move_sequence", "remove_sequence",
+        "move_experiment", "remove_experiment", "move_action", "remove_action",
+        "start", "stop",
         "skip", "estop", "clear_sequences", "clear_experiments", "clear_actions",
         "subscribe", "close",
     }

@@ -1815,6 +1815,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_exp_move_up(self, event):
+        """Move the selected queued experiment one position toward the front."""
         idxs = list(self.experiment_source.selected.indices)
         if idxs and idxs[0] > 0:
             i = idxs[0]
@@ -1824,6 +1825,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_exp_move_down(self, event):
+        """Move the selected queued experiment one position toward the back."""
         idxs = list(self.experiment_source.selected.indices)
         n = len(self.experiment_source.data.get("experiment_name", []))
         if idxs and idxs[0] < n - 1:
@@ -1834,6 +1836,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_exp_remove(self, event):
+        """Remove the selected queued experiment from the orch queue."""
         idxs = list(self.experiment_source.selected.indices)
         if idxs:
             i = idxs[0]
@@ -1843,6 +1846,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_act_move_up(self, event):
+        """Move the selected queued action one position toward the front."""
         idxs = list(self.action_source.selected.indices)
         if idxs and idxs[0] > 0:
             i = idxs[0]
@@ -1852,6 +1856,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_act_move_down(self, event):
+        """Move the selected queued action one position toward the back."""
         idxs = list(self.action_source.selected.indices)
         n = len(self.action_source.data.get("action_name", []))
         if idxs and idxs[0] < n - 1:
@@ -1862,6 +1867,7 @@ class BokehOperator:
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_act_remove(self, event):
+        """Remove the selected queued action from the orch queue."""
         idxs = list(self.action_source.selected.indices)
         if idxs:
             i = idxs[0]
