@@ -35,7 +35,10 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     if "root" in world_cfg:
         root = world_cfg["root"]
         save_root = os.path.join(root, "RUNS_ACTIVE")
-        log_root = os.path.join(root, "LOGS")
+        # Framework logs go to LOGS_FW (parallel to the legacy LOGS); retired +
+        # renamed to LOGS once the migration completes. Keep in sync with the
+        # launchers (fast_launcher.py / bokeh_launcher.py).
+        log_root = os.path.join(root, "LOGS_FW")
         states_root = os.path.join(root, "STATES")
         db_root = os.path.join(root, "DATABASE")
         user_exp = os.path.join(root, "USER_CONFIG", "EXP")

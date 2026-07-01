@@ -11,12 +11,14 @@ def test_builds_tree_under_root(tmp_path):
     root = str(tmp_path / "INST")
     dirs = helao_dirs({"root": root})
     assert str(dirs.root) == root
-    for sub in ("RUNS_ACTIVE", "LOGS", "STATES", "DATABASE", "ANALYSES", "PROCESSES"):
+    # Framework logs go to LOGS_FW (parallel to legacy LOGS) until the migration
+    # completes and LOGS_FW is renamed to LOGS.
+    for sub in ("RUNS_ACTIVE", "LOGS_FW", "STATES", "DATABASE", "ANALYSES", "PROCESSES"):
         assert os.path.isdir(os.path.join(root, sub))
     assert os.path.isdir(os.path.join(root, "USER_CONFIG", "EXP"))
     assert os.path.isdir(os.path.join(root, "USER_CONFIG", "SEQ"))
     assert str(dirs.save_root) == os.path.join(root, "RUNS_ACTIVE")
-    assert str(dirs.log_root) == os.path.join(root, "LOGS")
+    assert str(dirs.log_root) == os.path.join(root, "LOGS_FW")
 
 
 def test_no_root_returns_all_none():
@@ -29,7 +31,7 @@ def test_no_root_returns_all_none():
 def test_rotates_old_txt_logs(tmp_path):
     root = str(tmp_path / "INST")
     server = "TESTSRV"
-    log_dir = os.path.join(root, "LOGS", server)
+    log_dir = os.path.join(root, "LOGS_FW", server)
     os.makedirs(log_dir)
     log_path = os.path.join(log_dir, "TESTSRV.txt")
     with open(log_path, "w") as f:

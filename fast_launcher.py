@@ -40,6 +40,7 @@ import colorama
 
 
 from helao.helpers import helao_logging as logging
+from helao.framework.support import helao_logging as fw_logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
 
@@ -73,19 +74,30 @@ if __name__ == "__main__":
 
     all_servers_config = CONFIG["servers"]
     server_config = all_servers_config[server_key]
-    log_root = os.path.join(CONFIG["root"], "LOGS") if "root" in CONFIG else None
+    # Framework servers write per-server logs to <root>/LOGS_FW/<server_key>.log
+    # (parallel to the legacy LOGS). After the migration completes, retire LOGS
+    # and rename LOGS_FW -> LOGS.
+    log_root = os.path.join(CONFIG["root"], "LOGS_FW") if "root" in CONFIG else None
+    if log_root is not None:
+        os.makedirs(log_root, exist_ok=True)
     if CONFIG.get("alert_config_path", False):
         email_config = yml_load(CONFIG["alert_config_path"])
     else:
         email_config = {}
-    if logging.LOGGER is None:
-        logging.LOGGER = logging.make_logger(
+    # Build the per-server logger via the FRAMEWORK logging module (framework
+    # code reads helao.framework.support.helao_logging.LOGGER, a different global
+    # than the legacy helao.helpers one), then point BOTH module globals at the
+    # same stdlib logger (getLogger(server_key)) so every module — framework or
+    # legacy-helper — logs to the single LOGS_FW/<server_key>.log file.
+    if fw_logging.LOGGER is None:
+        fw_logging.LOGGER = fw_logging.make_logger(
             logger_name=server_key,
             log_dir=log_root,
             email_config=email_config,
             log_level=server_config.get("log_level", CONFIG.get("log_level", 20)),
         )
-    LOGGER = logging.LOGGER
+    logging.LOGGER = fw_logging.LOGGER
+    LOGGER = fw_logging.LOGGER
     LOGGER.info(f"Loaded config from: {CONFIG['loaded_config_path']}")
 
     config_path = CONFIG["loaded_config_path"]
@@ -133,7 +145,7 @@ if __name__ == "__main__":
     app = makeApp(server_key)
     root = CONFIG.get("root", None)
     if root is not None:
-        log_root = os.path.join(root, "LOGS")
+        log_root = os.path.join(root, "LOGS_FW")
     else:
         log_root = None
     # LOGGING_CONFIG["formatters"]["default"]["fmt"] = "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
