@@ -109,11 +109,22 @@ def mount_visualizers(app, vis_cfg_key: str) -> list:
         if isinstance(module_names, str):
             module_names = [module_names]
         for module_name in module_names:
-            viscls = import_vis_class(module_name)
-            LOGGER.info(
-                f"mounting '{module_name}.{VIS_CLASS_NAME}' for server '{server_name}'"
-            )
-            instances.append(viscls(vis_serv=app.vis, serv_key=server_name))
+            # Isolate each visualizer: one module that fails to import or raises
+            # in its constructor must NOT abort the whole mount and drop every
+            # later server's visualizer (e.g. a broken pal_vis was swallowing
+            # spec_vis). Log the failure with a traceback and carry on.
+            try:
+                viscls = import_vis_class(module_name)
+                LOGGER.info(
+                    f"mounting '{module_name}.{VIS_CLASS_NAME}' for server '{server_name}'"
+                )
+                instances.append(viscls(vis_serv=app.vis, serv_key=server_name))
+            except Exception:
+                LOGGER.error(
+                    f"failed to mount '{module_name}' for server '{server_name}'; "
+                    "skipping it so the remaining visualizers still load",
+                    exc_info=True,
+                )
     return instances
 
 
