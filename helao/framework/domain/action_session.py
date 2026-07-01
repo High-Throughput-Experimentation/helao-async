@@ -163,6 +163,13 @@ class ActionSession:
         manual action the synthetic experiment/sequence meta files are written
         too. Then the initial status is broadcast.
         """
+        # Legacy Active.myinit parity (base.py:1143 self.action.init_act): stamp
+        # action_timestamp / action_output_dir / uuid / status if unset, and for
+        # an unparented (direct-dispatch / Swagger) action synthesize the manual
+        # sequence+experiment identity. A no-op for orchestrator-dispatched
+        # actions, which the orch already stamps at dispatch — without this the
+        # meta write below crashes on ``action_timestamp.strftime`` (None).
+        self.action.init_act()
         if self.action.save_act:
             await self.update_act_file()
             if self.action.manual_action:

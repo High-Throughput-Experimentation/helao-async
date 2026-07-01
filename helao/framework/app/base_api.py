@@ -724,6 +724,10 @@ class FrameworkBase:
         self,
         ctx: Optional[ActionContext] = None,
         *,
+        json_data_keys: Optional[List[str]] = None,
+        action_abbr: Optional[str] = None,
+        file_type: Optional[str] = None,
+        hloheader=None,
         header: str = "",
     ) -> ActionSession:
         """Build the request's action and wrap it in an :class:`ActionSession`.
@@ -755,6 +759,18 @@ class FrameworkBase:
                 "no ActionContext: ACTION_CTX unset and no ctx passed"
             )
         action = self._get_action(ctx)
+        # Legacy Base.setup_and_contain_action parity: hte action endpoints pass
+        # action_abbr / hloheader / file_type / json_data_keys. Apply action_abbr,
+        # and when an HloHeaderModel is supplied serialize it to the header string
+        # used when the default HLO connection opens lazily. file_type and
+        # json_data_keys are accepted for signature parity but not threaded: the
+        # default extension already matches ``{server}_helao__file`` and the HLO
+        # column headings are inferred from the first data row (see
+        # ActionSession._write_live_rows / _default_hlo_header).
+        if action_abbr is not None:
+            action.action_abbr = action_abbr
+        if hloheader is not None:
+            header = self.storage.serialize_hlo_header(hloheader.clean_dict())
         self._default_header = header
         return await self.contain_action(action)
 
