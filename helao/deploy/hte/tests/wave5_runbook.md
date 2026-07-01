@@ -42,6 +42,17 @@ for `icpm1` (a private deployment also ships `icpm1.yml`).
 
 ## 1. Station inventory & suggested cut-over order
 
+> **Actual cut-over order (operator-directed, 2026-07-01):**
+> `power_supply_test` (canary, done) → `eche10` → `clad` → one private-deployment
+> station. This diverges from the risk-ordered plan below: `eche10` and `clad`
+> are order-5 motion+pstat rigs pulled forward because the lower-risk stations
+> (`icpm1` etc.) are not currently accessible. Extra care on the estop smoke
+> (§4.5) since these are the framework orch's first live motion+pstat + estop
+> tests. `clad` shares host `hte-adss-03` with `adss3` — never run both at once.
+> Private-deployment configs get the same generic-host cut-over as the hte
+> configs (ORCH `orchestrator`+`deployment: framework`; OPERATOR/VIS/data_browser
+> `deployment: framework`) before they will launch on the framework stack.
+
 Order low-risk → high-risk so the framework orch is shaken out on simple stations
 before estop-critical motion+pstat rigs. Hardware column lists estop-/safety-
 relevant instruments.
