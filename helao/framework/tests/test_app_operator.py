@@ -103,6 +103,12 @@ class _MockBackend:
                 "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
                 "current_stop_message": ""}
 
+    async def move_sequence(self, from_idx, to_idx):
+        self.queue_calls.append(("move_sequence", from_idx, to_idx))
+
+    async def remove_sequence(self, idx):
+        self.queue_calls.append(("remove_sequence", idx))
+
     async def move_experiment(self, from_idx, to_idx):
         self.queue_calls.append(("move_experiment", from_idx, to_idx))
 
@@ -228,6 +234,84 @@ def test_update_tables_suppresses_noop_writes():
     assert writes == [], f"no-op poll still wrote model props: {writes}"
     op.cleanup_session(None)
     print("test_update_tables_suppresses_noop_writes PASS")
+
+
+def test_unified_queue_buttons_dispatch_by_tab():
+    """The single ↑/↓/✕ button set routes to the queue of the active tab."""
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+
+    doc = Document()
+    op = BokehOperator(_FakeVisOp(doc), _MockBackend())
+
+    cases = [
+        (0, op.sequence_source, "sequence_name", "sequence"),
+        (1, op.experiment_source, "experiment_name", "experiment"),
+        (2, op.action_source, "action_name", "action"),
+    ]
+    for tab_idx, source, col, kind in cases:
+        op.queue_tabs.active = tab_idx
+        source.data = {col: ["a", "b"]}
+        source.selected.indices = [0]
+        op.backend.queue_calls.clear()
+        op.callback_queue_move_down(None)
+        _drain_callbacks(doc)
+        assert (f"move_{kind}", 0, 1) in op.backend.queue_calls, (kind, op.backend.queue_calls)
+
+        source.selected.indices = [1]
+        op.backend.queue_calls.clear()
+        op.callback_queue_move_up(None)
+        _drain_callbacks(doc)
+        assert (f"move_{kind}", 1, 0) in op.backend.queue_calls, (kind, op.backend.queue_calls)
+
+        source.selected.indices = [1]
+        op.backend.queue_calls.clear()
+        op.callback_queue_remove(None)
+        _drain_callbacks(doc)
+        assert (f"remove_{kind}", 1) in op.backend.queue_calls, (kind, op.backend.queue_calls)
+
+    # Read-only Action Servers tab: buttons are a no-op.
+    op.queue_tabs.active = 3
+    op.backend.queue_calls.clear()
+    op.callback_queue_move_up(None)
+    op.callback_queue_move_down(None)
+    op.callback_queue_remove(None)
+    _drain_callbacks(doc)
+    assert op.backend.queue_calls == [], op.backend.queue_calls
+    op.cleanup_session(None)
+    print("test_unified_queue_buttons_dispatch_by_tab PASS")
+
+
+def test_queue_button_state_by_tab():
+    """Disabled state of the unified queue buttons depends on tab × orch state."""
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+    from helao.core.models.orchstatus import LoopStatus
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    btns = (op.button_queue_move_up, op.button_queue_move_down, op.button_queue_remove)
+
+    def disabled_for(tab, loop_state, manual):
+        op.queue_tabs.active = tab
+        op._loop_state = loop_state
+        op._manual_seq = manual
+        op._refresh_queue_button_state()
+        return [b.disabled for b in btns]
+
+    stopped = LoopStatus.stopped.value
+    started = LoopStatus.started.value
+    # Sequence tab: enabled only when stopped (manual flag irrelevant).
+    assert disabled_for(0, stopped, False) == [False, False, False]
+    assert disabled_for(0, started, True) == [True, True, True]
+    # Experiment / Action tabs: enabled only when stopped AND manual sequence.
+    assert disabled_for(1, stopped, True) == [False, False, False]
+    assert disabled_for(1, stopped, False) == [True, True, True]
+    assert disabled_for(2, stopped, True) == [False, False, False]
+    assert disabled_for(2, started, True) == [True, True, True]
+    # Action Servers status tab: always disabled.
+    assert disabled_for(3, stopped, True) == [True, True, True]
+    op.cleanup_session(None)
+    print("test_queue_button_state_by_tab PASS")
 
 
 def test_assign_helper_only_writes_on_change():
@@ -372,17 +456,18 @@ def test_queue_controls_enable_gate():
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
 
+    # Default active queue tab is Sequence (0): gated on orch-stopped only.
     be.loop_state = "started"
     asyncio.run(op.update_tables())
-    assert op.button_seq_move_up.disabled is True
-    assert op.button_seq_move_down.disabled is True
-    assert op.button_seq_remove.disabled is True
+    assert op.button_queue_move_up.disabled is True
+    assert op.button_queue_move_down.disabled is True
+    assert op.button_queue_remove.disabled is True
 
     be.loop_state = "stopped"
     asyncio.run(op.update_tables())
-    assert op.button_seq_move_up.disabled is False
-    assert op.button_seq_move_down.disabled is False
-    assert op.button_seq_remove.disabled is False
+    assert op.button_queue_move_up.disabled is False
+    assert op.button_queue_move_down.disabled is False
+    assert op.button_queue_remove.disabled is False
     op.cleanup_session(None)
     print("test_queue_controls_enable_gate PASS")
 
@@ -828,55 +913,15 @@ def test_history_tab_order():
     op.cleanup_session(None)
 
 
-def test_exp_action_buttons_exist():
+def test_unified_queue_buttons_exist():
+    # Per-queue button sets (button_{seq,exp,act}_*) were consolidated into one
+    # tab-driven set. Dispatch + gating are covered by
+    # test_unified_queue_buttons_dispatch_by_tab / test_queue_button_state_by_tab.
     from bokeh.document import Document
     from helao.framework.app.operator.bokeh_operator import BokehOperator
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
-    for name in ("button_exp_move_up", "button_exp_move_down", "button_exp_remove",
-                 "button_act_move_up", "button_act_move_down", "button_act_remove"):
+    for name in ("button_queue_move_up", "button_queue_move_down", "button_queue_remove"):
         assert hasattr(op, name)
-
-
-def test_exp_remove_callback_dispatches(monkeypatch):
-    from bokeh.document import Document
-    from helao.framework.app.operator.bokeh_operator import BokehOperator
-    vis = _FakeVisOp(Document())
-    be = _MockBackend()
-    op = BokehOperator(vis, be)
-    op.experiment_source.selected.indices = [0]
-    op.experiment_source.data = {"experiment_name": ["e0", "e1"]}
-    op.callback_exp_remove(None)
-    _drain_callbacks(vis.doc)
-    assert ("remove_experiment", 0) in be.queue_calls
-
-
-def test_act_move_up_callback_dispatches():
-    from bokeh.document import Document
-    from helao.framework.app.operator.bokeh_operator import BokehOperator
-    vis = _FakeVisOp(Document())
-    be = _MockBackend()
-    op = BokehOperator(vis, be)
-    op.action_source.selected.indices = [1]
-    op.action_source.data = {"action_name": ["a0", "a1"]}
-    op.callback_act_move_up(None)
-    _drain_callbacks(vis.doc)
-    assert ("move_action", 1, 0) in be.queue_calls
-
-
-def test_exp_action_buttons_gated_on_stopped_and_manual():
-    from bokeh.document import Document
-    from helao.framework.app.operator.bokeh_operator import BokehOperator
-    vis = _FakeVisOp(Document())
-    be = _MockBackend()
-    be.loop_state = "stopped"
-    be.active_sequence = {"manual_action": True}
-    op = BokehOperator(vis, be)
-    _drain_callbacks(vis.doc)
-    asyncio.run(op.update_tables())
-    assert op.button_exp_remove.disabled is False
-    assert op.button_act_remove.disabled is False
-
-    be.active_sequence = {}  # not manual
-    _drain_callbacks(vis.doc)
-    asyncio.run(op.update_tables())
-    assert op.button_exp_remove.disabled is True
+    for old in ("button_exp_move_up", "button_act_remove", "callback_seq_move_up"):
+        assert not hasattr(op, old), f"stale per-queue attr survived: {old}"
+    op.cleanup_session(None)

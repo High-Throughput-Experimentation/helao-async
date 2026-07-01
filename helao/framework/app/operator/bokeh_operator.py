@@ -459,32 +459,17 @@ class BokehOperator:
         self.button_plan_remove = self._make_button(
             "Plan ✕", "default", 70, self.callback_plan_remove, width_policy="min"
         )
-        self.button_seq_move_up = self._make_button(
-            "Queue ↑", "default", 70, self.callback_seq_move_up, width_policy="min"
+        # One set of queue-reorder buttons that acts on whichever queue tab is
+        # active (Sequence / Experiment / Action). See callback_queue_* and
+        # _active_queue_target.
+        self.button_queue_move_up = self._make_button(
+            "Queue ↑", "default", 70, self.callback_queue_move_up, width_policy="min"
         )
-        self.button_seq_move_down = self._make_button(
-            "Queue ↓", "default", 70, self.callback_seq_move_down, width_policy="min"
+        self.button_queue_move_down = self._make_button(
+            "Queue ↓", "default", 70, self.callback_queue_move_down, width_policy="min"
         )
-        self.button_seq_remove = self._make_button(
-            "Queue ✕", "default", 70, self.callback_seq_remove, width_policy="min"
-        )
-        self.button_exp_move_up = self._make_button(
-            "ExpQ ↑", "default", 70, self.callback_exp_move_up, width_policy="min"
-        )
-        self.button_exp_move_down = self._make_button(
-            "ExpQ ↓", "default", 70, self.callback_exp_move_down, width_policy="min"
-        )
-        self.button_exp_remove = self._make_button(
-            "ExpQ ✕", "default", 70, self.callback_exp_remove, width_policy="min"
-        )
-        self.button_act_move_up = self._make_button(
-            "ActQ ↑", "default", 70, self.callback_act_move_up, width_policy="min"
-        )
-        self.button_act_move_down = self._make_button(
-            "ActQ ↓", "default", 70, self.callback_act_move_down, width_policy="min"
-        )
-        self.button_act_remove = self._make_button(
-            "ActQ ✕", "default", 70, self.callback_act_remove, width_policy="min"
+        self.button_queue_remove = self._make_button(
+            "Queue ✕", "default", 70, self.callback_queue_remove, width_policy="min"
         )
         self.button_stop_orch = self._make_button(
             "Stop Orch", "default", 70, self.callback_stop_orch
@@ -872,21 +857,9 @@ class BokehOperator:
                             ),
                         ],
                         row(
-                            self.button_seq_move_up,
-                            self.button_seq_move_down,
-                            self.button_seq_remove,
-                            spacing=4,
-                        ),
-                        row(
-                            self.button_exp_move_up,
-                            self.button_exp_move_down,
-                            self.button_exp_remove,
-                            spacing=4,
-                        ),
-                        row(
-                            self.button_act_move_up,
-                            self.button_act_move_down,
-                            self.button_act_remove,
+                            self.button_queue_move_up,
+                            self.button_queue_move_down,
+                            self.button_queue_remove,
                             spacing=4,
                         ),
                         Spacer(height=10),
@@ -979,7 +952,9 @@ class BokehOperator:
                 "indices", lambda a, o, n: self._render_queue_tree()
             )
         self.queue_tabs.on_change(
-            "active", lambda a, o, n: self._render_queue_tree()
+            "active",
+            lambda a, o, n: (self._render_queue_tree(),
+                             self._refresh_queue_button_state()),
         )
 
         # select the first item to force an update of the layout
@@ -994,6 +969,19 @@ class BokehOperator:
 
         self._queue_counts = {"n_sequences": 0, "n_experiments": 0, "n_actions": 0}
         self._current_stop_message = ""
+        # Last orch state the unified queue buttons gate on (set by update_tables).
+        self._loop_state = None
+        self._manual_seq = False
+        # queue_tabs index -> (source, move_fn, remove_fn, name_col) for the
+        # unified reorder buttons. The Action Servers tab (3) has no entry.
+        self._queue_targets = {
+            0: (self.sequence_source, self.backend.move_sequence,
+                self.backend.remove_sequence, "sequence_name"),
+            1: (self.experiment_source, self.backend.move_experiment,
+                self.backend.remove_experiment, "experiment_name"),
+            2: (self.action_source, self.backend.move_action,
+                self.backend.remove_action, "action_name"),
+        }
         self.backend.subscribe(self._on_backend_change)
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
@@ -1783,98 +1771,72 @@ class BokehOperator:
             del self.plan[i]
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_move_up(self, event):
-        """Move the selected queued sequence one position toward the front."""
-        idxs = list(self.sequence_source.selected.indices)
+    def _active_queue_target(self):
+        """Resolve the queue-reorder target for the active ``queue_tabs`` tab.
+
+        Returns ``(source, move_fn, remove_fn, name_col)`` for the Sequence (0),
+        Experiment (1), or Action (2) tab, or ``None`` for the read-only Action
+        Servers tab (3) where reordering is not possible.
+        """
+        return self._queue_targets.get(self.queue_tabs.active)
+
+    def callback_queue_move_up(self, event):
+        """Move the selected item of the active queue one position toward the front."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, move_fn, _remove_fn, _col = tgt
+        idxs = list(source.selected.indices)
         if idxs and idxs[0] > 0:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_sequence, i, i - 1)
-            )
+            self.vis.doc.add_next_tick_callback(partial(move_fn, i, i - 1))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_move_down(self, event):
-        """Move the selected queued sequence one position toward the back."""
-        idxs = list(self.sequence_source.selected.indices)
-        n = len(self.sequence_source.data.get("sequence_name", []))
+    def callback_queue_move_down(self, event):
+        """Move the selected item of the active queue one position toward the back."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, move_fn, _remove_fn, col = tgt
+        idxs = list(source.selected.indices)
+        n = len(source.data.get(col, []))
         if idxs and idxs[0] < n - 1:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_sequence, i, i + 1)
-            )
+            self.vis.doc.add_next_tick_callback(partial(move_fn, i, i + 1))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_remove(self, event):
-        """Remove the selected queued sequence from the orch queue."""
-        idxs = list(self.sequence_source.selected.indices)
+    def callback_queue_remove(self, event):
+        """Remove the selected item of the active queue from the orch queue."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, _move_fn, remove_fn, _col = tgt
+        idxs = list(source.selected.indices)
         if idxs:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.remove_sequence, i)
-            )
+            self.vis.doc.add_next_tick_callback(partial(remove_fn, i))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_exp_move_up(self, event):
-        """Move the selected queued experiment one position toward the front."""
-        idxs = list(self.experiment_source.selected.indices)
-        if idxs and idxs[0] > 0:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_experiment, i, i - 1)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+    def _refresh_queue_button_state(self):
+        """Enable/disable the unified queue-reorder buttons for the active tab.
 
-    def callback_exp_move_down(self, event):
-        """Move the selected queued experiment one position toward the back."""
-        idxs = list(self.experiment_source.selected.indices)
-        n = len(self.experiment_source.data.get("experiment_name", []))
-        if idxs and idxs[0] < n - 1:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_experiment, i, i + 1)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-
-    def callback_exp_remove(self, event):
-        """Remove the selected queued experiment from the orch queue."""
-        idxs = list(self.experiment_source.selected.indices)
-        if idxs:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.remove_experiment, i)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-
-    def callback_act_move_up(self, event):
-        """Move the selected queued action one position toward the front."""
-        idxs = list(self.action_source.selected.indices)
-        if idxs and idxs[0] > 0:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_action, i, i - 1)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-
-    def callback_act_move_down(self, event):
-        """Move the selected queued action one position toward the back."""
-        idxs = list(self.action_source.selected.indices)
-        n = len(self.action_source.data.get("action_name", []))
-        if idxs and idxs[0] < n - 1:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_action, i, i + 1)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
-
-    def callback_act_remove(self, event):
-        """Remove the selected queued action from the orch queue."""
-        idxs = list(self.action_source.selected.indices)
-        if idxs:
-            i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.remove_action, i)
-            )
-            self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+        Uses the last orch state seen by :meth:`update_tables` (``_loop_state`` /
+        ``_manual_seq``) so it can run on a tab switch without a backend round
+        trip. Sequence tab (0): enabled only when the orch is stopped.
+        Experiment/Action tabs (1, 2): enabled only when stopped AND the active
+        sequence is a manual sequence. Action Servers tab (3): always disabled.
+        """
+        idx = self.queue_tabs.active
+        stopped = self._loop_state == LoopStatus.stopped.value
+        if idx == 0:
+            disabled = not stopped
+        elif idx in (1, 2):
+            disabled = not stopped or not self._manual_seq
+        else:
+            disabled = True
+        self._assign(self.button_queue_move_up, "disabled", disabled)
+        self._assign(self.button_queue_move_down, "disabled", disabled)
+        self._assign(self.button_queue_remove, "disabled", disabled)
 
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
@@ -2756,17 +2718,12 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         self._assign(self.orch_status_button, "button_type", status_type)
         queue_disabled = loop_state != LoopStatus.stopped.value
         self._assign(self.button_prepend_plan, "disabled", queue_disabled)
-        self._assign(self.button_seq_move_up, "disabled", queue_disabled)
-        self._assign(self.button_seq_move_down, "disabled", queue_disabled)
-        self._assign(self.button_seq_remove, "disabled", queue_disabled)
-        manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
-        exp_act_disabled = queue_disabled or not manual_seq
-        self._assign(self.button_exp_move_up, "disabled", exp_act_disabled)
-        self._assign(self.button_exp_move_down, "disabled", exp_act_disabled)
-        self._assign(self.button_exp_remove, "disabled", exp_act_disabled)
-        self._assign(self.button_act_move_up, "disabled", exp_act_disabled)
-        self._assign(self.button_act_move_down, "disabled", exp_act_disabled)
-        self._assign(self.button_act_remove, "disabled", exp_act_disabled)
+        # Cache the state the unified queue buttons gate on, then refresh them.
+        # _refresh_queue_button_state also runs on tab switch (queue_tabs
+        # on_change) so the single button set matches whichever queue is shown.
+        self._loop_state = loop_state
+        self._manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
+        self._refresh_queue_button_state()
         self._assign(self.button_add_expplan, "label", f"Add plan [{len(self.plan)}]")
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
