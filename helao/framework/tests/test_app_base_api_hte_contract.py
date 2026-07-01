@@ -68,6 +68,22 @@ def test_baseapi_accepts_and_wires_poller_class(tmp_path):
         assert isinstance(app.poller, _Poller)
         assert app.poller.driver is app.driver
         assert app.poller._base_hook is app.base
+        # driver mirrored onto the base so ActionSession.driver / active.driver
+        # reach it (gamry GamryExec reads self.active.driver).
+        assert app.base.driver is app.driver
+        assert app.base.driver is not None
+
+
+def test_action_session_driver_resolves_to_base_driver(tmp_path):
+    base = _base(tmp_path)
+    sentinel = object()
+    base.driver = sentinel  # stand-in for the server's driver
+
+    async def _drive():
+        return await base.contain_action(RunAction(action_name="run_OCV"))
+
+    session = asyncio.run(_drive())
+    assert session.driver is sentinel
 
 
 def test_async_dyn_endpoints_are_awaited(tmp_path):

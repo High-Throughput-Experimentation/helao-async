@@ -120,6 +120,13 @@ class FrameworkBase:
                 exposed as :attr:`server_params`.
         """
         self.server_key = server_key
+        # Driver handles are owned by the app (BaseAPI) but mirrored here at
+        # startup so ActionSession.driver (and executors via active.driver) can
+        # reach the server's driver without an app back-reference — legacy
+        # Active.driver == base.app.driver (base.py:1126).
+        self.driver = None
+        self.drivers = tuple()
+        self.poller = None
         self.storage = storage
         self.eventsink = eventsink
         self.clock = clock
@@ -940,9 +947,13 @@ def _build_action_from_kwargs(
                     f"'{name}', skipping it"
                 )
     if action is None:
-        LOGGER.error(
-            "critical error: no RunAction was found by setup_action, using blank "
-            "RunAction."
+        # No RunAction wrapper in the request — normal for a manual/direct
+        # invocation (e.g. a Swagger call that supplies only params). Build a
+        # blank one and fold the kwargs into action_params below; myinit's
+        # init_act() then stamps it as a manual run.
+        LOGGER.info(
+            "no RunAction in request kwargs; building a blank RunAction "
+            "(manual/direct invocation)."
         )
         action = RunAction()
     else:
@@ -1363,6 +1374,11 @@ def _make_base_api_class():
                 driver_dict[driver_class.__name__] = driver_inst
             self.drivers = Drivers(**driver_dict)
             self.driver = self.drivers[0] if self.drivers else None
+            # mirror onto the base so ActionSession.driver / active.driver reach
+            # the server's driver (legacy Active.driver == base.app.driver).
+            self.base.driver = self.driver
+            self.base.drivers = self.drivers
+            self.base.poller = self.poller
 
         async def _shutdown_drivers(self):
             """Shut down each driver, preferring ``async_shutdown`` over ``shutdown``.

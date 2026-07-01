@@ -143,6 +143,17 @@ class ActionSession:
         if self.action.save_data is True:
             self.action.save_act = True
 
+    @property
+    def driver(self):
+        """The server's driver instance, or ``None``.
+
+        Ports legacy ``Active.driver == base.app.driver`` (base.py:1126): action
+        executors read ``self.active.driver`` in their ``__init__`` (e.g.
+        ``gamry_server2`` ``GamryExec``). The driver is owned by the app and
+        mirrored onto the base at startup (see ``BaseAPI._instantiate_drivers``).
+        """
+        return getattr(self.base, "driver", None) if self.base is not None else None
+
     # --- meta / output -------------------------------------------------------
 
     def _meta_relpath(self) -> str:
