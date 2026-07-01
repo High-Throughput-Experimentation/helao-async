@@ -27,6 +27,20 @@ from bokeh.layouts import Spacer
 from helao.framework.support import helao_logging as logging
 from helao.framework.support import config_loader
 from helao.helpers.ws_utils import WsSubscriber as Wss
+from helao.framework.models.data import DataPackageModel
+
+
+def _decode_data_package(raw):
+    """Decode a framework ``send_json`` data frame into a ``DataPackageModel``.
+
+    Framework action servers relay ws_data/ws_live as JSON
+    (``BaseAPI._ws_relay`` sends ``DataPackageModel.as_dict()``). Reconstructing
+    the model restores the object/typed access the (legacy-ported) vis code
+    expects; ``json.loads`` alone would hand the vis a plain dict with a string
+    ``status`` that never matches the ``HloStatus`` members in
+    ``VALID_DATA_STATUS``.
+    """
+    return DataPackageModel.model_validate(json.loads(raw))
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -133,10 +147,14 @@ class VisSubscriber:
         self.host = self.serv_config.get("host", None)
         self.port = self.serv_config.get("port", None)
         self.data_url = f"ws://{self.host}:{self.port}/{self.WS_PATH}"
-        # framework action servers relay ws_data as JSON (BaseAPI._ws_relay
-        # send_json), not the legacy zstd+pickle — decode accordingly.
+        # framework action servers relay ws_data/ws_live as JSON (BaseAPI.
+        # _ws_relay send_json == DataPackageModel.as_dict()), not the legacy
+        # zstd+pickle object. Reconstruct the model so the vis keeps its object
+        # access (data_package.datamodel.status / .action_name) and typed fields
+        # (HloStatus) — a plain dict would leave status as a str and never match
+        # VALID_DATA_STATUS (HloStatus enums), silently dropping all data.
         self.wss = (
-            Wss(self.host, self.port, self.WS_PATH, decode=json.loads)
+            Wss(self.host, self.port, self.WS_PATH, decode=_decode_data_package)
             if self.USE_WSS
             else None
         )
