@@ -1461,7 +1461,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.sequence_lists[key] = vals
-        self.sequence_source.data = self.sequence_lists
+        self._assign(self.sequence_source, "data", self.sequence_lists)
 
     async def get_experiments(self):
         """Refresh the queued-experiments table from the backend."""
@@ -1471,7 +1471,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.experiment_lists[key] = vals
-        self.experiment_source.data = self.experiment_lists
+        self._assign(self.experiment_source, "data", self.experiment_lists)
 
     async def get_actions(self):
         """Refresh the queued-actions table from the backend."""
@@ -1481,7 +1481,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.action_lists[key] = vals
-        self.action_source.data = self.action_lists
+        self._assign(self.action_source, "data", self.action_lists)
 
     async def get_history(self):
         """Refresh the action/experiment/sequence history tables from the backend."""
@@ -1532,9 +1532,9 @@ class BokehOperator:
                 if isinstance(val, list):
                     val = val[-1] if val else ""
                 self.sequence_history_lists[k].append("" if val is None else val)
-        self.action_history_source.data = self.action_history_lists
-        self.experiment_history_source.data = self.experiment_history_lists
-        self.sequence_history_source.data = self.sequence_history_lists
+        self._assign(self.action_history_source, "data", self.action_history_lists)
+        self._assign(self.experiment_history_source, "data", self.experiment_history_lists)
+        self._assign(self.sequence_history_source, "data", self.sequence_history_lists)
 
     async def get_orch_status_summary(self):
         """Refresh the action-server status table from the backend's status summary."""
@@ -1549,7 +1549,7 @@ class BokehOperator:
             self.action_server_lists["driver_status"].append(driver_str)
         # Replace the data wholesale (like the history tables) instead of
         # streaming per row, so rows render exactly once in the sorted order.
-        self.action_server_source.data = self.action_server_lists
+        self._assign(self.action_server_source, "data", self.action_server_lists)
 
     def update_selector_layout(self, attr, old, new):
         """Switch the parameter panel to match the currently active selector tab."""
@@ -2136,7 +2136,9 @@ class BokehOperator:
             (self.orch_stepact_button, "n_actions"),
         ]:
             numq = self._queue_counts.get(count_key, 0)
-            sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
+            self._assign(
+                sbutton, "label", sbutton.label.split("[")[0].strip() + f" [{numq}]"
+            )
 
     def update_seq_param_layout(self, idx):
         """Rebuild the sequence-parameter panel for entry ``idx`` of the sequence library."""
@@ -2688,6 +2690,22 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         """Placeholder hook for future experiment-to-sequence integration."""
         pass
 
+    @staticmethod
+    def _assign(model, attr, value):
+        """Set ``model.attr`` only when the value actually changed.
+
+        The operator refreshes on a 5 s poll (and on every status-WS message).
+        Re-assigning a Bokeh model property to an identical value still emits a
+        document patch to the browser, which triggers a layout reflow and blurs
+        whatever input the user is currently typing into. Skipping no-op writes
+        keeps an idle/stopped UI from pushing any patch, so focus is preserved.
+        Returns True if a write happened.
+        """
+        if getattr(model, attr) != value:
+            setattr(model, attr, value)
+            return True
+        return False
+
     async def update_tables(self):
         """Refresh every queue/history table and update the orchestrator status banner/buttons."""
         start_time = time.time()
@@ -2696,7 +2714,6 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         await self.get_actions()
         await self.get_history()
         await self.get_orch_status_summary()
-        self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
         for seq in self.plan:
@@ -2705,7 +2722,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             self.experiment_plan_lists["num_experiments"].append(
                 len(seq.planned_experiments)
             )
-        self.experiment_plan_source.data = self.experiment_plan_lists
+        self._assign(self.experiment_plan_source, "data", self.experiment_plan_lists)
 
         state = await self.backend.get_orch_state()
         self._queue_counts = {
@@ -2713,6 +2730,10 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             "n_experiments": state.get("n_experiments", 0),
             "n_actions": state.get("n_actions", 0),
         }
+        # Refresh the step-button counters AFTER _queue_counts is updated from the
+        # current orch state, so the labels reflect this poll (not the previous
+        # one) and don't flip a poll late.
+        self.update_queuecount_labels()
         loop_state = state.get("loop_state")
         loop_state = getattr(loop_state, "value", loop_state)  # normalize enum->str
         self._current_stop_message = state.get("current_stop_message", "") or ""
@@ -2720,31 +2741,33 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         aexp = (state.get("active_experiment") or {}).get("experiment_name")
         if loop_state == LoopStatus.started.value:
             if aseq is not None and aexp is not None:
-                self.orch_status_button.label = f"running {aseq} / {aexp}"
+                status_label = f"running {aseq} / {aexp}"
             else:
-                self.orch_status_button.label = "running"
-            self.orch_status_button.button_type = "success"
+                status_label = "running"
+            status_type = "success"
         elif loop_state == LoopStatus.stopped.value:
             stop_msg = f": {self._current_stop_message}" if self._current_stop_message else ""
-            self.orch_status_button.label = f"stopped{stop_msg}"
-            self.orch_status_button.button_type = "warning" if stop_msg else "primary"
+            status_label = f"stopped{stop_msg}"
+            status_type = "warning" if stop_msg else "primary"
         else:
-            self.orch_status_button.label = f"{loop_state}"
-            self.orch_status_button.button_type = "danger"
-        self.button_prepend_plan.disabled = loop_state != LoopStatus.stopped.value
+            status_label = f"{loop_state}"
+            status_type = "danger"
+        self._assign(self.orch_status_button, "label", status_label)
+        self._assign(self.orch_status_button, "button_type", status_type)
         queue_disabled = loop_state != LoopStatus.stopped.value
-        self.button_seq_move_up.disabled = queue_disabled
-        self.button_seq_move_down.disabled = queue_disabled
-        self.button_seq_remove.disabled = queue_disabled
+        self._assign(self.button_prepend_plan, "disabled", queue_disabled)
+        self._assign(self.button_seq_move_up, "disabled", queue_disabled)
+        self._assign(self.button_seq_move_down, "disabled", queue_disabled)
+        self._assign(self.button_seq_remove, "disabled", queue_disabled)
         manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
         exp_act_disabled = queue_disabled or not manual_seq
-        self.button_exp_move_up.disabled = exp_act_disabled
-        self.button_exp_move_down.disabled = exp_act_disabled
-        self.button_exp_remove.disabled = exp_act_disabled
-        self.button_act_move_up.disabled = exp_act_disabled
-        self.button_act_move_down.disabled = exp_act_disabled
-        self.button_act_remove.disabled = exp_act_disabled
-        self.button_add_expplan.label = f"Add plan [{len(self.plan)}]"
+        self._assign(self.button_exp_move_up, "disabled", exp_act_disabled)
+        self._assign(self.button_exp_move_down, "disabled", exp_act_disabled)
+        self._assign(self.button_exp_remove, "disabled", exp_act_disabled)
+        self._assign(self.button_act_move_up, "disabled", exp_act_disabled)
+        self._assign(self.button_act_move_down, "disabled", exp_act_disabled)
+        self._assign(self.button_act_remove, "disabled", exp_act_disabled)
+        self._assign(self.button_add_expplan, "label", f"Add plan [{len(self.plan)}]")
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 

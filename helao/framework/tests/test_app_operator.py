@@ -194,6 +194,55 @@ def test_operator_tables_from_backend():
     print("test_operator_tables_from_backend PASS")
 
 
+def test_update_tables_suppresses_noop_writes():
+    """A poll that finds nothing changed must write zero Bokeh model props.
+
+    The operator refreshes on a 5 s poll. Re-assigning a model property to an
+    identical value still pushes a document patch to the browser, which reflows
+    the layout and blurs whatever input the user is typing into. After the first
+    refresh populates every source/button, a second *identical* refresh must be
+    a complete no-op so an idle/stopped UI never steals focus.
+    """
+    from bokeh.document import Document
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+
+    doc = Document()
+    op = BokehOperator(_FakeVisOp(doc), _MockBackend())
+    asyncio.run(op.update_tables())  # first pass populates sources + buttons
+
+    writes = []
+    orig = BokehOperator._assign
+
+    def _counting(model, attr, value):
+        changed = orig(model, attr, value)
+        if changed:
+            writes.append((type(model).__name__, attr))
+        return changed
+
+    BokehOperator._assign = staticmethod(_counting)
+    try:
+        asyncio.run(op.update_tables())  # second identical pass
+    finally:
+        BokehOperator._assign = staticmethod(orig)
+
+    assert writes == [], f"no-op poll still wrote model props: {writes}"
+    op.cleanup_session(None)
+    print("test_update_tables_suppresses_noop_writes PASS")
+
+
+def test_assign_helper_only_writes_on_change():
+    """`_assign` writes (and reports True) only when the value differs."""
+    from bokeh.models import Button
+    from helao.framework.app.operator.bokeh_operator import BokehOperator
+
+    btn = Button(label="a")
+    assert BokehOperator._assign(btn, "label", "b") is True
+    assert btn.label == "b"
+    assert BokehOperator._assign(btn, "label", "b") is False
+    assert btn.label == "b"
+    print("test_assign_helper_only_writes_on_change PASS")
+
+
 def test_plate_api_disabled_by_default():
     from bokeh.document import Document
     from helao.framework.app.operator.bokeh_operator import BokehOperator
