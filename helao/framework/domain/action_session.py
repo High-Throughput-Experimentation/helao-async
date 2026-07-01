@@ -126,6 +126,11 @@ class ActionSession:
         # data packages awaiting drain to storage (in lieu of the legacy
         # data_q / log_data_task background task). finish() drains these.
         self._pending_data: List[DataPackageModel] = []
+        # in-flight enqueue_data_nowait() tasks. finish() awaits these before
+        # closing file handles so a fire-and-forget write scheduled right before
+        # finish() can't open the .hlo AFTER _close_conns (a leaked handle would
+        # lock RUNS_ACTIVE->FINISHED promotion on Windows: WinError 32).
+        self._enqueue_tasks: list = []
         # open HLO file-connection handles keyed by file_conn_key (ports the
         # legacy Active.file_conn_dict open-file bookkeeping). substitute/finish
         # close these; split closes the prior ones and opens fresh ones.
@@ -314,7 +319,12 @@ class ActionSession:
         iteration (``await asyncio.sleep(0)`` is sufficient to drain it in tests).
         """
         import asyncio
-        asyncio.ensure_future(self.enqueue_data(datamodel, action))
+        # track the task so finish() can await it before closing file handles
+        # (see _enqueue_tasks / _finish); otherwise the write may open the .hlo
+        # after _close_conns and leak the handle.
+        self._enqueue_tasks.append(
+            asyncio.ensure_future(self.enqueue_data(datamodel, action))
+        )
 
     async def _enqueue_phase_data(self, data: dict) -> None:
         """Enqueue executor-phase ``data`` keyed by the action's first file conn."""
@@ -903,6 +913,17 @@ class ActionSession:
         )
         if not all_finished:
             return self.action
+
+        # await any in-flight enqueue_data_nowait() writes BEFORE draining and
+        # closing file handles. A nowait write lazily opens the .hlo; if it runs
+        # after _close_conns the handle leaks and locks the RUNS_ACTIVE->FINISHED
+        # promotion (Windows WinError 32). Awaiting here guarantees the open is
+        # tracked in _open_handles so _close_conns closes it.
+        if self._enqueue_tasks:
+            _pending_tasks = [t for t in self._enqueue_tasks if not t.done()]
+            self._enqueue_tasks = []
+            if _pending_tasks:
+                await asyncio.gather(*_pending_tasks, return_exceptions=True)
 
         # deterministic data drain: bounded loop converting queued -> written.
         # (The legacy code re-enqueues empty finished packages and sleeps 0.1s up
