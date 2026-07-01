@@ -126,7 +126,8 @@ async def test_baseapi_no_drivers(tmp_path):
         assert app.driver is None
 
 
-def test_baseapi_dyn_endpoints_invoked(tmp_path):
+@pytest.mark.asyncio
+async def test_baseapi_dyn_endpoints_invoked(tmp_path):
     received = {}
 
     def dyn(app):
@@ -135,7 +136,11 @@ def test_baseapi_dyn_endpoints_invoked(tmp_path):
     app = BaseAPI(
         server_key="SIM", save_root=str(tmp_path), dyn_endpoints=dyn
     )
-    assert received["app"] is app
+    # dyn_endpoints now runs in the startup event (so async ones can be
+    # awaited), not at __init__ — assert after lifespan startup.
+    assert "app" not in received
+    async with asgi_lifespan(app):
+        assert received["app"] is app
 
 
 # --- T-action-endpoint -----------------------------------------------------

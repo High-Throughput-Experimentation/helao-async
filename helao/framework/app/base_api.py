@@ -1187,6 +1187,7 @@ def _make_base_api_class():
             *,
             driver_classes=None,
             dyn_endpoints=None,
+            poller_class=None,
             save_root=None,
             transport=None,
             sequence_lib=None,
@@ -1204,8 +1205,12 @@ def _make_base_api_class():
                     the base (dual-convention: ``HelaoDriver`` subclasses get
                     ``config=server_params``; bare helpers get the base
                     positionally — see ``[[sp8-drivers-bare-helpers]]``).
-                dyn_endpoints: Optional callable invoked as ``dyn_endpoints(app=self)``
-                    after base construction to register extra routes.
+                dyn_endpoints: Optional callable (sync OR ``async def``) invoked
+                    as ``dyn_endpoints(app=self)`` in the startup event, after the
+                    drivers are built, to register extra routes. Async callables
+                    are awaited (galil/gamry/sm303 use ``async def``).
+                poller_class: Optional ``DriverPoller`` subclass; attached to the
+                    first ``HelaoDriver`` at startup (legacy parity).
                 save_root: Output root for ``FsStorage``; a temp dir when ``None``.
                 transport: Transport adapter; a :class:`FakeTransport` when ``None``.
                 sequence_lib: Reserved (orchestrator concern; accepted for parity).
@@ -1246,6 +1251,13 @@ def _make_base_api_class():
             self.base = base
             self.state.base = base
             self.state.save_root = save_root
+            # Legacy parity: hte action servers read config off the *app*, not
+            # the base — app.server_params (pal_server), app.helao_cfg (the whole
+            # world config; mfc_server), app.server_cfg.
+            self.server_params = base.server_params
+            self.server_cfg = base.server_cfg
+            self.helao_cfg = base.helao_cfg
+            self.world_cfg = base.world_cfg
 
             # --- driver instantiation (DEFERRED to startup) ----------------
             # Drivers are NOT built here: several ``test``-deployment drivers
@@ -1258,12 +1270,16 @@ def _make_base_api_class():
             # loop. ``app.driver``/``app.drivers`` stay ``None``/``()`` until
             # then.
             self._driver_classes = list(driver_classes or [])
+            self._poller_class = poller_class
             self.drivers = tuple()
             self.driver = None
+            self.poller = None
 
-            # --- dynamic endpoints -----------------------------------------
-            if dyn_endpoints is not None:
-                dyn_endpoints(app=self)
+            # dyn_endpoints is invoked in the startup event (after drivers are
+            # built, loop live) so async callables can be awaited — see
+            # _framework_base_startup. Registering it here would leave an async
+            # dyn_endpoints coroutine un-awaited (routes never registered).
+            self._dyn_endpoints = dyn_endpoints
 
             # --- private status-client endpoints (port base.py attach/detach) ---
             self._register_status_endpoints(server_key, base)
@@ -1283,6 +1299,12 @@ def _make_base_api_class():
                 # onto the now-running loop.
                 self._instantiate_drivers()
                 await base.myinit()
+                # dynamic endpoints: run AFTER drivers exist (dyn callables may
+                # reference app.driver) and await async ones (galil/gamry/sm303).
+                if self._dyn_endpoints is not None:
+                    res = self._dyn_endpoints(app=self)
+                    if inspect.iscoroutine(res):
+                        await res
                 await base.init_endpoint_status(self.routes)
                 # WS-B: mirror every POST route as a HEAD route so the
                 # dispatcher's endpoints_available HEAD probes return 200. Done
@@ -1310,9 +1332,16 @@ def _make_base_api_class():
                 "Drivers", [d.__name__ for d in self._driver_classes]
             )
             driver_dict = {}
-            for driver_class in self._driver_classes:
+            for i, driver_class in enumerate(self._driver_classes):
                 if self._is_helao_driver(driver_class):
                     driver_inst = driver_class(config=self.base.server_params)
+                    # legacy parity: attach the poller to the first HelaoDriver
+                    if i == 0 and self._poller_class is not None:
+                        self.poller = self._poller_class(
+                            driver_inst,
+                            self.base.server_cfg.get("polling_time", 0.1),
+                        )
+                        self.poller._base_hook = self.base
                 else:
                     driver_inst = driver_class(self.base)
                 driver_dict[driver_class.__name__] = driver_inst
