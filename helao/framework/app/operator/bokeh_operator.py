@@ -425,7 +425,7 @@ class BokehOperator:
 
         # buttons to control orch
         self.button_start_orch = self._make_button(
-            "Start Orch", "default", 70, self.callback_start_orch
+            "Start Orch", "success", 70, self.callback_start_orch
         )
         self.button_estop_orch = self._make_button(
             "ESTOP", "danger", int(self.max_width * 0.25), self.callback_estop_orch,
@@ -472,9 +472,13 @@ class BokehOperator:
             "Queue ✕", "default", 70, self.callback_queue_remove, width_policy="min"
         )
         self.button_stop_orch = self._make_button(
-            "Stop Orch", "default", 70, self.callback_stop_orch
+            "Stop Orch", "danger", 70, self.callback_stop_orch
         )
-        self.reset_run_id_on_stop = CheckboxGroup(labels=["reset run_id"], active=[])
+        # align="center" cross-centers the checkbox vertically against the
+        # adjacent Stop Orch button in their shared row.
+        self.reset_run_id_on_stop = CheckboxGroup(
+            labels=["reset run_id"], active=[], align="center"
+        )
         self.button_skip_exp = self._make_button(
             "Skip exp", "danger", 70, self.callback_skip_exp
         )
