@@ -14,6 +14,7 @@ Lives under ``adapters/`` so it may import I/O libraries (aiofiles, os,
 ruamel.yaml). The YAML formatting matches ``helao.helpers.yml_tools.yml_dumps``
 (2/4/2 indent, ``null`` for None, duplicate keys allowed) for meta-byte parity.
 """
+import asyncio
 import json
 import os
 from io import StringIO
@@ -26,6 +27,28 @@ import aioshutil
 import ruamel.yaml
 
 from helao.framework.ports.storage import Storage, StorageKeyError
+
+
+async def _retry_busy(thunk, *, attempts: int = 10, delay: float = 0.2):
+    """Run an async filesystem op, retrying transient Windows busy-file locks.
+
+    A just-closed ``.hlo`` can stay briefly locked by the OS (a lagging handle
+    release, AV/indexer, or a post-processor read), so a single
+    ``remove``/``rmtree``/``move`` during RUNS_ACTIVE->FINISHED promotion can
+    raise ``PermissionError`` (WinError 32). Retry a bounded number of times
+    with a short sleep, then re-raise. ``FileNotFoundError`` is tolerated
+    (the target was already moved by a concurrent op). Ports the busy-file
+    retry the legacy ``move_dir`` performed.
+    """
+    for attempt in range(attempts):
+        try:
+            return await thunk()
+        except FileNotFoundError:
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            await asyncio.sleep(delay)
 
 
 def _yml_dumps(obj: Any) -> str:
@@ -193,28 +216,23 @@ class FsStorage(Storage):
                 )
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
                 if target_root == "RUNS_NOSYNC":
-                    await aioshutil.move(src, dst)
+                    await _retry_busy(lambda s=src, d=dst: aioshutil.move(s, d))
                 else:
                     await aioshutil.copy(src, dst)
                 moved_or_copied.append(src)
 
-            # remove the copied sources (moved NOSYNC files are already gone)
+            # remove the copied sources (moved NOSYNC files are already gone).
+            # Retry transient Windows busy-file locks on the just-closed .hlo.
             for src in moved_or_copied:
                 if os.path.isfile(src):
-                    try:
-                        await aiofiles.os.remove(src)
-                    except FileNotFoundError:
-                        pass
+                    await _retry_busy(lambda s=src: aiofiles.os.remove(s))
 
             # rmtree the (now-empty) source dir; tolerate concurrent removal.
             # For non-recursive promotes the source dir may still hold child
             # subdirs (not yet promoted) -- only remove when it is empty.
             if os.path.isdir(src_dir):
                 if recursive or not os.listdir(src_dir):
-                    try:
-                        await aioshutil.rmtree(src_dir)
-                    except FileNotFoundError:
-                        pass
+                    await _retry_busy(lambda d=src_dir: aioshutil.rmtree(d))
         except Exception:
             if log is not None:
                 log.error(
