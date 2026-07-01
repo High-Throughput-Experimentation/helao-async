@@ -63,6 +63,39 @@ async def test_reconnects_past_five_and_never_blocks(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_decode_hook_parses_json_frames(monkeypatch):
+    import json
+
+    real_sleep = asyncio.sleep
+    frames = ['{"a": 1, "b": "x"}']
+
+    class _Session:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def recv(self):
+            if frames:
+                return frames.pop(0)
+            raise asyncio.CancelledError  # stop the loop after the one frame
+
+    monkeypatch.setattr(ws_utils.websockets, "connect", lambda url: _Session())
+
+    sub = ws_utils.WsSubscriber.__new__(ws_utils.WsSubscriber)
+    sub.data_url = "ws://test/ws_data"
+    sub.recv_queue = collections.deque(maxlen=10)
+    sub._decode = json.loads  # framework send_json relay
+
+    task = asyncio.create_task(sub.subscriber_loop())
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert list(sub.recv_queue) == [{"a": 1, "b": "x"}]
+
+
+@pytest.mark.asyncio
 async def test_backoff_resets_after_successful_connect(monkeypatch):
     backoffs = []
     real_sleep = asyncio.sleep

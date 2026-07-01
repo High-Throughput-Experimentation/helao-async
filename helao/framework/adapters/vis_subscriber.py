@@ -16,6 +16,7 @@ __all__ = [
 ]
 
 import os
+import json
 import time
 import asyncio
 from functools import partial
@@ -132,7 +133,13 @@ class VisSubscriber:
         self.host = self.serv_config.get("host", None)
         self.port = self.serv_config.get("port", None)
         self.data_url = f"ws://{self.host}:{self.port}/{self.WS_PATH}"
-        self.wss = Wss(self.host, self.port, self.WS_PATH) if self.USE_WSS else None
+        # framework action servers relay ws_data as JSON (BaseAPI._ws_relay
+        # send_json), not the legacy zstd+pickle — decode accordingly.
+        self.wss = (
+            Wss(self.host, self.port, self.WS_PATH, decode=json.loads)
+            if self.USE_WSS
+            else None
+        )
 
         self.IOloop_data_run = False
         self.IOloop_stat_run = False

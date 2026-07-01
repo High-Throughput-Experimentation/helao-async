@@ -25,6 +25,11 @@ INITIAL_RECONNECT_BACKOFF_S = 2
 MAX_RECONNECT_BACKOFF_S = 30
 
 
+def _decode_zstd_pickle(raw):
+    """Default WS payload decoder: zstd-decompress then unpickle (legacy wire)."""
+    return pickle.loads(pyzstd.decompress(raw))
+
+
 class WsPublisher:
     """Broadcast messages from a multi-subscriber queue to WebSocket clients.
 
@@ -108,10 +113,18 @@ class WsSubscriber:
     message into ``recv_queue`` (bounded by ``max_qlen``).
     """
 
-    def __init__(self, host, port, path, max_qlen=500):
-        """Start the background subscriber task targeting ``ws://host:port/path``."""
+    def __init__(self, host, port, path, max_qlen=500, decode=None):
+        """Start the background subscriber task targeting ``ws://host:port/path``.
+
+        ``decode`` maps a raw received frame to a Python object. It defaults to
+        the legacy zstd+pickle wire format; framework consumers of a ``send_json``
+        relay (``BaseAPI._ws_relay`` — action-server ``/ws_data`` / ``/ws_status``)
+        must pass ``decode=json.loads`` since those frames are JSON text, not
+        zstd-compressed pickle.
+        """
         self.data_url = f"ws://{host}:{port}/{path}"
         self.recv_queue = collections.deque(maxlen=max_qlen)
+        self._decode = decode or _decode_zstd_pickle
         self.subscriber_task = asyncio.create_task(self.subscriber_loop())
 
     async def subscriber_loop(self):
@@ -133,7 +146,7 @@ class WsSubscriber:
                     backoff = INITIAL_RECONNECT_BACKOFF_S  # reset on success
                     while True:
                         recv_bytes = await ws.recv()
-                        recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
+                        recv_data_dict = self._decode(recv_bytes)
                         self.recv_queue.append(recv_data_dict)
             except asyncio.CancelledError:
                 raise

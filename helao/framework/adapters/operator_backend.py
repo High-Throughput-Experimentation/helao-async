@@ -9,6 +9,7 @@ branch on object-vs-JSON. See the method docstrings for the contract.
 """
 
 import asyncio
+import json
 from typing import Callable, Optional
 
 from helao.framework.support.dispatcher import async_private_dispatcher
@@ -197,7 +198,8 @@ class RemoteBackend(OrchBackend):
             if resp:
                 self._step_flags.update(resp)
             on_change()
-        self._wss = Wss(self.host, self.port, "ws_status")
+        # framework orch relays ws_status as JSON (send_json), not zstd+pickle.
+        self._wss = Wss(self.host, self.port, "ws_status", decode=json.loads)
         self._ws_task = asyncio.create_task(self._ws_loop(on_change))
         self._poll_task = asyncio.create_task(self._poll_loop(on_change))
         self._prime_task = asyncio.create_task(_prime())
