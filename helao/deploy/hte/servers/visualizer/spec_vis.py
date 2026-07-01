@@ -10,7 +10,7 @@ from bokeh.models.widgets import Div
 from bokeh.layouts import layout, Spacer
 from bokeh.models import ColumnDataSource
 
-import matplotlib.cm as cm
+from matplotlib import colormaps
 import matplotlib.colors as mcolors
 
 from helao.framework.support import helao_logging as logging
@@ -83,7 +83,7 @@ class C_vis(ActionVisualizer):
         self.max_spectra = 5
         self.downsample = 2
 
-        self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
+        self.cmap = colormaps["Reds_r"].resampled(self.max_spectra)
         self.latest_coloridx = 0
 
         self.wl = private_dispatcher(
@@ -208,7 +208,7 @@ class C_vis(ActionVisualizer):
             newpts = 10000
 
         self.max_spectra = newpts
-        self.cmap = cm.get_cmap("Reds_r", self.max_spectra)
+        self.cmap = colormaps["Reds_r"].resampled(self.max_spectra)
 
         self.vis.doc.add_next_tick_callback(
             partial(self.update_input_value, sender, f"{self.max_spectra}")
