@@ -19,6 +19,11 @@ import websockets
 from fastapi import WebSocket
 from websockets.sync.client import connect
 
+# WsSubscriber reconnect backoff (seconds): start here, double on each failed
+# attempt, cap at the max. Reset to the initial value after a successful connect.
+INITIAL_RECONNECT_BACKOFF_S = 2
+MAX_RECONNECT_BACKOFF_S = 30
+
 
 class WsPublisher:
     """Broadcast messages from a multi-subscriber queue to WebSocket clients.
@@ -112,20 +117,32 @@ class WsSubscriber:
     async def subscriber_loop(self):
         """Connect to the publisher and feed decoded messages into ``recv_queue``.
 
-        Retries up to five times on connection failure with a two-second
-        sleep between attempts.
+        Reconnects indefinitely: on any connection failure or mid-stream drop it
+        waits a capped exponential backoff and retries, so a slow-starting or
+        restarted publisher (e.g. an action server the visualizer subscribes to)
+        is picked up whenever it comes back — rather than the subscriber dying
+        after a fixed number of attempts. The wait is ``await asyncio.sleep`` so
+        it never blocks the event loop (the old ``time.sleep`` froze the whole
+        Bokeh document). The backoff resets after a successful connection, and
+        cancelling ``subscriber_task`` (see the owner's ``close``) exits cleanly.
         """
-        retry_limit = 5
-        for retry_idx in range(retry_limit):
+        backoff = INITIAL_RECONNECT_BACKOFF_S
+        while True:
             try:
                 async with websockets.connect(self.data_url) as ws:
+                    backoff = INITIAL_RECONNECT_BACKOFF_S  # reset on success
                     while True:
                         recv_bytes = await ws.recv()
                         recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
                         self.recv_queue.append(recv_data_dict)
+            except asyncio.CancelledError:
+                raise
             except Exception:
-                print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
-                time.sleep(2)
+                print(
+                    f"{self.data_url}: not connected, reconnecting in {backoff}s"
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, MAX_RECONNECT_BACKOFF_S)
 
     async def read_messages(self) -> list:
         """Drain and return every buffered message in FIFO order."""
