@@ -112,6 +112,22 @@ def _base(tmp_path):
     )
 
 
+def test_public_file_conn_key_aliases(tmp_path):
+    """hte action servers call the public dflt_file_conn_key / new_file_conn_key."""
+    import hashlib
+    from uuid import UUID
+
+    base = _base(tmp_path)
+    # public alias matches the private default and is legacy-deterministic
+    assert base.dflt_file_conn_key() == base._dflt_file_conn_key()
+    assert base.dflt_file_conn_key() == UUID(
+        hashlib.md5(b"None").hexdigest()
+    )
+    assert base.new_file_conn_key("x") == UUID(
+        hashlib.md5(b"x").hexdigest()
+    )
+
+
 def test_setup_and_contain_accepts_legacy_kwargs_and_stamps(tmp_path):
     """setup_and_contain_action takes the legacy kwargs (action_abbr/hloheader/
     file_type/json_data_keys) and myinit stamps action identity when unset."""

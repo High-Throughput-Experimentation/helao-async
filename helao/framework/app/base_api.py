@@ -791,6 +791,22 @@ class FrameworkBase:
         """
         return UUID(hashlib.md5(str(None).encode("utf-8")).hexdigest())
 
+    def new_file_conn_key(self, key: str) -> UUID:
+        """MD5-derived file-connection UUID. Ports legacy ``Base.new_file_conn_key``.
+
+        hte action servers (e.g. pal_server) call this public name off the base;
+        the framework's internal default key uses ``_dflt_file_conn_key``.
+        """
+        return UUID(hashlib.md5(str(key).encode("utf-8")).hexdigest())
+
+    def dflt_file_conn_key(self) -> UUID:
+        """Public legacy alias for the default file-connection key (``md5(str(None))``).
+
+        Ports ``Base.dflt_file_conn_key``; hte action servers call this name
+        directly (``active.base.dflt_file_conn_key()``).
+        """
+        return self._dflt_file_conn_key()
+
     async def contain_action(self, action: RunAction) -> ActionSession:
         """Register ``action`` as active, substituting any prior session with the same UUID.
 
