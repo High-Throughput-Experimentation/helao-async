@@ -210,9 +210,15 @@ class LocalLoader:
                 "data_path argument is not a valid file or folder path"
             )
         _yml_paths = []
+        # MicroOrch zips are rooted at RUNS_FINISHED (arcnames keep the sequence
+        # dir prefix) and carry a MANIFEST.txt at the archive root. Regular Orch
+        # sequence zips are rooted at the sequence itself (no seq_dir prefix) and
+        # have no MANIFEST. This flag disambiguates the two in get_bytes.
+        self._is_microorch_zip = False
         if self.target.endswith(".zip"):
             with ZipFile(self.target, "r") as zf:
                 zip_contents = zf.namelist()
+            self._is_microorch_zip = "MANIFEST.txt" in zip_contents
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
             _yml_paths += glob(
                 os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
@@ -477,7 +483,13 @@ class LocalLoader:
             ):
                 if seq_dir and seq_dir in fn:
                     rel_seqzip_path = fn.split(seq_dir, 1)[-1].lstrip("/")
-                    rel_seqzip_path = f"{rel_seqzip_path}".rstrip("/")
+                    # MicroOrch zips are RUNS_FINISHED-rooted, so arcnames keep
+                    # the seq_dir prefix; regular Orch sequence zips are rooted
+                    # at the sequence, so the prefix is dropped.
+                    if self._is_microorch_zip:
+                        rel_seqzip_path = f"{seq_dir}/{rel_seqzip_path}".rstrip("/")
+                    else:
+                        rel_seqzip_path = rel_seqzip_path.rstrip("/")
                     break
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()
