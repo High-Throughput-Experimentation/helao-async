@@ -77,13 +77,15 @@ if __name__ == "__main__":
     )
     deployment = server_config.get("deployment", detected_deployment)
     if "deployment" not in server_config:
-        possible_deployments = glob(
-            os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
-                "*",
-                "servers",
-                server_config["group"],
-                f"{server_config['fast']}.py",
+        possible_deployments = sorted(
+            glob(
+                os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.dirname(config_path))),
+                    "*",
+                    "servers",
+                    server_config["group"],
+                    f"{server_config['fast']}.py",
+                )
             )
         )
         if len(possible_deployments) == 1:
@@ -94,16 +96,29 @@ if __name__ == "__main__":
             )
             LOGGER.info(f"Auto-detected deployment: {deployment}")
         elif len(possible_deployments) > 1:
-            # prefer detected deployment
+            # Prefer the deployment matching the config's own path. If none
+            # match (e.g. a derived/private config that reuses another
+            # deployment's generic app), fall back to the first match and warn
+            # rather than crashing on an empty filter.
+            config_dep_dir = os.path.dirname(os.path.dirname(config_path))
             filter_possible = [
-                x
-                for x in possible_deployments
-                if x.startswith(os.path.dirname(os.path.dirname(config_path)))
-            ][0]
+                x for x in possible_deployments if x.startswith(config_dep_dir)
+            ]
+            chosen = filter_possible[0] if filter_possible else possible_deployments[0]
             deployment = os.path.basename(
-                os.path.dirname(os.path.dirname(os.path.dirname(filter_possible)))
+                os.path.dirname(os.path.dirname(os.path.dirname(chosen)))
             )
-            LOGGER.info(f"Auto-detected deployment from multiple options: {deployment}")
+            if filter_possible:
+                LOGGER.info(
+                    f"Auto-detected deployment from multiple options: {deployment}"
+                )
+            else:
+                LOGGER.warning(
+                    f"No deployment under the config path matched "
+                    f"{server_config['fast']} in {server_config['group']}; "
+                    f"falling back to '{deployment}'. Set an explicit "
+                    f"'deployment:' key on this server to disambiguate."
+                )
         else:
             raise FileNotFoundError(
                 f"Could not find deployment for {server_config['fast']} in {server_config['group']}"
