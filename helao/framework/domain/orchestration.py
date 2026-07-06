@@ -253,6 +253,10 @@ def _broadcast(state: OrchState) -> BroadcastGlobalStatus:
     Ports the ``interrupt_q.put(globalstatusmodel)`` push every legacy transition
     issued so subscribers see the new state.
     """
+    # NOTE: the payload carries RAW nested objects (MachineModel,
+    # Dict[UUID, ActionModel], enums) — in-process consumers (runners, status
+    # ingestion) depend on them. JSON-serialization for the ws wire is the
+    # relay adapter's job (orch_api._json_clean), NOT the domain's.
     return BroadcastGlobalStatus(payload=state.globalstatusmodel.as_json())
 
 

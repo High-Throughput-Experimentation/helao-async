@@ -1072,6 +1072,32 @@ class OwnStatusIngestor:
 # --------------------------------------------------------------------------- #
 
 
+def _json_clean(obj):
+    """Deep-convert a domain payload into a json.dumps-safe structure.
+
+    The global-status payload carries raw MachineModel/ActionModel objects,
+    UUID (and tuple) dict keys, and enums. dict keys are stringified; models
+    fall back to their ``as_dict`` (re-cleaned) or ``str()``. Used only at the
+    ws wire boundary — in-process consumers keep the rich objects.
+    """
+    if isinstance(obj, dict):
+        return {str(k): _json_clean(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple, set)):
+        return [_json_clean(v) for v in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    as_dict = getattr(obj, "as_dict", None)
+    if callable(as_dict):
+        try:
+            return _json_clean(as_dict())
+        except Exception:
+            return str(obj)
+    value = getattr(obj, "value", None)  # plain enums
+    if value is not None and isinstance(value, (str, int, float)):
+        return value
+    return str(obj)
+
+
 async def _orch_ws_relay(websocket, eventsink, channel: str) -> None:
     """Accept a websocket and forward eventsink items on ``channel`` as JSON.
 
@@ -1101,8 +1127,10 @@ async def _orch_ws_relay(websocket, eventsink, channel: str) -> None:
             # this function's docstring). The operator's WsSubscriber decodes
             # json.loads, so the old zstd+pickle bytes made every DELIVERED frame
             # fail to decode -> drop -> 2s reconnect flap whenever status flowed
-            # (i.e. during a running sequence).
-            await websocket.send_json(payload)
+            # (i.e. during a running sequence). The domain payload carries raw
+            # models/UUID-keyed dicts for in-process consumers, so serialize it
+            # here at the wire boundary.
+            await websocket.send_json(_json_clean(payload))
     except WebSocketDisconnect:
         return
     except Exception:

@@ -118,6 +118,35 @@ def test_remote_backend_ws_loop_fires_on_change():
     assert calls, "on_change was not fired on a ws message"
 
 
+def test_broadcast_payload_json_cleans_for_the_wire():
+    """The relay's _json_clean makes a POPULATED broadcast payload send_json-safe.
+
+    The domain payload (as_json) carries raw MachineModel / Dict[UUID,
+    ActionModel] / enums for in-process consumers; json.dumps on it raises
+    TypeError, which silently killed the relay (except-Exception-return) on
+    every frame -- the operator's reconnect flap during running sequences. The
+    relay must clean it at the wire boundary.
+    """
+    from uuid import uuid4
+
+    from helao.framework.app.orch_api import _json_clean
+    from helao.framework.domain.orchestration import OrchState, _broadcast
+    from helao.framework.models.action import ActionModel
+    from helao.framework.models.machine import MachineModel
+
+    state = OrchState()
+    gsm = state.globalstatusmodel
+    gsm.orchestrator = MachineModel(server_name="ORCH", machine_name="uvis4")
+    gsm.active_dict[uuid4()] = ActionModel(
+        action_name="archive_custom_unloadall",
+        action_server=MachineModel(server_name="PAL", machine_name="uvis4"),
+    )
+    payload = _broadcast(state).payload
+    cleaned = _json_clean(payload)
+    out = json.dumps(cleaned)  # must not raise
+    assert "archive_custom_unloadall" in out
+
+
 def test_ws_status_wire_format_matches_consumer(tmp_path):
     """Prove a forwarded frame decodes exactly as the real consumer does.
 
