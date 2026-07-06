@@ -128,6 +128,53 @@ def test_public_file_conn_key_aliases(tmp_path):
     )
 
 
+def test_legacy_base_helper_methods(tmp_path):
+    """Legacy Base public helpers hte servers call off app.base.
+
+    galil_motion calls get_main_error (its absence estopped MOTOR at uvis4);
+    calc_server calls get_realtime_nowait; galil/aligner call print_message and
+    stop_all_executor_prefix / stop_executor.
+    """
+    from helao.framework.models.errors import ErrorCodes
+
+    base = _base(tmp_path)
+
+    # get_main_error: first non-none from a list, passthrough otherwise
+    assert base.get_main_error(
+        [ErrorCodes.none, ErrorCodes.motor, ErrorCodes.critical_error]
+    ) == ErrorCodes.motor
+    assert base.get_main_error([ErrorCodes.none]) == ErrorCodes.none
+    assert base.get_main_error(ErrorCodes.setup) == ErrorCodes.setup
+
+    # get_realtime_nowait: applies the clock offset; explicit args honored
+    base.clock.offset_seconds = 2.0
+    t = base.get_realtime_nowait(epoch_ns=1_000)
+    assert t == 1_000 + 2_000_000_000
+    assert base.get_realtime_nowait(epoch_ns=1_000, offset=0) == 1_000
+
+    # print_message: must not raise for the common call shapes
+    base.print_message("hello", "world")
+    base.print_message("bad", error=True)
+
+    # stop_executor / stop_all_executor_prefix drive registered executors
+    class _Exec:
+        def __init__(self):
+            self.stopped = False
+            self.tag = "x"
+
+        def stop_action_task(self):
+            self.stopped = True
+
+    e1, e2, e3 = _Exec(), _Exec(), _Exec()
+    e2.tag = "y"
+    base.executors.update({"move a": e1, "move b": e2, "other c": e3})
+    assert base.stop_executor("move a") == {"signal_stop": True}
+    assert e1.stopped
+    assert base.stop_executor("missing") == {"signal_stop": False}
+    base.stop_all_executor_prefix("move", match_vars={"tag": "y"})
+    assert e2.stopped and not e3.stopped
+
+
 def test_setup_and_contain_accepts_legacy_kwargs_and_stamps(tmp_path):
     """setup_and_contain_action takes the legacy kwargs (action_abbr/hloheader/
     file_type/json_data_keys) and myinit stamps action identity when unset."""

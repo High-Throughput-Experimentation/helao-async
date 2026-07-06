@@ -807,6 +807,77 @@ class FrameworkBase:
         """
         return self._dflt_file_conn_key()
 
+    # --- legacy Base public surface used by deploy action servers -------------
+
+    def get_main_error(self, errors) -> ErrorCodes:
+        """First non-``none`` error code, or the input itself if not a list.
+
+        Ports ``Base.get_main_error`` (galil_motion/move and the aligner call
+        ``app.base.get_main_error(...)``).
+        """
+        if isinstance(errors, list):
+            for error in errors:
+                if error != ErrorCodes.none:
+                    return error
+            return ErrorCodes.none
+        return errors
+
+    def get_realtime_nowait(self, epoch_ns=None, offset=None) -> int:
+        """Wall-clock time in nanoseconds with the (NTP) offset applied.
+
+        Ports ``Base.get_realtime_nowait``: ``offset`` (seconds) defaults to the
+        injected clock's NTP offset; ``epoch_ns`` defaults to now.
+        """
+        if offset is None:
+            offset_s = float(getattr(self.clock, "offset_seconds", 0.0) or 0.0)
+        else:
+            offset_s = float(offset)
+        base_ns = time.time_ns() if epoch_ns is None else int(epoch_ns)
+        return base_ns + int(offset_s * 1e9)
+
+    def print_message(self, *args, **kwargs) -> None:
+        """Forward a message through the shared logger. Ports ``Base.print_message``."""
+        kwargs.pop("log_dir", None)
+        level = kwargs.pop("error", None) or kwargs.pop("level", None)
+        msg = " ".join(str(a) for a in args)
+        if level in ("error", 40, True):
+            LOGGER.error(msg)
+        elif level in ("warning", "warn", 30):
+            LOGGER.warning(msg)
+        else:
+            LOGGER.info(msg)
+
+    def stop_executor(self, executor_id: str) -> dict:
+        """Signal the named executor to end its polling loop. Ports ``Base.stop_executor``."""
+        executor = self.executors.get(executor_id)
+        if executor is None:
+            LOGGER.error(
+                f"Could not find executor {executor_id}; may have already finished."
+            )
+            return {"signal_stop": False}
+        stop_fn = getattr(executor, "stop_action_task", None)
+        if callable(stop_fn):
+            stop_fn()
+        LOGGER.info(f"Signaling executor task {executor_id} to end polling loop.")
+        return {"signal_stop": True}
+
+    def stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}) -> None:
+        """Stop every executor whose key starts with ``action_name``.
+
+        Ports ``Base.stop_all_executor_prefix`` incl. the optional
+        ``match_vars`` attribute filter.
+        """
+        matching = [k for k in self.executors if k.startswith(action_name)]
+        if match_vars:
+            matching = [
+                ek
+                for ek, ex in self.executors.items()
+                if any(vars(ex).get(vk, "") == vv for vk, vv in match_vars.items())
+                and ek in matching
+            ]
+        for exec_key in matching:
+            self.stop_executor(exec_key)
+
     async def contain_action(self, action: RunAction) -> ActionSession:
         """Register ``action`` as active, substituting any prior session with the same UUID.
 
