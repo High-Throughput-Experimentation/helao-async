@@ -1078,7 +1078,7 @@ class MicroOrch:
                             continue
                         seen.add(arcname)
                         zf.write(abs_path, arcname)
-            zf.writestr("\n".join(sorted(seen)), "MANIFEST.txt")
+            zf.writestr("MANIFEST.txt", "\n".join(sorted(seen)))
         return zip_path
 
     # ------------------------------------------------------------------
