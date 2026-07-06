@@ -1,7 +1,12 @@
-"""Orchestrator /ws_status WebSocket relay."""
-import pickle
+"""Orchestrator /ws_status WebSocket relay.
 
-import pyzstd
+Wire format is JSON (framework standard, matching BaseAPI._ws_relay). The
+operator's WsSubscriber decodes frames with json.loads — the relay's earlier
+zstd+pickle bytes made every delivered frame fail to decode and flap the
+operator's status subscription during running sequences.
+"""
+import json
+
 from fastapi.testclient import TestClient
 
 from helao.framework.app.factory import makeApp
@@ -9,8 +14,8 @@ from helao.framework.ports.eventsink import STATUS_CHANNEL
 
 
 def _recv(ws):
-    """Decode a zstd-pickle frame the way WsSubscriber.subscriber_loop does."""
-    return pickle.loads(pyzstd.decompress(ws.receive_bytes()))
+    """Decode a JSON frame the way the operator's WsSubscriber (json.loads) does."""
+    return json.loads(ws.receive_text())
 
 
 def _app(tmp_path):
@@ -114,16 +119,17 @@ def test_remote_backend_ws_loop_fires_on_change():
 
 
 def test_ws_status_wire_format_matches_consumer(tmp_path):
-    """Prove a forwarded frame decodes exactly as WsSubscriber.subscriber_loop would.
+    """Prove a forwarded frame decodes exactly as the real consumer does.
 
-    This is the real-consumer-path round-trip: receive raw bytes from the relay
-    and decode them with the identical pickle+zstd path used by WsSubscriber.
+    The operator's RemoteBackend subscribes with WsSubscriber(decode=json.loads),
+    so the relay must send JSON text frames. Receive the raw text and decode it
+    with the identical json.loads path.
     """
     app = makeApp("ORCH", save_root=str(tmp_path), group="orchestrator")
     with TestClient(app) as client:
         with client.websocket_connect("/ws_status") as ws:
             eventsink = app.state.driver.ports.eventsink
             client.portal.call(eventsink.emit_global_status, {"loop_state": "started"})
-            raw = ws.receive_bytes()
-            decoded = pickle.loads(pyzstd.decompress(raw))
+            raw = ws.receive_text()
+            decoded = json.loads(raw)
             assert decoded == {"loop_state": "started"}

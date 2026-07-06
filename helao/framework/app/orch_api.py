@@ -27,14 +27,11 @@ from __future__ import annotations
 
 import asyncio
 import os
-import pickle
 import tempfile
 import time
 import uuid as _uuid
 from datetime import datetime
 from typing import Any, Callable, List, Mapping, Optional
-
-import pyzstd
 
 from helao.framework.models.errors import ErrorCodes
 from helao.framework.models.hlostatus import HloStatus
@@ -1100,7 +1097,12 @@ async def _orch_ws_relay(websocket, eventsink, channel: str) -> None:
                 item_channel, payload = channel, item
             if item_channel != channel:
                 continue
-            await websocket.send_bytes(pyzstd.compress(pickle.dumps(payload)))
+            # JSON wire format (framework standard; matches BaseAPI._ws_relay and
+            # this function's docstring). The operator's WsSubscriber decodes
+            # json.loads, so the old zstd+pickle bytes made every DELIVERED frame
+            # fail to decode -> drop -> 2s reconnect flap whenever status flowed
+            # (i.e. during a running sequence).
+            await websocket.send_json(payload)
     except WebSocketDisconnect:
         return
     except Exception:
