@@ -92,25 +92,38 @@ def read_hlo_stream(
     data = defaultdict(list)
 
     for line in stream:
-        if header_end:
-            if not line.strip():
+        if not header_end:
+            stripped = line.decode("utf8", "ignore").lstrip()
+            if stripped.startswith("%%"):
+                # The header/data separator. A ``%%`` seen before any header
+                # line has been collected is a stray/duplicate marker (some
+                # files carry a spurious leading ``%%`` before the real
+                # header); ignore it and keep reading so the real header is
+                # not swallowed into the body.
+                if header_lines:
+                    header_end = True
                 continue
-            try:
-                line_dict = orjson.loads(line)
-            except orjson.JSONDecodeError:
-                print(f"skipping unparseable hlo data line: {line[:80]!r}")
+            if not stripped.startswith("{"):
+                # Ordinary header line (YAML ``key: value`` / list item).
+                header_lines.append(line)
                 continue
-            for k in line_dict:
-                if k in keep_keys or k not in omit_keys:
-                    v = line_dict[k]
-                    if isinstance(v, list):
-                        data[k] += v
-                    else:
-                        data[k].append(v)
-        elif line.decode("utf8").startswith("%%"):
+            # A JSON object appeared before any separator: the body has begun
+            # (e.g. a header-less file). Switch to data mode and parse it.
             header_end = True
-        elif not header_end:
-            header_lines.append(line)
+        if not line.strip():
+            continue
+        try:
+            line_dict = orjson.loads(line)
+        except orjson.JSONDecodeError:
+            print(f"skipping unparseable hlo data line: {line[:80]!r}")
+            continue
+        for k in line_dict:
+            if k in keep_keys or k not in omit_keys:
+                v = line_dict[k]
+                if isinstance(v, list):
+                    data[k] += v
+                else:
+                    data[k].append(v)
     if header_lines:
         meta = dict(yml_load("".join([x.decode("utf8") for x in header_lines])))
     else:
@@ -156,8 +169,12 @@ def read_hlo_header(file_path) -> tuple:
     with open(file_path) as f:
         for i, line in enumerate(f):
             if line.strip().startswith("%%"):
-                data_start_index = i + 1
-                break
+                # Ignore a stray leading ``%%`` written before the real header
+                # (see :func:`read_hlo_stream`); only a separator that follows
+                # collected header lines marks the true start of the body.
+                if yml_lines:
+                    data_start_index = i + 1
+                    break
             else:
                 yml_lines.append(line)
         yd = dict(_yaml.load("\n".join(yml_lines)))

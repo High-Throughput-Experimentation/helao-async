@@ -1559,9 +1559,14 @@ class Active:
         os.makedirs(output_path, exist_ok=True)
 
         LOGGER.info(f"writing data to: {output_file}")
-        # create output file and set connection
+        # create output file and set connection. Open with truncation ("w+")
+        # rather than append: this is the one-time creation of a fresh log
+        # file (filenames encode retry/split so there is no legitimate
+        # same-path append), and appending to any stale bytes left by a crash
+        # or re-run would push a spurious separator/header ahead of the real
+        # header and corrupt the .hlo layout.
         self.file_conn_dict[file_conn_key].file = await aiofiles.open(
-            output_file, mode="a+"
+            output_file, mode="w+"
         )
 
         if header:
