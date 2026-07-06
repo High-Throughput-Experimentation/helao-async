@@ -386,9 +386,9 @@ class BokehOperator:
         self.planhistory_tabs = Tabs(
             tabs=[
                 self.planner_tab,
-                self.action_history_tab,
-                self.experiment_history_tab,
                 self.sequence_history_tab,
+                self.experiment_history_tab,
+                self.action_history_tab,
             ],
             height_policy="min",
             sizing_mode="stretch_width",
@@ -425,7 +425,7 @@ class BokehOperator:
 
         # buttons to control orch
         self.button_start_orch = self._make_button(
-            "Start Orch", "default", 70, self.callback_start_orch
+            "Start Orch", "success", 70, self.callback_start_orch
         )
         self.button_estop_orch = self._make_button(
             "ESTOP", "danger", int(self.max_width * 0.25), self.callback_estop_orch,
@@ -459,17 +459,25 @@ class BokehOperator:
         self.button_plan_remove = self._make_button(
             "Plan ✕", "default", 70, self.callback_plan_remove, width_policy="min"
         )
-        self.button_seq_move_up = self._make_button(
-            "Queue ↑", "default", 70, self.callback_seq_move_up, width_policy="min"
+        # One set of queue-reorder buttons that acts on whichever queue tab is
+        # active (Sequence / Experiment / Action). See callback_queue_* and
+        # _active_queue_target.
+        self.button_queue_move_up = self._make_button(
+            "Queue ↑", "default", 70, self.callback_queue_move_up, width_policy="min"
         )
-        self.button_seq_move_down = self._make_button(
-            "Queue ↓", "default", 70, self.callback_seq_move_down, width_policy="min"
+        self.button_queue_move_down = self._make_button(
+            "Queue ↓", "default", 70, self.callback_queue_move_down, width_policy="min"
         )
-        self.button_seq_remove = self._make_button(
-            "Queue ✕", "default", 70, self.callback_seq_remove, width_policy="min"
+        self.button_queue_remove = self._make_button(
+            "Queue ✕", "default", 70, self.callback_queue_remove, width_policy="min"
         )
         self.button_stop_orch = self._make_button(
-            "Stop Orch", "default", 70, self.callback_stop_orch
+            "Stop Orch", "danger", 70, self.callback_stop_orch
+        )
+        # align="center" cross-centers the checkbox vertically against the
+        # adjacent Stop Orch button in their shared row.
+        self.reset_run_id_on_stop = CheckboxGroup(
+            labels=["reset run_id"], active=[], align="center"
         )
         self.button_skip_exp = self._make_button(
             "Skip exp", "danger", 70, self.callback_skip_exp
@@ -478,7 +486,7 @@ class BokehOperator:
             "Update tables", "default", 120, self.callback_update_tables
         )
         self.button_clear_expplan = self._make_button(
-            "Clear expplan", "default", 100, self.callback_clear_expplan
+            "Clear plan", "default", 100, self.callback_clear_expplan
         )
         self.orch_status_button = Button(
             label="Disabled", disabled=False, button_type="danger",
@@ -774,9 +782,10 @@ class BokehOperator:
                             self.button_add_expplan,
                             self.button_add_smpseqs,
                             self.button_prepend_plan,
+                            self.button_clear_expplan,
                             self.button_start_orch,
                             self.button_stop_orch,
-                            self.button_clear_expplan,
+                            self.reset_run_id_on_stop,
                             spacing=4,
                             sizing_mode="stretch_width",
                         ),
@@ -852,9 +861,9 @@ class BokehOperator:
                             ),
                         ],
                         row(
-                            self.button_seq_move_up,
-                            self.button_seq_move_down,
-                            self.button_seq_remove,
+                            self.button_queue_move_up,
+                            self.button_queue_move_down,
+                            self.button_queue_remove,
                             spacing=4,
                         ),
                         Spacer(height=10),
@@ -947,7 +956,9 @@ class BokehOperator:
                 "indices", lambda a, o, n: self._render_queue_tree()
             )
         self.queue_tabs.on_change(
-            "active", lambda a, o, n: self._render_queue_tree()
+            "active",
+            lambda a, o, n: (self._render_queue_tree(),
+                             self._refresh_queue_button_state()),
         )
 
         # select the first item to force an update of the layout
@@ -962,6 +973,19 @@ class BokehOperator:
 
         self._queue_counts = {"n_sequences": 0, "n_experiments": 0, "n_actions": 0}
         self._current_stop_message = ""
+        # Last orch state the unified queue buttons gate on (set by update_tables).
+        self._loop_state = None
+        self._manual_seq = False
+        # queue_tabs index -> (source, move_fn, remove_fn, name_col) for the
+        # unified reorder buttons. The Action Servers tab (3) has no entry.
+        self._queue_targets = {
+            0: (self.sequence_source, self.backend.move_sequence,
+                self.backend.remove_sequence, "sequence_name"),
+            1: (self.experiment_source, self.backend.move_experiment,
+                self.backend.remove_experiment, "experiment_name"),
+            2: (self.action_source, self.backend.move_action,
+                self.backend.remove_action, "action_name"),
+        }
         self.backend.subscribe(self._on_backend_change)
         self.vis.doc.on_session_destroyed(self.cleanup_session)
 
@@ -1429,7 +1453,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.sequence_lists[key] = vals
-        self.sequence_source.data = self.sequence_lists
+        self._assign(self.sequence_source, "data", self.sequence_lists)
 
     async def get_experiments(self):
         """Refresh the queued-experiments table from the backend."""
@@ -1439,7 +1463,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.experiment_lists[key] = vals
-        self.experiment_source.data = self.experiment_lists
+        self._assign(self.experiment_source, "data", self.experiment_lists)
 
     async def get_actions(self):
         """Refresh the queued-actions table from the backend."""
@@ -1449,7 +1473,7 @@ class BokehOperator:
             if key.endswith("_uuid"):
                 vals = [str(v)[-8:] if v else v for v in vals]
             self.action_lists[key] = vals
-        self.action_source.data = self.action_lists
+        self._assign(self.action_source, "data", self.action_lists)
 
     async def get_history(self):
         """Refresh the action/experiment/sequence history tables from the backend."""
@@ -1465,11 +1489,15 @@ class BokehOperator:
             )
             self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
             self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
+            # Append to EVERY column once per row (default "" when the key is
+            # missing) so all ColumnDataSource columns stay equal length —
+            # otherwise Bokeh refuses to render the table ("columns must be of
+            # the same length") and the history tab appears empty.
             for k in ["action_status", "experiment_name", "sequence_label"]:
-                v = actdict.get(k)
-                if isinstance(v, list):
-                    v = v[-1] if v else None
-                self.action_history_lists[k].append(v)
+                val = actdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.action_history_lists[k].append("" if val is None else val)
         for key in self.experiment_history_lists:
             self.experiment_history_lists[key] = []
         for expuuid, expdict in sorted(hist["experiment"], key=lambda x: x[0])[::-1]:
@@ -1479,10 +1507,10 @@ class BokehOperator:
             self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
             self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
             for k in ["experiment_status", "sequence_label", "campaign_name"]:
-                v = expdict.get(k)
-                if isinstance(v, list):
-                    v = v[-1] if v else None
-                self.experiment_history_lists[k].append(v)
+                val = expdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.experiment_history_lists[k].append("" if val is None else val)
         for key in self.sequence_history_lists:
             self.sequence_history_lists[key] = []
         for sequuid, seqdict in sorted(hist["sequence"], key=lambda x: x[0])[::-1]:
@@ -1492,13 +1520,13 @@ class BokehOperator:
             self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
             self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
             for k in ["sequence_status", "sequence_label", "campaign_name"]:
-                v = seqdict.get(k)
-                if isinstance(v, list):
-                    v = v[-1] if v else None
-                self.sequence_history_lists[k].append(v)
-        self.action_history_source.data = self.action_history_lists
-        self.experiment_history_source.data = self.experiment_history_lists
-        self.sequence_history_source.data = self.sequence_history_lists
+                val = seqdict.get(k)
+                if isinstance(val, list):
+                    val = val[-1] if val else ""
+                self.sequence_history_lists[k].append("" if val is None else val)
+        self._assign(self.action_history_source, "data", self.action_history_lists)
+        self._assign(self.experiment_history_source, "data", self.experiment_history_lists)
+        self._assign(self.sequence_history_source, "data", self.sequence_history_lists)
 
     async def get_orch_status_summary(self):
         """Refresh the action-server status table from the backend's status summary."""
@@ -1513,7 +1541,7 @@ class BokehOperator:
             self.action_server_lists["driver_status"].append(driver_str)
         # Replace the data wholesale (like the history tables) instead of
         # streaming per row, so rows render exactly once in the sorted order.
-        self.action_server_source.data = self.action_server_lists
+        self._assign(self.action_server_source, "data", self.action_server_lists)
 
     def update_selector_layout(self, attr, old, new):
         """Switch the parameter panel to match the currently active selector tab."""
@@ -1747,36 +1775,72 @@ class BokehOperator:
             del self.plan[i]
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_move_up(self, event):
-        """Move the selected queued sequence one position toward the front."""
-        idxs = list(self.sequence_source.selected.indices)
+    def _active_queue_target(self):
+        """Resolve the queue-reorder target for the active ``queue_tabs`` tab.
+
+        Returns ``(source, move_fn, remove_fn, name_col)`` for the Sequence (0),
+        Experiment (1), or Action (2) tab, or ``None`` for the read-only Action
+        Servers tab (3) where reordering is not possible.
+        """
+        return self._queue_targets.get(self.queue_tabs.active)
+
+    def callback_queue_move_up(self, event):
+        """Move the selected item of the active queue one position toward the front."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, move_fn, _remove_fn, _col = tgt
+        idxs = list(source.selected.indices)
         if idxs and idxs[0] > 0:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_sequence, i, i - 1)
-            )
+            self.vis.doc.add_next_tick_callback(partial(move_fn, i, i - 1))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_move_down(self, event):
-        """Move the selected queued sequence one position toward the back."""
-        idxs = list(self.sequence_source.selected.indices)
-        n = len(self.sequence_source.data.get("sequence_name", []))
+    def callback_queue_move_down(self, event):
+        """Move the selected item of the active queue one position toward the back."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, move_fn, _remove_fn, col = tgt
+        idxs = list(source.selected.indices)
+        n = len(source.data.get(col, []))
         if idxs and idxs[0] < n - 1:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.move_sequence, i, i + 1)
-            )
+            self.vis.doc.add_next_tick_callback(partial(move_fn, i, i + 1))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
-    def callback_seq_remove(self, event):
-        """Remove the selected queued sequence from the orch queue."""
-        idxs = list(self.sequence_source.selected.indices)
+    def callback_queue_remove(self, event):
+        """Remove the selected item of the active queue from the orch queue."""
+        tgt = self._active_queue_target()
+        if tgt is None:
+            return
+        source, _move_fn, remove_fn, _col = tgt
+        idxs = list(source.selected.indices)
         if idxs:
             i = idxs[0]
-            self.vis.doc.add_next_tick_callback(
-                partial(self.backend.remove_sequence, i)
-            )
+            self.vis.doc.add_next_tick_callback(partial(remove_fn, i))
             self.vis.doc.add_next_tick_callback(partial(self.update_tables))
+
+    def _refresh_queue_button_state(self):
+        """Enable/disable the unified queue-reorder buttons for the active tab.
+
+        Uses the last orch state seen by :meth:`update_tables` (``_loop_state`` /
+        ``_manual_seq``) so it can run on a tab switch without a backend round
+        trip. Sequence tab (0): enabled only when the orch is stopped.
+        Experiment/Action tabs (1, 2): enabled only when stopped AND the active
+        sequence is a manual sequence. Action Servers tab (3): always disabled.
+        """
+        idx = self.queue_tabs.active
+        stopped = self._loop_state == LoopStatus.stopped.value
+        if idx == 0:
+            disabled = not stopped
+        elif idx in (1, 2):
+            disabled = not stopped or not self._manual_seq
+        else:
+            disabled = True
+        self._assign(self.button_queue_move_up, "disabled", disabled)
+        self._assign(self.button_queue_move_down, "disabled", disabled)
+        self._assign(self.button_queue_remove, "disabled", disabled)
 
     def callback_toggle_stepact(self, event):
         """Flip the step-through-actions toggle."""
@@ -1798,7 +1862,8 @@ class BokehOperator:
 
     def callback_stop_orch(self, event):
         LOGGER.info("stopping operator orch")
-        self.vis.doc.add_next_tick_callback(partial(self.backend.stop))
+        reset = 0 in self.reset_run_id_on_stop.active
+        self.vis.doc.add_next_tick_callback(partial(self.backend.stop, reset_run_id=reset))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):
@@ -1855,7 +1920,9 @@ class BokehOperator:
         """Wrap the current experiment selection as a manual sequence appended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
         seq = Sequence(
-            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+            sequence_name="manual_orch_seq",
+            planned_experiments=[experimentmodel],
+            manual_action=True,
         )
         self._capture_metadata(seq)
         self.plan.append(seq)
@@ -1864,7 +1931,9 @@ class BokehOperator:
         """Wrap the current experiment selection as a manual sequence prepended to the buffer."""
         experimentmodel = self.populate_experimentmodel()
         seq = Sequence(
-            sequence_name="manual_orch_seq", planned_experiments=[experimentmodel]
+            sequence_name="manual_orch_seq",
+            planned_experiments=[experimentmodel],
+            manual_action=True,
         )
         self._capture_metadata(seq)
         self.plan.insert(0, seq)
@@ -2033,7 +2102,9 @@ class BokehOperator:
             (self.orch_stepact_button, "n_actions"),
         ]:
             numq = self._queue_counts.get(count_key, 0)
-            sbutton.label = sbutton.label.split("[")[0].strip() + f" [{numq}]"
+            self._assign(
+                sbutton, "label", sbutton.label.split("[")[0].strip() + f" [{numq}]"
+            )
 
     def update_seq_param_layout(self, idx):
         """Rebuild the sequence-parameter panel for entry ``idx`` of the sequence library."""
@@ -2585,6 +2656,22 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         """Placeholder hook for future experiment-to-sequence integration."""
         pass
 
+    @staticmethod
+    def _assign(model, attr, value):
+        """Set ``model.attr`` only when the value actually changed.
+
+        The operator refreshes on a 5 s poll (and on every status-WS message).
+        Re-assigning a Bokeh model property to an identical value still emits a
+        document patch to the browser, which triggers a layout reflow and blurs
+        whatever input the user is currently typing into. Skipping no-op writes
+        keeps an idle/stopped UI from pushing any patch, so focus is preserved.
+        Returns True if a write happened.
+        """
+        if getattr(model, attr) != value:
+            setattr(model, attr, value)
+            return True
+        return False
+
     async def update_tables(self):
         """Refresh every queue/history table and update the orchestrator status banner/buttons."""
         start_time = time.time()
@@ -2593,7 +2680,6 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         await self.get_actions()
         await self.get_history()
         await self.get_orch_status_summary()
-        self.update_queuecount_labels()
         for key in self.experiment_plan_lists:
             self.experiment_plan_lists[key] = []
         for seq in self.plan:
@@ -2602,7 +2688,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             self.experiment_plan_lists["num_experiments"].append(
                 len(seq.planned_experiments)
             )
-        self.experiment_plan_source.data = self.experiment_plan_lists
+        self._assign(self.experiment_plan_source, "data", self.experiment_plan_lists)
 
         state = await self.backend.get_orch_state()
         self._queue_counts = {
@@ -2610,6 +2696,10 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             "n_experiments": state.get("n_experiments", 0),
             "n_actions": state.get("n_actions", 0),
         }
+        # Refresh the step-button counters AFTER _queue_counts is updated from the
+        # current orch state, so the labels reflect this poll (not the previous
+        # one) and don't flip a poll late.
+        self.update_queuecount_labels()
         loop_state = state.get("loop_state")
         loop_state = getattr(loop_state, "value", loop_state)  # normalize enum->str
         self._current_stop_message = state.get("current_stop_message", "") or ""
@@ -2617,23 +2707,28 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         aexp = (state.get("active_experiment") or {}).get("experiment_name")
         if loop_state == LoopStatus.started.value:
             if aseq is not None and aexp is not None:
-                self.orch_status_button.label = f"running {aseq} / {aexp}"
+                status_label = f"running {aseq} / {aexp}"
             else:
-                self.orch_status_button.label = "running"
-            self.orch_status_button.button_type = "success"
+                status_label = "running"
+            status_type = "success"
         elif loop_state == LoopStatus.stopped.value:
             stop_msg = f": {self._current_stop_message}" if self._current_stop_message else ""
-            self.orch_status_button.label = f"stopped{stop_msg}"
-            self.orch_status_button.button_type = "warning" if stop_msg else "primary"
+            status_label = f"stopped{stop_msg}"
+            status_type = "warning" if stop_msg else "primary"
         else:
-            self.orch_status_button.label = f"{loop_state}"
-            self.orch_status_button.button_type = "danger"
-        self.button_prepend_plan.disabled = loop_state != LoopStatus.stopped.value
+            status_label = f"{loop_state}"
+            status_type = "danger"
+        self._assign(self.orch_status_button, "label", status_label)
+        self._assign(self.orch_status_button, "button_type", status_type)
         queue_disabled = loop_state != LoopStatus.stopped.value
-        self.button_seq_move_up.disabled = queue_disabled
-        self.button_seq_move_down.disabled = queue_disabled
-        self.button_seq_remove.disabled = queue_disabled
-        self.button_add_expplan.label = f"Add plan [{len(self.plan)}]"
+        self._assign(self.button_prepend_plan, "disabled", queue_disabled)
+        # Cache the state the unified queue buttons gate on, then refresh them.
+        # _refresh_queue_button_state also runs on tab switch (queue_tabs
+        # on_change) so the single button set matches whichever queue is shown.
+        self._loop_state = loop_state
+        self._manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
+        self._refresh_queue_button_state()
+        self._assign(self.button_add_expplan, "label", f"Add plan [{len(self.plan)}]")
         end_time = time.time()
         LOGGER.debug(f"Updating tables took {end_time - start_time} seconds")
 

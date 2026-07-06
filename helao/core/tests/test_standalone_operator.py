@@ -179,6 +179,11 @@ class _MockBackend:
         self.added = []
         self.split_added = []
         self.prepended = None
+        # (endpoint_name, *args) log for queue-mutation calls
+        self.queue_calls = []
+        self.stop_reset = None
+        # override in a test to exercise the manual-sequence gating path
+        self.active_sequence = {}
 
     def unpack_sequence(self, sequence_name, sequence_params):
         return self.sequence_lib[sequence_name](**sequence_params)
@@ -208,7 +213,8 @@ class _MockBackend:
         return {"motor": ["idle", "ok"]}
 
     async def get_orch_state(self):
-        return {"loop_state": self.loop_state, "active_sequence": {}, "active_experiment": {},
+        return {"loop_state": self.loop_state, "active_sequence": self.active_sequence,
+                "active_experiment": {},
                 "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
                 "current_stop_message": ""}
 
@@ -227,12 +233,32 @@ class _MockBackend:
     async def start(self):
         self.started = True
 
-    async def stop(self): ...
+    async def stop(self, reset_run_id: bool = False):
+        self.stop_reset = reset_run_id
+
     async def skip(self): ...
     async def estop(self): ...
     async def clear_sequences(self): ...
     async def clear_experiments(self): ...
     async def clear_actions(self): ...
+
+    async def move_sequence(self, from_idx, to_idx):
+        self.queue_calls.append(("move_sequence", from_idx, to_idx))
+
+    async def remove_sequence(self, idx):
+        self.queue_calls.append(("remove_sequence", idx))
+
+    async def move_experiment(self, from_idx, to_idx):
+        self.queue_calls.append(("move_experiment", from_idx, to_idx))
+
+    async def remove_experiment(self, idx):
+        self.queue_calls.append(("remove_experiment", idx))
+
+    async def move_action(self, from_idx, to_idx):
+        self.queue_calls.append(("move_action", from_idx, to_idx))
+
+    async def remove_action(self, idx):
+        self.queue_calls.append(("remove_action", idx))
 
     def subscribe(self, on_change):
         self.on_change = on_change
@@ -574,19 +600,100 @@ def test_queue_controls_enable_gate():
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
 
-    be.loop_state = "started"
-    asyncio.run(op.update_tables())
-    assert op.button_seq_move_up.disabled is True
-    assert op.button_seq_move_down.disabled is True
-    assert op.button_seq_remove.disabled is True
+    def _disabled():
+        return (op.button_queue_move_up.disabled,
+                op.button_queue_move_down.disabled,
+                op.button_queue_remove.disabled)
 
-    be.loop_state = "stopped"
+    # Running -> the single unified button set is disabled on every tab.
+    be.loop_state = "started"
+    op.queue_tabs.active = 0
     asyncio.run(op.update_tables())
-    assert op.button_seq_move_up.disabled is False
-    assert op.button_seq_move_down.disabled is False
-    assert op.button_seq_remove.disabled is False
+    assert _disabled() == (True, True, True)
+
+    # Stopped + Sequence tab (0) -> enabled regardless of manual flag.
+    be.loop_state = "stopped"
+    be.active_sequence = {}
+    op.queue_tabs.active = 0
+    asyncio.run(op.update_tables())
+    assert _disabled() == (False, False, False)
+
+    # Stopped + Experiment tab (1), non-manual sequence -> still disabled.
+    op.queue_tabs.active = 1
+    op._refresh_queue_button_state()
+    assert _disabled() == (True, True, True)
+
+    # Stopped + Experiment tab (1), manual sequence -> enabled.
+    be.active_sequence = {"manual_action": True}
+    asyncio.run(op.update_tables())
+    assert _disabled() == (False, False, False)
+
+    # Action Servers tab (3) is read-only -> always disabled.
+    op.queue_tabs.active = 3
+    op._refresh_queue_button_state()
+    assert _disabled() == (True, True, True)
     op.cleanup_session(None)
     print("test_queue_controls_enable_gate PASS")
+
+
+def test_queue_button_dispatch_routing():
+    """The single unified button set targets the backend matching the active tab."""
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+    _drain_callbacks(op.vis.doc)
+
+    # _active_queue_target resolves the right (source, move_fn, remove_fn) per tab.
+    for idx, source, move_fn, remove_fn, col in (
+        (0, op.sequence_source, be.move_sequence, be.remove_sequence, "sequence_name"),
+        (1, op.experiment_source, be.move_experiment, be.remove_experiment, "experiment_name"),
+        (2, op.action_source, be.move_action, be.remove_action, "action_name"),
+    ):
+        op.queue_tabs.active = idx
+        tgt = op._active_queue_target()
+        assert tgt == (source, move_fn, remove_fn, col)
+    # Action Servers tab (3) has no reorderable queue.
+    op.queue_tabs.active = 3
+    assert op._active_queue_target() is None
+
+    # callback_queue_remove dispatches to the active tab's remove endpoint.
+    op.queue_tabs.active = 1
+    op.experiment_source.selected.indices = [0]
+    op.callback_queue_remove(None)
+    _drain_callbacks(op.vis.doc)
+    assert ("remove_experiment", 0) in be.queue_calls
+
+    op.queue_tabs.active = 2
+    op.action_source.selected.indices = [0]
+    op.callback_queue_remove(None)
+    _drain_callbacks(op.vis.doc)
+    assert ("remove_action", 0) in be.queue_calls
+    op.cleanup_session(None)
+    print("test_queue_button_dispatch_routing PASS")
+
+
+def test_stop_callback_forwards_reset_run_id():
+    """The reset-run_id checkbox forwards its state to backend.stop()."""
+    from bokeh.document import Document
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+    _drain_callbacks(op.vis.doc)
+
+    op.reset_run_id_on_stop.active = []
+    op.callback_stop_orch(None)
+    _drain_callbacks(op.vis.doc)
+    assert be.stop_reset is False
+
+    op.reset_run_id_on_stop.active = [0]
+    op.callback_stop_orch(None)
+    _drain_callbacks(op.vis.doc)
+    assert be.stop_reset is True
+    op.cleanup_session(None)
+    print("test_stop_callback_forwards_reset_run_id PASS")
 
 
 def test_prepend_plan_callback_clears_and_dispatches():
@@ -676,6 +783,60 @@ def test_orch_move_and_remove_sequence():
     print("test_orch_move_and_remove_sequence PASS")
 
 
+def test_orch_move_and_remove_experiment_action():
+    from helao.core.servers.orch import Orch
+    from helao.helpers.premodels import Experiment, Action
+    from helao.helpers.zdeque import zdeque
+
+    orch = Orch.__new__(Orch)
+    orch.experiment_dq = zdeque(
+        [Experiment(experiment_name=n) for n in ("A", "B", "C")]
+    )
+    orch.action_dq = zdeque(
+        [Action(action_name=n) for n in ("X", "Y", "Z")]
+    )
+
+    asyncio.run(orch.move_experiment(2, 0))
+    assert [e.experiment_name for e in orch.experiment_dq] == ["C", "A", "B"]
+    asyncio.run(orch.remove_experiment(0))
+    assert [e.experiment_name for e in orch.experiment_dq] == ["A", "B"]
+
+    asyncio.run(orch.move_action(0, 2))
+    assert [a.action_name for a in orch.action_dq] == ["Y", "Z", "X"]
+    asyncio.run(orch.remove_action(1))
+    assert [a.action_name for a in orch.action_dq] == ["Y", "X"]
+
+    # out-of-range is a no-op for both queues
+    asyncio.run(orch.move_experiment(5, 0))
+    asyncio.run(orch.remove_action(9))
+    assert [e.experiment_name for e in orch.experiment_dq] == ["A", "B"]
+    assert [a.action_name for a in orch.action_dq] == ["Y", "X"]
+    print("test_orch_move_and_remove_experiment_action PASS")
+
+
+def test_orch_stop_reset_run_id():
+    from helao.core.servers.orch import Orch
+    from helao.core.models.orchstatus import LoopStatus
+    from uuid import uuid4
+
+    orch = Orch.__new__(Orch)
+    orch.active_run_id = uuid4()
+
+    class _GSM:
+        loop_state = LoopStatus.stopped
+
+    orch.globalstatusmodel = _GSM()
+
+    # stop without reset leaves the run_id intact
+    asyncio.run(orch.stop())
+    assert orch.active_run_id is not None
+
+    # stop with reset drops the run_id
+    asyncio.run(orch.stop(reset_run_id=True))
+    assert orch.active_run_id is None
+    print("test_orch_stop_reset_run_id PASS")
+
+
 def test_remote_backend_move_remove():
     from helao.core.servers.operator.orch_backend import RemoteBackend
     from helao.core.error import ErrorCodes
@@ -694,9 +855,40 @@ def test_remote_backend_move_remove():
 
     asyncio.run(be.move_sequence(2, 0))
     asyncio.run(be.remove_sequence(1))
+    asyncio.run(be.move_experiment(3, 1))
+    asyncio.run(be.remove_experiment(2))
+    asyncio.run(be.move_action(4, 0))
+    asyncio.run(be.remove_action(5))
     assert calls[0] == ("move_sequence", {"from_idx": 2, "to_idx": 0})
     assert calls[1] == ("remove_sequence", {"idx": 1})
+    assert calls[2] == ("move_experiment", {"from_idx": 3, "to_idx": 1})
+    assert calls[3] == ("remove_experiment", {"idx": 2})
+    assert calls[4] == ("move_action", {"from_idx": 4, "to_idx": 0})
+    assert calls[5] == ("remove_action", {"idx": 5})
     print("test_remote_backend_move_remove PASS")
+
+
+def test_remote_backend_stop_reset_run_id():
+    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.core.error import ErrorCodes
+
+    calls = []
+
+    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+        calls.append((endpoint, params_dict))
+        return {}, ErrorCodes.none
+
+    be = RemoteBackend.__new__(RemoteBackend)
+    be.orch_key = "ORCH"
+    be.host = "127.0.0.1"
+    be.port = 8001
+    be._dispatch = fake_dispatch
+
+    asyncio.run(be.stop())
+    asyncio.run(be.stop(reset_run_id=True))
+    assert calls[0] == ("stop", {"reset_run_id": False})
+    assert calls[1] == ("stop", {"reset_run_id": True})
+    print("test_remote_backend_stop_reset_run_id PASS")
 
 
 def test_uuid_truncation_in_queue_tables():
@@ -1084,10 +1276,13 @@ def run_all():
     test_sanitize_sequence_label()
     test_orch_add_sequence_sanitizes_label()
     test_orch_move_and_remove_sequence()
+    test_orch_move_and_remove_experiment_action()
+    test_orch_stop_reset_run_id()
     test_prepend_sequences_helper()
     test_queue_object_payload()
     test_remote_backend_prepend()
     test_remote_backend_move_remove()
+    test_remote_backend_stop_reset_run_id()
     test_remote_backend_get_queue_object()
     test_plan_buffer_append_and_wrap()
     test_plan_buffer_order()
@@ -1096,6 +1291,8 @@ def run_all():
     test_plan_table_rows()
     test_plan_reorder_and_remove()
     test_queue_controls_enable_gate()
+    test_queue_button_dispatch_routing()
+    test_stop_callback_forwards_reset_run_id()
     test_prepend_plan_callback_clears_and_dispatches()
     test_prepend_button_enable_gate()
     test_history_objects_retained()

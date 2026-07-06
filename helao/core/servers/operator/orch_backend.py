@@ -82,10 +82,22 @@ class OrchBackend(ABC):
     async def remove_sequence(self, idx: int) -> None: ...
 
     @abstractmethod
+    async def move_experiment(self, from_idx: int, to_idx: int) -> None: ...
+
+    @abstractmethod
+    async def remove_experiment(self, idx: int) -> None: ...
+
+    @abstractmethod
+    async def move_action(self, from_idx: int, to_idx: int) -> None: ...
+
+    @abstractmethod
+    async def remove_action(self, idx: int) -> None: ...
+
+    @abstractmethod
     async def start(self) -> None: ...
 
     @abstractmethod
-    async def stop(self) -> None: ...
+    async def stop(self, reset_run_id: bool = False) -> None: ...
 
     @abstractmethod
     async def skip(self) -> None: ...
@@ -243,11 +255,27 @@ class RemoteBackend(OrchBackend):
     async def remove_sequence(self, idx):
         await self._call("remove_sequence", params_dict={"idx": idx})
 
+    async def move_experiment(self, from_idx, to_idx):
+        await self._call(
+            "move_experiment", params_dict={"from_idx": from_idx, "to_idx": to_idx}
+        )
+
+    async def remove_experiment(self, idx):
+        await self._call("remove_experiment", params_dict={"idx": idx})
+
+    async def move_action(self, from_idx, to_idx):
+        await self._call(
+            "move_action", params_dict={"from_idx": from_idx, "to_idx": to_idx}
+        )
+
+    async def remove_action(self, idx):
+        await self._call("remove_action", params_dict={"idx": idx})
+
     async def start(self):
         await self._call("start")
 
-    async def stop(self):
-        await self._call("stop")
+    async def stop(self, reset_run_id: bool = False):
+        await self._call("stop", params_dict={"reset_run_id": reset_run_id})
 
     async def skip(self):
         await self._call("skip_experiment")
