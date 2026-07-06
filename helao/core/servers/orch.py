@@ -1629,14 +1629,22 @@ class Orch(Base):
         self.globalstatusmodel.loop_intent = LoopIntent.skip
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
-    async def stop(self):
-        """Request a graceful stop respecting the current loop state."""
+    async def stop(self, reset_run_id: bool = False):
+        """Request a graceful stop respecting the current loop state.
+
+        When ``reset_run_id`` is True, also drop ``active_run_id`` so the next
+        dequeued sequence starts a fresh run rather than re-joining the current
+        one.
+        """
         if self.globalstatusmodel.loop_state == LoopStatus.started:
             await self.intend_stop()
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
             LOGGER.info("orchestrator E-STOP flag was raised; nothing to stop")
         else:
             LOGGER.info("orchestrator is not running")
+        if reset_run_id:
+            LOGGER.info("resetting active_run_id on stop")
+            self.active_run_id = None
 
     async def intend_stop(self):
         """Set ``LoopIntent.stop`` and post it to the interrupt queue."""
@@ -1840,6 +1848,56 @@ class Orch(Base):
             seqs.pop(idx)
             self._rebuild_sequence_dq(seqs)
 
+    def _rebuild_experiment_dq(self, exps) -> None:
+        """Replace the experiment deque contents with ``exps`` (re-compresses each)."""
+        self.experiment_dq.clear()
+        for e in exps:
+            self.experiment_dq.append(e)
+
+    async def move_experiment(self, from_idx: int, to_idx: int) -> None:
+        """Move the queued experiment at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
+        exps = list(self.experiment_dq)
+        n = len(exps)
+        if 0 <= from_idx < n and 0 <= to_idx < n:
+            exp = exps.pop(from_idx)
+            exps.insert(to_idx, exp)
+            self._rebuild_experiment_dq(exps)
+
+    async def remove_experiment(
+        self, idx: Optional[int] = None, by_uuid: Optional[UUID] = None
+    ) -> None:
+        """Remove the queued experiment at ``idx`` (or matching ``by_uuid``); no-op if out of range."""
+        exps = list(self.experiment_dq)
+        if by_uuid is not None:
+            idx = next(
+                (i for i, e in enumerate(exps) if e.experiment_uuid == by_uuid), None
+            )
+        if idx is not None and 0 <= idx < len(exps):
+            exps.pop(idx)
+            self._rebuild_experiment_dq(exps)
+
+    def _rebuild_action_dq(self, acts) -> None:
+        """Replace the action deque contents with ``acts`` (re-compresses each)."""
+        self.action_dq.clear()
+        for a in acts:
+            self.action_dq.append(a)
+
+    async def move_action(self, from_idx: int, to_idx: int) -> None:
+        """Move the queued action at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
+        acts = list(self.action_dq)
+        n = len(acts)
+        if 0 <= from_idx < n and 0 <= to_idx < n:
+            act = acts.pop(from_idx)
+            acts.insert(to_idx, act)
+            self._rebuild_action_dq(acts)
+
+    async def remove_action(self, idx: int) -> None:
+        """Remove the queued action at ``idx`` (no-op if out of range)."""
+        acts = list(self.action_dq)
+        if 0 <= idx < len(acts):
+            acts.pop(idx)
+            self._rebuild_action_dq(acts)
+
     async def add_experiment(
         self,
         seq: Sequence,
@@ -1972,25 +2030,6 @@ class Orch(Base):
             else:
                 LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
                 LOGGER.info(", ")
-
-    def remove_experiment(
-        self, by_index: Optional[int] = None, by_uuid: Optional[UUID] = None
-    ):
-        """Remove an experiment from the queue by index (preferred) or UUID."""
-        if by_index is not None:
-            i = by_index
-        elif by_uuid is not None:
-            i = [
-                i
-                for i, D in enumerate(list(self.experiment_dq))
-                if D.experiment_uuid == by_uuid
-            ][0]
-        else:
-            LOGGER.info(
-                "No arguments given for locating existing experiment to remove."
-            )
-            return None
-        del self.experiment_dq[i]
 
     def replace_action(
         self,

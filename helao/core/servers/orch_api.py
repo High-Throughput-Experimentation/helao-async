@@ -360,9 +360,13 @@ class OrchAPI(HelaoFastAPI):
             return {}
 
         @self.post("/stop", tags=["private"])
-        async def stop():
-            """Request a graceful stop of the orchestrator's dispatch loop."""
-            await self.orch.stop()
+        async def stop(reset_run_id: bool = False):
+            """Request a graceful stop of the orchestrator's dispatch loop.
+
+            ``reset_run_id`` also drops the active run_id so the next sequence
+            starts a fresh run.
+            """
+            await self.orch.stop(reset_run_id=reset_run_id)
             return {}
 
         @self.post("/clear_estop", tags=["private"])
@@ -424,6 +428,30 @@ class OrchAPI(HelaoFastAPI):
             """Remove a queued sequence by index."""
             await self.orch.remove_sequence(idx)
             return {"n_sequences": len(self.orch.sequence_dq)}
+
+        @self.post("/move_experiment", tags=["private"])
+        async def move_experiment(from_idx: int, to_idx: int):
+            """Move a queued experiment from one index to another."""
+            await self.orch.move_experiment(from_idx, to_idx)
+            return {"n_experiments": len(self.orch.experiment_dq)}
+
+        @self.post("/remove_experiment", tags=["private"])
+        async def remove_experiment(idx: int):
+            """Remove a queued experiment by index."""
+            await self.orch.remove_experiment(idx)
+            return {"n_experiments": len(self.orch.experiment_dq)}
+
+        @self.post("/move_action", tags=["private"])
+        async def move_action(from_idx: int, to_idx: int):
+            """Move a queued action from one index to another."""
+            await self.orch.move_action(from_idx, to_idx)
+            return {"n_actions": len(self.orch.action_dq)}
+
+        @self.post("/remove_action", tags=["private"])
+        async def remove_action(idx: int):
+            """Remove a queued action by index."""
+            await self.orch.remove_action(idx)
+            return {"n_actions": len(self.orch.action_dq)}
 
         @self.post("/get_queue_object", tags=["private"])
         def get_queue_object(kind: str, idx: int):
