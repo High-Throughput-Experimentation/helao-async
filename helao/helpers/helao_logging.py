@@ -15,6 +15,7 @@ Usage::
     logger = logging.LOGGER
 """
 
+import copy
 import tempfile
 import os
 import subprocess
@@ -45,6 +46,15 @@ logging.addLevelName(ALERT_LEVEL, "ALERT")
 # throttling entirely. Overridden per-deployment via the ``email_interval``
 # key in the alert config referenced by ``alert_config_path``.
 DEFAULT_EMAIL_INTERVAL = 600
+
+# Default seconds over which identical consecutive file-log messages are
+# collapsed into a single summary line. When a message is immediately repeated,
+# further identical records are counted (not written) until a different message
+# arrives or this interval elapses, at which point one summary line reporting
+# the repeat count is written. ``0`` disables de-duplication and restores stock
+# ``TimedRotatingFileHandler`` behaviour. Overridden per-logger via the
+# ``dedup_interval`` argument to :func:`make_logger`.
+DEFAULT_DEDUP_INTERVAL = 10.0
 
 
 def alert(self, message, *args, **kws):
@@ -77,7 +87,14 @@ class TitledSMTPHandler(SMTPHandler):
     ``min_interval`` seconds. Records that arrive during the cooldown window
     are dropped rather than mailed, but are counted so the next email that
     does go out can report how many alerts were suppressed in the meantime.
+    The subject lines of dropped records are also buffered (up to
+    ``MAX_SUPPRESSED_SUBJECTS`` lines) and appended to the body of the next
+    email. Once the buffer is full further records are still counted but their
+    subject lines are no longer retained.
     """
+
+    #: Maximum number of suppressed subject lines buffered for the next email.
+    MAX_SUPPRESSED_SUBJECTS = 100
 
     def __init__(self, *args, min_interval: float = 0, **kwargs):
         """Build the handler.
@@ -92,6 +109,16 @@ class TitledSMTPHandler(SMTPHandler):
         self.min_interval = min_interval
         self._last_emit_monotonic = None
         self._suppressed_count = 0
+        self._suppressed_subjects = []
+
+    def _base_subject(self, record) -> str:
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``."""
+        message = record.getMessage()
+        if "~" in message:
+            title = message.split("~")[0].strip()
+        else:
+            title = message.split()[0].strip()
+        return f"{record.levelname} - {title} on {HOST}"
 
     def getSubject(self, record) -> str:
         """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``.
@@ -99,14 +126,29 @@ class TitledSMTPHandler(SMTPHandler):
         When alerts were suppressed by throttling since the last email, a
         ``"(+N suppressed)"`` note is appended to the subject.
         """
-        if "~" in record.message:
-            title = record.message.split("~")[0].strip()
-        else:
-            title = record.message.split()[0].strip()
-        subject = f"{record.levelname} - {title} on {HOST}"
+        subject = self._base_subject(record)
         if self._suppressed_count:
             subject += f" (+{self._suppressed_count} suppressed)"
         return subject
+
+    def format(self, record) -> str:
+        """Format ``record`` and append any buffered suppressed subject lines."""
+        body = super().format(record)
+        if self._suppressed_subjects:
+            note_lines = [
+                "",
+                "",
+                f"--- {self._suppressed_count} alert(s) suppressed during cooldown ---",
+            ]
+            note_lines.extend(self._suppressed_subjects)
+            if self._suppressed_count > len(self._suppressed_subjects):
+                dropped = self._suppressed_count - len(self._suppressed_subjects)
+                note_lines.append(
+                    f"... (+{dropped} more not shown; buffer limit "
+                    f"{self.MAX_SUPPRESSED_SUBJECTS} reached)"
+                )
+            body = body + "\n".join(note_lines)
+        return body
 
     def emit(self, record):
         """Send ``record`` by email unless still within the cooldown window."""
@@ -117,10 +159,94 @@ class TitledSMTPHandler(SMTPHandler):
                 and now - self._last_emit_monotonic < self.min_interval
             ):
                 self._suppressed_count += 1
+                if len(self._suppressed_subjects) < self.MAX_SUPPRESSED_SUBJECTS:
+                    self._suppressed_subjects.append(self._base_subject(record))
                 return
             self._last_emit_monotonic = now
         super().emit(record)
         self._suppressed_count = 0
+        self._suppressed_subjects = []
+
+
+class DedupTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """Rotating file handler that collapses repeated consecutive messages.
+
+    When the same log message — compared by raw content via
+    ``record.getMessage()``, ignoring formatting — is emitted twice in a row,
+    a de-duplication cooldown starts: subsequent identical messages are counted
+    rather than written. The buffered repeat count is flushed as a single
+    summary line when either a different message arrives or the cooldown
+    interval elapses, whichever comes first. Because handlers only act on
+    ``emit``, an elapsed cooldown is detected lazily on the next record; a run
+    of duplicates that simply stops is summarised when the next record (of any
+    kind) arrives. ``dedup_interval`` of ``0`` disables the behaviour and
+    restores stock ``TimedRotatingFileHandler`` semantics.
+    """
+
+    def __init__(self, *args, dedup_interval: float = 0, **kwargs):
+        """Build the handler.
+
+        Args:
+            *args: Positional arguments forwarded to
+                ``TimedRotatingFileHandler``.
+            dedup_interval: Seconds a run of identical consecutive messages is
+                collapsed before a summary line is written. ``0`` (the default)
+                disables de-duplication.
+            **kwargs: Keyword arguments forwarded to
+                ``TimedRotatingFileHandler``.
+        """
+        super().__init__(*args, **kwargs)
+        self.dedup_interval = dedup_interval
+        self._dedup_last_message = None
+        self._dedup_record = None
+        self._dedup_count = 0
+        self._dedup_started = None
+
+    def _flush_dedup(self):
+        """Write a summary line for any buffered repeats and reset the window."""
+        if self._dedup_count > 0 and self._dedup_record is not None:
+            times = self._dedup_count
+            summary = copy.copy(self._dedup_record)
+            summary.msg = (
+                f"{self._dedup_record.getMessage()} "
+                f"[previous message repeated {times} "
+                f"time{'s' if times != 1 else ''}]"
+            )
+            summary.args = None
+            super().emit(summary)
+        self._dedup_count = 0
+        self._dedup_started = None
+
+    def emit(self, record):
+        """Write ``record`` unless it is a suppressed consecutive duplicate."""
+        if not (self.dedup_interval and self.dedup_interval > 0):
+            super().emit(record)
+            return
+
+        message = record.getMessage()
+        now = time.monotonic()
+
+        if message != self._dedup_last_message:
+            # New, non-duplicate message: flush any pending repeats, then write.
+            self._flush_dedup()
+            super().emit(record)
+            self._dedup_last_message = message
+            self._dedup_record = record
+            return
+
+        if self._dedup_started is None:
+            # First immediate repeat: open the cooldown window and suppress.
+            self._dedup_started = now
+            self._dedup_count = 1
+            return
+
+        # Continued repeat within an open window.
+        self._dedup_count += 1
+        if now - self._dedup_started >= self.dedup_interval:
+            # Cooldown satisfied: summarise the run so far and reopen a window
+            # so sustained spam yields one summary line per interval.
+            self._flush_dedup()
+            self._dedup_started = now
 
 
 class HTTPPostHandler(logging.Handler):
@@ -241,6 +367,7 @@ def make_logger(
     log_level: int = 20,  # 10 (DEBUG), 20 (INFO), 30 (WARNING), 40 (ERROR), 50 (CRITICAL)
     email_config: dict = {},
     show_debug_console: bool = False,
+    dedup_interval: float = DEFAULT_DEDUP_INTERVAL,
 ) -> logging.Logger:
     """Build and configure the canonical per-server HELAO logger.
 
@@ -264,6 +391,10 @@ def make_logger(
             interval, defaulting to :data:`DEFAULT_EMAIL_INTERVAL`.
         show_debug_console: If ``True``, the console handler is set to
             ``DEBUG`` level.
+        dedup_interval: Seconds over which identical consecutive messages
+            written to the rotating file are collapsed into a single summary
+            line, defaulting to :data:`DEFAULT_DEDUP_INTERVAL`. ``0`` disables
+            de-duplication.
 
     Returns:
         The configured ``logging.Logger`` instance.
@@ -304,15 +435,23 @@ def make_logger(
     console = logging.StreamHandler()
     console.setFormatter(colored_formatter)
     try:
-        timed_rotation = TimedRotatingFileHandler(
-            filename=log_path, when="D", interval=1, backupCount=90
+        timed_rotation = DedupTimedRotatingFileHandler(
+            filename=log_path,
+            when="D",
+            interval=1,
+            backupCount=90,
+            dedup_interval=dedup_interval,
         )
         timed_rotation.rotator = GZipRotator()
     except OSError:
         temp_log_path = Path(os.path.join(temp_dir, f"{logger_name}.log"))
         print(f"Can't write to {log_path}. Redirecting to: {temp_log_path}")
-        timed_rotation = TimedRotatingFileHandler(
-            filename=temp_log_path, when="D", interval=1, backupCount=90
+        timed_rotation = DedupTimedRotatingFileHandler(
+            filename=temp_log_path,
+            when="D",
+            interval=1,
+            backupCount=90,
+            dedup_interval=dedup_interval,
         )
     timed_rotation.setFormatter(formatter)
 
