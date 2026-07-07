@@ -77,7 +77,14 @@ class TitledSMTPHandler(SMTPHandler):
     ``min_interval`` seconds. Records that arrive during the cooldown window
     are dropped rather than mailed, but are counted so the next email that
     does go out can report how many alerts were suppressed in the meantime.
+    The subject lines of dropped records are also buffered (up to
+    ``MAX_SUPPRESSED_SUBJECTS`` lines) and appended to the body of the next
+    email. Once the buffer is full further records are still counted but their
+    subject lines are no longer retained.
     """
+
+    #: Maximum number of suppressed subject lines buffered for the next email.
+    MAX_SUPPRESSED_SUBJECTS = 100
 
     def __init__(self, *args, min_interval: float = 0, **kwargs):
         """Build the handler.
@@ -92,6 +99,16 @@ class TitledSMTPHandler(SMTPHandler):
         self.min_interval = min_interval
         self._last_emit_monotonic = None
         self._suppressed_count = 0
+        self._suppressed_subjects = []
+
+    def _base_subject(self, record) -> str:
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``."""
+        message = record.getMessage()
+        if "~" in message:
+            title = message.split("~")[0].strip()
+        else:
+            title = message.split()[0].strip()
+        return f"{record.levelname} - {title} on {HOST}"
 
     def getSubject(self, record) -> str:
         """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``.
@@ -99,14 +116,29 @@ class TitledSMTPHandler(SMTPHandler):
         When alerts were suppressed by throttling since the last email, a
         ``"(+N suppressed)"`` note is appended to the subject.
         """
-        if "~" in record.message:
-            title = record.message.split("~")[0].strip()
-        else:
-            title = record.message.split()[0].strip()
-        subject = f"{record.levelname} - {title} on {HOST}"
+        subject = self._base_subject(record)
         if self._suppressed_count:
             subject += f" (+{self._suppressed_count} suppressed)"
         return subject
+
+    def format(self, record) -> str:
+        """Format ``record`` and append any buffered suppressed subject lines."""
+        body = super().format(record)
+        if self._suppressed_subjects:
+            note_lines = [
+                "",
+                "",
+                f"--- {self._suppressed_count} alert(s) suppressed during cooldown ---",
+            ]
+            note_lines.extend(self._suppressed_subjects)
+            if self._suppressed_count > len(self._suppressed_subjects):
+                dropped = self._suppressed_count - len(self._suppressed_subjects)
+                note_lines.append(
+                    f"... (+{dropped} more not shown; buffer limit "
+                    f"{self.MAX_SUPPRESSED_SUBJECTS} reached)"
+                )
+            body = body + "\n".join(note_lines)
+        return body
 
     def emit(self, record):
         """Send ``record`` by email unless still within the cooldown window."""
@@ -117,10 +149,13 @@ class TitledSMTPHandler(SMTPHandler):
                 and now - self._last_emit_monotonic < self.min_interval
             ):
                 self._suppressed_count += 1
+                if len(self._suppressed_subjects) < self.MAX_SUPPRESSED_SUBJECTS:
+                    self._suppressed_subjects.append(self._base_subject(record))
                 return
             self._last_emit_monotonic = now
         super().emit(record)
         self._suppressed_count = 0
+        self._suppressed_subjects = []
 
 
 class HTTPPostHandler(logging.Handler):
