@@ -13,9 +13,11 @@ Usage:
     keyboard input.
 Example:
     To run the launcher, use the following command:
-    python launch.py <config_file> [extra_option]
+    python launch.py <config_file> [extra_option] [--restore]
     Where <config_file> is the path to the configuration file and [extra_option] is an optional argument for additional
-    launch options.
+    launch options. The optional --restore flag makes launched orchestrators
+    import their previously exported queues (STATES/queues.pck) on startup;
+    flags may appear anywhere on the command line.
 Note:
     This script requires the 'click', 'termcolor', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
 """
@@ -435,7 +437,7 @@ def wait_key():
     return keypress
 
 
-def launcher(confArg, confDict, helao_repo_root, extraopt=""):
+def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     """
     Launches the Helao servers based on the provided configuration.
     Args:
@@ -443,6 +445,9 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
         confDict (dict): Dictionary containing the configuration details.
         helao_repo_root (str): Root directory of the Helao project.
         extraopt (str, optional): Additional options for launching. Defaults to "".
+        restore (bool, optional): When True, pass ``--restore`` to launched
+            orchestrators so they import their saved queues on startup. Defaults
+            to False.
     Raises:
         Exception: If the configuration is invalid.
         Exception: If a server cannot be started due to port conflicts.
@@ -520,6 +525,11 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
                         if group == "orchestrator":
                             pidd.orchServs.append(server)
                         cmd = ["python", "fast_launcher.py", confArg, server]
+                        if restore and group == "orchestrator":
+                            cmd.append("--restore")
+                            LAUNCH_LOGGER.info(
+                                f"{server} launched with --restore; will import saved queues."
+                            )
                         p = subprocess.Popen(cmd, cwd=helao_repo_root)
                         ppid = p.pid
                     elif codeKey == "bokeh":
@@ -590,7 +600,12 @@ def main():
         }
         print(branches)
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
-    confArg = sys.argv[1]
+    # Separate flags (e.g. --restore) from positional args so confArg and the
+    # optional extraopt are not shifted by a flag's position on the command line.
+    positional = [a for a in sys.argv[1:] if not a.startswith("--")]
+    cli_flags = [a for a in sys.argv[1:] if a.startswith("--")]
+    restore = "--restore" in cli_flags
+    confArg = positional[0]
     config = read_config(confArg)
 
     # Run the full unit-test suite only when the config opts in.
@@ -604,8 +619,8 @@ def main():
     helaodirs = helao_dirs(config, "launcher")
     get_ntp_time("time.nist.gov", os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
 
-    if len(sys.argv) > 2:
-        extraopt = sys.argv[2]
+    if len(positional) > 1:
+        extraopt = positional[1]
     else:
         extraopt = ""
 
@@ -694,6 +709,7 @@ def main():
         confDict=config,
         helao_repo_root=helao_repo_root,
         extraopt=extraopt,
+        restore=restore,
     )
 
     def hotkey_msg():
