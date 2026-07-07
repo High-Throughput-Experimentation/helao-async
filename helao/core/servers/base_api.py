@@ -125,9 +125,24 @@ def _build_action_from_kwargs(
                     f"critical error: found another Action BaseModel under parameter '{name}', skipping it"
                 )
     if action is None:
-        LOGGER.error(
-            "critical error: no Action BaseModel was found by setup_action, using blank Action."
-        )
+        if "action" in kwargs:
+            # An 'action' value was supplied by the caller but is not an Action
+            # instance (e.g. a malformed envelope that failed to rehydrate) --
+            # this is a genuine problem worth flagging loudly.
+            LOGGER.error(
+                "critical error: 'action' kwarg present but is not an Action "
+                "BaseModel, using blank Action."
+            )
+        else:
+            # No action envelope was supplied at all. This is expected for a
+            # tags=["action"] query endpoint (e.g. PAL 'list_new_samples')
+            # invoked via async_private_dispatcher over the ZMQ-RPC fast path,
+            # which does not synthesize FastAPI's Body({}) default. Such
+            # endpoints do not use the action machinery, so a blank Action is
+            # the correct benign fallback -- log it at debug, not error.
+            LOGGER.debug(
+                "no Action supplied to action-tagged endpoint; using blank Action."
+            )
         action = Action()
     else:
         LOGGER.info(f"found Action BaseModel under parameter '{seen_action_param}'")
