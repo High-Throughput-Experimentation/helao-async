@@ -37,6 +37,7 @@ from helao.core.tests.unit_test_sync_to_thread import sync_to_thread_unit_test
 from helao.core.tests.unit_test_sync_process_recovery import (
     sync_process_recovery_unit_test,
 )
+from helao.core.tests.unit_test_estop_sync import estop_sync_unit_test
 
 
 TESTS = [
@@ -56,6 +57,7 @@ TESTS = [
     ("micro_orch", micro_orch_unit_test),
     ("sync_to_thread", sync_to_thread_unit_test),
     ("sync_process_recovery", sync_process_recovery_unit_test),
+    ("estop_sync", estop_sync_unit_test),
 ]
 
 

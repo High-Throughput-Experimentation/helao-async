@@ -812,28 +812,32 @@ class BaseAPI(HelaoFastAPI):
         async def estop(
             switch: bool = True,
         ):
-            """Trigger an emergency stop: call the driver's estop hook (if any), latch the
-            E-STOP flag when ``switch`` is True, mark the action as estopped, and stop all
-            running executors. Returns the finished action as a dict.
+            """Trigger an emergency stop.
+
+            Calls the driver's estop hook (if any), latches the E-STOP flag,
+            stops all running executors, and finalizes any actions that were
+            actually in-flight with ``estopped`` status (moving them to
+            ``RUNS_FINISHED`` via their normal lifecycle).
+
+            Unlike the previous implementation, this does NOT fabricate a
+            placeholder ``estop`` action. An idle server writes no artifact; the
+            estop is recorded purely through the ``*_status`` fields of the
+            actions/experiment/sequence that were running.
             """
-            active = await self.base.setup_and_contain_action(
-                json_data_keys=["estop"], action_abbr="estop"
-            )
             has_estop = getattr(self.driver, "estop", None)
+            driver_resp = None
             if has_estop is not None and callable(has_estop):
                 LOGGER.info("driver has estop function")
-                await active.enqueue_data_dflt(
-                    datadict={
-                        "estop": await self.driver.estop(**active.action.action_params)
-                    }
-                )
+                driver_resp = await self.driver.estop(switch=switch)
             else:
                 LOGGER.info("driver has NO estop function")
-                self.base.actionservermodel.estop = switch
-            if switch:
-                active.action.action_status.append(HloStatus.estopped)
-            for executor_id in self.base.executors:
+            self.base.actionservermodel.estop = switch
+            for executor_id in list(self.base.executors):
                 self.base.stop_executor(executor_id)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            estopped_actions = await self.base.estop_actives()
+            return {
+                "estop": switch,
+                "estopped_actions": estopped_actions,
+                "driver": driver_resp,
+            }
 

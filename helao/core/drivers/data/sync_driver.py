@@ -317,6 +317,25 @@ class HelaoYml:
         status = path_parts[0].split("_")[-1].lower()
         return status
 
+    @property
+    def meta_status(self) -> list:
+        """The ``<type>_status`` list from the yml meta (e.g. action_status).
+
+        This is the in-file lifecycle status (a list of ``HloStatus`` values),
+        distinct from :attr:`status` which is derived from the ``RUNS_*`` path.
+        """
+        return list(self.meta.get(f"{self.type}_status", []) or [])
+
+    @property
+    def is_estopped(self) -> bool:
+        """True if this record's meta ``<type>_status`` contains ``estopped``.
+
+        Matches both the enum value (``"estopped"``) and its ``repr``
+        (``"HloStatus.estopped"``) so it is robust to how the status list was
+        serialized into the yml.
+        """
+        return any("estopped" in str(s) for s in self.meta_status)
+
     def rename(self, status: str) -> str:
         """Return ``self.target`` with its ``RUNS_*`` segment replaced by ``status``.
 
@@ -1064,11 +1083,24 @@ class SyncDriver:
         # locks acquired in the syncer worker, so this method only needs to
         # gate on child *sync status*, not on whether children are running.
         if prog.yml.type != "action":
-            if prog.yml.active_children:
+            active_children = prog.yml.active_children
+            # An estopped child left stranded in RUNS_ACTIVE is terminal: it will
+            # never finish or move on its own, so it must not block the parent
+            # forever. Only genuinely-still-running (non-estopped) active children
+            # gate the parent. The estopped ones' process contributions are still
+            # picked up by reconcile_processes (which reads active children too).
+            blocking_active = [c for c in active_children if not c.is_estopped]
+            if blocking_active:
                 LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
                 )
                 return False
+            if active_children:
+                LOGGER.warning(
+                    f"{str(prog.yml.target)} has {len(active_children)} estopped "
+                    f"child(ren) stranded in RUNS_ACTIVE; treating as terminal and "
+                    f"proceeding with sync."
+                )
             if prog.yml.finished_children:
                 LOGGER.debug(
                     f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
