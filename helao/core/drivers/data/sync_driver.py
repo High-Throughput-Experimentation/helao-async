@@ -1207,6 +1207,12 @@ class SyncDriver:
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
             LOGGER.debug(f"Finishing processes for {prog.yml.target.name}")
+            # Rebuild process metas from the on-disk action ymls before flushing.
+            # A reset/stale/cross-run .prg may have empty or partial
+            # process_metas even though every child action already synced; this
+            # recovers them so the experiment isn't stuck on "process index
+            # ... missing".
+            prog = self.reconcile_processes(prog)
             retry_count = 0
             s3_unf, api_unf = prog.list_unfinished_procs()
             while s3_unf or api_unf:
@@ -1371,7 +1377,28 @@ class SyncDriver:
         exp_prog = self.get_progress(exp_path)
         # with exp_prog.prglock:
         act_idx = act_meta["action_order"]
-        # handle legacy experiments (no process list)
+
+        # Idempotency guard: skip an action whose contribution is already folded
+        # into process_metas, so update_process is safe to replay (required for
+        # reconcile_processes to rebuild from on-disk ymls after a reset or
+        # cross-run resume). The guard keys on action_uuid, NOT action_order:
+        # split actions (Base.split_action bumps action_split but keeps
+        # action_order) produce several ymls sharing one action_order, each with
+        # a distinct uuid and its own samples/files -- all must be folded.
+        # process_actions_done stays order-keyed for the completion gate.
+        act_uuid = act_meta.get("action_uuid")
+        if act_uuid is not None:
+            folded_uuids = {
+                str(a.get("action_uuid"))
+                for m in exp_prog.dict["process_metas"].values()
+                for a in m.get("dispatched_actions_abbr", [])
+            }
+            if str(act_uuid) in folded_uuids:
+                return exp_prog
+        elif act_idx in exp_prog.dict["process_actions_done"]:
+            return exp_prog
+
+        # handle legacy experiments (no pre-declared process_order_groups)
         if exp_prog.dict["legacy_experiment"]:
             # if action is a process finisher, add to exp progress
             if act_meta["process_finish"]:
@@ -1387,13 +1414,41 @@ class SyncDriver:
             exp_prog.dict["process_groups"][pidx] = exp_prog.dict["process_groups"].get(
                 pidx, []
             )
-            exp_prog.dict["process_groups"][pidx].append(act_idx)
+            if act_idx not in exp_prog.dict["process_groups"][pidx]:
+                exp_prog.dict["process_groups"][pidx].append(act_idx)
+            pidxs = [pidx]
         else:
-            pidx = [
+            pidxs = [
                 k for k, l in exp_prog.dict["process_groups"].items() if act_idx in l
-            ][0]
+            ]
+            if not pidxs:
+                # An executed action that belongs to no declared process group
+                # contributes nothing; skip it rather than raising IndexError
+                # (which would abort the whole syncer worker mid-experiment).
+                LOGGER.warning(
+                    f"Action order {act_idx} ({act_yml.target.name}) is not a member "
+                    f"of any process group for {exp_prog.yml.target.name}; skipping "
+                    f"process contribution."
+                )
+                return exp_prog
+            if len(pidxs) > 1:
+                # An action_order declared in more than one process group
+                # contributes to EACH of them. Folding into only the first (the
+                # old matches[0] behavior) left the other groups without a meta,
+                # so sync_process found "actions but no meta" and the experiment
+                # never finished. Fold into all matching groups.
+                LOGGER.warning(
+                    f"Action order {act_idx} ({act_yml.target.name}) belongs to "
+                    f"multiple process groups {pidxs} in "
+                    f"{exp_prog.yml.target.name}; folding into all of them."
+                )
 
-            # if exp_prog doesn't yet have metadict, create one
+        # Build or extend the process meta for every group this action belongs
+        # to. This runs for BOTH legacy and non-legacy experiments. The legacy
+        # branch previously stopped after bucketing the action, never populating
+        # process_metas, so a legacy experiment could never finish syncing --
+        # sync_process looped forever on "process index {pidx} is missing".
+        for pidx in pidxs:
             if pidx not in exp_prog.dict["process_metas"]:
                 process_meta = {
                     k: v
@@ -1432,16 +1487,13 @@ class SyncDriver:
                 process_meta["process_uuid"] = process_uuid
                 process_meta["process_group_index"] = pidx
                 process_meta["dispatched_actions_abbr"] = []
-
             else:
                 process_meta = exp_prog.dict["process_metas"][pidx]
 
-            # update experiment progress with action
+            # fold this action into the process meta
             process_meta["dispatched_actions_abbr"].append(
                 ShortActionModel(**act_meta).clean_dict(strip_private=True)
             )
-
-            LOGGER.debug(f"current experiment progress:\n{exp_prog.dict}")
             if act_idx == min(exp_prog.dict["process_groups"][pidx]):
                 process_meta["process_timestamp"] = act_meta["action_timestamp"]
             if "technique_name" in act_meta:
@@ -1456,7 +1508,13 @@ class SyncDriver:
                 contrib = act_meta[pc]
                 new_name = pc.replace("action_", "process_")
                 if new_name not in process_meta:
-                    process_meta[new_name] = contrib
+                    # copy mutable contribs so multiple groups (and repeated
+                    # folds) never alias the same list/dict object
+                    process_meta[new_name] = (
+                        copy(contrib)
+                        if isinstance(contrib, (list, dict))
+                        else contrib
+                    )
                 elif isinstance(contrib, dict):
                     process_meta[new_name].update(contrib)
                 elif isinstance(contrib, list):
@@ -1494,11 +1552,44 @@ class SyncDriver:
                         ]
                     if deduped_samples:
                         process_meta[new_name] = deduped_samples
-            # register finished action in process_actions_done {order: ymltargetname}
-            exp_prog = self.get_progress(exp_path)
             exp_prog.dict["process_metas"][pidx] = process_meta
-            exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
-            exp_prog.write_dict()
+
+        # register finished action in process_actions_done {order: ymltargetname}
+        exp_prog.dict["process_actions_done"].update({act_idx: act_yml.target.name})
+        exp_prog.write_dict()
+        return exp_prog
+
+    def reconcile_processes(self, exp_prog: Progress) -> Progress:
+        """Rebuild an experiment's process bookkeeping from its on-disk actions.
+
+        ``process_metas`` / ``process_actions_done`` are accumulated one action
+        at a time as each child syncs, and live only in the experiment's
+        ``.prg``. That state is lost whenever the ``.prg`` is reset or recreated
+        -- after a partial sync, a ``reset_sync``, or a cross-run resume where
+        the contributing actions already moved to ``RUNS_SYNCED`` and so are
+        never re-enqueued (``list_pending_acts`` only scans ``RUNS_FINISHED``).
+        A fresh ``.prg`` then has empty ``process_metas`` and the experiment can
+        never finish syncing.
+
+        This replays every child action yml found on disk (any status) through
+        :meth:`update_process`, which is idempotent, so the process metadata is
+        reconstructed from the authoritative source instead of being lost.
+
+        Args:
+            exp_prog: Experiment progress to reconcile.
+
+        Returns:
+            The reconciled experiment ``Progress`` (a fresh object).
+        """
+        if exp_prog.yml.type != "experiment":
+            return exp_prog
+        for child in exp_prog.yml.children:
+            if child.type != "action":
+                continue
+            child_meta = child.meta
+            if not child_meta.get("process_contrib", False):
+                continue
+            exp_prog = self.update_process(child, child_meta)
         return exp_prog
 
     async def sync_process(self, exp_prog: Progress, force: bool = False) -> Progress:
@@ -1535,14 +1626,40 @@ class SyncDriver:
 
             if push_condition:
                 if pidx not in exp_prog.dict["process_metas"]:
-                    push_condition = False
-                    sync_path = os.path.dirname(str(exp_prog.prg))
-                    LOGGER.warning(
-                        f"Cannot sync experiment because process index {pidx} is missing. See {str(exp_prog.yml.target)}"
+                    # No process meta even after reconcile_processes replayed
+                    # every on-disk action. Decide by whether any contributing
+                    # action actually exists for this group.
+                    gids = exp_prog.dict["process_groups"].get(pidx, [])
+                    done_gids = [
+                        i for i in gids if i in exp_prog.dict["process_actions_done"]
+                    ]
+                    if not done_gids:
+                        # Phantom group: declared in process_order_groups at
+                        # orch plan time, but its contributing action was never
+                        # dispatched/synced (skipped or removed from the queue).
+                        # Drop it so the experiment can finish instead of looping
+                        # on reset_sync + re-enqueue forever.
+                        LOGGER.warning(
+                            f"Process group {pidx} in {str(exp_prog.yml.target)} has "
+                            f"no contributing actions on disk; dropping it so the "
+                            f"experiment can finish."
+                        )
+                        exp_prog.dict["process_groups"].pop(pidx, None)
+                        if pidx not in exp_prog.dict["process_s3"]:
+                            exp_prog.dict["process_s3"].append(pidx)
+                        if pidx not in exp_prog.dict["process_api"]:
+                            exp_prog.dict["process_api"].append(pidx)
+                        exp_prog.write_dict()
+                        continue
+                    # Contributing actions exist but their meta is still missing
+                    # -- unexpected after reconcile. Skip this pass rather than
+                    # wiping and re-queuing the whole subtree.
+                    LOGGER.error(
+                        f"Process group {pidx} in {str(exp_prog.yml.target)} has "
+                        f"contributing actions {done_gids} but no process meta after "
+                        f"reconcile; skipping."
                     )
-                    self.reset_sync(sync_path)
-                    await self.enqueue_yml(str(exp_prog.yml.target), 1)
-                    return exp_prog
+                    continue
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
                 model = ProcessModel(**meta).clean_dict(strip_private=True)
@@ -1566,7 +1683,11 @@ class SyncDriver:
                     exp_prog.dict["process_s3"].append(pidx)
                     exp_prog.write_dict()
         for pidx in api_unfinished:
-            gids = exp_prog.dict["process_groups"][pidx]
+            gids = exp_prog.dict["process_groups"].get(pidx)
+            # a group dropped as phantom in the s3 loop above is gone from
+            # process_groups; skip it here too (its pidx was already flagged done)
+            if gids is None or pidx not in exp_prog.dict["process_metas"]:
+                continue
             if all(i in exp_prog.dict["process_actions_done"] for i in gids):
                 meta = exp_prog.dict["process_metas"][pidx]
                 model = ProcessModel(**meta).clean_dict(strip_private=True)

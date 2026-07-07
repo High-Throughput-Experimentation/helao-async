@@ -34,6 +34,9 @@ from helao.core.tests.unit_test_extra_models import extra_models_unit_test
 from helao.core.tests.unit_test_helao_driver import helao_driver_unit_test
 from helao.core.tests.unit_test_micro_orch import micro_orch_unit_test
 from helao.core.tests.unit_test_sync_to_thread import sync_to_thread_unit_test
+from helao.core.tests.unit_test_sync_process_recovery import (
+    sync_process_recovery_unit_test,
+)
 
 
 TESTS = [
@@ -52,6 +55,7 @@ TESTS = [
     ("helao_driver", helao_driver_unit_test),
     ("micro_orch", micro_orch_unit_test),
     ("sync_to_thread", sync_to_thread_unit_test),
+    ("sync_process_recovery", sync_process_recovery_unit_test),
 ]
 
 
