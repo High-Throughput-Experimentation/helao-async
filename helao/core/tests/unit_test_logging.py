@@ -16,6 +16,7 @@ import logging.handlers
 import os
 import sys
 import tempfile
+import time
 import traceback
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
@@ -24,6 +25,7 @@ from helao.helpers import helao_logging as helao_log
 from helao.helpers.helao_logging import (
     ALERT_LEVEL,
     ColoredNtpOffsetFormatter,
+    DedupTimedRotatingFileHandler,
     GZipRotator,
     NtpOffsetFormatter,
     make_logger,
@@ -252,6 +254,94 @@ def logging_unit_test() -> bool:
         reporter.check(
             "min_interval=0 disables throttling (all alerts mailed)",
             lambda: len(sent_subjects) == 4,
+        )
+
+        reporter.section("DedupTimedRotatingFileHandler collapses repeats")
+
+        def _plain_record(message):
+            return logging.LogRecord(
+                name="dedup",
+                level=logging.INFO,
+                pathname=__file__,
+                lineno=1,
+                msg=message,
+                args=(),
+                exc_info=None,
+            )
+
+        def _read_lines(path):
+            with open(path, "r") as fh:
+                return [ln.rstrip("\n") for ln in fh if ln.strip()]
+
+        # Large interval so only a new message (not elapsed time) triggers flush.
+        dedup_path = os.path.join(tmpdir, "dedup_flush.log")
+        dh = DedupTimedRotatingFileHandler(
+            filename=dedup_path, when="D", interval=1, backupCount=1,
+            dedup_interval=3600,
+        )
+        dh.setFormatter(logging.Formatter("%(message)s"))
+        dh.emit(_plain_record("A"))  # written
+        dh.emit(_plain_record("A"))  # first repeat: cooldown opens, suppressed
+        dh.emit(_plain_record("A"))  # second repeat: counted, suppressed
+        dh.emit(_plain_record("B"))  # new message: flush summary for A, write B
+        dh.close()
+        flush_lines = _read_lines(dedup_path)
+
+        reporter.check(
+            "duplicates suppressed until a new message flushes them "
+            "(3 lines: A, summary, B)",
+            lambda: len(flush_lines) == 3,
+        )
+        reporter.check(
+            "first line is the original message",
+            lambda: flush_lines[0] == "A",
+        )
+        reporter.check(
+            "summary reports the repeat count for the collapsed run",
+            lambda: flush_lines[1] == "A [previous message repeated 2 times]",
+        )
+        reporter.check(
+            "new message is written after the flushed summary",
+            lambda: flush_lines[2] == "B",
+        )
+        reporter.check(
+            "handler state resets after flushing (tracks new message)",
+            lambda: dh._dedup_count == 0 and dh._dedup_last_message == "B",
+        )
+
+        # dedup_interval=0 restores stock behaviour (every record written).
+        stock_path = os.path.join(tmpdir, "dedup_off.log")
+        sh = DedupTimedRotatingFileHandler(
+            filename=stock_path, when="D", interval=1, backupCount=1,
+            dedup_interval=0,
+        )
+        sh.setFormatter(logging.Formatter("%(message)s"))
+        for _ in range(3):
+            sh.emit(_plain_record("SAME"))
+        sh.close()
+        reporter.check(
+            "dedup_interval=0 writes every duplicate (no collapsing)",
+            lambda: _read_lines(stock_path) == ["SAME", "SAME", "SAME"],
+        )
+
+        # Elapsed cooldown flushes a running summary without a new message.
+        elapsed_path = os.path.join(tmpdir, "dedup_elapsed.log")
+        eh = DedupTimedRotatingFileHandler(
+            filename=elapsed_path, when="D", interval=1, backupCount=1,
+            dedup_interval=0.02,
+        )
+        eh.setFormatter(logging.Formatter("%(message)s"))
+        eh.emit(_plain_record("SPAM"))  # written
+        eh.emit(_plain_record("SPAM"))  # cooldown opens, suppressed
+        time.sleep(0.05)
+        eh.emit(_plain_record("SPAM"))  # elapsed: flush summary, reopen window
+        eh.close()
+        elapsed_lines = _read_lines(elapsed_path)
+        reporter.check(
+            "elapsed cooldown flushes a summary line for sustained duplicates",
+            lambda: len(elapsed_lines) == 2
+            and elapsed_lines[0] == "SPAM"
+            and elapsed_lines[1] == "SPAM [previous message repeated 2 times]",
         )
 
         return reporter.success()
