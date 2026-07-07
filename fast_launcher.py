@@ -32,11 +32,20 @@ __all__ = []
 
 import sys
 import os
+import asyncio
 from glob import glob
 from importlib import import_module
 from uvicorn.config import LOGGING_CONFIG
 import uvicorn
 import colorama
+
+# pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
+# family, which the Windows Proactor loop (the default on Windows) does not
+# provide. Select the WindowsSelectorEventLoopPolicy before uvicorn creates its
+# loop so the co-located ZMQ RPC server works without the RuntimeWarning and the
+# extra tornado selector thread. Safe here: helao uses no asyncio subprocesses.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 from helao.helpers import helao_logging as logging
