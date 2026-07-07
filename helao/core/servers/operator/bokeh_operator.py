@@ -61,6 +61,20 @@ BUILTIN_TYPES = [
     if isinstance(getattr(builtins, d), type)
 ]
 
+# Bokeh re-runs makeBokehApp (and thus BokehOperator.__init__) on every client
+# connection. The following process-level caches hold the session-invariant
+# results of expensive per-config work so only the first connection pays for it:
+#   * _SEQSPEC_MODULE_CACHE: parser module loaded from a file via exec_module
+#     (keyed by parser file path); the SpecParser instance is still created per
+#     session in case it carries per-parse state.
+#   * _PLATE_API_CACHE: shared read-only plate-data API instances (keyed by class
+#     name) whose construction loads static plate data.
+#   * _LIB_TABLE_CACHE: introspected sequence/experiment dropdown data (plain
+#     dicts + name lists) produced by BokehOperator._build_lib.
+_SEQSPEC_MODULE_CACHE: dict = {}
+_PLATE_API_CACHE: dict = {}
+_LIB_TABLE_CACHE: dict = {}
+
 
 def _render_node(key, val, top=False, open_keys=()):
     """Render one object node as collapsible HTML. Top-level nodes whose key is
@@ -175,8 +189,12 @@ class BokehOperator:
         self.dataAPI = None
         plate_api_name = self.config_dict.get("plate_api")
         if plate_api_name == "HTEPlateAPI":
-            from helao.helpers.plate_api import HTEPlateAPI
-            self.dataAPI = HTEPlateAPI()
+            cached_api = _PLATE_API_CACHE.get(plate_api_name)
+            if cached_api is None:
+                from helao.helpers.plate_api import HTEPlateAPI
+                cached_api = HTEPlateAPI()
+                _PLATE_API_CACHE[plate_api_name] = cached_api
+            self.dataAPI = cached_api
         self.loaded_config_path = self.vis.world_cfg.get("loaded_config_path", "")
         self.pal_name = None
         self.num_actserv = len(
@@ -301,13 +319,16 @@ class BokehOperator:
         specs_folder = self.config_dict.get("seqspec_folder_path", None)
         if self.parser_path is not None:
             if os.path.exists(self.parser_path) and os.path.isfile(self.parser_path):
-                module_name = os.path.basename(self.parser_path).replace(".py", "")
-                spec = importlib.util.spec_from_file_location(
-                    module_name, self.parser_path
-                )
-                self.seqspec_parser_module = importlib.util.module_from_spec(spec)
-                sys.modules[module_name] = self.seqspec_parser_module
-                spec.loader.exec_module(self.seqspec_parser_module)
+                self.seqspec_parser_module = _SEQSPEC_MODULE_CACHE.get(self.parser_path)
+                if self.seqspec_parser_module is None:
+                    module_name = os.path.basename(self.parser_path).replace(".py", "")
+                    spec = importlib.util.spec_from_file_location(
+                        module_name, self.parser_path
+                    )
+                    self.seqspec_parser_module = importlib.util.module_from_spec(spec)
+                    sys.modules[module_name] = self.seqspec_parser_module
+                    spec.loader.exec_module(self.seqspec_parser_module)
+                    _SEQSPEC_MODULE_CACHE[self.parser_path] = self.seqspec_parser_module
                 self.seqspec_parser = self.seqspec_parser_module.SpecParser()
         if specs_folder is not None:
             if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
@@ -1074,6 +1095,23 @@ class BokehOperator:
         select_list = []
         codehash_map = codehash_map or {}
         version_attr = name_field.replace("_name", "_version")
+
+        # The introspected table is a pure function of the library callables,
+        # their file hashes, and the config-level default overlay; all are fixed
+        # for a running process, so cache across Bokeh sessions. Only plain data
+        # is cached (dicts + name list), never Bokeh models.
+        cache_key = (
+            self.loaded_config_path,
+            config_key,
+            name_field,
+            tuple(lib),
+            tuple(sorted(codehash_map.items())),
+        )
+        cached = _LIB_TABLE_CACHE.get(cache_key)
+        if cached is not None:
+            cached_items, cached_select = cached
+            return [dict(it) for it in cached_items], list(cached_select)
+
         LOGGER.info(f"found {name_field.replace('_name', '')}s: {list(lib)}")
         for i, name in enumerate(lib):
             func = lib[name]
@@ -1123,6 +1161,10 @@ class BokehOperator:
                 ).model_dump()
             )
             select_list.append(name)
+        _LIB_TABLE_CACHE[cache_key] = (
+            [dict(it) for it in items],
+            list(select_list),
+        )
         return items, select_list
 
     @staticmethod
