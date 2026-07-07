@@ -1665,7 +1665,7 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/list_new_samples", tags=["action"])
+    @app.post(f"/list_new_samples", tags=["private"])
     async def list_new_samples(num_smps: int = 10, give_only: str = "false") -> dict:
         """List the most recent global sample labels from each local DB table.
 
