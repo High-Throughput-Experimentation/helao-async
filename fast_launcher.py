@@ -134,6 +134,15 @@ if __name__ == "__main__":
             )
     CONFIG["deployment"] = deployment
 
+    # Launcher CLI override: `--restore` forces orchestrators to import their
+    # saved queues on startup regardless of the config default. server_config is
+    # the same dict HelaoFastAPI exposes as server_cfg (CONFIG["servers"][key]),
+    # so mutating it here — before makeApp constructs the app — is visible to
+    # Orch.myinit's restore gate.
+    if "--restore" in sys.argv[3:] and server_config.get("group") == "orchestrator":
+        server_config["restore_queues_on_startup"] = True
+        LOGGER.info("--restore flag set; orchestrator will import saved queues.")
+
     makeApp = import_module(
         f"helao.deploy.{deployment}.servers.{server_config['group']}.{server_config['fast']}"
     ).makeApp

@@ -223,7 +223,16 @@ class Orch(Base):
         self.heartbeat_monitor = asyncio.create_task(self.active_action_monitor())
         self.driver_monitor = asyncio.create_task(self.action_server_monitor())
 
-        # self.import_queues()
+        # Restore previously exported queues only when opted in, either via the
+        # per-server config key `restore_queues_on_startup: true` or the launcher
+        # CLI switch `--restore` (which sets that key for orchestrators). Left off
+        # by default so a stale STATES/queues.pck is never silently replayed.
+        if self.server_cfg.get("restore_queues_on_startup", False):
+            LOGGER.info(
+                "restore_queues_on_startup is set; importing saved queues from "
+                "STATES/queues.pck."
+            )
+            self.import_queues()
 
     # def endpoint_queues_init(self):
     #     """
