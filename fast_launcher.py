@@ -145,16 +145,21 @@ if __name__ == "__main__":
         log_root = None
     # LOGGING_CONFIG["formatters"]["default"]["fmt"] = "%(asctime)s [%(name)s] %(levelprefix)s %(message)s"
 
+    # NB: no leading "\n" / trailing "\r". The old carriage return left the
+    # cursor at column 0 without a newline; when multiple server subprocesses
+    # interleave on the shared (block-buffered) stdout on Linux, later writes
+    # overwrote from column 0, producing variable indentation. A plain line with
+    # the handler's default "\n" terminator renders one clean line per record.
     LOGGING_CONFIG["formatters"]["default"]["datefmt"] = "%H:%M:%S"
     LOGGING_CONFIG["formatters"]["default"][
         "fmt"
-    ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
+    ] = f"[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s"
     LOGGING_CONFIG["formatters"]["default"]["use_colors"] = False
 
     LOGGING_CONFIG["formatters"]["access"]["datefmt"] = "%H:%M:%S"
     LOGGING_CONFIG["formatters"]["access"][
         "fmt"
-    ] = f"\n[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s\r"
+    ] = f"[%(asctime)s_{server_key}]: %(levelprefix)s %(message)s"
     LOGGING_CONFIG["formatters"]["access"]["use_colors"] = False
 
     LOGGER.info(f" ---- starting  {server_key} ----")

@@ -73,8 +73,6 @@ class Pidd:
             Stores a PID with the given key, host, port, and PID.
         list_active():
             Lists all active PIDs that are currently running.
-        find_bokeh(host, port):
-            Finds the PID of a running Bokeh server at the given host and port.
         kill_server(k):
             Terminates the server with the given key.
         close():
@@ -105,6 +103,17 @@ class Pidd:
         self.PROC_NAMES = ["python.exe", "python"]
         self.pidFilePath = os.path.join(pidPath, pidFile)
         self.RETRIES = retries
+        # Seconds to wait for a cooperative SIGTERM shutdown before escalating to
+        # SIGKILL. Must exceed the servers' own graceful-shutdown floor: uvicorn's
+        # timeout_graceful_shutdown (5s) plus Base.shutdown()'s detach_subscribers
+        # sleep (1s). The old 3x0.5s=1.5s budget was shorter than that floor and
+        # always timed out on Linux.
+        self.GRACEFUL_WAIT = 7.0
+        self.FORCE_WAIT = 3.0
+        # server_key -> subprocess.Popen handle, populated by launcher(). Kept so
+        # terminated children can be reaped; an unreaped child becomes a zombie
+        # whose PID psutil.pid_exists() still reports as alive.
+        self.procs = {}
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh")
         self.d = {}
@@ -204,35 +213,40 @@ class Pidd:
         #             active.append(tup)
         return running
 
-    def find_bokeh(self, host, port):
+    def _reap_child(self, k):
+        """Reap the OS child for server ``k`` so a terminated process does not
+        linger as an unwaited zombie. No-op if this launcher never spawned it
+        (e.g. servers appended by ``append.py`` or a fresh ``Pidd`` in cli.py)."""
+        p = self.procs.get(k)
+        if p is not None:
+            try:
+                p.wait(timeout=0)
+            except Exception:
+                pass
+
+    def _wait_gone(self, proc, timeout, k):
+        """Wait up to ``timeout`` seconds for ``proc`` to exit, reaping it so no
+        zombie remains. Return True if the process is gone.
+
+        ``psutil.Process.wait()`` reaps the process when it is a child of this
+        process (which every launcher-spawned server is), preventing the zombie
+        that would otherwise keep ``psutil.pid_exists()`` returning True forever.
         """
-        Find the process ID of a running Bokeh server.
-
-        This method searches through all running Python processes and checks their
-        network connections to find a process that is listening on the specified
-        host and port.
-
-        Args:
-            host (str): The hostname or IP address where the Bokeh server is running.
-            port (int): The port number on which the Bokeh server is listening.
-
-        Returns:
-            int: The process ID (PID) of the Bokeh server.
-
-        Raises:
-            Exception: If no running Bokeh server is found at the specified host and port.
-        """
-        pyPids = {
-            p.pid: p.info["connections"]
-            for p in psutil.process_iter(["name", "connections"])
-            if p.info["name"].startswith("python")
-        }
-        # print_message(LAUNCH_LOGGER, "launcher", pyPids)
-        match = {pid: connections for pid, connections in pyPids.items() if connections}
-        for pid, connections in match.items():
-            if (host, port) in [(c.laddr.ip, c.laddr.port) for c in connections]:
-                return pid
-        raise Exception(f"Could not find running bokeh server at {host}:{port}")
+        try:
+            proc.wait(timeout=timeout)
+        except psutil.TimeoutExpired:
+            return False
+        except psutil.NoSuchProcess:
+            pass
+        # belt-and-suspenders: also reap via the Popen handle if we own it
+        self._reap_child(k)
+        if not psutil.pid_exists(proc.pid):
+            return True
+        # a lingering PID that is a zombie counts as gone (already dead)
+        try:
+            return proc.status() == psutil.STATUS_ZOMBIE
+        except psutil.NoSuchProcess:
+            return True
 
     def kill_server(self, k):
         """
@@ -240,51 +254,82 @@ class Pidd:
 
         This method attempts to terminate a server process by its PID. It first checks if the server
         exists in the global dictionary and if it is currently running. If the server is not running,
-        it removes the server from the global dictionary. If the server is running, it tries to
-        terminate the process up to a specified number of retries.
+        it removes the server from the global dictionary. If the server is running, it sends SIGTERM
+        and waits up to ``GRACEFUL_WAIT`` seconds for a cooperative shutdown, escalating to SIGKILL
+        (waiting a further ``FORCE_WAIT`` seconds) if needed. Every terminating branch reaps the child
+        so it does not linger as a zombie.
 
         Args:
             k (str): The key identifying the server to be terminated.
 
         Returns:
-            bool: True if the server was successfully terminated or not found, False if the termination failed.
-
-        Raises:
-            Exception: If an error occurs during the termination process, it logs the traceback and returns False.
+            bool: True if the server was successfully terminated or not found, False if the process
+                survived even SIGKILL (in which case the pid entry is retained for recovery).
         """
         self.load_global()  # reload in case any servers were appended
         if k not in self.d:
             LAUNCH_LOGGER.info(f"Server '{k}' not found in pid dict.")
             return True
-        else:
-            active = self.list_active()
-            if k not in [key for key, _, _, _ in active]:
-                LAUNCH_LOGGER.info(
-                    f"Server '{k}' is not running, removing from global dict."
-                )
-                del self.d[k]
-                return True
-            else:
-                try:
-                    p = psutil.Process(self.d[k]["pid"])
-                    for _ in range(self.RETRIES):
-                        # os.kill(p.pid, signal.SIGTERM)
-                        p.terminate()
-                        time.sleep(0.5)
-                        if not psutil.pid_exists(p.pid):
-                            LAUNCH_LOGGER.info(f"Successfully terminated server '{k}'.")
-                            return True
-                    if psutil.pid_exists(p.pid):
-                        LAUNCH_LOGGER.error(
-                            f"Failed to terminate server '{k}' after {self.RETRIES} retries.",
-                            exc_info=True,
-                        )
-                        return False
-                except Exception:
-                    LAUNCH_LOGGER.error(
-                        f"Error terminating server '{k}'", exc_info=True
-                    )
-                    return False
+
+        active = self.list_active()
+        if k not in [key for key, _, _, _ in active]:
+            LAUNCH_LOGGER.info(
+                f"Server '{k}' is not running, removing from global dict."
+            )
+            self._reap_child(k)  # in case the child exited but was never waited on
+            del self.d[k]
+            self.write_global()
+            return True
+
+        pid = self.d[k]["pid"]
+        try:
+            p = psutil.Process(pid)
+        except psutil.NoSuchProcess:
+            LAUNCH_LOGGER.info(f"Server '{k}' (pid {pid}) already gone.")
+            self._reap_child(k)
+            del self.d[k]
+            self.write_global()
+            return True
+
+        # Send SIGTERM (an alias for kill() on Windows) and wait past the servers'
+        # graceful-shutdown floor before escalating to SIGKILL. Every branch reaps
+        # the child so it never lingers as a zombie.
+        try:
+            p.terminate()
+        except psutil.NoSuchProcess:
+            self._reap_child(k)
+            del self.d[k]
+            self.write_global()
+            return True
+        except Exception:
+            LAUNCH_LOGGER.error(f"Error signaling server '{k}'", exc_info=True)
+            return False
+
+        if self._wait_gone(p, self.GRACEFUL_WAIT, k):
+            LAUNCH_LOGGER.info(f"Successfully terminated server '{k}' (graceful).")
+            del self.d[k]
+            self.write_global()
+            return True
+
+        LAUNCH_LOGGER.warning(
+            f"Server '{k}' still alive after {self.GRACEFUL_WAIT}s SIGTERM; "
+            f"escalating to SIGKILL."
+        )
+        try:
+            p.kill()
+        except psutil.NoSuchProcess:
+            pass
+        except Exception:
+            LAUNCH_LOGGER.error(f"Error killing server '{k}'", exc_info=True)
+
+        if self._wait_gone(p, self.FORCE_WAIT, k):
+            LAUNCH_LOGGER.info(f"Successfully killed server '{k}' (SIGKILL).")
+            del self.d[k]
+            self.write_global()
+            return True
+
+        LAUNCH_LOGGER.error(f"Failed to terminate server '{k}' even after SIGKILL.")
+        return False
 
     def close(self):
         """
@@ -324,15 +369,20 @@ class Pidd:
                         self.kill_server(server)
 
         # kill whats left
-        active = self.list_active()
         for k, _, _, _ in self.list_active():
             self.kill_server(k)
         active = self.list_active()
         if active:
-            LAUNCH_LOGGER.warning(f"Following actions failed to terminate: {active}")
+            LAUNCH_LOGGER.warning(
+                f"Following servers failed to terminate: {active}. "
+                f"Retaining '{self.pidFilePath}' for recovery."
+            )
         else:
-            LAUNCH_LOGGER.info(f"All actions terminated. Removing '{self.pidFilePath}'")
-        os.remove(self.pidFilePath)
+            LAUNCH_LOGGER.info(
+                f"All servers terminated. Removing '{self.pidFilePath}'"
+            )
+            if os.path.exists(self.pidFilePath):
+                os.remove(self.pidFilePath)
 
 
 def validateConfig(PIDD, confDict, helao_repo_root):
@@ -537,6 +587,7 @@ def launcher(confArg, confDict, helao_repo_root, extraopt=""):
                         )
                         continue
                     pidd.store_pid(server, servHost, servPort, ppid)
+                    pidd.procs[server] = p
                     time.sleep(0.5)
         if group != LAUNCH_ORDER[-1]:
             time.sleep(3)
@@ -791,15 +842,24 @@ def main():
                             )
                             ppid = p.pid
                             pidd.store_pid(sn, S["host"], S["port"], ppid)
+                            pidd.procs[sn] = p
                             if sg == "action":
                                 for orchserv in pidd.orchServs:
                                     OS = pidd.servers["orchestrator"][orchserv]
                                     LAUNCH_LOGGER.info(
                                         f"Reregistering {sn} on {orchserv}."
                                     )
+                                    # /attach_client takes client_servkey,
+                                    # client_host, client_port as query params
+                                    # (base_api.py); a form body of only
+                                    # client_servkey yields a 422.
                                     requests.post(
                                         f"http://{OS['host']}:{OS['port']}/attach_client",
-                                        data={"client_servkey": sn},
+                                        params={
+                                            "client_servkey": sn,
+                                            "client_host": S["host"],
+                                            "client_port": S["port"],
+                                        },
                                     )
                         except Exception:
                             LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
