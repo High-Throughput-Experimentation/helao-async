@@ -1053,6 +1053,40 @@ class Base:
         for exec_key in matching_execs:
             self.stop_executor(exec_key)
 
+    async def estop_actives(self) -> list:
+        """Finalize every in-flight action as estopped without writing a new artifact.
+
+        Replaces the old ``/estop`` behavior that fabricated a placeholder
+        ``estop`` action on every server (including idle ones). Here only actions
+        that were actually running are touched: ``HloStatus.estopped`` is appended
+        to each and the action is finalized through its normal lifecycle
+        (``write_act`` with the estopped status, then move to ``RUNS_FINISHED``).
+        An idle server has no actives, so it writes nothing. ``finish`` is
+        idempotent (guarded by ``finish_lock`` and the finished-status check), so
+        a concurrent action-loop finish for the same active is safe.
+
+        This is intentionally independent of the ``/estop`` ``switch`` flag (which
+        only latches/releases the per-server estop state): whenever estop is
+        signalled there may be running actions to finalize, and on release there
+        simply are none, so calling it unconditionally is safe.
+
+        Returns:
+            List of finalized ``action_uuid`` strings.
+        """
+        finalized = []
+        for active in list(self.actives.values()):
+            try:
+                for action in active.action_list:
+                    if HloStatus.estopped not in action.action_status:
+                        active.set_estop(action=action)
+                await active.finish_all()
+                finalized.extend(str(a.action_uuid) for a in active.action_list)
+            except Exception:
+                LOGGER.error(
+                    "error finalizing an active action during estop", exc_info=True
+                )
+        return finalized
+
     def import_postprocessors(self, name_list, class_list, proc_class):
         """Resolve and append post-processor classes from file paths or deployment names.
 

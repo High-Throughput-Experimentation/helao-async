@@ -655,27 +655,31 @@ class OrchAPI(HelaoFastAPI):
         async def estop(
             switch: bool = True,
         ):
-            """Trigger emergency stop on the orchestrator: invoke driver estop if any, latch when ``switch`` is True, mark the action as estopped, and stop all executors."""
-            active = await self.orch.setup_and_contain_action(
-                json_data_keys=["estop"], action_abbr="estop"
-            )
+            """Trigger emergency stop on the orchestrator.
+
+            Invokes the driver estop hook (if any), latches the E-STOP flag,
+            stops all executors, and finalizes any in-flight actions with
+            ``estopped`` status. Like the action-server ``/estop``, this no longer
+            fabricates a placeholder ``estop`` action; the orchestrator is in its
+            own ``server_dict`` and ``estop_actions`` dispatches here too, so
+            fabricating would reintroduce the very artifact being removed.
+            """
             has_estop = getattr(self.driver, "estop", None)
+            driver_resp = None
             if has_estop is not None and callable(has_estop):
                 LOGGER.info("driver has estop function")
-                await active.enqueue_data_dflt(
-                    datadict={
-                        "estop": await self.driver.estop(**active.action.action_params)
-                    }
-                )
+                driver_resp = await self.driver.estop(switch=switch)
             else:
                 LOGGER.info("driver has NO estop function")
-                self.orch.actionservermodel.estop = switch
-            if switch:
-                active.action.action_status.append(HloStatus.estopped)
-            for k in self.orch.executors:
+            self.orch.actionservermodel.estop = switch
+            for k in list(self.orch.executors):
                 self.orch.stop_executor(k)
-            finished_action = await active.finish()
-            return finished_action.as_dict()
+            estopped_actions = await self.orch.estop_actives()
+            return {
+                "estop": switch,
+                "estopped_actions": estopped_actions,
+                "driver": driver_resp,
+            }
 
         @self.post(f"/{server_key}/conditional_exp", tags=["action"])
         async def conditional_exp(

@@ -1550,6 +1550,15 @@ class Orch(Base):
         # reset loop intend
         await self.intend_none()
 
+        # finalize + move the active experiment/sequence with estopped status so
+        # the partial run is not stranded in RUNS_ACTIVE and can be synced
+        try:
+            await self.estop_finish_active()
+        except Exception:
+            LOGGER.error(
+                "error finalizing estopped experiment/sequence", exc_info=True
+            )
+
         self.current_stop_message = "E-STOP" + reason_suffix
         LOGGER.warning("E-STOP" + reason_suffix)
         LOGGER.alert("ORCH E-STOP")
@@ -1559,62 +1568,178 @@ class Orch(Base):
         await self.intend_stop()
 
     async def estop_actions(self, switch: bool):
-        """Send an ``estop`` action to every registered action server.
+        """Signal every registered action server to emergency-stop (or release).
+
+        Each server's ``/estop`` endpoint stops its executors and finalizes any
+        in-flight actions with ``estopped`` status (moving them to
+        ``RUNS_FINISHED`` via their normal lifecycle). No placeholder ``estop``
+        action artifact is generated -- an idle server writes nothing, and estop
+        is recorded purely through the ``*_status`` fields of the actions (and,
+        orch-side, the experiment/sequence) that were actually running.
 
         Args:
-            switch: ``True`` to latch estop, ``False`` to release it.
+            switch: ``True`` to latch the per-server estop flag, ``False`` to
+                release it. Finalization of in-flight actions happens regardless;
+                on release there are simply none left to finalize.
         """
         LOGGER.info("estopping all servers")
-
-        # create a dict for current active_experiment
-        # (estop happens during the active_experiment)
-
-        if self.active_experiment is not None:
-            active_exp_dict = self.active_experiment.as_dict()
-        elif self.last_experiment is not None:
-            active_exp_dict = self.last_experiment.as_dict()
-        else:
-            exp = Experiment()
-            exp.sequence_name = "orch_estop"
-            # need to set status, else init will set in to active
-            exp.sequence_status = [HloStatus.estopped, HloStatus.finished]
-            exp.init_seq(time_offset=self.ntp_offset)
-
-            exp.run_type = self.run_type
-            exp.orchestrator = self.server
-            exp.experiment_status = [HloStatus.estopped, HloStatus.finished]
-            exp.init_exp(time_offset=self.ntp_offset)
-            active_exp_dict = exp.as_dict()
 
         for (
             action_server_key,
             actionservermodel,
         ) in self.globalstatusmodel.server_dict.items():
-            # if actionservermodel.action_server == self.server:
-            #     continue
-
-            action_dict = deepcopy(active_exp_dict)
-            action_dict.update(
-                {
-                    "action_name": "estop",
-                    "action_server": actionservermodel.action_server.as_dict(),
-                    "action_params": {"switch": switch},
-                    "start_condition": ActionStartCondition.no_wait,
-                }
+            # A minimal estop action -- the endpoint ignores the action payload
+            # entirely now (it operates on whatever actions were already running),
+            # so no experiment/sequence identity needs to be attached.
+            A = Action(
+                action_name="estop",
+                action_server=actionservermodel.action_server.as_dict(),
+                action_params={"switch": switch},
+                start_condition=ActionStartCondition.no_wait,
             )
-
-            A = Action(**action_dict)
             LOGGER.info(
                 f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}"
             )
             try:
-                _ = await async_action_dispatcher(self.world_cfg, A)
+                # pass switch as an explicit query/RPC param so it reliably
+                # reaches the endpoint's `switch` parameter
+                _ = await async_action_dispatcher(
+                    self.world_cfg, A, params={"switch": switch}
+                )
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 # no estop endpoint for this action server?
                 LOGGER.error(
                     f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}"
                 )
+
+    async def estop_finish_active(self):
+        """Finalize the active experiment and sequence with estopped status on e-stop.
+
+        The clean finish path (:meth:`finish_active_experiment` /
+        :meth:`finish_active_sequence`) waits for all actions and is never reached
+        on e-stop, so the active experiment and sequence would otherwise stay
+        stranded in ``RUNS_ACTIVE`` and never be enqueued for sync. This marks
+        them ``estopped`` (leaving ``active`` swapped to ``finished`` so they read
+        as terminal), persists the yml, and schedules a background promotion to
+        ``RUNS_FINISHED`` so the syncer can ship the partial run.
+
+        It does NOT wait for actions inline: the e-stop already halted them and
+        each action server finalizes its own in-flight actions independently
+        (they may live on other machines). The background promotion, however,
+        does wait for co-located child directories to clear before moving -- see
+        :meth:`_estop_promote`.
+        """
+
+        def _mark_estopped(status_list: list):
+            self.replace_status(
+                status_list=status_list,
+                old_status=HloStatus.active,
+                new_status=HloStatus.finished,
+            )
+            if HloStatus.estopped not in status_list:
+                status_list.append(HloStatus.estopped)
+
+        exp_to_move = None
+        seq_to_move = None
+
+        if self.active_experiment is not None:
+            _mark_estopped(self.active_experiment.experiment_status)
+            self.active_experiment.experiment_finished_timestamp = set_time(
+                offset=self.ntp_offset
+            )
+            self.active_experiment.finished_global_params = {
+                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
+            }
+            try:
+                if self.active_sequence is not None:
+                    self.active_sequence.dispatched_experiments.append(
+                        deepcopy(self.active_experiment.get_exp())
+                    )
+                    await self.write_active_sequence_seq()
+                await self.write_exp(self.active_experiment)
+            except Exception:
+                LOGGER.error("error writing estopped experiment", exc_info=True)
+            self.last_experiment = deepcopy(self.active_experiment)
+            exp_to_move = self.last_experiment
+            self.active_experiment = None
+
+        if self.active_sequence is not None:
+            _mark_estopped(self.active_sequence.sequence_status)
+            self.active_sequence.sequence_finished_timestamp = set_time(
+                offset=self.ntp_offset
+            )
+            try:
+                await self.write_seq(self.active_sequence)
+            except Exception:
+                LOGGER.error("error writing estopped sequence", exc_info=True)
+            self.last_sequence = deepcopy(self.active_sequence)
+            seq_to_move = self.last_sequence
+            self.active_sequence = None
+            self.active_seq_exp_counter = 0
+            self.globalstatusmodel.counter_dispatched_actions = {}
+
+        # Promote in a background task, experiment before sequence, so the
+        # sequence dir's child experiment dir is gone before the sequence moves.
+        if exp_to_move is not None or seq_to_move is not None:
+            self.aloop.create_task(
+                self._estop_promote_all(exp_to_move, seq_to_move)
+            )
+
+    async def _estop_promote_all(self, exp_to_move, seq_to_move):
+        """Promote an estopped experiment then sequence to RUNS_FINISHED, in order."""
+        if exp_to_move is not None:
+            await self._estop_promote(exp_to_move, "experiment")
+        if seq_to_move is not None:
+            await self._estop_promote(seq_to_move, "sequence")
+
+    async def _estop_promote(self, hobj, kind: str, max_wait: int = 30) -> bool:
+        """Move an estopped exp/seq to RUNS_FINISHED once its child dirs have cleared.
+
+        :func:`move_dir` promotes only an exp/seq's *top-level* files and then
+        ``rmtree``s the whole directory, so moving while a co-located child
+        action is still finalizing in ``RUNS_ACTIVE`` would delete that action's
+        data. We wait (bounded) for child subdirectories to be vacated by the
+        (possibly co-located) action servers; if they don't clear, we leave the
+        record in ``RUNS_ACTIVE`` (data preserved) rather than destroy in-flight
+        children -- ``finish_pending`` can promote it later. For remote action
+        servers there are no local child dirs, so this returns immediately.
+
+        Returns:
+            True if the record was moved, False if left in place.
+        """
+        save_dir = str(self.helaodirs.save_root)
+        subdir = (
+            hobj.get_experiment_dir()
+            if kind == "experiment"
+            else hobj.get_sequence_dir()
+        )
+        ydir = os.path.normpath(os.path.join(save_dir, subdir))
+
+        def _child_dirs():
+            if not os.path.isdir(ydir):
+                return []
+            return [e.path for e in os.scandir(ydir) if e.is_dir()]
+
+        waited = 0
+        while _child_dirs() and waited < max_wait:
+            await asyncio.sleep(1)
+            waited += 1
+        remaining = _child_dirs()
+        if remaining:
+            LOGGER.warning(
+                f"estop: {kind} {ydir} still has {len(remaining)} child dir(s) in "
+                f"RUNS_ACTIVE after {max_wait}s; leaving it in place (data "
+                f"preserved) to avoid deleting in-flight child actions. Run "
+                f"finish_pending once children clear to sync it."
+            )
+            return False
+        try:
+            await move_dir(hobj, base=self)
+            return True
+        except Exception:
+            LOGGER.error(f"error moving estopped {kind} to RUNS_FINISHED", exc_info=True)
+            return False
 
     async def skip(self):
         """Request a skip while running, or clear ``action_dq`` if the loop is idle."""
