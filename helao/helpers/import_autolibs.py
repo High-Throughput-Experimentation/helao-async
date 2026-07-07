@@ -22,6 +22,16 @@ from helao.helpers import config_loader
 CONFIG = config_loader.CONFIG
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+#: Process-level cache of ``import_autolibs`` results. For a fixed world config
+#: the imported library dict, per-function file hashes, and source paths are
+#: invariant, but Bokeh re-runs each ``makeBokehApp`` (and thus ``RemoteBackend``
+#: construction) on every client connection. Without this cache each new operator
+#: session re-hashes every library file, re-globs the deployment tree, and
+#: re-``os.listdir``s the user lib dir. The imported module objects themselves are
+#: already cached by ``sys.modules``; caching here also makes the returned hash
+#: match the loaded module for the lifetime of the process.
+_AUTOLIB_CACHE: dict = {}
+
 
 def import_autolibs(
     world_config_dict: dict,
@@ -53,6 +63,23 @@ def import_autolibs(
         name to source-file hash, and a dict mapping function name to
         forward-slash source path.
     """
+
+    # Cache key spans every input that can change the result: the lib type,
+    # the (possibly None) explicit dirs, the configured library list + path
+    # override, and the loaded config path that pins the deployment. For a
+    # running server all of these are fixed, so repeat sessions hit the cache.
+    cache_key = (
+        lib_type,
+        lib_dir,
+        user_lib_dir,
+        world_config_dict.get("loaded_config_path"),
+        tuple(world_config_dict.get(f"{lib_type}_libraries", [])),
+        world_config_dict.get(f"{lib_type}_path"),
+    )
+    cached = _AUTOLIB_CACHE.get(cache_key)
+    if cached is not None:
+        lib, codehash_lib, codepath_lib = cached
+        return dict(lib), dict(codehash_lib), dict(codepath_lib)
 
     lib = {}
     codehash_lib = {}
@@ -137,4 +164,5 @@ def import_autolibs(
     LOGGER.info(
         f"imported {len(libs)} {lib_type}s specified by config.",
     )
+    _AUTOLIB_CACHE[cache_key] = (dict(lib), dict(codehash_lib), dict(codepath_lib))
     return lib, codehash_lib, codepath_lib

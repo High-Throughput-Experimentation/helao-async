@@ -17,6 +17,14 @@ from typing import Optional
 
 from helao.core.models.helaodirs import HelaoDirs
 
+#: Process-level cache keyed on ``(root, server_name)``. Bokeh re-runs each
+#: ``makeBokehApp`` per client connection, and ``Vis.__init__`` calls
+#: ``helao_dirs`` every time; the resolved layout is identical for a fixed
+#: root, so caching avoids redundant directory-existence checks and, more
+#: importantly, avoids re-running the old-log archival glob on every session.
+#: Non-Bokeh servers call this once at startup, so caching is a no-op for them.
+_HELAO_DIRS_CACHE: dict = {}
+
 
 def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
     """Create the standard HELAO directory tree and return its paths.
@@ -35,6 +43,11 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
         A ``HelaoDirs`` model populated with the resolved paths (or all
         ``None`` when ``root`` is absent from the config).
     """
+
+    cache_key = (world_cfg.get("root"), server_name)
+    cached = _HELAO_DIRS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
 
     def check_dir(path):
         if not os.path.isdir(path):
@@ -127,4 +140,5 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
             process_root=None,
         )
 
+    _HELAO_DIRS_CACHE[cache_key] = helaodirs
     return helaodirs
