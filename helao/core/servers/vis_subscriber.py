@@ -35,7 +35,7 @@ __all__ = [
 import os
 import time
 import asyncio
-from functools import partial
+from functools import partial, lru_cache
 from importlib import import_module, util as importlib_util
 
 from bokeh.layouts import Spacer
@@ -86,6 +86,7 @@ def _deployment_search_order() -> list:
     return order
 
 
+@lru_cache(maxsize=None)
 def import_vis_class(module_name: str, class_name: str = VIS_CLASS_NAME):
     """Import a visualizer class by module short name, searching deployments.
 
@@ -94,6 +95,13 @@ def import_vis_class(module_name: str, class_name: str = VIS_CLASS_NAME):
     ``class_name`` attribute. ``find_spec`` is used to probe each deployment so
     that a module which exists but fails to import surfaces its real error
     instead of being silently skipped.
+
+    The resolved class is cached per ``(module_name, class_name)``: the
+    deployment search order is fixed for a running process, so this avoids
+    repeating the ``find_spec`` probe and ``os.listdir`` deployment scan on
+    every Bokeh session. Only the class *resolution* is cached; ``mount_visualizers``
+    still instantiates a fresh visualizer (with its own data sources and
+    WebSocket) per client.
 
     Args:
         module_name: Short module name from a server's ``action_vis`` /
