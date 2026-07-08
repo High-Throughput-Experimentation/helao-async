@@ -13,11 +13,14 @@ Usage:
     keyboard input.
 Example:
     To run the launcher, use the following command:
-    python launch.py <config_file> [extra_option] [--restore]
+    python launch.py <config_file> [extra_option] [--restore] [--no-hot-reload]
     Where <config_file> is the path to the configuration file and [extra_option] is an optional argument for additional
     launch options. The optional --restore flag makes launched orchestrators
-    import their previously exported queues (STATES/queues.pck) on startup;
-    flags may appear anywhere on the command line.
+    import their previously exported queues (STATES/queues.pck) on startup. The
+    hot-reload watcher (which watches the parent and nested deployment git repos
+    and restarts idle servers whose loaded code changes on a pull) runs by
+    default; pass --no-hot-reload (or set `hot_reload.enabled: false` in the
+    config) to disable it. Flags may appear anywhere on the command line.
 Note:
     This script requires the 'click', 'termcolor', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
 """
@@ -26,6 +29,7 @@ __all__ = []
 
 import os
 import sys
+import json
 import pickle
 import psutil
 import time
@@ -604,6 +608,127 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     return pidd
 
 
+# ---------------------------------------------------------------------------
+# Hot-reload support (Phase 2): map pulled git changes to the idle servers that
+# must restart. See .omc/specs/deep-dive-hotreload-phase2.md. All helpers are
+# pure/read-only; the orchestration lives in main()'s thread_hotreload so it can
+# reuse restart_server and pidd.
+# ---------------------------------------------------------------------------
+
+
+def discover_git_repos(helao_repo_root):
+    """Return git working-tree roots to watch: the parent helao-async repo plus
+    each nested ``helao/deploy/*`` deployment that is its own git repo."""
+    repos = []
+    if os.path.isdir(os.path.join(helao_repo_root, ".git")):
+        repos.append(helao_repo_root)
+    for deploy_dir in sorted(
+        glob(os.path.join(helao_repo_root, "helao", "deploy", "*"))
+    ):
+        if os.path.isdir(os.path.join(deploy_dir, ".git")):
+            repos.append(deploy_dir)
+    return repos
+
+
+def git_head(repo):
+    """Return the current HEAD commit sha for ``repo`` (or None on failure)."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", repo, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if out.returncode == 0:
+            return out.stdout.strip()
+    except Exception:
+        pass
+    return None
+
+
+def git_changed_files(repo, old_sha, new_sha):
+    """Return absolute paths changed between ``old_sha`` and ``new_sha`` in ``repo``."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", repo, "diff", "--name-only", f"{old_sha}..{new_sha}"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if out.returncode != 0:
+            return []
+        return [
+            os.path.abspath(os.path.join(repo, rel.strip()))
+            for rel in out.stdout.splitlines()
+            if rel.strip()
+        ]
+    except Exception:
+        return []
+
+
+def server_loaded_files(server_entry, server_key, root):
+    """Return the set of repo files a server has loaded.
+
+    FastAPI servers (``fast``) are queried live at ``/loaded_modules``; bokeh
+    servers (``bokeh``) have no HTTP route, so their startup snapshot at
+    ``<root>/STATES/loaded_modules_<key>.json`` is read instead. Returns an empty
+    set on any failure (treated as "no known mapping", so nothing is restarted
+    on a bad read rather than restarting blindly)."""
+    if "fast" in server_entry:
+        try:
+            resp = requests.post(
+                f"http://{server_entry['host']}:{server_entry['port']}/loaded_modules",
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                return set(resp.json().keys())
+        except Exception:
+            return set()
+        return set()
+    # bokeh server (visualizer/operator)
+    if root is None:
+        return set()
+    snap = os.path.join(root, "STATES", f"loaded_modules_{server_key}.json")
+    try:
+        with open(snap) as f:
+            return set(json.load(f).keys())
+    except Exception:
+        return set()
+
+
+def server_is_idle(group, server_entry):
+    """Return True if a server is safe to restart (no active work).
+
+    - action: ``/get_status`` shows no endpoint with active actions.
+    - orchestrator: ``/global_status`` shows loop_state 'stopped' and no active
+      actions. Pending (not-yet-dispatched) queue items are preserved across the
+      restart via the --restore path, so they do not block idleness.
+    - visualizer/operator: always idle (stateless bokeh subscribers).
+
+    Any query failure returns False (fail safe: do not restart what we cannot
+    confirm is idle)."""
+    if group in ("visualizer", "operator"):
+        return True
+    host, port = server_entry["host"], server_entry["port"]
+    try:
+        if group == "orchestrator":
+            resp = requests.post(f"http://{host}:{port}/global_status", timeout=10)
+            if resp.status_code != 200:
+                return False
+            gs = resp.json()
+            return gs.get("loop_state") == "stopped" and not gs.get("active_dict")
+        if group == "action":
+            resp = requests.post(f"http://{host}:{port}/get_status", timeout=10)
+            if resp.status_code != 200:
+                return False
+            endpoints = resp.json().get("endpoints", {})
+            return not any(ep.get("active_dict") for ep in endpoints.values())
+    except Exception:
+        return False
+    # unknown group: be conservative
+    return False
+
+
 def main():
     """
     Main function to initialize and launch the HELAO application.
@@ -793,14 +918,20 @@ def main():
         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
         return S
 
+    # Serializes all pidd mutation across the keypress thread (CTRL-r/CTRL-x) and
+    # the hot-reload daemon so their read-modify-write on pidd.d / the pickle /
+    # pidd.procs can't interleave and drop, resurrect, or double-restart a server.
+    pidd_lock = threading.Lock()
+
     def restart_server(groupname, servername, restore=False):
         """Gracefully stop, kill, and relaunch a single server, re-registering
         action servers with every orchestrator afterward.
 
-        Shared by the CTRL-r hotkey and (in a later phase) the hot-reload
-        watcher so both drive exactly one restart code path. Reuses
-        ``pidd.kill_server`` (graceful -> SIGKILL + reap) and records the new
-        ``Popen`` handle in ``pidd.procs`` for later reaping.
+        Shared by the CTRL-r hotkey and the hot-reload watcher so both drive
+        exactly one restart code path. Reuses ``pidd.kill_server`` (graceful ->
+        SIGKILL + reap) and records the new ``Popen`` handle in ``pidd.procs``
+        for later reaping. Holds ``pidd_lock`` for the whole sequence so it
+        cannot race the keypress thread's pidd mutations.
 
         Args:
             groupname (str): Server group (action/orchestrator/visualizer/operator).
@@ -811,49 +942,155 @@ def main():
         Returns:
             bool: True if the relaunch sequence completed without error.
         """
-        try:
-            codeKey = [
-                k
-                for k in pidd.servers[groupname][servername].keys()
-                if k in pidd.codeKeys
-            ][0]
-            S = stop_server(groupname, servername)
-            LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
-            pidd.kill_server(servername)
-            LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
-            cmd = ["python", f"{codeKey}_launcher.py", confArg, servername]
-            if restore and groupname == "orchestrator":
-                cmd.append("--restore")
-            p = subprocess.Popen(
-                cmd,
-                cwd=helao_repo_root,
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-            )
-            pidd.store_pid(servername, S["host"], S["port"], p.pid)
-            pidd.procs[servername] = p
-            if groupname == "action":
-                for orchserv in pidd.orchServs:
-                    OS = pidd.servers["orchestrator"][orchserv]
-                    LAUNCH_LOGGER.info(f"Reregistering {servername} on {orchserv}.")
-                    # /attach_client takes client_servkey, client_host,
-                    # client_port as query params (base_api.py); a form body of
-                    # only client_servkey yields a 422.
-                    requests.post(
-                        f"http://{OS['host']}:{OS['port']}/attach_client",
-                        params={
-                            "client_servkey": servername,
-                            "client_host": S["host"],
-                            "client_port": S["port"],
-                        },
+        with pidd_lock:
+            try:
+                codeKey = [
+                    k
+                    for k in pidd.servers[groupname][servername].keys()
+                    if k in pidd.codeKeys
+                ][0]
+                S = stop_server(groupname, servername)
+                LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
+                pidd.kill_server(servername)
+                LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
+                cmd = ["python", f"{codeKey}_launcher.py", confArg, servername]
+                if restore and groupname == "orchestrator":
+                    cmd.append("--restore")
+                p = subprocess.Popen(
+                    cmd,
+                    cwd=helao_repo_root,
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                )
+                pidd.store_pid(servername, S["host"], S["port"], p.pid)
+                pidd.procs[servername] = p
+                if groupname == "action":
+                    for orchserv in pidd.orchServs:
+                        OS = pidd.servers["orchestrator"][orchserv]
+                        LAUNCH_LOGGER.info(
+                            f"Re-subscribing {orchserv} to restarted {servername}."
+                        )
+                        # A restarted action server comes up with an empty
+                        # subscriber list, so the orchestrator must re-subscribe
+                        # to it. Mirror Orch.subscribe_all: call the ACTION
+                        # server's /attach_client with the orchestrator as the
+                        # client, so the action server pushes its status to the
+                        # orch's /update_status. (Calling the ORCH's
+                        # /attach_client with the action server as the client is
+                        # backwards -- it makes the orch POST to
+                        # <action>/update_status, which 404s and spams the log.)
+                        requests.post(
+                            f"http://{S['host']}:{S['port']}/attach_client",
+                            params={
+                                "client_servkey": orchserv,
+                                "client_host": OS["host"],
+                                "client_port": OS["port"],
+                            },
+                        )
+                return True
+            except Exception:
+                LAUNCH_LOGGER.error(
+                    f" ... got error restarting {groupname}/{servername}: ",
+                    exc_info=True,
+                )
+                return False
+
+    def thread_hotreload(poll_seconds):
+        """Poll watched git repos; hot-reload idle servers whose loaded code changed.
+
+        On each poll: detect new commits (git pull) in the parent repo and any
+        nested deployment repos, diff the changed files, and intersect them with
+        each running server's loaded-module set (live /loaded_modules for fast
+        servers, startup snapshot for bokeh). Affected servers are queued and
+        restarted once idle (busy ones are deferred to a later poll, never
+        forced). Reuses restart_server (Phase-1 kill+reap+re-register).
+        """
+        repos = discover_git_repos(helao_repo_root)
+        if not repos:
+            LAUNCH_LOGGER.warning("Hot-reload: no git repos found to watch; watcher exiting.")
+            return
+        root = config.get("root", None)
+        # Seed only repos whose HEAD is currently readable; a repo that fails to
+        # read here stays unseeded and is picked up (as a seed, not a diff) on a
+        # later poll, so its first observed commit is never silently dropped.
+        heads = {}
+        for r in repos:
+            h = git_head(r)
+            if h is not None:
+                heads[r] = h
+        LAUNCH_LOGGER.info(
+            f"Hot-reload watching {len(repos)} repo(s) every {poll_seconds}s: {repos}"
+        )
+        pending = set()  # (group, name) affected but not yet restarted
+        while True:
+            time.sleep(poll_seconds)
+            changed = set()
+            for r in repos:
+                cur = git_head(r)
+                if cur is None:
+                    continue
+                if r not in heads:
+                    # first successful read for this repo: seed, don't diff
+                    heads[r] = cur
+                    continue
+                if cur == heads[r]:
+                    continue
+                LAUNCH_LOGGER.info(
+                    f"Hot-reload: new commit in {r}: {heads[r]} -> {cur}"
+                )
+                changed.update(git_changed_files(r, heads[r], cur))
+                heads[r] = cur
+            if changed:
+                active_names = [k for k, *_ in pidd.list_active()]
+                mapped_any = False
+                for group, gd in pidd.servers.items():
+                    for name, entry in gd.items():
+                        if name not in active_names:
+                            continue
+                        hits = changed & server_loaded_files(entry, name, root)
+                        if hits:
+                            mapped_any = True
+                            LAUNCH_LOGGER.info(
+                                f"Hot-reload: {group}/{name} affected by "
+                                f"{len(hits)} changed file(s): {sorted(hits)}"
+                            )
+                            pending.add((group, name))
+                if not mapped_any:
+                    LAUNCH_LOGGER.info(
+                        f"Hot-reload: {len(changed)} changed file(s) map to no "
+                        f"running server; nothing to reload."
                     )
-            return True
-        except Exception:
-            LAUNCH_LOGGER.error(
-                f" ... got error restarting {groupname}/{servername}: ",
-                exc_info=True,
-            )
-            return False
+                if len(pending) > 3:
+                    LAUNCH_LOGGER.warning(
+                        f"Hot-reload: {len(pending)} servers queued for restart "
+                        f"(likely a core/helpers change); restarts are gated on "
+                        f"idle and applied one at a time."
+                    )
+            if pending:
+                still_pending = set()
+                for group, name in pending:
+                    entry = pidd.servers.get(group, {}).get(name)
+                    if entry is None:
+                        continue  # server no longer known; drop
+                    if server_is_idle(group, entry):
+                        LAUNCH_LOGGER.info(f"Hot-reload: restarting idle {group}/{name}.")
+                        if not restart_server(
+                            group, name, restore=(group == "orchestrator")
+                        ):
+                            # relaunch failed (server may now be down); keep it
+                            # queued so a later poll retries rather than leaving
+                            # it dead silently.
+                            LAUNCH_LOGGER.error(
+                                f"Hot-reload: restart of {group}/{name} failed; "
+                                f"will retry next poll."
+                            )
+                            still_pending.add((group, name))
+                    else:
+                        LAUNCH_LOGGER.info(
+                            f"Hot-reload: {group}/{name} busy; deferring restart."
+                        )
+                        still_pending.add((group, name))
+                pending = still_pending
 
     def thread_waitforkey():
         """
@@ -934,7 +1171,10 @@ def main():
                             requests.post(f"http://{S['host']}:{S['port']}/shutdown")
                         except Exception:
                             LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
-            pidd.close()
+            # hold pidd_lock so a concurrent hot-reload restart can't interleave
+            # its pidd mutation with the teardown's kill loop.
+            with pidd_lock:
+                pidd.close()
         else:
             LAUNCH_LOGGER.info(
                 f"Disconnecting action monitor. Launch 'python launch.py {confArg}' to reconnect."
@@ -942,6 +1182,37 @@ def main():
 
     x = threading.Thread(target=thread_waitforkey)
     x.start()
+
+    # Phase-2 hot-reload: ON by default. Disable via the `--no-hot-reload` CLI
+    # flag or `hot_reload.enabled: false` in the config. Precedence:
+    # --no-hot-reload (force off) > --hot-reload (force on) > config
+    # hot_reload.enabled (default True). Runs as a daemon thread so it dies with
+    # the process.
+    hot_reload_cfg = config.get("hot_reload", {}) or {}
+    if "--no-hot-reload" in cli_flags:
+        hot_reload_on = False
+        reason = "--no-hot-reload flag"
+    elif "--hot-reload" in cli_flags:
+        hot_reload_on = True
+        reason = "--hot-reload flag"
+    else:
+        hot_reload_on = bool(hot_reload_cfg.get("enabled", True))
+        reason = f"config hot_reload.enabled={hot_reload_cfg.get('enabled', True)}"
+    if hot_reload_on:
+        poll_seconds = int(hot_reload_cfg.get("poll_seconds", 30))
+        LAUNCH_LOGGER.info(
+            f"Hot-reload ENABLED ({reason}, poll {poll_seconds}s). Idle servers "
+            f"whose loaded code changes on git pull will be restarted."
+        )
+        hr = threading.Thread(
+            target=thread_hotreload, args=(poll_seconds,), daemon=True
+        )
+        hr.start()
+    else:
+        LAUNCH_LOGGER.info(
+            f"Hot-reload disabled ({reason}). Re-enable by omitting --no-hot-reload "
+            f"and setting hot_reload.enabled: true (or omitting it)."
+        )
 
 
 if __name__ == "__main__":

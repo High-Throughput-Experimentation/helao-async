@@ -2602,6 +2602,24 @@ class Orch(Base):
                 self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
                 self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
                 self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
+                if pck_path is None:
+                    # Consume the default queues.pck after a successful restore so
+                    # a stale file cannot be auto-replayed on a later restart
+                    # (e.g. hot-reload of an idle-empty orchestrator, which passes
+                    # --restore unconditionally). Archive rather than delete so it
+                    # stays recoverable. An explicitly-pathed restore is left
+                    # untouched (the caller chose it deliberately).
+                    try:
+                        archived = save_path.replace(
+                            ".pck",
+                            f"_imported_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck",
+                        )
+                        os.replace(save_path, archived)
+                        LOGGER.info(f"Archived restored queue pck to {archived}.")
+                    except OSError:
+                        LOGGER.warning(
+                            "Could not archive restored queue pck.", exc_info=True
+                        )
             except Exception:
                 LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
         return save_path
