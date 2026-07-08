@@ -13,14 +13,14 @@ Usage:
     keyboard input.
 Example:
     To run the launcher, use the following command:
-    python launch.py <config_file> [extra_option] [--restore] [--hot-reload]
+    python launch.py <config_file> [extra_option] [--restore] [--no-hot-reload]
     Where <config_file> is the path to the configuration file and [extra_option] is an optional argument for additional
     launch options. The optional --restore flag makes launched orchestrators
     import their previously exported queues (STATES/queues.pck) on startup. The
-    optional --hot-reload flag watches the parent and nested deployment git
-    repos and restarts idle servers whose loaded code changes on a pull (also
-    enablable via the config `hot_reload` block). Flags may appear anywhere on
-    the command line.
+    hot-reload watcher (which watches the parent and nested deployment git repos
+    and restarts idle servers whose loaded code changes on a pull) runs by
+    default; pass --no-hot-reload (or set `hot_reload.enabled: false` in the
+    config) to disable it. Flags may appear anywhere on the command line.
 Note:
     This script requires the 'click', 'termcolor', 'pyfiglet', 'colorama', 'psutil', and 'requests' libraries.
 """
@@ -1175,15 +1175,26 @@ def main():
     x = threading.Thread(target=thread_waitforkey)
     x.start()
 
-    # Phase-2 hot-reload: opt-in via config `hot_reload.enabled` or the
-    # `--hot-reload` CLI flag. Off by default so production never auto-restarts
-    # servers unexpectedly. Runs as a daemon thread so it dies with the process.
+    # Phase-2 hot-reload: ON by default. Disable via the `--no-hot-reload` CLI
+    # flag or `hot_reload.enabled: false` in the config. Precedence:
+    # --no-hot-reload (force off) > --hot-reload (force on) > config
+    # hot_reload.enabled (default True). Runs as a daemon thread so it dies with
+    # the process.
     hot_reload_cfg = config.get("hot_reload", {}) or {}
-    if ("--hot-reload" in cli_flags) or hot_reload_cfg.get("enabled", False):
+    if "--no-hot-reload" in cli_flags:
+        hot_reload_on = False
+        reason = "--no-hot-reload flag"
+    elif "--hot-reload" in cli_flags:
+        hot_reload_on = True
+        reason = "--hot-reload flag"
+    else:
+        hot_reload_on = bool(hot_reload_cfg.get("enabled", True))
+        reason = f"config hot_reload.enabled={hot_reload_cfg.get('enabled', True)}"
+    if hot_reload_on:
         poll_seconds = int(hot_reload_cfg.get("poll_seconds", 30))
         LAUNCH_LOGGER.info(
-            f"Hot-reload ENABLED (poll {poll_seconds}s). Idle servers whose loaded "
-            f"code changes on git pull will be restarted."
+            f"Hot-reload ENABLED ({reason}, poll {poll_seconds}s). Idle servers "
+            f"whose loaded code changes on git pull will be restarted."
         )
         hr = threading.Thread(
             target=thread_hotreload, args=(poll_seconds,), daemon=True
@@ -1191,7 +1202,8 @@ def main():
         hr.start()
     else:
         LAUNCH_LOGGER.info(
-            "Hot-reload disabled (enable via config hot_reload.enabled or --hot-reload)."
+            f"Hot-reload disabled ({reason}). Re-enable by omitting --no-hot-reload "
+            f"and setting hot_reload.enabled: true (or omitting it)."
         )
 
 
