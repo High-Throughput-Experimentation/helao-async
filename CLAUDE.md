@@ -22,10 +22,14 @@ Launching an orchestration group (matches the prefix of a YAML in `helao/deploy/
 ```
 ./helao.sh <config_prefix>          # Linux wrapper
 helao.bat <config_prefix>           # Windows wrapper
-python launch.py <config_prefix> [extraopt]
+python launch.py <config_prefix> [extraopt] [--restore] [--hot-reload | --no-hot-reload]
 ```
 
 `extraopt` values understood by `launch.py`: `liveonly`/`gpvis` (only the live_visualizer Bokeh app), `nolive`/`actionvis` (suppress live_visualizer). Hotkeys after launch: `CTRL-r` restart a single server, `CTRL-x` terminate the group, `CTRL-d` disconnect monitor.
+
+CLI flags (position-independent; parsed separately from `extraopt`):
+- `--restore` — launched orchestrators import their previously exported queues (`STATES/queues.pck`) on startup. Per-instrument persistent equivalent: `restore_queues_on_startup: true` on the orchestrator's server config. A restored `queues.pck` is archived (`queues_imported_<ts>.pck`) so it is not replayed again.
+- `--hot-reload` / `--no-hot-reload` — the hot-reload watcher (watches the parent repo and each nested `helao/deploy/*` git repo; on a pulled commit, restarts idle servers whose loaded code changed) runs **on by default**. Disable with `--no-hot-reload` or `hot_reload.enabled: false` in the config; `hot_reload.poll_seconds` (default 30) tunes the poll interval. Precedence: `--no-hot-reload` > `--hot-reload` > config. Affected servers are mapped via each server's `/loaded_modules` endpoint (bokeh servers use a `STATES/loaded_modules_<key>.json` startup snapshot); orchestrators are only reloaded when idle and restart with `--restore`.
 
 Other utilities:
 - `python append.py <running_prefix> <append_prefix>` — start additional servers and merge them into a running group.
