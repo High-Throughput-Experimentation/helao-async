@@ -4,6 +4,10 @@ Hosts :class:`WsSim`, which polls a synthetic 6-series random data
 generator into the action server's live buffer, and exposes the
 ``acquire_data``/``cancel_acquire_data`` actions driven by
 :class:`WsExec` to forward the live buffer to clients.
+
+Note: hot-reload smoke-test marker (harmless docstring edit). This comment
+exists only to produce a tracked change to a loaded server module so the
+launch.py hot-reload watcher restarts this idle server on pull.
 """
 
 __all__ = ["makeApp"]
