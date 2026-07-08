@@ -158,6 +158,25 @@ if __name__ == "__main__":
         log_root = os.path.join(root, "LOGS")
     else:
         log_root = None
+
+    # Hot-reload support: snapshot the modules this bokeh process imported so the
+    # launcher's watcher can map a changed file to this server. Bokeh apps expose
+    # no HTTP route, so unlike FastAPI servers (which serve /loaded_modules live)
+    # we persist a startup snapshot here. Refreshed on every (re)launch.
+    if root is not None:
+        try:
+            import json
+            from helao.helpers.loaded_modules import loaded_repo_modules
+
+            states_dir = os.path.join(root, "STATES")
+            os.makedirs(states_dir, exist_ok=True)
+            snap_path = os.path.join(states_dir, f"loaded_modules_{server_key}.json")
+            with open(snap_path, "w") as f:
+                json.dump(loaded_repo_modules(), f)
+            LOGGER.info(f"wrote loaded-modules snapshot: {snap_path}")
+        except Exception:
+            LOGGER.warning("failed to write loaded-modules snapshot", exc_info=True)
+
     LOGGER.info(f" ---- starting  {server_key} ----")
 
     bokehapp = Server(

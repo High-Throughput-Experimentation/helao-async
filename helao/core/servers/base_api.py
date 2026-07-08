@@ -24,6 +24,7 @@ from typing_extensions import Annotated
 from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.eval import eval_val
 from helao.helpers.time_utils import gen_uuid
+from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.core.servers.base import Base
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.premodels import Action
@@ -714,6 +715,18 @@ class BaseAPI(HelaoFastAPI):
         def get_config():
             """Return the world configuration dictionary."""
             return self.base.world_cfg
+
+        @self.post("/loaded_modules", tags=["private"])
+        def loaded_modules():
+            """Return {repo_file_path: sha1} for every module this server process
+            has imported from the repository (transitive closure via sys.modules).
+
+            The hot-reload watcher intersects a pulled commit's changed files with
+            this set to decide whether this server must restart, and uses the
+            hashes to confirm the on-disk file actually differs from what was
+            loaded. Pure read; safe to call anytime.
+            """
+            return loaded_repo_modules()
 
         @self.post("/get_status", tags=["private"])
         def get_status():
