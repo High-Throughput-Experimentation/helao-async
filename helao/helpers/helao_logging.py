@@ -1,5 +1,9 @@
 """Canonical logger factory shared by every HELAO server.
 
+.. note:: Hot-reload smoke-test marker (harmless docstring edit). This core
+   module is imported by every server, so a tracked change here should make the
+   launch.py hot-reload watcher restart the entire idle server group on pull.
+
 Adds a custom ``ALERT`` level above ``CRITICAL`` and provides ``make_logger``,
 which configures a single per-server ``logging.Logger`` with a coloured
 console handler, a daily ``TimedRotatingFileHandler`` that gzips rotated
