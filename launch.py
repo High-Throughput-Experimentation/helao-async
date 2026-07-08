@@ -967,16 +967,24 @@ def main():
                 if groupname == "action":
                     for orchserv in pidd.orchServs:
                         OS = pidd.servers["orchestrator"][orchserv]
-                        LAUNCH_LOGGER.info(f"Reregistering {servername} on {orchserv}.")
-                        # /attach_client takes client_servkey, client_host,
-                        # client_port as query params (base_api.py); a form body
-                        # of only client_servkey yields a 422.
+                        LAUNCH_LOGGER.info(
+                            f"Re-subscribing {orchserv} to restarted {servername}."
+                        )
+                        # A restarted action server comes up with an empty
+                        # subscriber list, so the orchestrator must re-subscribe
+                        # to it. Mirror Orch.subscribe_all: call the ACTION
+                        # server's /attach_client with the orchestrator as the
+                        # client, so the action server pushes its status to the
+                        # orch's /update_status. (Calling the ORCH's
+                        # /attach_client with the action server as the client is
+                        # backwards -- it makes the orch POST to
+                        # <action>/update_status, which 404s and spams the log.)
                         requests.post(
-                            f"http://{OS['host']}:{OS['port']}/attach_client",
+                            f"http://{S['host']}:{S['port']}/attach_client",
                             params={
-                                "client_servkey": servername,
-                                "client_host": S["host"],
-                                "client_port": S["port"],
+                                "client_servkey": orchserv,
+                                "client_host": OS["host"],
+                                "client_port": OS["port"],
                             },
                         )
                 return True
