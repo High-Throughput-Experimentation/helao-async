@@ -19,6 +19,10 @@ import websockets
 from fastapi import WebSocket
 from websockets.sync.client import connect
 
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
 
 class WsPublisher:
     """Broadcast messages from a multi-subscriber queue to WebSocket clients.
@@ -112,20 +116,32 @@ class WsSubscriber:
     async def subscriber_loop(self):
         """Connect to the publisher and feed decoded messages into ``recv_queue``.
 
-        Retries up to five times on connection failure with a two-second
-        sleep between attempts.
+        Reconnects indefinitely so the subscriber survives a restart of the
+        target server (hot-reload, CTRL-r, crash, transient network drop). Uses
+        a capped exponential backoff, reset after each successful connect, and a
+        non-blocking ``await asyncio.sleep`` so it never stalls the event loop.
+        The task ends only when cancelled (``CancelledError`` derives from
+        ``BaseException`` and is intentionally not caught here).
         """
-        retry_limit = 5
-        for retry_idx in range(retry_limit):
+        backoff = 1.0
+        max_backoff = 30.0
+        while True:
             try:
                 async with websockets.connect(self.data_url) as ws:
+                    if backoff != 1.0:
+                        LOGGER.info(f"WsSubscriber (re)connected to {self.data_url}")
+                    backoff = 1.0  # reset after a successful connect
                     while True:
                         recv_bytes = await ws.recv()
                         recv_data_dict = pickle.loads(pyzstd.decompress(recv_bytes))
                         self.recv_queue.append(recv_data_dict)
             except Exception:
-                print(f"Could not connect, retrying {retry_idx+1}/{retry_limit}")
-                time.sleep(2)
+                LOGGER.warning(
+                    f"WsSubscriber lost/failed connection to {self.data_url}; "
+                    f"reconnecting in {backoff:.0f}s."
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, max_backoff)
 
     async def read_messages(self) -> list:
         """Drain and return every buffered message in FIFO order."""

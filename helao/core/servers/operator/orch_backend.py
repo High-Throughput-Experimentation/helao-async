@@ -186,8 +186,12 @@ class RemoteBackend(OrchBackend):
         return dict(self._step_flags)
 
     async def set_step_flag(self, kind, value):
-        await self._call("set_step_flag", params_dict={"kind": kind, "value": value})
-        self._step_flags[kind] = bool(value)
+        resp = await self._call("set_step_flag", params_dict={"kind": kind, "value": value})
+        # Only trust the local cache if the orch accepted the change. _call
+        # returns None on failure; without this guard the cached flag would
+        # drift from the orch's true state on a failed RPC (e.g. mid-restart).
+        if resp is not None:
+            self._step_flags[kind] = bool(value)
 
     async def list_sequences(self):
         resp = await self._call("list_sequences") or []
@@ -317,6 +321,12 @@ class RemoteBackend(OrchBackend):
     async def _poll_loop(self, on_change):
         while True:
             await asyncio.sleep(self.poll_interval)
+            # Re-sync step flags each poll so they can't stay stale after an
+            # orchestrator restart (the ws push channel and the one-shot _prime
+            # would otherwise leave the cache frozen at its pre-restart value).
+            resp = await self._call("get_step_flags")
+            if resp:
+                self._step_flags.update(resp)
             on_change()
 
     def close(self):
