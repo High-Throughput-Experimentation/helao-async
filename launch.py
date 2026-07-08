@@ -793,6 +793,68 @@ def main():
         requests.post(f"http://{S['host']}:{S['port']}/shutdown")
         return S
 
+    def restart_server(groupname, servername, restore=False):
+        """Gracefully stop, kill, and relaunch a single server, re-registering
+        action servers with every orchestrator afterward.
+
+        Shared by the CTRL-r hotkey and (in a later phase) the hot-reload
+        watcher so both drive exactly one restart code path. Reuses
+        ``pidd.kill_server`` (graceful -> SIGKILL + reap) and records the new
+        ``Popen`` handle in ``pidd.procs`` for later reaping.
+
+        Args:
+            groupname (str): Server group (action/orchestrator/visualizer/operator).
+            servername (str): Server key to restart.
+            restore (bool): When True and the server is an orchestrator, pass
+                ``--restore`` so it imports its saved queues on startup.
+
+        Returns:
+            bool: True if the relaunch sequence completed without error.
+        """
+        try:
+            codeKey = [
+                k
+                for k in pidd.servers[groupname][servername].keys()
+                if k in pidd.codeKeys
+            ][0]
+            S = stop_server(groupname, servername)
+            LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
+            pidd.kill_server(servername)
+            LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
+            cmd = ["python", f"{codeKey}_launcher.py", confArg, servername]
+            if restore and groupname == "orchestrator":
+                cmd.append("--restore")
+            p = subprocess.Popen(
+                cmd,
+                cwd=helao_repo_root,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
+            pidd.store_pid(servername, S["host"], S["port"], p.pid)
+            pidd.procs[servername] = p
+            if groupname == "action":
+                for orchserv in pidd.orchServs:
+                    OS = pidd.servers["orchestrator"][orchserv]
+                    LAUNCH_LOGGER.info(f"Reregistering {servername} on {orchserv}.")
+                    # /attach_client takes client_servkey, client_host,
+                    # client_port as query params (base_api.py); a form body of
+                    # only client_servkey yields a 422.
+                    requests.post(
+                        f"http://{OS['host']}:{OS['port']}/attach_client",
+                        params={
+                            "client_servkey": servername,
+                            "client_host": S["host"],
+                            "client_port": S["port"],
+                        },
+                    )
+            return True
+        except Exception:
+            LAUNCH_LOGGER.error(
+                f" ... got error restarting {groupname}/{servername}: ",
+                exc_info=True,
+            )
+            return False
+
     def thread_waitforkey():
         """
         Monitors for specific keypress events and performs corresponding actions.
@@ -839,46 +901,7 @@ def main():
                     if sind in [str(o) for o in opts]:
                         sg, sn = slist[int(sind)]
                         LAUNCH_LOGGER.info(f"Got option {sind}. Restarting {sg}/{sn}.")
-                        try:
-                            codeKey = [
-                                k
-                                for k in pidd.servers[sg][sn].keys()
-                                if k in pidd.codeKeys
-                            ][0]
-                            S = stop_server(sg, sn)
-                            LAUNCH_LOGGER.info(f"{sn} successful shutdown() event.")
-                            pidd.kill_server(sn)
-                            LAUNCH_LOGGER.info(f"Successfully closed {sn} process.")
-                            cmd = ["python", f"{codeKey}_launcher.py", confArg, sn]
-                            p = subprocess.Popen(
-                                cmd,
-                                cwd=helao_repo_root,
-                                stdout=sys.stdout,
-                                stderr=sys.stderr,
-                            )
-                            ppid = p.pid
-                            pidd.store_pid(sn, S["host"], S["port"], ppid)
-                            pidd.procs[sn] = p
-                            if sg == "action":
-                                for orchserv in pidd.orchServs:
-                                    OS = pidd.servers["orchestrator"][orchserv]
-                                    LAUNCH_LOGGER.info(
-                                        f"Reregistering {sn} on {orchserv}."
-                                    )
-                                    # /attach_client takes client_servkey,
-                                    # client_host, client_port as query params
-                                    # (base_api.py); a form body of only
-                                    # client_servkey yields a 422.
-                                    requests.post(
-                                        f"http://{OS['host']}:{OS['port']}/attach_client",
-                                        params={
-                                            "client_servkey": sn,
-                                            "client_host": S["host"],
-                                            "client_port": S["port"],
-                                        },
-                                    )
-                        except Exception:
-                            LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
+                        restart_server(sg, sn)
                         break
                     elif sind == "":
                         LAUNCH_LOGGER.info("Cancelling restart.")
