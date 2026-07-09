@@ -874,9 +874,6 @@ def ANEC_sub_CP(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
-    if int(round(toggle_illum_time)) == -1:
-        toggle_illum_time = CP_duration_sec
-
     # get sample for gamry
     apm.add(
         PAL_server,

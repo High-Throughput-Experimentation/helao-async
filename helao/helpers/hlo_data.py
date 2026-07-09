@@ -22,7 +22,10 @@ import json
 from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .helao_data import HelaoData
 
 import orjson
 import pandas as pd

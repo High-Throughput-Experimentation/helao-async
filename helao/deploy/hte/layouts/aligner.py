@@ -1468,7 +1468,7 @@ class Aligner:
             # but can still produce a not valid Matrix
             # as xymotor plates might not be unique/faulty
             LOGGER.error("Matrix singular", exc_info=True)
-            M = TransferMatrix
+            M = self.plate_transfermatrix
         return M
 
     def align_test_point(self, test_list):

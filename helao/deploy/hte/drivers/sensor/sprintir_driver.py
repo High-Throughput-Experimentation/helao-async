@@ -275,7 +275,7 @@ class SprintIR:
         lines, _ = self.send("Z")
         for line in lines[::-1]:
             stripped = line.strip()
-            filts = re.findall("Z\s[0-9]+", stripped)
+            filts = re.findall(r"Z\s[0-9]+", stripped)
             filt = filts[-1].split()[-1] if filts else False
             if filt:
                 return filt

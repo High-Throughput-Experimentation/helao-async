@@ -16,6 +16,7 @@ from logging.handlers import TimedRotatingFileHandler
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import pandas as pd
 import leancat_helao.config
+import leancat_helao.logger
 
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
@@ -76,7 +77,6 @@ class LeancatDriver(HelaoDriver):
 
         self.station_name = config.get("station_name", "Caltech_PBT_n1")
 
-        import leancat_helao.logger
         from leancat_helao.station import Station
 
         self.station = Station(self.station_name)

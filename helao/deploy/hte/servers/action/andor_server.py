@@ -268,7 +268,6 @@ async def andor_dyn_endpoints(app: BaseAPI):
             file_type="andor_helao__file",
             # to reduce polling data size, we get the wl_arr directly from the driver
             hloheader=HloHeaderModel(
-                action_name=action.action_name,
                 column_headings=data_keys,
                 optional={"wl": list(app.driver.wl_arr)},
             ),

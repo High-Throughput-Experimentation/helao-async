@@ -467,7 +467,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
-                action_name=action.action_name,
                 column_headings=data_keys,
                 optional={},
             ),
@@ -510,7 +509,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
-                action_name=action.action_name,
                 column_headings=data_keys,
                 optional={},
             ),
@@ -562,7 +560,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
-                action_name=action.action_name,
                 column_headings=data_keys,
                 optional={},
             ),

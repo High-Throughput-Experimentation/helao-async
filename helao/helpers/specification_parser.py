@@ -55,7 +55,7 @@ class BaseParser:
         tmptypes = []
         return {k: v for k, v in zip(tmpargs, tmptypes)}
 
-    def parser(specfile: str, orch, params: dict = {}, **kwargs) -> Sequence:
+    def parser(self, specfile: str, orch, params: dict = {}, **kwargs) -> Sequence:
         """Build a :class:`Sequence` from a spec file and parameter overrides.
 
         Args:

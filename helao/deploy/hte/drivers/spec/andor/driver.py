@@ -404,7 +404,6 @@ class AndorDriver(HelaoDriver):
 
             else:
                 LOGGER.info("Cannot continue, could not initialise Spectrograph")
-                ()
 
             # important calibration stuff I keep out of the big block just to make it easier
 

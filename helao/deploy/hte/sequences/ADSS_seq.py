@@ -1242,123 +1242,124 @@ def ADSS_CA_cell_multipotential(
     # )
     epm.add("ADSS_sub_recirculate", {})
 
-    if led_illumination:
+    for CA_potential_vs in CA_potentials_vs:
+        if led_illumination:
 
-        epm.add(
-            "ADSS_sub_OCV_photo",
-            {
-                "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "led_wavelength": led_wavelength,
-                "toggle_illum_duty": led_dutycycle,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": 1,
-            },
-        )
-        epm.add(
-            "ADSS_sub_CA_photo",
-            {
-                "CA_potential": CA_potential_vs,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "potential_versus": potential_versus,
-                "samplerate_sec": samplerate_sec,
-                "CA_duration_sec": CA_duration_sec,
-                "led_wavelength": led_wavelength,
-                "toggle_illum_duty": led_dutycycle,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": aliquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-            },
-        )
-        epm.add(
-            "ADSS_sub_OCV_photo",
-            {
-                "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "led_wavelength": led_wavelength,
-                "toggle_illum_duty": led_dutycycle,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": 0,
-                "rinse_4": 1,
-            },
-        )
-        epm.add(
-            "ADSS_sub_cell_illumination",
-            {
-                "led_wavelength": led_wavelength,
-                "illumination_on": False,
-            },
-        )
-    else:
+            epm.add(
+                "ADSS_sub_OCV_photo",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": samplerate_sec,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "led_wavelength": led_wavelength,
+                    "toggle_illum_duty": led_dutycycle,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": OCValiquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": 1,
+                },
+            )
+            epm.add(
+                "ADSS_sub_CA_photo",
+                {
+                    "CA_potential": CA_potential_vs,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "potential_versus": potential_versus,
+                    "samplerate_sec": samplerate_sec,
+                    "CA_duration_sec": CA_duration_sec,
+                    "led_wavelength": led_wavelength,
+                    "toggle_illum_duty": led_dutycycle,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": aliquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                },
+            )
+            epm.add(
+                "ADSS_sub_OCV_photo",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": samplerate_sec,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "led_wavelength": led_wavelength,
+                    "toggle_illum_duty": led_dutycycle,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": OCValiquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": 0,
+                    "rinse_4": 1,
+                },
+            )
+            epm.add(
+                "ADSS_sub_cell_illumination",
+                {
+                    "led_wavelength": led_wavelength,
+                    "illumination_on": False,
+                },
+            )
+        else:
 
-        epm.add(
-            "ADSS_sub_OCV",
-            {
-                "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": 1,
-            },
-        )
-        epm.add(
-            "ADSS_sub_CA",
-            {
-                "CA_potential": CA_potential_vs,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "potential_versus": potential_versus,
-                "samplerate_sec": samplerate_sec,
-                "CA_duration_sec": CA_duration_sec,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": aliquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-            },
-        )
-        epm.add(
-            "ADSS_sub_OCV",
-            {
-                "Tval__s": OCV_duration,
-                "SampleRate": samplerate_sec,
-                "ph": ph,
-                "ref_type": ref_type,
-                "ref_offset__V": ref_offset__V,
-                "aliquot_volume_ul": aliquot_volume_ul,
-                "aliquot_times_sec": OCValiquot_times_sec,
-                "aliquot_insitu": True,
-                "PAL_Injector": PAL_Injector,
-                "PAL_Injector_id": PAL_Injector_id,
-                "rinse_1": 0,
-                "rinse_4": 1,
-            },
-        )
+            epm.add(
+                "ADSS_sub_OCV",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": samplerate_sec,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": OCValiquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": 1,
+                },
+            )
+            epm.add(
+                "ADSS_sub_CA",
+                {
+                    "CA_potential": CA_potential_vs,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "potential_versus": potential_versus,
+                    "samplerate_sec": samplerate_sec,
+                    "CA_duration_sec": CA_duration_sec,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": aliquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                },
+            )
+            epm.add(
+                "ADSS_sub_OCV",
+                {
+                    "Tval__s": OCV_duration,
+                    "SampleRate": samplerate_sec,
+                    "ph": ph,
+                    "ref_type": ref_type,
+                    "ref_offset__V": ref_offset__V,
+                    "aliquot_volume_ul": aliquot_volume_ul,
+                    "aliquot_times_sec": OCValiquot_times_sec,
+                    "aliquot_insitu": True,
+                    "PAL_Injector": PAL_Injector,
+                    "PAL_Injector_id": PAL_Injector_id,
+                    "rinse_1": 0,
+                    "rinse_4": 1,
+                },
+            )
 
     epm.add(
         "ADSS_sub_drain_cell",

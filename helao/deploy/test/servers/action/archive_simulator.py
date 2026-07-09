@@ -177,12 +177,12 @@ class ArchiveSim:
             Integer sample number of the matched row, or ``False`` if the
             composition is not on the loaded plate.
         """
+        compstr = "-".join(
+            [f"{e}{f:.1f}" for e, f in zip(self.loaded_els, element_fracs)]
+        )
         if element_fracs in self.loaded_space:
             match = self.loaded_df.iloc[self.loaded_space.index(element_fracs)]
             sample_no = int(match.Sample)
-            compstr = "-".join(
-                [f"{e}{f:.1f}" for e, f in zip(self.loaded_els, element_fracs)]
-            )
             LOGGER.info(f"acquired sample {sample_no} with composition {compstr}")
             eta3 = float(match.EtaV_CP3)
             eta10 = float(match.EtaV_CP10)
@@ -247,7 +247,7 @@ def makeApp(server_key):
             return []
 
     @app.post(f"/clear_measured", tags=["private"])
-    def get_measured():
+    def clear_measured():
         result = app.driver.reset_acquired()
         return result
 
