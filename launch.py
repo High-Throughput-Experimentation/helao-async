@@ -468,6 +468,34 @@ def validateConfig(PIDD, confDict, helao_repo_root):
     return True
 
 
+def _posix_getchar():
+    """Read one character in cbreak mode (POSIX).
+
+    click.getchar()/tty.setraw put the terminal in *raw* mode for the blocking
+    read, which disables output post-processing (OPOST/ONLCR). Because the
+    key-reader thread blocks in this read almost continuously, log lines
+    emitted by other threads during that window get a bare '\\n' with no
+    carriage return, so every line stair-steps further right across the
+    terminal. cbreak leaves OPOST/ONLCR enabled (it only turns off canonical
+    mode and echo), so '\\n' -> '\\r\\n' translation still happens and log
+    lines stay left-aligned. Control keys (CTRL-r/x/d) arrive as single bytes
+    either way.
+    """
+    import termios
+    import tty
+
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)
+        ch = os.read(fd, 1)
+        if not ch:
+            raise EOFError
+        return ch.decode(errors="replace")
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
 def wait_key():
     """
     Waits for a key press and returns the character of the key pressed.
@@ -480,7 +508,10 @@ def wait_key():
         str: The character of the key pressed or a specific character based on the exception.
     """
     try:
-        keypress = click.getchar()
+        if os.name == "nt":
+            keypress = click.getchar()
+        else:
+            keypress = _posix_getchar()
     except KeyboardInterrupt:
         keypress = "\x03"
     except EOFError:
@@ -694,6 +725,30 @@ def server_loaded_files(server_entry, server_key, root):
             return set(json.load(f).keys())
     except Exception:
         return set()
+
+
+def wait_for_server_ready(host, port, timeout=30.0, interval=0.5):
+    """Poll a just-restarted server until it accepts requests, or timeout.
+
+    A freshly ``Popen``'d server needs a few seconds to boot uvicorn and bind
+    its port. POSTing to it immediately (e.g. ``/attach_client`` when
+    re-subscribing an orchestrator) raises ``ConnectionError`` because nothing
+    is listening yet -- this is what broke hot-reload / CTRL-r re-subscription
+    on Linux. Probe a cheap endpoint (``/get_status``) until it answers so the
+    caller doesn't fire requests at a not-yet-listening socket.
+
+    Returns True if the server responded before the timeout, else False.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            resp = requests.post(f"http://{host}:{port}/get_status", timeout=5)
+            if resp.status_code == 200:
+                return True
+        except Exception:
+            pass
+        time.sleep(interval)
+    return False
 
 
 def server_is_idle(group, server_entry):
@@ -965,6 +1020,15 @@ def main():
                 pidd.store_pid(servername, S["host"], S["port"], p.pid)
                 pidd.procs[servername] = p
                 if groupname == "action":
+                    # The restarted server was just Popen'd; wait for it to
+                    # bind its port before re-subscribing, otherwise the
+                    # /attach_client POST below hits a dead socket
+                    # (ConnectionError) and re-subscription silently fails.
+                    if not wait_for_server_ready(S["host"], S["port"]):
+                        LAUNCH_LOGGER.warning(
+                            f"Restarted {servername} not responding after wait; "
+                            f"attempting re-subscription anyway."
+                        )
                     for orchserv in pidd.orchServs:
                         OS = pidd.servers["orchestrator"][orchserv]
                         LAUNCH_LOGGER.info(
@@ -986,6 +1050,7 @@ def main():
                                 "client_host": OS["host"],
                                 "client_port": OS["port"],
                             },
+                            timeout=10,
                         )
                 return True
             except Exception:
