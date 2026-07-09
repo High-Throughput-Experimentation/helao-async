@@ -18,7 +18,7 @@ from copy import copy
 from dataclasses import dataclass
 from socket import gethostname
 from collections import namedtuple
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 from typing_extensions import Annotated
 
 from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
@@ -635,8 +635,8 @@ class BaseAPI(HelaoFastAPI):
             description=description,
             version=str(version),
         )
-        self.drivers = tuple()
-        self.driver = None
+        self.drivers: Any = tuple()
+        self.driver: Any = None
         self.poller = None
 
         self.middleware("http")(_make_app_entry_middleware(server_key, lambda: self.base))
