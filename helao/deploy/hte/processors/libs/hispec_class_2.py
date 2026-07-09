@@ -355,9 +355,9 @@ def plot_DOD(
     # set the y label to f"$\Delta$A (O.D. vs {reference_potential} V)" if reference_potential is not None else f"$\Delta$A (O.D.)"
     plt.ylabel(
         (
-            f"$\Delta $A (O.D. vs {reference_potential})"
+            rf"$\Delta $A (O.D. vs {reference_potential})"
             if reference_potential is not None
-            else f"$\Delta $A (O.D.)"
+            else rf"$\Delta $A (O.D.)"
         ),
         fontsize=18,
     )
@@ -458,9 +458,9 @@ def Co_plot_DOD_and_CV(
     # set the y label to f"$\Delta$A (O.D. vs {reference_potential} V)" if reference_potential is not None else f"$\Delta$A (O.D.)"
     ax[0].set_ylabel(
         (
-            f"$\Delta$A (O.D. vs {reference_potential})"
+            rf"$\Delta$A (O.D. vs {reference_potential})"
             if reference_potential is None
-            else f"$\Delta$A (O.D.)"
+            else rf"$\Delta$A (O.D.)"
         ),
         fontsize=12,
     )

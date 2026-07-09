@@ -252,7 +252,6 @@ def SetupSpectroscope(
 
         else:
             print("Cannot continue, could not initialise Spectrograph")
-            ()
 
         # important calibration stuff I keep out of the big block just to make it easier
 

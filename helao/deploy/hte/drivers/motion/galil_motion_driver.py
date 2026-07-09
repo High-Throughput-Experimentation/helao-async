@@ -752,7 +752,7 @@ class Galil:
         if len(timeofmove) > 0:
             tmax = max(timeofmove)
             if tmax > 30 * 60:
-                tmax > 30 * 60  # 30min hard limit
+                tmax = 30 * 60  # 30min hard limit
         else:
             tmax = 0
 

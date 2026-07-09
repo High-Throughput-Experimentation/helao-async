@@ -23,7 +23,7 @@ from helao.helpers.premodels import Sequence
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.dispatcher import private_dispatcher
 from ..sequences.OERSIM_seq import OERSIM_activelearn
-from helao.helpers.config_loader import CONFIG
+from helao.helpers.config_loader import CONFIG, read_config
 
 cfgd = {f"demo{i}": read_config(f"demo{i}", async_root) for i in range(2)}
 
