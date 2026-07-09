@@ -8,7 +8,7 @@
 pyrightconfig.json
 
 # cache
-__pycache__/*
+__pycache__
 *.pyc
 */.DS_Store
 .DS_Store
@@ -17,7 +17,7 @@ __pycache__/*
 ntpLastSync.txt
 *.pck
 *.parquet
-*/.ipynb_checkpoints/
+*/.ipynb_checkpoints
 
 # external deployment
 helao/deploy/*
@@ -25,4 +25,14 @@ helao/deploy/*
 !helao/deploy/hte/
 
 # superpowers brainstorm/companion artifacts
-.superpowers/
+.superpowers
+
+# oh-my-claudecode
+.omc
+.coverage
+.framework-cov.json
+
+# local test artifacts
+C:*
+
+.pytest_cache
