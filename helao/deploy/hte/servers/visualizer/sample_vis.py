@@ -121,7 +121,14 @@ class C_vis(ActionVisualizer):
                 columns=[TableColumn(field=k, title=k) for k in self.data_dict_keys],
                 width=self.max_width - 20,
                 height=200,
-                autosize_mode="fit_columns",
+                # "fit_columns" triggers a Bokeh JS crash in SlickGrid's
+                # autosizeColumns/getColContentSize ("row is not defined") that
+                # aborts the whole document render -> every visualizer mounted
+                # after sample_vis (e.g. spec_vis) silently disappears, and the
+                # sample tables render collapsed. "force_fit" fits columns to
+                # the table width without the content-size autosize path
+                # (matches the operator's working DataTables).
+                autosize_mode="force_fit",
             )
             for smptype in smptypes
         }
