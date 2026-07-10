@@ -17,6 +17,7 @@ loaded.
 
 import os
 import sys
+import json
 import hashlib
 from typing import Optional
 
@@ -64,3 +65,36 @@ def loaded_repo_modules(repo_root: Optional[str] = None) -> dict:
         if digest is not None:
             out[af] = digest
     return out
+
+
+def write_loaded_modules_snapshot(
+    states_dir: str, server_key: str, repo_root: Optional[str] = None
+) -> Optional[str]:
+    """Persist this process's loaded-module map for the hot-reload watcher.
+
+    Bokeh servers expose no ``/loaded_modules`` HTTP route, so the launcher's
+    watcher reads a JSON snapshot at ``<states_dir>/loaded_modules_<server_key>.json``
+    to map a changed repo file to the bokeh server that must restart. The
+    snapshot must be (re)written whenever the set of loaded repo modules grows —
+    in particular after :func:`mount_visualizers` lazily imports the per-server
+    ``*_vis`` modules named by config strings, which are absent from the startup
+    snapshot written before any Bokeh session connects.
+
+    Args:
+        states_dir: The server root's ``STATES`` directory.
+        server_key: Config key of the bokeh server owning the snapshot.
+        repo_root: Optional repo root scope forwarded to
+            :func:`loaded_repo_modules`.
+
+    Returns:
+        The snapshot path on success, otherwise ``None`` (best-effort; never
+        raises so a snapshot failure cannot break server bring-up).
+    """
+    try:
+        os.makedirs(states_dir, exist_ok=True)
+        snap_path = os.path.join(states_dir, f"loaded_modules_{server_key}.json")
+        with open(snap_path, "w") as f:
+            json.dump(loaded_repo_modules(repo_root), f)
+        return snap_path
+    except Exception:
+        return None
