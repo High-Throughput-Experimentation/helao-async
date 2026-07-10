@@ -64,6 +64,7 @@ PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
+SAMPLE_server = MachineModel(server_name="SAMPLE", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 # CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
@@ -93,7 +94,7 @@ def ECMS_sub_unload_cell() -> list:
     """
 
     apm = ActionPlanMaker()
-    apm.add(PAL_server, "archive_custom_unloadall", {})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {})
     return apm.planned_actions
 
 
@@ -114,7 +115,7 @@ def ECMS_sub_load_solid(
     apm = ActionPlanMaker()
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -154,7 +155,7 @@ def ECMS_sub_load_liquid(
 
     # (3) Create liquid sample and add to assembly
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -186,7 +187,7 @@ def ECMS_sub_load_gas(
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",  # not sure there is a server function for gas
         {
             "custom": "cell1_we",
@@ -406,7 +407,7 @@ def ECMS_sub_electrolyte_fill_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4A", "on": 0})
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -492,7 +493,7 @@ def ECMS_sub_electrolyte_fill_cell_recirculation(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "5B", "on": 0})
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -770,7 +771,7 @@ def ECMS_sub_CA(
     else:
         raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -854,7 +855,7 @@ def ECMS_sub_pulseCA(
     #         )
     # =============================================================================
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1001,7 +1002,7 @@ def ECMS_sub_CV(
         )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1227,7 +1228,7 @@ def ECMS_sub_final_clean_cell(
     apm.add(NI_server, "liquidvalve", {"liquidvalve": "4B", "on": 0})
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -1722,7 +1723,7 @@ def ECMS_sub_CA_CO2flow(
     else:
         raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],

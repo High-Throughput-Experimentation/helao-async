@@ -34,6 +34,10 @@ PAL_server = MachineModel(
     server_name="PAL", machine_name=gethostname().lower()
 ).as_dict()
 
+SAMPLE_server = MachineModel(
+    server_name="SAMPLE", machine_name=gethostname().lower()
+).as_dict()
+
 ORCH_HOST = gethostname()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 
@@ -71,7 +75,7 @@ def create_liquid_sample(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "db_new_samples",
         {
             "fast_samples_in": [
@@ -126,7 +130,7 @@ def create_gas_sample(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "db_new_samples",
         {
             "fast_samples_in": [
@@ -215,7 +219,7 @@ def create_assembly_sample(
         parts.append(solid)
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "db_new_samples",
         {
             "fast_samples_in": [
@@ -288,7 +292,7 @@ def generate_sample_no_list(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "generate_plate_sample_no_list",
         {
             "plate_id": plate_id,
@@ -328,7 +332,7 @@ def load_liquid_sample(
     liquid = LiquidSample(sample_no=liquid_sample_no, machine_name=machine_name)
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_load",
         {"load_sample_in": liquid, "tray": tray, "slot": slot, "vial": vial},
     )
@@ -379,7 +383,7 @@ def create_and_load_liquid_sample(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "db_new_samples",
         {
             "fast_samples_in": [
@@ -404,7 +408,7 @@ def create_and_load_liquid_sample(
     )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_load",
         {"tray": tray, "slot": slot, "vial": vial},
         from_global_act_params={"_fast_sample_out": "load_sample_in"},

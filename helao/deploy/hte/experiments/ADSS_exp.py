@@ -90,6 +90,7 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
+SAMPLE_server = MachineModel(server_name="SAMPLE", machine_name=ORCH_HOST).as_dict()
 WORKSYRINGE_server = MachineModel(
     server_name="WORKSYRINGE", machine_name=ORCH_HOST
 ).as_dict()
@@ -114,7 +115,7 @@ def ADSS_sub_unloadall_customs() -> list:
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {
             #                "destroy_liquid": False,
@@ -136,7 +137,7 @@ def ADSS_sub_unload_liquid(
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unload",
         {
             "keep_solid": True,
@@ -171,7 +172,7 @@ def ADSS_sub_unload_solid(
     #     to_global_params=["_unloaded_liquid"],
     # )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unload",
         {
             "custom": "cell1_we",
@@ -204,13 +205,13 @@ def ADSS_sub_load_solid(
 
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {},
         to_global_params=["_unloaded_liquid"],
     )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -225,7 +226,7 @@ def ADSS_sub_load_solid(
         start_condition=ActionStartCondition.wait_for_orch,  #
     )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -258,7 +259,7 @@ def ADSS_sub_load_liquid(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": liquid_custom_position,
@@ -301,7 +302,7 @@ def ADSS_sub_load_liquid_only(
 
     # add liquid to cell position
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": liquid_custom_position,
@@ -350,7 +351,7 @@ def ADSS_sub_PAL_load_gas(
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_gas",
         {
             "custom": custom_position,
@@ -390,7 +391,7 @@ def ADSS_sub_unload_gas_only(
     #     to_global_params=["_unloaded_liquid", "unloaded_solid"],
     # )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unload",
         {
             "custom": "cell1_we",
@@ -437,7 +438,7 @@ def ADSS_sub_load(
 
     # clear cell position and track unloaded liquid
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {},
         start_condition=ActionStartCondition.wait_for_orch,
@@ -445,7 +446,7 @@ def ADSS_sub_load(
     )
     # load solid into cell position
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -462,7 +463,7 @@ def ADSS_sub_load(
     # add liquid to cell position
     if previous_liquid:
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_add_liquid",
             {
                 "custom": liquid_custom_position,
@@ -477,7 +478,7 @@ def ADSS_sub_load(
         )
     else:
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_add_liquid",
             {
                 "custom": liquid_custom_position,
@@ -964,7 +965,7 @@ def ADSS_sub_CA(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1146,7 +1147,7 @@ def ADSS_sub_CA_photo(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1340,7 +1341,7 @@ def ADSS_sub_CV(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1534,7 +1535,7 @@ def ADSS_sub_OCV(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1728,7 +1729,7 @@ def ADSS_sub_OCV_photo(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1970,7 +1971,7 @@ def ADSS_sub_insitu_actions(
                     waitcond,  # remove -vwait
                 )
                 apm.add(
-                    PAL_server,
+                    SAMPLE_server,
                     "archive_custom_add_liquid",
                     {
                         "custom": "cell1_we",
@@ -2002,7 +2003,7 @@ def ADSS_sub_insitu_actions(
     elif insert_electrolyte_bool:
         apm.add(ORCH_server, "wait", {"waittime": etime}, waitcond)
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_add_liquid",
             {
                 "custom": "cell1_we",
@@ -2055,7 +2056,7 @@ def ADSS_sub_add_liquid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -2106,7 +2107,7 @@ def ADSS_sub_tray_unload(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_export_json",
         {
             "tray": tray,
@@ -2116,7 +2117,7 @@ def ADSS_sub_tray_unload(
     )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_export_csv",
         {
             "tray": tray,
@@ -2126,7 +2127,7 @@ def ADSS_sub_tray_unload(
     )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_export_icpms",
         {
             "tray": tray,
@@ -2139,7 +2140,7 @@ def ADSS_sub_tray_unload(
     )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_unload",
         {
             "tray": tray,
@@ -2177,7 +2178,7 @@ def ADSS_sub_tray_icpms_export(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_export_icpms",
         {
             "tray": tray,
@@ -2472,7 +2473,7 @@ def ADSS_sub_cellfill_prefilled(
     """
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -2955,7 +2956,7 @@ def ADSS_sub_sample_aliquot(
     """
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -3208,7 +3209,7 @@ def ADSS_sub_transfer_liquid_in(
     """
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": destination,
@@ -3445,7 +3446,7 @@ def ADSS_sub_PAL_export_icpms(
     apm = ActionPlanMaker()
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_tray_export_icpms",
         {
             "tray": tray,
