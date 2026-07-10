@@ -8,6 +8,8 @@ from zipfile import ZipFile
 from .yml_tools import yml_load
 from .hlo_data import read_hlo_bytes
 
+from helao.core.models.run_dir import RunDir
+
 
 class FileMapper:
     """Locate and read files within a run tree across its lifecycle states.
@@ -141,7 +143,7 @@ class FileMapper:
             the member, otherwise ``None``.
         """
         parts = Path(p).parts
-        synced_root = os.path.join(self.prestr, "RUNS_SYNCED")
+        synced_root = os.path.join(self.prestr, RunDir.SYNCED.value)
         for i in range(1, len(parts)):
             zip_path = Path(os.path.join(synced_root, *parts[:i]) + ".zip")
             if not zip_path.is_file():

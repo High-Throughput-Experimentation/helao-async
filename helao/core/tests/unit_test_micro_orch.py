@@ -27,6 +27,7 @@ from typing import Any, Dict
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
+from helao.core.models.run_dir import RunDir
 from helao.core.rpc import RPCDispatcher, derive_rpc_port
 from helao.core.runners.micro_orch import MicroOrch, _is_terminal
 from helao.helpers.premodels import Action
@@ -194,7 +195,7 @@ class _FakeDataActionServer:
         # produce a sample_out so the experiment aggregates something
         action_dict.setdefault("samples_out", [])
         # write artifacts to disk like a real server would
-        state = "RUNS_DIAG" if action_dict.get("manual_action") else "RUNS_FINISHED"
+        state = RunDir.DIAG.value if action_dict.get("manual_action") else RunDir.FINISHED.value
         out_dir = action_dict.get("action_output_dir")
         if out_dir:
             abs_dir = os.path.join(self.root, state, out_dir)
@@ -514,7 +515,7 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
         )
         reporter.check(
             "exp yml is under RUNS_DIAG (manual_action)",
-            lambda: os.sep + "RUNS_DIAG" + os.sep in exp_file,
+            lambda: os.sep + RunDir.DIAG.value + os.sep in exp_file,
         )
         from helao.helpers.yml_tools import yml_load
         with open(exp_file) as f:
@@ -534,7 +535,7 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
         reporter.check(
             "_write_seq returns an existing .yml path under RUNS_DIAG",
             lambda: os.path.isfile(seq_file)
-            and os.sep + "RUNS_DIAG" + os.sep in seq_file,
+            and os.sep + RunDir.DIAG.value + os.sep in seq_file,
         )
         with open(seq_file) as f:
             seq_meta = yml_load(f.read())
@@ -602,7 +603,7 @@ async def _drive_load_finished(reporter: TestReporter) -> None:
         reporter.check(
             "_await_finished locates the manual exp yml in RUNS_DIAG",
             lambda: os.path.isfile(found)
-            and os.sep + "RUNS_DIAG" + os.sep in found,
+            and os.sep + RunDir.DIAG.value + os.sep in found,
         )
 
         loaded = await orch._load_finished(rel_dir, "exp")
@@ -639,7 +640,7 @@ def _check_track_run(reporter: TestReporter) -> None:
     try:
         orch = _make_orch(root)
         yml_path = os.path.join(
-            root, "RUNS_DIAG", "26.24", "0616",
+            root, RunDir.DIAG.value, "26.24", "0616",
             "120000__seq--x__manual", "260616.120001000000__exp--x",
             "260616.120001000000-exp.yml",
         )
@@ -651,7 +652,7 @@ def _check_track_run(reporter: TestReporter) -> None:
         reporter.check("_track_run returns the record", lambda: rec in orch.runs)
         reporter.check(
             "record state derived from path",
-            lambda: rec["state"] == "RUNS_DIAG",
+            lambda: rec["state"] == RunDir.DIAG,
         )
         reporter.check(
             "record rel_dir is relative to the state root",

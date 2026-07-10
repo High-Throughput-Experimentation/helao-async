@@ -42,6 +42,7 @@ import zmq
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.run_dir import RunDir
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
@@ -891,7 +892,7 @@ class MicroOrch:
             raise RuntimeError(
                 "world_cfg['root'] is required to persist or read back artifacts"
             )
-        return os.path.join(root, "RUNS_DIAG" if manual else "RUNS_FINISHED")
+        return os.path.join(root, RunDir.DIAG.value if manual else RunDir.FINISHED.value)
 
     async def _write_meta_atomic(self, output_file: str, output_str: str) -> None:
         """Atomically write ``output_str`` to ``output_file`` (temp + os.replace)."""
@@ -952,7 +953,7 @@ class MicroOrch:
         root = self.world_cfg.get("root")
         if not root:
             raise RuntimeError("world_cfg['root'] is required to read back artifacts")
-        for state in ("RUNS_FINISHED", "RUNS_DIAG"):
+        for state in (RunDir.FINISHED.value, RunDir.DIAG.value):
             pattern = os.path.join(root, state, rel_dir, f"*-{suffix}.yml")
             matches = sorted(glob_module.glob(pattern))
             if matches:
@@ -1011,8 +1012,8 @@ class MicroOrch:
         """
         norm = os.path.normpath(yml_path)
         parts = norm.split(os.sep)
-        state = "RUNS_FINISHED"
-        for candidate in ("RUNS_FINISHED", "RUNS_DIAG"):
+        state = RunDir.FINISHED.value
+        for candidate in (RunDir.FINISHED.value, RunDir.DIAG.value):
             if candidate in parts:
                 state = candidate
                 break
@@ -1062,7 +1063,7 @@ class MicroOrch:
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for record in self.runs:
                 state = record["state"]
-                if state == "RUNS_DIAG" and not include_diag:
+                if state == RunDir.DIAG.value and not include_diag:
                     continue
                 state_root = os.path.join(root, state)
                 rec_dir = os.path.join(state_root, record["rel_dir"])

@@ -27,6 +27,7 @@ from pathlib import Path
 from helao.core.tests._test_utils import TestReporter
 from helao.core.servers.base import Base
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.run_dir import RunDir
 from helao.core.drivers.data.sync_driver import HelaoYml
 from helao.helpers.yml_tools import yml_dumps
 
@@ -76,7 +77,7 @@ def _exp_dir(root: Path, runs: str) -> Path:
 
 
 def _make_exp(root: Path) -> Path:
-    exp_yml = _exp_dir(root, "RUNS_FINISHED") / f"{_ts(0)}-exp.yml"
+    exp_yml = _exp_dir(root, RunDir.FINISHED.value) / f"{_ts(0)}-exp.yml"
     _write_yml(
         exp_yml,
         {
@@ -90,7 +91,7 @@ def _make_exp(root: Path) -> Path:
 
 def _make_active_child(root: Path, order: int, status: list) -> Path:
     act_yml = (
-        _exp_dir(root, "RUNS_ACTIVE")
+        _exp_dir(root, RunDir.ACTIVE.value)
         / f"{order}__0__srv__test_action"
         / f"{_ts(order + 1)}-act.yml"
     )

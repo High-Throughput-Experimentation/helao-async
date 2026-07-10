@@ -44,6 +44,7 @@ from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
+from helao.core.models.run_dir import RunDir
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.helao_logging import print_message
 from helao.helpers import async_copy
@@ -913,7 +914,7 @@ class Base:
             act_dict = action.get_act().clean_dict()
             save_root = str(self.helaodirs.save_root)
             if action.manual_action:
-                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
             output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(
                 output_path,
@@ -939,7 +940,7 @@ class Base:
         exp_dict = experiment.get_exp().clean_dict()
         save_root = str(self.helaodirs.save_root)
         if experiment.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
@@ -961,7 +962,7 @@ class Base:
         sequence_dir = sequence.get_sequence_dir()
         save_root = str(self.helaodirs.save_root)
         if sequence.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,
@@ -1260,7 +1261,7 @@ class Active:
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         if self.action.save_act:
             full_action_output_path = os.path.join(
                 save_root,
@@ -1586,7 +1587,7 @@ class Active:
         filename = file_info.file_name
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         output_path = os.path.join(save_root, output_action.action_output_dir)
         output_file = os.path.join(output_path, filename)
 
@@ -1755,7 +1756,7 @@ class Active:
         )
         save_root = str(self.base.helaodirs.save_root)
         if action.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         output_path = os.path.join(save_root, action.action_output_dir)
         output_file = os.path.join(output_path, file_info.file_name)
         if os.name == "nt":
@@ -2207,7 +2208,7 @@ class Active:
 
             save_root = str(self.base.helaodirs.save_root)
             if self.action.manual_action:
-                save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
             try:
                 # call custom hlo post-processor if it exists
                 if self.base.hlo_postprocessors:
@@ -2293,7 +2294,7 @@ class Active:
             action = self.action
         save_root = str(self.base.helaodirs.save_root)
         if action.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         if os.path.dirname(file_path) != os.path.join(
             save_root, action.action_output_dir
         ):
@@ -2315,7 +2316,7 @@ class Active:
         """Copy any tracked auxiliary file paths into the action's output directory."""
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
-            save_root = save_root.replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         for x in self.action.aux_file_paths:
             new_path = os.path.join(
                 save_root,
