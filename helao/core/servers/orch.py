@@ -57,12 +57,10 @@ from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
 from helao.core.drivers.data.sync_driver import HelaoSyncer
-from helao.helpers import config_loader
 from helao.helpers.processors import MetaProcessor
 from helao.helpers.dequedict import DequeDict
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-CONFIG = config_loader.CONFIG
 
 
 def sanitize_sequence_label(label):

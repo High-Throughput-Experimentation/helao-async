@@ -19,7 +19,6 @@ from helao.core.version import get_filehash
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 
-CONFIG = config_loader.CONFIG
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 #: Process-level cache of ``import_autolibs`` results. For a fixed world config
@@ -132,7 +131,9 @@ def import_autolibs(
 
     if lib_dir is None:
         config_deployment = os.path.basename(
-            os.path.dirname(os.path.dirname(CONFIG["loaded_config_path"]))
+            os.path.dirname(
+                os.path.dirname(config_loader.CONFIG["loaded_config_path"])
+            )
         )
         lib_dir = world_config_dict.get(
             f"{lib_type}_path",

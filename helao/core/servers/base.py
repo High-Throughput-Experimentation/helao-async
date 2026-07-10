@@ -84,11 +84,12 @@ from helao.core.models.file import (
 )
 from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
+from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
+from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-CONFIG = config_loader.CONFIG
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -118,18 +119,25 @@ class Base:
     plus HLO data files under the configured ``root``.
     """
 
-    # TODO: add world_cfg: dict parameter for BaseAPI to pass config instead of fastapp
-    def __init__(self, app: HelaoFastAPI, dyn_endpoints=None):
+    def __init__(
+        self,
+        app: HelaoFastAPI,
+        dyn_endpoints=None,
+        helao_cfg: Optional[HelaoConfig] = None,
+    ):
         """Wire the controller to a running FastAPI app and read the world config.
 
         Args:
             app: The ``HelaoFastAPI`` instance that owns this controller.
             dyn_endpoints: Optional callable invoked with the app instance to
                 register additional endpoints.
+            helao_cfg: Optional validated :class:`HelaoConfig` to use instead
+                of validating ``app.helao_cfg`` (injection seam for tests/
+                future callers).
 
         Raises:
             ValueError: If the world config defines no ``root`` directory or
-                is missing the ``run_type`` key.
+                fails ``HelaoConfig`` validation (e.g. missing ``run_type``).
         """
 
         self.app = app
@@ -139,16 +147,29 @@ class Base:
         self.server_params = app.server_params
         self.server.hostname = self.server_cfg["host"]
         self.server.port = self.server_cfg["port"]
+        # Dict shim — stays the runtime source of truth for deployment code
+        # reading self.base.world_cfg[...]; do not remove in 3b.
         self.world_cfg = self.app.helao_cfg
-        orch_keys = [
-            k
-            for k, d in self.world_cfg.get("servers", {}).items()
-            if d["group"] == "orchestrator"
-        ]
+        # Typed view (3b injection seam). Injected for tests/future callers;
+        # defaults to validating the same dict the shim exposes.
+        try:
+            self.typed_cfg: HelaoConfig = (
+                helao_cfg if helao_cfg is not None else HelaoConfig(**self.world_cfg)
+            )
+        except ValidationError as exc:
+            raise ValueError(
+                f"world config failed HelaoConfig validation: {exc}"
+            ) from exc
+        self.typed_server_cfg: Optional[ServerConfig] = (
+            self.typed_cfg.servers or {}
+        ).get(self.server.server_name)
+
+        servers_cfg = self.typed_cfg.servers or {}
+        orch_keys = [k for k, s in servers_cfg.items() if s.group == "orchestrator"]
         if orch_keys:
             self.orch_key = orch_keys[0]
-            self.orch_host = self.world_cfg["servers"][self.orch_key]["host"]
-            self.orch_port = self.world_cfg["servers"][self.orch_key]["port"]
+            self.orch_host = servers_cfg[self.orch_key].host
+            self.orch_port = servers_cfg[self.orch_key].port
         else:
             self.orch_key = None
             self.orch_host = None
@@ -162,13 +183,8 @@ class Base:
                 "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
             )
 
-        if "run_type" in self.world_cfg:
-            LOGGER.info(f"Found run_type in config: {self.world_cfg['run_type']}")
-            self.run_type = self.world_cfg["run_type"].lower()
-        else:
-            raise ValueError(
-                "Missing 'run_type' in config, cannot create server object.",
-            )
+        LOGGER.info(f"Found run_type in config: {self.typed_cfg.run_type}")
+        self.run_type = self.typed_cfg.run_type.lower()
 
         self.actives: Dict[UUID, Active] = {}
         self.history = DequeDict(maxlen=200)  # store history of active actions (contained)
@@ -1113,7 +1129,11 @@ class Base:
                 script_path = None
                 LOGGER.info(f"Looking for {pplib} post-processor in deployments")
                 deploy_script_path = os.path.join(
-                    "helao", "deploy", CONFIG["deployment"], "processors", f"{pplib}.py"
+                    "helao",
+                    "deploy",
+                    config_loader.CONFIG["deployment"],
+                    "processors",
+                    f"{pplib}.py",
                 )
                 hte_path = os.path.join(
                     "helao", "deploy", "hte", "processors", f"{pplib}.py"
