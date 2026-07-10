@@ -56,6 +56,7 @@ from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.time_utils import set_time
 from helao.helpers.time_utils import read_saved_offset
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.status_transitions import guarded_replace
 from helao.core.models.sample import (
     SampleType,
     AssemblySample,
@@ -997,12 +998,13 @@ class Base:
     def replace_status(
         self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus
     ):
-        """Swap ``old_status`` for ``new_status`` in ``status_list``, or append if missing."""
-        if old_status in status_list:
-            idx = status_list.index(old_status)
-            status_list[idx] = new_status
-        else:
-            status_list.append(new_status)
+        """Swap ``old_status`` for ``new_status`` in ``status_list``, or append if missing.
+
+        Prefer the model methods (``replace_action_status``/``replace_experiment_status``/
+        ``replace_sequence_status``) for new call sites; this shim delegates to
+        ``guarded_replace`` for callers still holding a bare ``status_list`` reference.
+        """
+        guarded_replace(status_list, old_status, new_status)
 
     def get_main_error(self, errors) -> ErrorCodes:
         """Return the first non-``none`` error code, or the input itself if not a list."""
@@ -1277,8 +1279,8 @@ class Active:
 
             if self.action.manual_action:
                 exp = deepcopy(self.action_list[-1])
-                exp.experiment_status = [HloStatus.active]
-                exp.sequence_status = [HloStatus.active]
+                exp.reset_experiment_status(HloStatus.active)
+                exp.reset_sequence_status(HloStatus.active)
                 exp.samples_in = []
                 exp.samples_out = []
                 exp.files = []
@@ -1427,7 +1429,7 @@ class Active:
         """Append ``HloStatus.estopped`` to ``action.action_status`` (defaults to ``self.action``)."""
         if action is None:
             action = self.action
-        action.action_status.append(HloStatus.estopped)
+        action.append_action_status(HloStatus.estopped)
         LOGGER.error(
             f"E-STOP {str(action.action_uuid)} on {action.action_name} status."
         )
@@ -1438,7 +1440,8 @@ class Active:
         """Mark the action as errored and record the error code (or ``ErrorCodes.unspecified``)."""
         if action is None:
             action = self.action
-        action.experiment_status.append(HloStatus.errored)
+        # NOTE: appends to experiment_status (not action_status) — historical behavior, see open-questions
+        action.append_experiment_status(HloStatus.errored)
 
         if error_code:
             action.error_code = error_code
@@ -1930,7 +1933,7 @@ class Active:
             LOGGER.info("got split action request")
             # add split status to current action
             if HloStatus.split not in self.action.action_status:
-                self.action.action_status.append(HloStatus.split)
+                self.action.append_action_status(HloStatus.split)
             # make a copy of prev_action
             prev_action = deepcopy(self.action)
             prev_action_list = deepcopy(self.action_list)
@@ -2069,16 +2072,12 @@ class Active:
             try:
                 # set status to finish
                 # (replace active with finish)
-                self.base.replace_status(
-                    status_list=action.action_status,
-                    old_status=HloStatus.active,
-                    new_status=HloStatus.finished,
-                )
+                action.replace_action_status(HloStatus.active, HloStatus.finished)
                 action.action_finished_timestamp = set_time(offset=self.base.ntp_offset)
 
                 if action.error_code != ErrorCodes.none:
                     if HloStatus.errored not in action.action_status:
-                        action.action_status.append(HloStatus.errored)
+                        action.append_action_status(HloStatus.errored)
 
                 # send globalparams
                 if action.to_global_params:
@@ -2331,8 +2330,8 @@ class Active:
         # self.action_list[-1] is the very first action
         if self.action_list[-1].manual_action:
             exp = deepcopy(self.action_list[-1])
-            exp.experiment_status = [HloStatus.finished]
-            exp.sequence_status = [HloStatus.finished]
+            exp.reset_experiment_status(HloStatus.finished)
+            exp.reset_sequence_status(HloStatus.finished)
             exp.samples_in = []
             exp.samples_out = []
             exp.files = []

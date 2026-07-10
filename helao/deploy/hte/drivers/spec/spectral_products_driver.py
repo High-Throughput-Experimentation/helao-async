@@ -149,7 +149,7 @@ class SM303:
                             # await self.stat.set_idle()
                         LOGGER.info("Spec measurement is done")
                     else:
-                        self.active.action.action_status.append(HloStatus.estopped)
+                        self.active.action.append_action_status(HloStatus.estopped)
                         self.IO_do_meas = False
                         LOGGER.error("Spec is in estop.")
 

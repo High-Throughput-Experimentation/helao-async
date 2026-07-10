@@ -35,6 +35,7 @@ from fastapi import WebSocket
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.status_transitions import guarded_append, guarded_replace
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
 from helao.core.models.run_dir import RunDir
@@ -1641,20 +1642,21 @@ class Orch(Base):
         :meth:`_estop_promote`.
         """
 
-        def _mark_estopped(status_list: list):
-            self.replace_status(
-                status_list=status_list,
-                old_status=HloStatus.active,
-                new_status=HloStatus.finished,
+        def _mark_estopped(status_list: list, owner: str):
+            guarded_replace(
+                status_list,
+                HloStatus.active,
+                HloStatus.finished,
+                owner=owner,
             )
             if HloStatus.estopped not in status_list:
-                status_list.append(HloStatus.estopped)
+                guarded_append(status_list, HloStatus.estopped, owner=owner)
 
         exp_to_move = None
         seq_to_move = None
 
         if self.active_experiment is not None:
-            _mark_estopped(self.active_experiment.experiment_status)
+            _mark_estopped(self.active_experiment.experiment_status, owner="experiment_status")
             self.active_experiment.experiment_finished_timestamp = set_time(
                 offset=self.ntp_offset
             )
@@ -1675,7 +1677,7 @@ class Orch(Base):
             self.active_experiment = None
 
         if self.active_sequence is not None:
-            _mark_estopped(self.active_sequence.sequence_status)
+            _mark_estopped(self.active_sequence.sequence_status, owner="sequence_status")
             self.active_sequence.sequence_finished_timestamp = set_time(
                 offset=self.ntp_offset
             )
@@ -2225,10 +2227,8 @@ class Orch(Base):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         await self.orch_wait_for_all_actions()
         if self.active_sequence is not None:
-            self.replace_status(
-                status_list=self.active_sequence.sequence_status,
-                old_status=HloStatus.active,
-                new_status=HloStatus.finished,
+            self.active_sequence.replace_sequence_status(
+                HloStatus.active, HloStatus.finished
             )
             self.active_sequence.sequence_finished_timestamp = set_time(
                 offset=self.ntp_offset
@@ -2314,10 +2314,8 @@ class Orch(Base):
             #     )
             # )
             # set exp status to finished
-            self.replace_status(
-                status_list=self.active_experiment.experiment_status,
-                old_status=HloStatus.active,
-                new_status=HloStatus.finished,
+            self.active_experiment.replace_experiment_status(
+                HloStatus.active, HloStatus.finished
             )
             self.active_experiment.experiment_finished_timestamp = set_time(
                 offset=self.ntp_offset
