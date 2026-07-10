@@ -26,6 +26,15 @@ servers:
     params:
       orch_key: ORCH
       poll_interval: 5
+  SAMPLE:
+    host: hte-icpm-01.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-icpm-01.htejcap.caltech.edu
     port: 8007

@@ -125,6 +125,15 @@ servers:
         # doric_led2: 5
         # doric_led3: 6
         # ir_emitter: 7
+  SAMPLE:
+    host: hte-eche-10.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8007

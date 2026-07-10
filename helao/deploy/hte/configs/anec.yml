@@ -115,6 +115,26 @@ servers:
         down: cDAQ1Mod1/port0/line3
       dev_led:
         led: cDAQ1Mod1/port0/line11
+  SAMPLE:
+    host: hte-anec-03.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        tray1:
+          slot1: null
+          slot2: null
+          slot3: null
+        tray2:
+          slot1: VT54
+          slot2: VT54
+          slot3: VT54
+        custom:
+          cell1_we: cell
+          Injector 1: injector
+          Injector 2: injector
+          LCInjector1: injector
   PAL:
     host: hte-anec-03.htejcap.caltech.edu
     port: 8007
