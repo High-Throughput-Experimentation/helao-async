@@ -57,6 +57,7 @@ SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+SAMPLE_server = MM(server_name="SAMPLE", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
@@ -77,7 +78,7 @@ def ECHEUVIS_sub_startup() -> list:
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": True})
     return apm.planned_actions  # returns complete action list to orch
 
@@ -90,7 +91,7 @@ def ECHEUVIS_sub_shutdown() -> list:
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     apm.add(IO_server, "set_digital_out", {"do_item": "ir_emitter", "on": False})
     return apm.planned_actions  # returns complete action list to orch
 
@@ -199,7 +200,7 @@ def ECHEUVIS_sub_CV_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -415,7 +416,7 @@ def ECHEUVIS_sub_CA_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -633,7 +634,7 @@ def ECHEUVIS_sub_CP_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -859,7 +860,7 @@ def ECHEUVIS_sub_OCV_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",

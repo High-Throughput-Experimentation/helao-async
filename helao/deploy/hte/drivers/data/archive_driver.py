@@ -13,6 +13,7 @@ __all__ = [
 
 import asyncio
 import os
+import shutil
 from datetime import datetime
 from copy import deepcopy
 from typing import List, Tuple, Union, Optional
@@ -80,7 +81,7 @@ class Archive:
 
     Holds the current :class:`Positions` (tray slots and custom
     positions) for an action server, persists them to
-    ``<host>_<server>_archive.json``, and proxies sample CRUD operations
+    ``<host>_archive.json``, and proxies sample CRUD operations
     through :class:`UnifiedSampleDataAPI`. Most HTE PAL/orchestrator
     actions interact with samples via this class.
     """
@@ -105,10 +106,36 @@ class Archive:
         self.position_config = self.config_dict.get("positions", None)
         self.archivejson = None
         if self.base.helaodirs.states_root is not None:
+            # Single-owner, server_name-independent state filename (Phase 4).
+            # PAL no longer instantiates Archive, so only the SAMPLE server
+            # opens this file; keying on host alone decouples it from the
+            # owning server's name.
+            host = gethostname().lower()
             self.archivejson = os.path.join(
                 self.base.helaodirs.states_root,
-                f"{gethostname().lower()}_{self.base.server.server_name}_archive.json",
+                f"{host}_archive.json",
             )
+            # One-time migration: seed the fixed-name file from PAL's legacy
+            # <host>_PAL_archive.json on first launch so SAMPLE inherits PAL's
+            # real loaded positions. Copy (not move) is safer for rollback.
+            legacy_json = os.path.join(
+                self.base.helaodirs.states_root,
+                f"{host}_PAL_archive.json",
+            )
+            if not os.path.exists(self.archivejson) and os.path.exists(
+                legacy_json
+            ):
+                try:
+                    shutil.copy2(legacy_json, self.archivejson)
+                    LOGGER.info(
+                        f"Migrated legacy archive state '{legacy_json}' -> "
+                        f"'{self.archivejson}'."
+                    )
+                except Exception as e:
+                    LOGGER.error(
+                        f"Failed to migrate legacy archive state "
+                        f"'{legacy_json}': {repr(e)}"
+                    )
         self.config = {}
 
         # configure the tray

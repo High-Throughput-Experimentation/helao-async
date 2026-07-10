@@ -46,6 +46,7 @@ SPEC_T_server = MM(server_name="SPEC_T", machine_name=gethostname().lower()).as_
 SPEC_R_server = MM(server_name="SPEC_R", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+SAMPLE_server = MM(server_name="SAMPLE", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
@@ -63,7 +64,7 @@ def UVIS_sub_unloadall_customs() -> list:
     """
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {"destroy_liquid": True},
         start_condition=ActionStartCondition.no_wait,
@@ -89,7 +90,7 @@ def UVIS_sub_load_solid(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -127,7 +128,7 @@ def UVIS_sub_startup(
 
     # load new requested solid samples
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -311,7 +312,7 @@ def UVIS_sub_measure(
 
     # query loaded sample in cell1_we position
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         start_condition=ActionStartCondition.no_wait,
@@ -453,7 +454,7 @@ def UVIS_sub_setup_ref(
             to_global_params=["_refno", "_refxy"],
         )
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_load_solid",
             {
                 "custom": solid_custom_position,
@@ -471,7 +472,7 @@ def UVIS_sub_setup_ref(
             to_global_params=["_refxy"],
         )
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_load_solid",
             {
                 "custom": solid_custom_position,
@@ -487,7 +488,7 @@ def UVIS_sub_setup_ref(
             {"reason": "Load blank substrate for reference measurement."},
         )
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_load",
             {
                 "custom": solid_custom_position,

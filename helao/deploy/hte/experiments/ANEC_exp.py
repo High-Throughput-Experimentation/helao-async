@@ -68,6 +68,7 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
+SAMPLE_server = MachineModel(server_name="SAMPLE", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 TEC_server = MachineModel(server_name="TEC", machine_name=ORCH_HOST).as_dict()
 
@@ -201,7 +202,7 @@ def ANEC_sub_load_solid(
     apm = ActionPlanMaker()
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -377,7 +378,7 @@ def ANEC_sub_flush_fill_cell(
             )
     liquid_sample_in.global_label = liquid_sample_in.get_global_label()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -399,7 +400,7 @@ def ANEC_sub_unload_cell() -> list:
     """
 
     apm = ActionPlanMaker()
-    apm.add(PAL_server, "archive_custom_unloadall", {})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {})
     return apm.planned_actions
 
 
@@ -414,13 +415,13 @@ def ANEC_sub_unload_liquid(
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {},
         to_global_params=["_unloaded_solid"],
     )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {"custom": "cell1_we"},
         from_global_act_params={"_unloaded_solid": "load_sample_in"},
@@ -576,7 +577,7 @@ def ANEC_sub_load_solid_only(
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_unload_cell())
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -616,7 +617,7 @@ def ANEC_sub_load_solid_and_clean_cell(
     apm = ActionPlanMaker()
     apm.add_actions(ANEC_sub_unload_cell())
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -876,7 +877,7 @@ def ANEC_sub_CP(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -939,7 +940,7 @@ def ANEC_sub_CA(
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1005,7 +1006,7 @@ def ANEC_sub_HeatCA(
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1066,7 +1067,7 @@ def ANEC_sub_OCV(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1161,7 +1162,7 @@ def ANEC_sub_photo_CA(
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
         )
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1286,7 +1287,7 @@ def ANEC_sub_CV(
         )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1390,7 +1391,7 @@ def ANEC_sub_HeatCV(
         )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1550,7 +1551,7 @@ def ANEC_sub_photo_CV(
         )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1819,7 +1820,7 @@ def ANEC_sub_photo_LSV(
         )
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],
@@ -1937,7 +1938,7 @@ def ANEC_sub_photo_CP(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {"custom": "cell1_we"},
         to_global_params=["_fast_samples_in"],

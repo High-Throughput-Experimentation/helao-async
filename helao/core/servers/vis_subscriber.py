@@ -47,6 +47,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.servers.vis import Vis
 from helao.helpers.ws_utils import WsSubscriber as Wss
 from helao.helpers import config_loader
+from helao.helpers.loaded_modules import write_loaded_modules_snapshot
 
 #: Common class name every ``*_vis.py`` module exposes. The generic
 #: ``action_visualizer``/``live_visualizer`` Bokeh apps look up this attribute
@@ -168,6 +169,22 @@ def mount_visualizers(app, vis_cfg_key: str) -> list:
                 f"mounting '{module_name}.{VIS_CLASS_NAME}' for server '{server_name}'"
             )
             instances.append(viscls(vis_serv=app.vis, serv_key=server_name))
+
+    # Refresh the hot-reload loaded-modules snapshot now that the per-server
+    # ``*_vis`` modules have been lazily imported. bokeh_launcher writes a
+    # startup snapshot before any Bokeh session connects, so it cannot see the
+    # vis modules resolved here (import_vis_class runs per session); without this
+    # refresh, editing a ``*_vis`` module never maps to this bokeh server and the
+    # watcher never restarts it. Best-effort; helper swallows its own errors.
+    if instances:
+        helaodirs = getattr(app.vis, "helaodirs", None)
+        states_root = getattr(helaodirs, "states_root", None) if helaodirs else None
+        if states_root is not None:
+            snap = write_loaded_modules_snapshot(
+                states_root, app.vis.server.server_name
+            )
+            if snap is not None:
+                LOGGER.info(f"refreshed loaded-modules snapshot: {snap}")
     return instances
 
 

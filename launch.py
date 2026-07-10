@@ -465,6 +465,20 @@ def validateConfig(PIDD, confDict, helao_repo_root):
     if len(serverAddrs) != len(set(serverAddrs)):
         LAUNCH_LOGGER.info("Server host:port locations are not unique.")
         return False
+    # Single-owner sample-state guardrail: at most one server may declare
+    # params.positions (the SAMPLE server after the archive hoist). Two owners
+    # would race/clobber the shared archive-state JSON.
+    positionsOwners = [
+        server
+        for server, d in confDict["servers"].items()
+        if isinstance(d.get("params"), dict) and d["params"].get("positions")
+    ]
+    if len(positionsOwners) > 1:
+        LAUNCH_LOGGER.info(
+            f"More than one server declares 'params.positions': "
+            f"{positionsOwners}. Exactly one sample-state owner is allowed."
+        )
+        return False
     return True
 
 

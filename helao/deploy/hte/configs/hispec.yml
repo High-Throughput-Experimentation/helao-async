@@ -120,16 +120,22 @@ servers:
         we_pump: 7
         ce_pump: 3
         ce_flow: 4
+  SAMPLE:
+    host: hte-eche-11.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    action_vis: sample_vis
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-eche-11.htejcap.caltech.edu
     port: 8007
     group: action
     fast: pal_server
-    action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   ANDOR:
     host: hte-eche-11.htejcap.caltech.edu
     port: 8011

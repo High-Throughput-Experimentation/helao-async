@@ -24,15 +24,21 @@ servers:
     params:
       orch_key: ORCH
       poll_interval: 5
+  SAMPLE:
+    host: hte-xrfs-01.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8007
     group: action
     fast: pal_server
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   DB:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8010
