@@ -171,11 +171,25 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
 
     # Pass 2: leftover args + an unfilled dict/BaseModel param -> wrap.
     # Handles the "body IS the dict" pattern (e.g. update_global_params).
+    #
+    # NOTE: modules that use ``from __future__ import annotations`` (PEP 563)
+    # have their annotations stored as *strings*, not live types.  ``ann is
+    # dict`` will be False when ann == 'dict'.  We resolve annotations via
+    # ``get_type_hints`` so both forms work.  We fall back to the raw
+    # annotation on any resolution error (keeps old behaviour intact).
     if remaining:
+        try:
+            hints = inspect.get_annotations(fn, eval_str=True)
+        except Exception:
+            try:
+                import typing
+                hints = typing.get_type_hints(fn)
+            except Exception:
+                hints = {n: p.annotation for n, p in params.items()}
         for name, param in params.items():
             if name in out:
                 continue
-            ann = param.annotation
+            ann = hints.get(name, param.annotation)
             is_dict = ann is dict
             is_model = (
                 isinstance(ann, type)
