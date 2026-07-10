@@ -20,6 +20,8 @@ from helao.core.tests.unit_test_action_experiment_sequence import (
     action_experiment_sequence_unit_test,
 )
 from helao.core.tests.unit_test_config_loader import config_loader_unit_test
+from helao.core.tests.unit_test_config_validation import config_validation_unit_test
+from helao.core.tests.unit_test_config_seam import config_seam_unit_test
 from helao.core.tests.unit_test_logging import logging_unit_test
 from helao.core.tests.unit_test_artifact_generation import (
     artifact_generation_unit_test,
@@ -44,6 +46,8 @@ TESTS = [
     ("sample_models", sample_model_unit_test),
     ("action_experiment_sequence", action_experiment_sequence_unit_test),
     ("config_loader", config_loader_unit_test),
+    ("config_validation", config_validation_unit_test),
+    ("config_seam", config_seam_unit_test),
     ("logging", logging_unit_test),
     ("artifact_generation", artifact_generation_unit_test),
     ("dispatcher", dispatcher_unit_test),

@@ -20,11 +20,15 @@ import sys
 import tempfile
 import traceback
 
+from helao.helpers import config_loader
 from helao.helpers.config_loader import (
     HelaoConfig,
     OrchServerParams,
     ServerConfig,
+    install_global_config,
+    load_global_config,
     read_config,
+    read_validated_config,
 )
 from helao.core.tests._test_utils import TestReporter
 
@@ -128,6 +132,55 @@ def config_loader_unit_test() -> bool:
             lambda: minimal.dummy is True and minimal.simulation is True,
         )
 
+        reporter.section("read_validated_config / install_global_config (D3 seam)")
+        _saved_config = config_loader.CONFIG
+        try:
+            config_dict, validated = read_validated_config(demo_path)
+            reporter.check(
+                "read_validated_config returns a (dict, HelaoConfig) tuple",
+                lambda: isinstance(config_dict, dict)
+                and isinstance(validated, HelaoConfig),
+            )
+            reporter.check(
+                "read_validated_config dict has loaded_config_path",
+                lambda: os.path.abspath(config_dict["loaded_config_path"])
+                == os.path.abspath(demo_path),
+            )
+            reporter.check(
+                "read_validated_config validated view has run_type == simulation",
+                lambda: validated.run_type == "simulation",
+            )
+
+            installed = install_global_config(config_dict)
+            reporter.check(
+                "install_global_config installs the RAW dict by object identity"
+                " (D3 contract, not a model_dump)",
+                lambda: config_loader.CONFIG is config_dict
+                and installed is config_dict,
+            )
+
+            config_loader.CONFIG = None
+            shim_returned = load_global_config(demo_path, set_global=True)
+            reporter.check(
+                "load_global_config shim returns the dict",
+                lambda: isinstance(shim_returned, dict),
+            )
+            reporter.check(
+                "load_global_config shim installs that same dict on CONFIG"
+                " (shim parity with read_validated_config + install_global_config)",
+                lambda: config_loader.CONFIG is shim_returned,
+            )
+
+            config_loader.CONFIG = None
+            pure_returned = load_global_config(demo_path)
+            reporter.check(
+                "load_global_config default flag is a pure read (CONFIG unchanged)",
+                lambda: config_loader.CONFIG is None
+                and isinstance(pure_returned, dict),
+            )
+        finally:
+            config_loader.CONFIG = _saved_config
+
         return reporter.success()
 
     except Exception as exc:  # noqa: BLE001
@@ -145,3 +198,7 @@ def _expect_raises(fn, exc_type) -> bool:
     except Exception:  # noqa: BLE001
         return False
     return False
+
+
+if __name__ == "__main__":
+    raise SystemExit(0 if config_loader_unit_test() else 1)
