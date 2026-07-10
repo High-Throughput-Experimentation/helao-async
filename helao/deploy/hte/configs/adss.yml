@@ -170,6 +170,7 @@ servers:
     port: 8008
     group: action
     fast: sample_server
+    action_vis: sample_vis
     params:
       positions:
         tray1:
@@ -190,7 +191,6 @@ servers:
     group: action
     verbose: true
     fast: pal_server
-    action_vis: pal_vis
     regular_update: true
     params:
       user: RSHS

@@ -86,6 +86,7 @@ servers:
     port: 8008
     group: action
     fast: sample_server
+    action_vis: sample_vis
     params:
       positions:
         custom:
@@ -95,7 +96,6 @@ servers:
     port: 8007
     group: action
     fast: pal_server
-    action_vis: pal_vis
     params: {}
   VIS:
     host: hte-ccsi-01.htejcap.caltech.edu
