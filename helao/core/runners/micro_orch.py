@@ -545,7 +545,7 @@ class MicroOrch:
         exp_fields = set(Experiment.model_fields)
         exp_kwargs = {k: v for k, v in dump.items() if k in exp_fields}
         experiment = Experiment(**exp_kwargs)
-        experiment.experiment_status = [HloStatus.finished]
+        experiment.reset_experiment_status(HloStatus.finished)
         experiment.experiment_finished_timestamp = set_time(offset=0)
         await self._write_exp(experiment)
 
@@ -629,7 +629,7 @@ class MicroOrch:
 
         if not actions:
             if await_completion:
-                experiment.experiment_status = [HloStatus.finished]
+                experiment.reset_experiment_status(HloStatus.finished)
                 experiment.experiment_finished_timestamp = set_time(offset=0)
                 yml_path = await self._write_exp(experiment)
                 loaded = await self._load_finished(
@@ -680,7 +680,7 @@ class MicroOrch:
                 except Exception:
                     LOGGER.exception("could not rebuild Action from terminal dump")
 
-        experiment.experiment_status = [HloStatus.finished]
+        experiment.reset_experiment_status(HloStatus.finished)
         experiment.experiment_finished_timestamp = set_time(offset=0)
         yml_path = await self._write_exp(experiment)
         loaded = await self._load_finished(experiment.get_experiment_dir(), "exp")
@@ -773,7 +773,7 @@ class MicroOrch:
         if not await_completion:
             return raw_results
 
-        sequence.sequence_status = [HloStatus.finished]
+        sequence.reset_sequence_status(HloStatus.finished)
         sequence.sequence_finished_timestamp = set_time(offset=0)
         yml_path = await self._write_seq(sequence)
         loaded = await self._load_finished(sequence.get_sequence_dir(), "seq")

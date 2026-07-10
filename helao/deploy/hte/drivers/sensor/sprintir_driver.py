@@ -202,7 +202,7 @@ class SprintIR:
                             # await self.stat.set_idle()
                         LOGGER.info("CO2 measurement is done")
                     else:
-                        self.active.action.action_status.append(HloStatus.estopped)
+                        self.active.action.append_action_status(HloStatus.estopped)
                         self.IO_do_meas = False
                         LOGGER.error("CO2-sense is in estop.")
 
