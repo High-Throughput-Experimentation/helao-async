@@ -64,6 +64,7 @@ MOTOR_server = MachineModel(server_name="MOTOR", machine_name=ORCH_HOST).as_dict
 NI_server = MachineModel(server_name="NI", machine_name=ORCH_HOST).as_dict()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
+SAMPLE_server = MachineModel(server_name="SAMPLE", machine_name=ORCH_HOST).as_dict()
 IO_server = MachineModel(server_name="IO", machine_name=ORCH_HOST).as_dict()
 CALC_server = MachineModel(server_name="CALC", machine_name=ORCH_HOST).as_dict()
 CO2S_server = MachineModel(server_name="CO2SENSOR", machine_name=ORCH_HOST).as_dict()
@@ -91,7 +92,7 @@ def CCSI_sub_unload_cell() -> list:
     """
 
     apm = ActionPlanMaker()
-    apm.add(PAL_server, "archive_custom_unloadall", {})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {})
     return apm.planned_actions
 
 
@@ -112,7 +113,7 @@ def CCSI_sub_load_solid(
     apm = ActionPlanMaker()
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": "cell1_we",
@@ -158,7 +159,7 @@ def CCSI_sub_load_liquid(
 
     # (3) Create liquid sample and add to assembly
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
@@ -196,7 +197,7 @@ def CCSI_sub_load_gas(
 
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",  # not sure there is a server function for gas
         {
             "custom": "cell1_we",
@@ -373,7 +374,7 @@ def CCSI_sub_headspace_measure(
     apm = ActionPlanMaker()
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -463,7 +464,7 @@ def CCSI_sub_drain(
 
     apm.add(ORCH_server, "wait", {"waittime": HSpurge_duration})
 
-    apm.add(PAL_server, "archive_custom_unloadall", {})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {})
 
     if recirculation:
         apm.add(
@@ -618,7 +619,7 @@ def CCSI_sub_n2drain(
     )
     #    apm.add(ORCH_server, "wait", {"waittime": HSpurge_duration})
 
-    apm.add(PAL_server, "archive_custom_unloadall", {}, asc.no_wait)
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {}, asc.no_wait)
 
     drain_wait = HSpurge_duration - recirculation_duration
     if drain_wait < 0:
@@ -931,7 +932,7 @@ def CCSI_sub_cellfill(
                     )
                 )
                 apm.add(
-                    PAL_server,
+                    SAMPLE_server,
                     "archive_custom_query_sample",
                     {
                         "custom": "cell1_we",
@@ -1020,7 +1021,7 @@ def CCSI_sub_cellfill(
             )
         )
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_query_sample",
             {
                 "custom": "cell1_we",
@@ -1147,7 +1148,7 @@ def CCSI_sub_cellfill(
                     )
                 )
                 apm.add(
-                    PAL_server,
+                    SAMPLE_server,
                     "archive_custom_query_sample",
                     {
                         "custom": "cell1_we",
@@ -1236,7 +1237,7 @@ def CCSI_sub_cellfill(
             )
         )
         apm.add(
-            PAL_server,
+            SAMPLE_server,
             "archive_custom_query_sample",
             {
                 "custom": "cell1_we",
@@ -1860,7 +1861,7 @@ def CCSI_sub_co2maintainconcentration(
     """
     apm = ActionPlanMaker()
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1937,7 +1938,7 @@ def CCSI_sub_co2maintainconcentration(
     apm.add(ORCH_server, "wait", {"waittime": 3})
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_gas",
         {
             "custom": "cell1_we",

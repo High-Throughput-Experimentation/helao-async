@@ -71,6 +71,7 @@ IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()
 ANDOR_server = MM(server_name="ANDOR", machine_name=gethostname().lower()).as_dict()
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
+SAMPLE_server = MM(server_name="SAMPLE", machine_name=gethostname().lower()).as_dict()
 # CAM_server = MM(server_name="CAM", machine_name=gethostname().lower()).as_dict()
 KMOTOR_server = MM(server_name="KMOTOR", machine_name=gethostname().lower()).as_dict()
 # ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
@@ -126,7 +127,7 @@ def HISPEC_sub_unloadall_customs() -> list:
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {
             "destroy_liquid": True,
@@ -158,7 +159,7 @@ def HISPEC_sub_add_liquid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": solid_custom_position,
@@ -199,7 +200,7 @@ def HISPEC_sub_load_solid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -447,7 +448,7 @@ def HISPEC_sub_shutdown() -> list:
         List containing a single PAL ``archive_custom_unloadall`` action.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(PAL_server, "archive_custom_unloadall", {"destroy_liquid": True})
+    apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.planned_actions  # returns complete action list to orch
 
 @experiment(version=1)
@@ -587,7 +588,7 @@ def HISPEC_sub_OCV(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -697,7 +698,7 @@ def HISPEC_sub_SpEC(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -856,7 +857,7 @@ def HISPEC_sub_CP(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",

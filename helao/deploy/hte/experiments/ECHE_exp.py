@@ -59,6 +59,9 @@ ORCH_server = MachineModel(
 PAL_server = MachineModel(
     server_name="PAL", machine_name=gethostname().lower()
 ).as_dict()
+SAMPLE_server = MachineModel(
+    server_name="SAMPLE", machine_name=gethostname().lower()
+).as_dict()
 
 toggle_triggertype = TriggerType.fallingedge
 
@@ -74,7 +77,7 @@ def ECHE_sub_unloadall_customs() -> list:
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_unloadall",
         {
             "destroy_liquid": True,
@@ -106,7 +109,7 @@ def ECHE_sub_add_liquid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": solid_custom_position,
@@ -147,7 +150,7 @@ def ECHE_sub_load_solid(
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
 
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": solid_custom_position,
@@ -325,7 +328,7 @@ def ECHE_sub_CA_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -414,7 +417,7 @@ def ECHE_sub_OCV(
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -469,7 +472,7 @@ def ECHE_sub_preCV(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -545,7 +548,7 @@ def ECHE_sub_CA(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -688,7 +691,7 @@ def ECHE_sub_CV_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -814,7 +817,7 @@ def ECHE_sub_CV(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -904,7 +907,7 @@ def ECHE_sub_CP(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",
@@ -1007,7 +1010,7 @@ def ECHE_sub_CP_led(
 
     # get sample for gamry
     apm.add(
-        PAL_server,
+        SAMPLE_server,
         "archive_custom_query_sample",
         {
             "custom": "cell1_we",

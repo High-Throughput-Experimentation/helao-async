@@ -46,6 +46,10 @@ from helao.helpers.lib_decorators import experiment
 
 EXPERIMENTS = __all__
 
+SAMPLE_server = MachineModel(
+    server_name="SAMPLE", machine_name=gethostname().lower()
+).as_dict()
+
 # cannot save data without exp
 debug_save_act = True
 debug_save_data = True
@@ -128,7 +132,7 @@ def CLAD_sub_load_sample(
 
     if clear_position:
         apm.add(
-            "PAL",
+            SAMPLE_server,
             "archive_custom_unloadall",
             {},
             start_condition=ActionStartCondition.wait_for_orch,
@@ -141,7 +145,7 @@ def CLAD_sub_load_sample(
 
     if solid_sample_no is not None and solid_plate_id is not None:
         apm.add(
-            "PAL",
+            SAMPLE_server,
             "archive_custom_load",
             {
                 "custom": load_position,
@@ -154,7 +158,7 @@ def CLAD_sub_load_sample(
         )
     if liquid_sample_no is not None and liquid_volume_ul is not None:
         apm.add(
-            "PAL",
+            SAMPLE_server,
             "archive_custom_add_liquid",
             {
                 "custom": load_position,
@@ -169,7 +173,7 @@ def CLAD_sub_load_sample(
         )
     if liquid_sample_no is not None and gas_volume_ml is not None:
         apm.add(
-            "PAL",
+            SAMPLE_server,
             "archive_custom_add_gas",
             {
                 "custom": load_position,
@@ -214,7 +218,7 @@ def CLAD_sub_fill_cell(
 
     if load_sample:
         apm.add(
-            "PAL",
+            SAMPLE_server,
             "archive_custom_query_sample",
             {
                 "custom": "cell1_we",
@@ -393,7 +397,7 @@ def CLAD_sub_reference_setup(
 
     # LOAD REFERENCE SAMPLE
     apm.add(
-        "PAL",
+        SAMPLE_server,
         "archive_custom_unloadall",
         {},
         start_condition=ActionStartCondition.wait_for_orch,
@@ -404,7 +408,7 @@ def CLAD_sub_reference_setup(
     )
     # need to use custom solid label here, not supported by ADSS_sub_load
     apm.add(
-        "PAL",
+        SAMPLE_server,
         "archive_custom_load",
         {
             "custom": load_position,
@@ -415,7 +419,7 @@ def CLAD_sub_reference_setup(
         start_condition=ActionStartCondition.wait_for_previous,
     )
     apm.add(
-        "PAL",
+        SAMPLE_server,
         "archive_custom_add_liquid",
         {
             "custom": load_position,
