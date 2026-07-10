@@ -37,6 +37,7 @@ from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import OrchStatus, LoopStatus, LoopIntent
+from helao.core.models.run_dir import RunDir
 from helao.core.error import ErrorCodes
 
 from helao.helpers.server_api import HelaoFastAPI
@@ -674,7 +675,7 @@ class Orch(Base):
                 {
                     self.active_sequence.sequence_uuid: {
                         "sequence_name": self.active_sequence.sequence_name,
-                        "status": "active",
+                        "status": HloStatus.active.value,
                     }
                 }
             )
@@ -690,7 +691,7 @@ class Orch(Base):
                     "sequence_name": self.active_sequence.sequence_name,
                     "sequence_params": self.active_sequence.sequence_params,
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_status": "active",
+                    "sequence_status": HloStatus.active.value,
                     "sequence_label": self.active_sequence.sequence_label,
                     "campaign_name": (
                         self.active_sequence.campaign_name
@@ -860,7 +861,7 @@ class Orch(Base):
             {
                 self.active_experiment.experiment_uuid: {
                     "experiment_name": self.active_experiment.experiment_name,
-                    "status": "active",
+                    "status": HloStatus.active.value,
                 }
             }
         )
@@ -876,7 +877,7 @@ class Orch(Base):
                 "experiment_name": self.active_experiment.experiment_name,
                 "experiment_params": self.active_experiment.experiment_params,
                 "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
-                "experiment_status": "active",
+                "experiment_status": HloStatus.active.value,
                 "sequence_label": self.active_sequence.sequence_label,
                 "campaign_name": (
                     self.active_sequence.campaign_name
@@ -1206,7 +1207,7 @@ class Orch(Base):
                     f"Action {A.action_name} dispatched with uuid: {result_uuid}"
                 )
                 self.put_lbuf_nowait(
-                    {result_uuid: {"action_name": A.action_name, "status": "active"}}
+                    {result_uuid: {"action_name": A.action_name, "status": HloStatus.active.value}}
                 )
 
                 if not A.nonblocking:
@@ -2254,7 +2255,7 @@ class Orch(Base):
                 {
                     self.active_sequence.sequence_uuid: {
                         "sequence_name": self.active_sequence.sequence_name,
-                        "status": "finished",
+                        "status": HloStatus.finished.value,
                     }
                 }
             )
@@ -2265,7 +2266,7 @@ class Orch(Base):
                     "sequence_params": self.active_sequence.sequence_params,
                     "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
                     "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_status": "finished",
+                    "sequence_status": HloStatus.finished.value,
                     "sequence_label": self.active_sequence.sequence_label,
                     "campaign_name": (
                         self.active_sequence.campaign_name
@@ -2299,7 +2300,7 @@ class Orch(Base):
                 {
                     self.active_experiment.experiment_uuid: {
                         "experiment_name": self.active_experiment.experiment_name,
-                        "status": "finished",
+                        "status": HloStatus.finished.value,
                     }
                 }
             )
@@ -2358,7 +2359,7 @@ class Orch(Base):
                     "experiment_params": self.active_experiment.experiment_params,
                     "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
                     "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
-                    "experiment_status": "finished",
+                    "experiment_status": HloStatus.finished.value,
                     "sequence_label": self.active_sequence.sequence_label,
                     "campaign_name": (
                         self.active_sequence.campaign_name

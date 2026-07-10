@@ -14,6 +14,7 @@ import yaml
 
 from bokeh.document import Document
 
+from helao.core.models.run_dir import RunDir
 from helao.core.servers.data_browser import readers
 from helao.core.servers.data_browser import sources
 from helao.core.servers.data_browser import state as dbstate
@@ -104,7 +105,7 @@ def test_read_hlo_from_zip():
 
 def test_dir_walk_and_range():
     with tempfile.TemporaryDirectory() as d:
-        base = os.path.join(d, "RUNS_FINISHED")
+        base = os.path.join(d, RunDir.FINISHED.value)
         for ww, mmdd in [("26.20", "0515"), ("26.25", "0618")]:
             os.makedirs(os.path.join(base, ww, mmdd))
         dates = [ds for ds, _ in sources._list_day_dirs(base)]
@@ -118,7 +119,7 @@ def test_dir_walk_and_range():
 def _make_finished_tree(root):
     """Create root/RUNS_FINISHED/26.25/0618/<seq>/<exp>/<act>/ with an .hlo + act.yml."""
     act_dir = os.path.join(
-        root, "RUNS_FINISHED", "26.25", "0618",
+        root, RunDir.FINISHED.value, "26.25", "0618",
         "141523__SDC_seq__lab1", "260618.141524__SDC_exp_CV",
         "1__0__sim__cv",
     )
@@ -140,7 +141,7 @@ def test_runs_finished_index():
         assert list(df.columns) == sources.INDEX_COLUMNS, list(df.columns)
         assert len(df) == 1, df
         r = df.iloc[0]
-        assert r["source"] == "RUNS_FINISHED"
+        assert r["source"] == RunDir.FINISHED
         assert r["sequence"] == "SDC_seq"
         assert r["technique"] == "CV"
         assert r["sample"] == "solid__lab1_1"
@@ -154,7 +155,7 @@ def test_runs_finished_index():
 
 def _make_synced_zip(root):
     """Create root/RUNS_SYNCED/26.25/0618/<seq>.zip with act.yml + .hlo members."""
-    day = os.path.join(root, "RUNS_SYNCED", "26.25", "0618")
+    day = os.path.join(root, RunDir.SYNCED.value, "26.25", "0618")
     os.makedirs(day)
     with tempfile.TemporaryDirectory() as tmp:
         hlo = os.path.join(tmp, "cv_data.hlo")
@@ -175,7 +176,7 @@ def test_runs_synced_index():
         df = sources.RunsSourceIndex(d, "SYNCED").index()
         assert len(df) == 1, df
         r = df.iloc[0]
-        assert r["source"] == "RUNS_SYNCED"
+        assert r["source"] == RunDir.SYNCED
         assert r["sequence"] == "SDC_seq"
         assert r["technique"] == "CV"
         assert r["sample"] == "solid__lab1_1"
@@ -275,8 +276,8 @@ def test_analyses_index_s3_only_unavailable():
 def test_get_index_dispatch():
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
-        df = sources.get_index(d, "RUNS_FINISHED", None, None)
-        assert df.iloc[0]["source"] == "RUNS_FINISHED"
+        df = sources.get_index(d, RunDir.FINISHED, None, None)
+        assert df.iloc[0]["source"] == RunDir.FINISHED
         empty = sources.get_index(d, "ANALYSES", None, None)
         assert list(empty.columns) == sources.INDEX_COLUMNS
         assert len(empty) == 0
@@ -287,7 +288,7 @@ def test_load_selected_end_to_end():
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
         _make_process(d)  # adds an unavailable-resolves-to-available process row too
-        df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        df = sources.get_index(d, RunDir.FINISHED, None, None)
         datasets, skipped = dbstate.load_selected(df, [0])
         assert len(datasets) == 1 and not skipped, (datasets, skipped)
         ds = datasets[0]
@@ -302,7 +303,7 @@ def test_load_selected_end_to_end():
 
 
 def _ds(label, data, **kw):
-    base = dict(locator="L", source="RUNS_FINISHED", sequence="s", experiment="e",
+    base = dict(locator="L", source=RunDir.FINISHED, sequence="s", experiment="e",
                 node="n", technique="CV", sample="smp", file_name="f.hlo", meta={})
     base.update(kw)
     return dbstate.SelectedDataset(label=label, data=data, **base)
@@ -329,7 +330,7 @@ def test_summary_row():
     assert s["n_points"] == 3
     assert s["x_min"] == 0 and s["x_max"] == 2
     assert s["y_min"] == 0.1 and s["y_max"] == 0.5
-    assert s["source"] == "RUNS_FINISHED" and s["technique"] == "CV"
+    assert s["source"] == RunDir.FINISHED and s["technique"] == "CV"
     print("test_state PASS")
 
 
@@ -351,7 +352,7 @@ def test_plot_tab_builds_traces():
         doc = Document()
         vis = _FakeVis(d, doc)
         ui = _UI(vis, d, 50000)
-        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui.index_df = sources.get_index(d, RunDir.FINISHED, None, None)
         ui._refresh_index_table()
         ui.index_source.selected.indices = [0]
         ui._on_add()
@@ -370,7 +371,7 @@ def test_table_tab_summary_and_rows():
         doc = Document()
         vis = _FakeVis(d, doc)
         ui = _UI(vis, d, 50000)
-        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui.index_df = sources.get_index(d, RunDir.FINISHED, None, None)
         ui._refresh_index_table()
         ui.index_source.selected.indices = [0]
         ui._on_add()
@@ -390,7 +391,7 @@ def test_plot_replot_and_clear_safe():
         _make_finished_tree(d)
         doc = Document()
         ui = _UI(_FakeVis(d, doc), d, 50000)
-        ui.index_df = sources.get_index(d, "RUNS_FINISHED", None, None)
+        ui.index_df = sources.get_index(d, RunDir.FINISHED, None, None)
         ui._refresh_index_table()
         ui.index_source.selected.indices = [0]
         ui._on_add()

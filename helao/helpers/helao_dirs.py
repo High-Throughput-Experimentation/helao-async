@@ -16,6 +16,7 @@ from glob import glob
 from typing import Optional
 
 from helao.core.models.helaodirs import HelaoDirs
+from helao.core.models.run_dir import RunDir
 
 #: Process-level cache keyed on ``(root, server_name)``. Bokeh re-runs each
 #: ``makeBokehApp`` per client connection, and ``Vis.__init__`` calls
@@ -58,7 +59,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
 
     if "root" in world_cfg:
         root = world_cfg["root"]
-        save_root = os.path.join(root, "RUNS_ACTIVE")
+        save_root = os.path.join(root, RunDir.ACTIVE.value)
         log_root = os.path.join(root, "LOGS")
         states_root = os.path.join(root, "STATES")
         db_root = os.path.join(root, "DATABASE")

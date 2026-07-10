@@ -17,6 +17,8 @@ import aiohttp
 import aioshutil
 import ruamel.yaml
 
+from helao.core.models.run_dir import RunDir
+
 
 def yml_dumps(obj, options=None) -> str:
     """Serialize ``obj`` to a YAML string using HELAO formatting conventions.
@@ -151,7 +153,7 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
 
     obj_type = hobj.__class__.__name__.lower()
-    dest_dir = "RUNS_FINISHED"
+    dest_dir = RunDir.FINISHED.value
     save_dir = str(base.helaodirs.save_root)
 
     is_manual = False
@@ -159,7 +161,7 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     yml_dir = None
 
     if hobj.manual_action:
-        dest_dir = "RUNS_DIAG"
+        dest_dir = RunDir.DIAG.value
         is_manual = True
     match obj_type:
         case "action":
@@ -176,8 +178,8 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
 
     yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
-    new_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", dest_dir))
-    nosync_dir = os.path.join(yml_dir.replace("RUNS_ACTIVE", "RUNS_NOSYNC"))
+    new_dir = os.path.join(yml_dir.replace(RunDir.ACTIVE.value, dest_dir))
+    nosync_dir = os.path.join(yml_dir.replace(RunDir.ACTIVE.value, RunDir.NOSYNC.value))
     await aiofiles.os.makedirs(new_dir, exist_ok=True)
     await aiofiles.os.makedirs(nosync_dir, exist_ok=True)
 
@@ -192,9 +194,9 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     while (not copy_success) and copy_retries <= 60:
         dst_list = [
             p.replace(
-                "RUNS_ACTIVE",
+                RunDir.ACTIVE.value,
                 (
-                    "RUNS_NOSYNC"
+                    RunDir.NOSYNC.value
                     if p.endswith(".hlo") and not hobj.sync_data
                     else dest_dir
                 ),
@@ -207,7 +209,7 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
         mvtups = []
         cptups = []
         for src, dst in zip(src_list, dst_list):
-            if "RUNS_NOSYNC" in dst:
+            if RunDir.NOSYNC.value in dst:
                 mvtups.append((src, dst))
             else:
                 cptups.append((src, dst))
