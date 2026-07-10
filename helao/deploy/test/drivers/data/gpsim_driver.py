@@ -391,11 +391,11 @@ class GPSim:
         acq_inds = np.array(
             self.acquired[plate_id] + self.acq_fromglobal[plate_id]
         ).astype(int)
-        LOGGER.info("acquired indices:", acq_inds)
+        LOGGER.info(f"acquired indices: {acq_inds}")
         X = self.features[plate_id][acq_inds].astype(float).round(2)
         y = self.targets[plate_id][acq_inds]
-        LOGGER.info(f"features {X.shape}:", X)
-        LOGGER.info(f"targets {y.shape}:", y)
+        LOGGER.info(f"features {X.shape}: {X}")
+        LOGGER.info(f"targets {y.shape}: {y}")
         opt = gpflow.optimizers.Scipy()
         kernel = self.kernel_func()
         try:
@@ -415,9 +415,9 @@ class GPSim:
                 self.features[plate_id].astype(float).round(2)
             )
         )
-        LOGGER.info("prediction min:", total_pred.min())
-        LOGGER.info("prediction mean:", total_pred.mean())
-        LOGGER.info("prediction max:", total_pred.max())
+        LOGGER.info(f"prediction min: {total_pred.min()}")
+        LOGGER.info(f"prediction mean: {total_pred.mean()}")
+        LOGGER.info(f"prediction max: {total_pred.max()}")
         total_mae = mean_absolute_error(total_pred, self.targets[plate_id])
         self.total_step[plate_id][plate_step] = (
             total_mae,
