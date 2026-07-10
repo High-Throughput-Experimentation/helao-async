@@ -55,9 +55,9 @@ def async_partial(f, *args):
 
 
 class C_vis(ActionVisualizer):
-    """Bokeh visualizer for a PAL/archive sample server.
+    """Bokeh visualizer for the SAMPLE (archive) server.
 
-    Polls the PAL server's ``list_new_samples`` private endpoint whenever
+    Polls the SAMPLE server's ``list_new_samples`` private endpoint whenever
     new data is observed on the ``ws_data`` WebSocket and renders one
     Bokeh ``DataTable`` per sample type (solid, liquid, gas, assembly)
     showing the newest entries. This visualizer manages its own WebSocket
@@ -75,7 +75,7 @@ class C_vis(ActionVisualizer):
         layout: Composed Bokeh layout mounted on the document.
         input_max_smps: Widget setting ``max_smps``.
         inheritance_selector_group: Checkbox controlling the ``give_only``
-            filter on the PAL request.
+            filter on the SAMPLE request.
         inheritance_select: Cached active list of the inheritance selector.
     """
 
@@ -86,7 +86,7 @@ class C_vis(ActionVisualizer):
 
         Args:
             vis_serv: Host :class:`Vis` server providing the Bokeh document.
-            serv_key: Configuration key of the PAL action server. If the
+            serv_key: Configuration key of the SAMPLE action server. If the
                 server is not in the config, ``__init__`` returns early
                 without registering any roots.
         """
@@ -162,7 +162,7 @@ class C_vis(ActionVisualizer):
                 [
                     Spacer(width=20),
                     Div(
-                        text=f'<b>PAL Visualizer module for server <a href="http://{self.host}:{self.port}/docs#/" target="_blank">\'{self.serv_key}\'</a></b>',
+                        text=f'<b>Sample Visualizer module for server <a href="http://{self.host}:{self.port}/docs#/" target="_blank">\'{self.serv_key}\'</a></b>',
                         width=1004,
                         height=15,
                     ),
@@ -216,7 +216,7 @@ class C_vis(ActionVisualizer):
 
         Parses ``new`` as an int, stores it as ``self.max_smps``, refreshes
         the widget value, and triggers :meth:`reset_plot` to re-query the
-        PAL server.
+        SAMPLE server.
 
         Args:
             attr: Bokeh property name that changed.
@@ -255,14 +255,14 @@ class C_vis(ActionVisualizer):
         self.reset_plot()
 
     async def add_points(self):
-        """Query the PAL server for the newest samples and refresh every table.
+        """Query the SAMPLE server for the newest samples and refresh every table.
 
         Issues a ``list_new_samples`` private dispatch with the current
         ``max_smps`` and inheritance filter, formats the creation timestamps
         as human-readable strings, and assigns the resulting per-type lists
         to each ``ColumnDataSource``.
         """
-        # pull latest sample lists from PAL server and populate self.datasource.data
+        # pull latest sample lists from SAMPLE server and populate self.datasource.data
         # keep global_label, sample_creation_timecode, comment, volume, ph, electrolyte
         resp, err = await async_private_dispatcher(
             self.serv_key,
@@ -286,7 +286,7 @@ class C_vis(ActionVisualizer):
                 self.datasource[smptype].data = self.data_dict[smptype]
 
     async def IOloop_data(self):
-        """Subscribe to the PAL data WebSocket and refresh tables on activity.
+        """Subscribe to the SAMPLE data WebSocket and refresh tables on activity.
 
         Connects directly with :mod:`websockets`, re-attempting up to five
         times on connection failure with a one second back-off. Each frame
@@ -294,7 +294,7 @@ class C_vis(ActionVisualizer):
         ``valid_data_status`` the visualizer schedules an async
         :meth:`add_points` call to pull the newest samples.
         """
-        LOGGER.info(f" ... PAL visualizer subscribing to: {self.data_url}")
+        LOGGER.info(f" ... sample visualizer subscribing to: {self.data_url}")
         retry_limit = 5
         for _ in range(retry_limit):
             try:
@@ -325,6 +325,6 @@ class C_vis(ActionVisualizer):
                 break
 
     def reset_plot(self):
-        """Schedule a fresh PAL sample query on the next document tick."""
+        """Schedule a fresh SAMPLE sample query on the next document tick."""
         # copy old data to "prev" plot
         self.vis.doc.add_next_tick_callback(partial(self.add_points))

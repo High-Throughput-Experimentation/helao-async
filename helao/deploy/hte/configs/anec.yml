@@ -120,6 +120,7 @@ servers:
     port: 8008
     group: action
     fast: sample_server
+    action_vis: sample_vis
     params:
       positions:
         tray1:
@@ -140,7 +141,6 @@ servers:
     port: 8007
     group: action
     fast: pal_server
-    action_vis: pal_vis
     params:
       host: localhost
       timeout: 300
