@@ -164,18 +164,15 @@ if __name__ == "__main__":
     # no HTTP route, so unlike FastAPI servers (which serve /loaded_modules live)
     # we persist a startup snapshot here. Refreshed on every (re)launch.
     if root is not None:
-        try:
-            import json
-            from helao.helpers.loaded_modules import loaded_repo_modules
+        from helao.helpers.loaded_modules import write_loaded_modules_snapshot
 
-            states_dir = os.path.join(root, "STATES")
-            os.makedirs(states_dir, exist_ok=True)
-            snap_path = os.path.join(states_dir, f"loaded_modules_{server_key}.json")
-            with open(snap_path, "w") as f:
-                json.dump(loaded_repo_modules(), f)
+        snap_path = write_loaded_modules_snapshot(
+            os.path.join(root, "STATES"), server_key
+        )
+        if snap_path is not None:
             LOGGER.info(f"wrote loaded-modules snapshot: {snap_path}")
-        except Exception:
-            LOGGER.warning("failed to write loaded-modules snapshot", exc_info=True)
+        else:
+            LOGGER.warning("failed to write loaded-modules snapshot")
 
     LOGGER.info(f" ---- starting  {server_key} ----")
 
