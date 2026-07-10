@@ -78,16 +78,22 @@ servers:
         '9': cDAQ1Mod1/port0/line12
       dev_pump:
         RecirculatingPeriPump1: cDAQ1Mod1/port0/line12
+  SAMPLE:
+    host: hte-ccsi-01.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    action_vis: sample_vis
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 8007
     group: action
     fast: pal_server
-    action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   VIS:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 5001
