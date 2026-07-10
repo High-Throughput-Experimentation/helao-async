@@ -93,10 +93,7 @@ servers:
     group: action
     fast: pal_server
     action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   VIS:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 5001
