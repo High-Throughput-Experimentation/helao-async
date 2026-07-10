@@ -107,6 +107,15 @@ servers:
         wl_source: 1
         spec_trig: 2
         spec_trig2: 3
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8009
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: 127.0.0.1
     port: 8007

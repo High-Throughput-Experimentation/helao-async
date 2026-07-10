@@ -165,6 +165,25 @@ servers:
         error: PXI-6284/port2/line6
       dev_led:
         led: PXI-6289/port0/line0
+  SAMPLE:
+    host: hte-adss-01.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        tray1:
+          slot1: null
+          slot2: null
+          slot3: null
+        tray2:
+          slot1: VT54
+          slot2: VT54
+          slot3: VT54
+        custom:
+          elec_res1: reservoir
+          elec_res2: reservoir
+          cell1_we: cell
   PAL:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8007

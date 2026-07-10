@@ -76,6 +76,15 @@ servers:
         RecirculatingPeriPump2-dir: dev1/port1/line3
         RecirculatingPeriPump2: dev1/port1/line4
         RecirculatingPeriPump2-maxspd: dev1/port2/line0
+  SAMPLE:
+    host: hte-ecms-03.htejcap.caltech.edu
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
   PAL:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8007
