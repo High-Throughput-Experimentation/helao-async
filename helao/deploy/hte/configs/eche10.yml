@@ -140,10 +140,7 @@ servers:
     group: action
     fast: pal_server
     action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   SPEC_T:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8011

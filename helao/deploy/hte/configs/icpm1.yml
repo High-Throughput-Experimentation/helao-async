@@ -40,10 +40,7 @@ servers:
     port: 8007
     group: action
     fast: pal_server
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   DB:
     host: hte-icpm-01.htejcap.caltech.edu
     port: 8010

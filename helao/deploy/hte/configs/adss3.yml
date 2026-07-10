@@ -213,19 +213,6 @@ servers:
         archive: custom_to_tray_220214.cam
         transfer_tray_custom: tray_to_custom_220214.cam
         deepclean: deep_clean_220214.cam
-      positions:
-        tray1:
-          slot1: null
-          slot2: null
-          slot3: null
-        tray2:
-          slot1: VT54
-          slot2: VT54
-          slot3: VT54
-        custom:
-          elec_res1: reservoir
-          elec_res2: reservoir
-          cell1_we: cell
   VIS:
     host: hte-adss-03.htejcap.caltech.edu
     port: 5001

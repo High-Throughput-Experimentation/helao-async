@@ -130,10 +130,7 @@ servers:
     group: action
     fast: pal_server
     action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   VIS:
     host: hte-eche-07.htejcap.caltech.edu
     port: 5001

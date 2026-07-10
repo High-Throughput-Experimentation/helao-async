@@ -122,10 +122,7 @@ servers:
     group: action
     fast: pal_server
     action_vis: pal_vis
-    params:
-      positions:
-        custom:
-          cell1_we: cell
+    params: {}
   VIS:
     host: 127.0.0.1
     port: 5001
