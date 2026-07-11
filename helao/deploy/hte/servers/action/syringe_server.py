@@ -11,7 +11,7 @@ __all__ = ["makeApp"]
 
 from fastapi import Body
 
-from ...drivers.pump.legato_driver import KDS100, PumpExec
+from ...drivers.pump.legato_driver import KDS100, KDS100Poller, PumpExec
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 from helao.core.models.data import DataModel
@@ -36,6 +36,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Syringe pump server",
         version=2.0,
         driver_classes=[KDS100],
+        poller_class=KDS100Poller,
     )
 
     @app.post("/start_polling", tags=["private"])
