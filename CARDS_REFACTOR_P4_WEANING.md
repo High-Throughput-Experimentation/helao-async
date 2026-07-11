@@ -252,6 +252,15 @@ Two sub-kinds:
   Loop niceties (reset-after-N-blanks, `sprintir_driver.py:299-304`) become poller state, or
   driver-internal counters inside `get_data`.
 
+  > **⚠️ Poll-cadence delta (verified, sprintir W3): centralizing the loop into `DriverPoller`
+  > changes the poll RATE.** Legacy loops hardcoded a frequency (sprintir polled at 4 Hz);
+  > `base_api.py:667-669` constructs the poller with `server_cfg.get("polling_time", 0.1)`,
+  > so absent a `polling_time` key the sensor now polls at 10 Hz (more serial traffic, shorter
+  > blank-reset window). Downstream data cadence is UNAFFECTED (action Executors sample the live
+  > buffer at their own `acquisition_rate`). Per migration: **record the old hardcoded frequency**
+  > and add `polling_time: <1/freq>` under that server's config `params` to preserve exact cadence
+  > — a station bring-up tuning item (construction-proof scope defers it, but capture the number).
+
 ### K7 — Methods that take `Active` → (driver method over plain params → `DriverResponse`) + (Executor that owns `active`)
 
 Split rule: everything the method **reads from** `active` (`action.action_params`,
@@ -344,6 +353,28 @@ Routing the two loop kinds (per P4 D2):
 Finally, `shutdown()` (task-cancel + port close, `sprintir_driver.py:459-469`) maps onto the
 ABC: device close → `disconnect()`; abort-activity → `stop()`; force-reopen → `reset()`;
 task cancellation disappears (the poller/Executor own their tasks).
+
+> **⚠️ Shutdown ordering (verified regression, legato/alicat W3): do NOT split a
+> "safe-state-then-close" `async_shutdown` into sync `shutdown()`=close + async
+> `async_shutdown()`=safe_state.** `base_api` shutdown_event calls sync `shutdown()` FIRST,
+> then `await async_shutdown()` (`base_api.py:817-832`). If `shutdown()` closes/nulls the
+> port, `async_shutdown()`'s `safe_state()` then writes to a dead port and raises — the device
+> is never returned to safe state on shutdown/hot-reload. Keep the safe-state send and the
+> close in ONE method in the correct order: `async_shutdown()` = `safe_state()` **then**
+> `disconnect()`; make sync `shutdown()` a no-op (or omit it). Applies to every driver whose
+> legacy `shutdown` did device I/O before closing.
+
+> **⚠️ State-transition publishes gate action start/finish — keep them SYNCHRONOUS, do NOT
+> defer to the poller (verified CRITICAL, legato W3).** When a driver eagerly wrote a status
+> value to the live buffer in the SAME call path as a start/stop command (e.g. legato wrote
+> `"infusing"` right after `start_pump`), an action Executor's `_poll` reads that status on
+> its FIRST iteration — which runs with NO initial sleep (`base.py:2464-2468`) — before a
+> separate `DriverPoller` task (K6b) can publish it. Dropping the synchronous write loses the
+> start-transition race deterministically: the Executor reads the stale pre-action status and
+> finishes immediately (no dispense). Fix: publish the transition synchronously in the
+> Executor (`_pre_exec`/`_exec` via `active.base.put_lbuf({dev: {"status": ...}})`) right after
+> issuing the command. K6b's poller handles steady-state/finish detection; it does NOT replace
+> the start-transition publish.
 
 ---
 
