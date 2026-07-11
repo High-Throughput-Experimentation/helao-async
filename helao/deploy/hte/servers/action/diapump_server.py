@@ -12,7 +12,7 @@ __all__ = ["makeApp"]
 from typing import Optional
 from fastapi import Body
 
-from ...drivers.pump.simdos_driver import SIMDOS, RunExec
+from ...drivers.pump.simdos_driver import SIMDOS, SIMDOSPoller, RunExec
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.premodels import Action
 
@@ -37,6 +37,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Diaphragm pump server",
         version=1.0,
         driver_classes=[SIMDOS],
+        poller_class=SIMDOSPoller,
     )
 
     @app.post("/start_polling", tags=["private"])
@@ -52,12 +53,12 @@ def makeApp(server_key) -> BaseAPI:
     @app.post("/start_pump", tags=["private"])
     async def start_pump():
         """Start the pump directly via the driver (no action record)."""
-        await app.driver.start()
+        await app.driver.start_pump()
 
     @app.post("/stop_pump", tags=["private"])
     async def stop_pump():
         """Stop the pump directly via the driver (no action record)."""
-        await app.driver.stop()
+        await app.driver.stop_pump()
 
     @app.post(f"/{server_key}/run_continuous", tags=["action"])
     async def run_continuous(

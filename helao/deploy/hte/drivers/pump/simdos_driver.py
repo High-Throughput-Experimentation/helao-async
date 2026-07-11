@@ -1,11 +1,12 @@
 """KNF SIMDOS RC-P series diaphragm pump driver.
 
 Defines status bit decoders, pump-mode/parameter enums, the :class:`SIMDOS`
-serial driver, and the :class:`RunExec` executor that runs the pump in
-continuous mode for a fixed duration.
+``HelaoDriver`` serial driver, the paired :class:`SIMDOSPoller` that publishes
+status into the action server's live buffer, and the :class:`RunExec`
+executor that runs the pump in continuous mode for a fixed duration.
 """
 
-__all__ = []
+__all__ = ["SIMDOS", "SIMDOSPoller", "RunExec"]
 
 import serial
 import time
@@ -19,8 +20,14 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
 
 """ Notes:
@@ -44,6 +51,8 @@ print(bBin)
 ```
 
 polling loop will check 5 states: operation, system, run mode, dispense mode, fault
+
+Pump status is published to the action server's live buffer by SIMDOSPoller.
 
 """
 
@@ -123,88 +132,112 @@ def str2bin(val: str) -> list:
         return []
 
 
-class SIMDOS:
-    """Driver for the KNF SIMDOS RC-P diaphragm pump over RS-485.
+class SIMDOS(HelaoDriver):
+    """``HelaoDriver`` wrapper for the KNF SIMDOS RC-P diaphragm pump over RS-485.
 
-    Opens a serial port to the pump, runs a background polling task that
-    reads operation/system/run/dispense/fault status registers, and exposes
-    methods to start/stop/prime/pause the pump and to set its mode and run
-    parameters. A fault detected during polling stops all active executors.
+    The serial port specified in ``config['port']`` is opened by :meth:`connect`,
+    not by construction. Always-on status polling (operation/system/run/
+    dispense/fault registers) is handled by the paired :class:`SIMDOSPoller`,
+    wired in as the server's ``poller_class``.
+
+    Server config parameters:
+        ``port``: Serial port for the pump.
+        ``address``: Pump's RS-485 device address.
     """
 
-    def __init__(self, action_serv: Base):
-        """Open the serial connection and start status polling.
+    def __init__(self, config: dict = {}):
+        """Store config; the serial connection is opened in :meth:`connect`.
 
         Args:
-            action_serv: Action server providing config (``port``, ``address``)
-                and the live buffer for status publication.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        # self.unified_db = UnifiedSampleDataAPI(self.base)
-        # self.bokehapp = None
+        super().__init__(config=config)
+        self.config_dict = self.config
 
-        # read pump addr and strings from config dict
-        self.com = serial.Serial(
-            port=self.config_dict["port"],
-            baudrate=9600,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.5,
-        )
-
-        self.aloop = asyncio.get_running_loop()
+        self.com = None
         self.polling = True
-        self.poll_signalq = asyncio.Queue(1)
-        self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
-        self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.last_state = "unknown"
 
-    async def start_polling(self):
-        """Signal the background polling loop to resume reading status.
+    def connect(self) -> DriverResponse:
+        """Open the serial connection to the pump.
 
-        Falls back to forcing ``self.polling = True`` if the signal queue
-        cannot be updated within two seconds.
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
         """
-        LOGGER.info("got 'start_polling' request, raising signal")
         try:
-            async with asyncio.timeout(2):
-                await self.poll_signalq.put(True)
-            while not self.polling:
-                LOGGER.warning("waiting for polling loop to start")
-                await asyncio.sleep(0.1)
-        except TimeoutError:
-            if self.poll_signalq.full():
-                self.poll_signalq.get_nowait()  # unsure if we should set polling directly, do normal put, or put_nowait
-            self.polling = True
-            LOGGER.warning(
-                "could not raise start signal, forcing polling loop to start"
+            self.com = serial.Serial(
+                port=self.config_dict["port"],
+                baudrate=9600,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.5,
             )
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def get_status(self) -> DriverResponse:
+        """Return whether the serial connection has been opened.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
+        """
+        if self.com is not None:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the serial connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close the underlying serial port."""
+        try:
+            if self.com is not None:
+                self.com.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        finally:
+            self.com = None
+        return response
+
+    def shutdown(self):
+        """Close the underlying serial port on server shutdown."""
+        self.disconnect()
+
+    async def start_polling(self):
+        """Resume background status polling (consulted by :class:`SIMDOSPoller`)."""
+        LOGGER.info("got 'start_polling' request")
+        self.polling = True
 
     async def stop_polling(self):
-        """Signal the background polling loop to pause.
-
-        Falls back to forcing ``self.polling = False`` if the signal cannot
-        be delivered within two seconds.
-        """
-        LOGGER.info("got 'stop_polling' request, raising signal")
-        try:
-            async with asyncio.timeout(2):
-                await self.poll_signalq.put(False)
-            while self.polling:
-                LOGGER.warning("waiting for polling loop to stop")
-                await asyncio.sleep(0.1)
-        except TimeoutError:
-            if self.poll_signalq.full():
-                self.poll_signalq.get_nowait()
-            self.polling = False
-            LOGGER.warning("could not raise start signal, forcing polling loop to stop")
-
-    async def poll_signal_loop(self):
-        """Forward polling start/stop signals from the queue to ``self.polling``."""
-        while True:
-            self.polling = await self.poll_signalq.get()
-            LOGGER.info("polling signal received")
+        """Pause background status polling so a raw command doesn't race the poller."""
+        LOGGER.info("got 'stop_polling' request")
+        self.polling = False
 
     def send(self, cmd: str) -> Optional[str]:
         """Send a framed command to the pump and return the first ACK payload.
@@ -288,56 +321,6 @@ class SIMDOS:
             state_dict[i] = (fault if bits[i] else "OK", bits[i])
         return state_dict
 
-    async def poll_sensor_loop(self, frequency: int = 10):
-        """Periodically read all status groups and publish to the live buffer.
-
-        Any detected fault flags trigger ``stop_action_task`` on every
-        executor registered on the action server.
-
-        Args:
-            frequency: Target polling rate in Hz.
-        """
-        LOGGER.info("polling background task has started")
-        waittime = 1.0 / frequency
-        lastupdate = 0
-        while True:
-            if self.polling:
-                status_dict = {}
-                for group, func in [
-                    ("operation", self.get_opstat),
-                    ("system", self.get_sysstat),
-                    ("run", self.get_runstat),
-                    ("dispense", self.get_dispstat),
-                    ("fault", self.get_faults),
-                ]:
-                    checktime = time.time()
-                    if checktime - lastupdate < waittime:
-                        # LOGGER.info("waiting for minimum update interval.")
-                        await asyncio.sleep(waittime - (checktime - lastupdate))
-
-                    resp_dict = func()
-                    # LOGGER.info(f"received status: {resp_dict}")
-                    for k, v in resp_dict.items():
-                        status_dict[f"{group}_{k}"] = v
-
-                    lastupdate = time.time()
-
-                await self.base.put_lbuf(status_dict)
-                # await asyncio.sleep(0.01)
-
-                faults = [
-                    fk
-                    for k, (fk, fv) in status_dict.items()
-                    if k.startswith("fault_") and fv != 0
-                ]
-                if faults:
-                    LOGGER.info(f"fault detected, stopping simdos executors")
-                    for executor in self.base.executors.values():
-                        executor.stop_action_task()
-
-            else:
-                await asyncio.sleep(0.05)
-
     def get_mode(self, retries: int = 5) -> Any:
         """Read the current pump mode, retrying up to ``retries`` times.
 
@@ -419,7 +402,7 @@ class SIMDOS:
                 LOGGER.info(f"could not validate {param.name} setpoint")
         return success
 
-    async def stop(self) -> bool:
+    async def stop_pump(self) -> bool:
         """Stop the pump (``KY0``); pauses polling around the command."""
         await self.stop_polling()
         success = False
@@ -429,7 +412,7 @@ class SIMDOS:
             success = True
         return success
 
-    async def start(self) -> bool:
+    async def start_pump(self) -> bool:
         """Start the pump (``KY1``); pauses polling around the command."""
         await self.stop_polling()
         success = False
@@ -459,9 +442,71 @@ class SIMDOS:
             success = True
         return success
 
-    def shutdown(self):
-        """Close the serial port."""
-        self.com.close()
+
+class SIMDOSPoller(DriverPoller):
+    """Background poller that reads all SIMDOS status groups each cycle."""
+
+    driver: SIMDOS
+
+    def get_data(self) -> DriverResponse:
+        """Read operation/system/run/dispense/fault status groups.
+
+        Rate-limits individual status-group queries to 0.1s apart (mirrors
+        the pre-migration ``poll_sensor_loop``'s per-group throttle at its
+        hardcoded ``frequency=10`` Hz), stops every executor registered on
+        the action server if a fault flag is detected (mirrors the
+        pre-migration fault sweep, which iterated the action server's
+        executors dict through the driver's old server-object reference;
+        here the same server object is reached via ``self._base_hook``),
+        and skips the read entirely while ``self.driver.polling`` is
+        ``False``.
+
+        Returns:
+            ``DriverResponse`` with ``data={f"{group}_{i}": (label, bit),
+            ...}`` for each status group and bit (identical key/value shape
+            to the pre-migration ``status_dict`` passed to ``put_lbuf``), or
+            an empty ``DriverResponse`` when polling is paused.
+        """
+        if not self.driver.polling:
+            return DriverResponse()
+        status_dict = {}
+        waittime = 0.1  # 10 Hz, mirrors pre-migration `frequency=10` default
+        lastupdate = 0.0
+        for group, func in [
+            ("operation", self.driver.get_opstat),
+            ("system", self.driver.get_sysstat),
+            ("run", self.driver.get_runstat),
+            ("dispense", self.driver.get_dispstat),
+            ("fault", self.driver.get_faults),
+        ]:
+            checktime = time.time()
+            if checktime - lastupdate < waittime:
+                time.sleep(waittime - (checktime - lastupdate))
+
+            resp_dict = func()
+            for k, v in resp_dict.items():
+                status_dict[f"{group}_{k}"] = v
+
+            lastupdate = time.time()
+
+        faults = [
+            fk
+            for k, (fk, fv) in status_dict.items()
+            if k.startswith("fault_") and fv != 0
+        ]
+        if faults:
+            LOGGER.info("fault detected, stopping simdos executors")
+            if self._base_hook is not None:
+                for executor in self._base_hook.executors.values():
+                    executor.stop_action_task()
+
+        if not status_dict:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=status_dict,
+        )
 
 
 class RunExec(Executor):
@@ -503,7 +548,7 @@ class RunExec(Executor):
         """Start the pump and resume background polling."""
         error = ErrorCodes.none
         self.start_time = time.time()
-        start_resp = await self.driver.start()
+        start_resp = await self.driver.start_pump()
         if not start_resp:
             LOGGER.info("could not start pump")
             error = ErrorCodes.cmd_error
@@ -516,14 +561,14 @@ class RunExec(Executor):
         elapsed_time = iter_time - self.start_time
         status = HloStatus.active
         if (elapsed_time > self.duration) and (self.duration > 0):
-            await self.driver.stop()
+            await self.driver.stop_pump()
             status = HloStatus.finished
         return {"error": ErrorCodes.none, "status": status}
 
     async def _manual_stop(self) -> dict:
         """Stop the pump in response to a manual stop request."""
         error = ErrorCodes.none
-        stop_resp = await self.driver.stop()
+        stop_resp = await self.driver.stop_pump()
         if not stop_resp:
             LOGGER.info("could not stop pump")
             error = ErrorCodes.cmd_error
