@@ -427,11 +427,12 @@ class AliCatMFC(HelaoDriver):
     #     return resp
 
     async def async_shutdown(self):
-        """Stop polling and close all valves prior to driver shutdown."""
+        """Stop polling, close all valves, then close every serial connection."""
         await self.stop_polling()
         await asyncio.sleep(0.5)
         LOGGER.info("stopping MFC flows")
         await self.hold_valve_closed()
+        self.disconnect()
 
     async def estop(self, *args, **kwargs) -> bool:
         """Close every valve and return True to indicate the estop was handled."""
@@ -440,8 +441,8 @@ class AliCatMFC(HelaoDriver):
         return True
 
     def shutdown(self):
-        """Close every Alicat serial connection. Invoked on action-server shutdown."""
-        self.disconnect()
+        """No-op; `async_shutdown` handles safe-state-then-disconnect ordering."""
+        return None
 
 
 class AliCatMFCPoller(DriverPoller):
