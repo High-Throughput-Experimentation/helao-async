@@ -47,6 +47,9 @@ from helao.core.tests.unit_test_orch_status_sync import orch_status_sync_unit_te
 from helao.core.tests.unit_test_orch_queues import orch_queues_unit_test
 from helao.core.tests.unit_test_orch_unpack import orch_unpack_unit_test
 from helao.core.tests.unit_test_orch_lifecycle import orch_lifecycle_unit_test
+from helao.core.tests.unit_test_orch_dispatch_policy import (
+    orch_dispatch_policy_unit_test,
+)
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
 
@@ -77,6 +80,7 @@ TESTS = [
     ("orch_queues", orch_queues_unit_test),
     ("orch_unpack", orch_unpack_unit_test),
     ("orch_lifecycle", orch_lifecycle_unit_test),
+    ("orch_dispatch_policy", orch_dispatch_policy_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
 
