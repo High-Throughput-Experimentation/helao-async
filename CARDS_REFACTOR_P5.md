@@ -7,9 +7,13 @@
 **Status:** DESIGN PLAN (no code yet). All line references verified on branch
 `feat/cards-refactor` (2026-07-11); `helao/core/servers/orch.py` is 2622 lines at HEAD
 (the audit's "2545 lines" predates the P1/P3 and e-stop-artifact commits that landed on
-this branch). Framework references are read from branch `feat/framework-scaffold`
-(`helao/framework/**` — present on disk only as `__pycache__` on this branch; the source
-is **not merged** into `unstable` or `feat/cards-refactor`).
+this branch).
+
+**Decision (2026-07-11, user):** execute the **full in-place decomposition (option a)**,
+including inversion of the dispatch state-machine into a dedicated collaborator. Legacy
+`helao/core` / `helao/deploy` is the **permanent** target of the CARDS program; CARDS
+improves this code in place, full stop. All scoping in this plan follows from that single
+premise.
 
 ---
 
@@ -20,26 +24,28 @@ the dispatch state-machine, network subscription/heartbeats, global-status inges
 broadcast, e-stop policy, queue persistence, and composition-root wiring. The worst single
 function is `loop_task_dispatch_action` (`orch.py:1012-1325`, ~313 lines).
 
-**Strategic finding (Section 2):** the framework rewrite already produced the clean
-decomposition of this exact orchestrator (pure FSM in `helao/framework/domain/orchestration.py`,
-async shell in `app/orch_api.py`, adapters, ports). Re-deriving that decomposition inside
-legacy `orch.py` would be double work on code slated for replacement. But the framework is
-unmerged, and the hte production migration is **paused with an open blocker** — legacy `Orch`
-remains the *only* production orchestrator for an unbounded window, and every hotfix during
-that window lands in this file.
+**Plan:** decompose all extractable concerns into cohesive collaborators under
+`helao/core/servers/` — `RunQueues` (queue CRUD), `QueuePersister` (pickle export/import),
+`ServerMonitor` (subscription + heartbeats), `StatusIngester` (status ingestion + WS
+broadcast), pure global-param fold functions, `unpack`/expansion helpers, `RunLifecycle`
+(sequence/experiment close-out), and — the centerpiece and highest-risk stage —
+`DispatchPolicy` + `DispatchRunner`, a proper state-machine inversion of
+`dispatch_loop_task` / `loop_task_dispatch_{sequence,experiment,action}`. E-stop (cluster E)
+stays in `orch.py` for P5 (freshly redesigned + production-verified safety code; see §3.5).
+`Orch` becomes a thin composition root: it constructs the collaborators, keeps every state
+attribute at its current name, and keeps every public method as a thin delegator, so the
+frozen external surface (§1.1) and pickle compatibility (§3.3) are preserved by construction.
 
-**Recommendation: option (b) minimal-seams, framed as (d) a cutover bridge.** Extract only
-the three leaf collaborators with narrow interfaces — persistence, network monitors,
-status-ingestion/broadcast — using the in-tree `base_api.py` free-function style (attribute
-layout untouched, methods become thin delegators), plus a *clarity-only* in-file decomposition
-of `loop_task_dispatch_action` into named helpers with pure global-param fold functions
-mirroring `framework/domain/expansion.py`. **Explicitly cancel** the full dispatch-FSM
-inversion for legacy: that Separation win is realized by adopting the framework, not by
-refactoring the same semantics twice. The dispatch-decision golden-master built to verify P5
-doubles as the acceptance suite for the eventual hte framework cutover.
+Staging is strictly risk-ordered (S0 baseline → pure functions → persistence → monitors →
+status sync → queue CRUD → unpack/lifecycle → in-file dispatch decomposition → FSM inversion
+→ sweep), one commit + Opus review per stage, each stage bootable and independently
+revertable.
 
 P5 is **fully Linux-verifiable** (unlike P4's hardware waves): every gate — unit suite, e2e
-OERSIM run-tree diff, dispatch-trace golden master — runs on this box.
+OERSIM run-tree byte-invisibility diff (plus a `--restore` queues.pck variant), and a
+dispatch-decision golden master — runs on this box. The golden master is a pure
+**behavior-preservation gate**: the recorded decision trace must be byte-identical before
+and after every stage.
 
 ---
 
@@ -59,7 +65,7 @@ reach directly into the instance:
   backend (already decoupled from Bokeh internals by the earlier operator-queue work); calls
   queue CRUD, `start/stop/skip`, list/get methods.
 - `helao/deploy/hte/servers/orchestrator/async_orch2.py` — the only deployment module that
-  imports the class; `test` runners use the framework `MicroOrch`, not legacy `Orch`.
+  imports the class.
 - **Private deployments: zero direct `Orch`/`OrchAPI` consumers** (verified by grep across
   all nested repos, 2026-07-11). P5 is parent-repo-only; no nested-repo commits.
 - `Base` (superclass) supplies `aiolock`, `put_lbuf`, `write_seq`/`write_exp`, `helaodirs`,
@@ -67,18 +73,20 @@ reach directly into the instance:
 
 ### 1.2 Concern clusters (method inventory, line refs at HEAD)
 
-| # | Cluster | Methods (orch.py lines) | ~LOC | Coupling notes |
-|---|---------|-------------------------|-----:|----------------|
-| **A** | **Queue CRUD & composition** | `register_obj_uuid` :250, `register_action_uuid` :269, `track_action_uuid` :273; `_prep_sequence_meta` :1832, `_ensure_run_id` :1845, `_resolve_active_run_id` :1855; `add_sequence` :1862, `add_split_sequences` :1873, `prepend_sequences` :1943; `_rebuild_{sequence,experiment,action}_dq` + `move_/remove_` ×6 :1964-2034; `add_experiment` :2036; `list_*`/`get_*`/`drop_experiment_inds` :2081-2138; `supplement_error_action` :2140, `replace_action` :2169, `append_action` :2202; `clear_{sequences,experiments,actions}` :1817-1830 | ~500 | Pure deque/state ops; heavily reached-into by `orch_api`/operator backend |
-| **B** | **Dispatch state-machine** (expansion + run lifecycle) | `wait_for_interrupt` :277; `unpack_sequence` :599, `get_sequence_codehash` :611, `seq_unpacker` :615, `verify_plate_in_params` :629; `loop_task_dispatch_sequence` :661-801 (~140), `loop_task_dispatch_experiment` :803-1010 (~207), **`loop_task_dispatch_action` :1012-1325 (~313)**, `dispatch_loop_task` :1327-1493 (~166); `orch_wait_for_all_actions` :1495; `start` :1512, `start_loop` :1528, `stop_loop` :1575, `skip` :1754, `stop` :1767, `intend_{skip,stop,estop,none}` :1762-1797; `finish_active_sequence` :2224-2281, `finish_active_experiment` :2283-2371, `write_active_{experiment_exp,sequence_seq}` :2373-2385; `start_wait` :2407, `dispatch_wait_task` :2411 | ~1250 | The load-bearing core. Mutates deques, `globalstatusmodel`, `global_params`, `active_*`; acquires `aiolock`; talks to `async_action_dispatcher`, `HelaoSyncer.to_s3`, `PLATE_API`, postprocessors, `move_dir` |
-| **C** | **Status ingestion + WS broadcast** | `update_status` :458-576 (~118), `update_nonblocking` :366-437, `clear_nonblocking` :439-456; `ws_globstat` :578-592, `globstat_broadcast_task` :594-597 | ~230 | Holds `aiolock`; mutates `globalstatusmodel`, `nonblocking`, histories; feeds `interrupt_q` + `globstat_q`; can trigger `estop_loop` |
-| **D** | **Network subscription & heartbeats** | `subscribe_all` :311-364, `active_action_monitor` :2440-2463, `ping_action_servers` :2465-2513, `action_server_monitor` :2515-2519 | ~160 | Reads `world_cfg["servers"]`; `async_private_dispatcher`/`endpoints_available`; writes `init_success`, `status_summary`; calls `self.stop()` |
-| **E** | **E-stop policy & finalization** | `estop_loop` :1543, `estop_actions(switch)` :1579, `estop_finish_active` :1625, `_estop_promote_all` :1699, `_estop_promote` :1706, `clear_estop` :1799, `clear_error` :1810 | ~270 | Recently redesigned (no fabricated artifacts; guarded transitions; co-located child-dir race guard). Production-critical, freshly verified |
-| **F** | **Queue persistence** | `export_queues` :2521-2555, `import_queues` :2557-2622; export call sites `dispatch_loop_task` :1481, `shutdown` :2387-2405 | ~120 | Pickle of deques + active/last exp/seq + `globalstatusmodel` + histories to `STATES/queues.pck`; consumed by `--restore` / `restore_queues_on_startup` and hot-reload |
-| **G** | **Composition root & task wiring** | `__init__` :97-194, `exception_handler` :196, `myinit` :205-235 | ~140 | Spawns the 4 background tasks + Base tasks; imports exp/seq libs; optional `HelaoSyncer` |
+The final column maps each cluster to its target collaborator from §3.2.
+
+| # | Cluster | Methods (orch.py lines) | ~LOC | Coupling notes | Target (§3.2) |
+|---|---------|-------------------------|-----:|----------------|---------------|
+| **A** | **Queue CRUD & composition** | `register_obj_uuid` :250, `register_action_uuid` :269, `track_action_uuid` :273; `_prep_sequence_meta` :1832, `_ensure_run_id` :1845, `_resolve_active_run_id` :1855; `add_sequence` :1862, `add_split_sequences` :1873, `prepend_sequences` :1943; `_rebuild_{sequence,experiment,action}_dq` + `move_/remove_` ×6 :1964-2034; `add_experiment` :2036; `list_*`/`get_*`/`drop_experiment_inds` :2081-2138; `supplement_error_action` :2140, `replace_action` :2169, `append_action` :2202; `clear_{sequences,experiments,actions}` :1817-1830 | ~500 | Pure deque/state ops; heavily reached-into by `orch_api`/operator backend | `RunQueues` (`orch_queues.py`) — S5 |
+| **B** | **Dispatch state-machine** (expansion + run lifecycle) | `wait_for_interrupt` :277; `unpack_sequence` :599, `get_sequence_codehash` :611, `seq_unpacker` :615, `verify_plate_in_params` :629; `loop_task_dispatch_sequence` :661-801 (~140), `loop_task_dispatch_experiment` :803-1010 (~207), **`loop_task_dispatch_action` :1012-1325 (~313)**, `dispatch_loop_task` :1327-1493 (~166); `orch_wait_for_all_actions` :1495; `start` :1512, `start_loop` :1528, `stop_loop` :1575, `skip` :1754, `stop` :1767, `intend_{skip,stop,estop,none}` :1762-1797; `finish_active_sequence` :2224-2281, `finish_active_experiment` :2283-2371, `write_active_{experiment_exp,sequence_seq}` :2373-2385; `start_wait` :2407, `dispatch_wait_task` :2411 | ~1250 | The load-bearing core. Mutates deques, `globalstatusmodel`, `global_params`, `active_*`; acquires `aiolock`; talks to `async_action_dispatcher`, `HelaoSyncer.to_s3`, `PLATE_API`, postprocessors, `move_dir` | split four ways: fold functions (`orch_global_params.py`, S1), unpack helpers (`orch_unpack.py`, S6), `RunLifecycle` (`orch_lifecycle.py`, S6), `DispatchPolicy`+`DispatchRunner` (`orch_dispatch.py`, S7-S8) |
+| **C** | **Status ingestion + WS broadcast** | `update_status` :458-576 (~118), `update_nonblocking` :366-437, `clear_nonblocking` :439-456; `ws_globstat` :578-592, `globstat_broadcast_task` :594-597 | ~230 | Holds `aiolock`; mutates `globalstatusmodel`, `nonblocking`, histories; feeds `interrupt_q` + `globstat_q`; can trigger `estop_loop` | `StatusIngester` (`orch_status_sync.py`) — S4 |
+| **D** | **Network subscription & heartbeats** | `subscribe_all` :311-364, `active_action_monitor` :2440-2463, `ping_action_servers` :2465-2513, `action_server_monitor` :2515-2519 | ~160 | Reads `world_cfg["servers"]`; `async_private_dispatcher`/`endpoints_available`; writes `init_success`, `status_summary`; calls `self.stop()` | `ServerMonitor` (`orch_monitor.py`) — S3 |
+| **E** | **E-stop policy & finalization** | `estop_loop` :1543, `estop_actions(switch)` :1579, `estop_finish_active` :1625, `_estop_promote_all` :1699, `_estop_promote` :1706, `clear_estop` :1799, `clear_error` :1810 | ~270 | Recently redesigned (no fabricated artifacts; guarded transitions; co-located child-dir race guard). Production-critical, freshly verified | stays in `orch.py` (P5); P5b candidate (§3.5, OQ-7) |
+| **F** | **Queue persistence** | `export_queues` :2521-2555, `import_queues` :2557-2622; export call sites `dispatch_loop_task` :1481, `shutdown` :2387-2405 | ~120 | Pickle of deques + active/last exp/seq + `globalstatusmodel` + histories to `STATES/queues.pck`; consumed by `--restore` / `restore_queues_on_startup` and hot-reload | `QueuePersister` (`orch_persist.py`) — S2 |
+| **G** | **Composition root & task wiring** | `__init__` :97-194, `exception_handler` :196, `myinit` :205-235 | ~140 | Spawns the 4 background tasks + Base tasks; imports exp/seq libs; optional `HelaoSyncer` | stays in `orch.py` — becomes the *only* substantive content besides E |
 
 Module-level: `sanitize_sequence_label` :66, `PLATE_API = HTEPlateAPI()` :77 (module-global
-service handle used by cluster B's plate verification).
+service handle used by cluster B's plate verification — relocation rule in §3.4).
 
 **Worst offenders (Clarity):** `loop_task_dispatch_action` :1012-1325 — one function that
 (1) applies loop intent (stop/skip/estop), (2) implements all five `ActionStartCondition`
@@ -89,17 +97,25 @@ the action, (5) dispatches under `aiolock` with estop re-check + failure→pause
 Second worst: `loop_task_dispatch_experiment` :803-1010 (~207 lines, expansion + process-group
 bookkeeping + S3 upload + plate gate).
 
+**Shared-state hazards verified for the collaborator design (§3.3):**
+- `import_queues` **reassigns** `globalstatusmodel`, `active_*`, `last_*` (payload dict →
+  attributes) while *appending in place* to the deques.
+- `loop_task_dispatch_experiment` **reassigns** `action_dq` (`orch.py:933`,
+  `self.action_dq = zdeque([])`).
+- Consequence: no collaborator may cache the *identity* of any shared mutable attribute at
+  construction; all shared state is resolved through the `orch` back-reference at call time.
+
 ### 1.3 Seams already laid by P1–P4 (what P5 consumes)
 
 - **P1 (`RunDir` + status literals):** `orch.py` imports `RunDir` (:41) and every status
   payload uses `HloStatus.<member>.value` (:677, :693, :863, :879, :1209, :2256, :2267,
   :2301, :2358) — extracted modules inherit zero magic strings.
 - **P3 (Domain Integrity):** guarded lifecycle transitions (`guarded_append`/`guarded_replace`
-  from `helao.core.models.status_transitions`, used at :1643-1651) mean extracted e-stop/finish
-  code cannot silently produce contradictory statuses; the typed-config injection seam
-  (`server_api.py:71` `helao_cfg`) and the discriminated sample union reduce what extracted
-  modules must know about raw dicts; typed action params + `StopCondition` enum (pilot,
-  commit 3dfac0d0) firm up the sim experiments the e2e gate drives.
+  from `helao.core.models.status_transitions`, used at :1643-1651) mean extracted
+  finish/close-out code cannot silently produce contradictory statuses; the typed-config
+  injection seam (`server_api.py:71` `helao_cfg`) and the discriminated sample union reduce
+  what extracted modules must know about raw dicts; typed action params + `StopCondition`
+  enum (pilot, commit 3dfac0d0) firm up the sim experiments the e2e gate drives.
 - **P3 verification artifacts (`.omc/artifacts/p3/`):** `run_e2e.sh` (deterministic
   ORCH+CPSIM+GPSIM OERSIM run), `normalize_runs_tree.py`, `compare_runs.py` (3-part
   byte-invisibility contract), `import_smoke.py`, `corpus_replay.py` — P5's primary gate
@@ -108,209 +124,259 @@ bookkeeping + S3 upload + plate gate).
   extraction cannot break driver back-references; the PAL call-trace golden-master
   (`helao/deploy/hte/tests/test_pal_golden_master.py`) is the proven template for the
   dispatch-trace harness in §5.3.
+- **Existing enums:** `OrchStatus` / `LoopStatus` / `LoopIntent` already live in
+  `helao/core/models/orchstatus.py` (:8, :24, :40) — the dispatch FSM (§3.6) consumes these
+  as its state alphabet; no new enums are needed for loop state.
 
 ---
 
-## 2. The strategic question: is an in-place split of legacy `orch.py` worth doing at all?
+## 2. Decision
 
-The framework rewrite (`helao/framework/`, branch `feat/framework-scaffold`) **already
-decomposed this orchestrator**, with the same semantics, into exactly the shape a P5 full
-split would target:
-
-| Framework module | Role | Legacy counterpart in `orch.py` |
-|---|---|---|
-| `domain/orchestration.py` (1533 ln) | **Pure FSM**: `OrchState` dataclass + pure functions `decide_next`, `apply_intent`, `on_status_update`, `dispatch_sequence/experiment`, queue CRUD as pure state transforms | clusters A + B decision logic |
-| `domain/commands.py` | Command value objects (`DispatchAction`, `ExpandSequence`, `PersistMeta`, `EstopServers`, `BroadcastGlobalStatus`, `FinishExperiment/Sequence`, `MoveRunDir`) | implicit side effects scattered through B/E |
-| `domain/expansion.py` | `unpack_sequence/experiment`, `fold_in_global`, `fold_out_global` (pure) | :599-627, :707-724, :838-854, :1115-1129, :1281-1314 |
-| `domain/status.py` | pure global-status aggregation (`actions_idle`, `server_free`, `endpoint_free`, `merge_server_status`) | `GlobalStatusModel` queries in B/C |
-| `app/orch_api.py` (1723 ln) | `OrchDriver` async shell driving the FSM through ports (`OrchPorts`: transport/storage/clock/eventsink), heartbeat, `run_dispatch_loop` | clusters B(loop shell) + D + G |
-| `adapters/orch_status_subscriber.py` | WS status subscription adapter | cluster D (`subscribe_all`) + C ingestion |
-| `models/orchstatus.py` | `OrchStatus`/`LoopStatus`/`LoopIntent` enums | same enums (already shared) |
-| `runners/micro_orch.py` | in-process runner over the same FSM | no legacy counterpart (new capability) |
-
-That decomposition is *validated*: the `test` deployment runs on it (`deployment: framework`
-launcher path; framework suite ~1705 passing per migration notes), and an hte canary station
-has run it. So the honest question is not "how to split `Orch`" but **"who should own the
-Separation win — legacy or the framework?"**
-
-### The options
-
-**(a) Full in-place decomposition of legacy `orch.py`** (pure-FSM + command objects + ports,
-i.e. re-derive the framework shape inside `helao/core`).
-- *For:* maximal CARDS-Separation score on the code that is actually in production.
-- *Against:* it is a second implementation of work that already exists one branch over;
-  highest-risk change class (control-flow inversion) on the production orchestrator; every
-  hour spent here is an hour not spent unblocking the hte framework migration (paused
-  2026-07-06, open uvis4 blocker); and when the migration completes, this code is deleted —
-  the win is written off. **Double work, twice the review burden, transient payoff.**
-
-**(b) Minimal-seams split** — extract only the 2-3 leaf collaborators (persistence,
-status/broadcast, network monitors) + a clarity pass on the worst function; leave the
-dispatch state-machine's control flow in place.
-- *For:* ~70 % of P5's *practical* value (hotfix blast-radius reduction, testability of the
-  restore path and status ingestion, a <100-line dispatch core readable during incidents) at
-  ~25 % of the risk and effort; every stage is behavior-preserving and Linux-gated; keeps
-  `orch.py` the composition root so nothing external moves.
-- *Against:* CARDS-Separation for legacy improves only modestly (orch.py stays ~2.1 k lines;
-  the state-machine still owns its side effects). Honest scoring: Separation goes from
-  "weak where it counts" to "moderate", not "strong".
-
-**(c) Defer/cancel P5; put the effort into finishing the framework migration.**
-- *For:* zero double work; the Separation card is fixed *permanently* by adoption; the hte
-  migration is the stated direction and its remaining blockers (uvis4 startup hang, KMOTOR)
-  are where scarce attention has the most leverage.
-- *Against:* the migration is **gated on live hardware windows and unresolved blockers with
-  no committed end date** — pausing P5 means the production orchestrator keeps a 313-line
-  dispatch function and an untestable pickle-restore path for the entire window. The recent
-  history of this file (e-stop redesign, queue restore, operator queue backport — all
-  landed in the last weeks) shows it takes continuous production hotfixes; CARDS explicitly
-  warns that weak design + ongoing local edits = erosion. Cancelling P5 concedes erosion in
-  the highest-stakes file for an unbounded period.
-
-**(d) Treat the split as a bridge that de-risks the framework cutover.**
-- Not a separate scope — a *framing* of (b): choose extraction boundaries and names that
-  converge on the framework's (`fold_in_global`/`fold_out_global`, status-subscriber,
-  persistence port), and build the dispatch-decision golden-master (§5.3) so that the same
-  scripted scenarios that prove P5 behavior-preserving become the **acceptance suite for the
-  hte framework orchestrator** (run the trace harness against `OrchDriver` and diff decisions
-  against the legacy trace). That converts P5 effort from "refactoring code slated for
-  deletion" into "building the equivalence evidence the cutover needs anyway".
-
-### Recommendation
-
-**Adopt (b) executed under (d)'s framing. Explicitly cancel (a) — the full decomposition of
-legacy is superseded by framework adoption.** Rationale, ranked:
-
-1. **The production window is unbounded.** hte migration Wave 5 is paused with an open
-   blocker; legacy `Orch` is the sole production orchestrator until every hte station cuts
-   over. During that window it *will* be hotfixed. Minimal seams are cheap insurance.
-2. **Double-work is capped, not eliminated.** Stages S1-S3 extract ~510 lines of *shell*
-   code (pickle I/O, HTTP pings, WS plumbing) whose framework counterparts are adapters —
-   the extraction is mechanical, not a re-derivation of decision logic. The one place
-   framework logic is mirrored (`fold_in/out_global` as pure functions) is ~120 lines and
-   directly reduces the worst function.
-3. **The golden-master pays twice** (P5 gate now, cutover acceptance later).
-4. **P1-P4 already improved this file** (literals, guarded transitions, typed seams); the
-   remaining acute pain is concentrated exactly where (b) aims: the untested restore path,
-   the intertwined status/broadcast code, and `loop_task_dispatch_action`'s length.
-
-If the human's judgment is that the hte migration will resume and complete within ~1-2
-station cycles, drop to S1+S4 only (persistence + clarity pass) — see OQ-1.
+**Option (a) — full in-place decomposition — is the executed scope.** The user has directed
+maximum Separation on the production orchestrator: every extractable concern becomes a
+cohesive collaborator, *including* inversion of the dispatch state-machine, which is the
+highest-value and highest-risk piece. Alternatives (minimal seams, deferral) are closed;
+`helao/core` is the permanent home of this orchestrator and the only place the Separation
+win can be realized. The only concern deliberately left in `orch.py` besides the composition
+root is e-stop (cluster E), for the stability reasons argued in §3.5 — and that is a
+sequencing choice within option (a), not a scope reduction (OQ-7 schedules its extraction).
 
 ---
 
-## 3. Design (for the recommended option)
+## 3. Design — the full decomposition
 
-### 3.1 Extraction style: `base_api.py`-shaped free functions, not collaborator objects
+### 3.1 Constraints that shape every choice
 
-The audit's own reference pattern (`base_api.py` — "decomposed into small free functions
-instead of a fat class") is the right shape here, for three verified reasons:
+1. **Frozen external surface.** 117 `.orch.<attr>` reach-ins (§1.1) + bound-method
+   registration (`orch_api` registers `orch.update_status`, `orch.ws_globstat`, …; `myinit`
+   does `asyncio.create_task(self.<method>())`). Therefore: every state attribute stays on
+   `Orch` at its current name, and every current public method survives as a thin delegator
+   on `Orch`. Collaborators add structure *behind* the surface; nothing external moves.
+2. **Pickle safety.** `export_queues` pickles a dict of live model instances
+   (`GlobalStatusModel`, `Sequence`/`Experiment`/`Action`, deque contents) keyed by short
+   names (`active_exp`, `last_seq`, …). Rules: (i) no pickled *class* moves modules;
+   (ii) the payload dict's keys and value types are frozen; (iii) collaborators are never
+   part of the payload (they hold behavior and an `orch` reference, not payload state).
+   Under these rules a pck written before any stage imports after it, and vice versa.
+3. **Call-time state resolution.** Because `import_queues` and `orch.py:933` *reassign*
+   shared attributes (§1.2), collaborators hold exactly one reference — the `orch` instance —
+   and read `self.orch.<attr>` at call time. No collaborator caches `globalstatusmodel`, a
+   deque, or `global_params` at construction. This single rule makes reassignment-safe
+   sharing mechanical and reviewable by grep (§5.5).
+4. **Locking stays verbatim.** `aiolock` remains a `Base` attribute; every
+   `async with self.orch.aiolock` moves *inside* the moved body, byte-for-byte. No await is
+   added or removed in any extraction stage except S8, where the golden master (§5.3) is the
+   hard gate. Lock/queue ownership after P5: `aiolock` — acquired by `StatusIngester`
+   (ingestion) and `DispatchRunner` (dispatch critical section); `interrupt_q` — written by
+   `StatusIngester`/`ServerMonitor`/e-stop, read by `DispatchRunner`; `globstat_q` — written
+   by `StatusIngester`, drained by its own broadcast task. This map is documented in each
+   module docstring.
+5. **No behavior fixes ride along.** Known quirks are logged, not fixed (e.g.
+   `dispatch_loop_task:1467` compares a `LoopStatus` field against `OrchStatus.estopped`; it
+   behaves correctly only because both are `str` enums with value `"estopped"`. Normalizing
+   it is a one-line P5b follow-up, not part of a behavior-preserving pass).
 
-1. **State is shared, not partitionable.** `aiolock`, `interrupt_q`, `globstat_q`,
-   `globalstatusmodel`, `nonblocking`, the three deques, and `active_*` are each touched by
-   2+ clusters (e.g. `nonblocking` by C's `update_nonblocking` *and* B's
-   `finish_active_experiment`; `aiolock` by C's `update_status` *and* B's dispatch). A
-   collaborator object owning any of them would force either back-references (a new god-knot)
-   or a state-object migration — which is precisely the framework's `OrchState`, i.e. option (a).
-2. **117 external attribute reach-ins** (§1.1) freeze the attribute layout. Free functions
-   taking `orch` as the first argument leave every attribute where consumers expect it.
-3. **Pickle safety.** `export_queues` pickles live model instances (`GlobalStatusModel`,
-   `Sequence`/`Experiment`/`Action`, `DequeDict` contents). Moving *functions* is
-   pickle-invisible; moving *classes or attributes* is not.
+### 3.2 Collaborator map (SRP boundaries + names)
 
-Shape per extracted module (delegators keep bound-method identity for endpoint/WS
-registration and `asyncio.create_task(self.<method>)` wiring in `myinit`):
+All new modules live beside `orch.py` under `helao/core/servers/` (sibling-module style,
+matching `orch_api.py`; `orch.py` keeps its import path so `from helao.core.servers.orch
+import Orch` is untouched). Names are legacy-idiomatic — they describe what the code does in
+this codebase's vocabulary.
+
+| New module | Collaborator | Absorbs (from §1.2) | State touched (via `orch` ref) |
+|---|---|---|---|
+| `orch_global_params.py` | pure functions `apply_from_globals(params, from_global_map, global_params, *, logger_ctx)` and `collect_to_globals(result_action, global_params)` | the three duplicated fold-in blocks (:707-724 seq, :838-854 exp, :1115-1129 act) and the fold-out block (:1281-1314) | none (pure; caller passes dicts) |
+| `orch_persist.py` | `QueuePersister` | cluster F: `export_queues`, `import_queues` | deques, `active_*`/`last_*`, `globalstatusmodel`, histories (read for export, written by import) |
+| `orch_monitor.py` | `ServerMonitor` | cluster D: `subscribe_all`, `ping_action_servers`, `active_action_monitor`, `action_server_monitor` | `world_cfg`, `init_success`, `status_summary`, `interrupt_q`; calls `orch.stop()` |
+| `orch_status_sync.py` | `StatusIngester` | cluster C: `update_status`, `update_nonblocking`, `clear_nonblocking`, `ws_globstat`, `globstat_broadcast_task` | `aiolock`, `globalstatusmodel`, `nonblocking`, histories, `interrupt_q`, `globstat_q`; can trigger `orch.estop_loop` |
+| `orch_queues.py` | `RunQueues` | cluster A: all queue CRUD, uuid tracking, `_prep_sequence_meta`/run-id helpers, list/get/clear/move/remove/rebuild, `supplement_error_action`/`replace_action`/`append_action` | the three deques + uuid trackers (which **remain attributes on `Orch`**; see OQ-6) |
+| `orch_unpack.py` | free functions: `unpack_sequence`, `seq_unpacker`, `get_sequence_codehash`, `verify_plate_in_params`; hosts `PLATE_API` (§3.4) | cluster B's expansion helpers (:599-659) | none beyond what's passed in (near-pure; `PLATE_API` is the one service handle) |
+| `orch_lifecycle.py` | `RunLifecycle` | cluster B's close-out: `finish_active_sequence`, `finish_active_experiment`, `write_active_experiment_exp`, `write_active_sequence_seq`, `start_wait`/`dispatch_wait_task` | `active_*`/`last_*`, deques (via `RunQueues`), `nonblocking`, syncer handoff, `move_dir`, `write_seq`/`write_exp` |
+| `orch_dispatch.py` | `DispatchPolicy` (pure decisions) + `DispatchRunner` (async shell) + a small closed union of step dataclasses | cluster B's loop: `dispatch_loop_task`, `loop_task_dispatch_{sequence,experiment,action}`, `wait_for_interrupt`, `orch_wait_for_all_actions`, `start_loop`/`stop_loop` internals, intent application | everything the loop touches today, always via `orch.` at call time; §3.6 |
+
+`orch.py` after P5 = module-level `sanitize_sequence_label` + `Orch` containing: `__init__`
+(constructs the eight collaborators, wires state attributes exactly as today),
+`exception_handler`, `myinit` (spawns the same four background tasks through delegators),
+cluster E (e-stop, unchanged), and ~75 one-to-three-line delegator methods. Estimated
+~800-900 lines (from 2622); ~1700+ lines relocated into eight focused, unit-testable modules.
+
+### 3.3 Delegator + pickle mechanics (how the frozen surface survives)
 
 ```python
-# helao/core/servers/orch_persist.py  (new)
-"""Queue persistence for the legacy orchestrator (pickle export/import)."""
-def export_queues(orch, timestamp_pck: bool = False) -> str: ...   # body moved verbatim
-def import_queues(orch, pck_path: Optional[str] = None) -> str: ...
+# orch.py — composition root (S2 example; identical shape for every collaborator)
+class Orch(Base):
+    def __init__(self, app):
+        ...existing attribute setup, unchanged...
+        self.queue_persister = QueuePersister(self)
+        self.status_ingester = StatusIngester(self)
+        ...
 
-# orch.py — Orch keeps thin delegators (public surface unchanged)
-def export_queues(self, timestamp_pck: bool = False) -> str:
-    return orch_persist.export_queues(self, timestamp_pck=timestamp_pck)
+    def export_queues(self, timestamp_pck: bool = False) -> str:
+        return self.queue_persister.export_queues(timestamp_pck=timestamp_pck)
+
+    async def update_status(self, actionservermodel=None):
+        return await self.status_ingester.update_status(actionservermodel)
 ```
 
-### 3.2 Target modules (SRP), scope IN
+- Delegators keep bound-method identity semantics for endpoint/WS registration and
+  `asyncio.create_task(self.<method>())` in `myinit` — `orch_api.py` and the operator
+  backend see a class whose API is unchanged by construction.
+- The new instance attributes (`queue_persister`, `status_ingester`, …) are additive;
+  `export_queues` builds its payload dict explicitly (it does not pickle `self`), so extra
+  attributes cannot leak into `queues.pck`. Verified by the S0 fixture + S2 cross-version
+  test (§5.1).
+- Collaborators never import `helao.core.servers.orch` (import-cycle grep gate, §5.5); they
+  import models/helpers and receive the orch instance by injection.
 
-| New module (under `helao/core/servers/`) | Moves (from §1.2) | Framework counterpart (naming convergence) |
-|---|---|---|
-| `orch_persist.py` | cluster F: `export_queues`, `import_queues` | `ports/storage.py` + `PersistMeta` command |
-| `orch_monitor.py` | cluster D: `subscribe_all`, `ping_action_servers`, `active_action_monitor`, `action_server_monitor` | `adapters/orch_status_subscriber.py` + `OrchDriver._heartbeat_*`; reuse `domain/orchestration.pingable_servers`/`parse_status_response` shapes |
-| `orch_status_sync.py` | cluster C: `update_status`, `update_nonblocking`, `clear_nonblocking`, `ws_globstat`, `globstat_broadcast_task` | `on_status_update`/`on_nonblocking` + `BroadcastGlobalStatus` |
-| `orch_global_params.py` | **new pure functions** `fold_in_global(params, from_global_map, global_params, *, logger_ctx)` and `fold_out_global(result_action, global_params)` extracted from the three duplicated fold blocks (:707-724 seq, :838-854 exp, :1115-1129 act) and the fold-out block (:1281-1314) | `domain/expansion.fold_in_global` / `fold_out_global` (same names, same split) |
+### 3.4 Module-global relocation rule
 
-Plus **in-file** clarity decomposition (no new module — these helpers mutate too much shared
-state to be honest free functions):
+`PLATE_API = HTEPlateAPI()` (:77) moves to `orch_unpack.py` (its only substantive consumer);
+`orch.py` re-imports it (`from helao.core.servers.orch_unpack import PLATE_API`) so the
+existing patch point `helao.core.servers.orch.PLATE_API` keeps working for tests and any
+out-of-tree monkeypatching. `sanitize_sequence_label` stays in `orch.py` (used by cluster-A
+code paths that remain reachable through `RunQueues`, which imports it — acceptable
+one-direction import).
 
-`loop_task_dispatch_action` (:1012-1325) becomes an ~40-line coordinator calling private
-methods, cut on the seams the function already exhibits:
+### 3.5 E-stop (cluster E): leave in `orch.py` for P5 — justified
 
-| New private method | Current lines | Behavior |
-|---|---|---|
-| `_apply_loop_intent_before_dispatch()` | :1030-1051 | stop/skip/estop intent handling; returns "handled" sentinel |
-| `_wait_for_start_condition(A)` | :1058-1111 | the five `ActionStartCondition` wait loops (each an inner `while` over `wait_for_interrupt`) |
-| `_stage_action_for_dispatch(A)` | :1115-1157 | fold-in (via `orch_global_params`), run_id, submit-order counters, `init_act` |
-| `_dispatch_action_locked(A)` | :1159-1261 | the `aiolock` block: estop re-check, `async_action_dispatcher`, failure→pause→requeue, self-registration into `globalstatusmodel` (active + non-active branches) |
-| `_record_dispatch_result(A, result_actiondict)` | :1263-1314 | model validation, error→`estop_loop`, fold-out (via `orch_global_params`) |
+Extract-or-leave decision: **leave**, for P5.
 
-Same pass, same PR, `loop_task_dispatch_experiment` (:803-1010) gets the identical
-treatment (`_stage_experiment`, `_expand_experiment_actions` (:906-971), `_upload_exp_meta_s3`
-(:979-991), plate-gate helper shared with the sequence path).
+- `estop_finish_active` / `_estop_promote*` / `clear_estop` were redesigned within the last
+  month (no fabricated artifacts, guarded transitions via `status_transitions`, co-located
+  child-dir race guard) and are **production-verified**. Churning freshly-stabilized
+  safety-critical code for layout points is the worst risk/benefit trade in this file.
+- E-stop is *invoked from* three collaborators (`StatusIngester` on error status,
+  `DispatchRunner` on dispatch failure, `ServerMonitor` indirectly via `stop()`), so during
+  P5 it is safest as a stable method set on the shared `orch` object all three already hold.
+- It is already the most cohesive non-A cluster (~270 lines, 7 methods, clear entry points).
 
-### 3.3 Scope OUT (explicit non-goals, with reasons)
+After the S8 inversion has soaked in production for one station cycle, extracting cluster E
+into `orch_estop.py` (`EstopController`) is a mechanical S2-style move — scheduled as the
+first P5b item (OQ-7). This is sequencing within option (a), not scope reduction.
 
-- **No FSM inversion.** `dispatch_loop_task`'s control flow, the deques-as-state, and the
-  interrupt-queue protocol stay exactly as they are. That redesign exists and is tested —
-  in the framework. (Cancels the master plan's implied "dispatch state-machine last" stage:
-  the state-machine is *never* extracted from legacy.)
-- **No queue-CRUD extraction (cluster A).** It is already the most cohesive cluster, is the
-  operator backend's primary touch surface, and moving it buys no incident-time clarity.
-- **No e-stop extraction (cluster E).** `estop_finish_active`/`_estop_promote*` were
-  redesigned and production-verified within the last month (guarded transitions, child-dir
-  race guard). Churning freshly-stabilized safety code for layout points is a bad trade.
-  `estop_actions(switch: bool)` flag-arg cleanup (audit Clarity finding) is deferred with it.
-- **No `Active._finish` decomposition** (`base.py`, ~221 lines — mentioned in the master
-  plan's P5 sketch). Different file, different blast radius (every action server, not just
-  orchestrators); decide separately (OQ-4).
-- **No behavior fixes.** Known quirks ride along unchanged (e.g. `dispatch_loop_task:1467`
-  compares `loop_state != OrchStatus.estopped` — a `LoopStatus` field against an
-  `OrchStatus` member; it happens to behave correctly only because both are `str` enums with
-  the value `"estopped"`. Normalizing it to `LoopStatus.estopped` is a P5b/one-line follow-up,
-  not part of a behavior-preserving pass. Log it, don't fix it).
+### 3.6 The dispatch state-machine inversion (S7 + S8) — the centerpiece
 
-### 3.4 Dependency-injection posture
+Today the FSM is implicit: `dispatch_loop_task` (:1327-1493) is a `while` loop whose state
+lives in `loop_state` (`LoopStatus`), `loop_intent` (`LoopIntent`), the relative fill of the
+three deques, and `globalstatusmodel` queries, with transitions buried inside three
+100-300-line `loop_task_dispatch_*` bodies that interleave decisions with side effects
+(HTTP dispatch, file writes, S3 upload, deque mutation, status registration).
 
-Injection stays at the `Base`/config seams P3 built (`helao_cfg`, `server_params`); the
-extracted free functions receive everything through the `orch` argument. This is deliberate:
-introducing constructor-injected collaborator objects into `Orch.__init__` would change
-pickle/`vars()` surface and add a second wiring pattern to a class the framework will retire.
-`orch.py` remains the composition root; `myinit` (:205-235) still owns all task spawning.
+The inversion separates **deciding** from **doing**:
+
+**`DispatchPolicy` (pure).** A class of pure functions over a read-only snapshot:
+
+```python
+@dataclass(frozen=True)
+class DispatchSnapshot:          # built by the runner, under the same read points as today
+    loop_state: LoopStatus
+    loop_intent: LoopIntent
+    n_seqs: int; n_exps: int; n_acts: int
+    head_action_start_condition: Optional[ActionStartCondition]
+    endpoint_free: bool; server_free: bool; actions_idle: bool   # globalstatusmodel queries
+    active_experiment_present: bool; active_sequence_present: bool
+    step_thru_flags: ...        # existing step-thru booleans, verbatim
+
+class DispatchPolicy:
+    def next_step(self, snap: DispatchSnapshot) -> DispatchStep: ...
+    def apply_intent(self, snap: DispatchSnapshot) -> Optional[DispatchStep]: ...
+```
+
+`DispatchStep` is a small closed union of dataclasses naming what the loop can do next —
+`LaunchAction`, `PopExperiment`, `PopSequence`, `RequeueActionFront`, `PauseLoop(reason)`,
+`CloseOutExperiment`, `CloseOutSequence`, `AwaitInterrupt(predicate_spec)`, `IdleWait`,
+`ExitLoop(reason)`. The five `ActionStartCondition` wait loops become `AwaitInterrupt` steps
+whose predicate spec the policy owns (which condition, against which server/endpoint) and
+whose *awaiting* the runner performs — the policy never blocks.
+
+**`DispatchRunner` (async shell).** Owns the loop task and all effects:
+
+- builds snapshots (reading `orch.` state at the exact points the current code reads it —
+  same lock discipline, same ordering);
+- executes steps: `async_action_dispatcher` calls, the `aiolock` dispatch critical section
+  with estop re-check and failure→pause→requeue, `globalstatusmodel` self-registration
+  (active and non-active branches), returned-model validation and error→`orch.estop_loop`,
+  fold-in/fold-out via `orch_global_params`, run_id/submit-order stamping and `init_act`,
+  experiment expansion via `orch_unpack` + process-group bookkeeping + `HelaoSyncer.to_s3`
+  + plate gate, close-out via `RunLifecycle`, mid-loop `export_queues` (:1481 call site);
+- performs all `wait_for_interrupt` awaits and interrupt-queue draining.
+
+**What stays on `Orch` (delegators):** `start`, `start_loop`, `stop_loop`, `stop`, `skip`,
+`intend_{skip,stop,estop,none}`, `wait_for_interrupt`, `orch_wait_for_all_actions` — the
+operator backend and `orch_api` call these today and must keep working unmodified.
+`loop_state`/`loop_intent` remain `Orch` attributes (reach-ins + pickle histories), mutated
+only through runner/intent methods.
+
+**Two-stage landing (risk containment):**
+- **S7 (in-file extract-method, no move, no inversion):** `loop_task_dispatch_action`
+  becomes an ~40-line coordinator over five private methods cut on the seams the function
+  already exhibits: `_apply_loop_intent_before_dispatch` (:1030-1051),
+  `_wait_for_start_condition` (:1058-1111), `_stage_action_for_dispatch` (:1115-1157),
+  `_dispatch_action_locked` (:1159-1261), `_record_dispatch_result` (:1263-1314). Same pass:
+  `loop_task_dispatch_experiment` → `_stage_experiment`, `_expand_experiment_actions`
+  (:906-971), `_upload_exp_meta_s3` (:979-991), plate-gate helper shared with the sequence
+  path. Golden master byte-identical.
+- **S8 (the inversion):** the S7 helpers migrate into `DispatchRunner` effect methods; the
+  decision logic distilled out of them becomes `DispatchPolicy`; `dispatch_loop_task`'s
+  `while` body becomes `snap = self._snapshot(); step = policy.next_step(snap); await
+  self._execute(step)`. Golden master byte-identical — this is the single hardest gate in
+  the whole CARDS program and the reason S8 is last.
+
+The pure `DispatchPolicy` finally makes the dispatch *decision table* unit-testable: the
+scenario matrix in §5.3 gains direct policy-level tests (snapshot in → step out) on top of
+the end-to-end trace equality.
+
+### 3.7 Scope OUT (explicit non-goals, with reasons)
+
+- **No e-stop extraction in P5** (§3.5; first P5b item, OQ-7).
+- **No `Active._finish` decomposition** (`base.py`, ~221 lines). Different file, different
+  blast radius (every action server, not just orchestrators); decide separately (OQ-2).
+- **No `orch_api.py` internal cleanup** (its duplicate `WaitExec` :883 / `checkcond` :929
+  and general shape are P5b/OQ-3 material; P5 must not grow its own surface area).
+- **No behavior fixes** (§3.1 rule 5).
+- **No config, wire-format, or data-format changes of any kind** — this is what makes
+  post-merge rollback trivially safe (§6).
+
+### 3.8 Dependency-injection posture
+
+Collaborators are constructed inside `Orch.__init__` with the orch back-reference —
+injection stays at the `Base`/config seams P3 built (`helao_cfg`, `server_params`); no new
+wiring pattern, no config keys, no launcher changes. `orch.py` remains the composition root;
+`myinit` (:205-235) still owns all task spawning (now via delegators). Test construction
+uses the same `Orch.__new__` + attribute-fixture bypass the golden master uses (§5.3), plus
+direct construction of individual collaborators with a fake orch for unit tests — the
+collaborator boundary is exactly what makes those unit tests possible for the first time.
 
 ---
 
 ## 4. Staging (ordered, each stage independently bootable + committable)
 
-Risk order: pure-addition first, persistence (cold path) next, monitors (background, idle-safe)
-next, status ingestion (hot path) next, dispatch clarity pass (hottest) last.
+Risk order: evidence first; pure-addition next; persistence (cold path); monitors
+(background, idle-safe); status ingestion (hot path, verbatim move); queue CRUD (wide but
+shallow); unpack + lifecycle (prepares the loop); in-file dispatch decomposition; the FSM
+inversion **last**, as the highest-risk stage with every gate warmed up; sweep.
 
 | Stage | Content | Why this order | Boot-safety argument |
 |---|---|---|---|
-| **S0** | Baseline capture: unit suite, ×2 e2e OERSIM runs (`run_e2e.sh baseline`, `baseline2` — establishes the noise floor), dispatch-trace golden master recorded (§5.3), `import_smoke.py` snapshot, export/import round-trip fixture (`queues.pck` produced by current code, checked into `.omc/artifacts/p5/`) | Evidence before edits (P4 D7 discipline) | no code change |
-| **S1** | `orch_global_params.py` (pure functions) + swap the four fold blocks to call them. Smallest semantic surface; de-duplicates 3 copies of the fold-in block | Pure, unit-testable, no async/lock involvement | fold behavior byte-equal (unit: identical dict mutations incl. list-vs-dict `to_global_params` forms and the `_fast_samples_in` exclusion is *not* part of fold — verify untouched) |
-| **S2** | `orch_persist.py` (cluster F) + delegators; add the round-trip unit test (export→import on a fake orch; **cross-version test**: S0's pickled fixture imports cleanly post-move) | Cold path — runs only at shutdown/loop-drain/`--restore`; failure mode is visible, not silent | delegator preserves `orch.export_queues` endpoint binding in `orch_api` and the `dispatch_loop_task:1481` / `shutdown:2402` call sites |
-| **S3** | `orch_monitor.py` (cluster D) + delegators | Background tasks; read-mostly; worst failure = missed heartbeat (self-healing next tick) | `myinit` still does `asyncio.create_task(self.subscribe_all())` etc. via delegators; `init_success`/`status_summary` attribute writes unchanged |
-| **S4** | `orch_status_sync.py` (cluster C) + delegators | Hot path but *ingress-only*: mutates `globalstatusmodel` under the same `aiolock`, pushes to the same queues. Extraction is verbatim-move; the lock acquisition stays inside the moved body so lock ordering vs. `_dispatch_action_locked` is untouched | `orch.update_status` / `orch.update_nonblocking` / `orch.ws_globstat` remain bound methods (orch_api registers them); WS clients unaffected |
-| **S5** | In-file decomposition of `loop_task_dispatch_action` → 5 helpers (§3.2), then `loop_task_dispatch_experiment` → 4 helpers | Hottest code, so it goes last with all gates warmed up; no cross-module move at all — pure intra-class extract-method | Coordinator preserves the exact early-return/requeue/lock structure; dispatch-trace golden master (§5.3) must be byte-identical before/after |
-| **S6** | Sweep: docstrings/module headers, grep gates (§5.5), line-count report, CARDS re-score note in `CARDS_AUDIT.md` appendix | — | no logic |
+| **S0** | Baseline capture: unit suite, ×2 e2e OERSIM runs (`run_e2e.sh baseline`, `baseline2` — noise floor), dispatch-trace golden master recorded (§5.3), `import_smoke.py` snapshot, export/import round-trip fixture (`queues.pck` produced by current code, checked into `.omc/artifacts/p5/`) | Evidence before edits (P4 D7 discipline) | no code change |
+| **S1** | `orch_global_params.py` (pure `apply_from_globals`/`collect_to_globals`) + swap the four fold blocks to call them; de-duplicates 3 copies of the fold-in block | Smallest semantic surface; pure, unit-testable, no async/lock involvement | fold behavior byte-equal (unit: identical dict mutations incl. list-vs-dict `to_global_params` forms; the `_fast_samples_in` exclusion is *not* part of fold — verify untouched) |
+| **S2** | `orch_persist.py` / `QueuePersister` + delegators; round-trip unit test (export→import on a fake orch); **cross-version test**: S0's pickled fixture imports cleanly post-move, and an S2-written pck imports under stashed S0 code | Cold path — runs only at shutdown/loop-drain/`--restore`; failure mode is visible, not silent | delegator preserves `orch.export_queues` endpoint binding in `orch_api` and the `dispatch_loop_task:1481` / `shutdown:2402` call sites |
+| **S3** | `orch_monitor.py` / `ServerMonitor` + delegators | Background tasks; read-mostly; worst failure = missed heartbeat (self-healing next tick) | `myinit` still does `asyncio.create_task(self.subscribe_all())` etc. via delegators; `init_success`/`status_summary` attribute writes unchanged |
+| **S4** | `orch_status_sync.py` / `StatusIngester` + delegators | Hot path but *ingress-only*: mutates `globalstatusmodel` under the same `aiolock`, pushes to the same queues; extraction is verbatim-move | `orch.update_status` / `orch.update_nonblocking` / `orch.ws_globstat` remain bound methods (orch_api registers them); WS clients unaffected; lock acquisition stays inside moved bodies |
+| **S5** | `orch_queues.py` / `RunQueues` + delegators for all cluster-A methods | Wide (~25 methods) but shallow — pure deque/state ops with no async or lock; operator backend + orch_api exercise it constantly, so breakage is loud and immediate in e2e | deques + uuid trackers stay as `Orch` attributes; `RunQueues` reads them call-time (§3.1 rule 3); every list/get/move/remove endpoint delegates |
+| **S6** | `orch_unpack.py` (expansion helpers + `PLATE_API` relocation w/ re-import, §3.4) and `orch_lifecycle.py` / `RunLifecycle` (finish/write/wait-action) + delegators | Shrinks the dispatch-loop bodies' callees before touching the loop itself; close-out logic gains its first unit tests | finish/write delegators preserve orch_api + loop call sites; e2e finish/move lifecycle is directly diffed by Gate 2 |
+| **S7** | In-file extract-method decomposition of `loop_task_dispatch_action` → 5 helpers and `loop_task_dispatch_experiment` → 4 helpers (§3.6); no move, no inversion | Names the seams the inversion will cut; golden master proves the cut lines are behavior-neutral before any code moves | intra-class only; coordinator preserves the exact early-return/requeue/lock structure |
+| **S8** | **The FSM inversion**: `orch_dispatch.py` — `DispatchPolicy` + `DispatchRunner` + `DispatchStep` union; loop/intent/wait methods become delegators; policy-level unit tests for the full decision table | Highest risk, so it lands last, alone, with all gates green and warmed | `start/stop/skip/intend_*` delegators keep operator + orch_api working; `loop_state`/`loop_intent` stay `Orch` attributes; golden master byte-equality is the hard gate |
+| **S9** | Sweep: docstrings/module headers incl. the lock-ownership map (§3.1 rule 4), grep gates (§5.5), dead-code decision (OQ-3), line-count report, CARDS re-score note in `CARDS_AUDIT.md` appendix | — | no logic |
 
 Per-stage cadence (CARDS convention): implement → gates green → **one commit per stage** →
-Opus review pass → push. No stage starts until the previous stage's review lands. Stages
-S1-S4 are individually revertable in isolation; S5 reverts as one commit.
+Opus review pass → push. No stage starts until the previous stage's review lands. S1-S7
+revert independently in isolation (`git revert <sha>` — each stage's delegators + module are
+self-contained); S8 reverts as one commit back onto the S7 shape.
 
-Estimated end state: `orch.py` ≈ 2100 lines / dispatch core function ≤ ~60 lines each;
-~510 lines relocated into 4 focused modules with unit tests; zero interface changes.
+Estimated end state: `orch.py` ≈ 800-900 lines (composition root + delegators + e-stop);
+~1700+ lines relocated into 8 focused modules with unit tests; zero interface changes; zero
+config/data-format changes.
 
 ---
 
@@ -324,12 +390,15 @@ full behavior, not just its importability.
 ### 5.1 Gate 1 — unit suite (every stage)
 
 `conda run -n helao python run_unit_tests.py` (the launch-blocking gate) plus the standalone
-`helao/core/tests/unit_test_*.py` scripts that touch orch behavior (`unit_test_estop_sync.py`,
-`unit_test_micro_orch.py`, operator/standalone tests). New unit tests added by P5:
-`orch_global_params` fold semantics (S1), persistence round-trip + cross-version pck (S2),
-monitor response-parsing (S3, reusing canned `get_status` payload shapes).
+`helao/core/tests/unit_test_*.py` scripts that touch orch behavior
+(`unit_test_estop_sync.py`, operator/standalone tests). New unit tests added by P5:
+`orch_global_params` fold semantics (S1); persistence round-trip + **both-direction**
+cross-version pck (S2); monitor response-parsing on canned `get_status` payload shapes (S3);
+`RunQueues` CRUD invariants incl. move/remove/rebuild ordering (S5); `RunLifecycle`
+close-out transitions against the P3 guarded-transition table (S6); `DispatchPolicy`
+decision-table tests — snapshot in, step out, over the full §5.3 scenario matrix (S8).
 
-### 5.2 Gate 2 — e2e sim byte-invisibility (stages S1, S2, S4, S5; cheap enough to run always)
+### 5.2 Gate 2 — e2e sim byte-invisibility (every stage from S1 on)
 
 The P3 harness, unchanged:
 
@@ -342,19 +411,21 @@ Pass = the 3-part contract (identical file manifest; identical normalized non-`.
 i.e. every `-act/-exp/-seq.yml`; identical `.hlo` headers + per-key value multisets). This
 single gate exercises: subscribe_all, status ingestion, the full dispatch loop across all
 three queue levels, global-param fold in/out (OERSIM uses `to_global_params`), finish/move
-lifecycle, and WS broadcast — i.e. every cluster P5 touches. Additionally for S2: a
-`--restore`-path variant (enqueue → export mid-queue → restart ORCH with
+lifecycle, and WS broadcast — i.e. every cluster P5 touches. Additionally from S2 on: a
+**`--restore`-path variant** (enqueue → export mid-queue → restart ORCH with
 `restore_queues_on_startup` → drain → same diff), which the current harness doesn't cover
 and P5 adds as `run_e2e_restore.sh` under `.omc/artifacts/p5/`.
 
-### 5.3 Gate 3 — dispatch-decision golden master (S0 records; S5 must match; the (d) bridge artifact)
+### 5.3 Gate 3 — dispatch-decision golden master (S0 records; byte-identical after every stage; the hard gate for S7/S8)
 
-Template: the PAL call-trace harness (`helao/deploy/hte/tests/test_pal_golden_master.py` —
-`__new__` bypass + fakes + pinned time + recorded ordered trace). P5 analog, new file
+A pure **behavior-preservation gate**. Template: the PAL call-trace harness
+(`helao/deploy/hte/tests/test_pal_golden_master.py` — `__new__` bypass + fakes + pinned time
++ recorded ordered trace). P5 analog, new file
 `helao/core/tests/test_orch_dispatch_golden_master.py`:
 
-- **Real (unmodified):** `dispatch_loop_task`, `loop_task_dispatch_{sequence,experiment,action}`,
-  `wait_for_interrupt`, intent methods, fold logic, `GlobalStatusModel`.
+- **Real (unmodified at S0; refactored thereafter):** `dispatch_loop_task`,
+  `loop_task_dispatch_{sequence,experiment,action}`, `wait_for_interrupt`, intent methods,
+  fold logic, `GlobalStatusModel`.
 - **Faked:** `async_action_dispatcher` (records `(server, action_name, ordered params,
   start_condition, submit_order)` and returns a canned active/finished action dict per
   scenario script); `async_private_dispatcher` (no-op); `HelaoSyncer.to_s3`; `PLATE_API`
@@ -368,69 +439,95 @@ Template: the PAL call-trace harness (`helao/deploy/hte/tests/test_pal_golden_ma
   → pause + front-requeue; (7) returned-action `error_code` → `estop_loop` path (faked
   `estop_actions`); (8) nonblocking action lifecycle; (9) step-thru flags.
 - **Gate:** the ordered decision trace (JSON lines) is byte-identical pre/post each stage.
-- **Bridge reuse:** the same scenario scripts, replayed against the framework `OrchDriver`
-  (on its branch), produce the legacy-vs-framework decision diff that the hte cutover needs.
+  For S8 additionally: the same matrix is re-expressed as direct `DispatchPolicy` unit tests
+  (snapshot → step), so the decision table is pinned at two levels.
 
 ### 5.4 Gate 4 — import smoke & construction
 
 `conda run -n helao python .omc/artifacts/p3/import_smoke.py` +
 `python -c "import helao.core.servers.orch, helao.core.servers.orch_api, <new modules>"`.
 
-### 5.5 Grep gates (S6)
+### 5.5 Grep gates (S9)
 
 - No method bodies left behind: moved functions exist exactly once
   (`grep -c "def update_status" orch.py orch_status_sync.py` → delegator + one body).
-- No new cross-imports from extracted modules back into `orch.py` (import-cycle guard:
-  extracted modules import models/helpers only, never `helao.core.servers.orch`).
-- The four fold blocks are gone from `orch.py` (`grep -n "from_global_.*_params.items()" `
+- No import cycles: extracted modules never import `helao.core.servers.orch`
+  (`grep -rn "servers.orch\b" helao/core/servers/orch_*.py` → only the `PLATE_API`
+  re-import direction allowed in `orch.py` itself, §3.4).
+- Call-time resolution rule (§3.1 rule 3): no collaborator `__init__` binds a shared mutable
+  (`grep -n "self\.\(globalstatusmodel\|.*_dq\|global_params\)\s*=" orch_*.py` → empty
+  outside `orch.py`).
+- The four fold blocks are gone from `orch.py` (`grep -n "from_global_.*_params.items()"`
   → only `orch_global_params.py`).
+- No `DispatchStep` execution outside `DispatchRunner._execute` (single-dispatch-site rule).
 
 ---
 
-## 6. Risk + rollback (highest-risk phase; production orchestrator)
+## 6. Risk + rollback (highest-risk phase of the CARDS program; production orchestrator)
+
+Honesty first: **option (a) is the most invasive path available for this file.** The S8
+inversion rewrites the control flow of the code that sequences every production run, in the
+highest-churn file in the repo, with no second implementation to diff against. What makes it
+tractable is that S1-S7 progressively shrink the loop bodies to named, individually-gated
+seams *before* the inversion touches control flow, and that the golden master pins the
+complete decision behavior byte-for-byte at every stage — the inversion lands as the last,
+smallest possible control-flow diff, not as a big-bang rewrite.
 
 | Risk | Exposure | Mitigation |
 |---|---|---|
-| **Pickle/restore breakage** (`queues.pck` written by old code, read by new) | Operators rely on `--restore` after crashes/hot-reload | No classes or attributes move (free functions only); S0 checked-in pck fixture + S2 cross-version import test; e2e restore-path variant (§5.2) |
+| **S8 semantic drift** (decision reordering, snapshot-vs-live-read divergence, early-return/requeue equivalence) | Wrong action ordering, lost requeue, or a stuck loop on a live station — the worst outcome P5 can produce | S7 first names every seam with the golden master green; snapshots are built at the exact read points (and under the same lock points) as current code; golden-master byte-equality + policy-level decision-table tests + e2e drain are all hard gates; S8 is one revertable commit |
+| **Pickle/restore breakage** (`queues.pck` written by old code, read by new, or vice versa after rollback) | Operators rely on `--restore` after crashes/hot-reload | No pickled classes or payload keys move (§3.1 rule 2); S0 checked-in pck fixture + S2 both-direction cross-version tests; e2e restore-path variant (§5.2) |
 | **Bound-method identity loss** (endpoints/WS handlers/`create_task` registered from `self.<method>`) | `orch_api.py` registers `orch.ws_globstat`, `orch.update_status`, …; `myinit` spawns 4 tasks | Delegator methods retained for every moved callable — the class API is unchanged by construction; import smoke + e2e catch a missed one immediately (server won't wire) |
-| **Lock/queue reordering** (`aiolock` held by both `update_status` and `_dispatch_action_locked`; `interrupt_q` written by C/D/E, read by B) | Deadlock or missed-interrupt = stuck production run | Verbatim-move rule: `async with self.aiolock` stays *inside* moved bodies; no await added/removed; golden-master scenario (4) specifically covers the interrupt handshake |
-| **Silent behavior drift in the S5 extract-method pass** (early returns, `return ErrorCodes.none` vs error propagation, requeue ordering) | Wrong action ordering / lost requeue on a live station | S5 is intra-class only; golden-master byte-equality is the hard gate; Opus review of the S5 diff specifically checks return-path equivalence |
+| **Lock/queue reordering** (`aiolock` held by both `StatusIngester.update_status` and the runner's dispatch critical section; `interrupt_q` written by C/D/E, read by the runner) | Deadlock or missed-interrupt = stuck production run | Verbatim-move rule (§3.1 rule 4): lock acquisitions stay inside moved bodies; no await added/removed outside S8; golden-master scenario (4) covers the interrupt handshake; lock-ownership map in module docstrings |
+| **Stale-reference bugs** (collaborator caches a deque/`globalstatusmodel` identity that `import_queues` or `orch.py:933` later reassigns) | Silent split-brain state after a restore or mid-run deque reset | Call-time resolution rule (§3.1 rule 3) + its grep gate (§5.5); restore e2e variant exercises exactly this path |
 | **Hot-reload interaction** (watcher restarts idle servers whose loaded modules changed) | New modules must appear in `/loaded_modules` | They do automatically (import-graph-based); noted for the reviewer, no action |
-| **Merge-window exposure** | hte stations run their deployed branch, not `feat/cards-refactor`; exposure begins at merge to `unstable` + station update | Merge P5 only as a whole (S1-S6 complete); first station update on a maintenance window with `--restore` smoke + one supervised sequence, per P4 wave discipline |
-| **Mid-flight hotfix collision** (`orch.py` is the highest-churn file) | Rebase conflicts with production fixes on `unstable` | Rebase `feat/cards-refactor` before each stage lands; delegator-style moves rebase cleanly (small orch.py diffs); if a hotfix touches a cluster mid-extraction, that stage restarts from the rebased file |
+| **Merge-window exposure** | hte stations run their deployed branch; exposure begins at merge to `unstable` + station update | Merge P5 only as a whole (S0-S9 complete); first station update on a maintenance window with `--restore` smoke + one supervised sequence, per P4 wave discipline |
+| **Mid-flight hotfix collision** (`orch.py` is the highest-churn file) | Rebase conflicts with production fixes on `unstable` | Rebase `feat/cards-refactor` before each stage lands; delegator-style moves rebase cleanly (small orch.py diffs); if a hotfix touches a cluster mid-extraction, that stage restarts from the rebased file; a hotfix touching the *loop* while S7/S8 are in flight pauses S8 until the fix is absorbed and the golden master re-recorded |
 
-**Rollback:** one commit per stage; S1-S4 revert independently (`git revert <sha>` — each
-stage's delegators + module are self-contained); S5 reverts as one commit; no nested-repo
-commits exist in P5 at all, so rollback is single-repo. Pre-merge, branch reset remains
-available. Post-merge worst case: revert the merge commit — no data-format, wire-format, or
-config change exists anywhere in P5, so reverted code is immediately compatible with
-anything P5-era servers wrote (including `queues.pck`, by the no-moved-classes rule).
+**Rollback:** one commit per stage; S1-S7 revert independently; S8 reverts as one commit
+back onto the fully-gated S7 shape; no nested-repo commits exist in P5 at all, so rollback
+is single-repo. Pre-merge, branch reset remains available. Post-merge worst case: revert the
+merge commit — no data-format, wire-format, or config change exists anywhere in P5, so
+reverted code is immediately compatible with anything P5-era servers wrote (including
+`queues.pck`, by the frozen-payload rule).
 
 ---
 
 ## 7. Open questions (for the human; append to `.omc/plans/open-questions.md`)
 
-- **OQ-1 (scope vs. migration timeline — the decisive one):** Does the hte framework
-  migration have a credible resume-and-finish horizon (uvis4 blocker + KMOTOR)? If yes
-  (≤ ~2 station cycles), shrink P5 to **S0+S1+S2+S5** (pure functions, persistence, clarity
-  pass — the pieces that pay off even in a short window) and skip S3/S4. If open-ended,
-  execute the full S0-S6 as planned. Recommended default: full S0-S6.
-- **OQ-2 (naming convergence):** Extracted modules use legacy-idiomatic names
-  (`orch_persist`, `orch_monitor`, `orch_status_sync`) with framework-converged *function*
-  names (`fold_in_global`, `fold_out_global`). Alternative: mirror framework module names
-  outright to make side-by-side diffing trivial. Recommended: as planned (module names must
-  not suggest the framework's port/adapter semantics that legacy doesn't have).
-- **OQ-3 (restore compatibility contract):** Is cross-version restore (pck written before
+- **OQ-1 (restore compatibility contract):** Is cross-version restore (pck written before
   P5, imported after — and the reverse, after a rollback) a *hard requirement* or
-  best-effort? The design preserves it by construction; a "hard requirement" answer adds the
-  reverse-direction test to S2. Recommended: hard requirement (hot-reload restarts
+  best-effort? The design preserves it by construction; a "hard requirement" answer keeps
+  the both-direction test in S2. Recommended: hard requirement (hot-reload restarts
   orchestrators with `--restore` unconditionally).
-- **OQ-4 (`Active._finish`):** The master plan's P5 sketch mentions decomposing
+- **OQ-2 (`Active._finish`):** The master plan's P5 sketch mentions decomposing
   `Active._finish` (~221 lines, `base.py`). It touches every action server, not just
-  orchestrators — different blast radius, different golden master. In P5 (as an S5-style
+  orchestrators — different blast radius, different golden master. In P5 (as an S7-style
   in-file clarity pass with the e2e gate) or deferred to a P5b? Recommended: defer to P5b,
-  decided after S5's golden-master experience.
-- **OQ-5 (dead consumers check before S6):** `orch_api.py:883` defines a second `WaitExec`
-  and `:929` a `checkcond` enum near-duplicating framework shapes; and `endpoint_queues_init`
-  (orch.py:237-248) is commented-out dead code. Delete dead code in S6, or freeze? Recommended:
-  delete the commented block only (zero-risk); leave `orch_api` untouched (out of P5 scope).
+  decided after S8's golden-master experience.
+- **OQ-3 (dead consumers check before S9):** `orch_api.py:883` defines a second `WaitExec`
+  and `:929` a `checkcond` enum; and `endpoint_queues_init` (orch.py:237-248) is
+  commented-out dead code. Delete dead code in S9, or freeze? Recommended: delete the
+  commented block only (zero-risk); leave `orch_api` untouched (out of P5 scope).
+- **OQ-4 (`DispatchPolicy` interface granularity):** One policy class returning
+  `DispatchStep` values for all three queue levels (as designed, §3.6), or three per-level
+  policies (sequence/experiment/action) composed by the runner? And are the
+  `ActionStartCondition` wait predicates policy-owned *specs* (as designed) or runner-coded
+  waits the policy merely names? Recommended: single policy + step values + policy-owned
+  wait specs — one decision table, directly unit-testable; split later only if it grows.
+- **OQ-5 (concurrency/locking ownership):** P5 leaves `aiolock`, `interrupt_q`, and
+  `globstat_q` on `Orch`/`Base`, shared by `StatusIngester` and `DispatchRunner` under the
+  documented ownership map (§3.1 rule 4). Should a later pass move coordination into a
+  dedicated object (e.g. a small `DispatchGate` owning lock + interrupt queue)? Recommended:
+  leave shared on `Orch` through P5; revisit in P5b once the S8 shape has soaked — moving
+  the lock is a semantics change, not a layout change.
+- **OQ-6 (run-deque residence):** The design keeps the three deques (and uuid trackers) as
+  plain `Orch` attributes borrowed call-time by `RunQueues` (§3.1 rule 3), because
+  reach-ins, pickle payload, and the `orch.py:933` reassignment all touch them. Alternative:
+  `RunQueues` owns them with forwarding properties on `Orch`. Recommended: as designed
+  (attributes stay on `Orch`); revisit only if a later pass proves property forwarding
+  behavior-equal under the restore harness.
+- **OQ-7 (e-stop extraction timing):** Cluster E stays in `orch.py` for P5 (§3.5). Schedule
+  its extraction (`orch_estop.py` / `EstopController`, incl. the `estop_actions(switch)`
+  flag-arg cleanup from the audit) as the first P5b item after one production soak cycle of
+  the S8 shape? Recommended: yes — P5b, not P5.
