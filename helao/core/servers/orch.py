@@ -55,6 +55,7 @@ from helao.core.servers.orch_global_params import (
 from helao.core.servers.orch_persist import QueuePersister
 from helao.core.servers.orch_monitor import ServerMonitor
 from helao.core.servers.orch_status_sync import StatusIngester
+from helao.core.servers.orch_queues import RunQueues
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
@@ -209,6 +210,7 @@ class Orch(Base):
         self.queue_persister = QueuePersister(self)
         self.server_monitor = ServerMonitor(self)
         self.status_ingester = StatusIngester(self)
+        self.run_queues = RunQueues(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -272,24 +274,15 @@ class Orch(Base):
             obj_uuid_dict: Metadata associated with the UUID.
             obj_type: One of ``"action"``, ``"experiment"``, or ``"sequence"``.
         """
-        OBJ_MAP = {
-            "action": self.action_history,
-            "experiment": self.experiment_history,
-            "sequence": self.sequence_history,
-        }
-
-        if obj_uuid_key in OBJ_MAP[obj_type].keys():
-            OBJ_MAP[obj_type][obj_uuid_key].update(obj_uuid_dict)
-        else:
-            OBJ_MAP[obj_type][obj_uuid_key] = obj_uuid_dict
+        return self.run_queues.register_obj_uuid(obj_uuid_key, obj_uuid_dict, obj_type)
 
     def register_action_uuid(self, action_uuid, action_dict):
         """Record an action UUID and its metadata in the action history map."""
-        self.register_obj_uuid(action_uuid, action_dict, "action")
+        return self.run_queues.register_action_uuid(action_uuid, action_dict)
 
     def track_action_uuid(self, action_uuid):
         """Remember ``action_uuid`` as the most recently dispatched action."""
-        self.last_dispatched_action_uuid = action_uuid
+        return self.run_queues.track_action_uuid(action_uuid)
 
     async def wait_for_interrupt(self, pending_action: Optional[Action] = None) -> bool:
         """Block until an interrupt message arrives and forward queued ``GlobalStatusModel``s.
@@ -1546,31 +1539,19 @@ class Orch(Base):
 
     async def clear_sequences(self):
         """Empty the sequence deque."""
-        LOGGER.info("clearing sequence queue")
-        self.sequence_dq.clear()
+        return await self.run_queues.clear_sequences()
 
     async def clear_experiments(self):
         """Empty the experiment deque."""
-        LOGGER.info("clearing experiment queue")
-        self.experiment_dq.clear()
+        return await self.run_queues.clear_experiments()
 
     async def clear_actions(self):
         """Empty the action deque."""
-        LOGGER.info("clearing action queue")
-        self.action_dq.clear()
+        return await self.run_queues.clear_actions()
 
     def _prep_sequence_meta(self, sequence: Sequence) -> None:
         """Populate uuid/codehash/codepath/funcname metadata on ``sequence`` in place."""
-        if sequence.sequence_uuid is None:
-            sequence.sequence_uuid = gen_uuid()
-        if (
-            sequence.sequence_codehash is None
-            and sequence.sequence_name in self.sequence_codehash_lib
-        ):
-            sequence.sequence_codehash = self.sequence_codehash_lib[sequence.sequence_name]
-            sequence.sequence_codepath = self.sequence_codepath_lib[sequence.sequence_name]
-            sequence.sequence_funcname = self.sequence_lib[sequence.sequence_name].__name__
-        sequence.sequence_label = sanitize_sequence_label(sequence.sequence_label)
+        return self.run_queues._prep_sequence_meta(sequence)
 
     def _ensure_run_id(self) -> UUID:
         """Return the run_id to stamp on a sequence entering the queue.
@@ -1578,16 +1559,11 @@ class Orch(Base):
         Empty/just-cleared queue -> fresh run_id; non-empty -> reuse the
         in-flight ``active_run_id`` (back-to-back sharing).
         """
-        if len(self.sequence_dq) == 0:
-            self.active_run_id = gen_uuid()
-        return self.active_run_id
+        return self.run_queues._ensure_run_id()
 
     def _resolve_active_run_id(self, sequence: Sequence) -> None:
         """At dequeue, sync ``active_run_id`` with the active sequence's run_id."""
-        if sequence.run_id is not None:
-            self.active_run_id = sequence.run_id
-        elif self.active_run_id is not None:
-            sequence.run_id = self.active_run_id
+        return self.run_queues._resolve_active_run_id(sequence)
 
     async def add_sequence(self, sequence: Sequence) -> UUID:
         """Append ``sequence`` to the sequence deque, populating its metadata and run_id.
@@ -1595,10 +1571,7 @@ class Orch(Base):
         Returns:
             The UUID of the added sequence.
         """
-        self._prep_sequence_meta(sequence)
-        sequence.run_id = self._ensure_run_id()
-        self.sequence_dq.append(sequence)
-        return sequence.sequence_uuid
+        return await self.run_queues.add_sequence(sequence)
 
     async def add_split_sequences(self, sequence: Sequence):
         """Split ``sequence`` along the configured params and enqueue each sub-sequence.
@@ -1610,65 +1583,7 @@ class Orch(Base):
             List of sub-sequence UUIDs, or the result of :meth:`add_sequence`
             if no split parameter applied.
         """
-        possible_splits = [
-            x
-            for x in sequence.sequence_params
-            if x in self.server_params.get("split_by_seq_params", [])
-        ]
-        possible_groups = [
-            x
-            for x in sequence.sequence_params
-            if x in self.server_params.get("group_by_seq_params", [])
-        ]
-
-        if possible_splits:
-            run_id = self._ensure_run_id()
-            split_key = possible_splits[0]
-            split_list = sequence.sequence_params[split_key]
-            sub_sequence_uuids = []
-            if possible_groups:
-                group_key = possible_groups[0]
-                group_list = sequence.sequence_params[group_key]
-                run_seq_param = group_key
-            else:
-                group_list = split_list
-                run_seq_param = split_key
-            sub_sequence_items = []
-            for i, item in enumerate(split_list):
-                sub_sequence_items.append(item)
-                if item in group_list or i == len(split_list) - 1:
-                    # create a copy of the sequence
-                    sub_sequence = deepcopy(sequence)
-                    sub_sequence.sequence_label = sanitize_sequence_label(
-                        sub_sequence.sequence_label
-                    )
-                    # set the plate_sample_no in the params
-                    sub_sequence.sequence_params[split_key] = sub_sequence_items
-                    # generate new sub_sequence uuid
-                    sub_sequence.sequence_uuid = gen_uuid()
-                    # Clear planned experiments to ensure they regenerate when the sub-sequence is dequeued.
-                    sub_sequence.planned_experiments.clear()
-                    if (
-                        sub_sequence.sequence_codehash is None
-                        and sub_sequence.sequence_name in self.sequence_codehash_lib
-                    ):
-                        sub_sequence.sequence_codehash = self.sequence_codehash_lib[
-                            sub_sequence.sequence_name
-                        ]
-                        sub_sequence.sequence_codepath = self.sequence_codepath_lib[
-                            sub_sequence.sequence_name
-                        ]
-                        sub_sequence.sequence_funcname = self.sequence_lib[
-                            sub_sequence.sequence_name
-                        ].__name__
-                    sub_sequence.run_sequence_parameter_variable = [run_seq_param]
-                    sub_sequence.run_id = run_id
-                    self.sequence_dq.append(sub_sequence)
-                    sub_sequence_uuids.append(sub_sequence.sequence_uuid)
-                    sub_sequence_items = []
-            return sub_sequence_uuids
-        else:
-            return await self.add_sequence(sequence)
+        return await self.run_queues.add_split_sequences(sequence)
 
     async def prepend_sequences(self, sequences: List[Sequence]) -> List[UUID]:
         """Insert ``sequences`` at the front of the queue, preserving their order.
@@ -1680,88 +1595,45 @@ class Orch(Base):
         Returns:
             The UUIDs of the prepended sequences, in buffer order.
         """
-        if not sequences:
-            return []
-        run_id = self._ensure_run_id()
-        uuids = []
-        for i, sequence in enumerate(sequences):
-            self._prep_sequence_meta(sequence)
-            sequence.run_id = run_id
-            self.sequence_dq.insert(i, sequence)
-            uuids.append(sequence.sequence_uuid)
-        return uuids
+        return await self.run_queues.prepend_sequences(sequences)
 
     def _rebuild_sequence_dq(self, seqs) -> None:
         """Replace the sequence deque contents with ``seqs`` (re-compresses each)."""
-        self.sequence_dq.clear()
-        for s in seqs:
-            self.sequence_dq.append(s)
+        return self.run_queues._rebuild_sequence_dq(seqs)
 
     async def move_sequence(self, from_idx: int, to_idx: int) -> None:
         """Move the queued sequence at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
-        seqs = list(self.sequence_dq)
-        n = len(seqs)
-        if 0 <= from_idx < n and 0 <= to_idx < n:
-            seq = seqs.pop(from_idx)
-            seqs.insert(to_idx, seq)
-            self._rebuild_sequence_dq(seqs)
+        return await self.run_queues.move_sequence(from_idx, to_idx)
 
     async def remove_sequence(self, idx: int) -> None:
         """Remove the queued sequence at ``idx`` (no-op if out of range)."""
-        seqs = list(self.sequence_dq)
-        if 0 <= idx < len(seqs):
-            seqs.pop(idx)
-            self._rebuild_sequence_dq(seqs)
+        return await self.run_queues.remove_sequence(idx)
 
     def _rebuild_experiment_dq(self, exps) -> None:
         """Replace the experiment deque contents with ``exps`` (re-compresses each)."""
-        self.experiment_dq.clear()
-        for e in exps:
-            self.experiment_dq.append(e)
+        return self.run_queues._rebuild_experiment_dq(exps)
 
     async def move_experiment(self, from_idx: int, to_idx: int) -> None:
         """Move the queued experiment at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
-        exps = list(self.experiment_dq)
-        n = len(exps)
-        if 0 <= from_idx < n and 0 <= to_idx < n:
-            exp = exps.pop(from_idx)
-            exps.insert(to_idx, exp)
-            self._rebuild_experiment_dq(exps)
+        return await self.run_queues.move_experiment(from_idx, to_idx)
 
     async def remove_experiment(
         self, idx: Optional[int] = None, by_uuid: Optional[UUID] = None
     ) -> None:
         """Remove the queued experiment at ``idx`` (or matching ``by_uuid``); no-op if out of range."""
-        exps = list(self.experiment_dq)
-        if by_uuid is not None:
-            idx = next(
-                (i for i, e in enumerate(exps) if e.experiment_uuid == by_uuid), None
-            )
-        if idx is not None and 0 <= idx < len(exps):
-            exps.pop(idx)
-            self._rebuild_experiment_dq(exps)
+        return await self.run_queues.remove_experiment(idx=idx, by_uuid=by_uuid)
 
     def _rebuild_action_dq(self, acts) -> None:
         """Replace the action deque contents with ``acts`` (re-compresses each)."""
-        self.action_dq.clear()
-        for a in acts:
-            self.action_dq.append(a)
+        return self.run_queues._rebuild_action_dq(acts)
 
     async def move_action(self, from_idx: int, to_idx: int) -> None:
         """Move the queued action at ``from_idx`` to ``to_idx`` (no-op if out of range)."""
-        acts = list(self.action_dq)
-        n = len(acts)
-        if 0 <= from_idx < n and 0 <= to_idx < n:
-            act = acts.pop(from_idx)
-            acts.insert(to_idx, act)
-            self._rebuild_action_dq(acts)
+        return await self.run_queues.move_action(from_idx, to_idx)
 
     async def remove_action(self, idx: int) -> None:
         """Remove the queued action at ``idx`` (no-op if out of range)."""
-        acts = list(self.action_dq)
-        if 0 <= idx < len(acts):
-            acts.pop(idx)
-            self._rebuild_action_dq(acts)
+        return await self.run_queues.remove_action(idx)
 
     async def add_experiment(
         self,
@@ -1781,91 +1653,47 @@ class Orch(Base):
         Returns:
             The UUID of the enqueued experiment.
         """
-        seq_dict = seq.model_dump()
-        if not isinstance(experimentmodel, Experiment):
-            experimentmodel_dict = experimentmodel.model_dump()
-            D = Experiment(**experimentmodel_dict)
-        else:
-            D = experimentmodel
-        for k in seq_dict.keys():
-            setattr(D, k, getattr(seq, k))
-
-        # init uuid now for tracking later
-        D.experiment_uuid = gen_uuid()
-
-        # reminder: experiment_dict values take precedence over keyword args
-        if D.orchestrator.server_name is None or D.orchestrator.machine_name is None:
-            D.orchestrator = self.server
-
-        await asyncio.sleep(0.01)
-        if at_index is not None:
-            self.experiment_dq.insert(i=at_index, x=D)
-        elif prepend:
-            self.experiment_dq.appendleft(D)
-            # LOGGER.info(f"experiment {D.experiment_name} prepended to queue")
-        else:
-            self.experiment_dq.append(D)
-            # LOGGER.info(f"experiment {D.experiment_name} appended to queue")
-        return D.experiment_uuid
+        return await self.run_queues.add_experiment(
+            seq, experimentmodel, prepend=prepend, at_index=at_index
+        )
 
     def list_sequences(self, limit=10) -> list:
         """Return at most ``limit`` sequence summaries from the sequence deque."""
-        return [
-            self.sequence_dq[i].get_seq()
-            for i in range(min(len(self.sequence_dq), limit))
-        ]
+        return self.run_queues.list_sequences(limit=limit)
 
     def list_experiments(self, limit=10) -> list:
         """Return at most ``limit`` experiment summaries from the experiment deque."""
-        return [
-            self.experiment_dq[i].get_exp()
-            for i in range(min(len(self.experiment_dq), limit))
-        ]
+        return self.run_queues.list_experiments(limit=limit)
 
     def list_all_experiments(self) -> list:
         """Return ``(index, experiment_name)`` tuples for every queued experiment."""
-        return [
-            (i, D.get_exp().experiment_name) for i, D in enumerate(self.experiment_dq)
-        ]
+        return self.run_queues.list_all_experiments()
 
     def drop_experiment_inds(self, inds: List[int]) -> list:
         """Remove the queued experiments at ``inds`` and return :meth:`list_all_experiments`."""
-        for i in sorted(inds, reverse=True):
-            del self.experiment_dq[i]
-        return self.list_all_experiments()
+        return self.run_queues.drop_experiment_inds(inds)
 
     def get_experiment(self, last=False) -> Experiment:
         """Return the active (or, if ``last`` is True, most recent) experiment summary.
 
         Returns an empty dict when no experiment is available.
         """
-        experiment = self.last_experiment if last else self.active_experiment
-        if experiment is not None:
-            return experiment.get_exp()
-        return {}
+        return self.run_queues.get_experiment(last=last)
 
     def get_sequence(self, last=False) -> Sequence:
         """Return the active (or, if ``last`` is True, most recent) sequence summary.
 
         Returns an empty dict when no sequence is available.
         """
-        sequence = self.last_sequence if last else self.active_sequence
-        if sequence is not None:
-            return sequence.get_seq()
-        return {}
+        return self.run_queues.get_sequence(last=last)
 
     def list_active_actions(self) -> list:
         """Return the status model entries for every currently active action."""
-        return [
-            statusmodel
-            for uuid, statusmodel in self.globalstatusmodel.active_dict.items()
-        ]
+        return self.run_queues.list_active_actions()
 
     def list_actions(self, limit=10) -> list:
         """Return at most ``limit`` action summaries from the action deque."""
-        return [
-            self.action_dq[i].get_act() for i in range(min(len(self.action_dq), limit))
-        ]
+        return self.run_queues.list_actions(limit=limit)
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
         """Retry an errored action by appending ``sup_action`` to the front of ``action_dq``.
@@ -1874,27 +1702,7 @@ class Orch(Base):
             check_uuid: UUID of the previously errored action.
             sup_action: Replacement action whose order/retry counters get adjusted.
         """
-
-        error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
-            hlostatus=HloStatus.errored,
-        )
-        if not error_uuids:
-            LOGGER.info("There are no error statuses to replace")
-        else:
-            if check_uuid in error_uuids:
-                EA_act = error_uuids[check_uuid]
-                # sup_action can be a differnt one,
-                # but for now we treat it thats a retry of the errored one
-                new_action = sup_action
-                new_action.action_order = EA_act.action_order
-                # will be updated again once its dispatched again
-                new_action.actual_order = EA_act.actual_order
-                new_action.action_retry = EA_act.action_retry + 1
-                new_action.action_server.machine_name = self.server.machine_name
-                self.action_dq.appendleft(new_action)
-            else:
-                LOGGER.info(f"uuid {check_uuid} not found in list of error statuses:")
-                LOGGER.info(", ")
+        return self.run_queues.supplement_error_action(check_uuid, sup_action)
 
     def replace_action(
         self,
@@ -1904,52 +1712,16 @@ class Orch(Base):
         by_action_order: Optional[int] = None,
     ):
         """Replace a queued action selected by index, UUID, or action order with ``sup_action``."""
-        if by_index:
-            i = by_index
-        elif by_uuid:
-            i = [
-                i
-                for i, A in enumerate(list(self.action_dq))
-                if A.action_uuid == by_uuid
-            ][0]
-        elif by_action_order:
-            i = [
-                i
-                for i, A in enumerate(list(self.action_dq))
-                if A.action_order == by_action_order
-            ][0]
-        else:
-            LOGGER.info("No arguments given for locating existing action to replace.")
-            return None
-        # get action_order of selected action which gets replaced
-        current_action_order = self.action_dq[i].action_order
-        new_action = sup_action
-        new_action.action_order = current_action_order
-        new_action.action_server.machine_name = self.server.machine_name
-        self.action_dq.insert(i, new_action)
-        del self.action_dq[i + 1]
+        return self.run_queues.replace_action(
+            sup_action,
+            by_index=by_index,
+            by_uuid=by_uuid,
+            by_action_order=by_action_order,
+        )
 
     def append_action(self, sup_action: Action):
         """Append ``sup_action`` to ``action_dq`` and assign it the next action order."""
-        if len(self.action_dq) == 0:
-            last_action_order = (
-                self.globalstatusmodel.counter_dispatched_actions[
-                    self.active_experiment.experiment_uuid
-                ]
-                - 1
-            )
-            if last_action_order < 0:
-                # no action was dispatched yet
-                last_action_order = 0
-        else:
-            last_action_order = self.action_dq[-1].action_order
-
-        new_action_order = last_action_order + 1
-        new_action = sup_action
-        new_action.action_uuid = gen_uuid()
-        new_action.action_order = new_action_order
-        new_action.action_server.machine_name = self.server.machine_name
-        self.action_dq.append(new_action)
+        return self.run_queues.append_action(sup_action)
 
     async def finish_active_sequence(self):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
