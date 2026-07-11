@@ -20,6 +20,13 @@ from socket import gethostname
 from helao.helpers.premodels import Experiment, ActionPlanMaker
 from helao.core.models.machine import MachineModel as MM
 from helao.helpers.lib_decorators import experiment
+from helao.deploy.test.param_models import (
+    CPSIMChangePlateParams,
+    GPSIMInitializePlateParams,
+    GPSIMCheckConditionParams,
+    OERSIMSubLoadPlateParams,
+    OERSIMSubActivelearnParams,
+)
 
 
 EXPERIMENTS = __all__
@@ -41,16 +48,22 @@ def OERSIM_sub_load_plate(
         init_random_points: Number of random initial compositions for GPSIM
             to acquire when initializing priors.
     """
+    pars = OERSIMSubLoadPlateParams(
+        plate_id=plate_id, init_random_points=init_random_points
+    )
     apm = ActionPlanMaker()
-    apm.add(CPSIM_server, "change_plate", {"plate_id": plate_id})
+    apm.add(
+        CPSIM_server,
+        "change_plate",
+        CPSIMChangePlateParams(plate_id=pars.plate_id).model_dump(),
+    )
     apm.add(CPSIM_server, "get_loaded_plate", {}, to_global_params=["_loaded_plate_id"])
     apm.add(
         GPSIM_server,
         "initialize_plate",
-        {
-            "num_random_points": init_random_points,
-            "reinitialize": False,
-        },
+        GPSIMInitializePlateParams(
+            num_random_points=pars.init_random_points, reinitialize=False
+        ).model_dump(),
         from_global_act_params={"_loaded_plate_id": "plate_id"},
     )
 
@@ -126,16 +139,25 @@ def OERSIM_sub_decision(
             "_orch_port",
         ],
     )
+    pars = GPSIMCheckConditionParams(
+        stop_condition=stop_condition,
+        thresh_value=thresh_value,
+        repeat_experiment_name=repeat_experiment_name,
+        repeat_experiment_params=repeat_experiment_params,
+        repeat_experiment_kwargs=repeat_experiment_kwargs,
+    )
+    check_condition_params = pars.model_dump()
+    # pydantic validation copies dict-typed fields, which would otherwise
+    # break object-identity-based yml anchor/alias emission relative to the
+    # legacy literal-dict authoring path (D6 wire-identity); restore the raw
+    # dict objects post-dump so ruamel's round-trip dumper reproduces the
+    # exact same bytes as before the model was introduced.
+    check_condition_params["repeat_experiment_params"] = repeat_experiment_params
+    check_condition_params["repeat_experiment_kwargs"] = repeat_experiment_kwargs
     apm.add(
         GPSIM_server,
         "check_condition",
-        {
-            "stop_condition": stop_condition,
-            "thresh_value": thresh_value,
-            "repeat_experiment_name": repeat_experiment_name,
-            "repeat_experiment_params": repeat_experiment_params,
-            "repeat_experiment_kwargs": repeat_experiment_kwargs,
-        },
+        check_condition_params,
         from_global_act_params={
             "_loaded_plate_id": "plate_id",
             "_orch_key": "orch_key",
@@ -172,6 +194,16 @@ def OERSIM_sub_activelearn(
         Combined planned actions for measuring the next composition and
         evaluating the stop condition.
     """
+    # validate inputs (enum enforced every self-requeue hop); the model is
+    # not used downstream so the raw args keep their object identity, which
+    # the reflection dict below (and the check_condition wire dict it feeds)
+    # depends on for byte-identical yml aliasing (D6 wire-identity).
+    OERSIMSubActivelearnParams(
+        init_random_points=init_random_points,
+        stop_condition=stop_condition,
+        thresh_value=thresh_value,
+        repeat_experiment_kwargs=repeat_experiment_kwargs,
+    )
     apm = ActionPlanMaker()
     apm.add_actions(
         OERSIM_sub_measure_CP(
