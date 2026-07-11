@@ -20,6 +20,7 @@ from helao.core.servers.base import Base, Active
 from helao.helpers.executor import Executor
 from helao.helpers.premodels import Experiment
 from helao.helpers.dispatcher import async_private_dispatcher
+from helao.deploy.test.param_models import StopCondition, resolve_stop_condition
 
 import numpy as np
 import gpflow
@@ -486,8 +487,9 @@ class GPSim:
         """Evaluate the active-learning stop condition and requeue if needed.
 
         Inspects the latest plate progress against the configured
-        ``stop_condition`` (``none``, ``max_iters``, ``max_stdev``,
-        ``max_ei``). While the condition is unmet, this dispatches an
+        ``stop_condition`` (a :class:`~helao.deploy.test.param_models.StopCondition`
+        member: ``none``, ``max_iters``, ``max_stdev``, ``max_ei``). While the
+        condition is unmet, this dispatches an
         ``insert_experiment`` RPC back to the requesting orchestrator to
         queue the next iteration.
 
@@ -500,7 +502,7 @@ class GPSim:
         """
         params = activeobj.action.action_params
         plate_id = params["plate_id"]
-        stop_condition = params["stop_condition"]
+        stop_condition = resolve_stop_condition(params["stop_condition"])
         thresh_value = params["thresh_value"]
         repeat_experiment_name = params["repeat_experiment_name"]
         repeat_experiment_params = params["repeat_experiment_params"]
@@ -513,19 +515,19 @@ class GPSim:
         progress = self.progress[plate_id]
         repeat_map = {
             # search full plate
-            "none": len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+            StopCondition.none: len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
             < self.features[plate_id].shape[0],
             # below maximum iterations per plate
-            "max_iters": progress["plate_step"] < thresh_value,
+            StopCondition.max_iters: progress["plate_step"] < thresh_value,
             # max model uncertainty
-            "max_stdev": max(
+            StopCondition.max_stdev: max(
                 self.avail_step[plate_id][len(self.acquired[plate_id])][2] ** 2
             )
             > thresh_value,
             # maximum expected improvement
-            "max_ei": progress["expected_improvement"] > thresh_value,
+            StopCondition.max_ei: progress["expected_improvement"] > thresh_value,
         }
-        if repeat_map[stop_condition] and repeat_map["none"]:
+        if repeat_map[stop_condition] and repeat_map[StopCondition.none]:
             repeat_measure_acquire = True
 
         if repeat_measure_acquire:

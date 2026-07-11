@@ -7,6 +7,7 @@ __all__ = [
 from typing import Union
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
+from helao.deploy.test.param_models import OERSIMActivelearnSeqParams
 
 
 SEQUENCES = __all__
@@ -36,10 +37,10 @@ def OERSIM_activelearn(
     epm = ExperimentPlanMaker()
     epm.add(
         "OERSIM_sub_activelearn",
-        {
-            "init_random_points": init_random_points,
-            "stop_condition": stop_condition,
-            "thresh_value": thresh_value,
-        },
+        OERSIMActivelearnSeqParams(
+            init_random_points=init_random_points,
+            stop_condition=stop_condition,
+            thresh_value=thresh_value,
+        ).model_dump(),
     )
     return epm.planned_experiments
