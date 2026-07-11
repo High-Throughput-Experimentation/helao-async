@@ -20,15 +20,27 @@ observed. Behavior is byte-identical to the original inline methods,
 including the exact ``aiolock`` critical section in ``update_status`` and the
 uuid-registration side effect shared with ``update_nonblocking``.
 
-Lock/queue ownership (rule 4): ``aiolock`` is acquired inside
-``update_status`` exactly where the original method acquired it (no await
-added or removed); ``interrupt_q`` is written by ``update_status`` and
-``update_nonblocking`` (read by the still-inline dispatch loop's
-``wait_for_interrupt``); ``globstat_q`` is only read/drained here
+Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
+``orch_dispatch.py``, the other lock owner):
+
+- ``aiolock`` -- acquired by ``StatusIngester`` (status ingestion) and
+  ``DispatchRunner`` (the dispatch critical section).
+- ``interrupt_q`` -- written by ``StatusIngester`` / ``ServerMonitor`` /
+  e-stop; read by ``DispatchRunner``.
+- ``globstat_q`` -- written by ``StatusIngester``; drained by its own
+  broadcast task.
+
+Concretely here: ``aiolock`` is acquired inside ``update_status`` exactly
+where the original method acquired it (no await added or removed);
+``interrupt_q`` is written by ``update_status`` and ``update_nonblocking``
+(read by ``Orch.wait_for_interrupt``, which ``DispatchRunner`` calls from its
+dispatch loop -- ``wait_for_interrupt`` itself remains an ``Orch`` method,
+cluster B, not yet extracted); ``globstat_q`` is only read/drained here
 (``ws_globstat`` subscribes, ``globstat_broadcast_task`` drains) -- it is
-written by ``wait_for_interrupt`` (cluster B, not yet extracted at S4).
-``update_status`` can trigger ``orch.estop_loop`` (cluster E, stays on
-``Orch``) when an action's status carries ``HloStatus.estopped``.
+also written by ``wait_for_interrupt`` as it forwards queued
+``GlobalStatusModel``s. ``update_status`` can trigger ``orch.estop_loop``
+(cluster E, stays on ``Orch``) when an action's status carries
+``HloStatus.estopped``.
 
 Task-creation semantics are unchanged: ``Orch.myinit`` still does
 ``asyncio.create_task(self.globstat_broadcast_task())`` via the thin
