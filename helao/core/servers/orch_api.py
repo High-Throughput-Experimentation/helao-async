@@ -602,17 +602,17 @@ class OrchAPI(HelaoFastAPI):
         @self.post("/latest_sequence_uuids", tags=["private"])
         def latest_sequence_uuids():
             """Return the orchestrator's recent dispatched sequence UUIDs."""
-            return self.orch.last_50_sequence_uuids
+            return list(self.orch.sequence_history.keys())[-50:]
 
         @self.post("/latest_experiment_uuids", tags=["private"])
         def latest_experiment_uuids():
             """Return the orchestrator's recent dispatched experiment UUIDs."""
-            return self.orch.last_50_experiment_uuids
+            return list(self.orch.experiment_history.keys())[-50:]
 
         @self.post("/latest_action_uuids", tags=["private"])
         def latest_action_uuids():
             """Return the orchestrator's recent dispatched action UUIDs."""
-            return self.orch.last_50_action_uuids
+            return list(self.orch.action_history.keys())[-50:]
 
         @self.post(f"/{server_key}/wait", tags=["action"])
         async def wait(
