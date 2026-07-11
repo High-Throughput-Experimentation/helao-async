@@ -202,3 +202,28 @@ The lesson is exactly the CARDS "AI amplifies weak design" thesis at repo scale:
 Do these at the core first; the deployments largely heal by following the corrected pattern.
 
 ---
+
+## Appendix — P5 outcome: `Orch` decomposition (2026-07-11)
+
+Highest-leverage fix #1 ("Split `Orch`") is **done** on `feat/cards-refactor`. The `Orch` god-class was decomposed in nine behavior-preserving stages (S0–S9), each gated by a dispatch-decision golden master (byte-identical trace) and reviewed independently.
+
+### What changed
+- `helao/core/servers/orch.py`: **2622 → ~1036 lines** (−60%). It is now a thin composition root — `__init__`/`_init_collaborators` (constructs the collaborators), `exception_handler`, `myinit`, cluster E (e-stop, intentionally retained — see below), and ~75 one-to-three-line delegators that preserve the frozen external surface (the 117 `orch_api`/operator reach-ins and bound-method registrations are unchanged).
+- Eight focused, unit-testable collaborator modules extracted beside it: `orch_global_params.py` (pure fold functions), `orch_persist.py` (`QueuePersister`), `orch_monitor.py` (`ServerMonitor`), `orch_status_sync.py` (`StatusIngester`), `orch_queues.py` (`RunQueues`), `orch_unpack.py` (expansion helpers + `PLATE_API`), `orch_lifecycle.py` (`RunLifecycle`), `orch_dispatch.py` (the FSM inversion: pure `DispatchPolicy` + async `DispatchRunner` + a closed `DispatchStep` union).
+- The dispatch state-machine was **inverted**: decisions (a pure, unit-tested decision table over a read-only `DispatchSnapshot`) are now separated from effects (the async runner). The previously-implicit FSM buried across 200–315-line multi-concern methods is now explicit and testable.
+- Behavior preservation: the dispatch golden master is byte-identical across all nine stages; a controller-run OERSIM end-to-end run confirmed real-server behavior equal through S6 (S7/S8 rest on the byte-identical decision trace + per-stage review — the real-server e2e for those two is pending an unrelated environment fix).
+
+### Card re-score (framework core, `helao/core`)
+
+| CARD | Part-1 (pre-P5) | **Post-P5 (core)** | Why it moves |
+|------|:---------------:|:------------------:|--------------|
+| **Separation** | weak (weakest) | **moderate → strong** | the core god-class is gone: networking, persistence, status-broadcast, queue-CRUD, run-lifecycle, and the dispatch FSM are now separate single-responsibility collaborators |
+| **Clarity** | weak → moderate | **moderate → strong** | no more 200–315-line multi-concern methods; the dispatch loop reads as `snapshot → policy.next_step → execute`, and the decision table is directly unit-tested |
+| Domain Integrity | moderate (whole-system: weak) | **unchanged** | untyped-param/lifecycle contract is a separate fix (still the top remaining core item) |
+| Resilience | moderate | **moderate (slightly up)** | behavior pinned by a golden master + 8 new unit-test modules; magic-string run-state still open |
+| Alignment | moderate | **moderate** | unchanged; ABC-migration + typed-param work is the remaining lever |
+
+**Net:** the pre-P5 weakest-and-tied cards (Separation, Clarity) — which shared the single root cause "god-classes fuse networking + persistence + state-machine + broadcast" — are materially lifted for the framework core. The remaining core levers are the ones P5 deliberately did **not** touch: **Domain Integrity** (typed params + guarded lifecycle state) and the **`HelaoDriver` ABC migration** across deployments (fix #1's deployment half, tracked separately under P4). Whole-system Separation is still gated by the ~26 legacy deployment god-classes, so the deployment-level scoreboard is unchanged until those migrate.
+
+### Deliberately deferred to P5b
+Cluster E (e-stop: `estop_loop`/`estop_actions`/`estop_finish_active`) stays in `orch.py` — freshly redesigned + production-verified, extracted only after one production soak of the inverted dispatch shape. Also P5b: the `supplement_error_action` `actual_order`/`action_actual_order` field-name bug (pre-existing), `dilute`/`autodilute`, and `Active._finish`.
