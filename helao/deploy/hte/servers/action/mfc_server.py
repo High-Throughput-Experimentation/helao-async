@@ -24,6 +24,7 @@ from helao.core.models.sample import (
 )
 from ...drivers.mfc.alicat_driver import (
     AliCatMFC,
+    AliCatMFCPoller,
     MfcExec,
     PfcExec,
     MfcConstConcExec,
@@ -556,8 +557,8 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
         @app.post("/manual_query_state", tags=["private"])
         def manual_query_state(device_name: app.driver.dev_mfcs = devices[0]):
-            """Force a single status read from the chosen device."""
-            return app.driver.manual_query_status(device_name)
+            """Return the most recent live-buffer entry for the chosen device."""
+            return app.base.get_lbuf(device_name)
 
         @app.post("/read_valve_register", tags=["private"])
         def read_valve_register(device_name: app.driver.dev_mfcs = devices[0]):
@@ -600,6 +601,7 @@ def makeApp(server_key) -> BaseAPI:
         version=0.1,
         driver_classes=[AliCatMFC],
         dyn_endpoints=mfc_dyn_endpoints,
+        poller_class=AliCatMFCPoller,
     )
 
     return app
