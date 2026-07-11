@@ -130,7 +130,7 @@ def OERSIM_sub_decision(
         GPSIM_server,
         "check_condition",
         {
-            "stop_condtion": stop_condition,
+            "stop_condition": stop_condition,
             "thresh_value": thresh_value,
             "repeat_experiment_name": repeat_experiment_name,
             "repeat_experiment_params": repeat_experiment_params,
