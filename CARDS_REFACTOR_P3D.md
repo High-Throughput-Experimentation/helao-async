@@ -6,8 +6,8 @@
 > `CARDS_REFACTOR_P3.md` §3d sketch. Methodology: the declared-deltas rigor of `CARDS_REFACTOR_P3C.md`
 > §3 (exhaustive delta enumeration; anything else in a diff is a defect; capture-per-delta commits).
 > Branch: `feat/cards-refactor`, entry HEAD `b6235127` (clean tree, verified 2026-07-10). Parent repo
-> only — the `test` deployment lives in the parent; **no nested-repo commits in 3d**; hte/lila/mea/priv
-> experiment/param code is untouched (their typing is deferred post-P3; mea `wait_for_temperature`
+> only — the `test` deployment lives in the parent; **no nested-repo commits in 3d**; hte/Deployment-A/Deployment-B/Deployment-C
+> experiment/param code is untouched (their typing is deferred post-P3; Deployment-B `wait_for_temperature`
 > schema divergence is the known blocker there).
 >
 > **Risk class: LOW-MEDIUM** — sims only, no hardware, no core-model change; but it is the
@@ -65,7 +65,7 @@ rejected the key at authoring time), which makes it the strongest possible pilot
 zero-delta reading) self-defeating: it would enshrine the defect inside the typed model that exists
 to prevent it. **Decision:** fix the typo as its own commit with its own e2e capture (3d-T1), so the
 key-rename delta is enumerated in isolation before any typed-model change, exactly like 3a handled
-lila `stop_ce_pump`. The harness runs on default params (`max_iters`), where old backfilled value ==
+Deployment-A `stop_ce_pump`. The harness runs on default params (`max_iters`), where old backfilled value ==
 new authored value, so the T1 delta is a pure key rename + disappearance of the backfill line — no
 run-behavior change in the gate itself. Sequence-level spelling was always correct
 (`OERSIM_seq.py:41`, `multi_orch_demo_helper.py:41`), so nothing outside `OERSIM_exp.py:133` changes.
@@ -441,13 +441,13 @@ policy; commit 1 pushed with it). No nested-repo commits.
 - **Import-weight regression:** the suite gate runs at every `launch.py` on every station;
   `param_models.py` and the test module are pydantic-only and the T2 gate asserts gpflow/tensorflow
   absent from `sys.modules`. The enum deliberately does NOT live in the driver (D4).
-- **Windows/hte exposure: none.** No hte/lila/mea/priv file changes (T5 grep-pledge); the one core
+- **Windows/hte exposure: none.** No hte/Deployment-A/Deployment-B/Deployment-C file changes (T5 grep-pledge); the one core
   file touched is the `run_unit_tests.py` registry line; new test imports are OS-neutral.
 - **Sim nondeterminism:** GPSIM seed 9999 / CPSIM plate 2750 unchanged; chunk-boundary noise is
   absorbed by multiset compare; anything the double-baseline doesn't absorb blocks at T0, before
   code changes, where it is a harness bug by definition.
 - **Pattern risk (this is the pattern-setter):** the §5 module docstring carries the adopter
-  contract (field order, `use_enum_values`, `extra="forbid"`, no driver-module placement) so hte/lila
+  contract (field order, `use_enum_values`, `extra="forbid"`, no driver-module placement) so hte/Deployment-A
   adoption copies the constraints, not just the shape.
 
 ---
@@ -467,7 +467,7 @@ policy; commit 1 pushed with it). No nested-repo commits.
 - [ ] `repeat_experiment_params` reflection dict (OERSIM_exp.py:186-190) left untyped — round-trip
       typing depends on the ActionPlanMaker item above.
 - [ ] Extending the typed-param pattern beyond OERSIM: `TEST_exp`/`simulatews_exp` (trivial), then
-      hte/lila/mea post-P3 — mea `wait_for_temperature` payload divergence (targets+success_count vs
-      flat setpoint) remains the known mea blocker (carry-over from P3 §4).
+      hte/Deployment-A/Deployment-B post-P3 — Deployment-B `wait_for_temperature` payload divergence (targets+success_count vs
+      flat setpoint) remains the known Deployment-B blocker (carry-over from P3 §4).
 - [ ] Carry-overs unchanged from 3a/3c: base.py:1441 `set_error` field-target oddity; 3e soak
       window + enforcement flip; `SampleModel.sample_type` enum tightening.

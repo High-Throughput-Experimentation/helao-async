@@ -823,7 +823,7 @@ grep -rEn "world_cfg\[.servers.\]\[[^]]+\]\[.(host|port).\]" helao/core/servers/
 ```
 Then: **one parent-repo commit** (T1+T2+TA test files; harness stays untracked under `.omc/`) on
 `feat/cards-refactor`, commit message stating the e2e diff-empty proof and the smoke-parity result;
-push (per-increment push policy). **No nested-repo commits in 3b** — lila/mea/priv are untouched
+push (per-increment push policy). **No nested-repo commits in 3b** — Deployment-A/Deployment-B/Deployment-C are untouched
 (their deployment code reads `self.base.world_cfg[...]`, which the shim preserves; `Base.__init__`
 gains only an optional trailing param).
 

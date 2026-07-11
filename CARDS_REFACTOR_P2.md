@@ -1,8 +1,8 @@
 # CARDS Refactor — P2: Kill duplication (full plan)
 
 > Expands `CARDS_REFACTOR_PLAN.md` §4 "P2 — Kill duplication". Evidence: `CARDS_AUDIT.md` Part 2.
-> Date: 2026-07-10 · Branches: `feat/cards-refactor` on parent + nested lila, mea, priv repos
-> (`deploy/lila_gl` and `deploy/mea/notes` excluded entirely). Increment 1 (RunDir enum) already landed.
+> Date: 2026-07-10 · Branches: `feat/cards-refactor` on parent + nested Deployment-A, Deployment-B, Deployment-C repos
+> (`deploy/Deployment-D` and `deploy/Deployment-B/notes` excluded entirely). Increment 1 (RunDir enum) already landed.
 > CARDS cards strengthened: **Resilience** (single source of truth), **Clarity**.
 
 ---
@@ -20,9 +20,9 @@ OpenAPI operation ids) must be byte-identical, proven by captured baselines.
 | # | Repo | Target | Audit evidence |
 |---|------|--------|----------------|
 | T1 | parent (hte) | `specifications/last2weeks.py` + `bimonthly.py` byte-identical; `last3months.py` differs by one number → one parameterized parser + 3 thin wrapper files | Part 2 hte |
-| T2 | lila (nested) | `sequences/SDC_seq.py` three ~430–516-line near-duplicate sequences (`:3487`, `:3972`, `:4488`) → one core builder + 3 signature-preserving wrappers | Part 2 lila |
-| T3 | mea (nested) | `experiments/AMTS_exp.py`: 29× copy-pasted `SampleModel` block → factory; `configure_leancat` vs `configure_leancat_for_ADVENT_MEA` → extract byte-identical common stages only | Part 2 mea |
-| T4 | priv (nested) | delete dead `extract_parts` in `scripts/common/helao_nbio.py`; unify the four `/run_<instrument>` handlers — **scope correction: they live in `servers/action/batch_convert_server.py:387-405`, not helao_nbio.py** | Part 2 priv |
+| T2 | Deployment-A (nested) | `sequences/SDC_seq.py` three ~430–516-line near-duplicate sequences (`:3487`, `:3972`, `:4488`) → one core builder + 3 signature-preserving wrappers | Part 2 Deployment-A |
+| T3 | Deployment-B (nested) | `experiments/AMTS_exp.py`: 29× copy-pasted `SampleModel` block → factory; `configure_leancat` vs `configure_leancat_for_ADVENT_MEA` → extract byte-identical common stages only | Part 2 Deployment-B |
+| T4 | Deployment-C (nested) | delete dead `extract_parts` in `scripts/common/helao_nbio.py`; unify the four `/run_<instrument>` handlers — **scope correction: they live in `servers/action/batch_convert_server.py:387-405`, not helao_nbio.py** | Part 2 Deployment-C |
 
 **Decisions (one option each, per mandate):**
 
@@ -33,13 +33,13 @@ OpenAPI operation ids) must be byte-identical, proven by captured baselines.
 - **`extract_parts_old` is LIVE, not dead** (called from `scripts/icpms/convert_icpms_csv.py:174,177`).
   Despite the name, it is the icpms conversion path. P2 deletes only the genuinely dead
   `extract_parts` (zero callers repo-wide). No rename of `extract_parts_old` in P2 (open question).
-- **mea `configure_leancat*`: dedupe identical stages only, do NOT unify.** The two functions have a
+- **Deployment-B `configure_leancat*`: dedupe identical stages only, do NOT unify.** The two functions have a
   real payload-schema divergence in `wait_for_temperature` (`targets` dict + `success_count` vs flat
   `setpoint`) plus `process_finish`/`from_global_act_params`/`technique_name` differences. Unifying
   those is a behavior change → out of scope; divergent steps stay inline verbatim (open question).
 - **`bimonthly.py` keeps its current 2-week behavior** (it is byte-identical to `last2weeks.py`
   today, i.e. `range(2)` despite the name). "Fixing" it to ~8 weeks is a behavior change (open question).
-- **priv route factory iterates the fixed tuple `("bruker","edax","xafs","icpms")`**, NOT
+- **Deployment-C route factory iterates the fixed tuple `("bruker","edax","xafs","icpms")`**, NOT
   `JOB_MODULES.keys()` — deriving from the registry would drop `/run_edax` (edax is commented out of
   `JOB_MODULES`) and add routes for `xrfs_quant`/`xrfs_cal`. Both are behavior changes (open questions).
 - **hte production safety:** T1 touches only `helao/deploy/hte/specifications/` — these files are
@@ -59,26 +59,26 @@ OpenAPI operation ids) must be byte-identical, proven by captured baselines.
    Because the module is exec'd outside the package, wrapper files must use **absolute imports**
    (`from helao.deploy.hte.specifications... import ...`) — fine, since `PYTHONPATH` always includes
    the repo root. Config-referenced paths (e.g. `hte/configs/ccsi2.yml:23` → `last2weeks.py`;
-   ~10 configs + `priv/configs/icpm1.yml:19` → `last3months.py`) must keep resolving to real files.
+   ~10 configs + `Deployment-C/configs/icpm1.yml:19` → `last3months.py`) must keep resolving to real files.
 2. **`ActionPlanMaker.__init__` inspects the caller's frame** (`helao/helpers/premodels.py:409-411`):
-   it reads the calling function's declared args and `co_name`. Therefore in mea, `apm =
+   it reads the calling function's declared args and `co_name`. Therefore in Deployment-B, `apm =
    ActionPlanMaker()` **must remain inside each public experiment function**. `apm.add(...)` is
    frame-free (`premodels.py:496-541`), so groups of `add` calls MAY move into private helpers that
    receive `apm` + explicit values.
-3. **`ExperimentPlanMaker` is frame-free** (`premodels.py:551-583`): lila sequence bodies can
+3. **`ExperimentPlanMaker` is frame-free** (`premodels.py:551-583`): Deployment-A sequence bodies can
    delegate entirely to a shared core function; only the public function's **name, signature with
    defaults, and `@sequence(version=N)` decorator** are contract (the operator/spec-parser introspect
    signatures via `inspect.getfullargspec` — wrappers must use real named params, never `**kwargs`).
-4. **lila public-name registry:** configs list the module (`configs/electrode-demo.py:16`
+4. **Deployment-A public-name registry:** configs list the module (`configs/electrode-demo.py:16`
    `sequence_libraries: ["SDC_seq"]`); the orchestrator enumerates `__all__`/`SEQUENCES`
    (`SDC_seq.py:11-37`). The three function names must stay in `__all__` unchanged. Additionally,
    `processors/append_ref_vshe.py:25` string-matches the literal `"SDC_seq_EFG_MUX_autoimport"`
    (currently dormant — commented out in the config) — names are preserved, so no change needed there.
-5. **mea public-name registry:** `configs/amts.yml` lists `AMTS_exp`/`AMTS_seq`; `AMTS_seq.py` calls
+5. **Deployment-B public-name registry:** `configs/amts.yml` lists `AMTS_exp`/`AMTS_seq`; `AMTS_seq.py` calls
    `epm.add("configure_leancat", ...)` (`:146`, `:414`) and
    `epm.add("configure_leancat_for_ADVENT_MEA", ...)` (`:658`) by string; `EXPERIMENTS`
    (`AMTS_exp.py:15-43`) lists both. Names and signatures unchanged.
-6. **FastAPI operation ids** derive from endpoint function `__name__` — the priv route factory must
+6. **FastAPI operation ids** derive from endpoint function `__name__` — the Deployment-C route factory must
    set `__name__ = f"run_{name}"` and the original docstring on each generated handler so the OpenAPI
    schema is unchanged.
 
@@ -149,7 +149,7 @@ differs only in docstrings and `for i in range(2)` → `range(15)` (`lister`, li
   ```
 
 - **Each existing file becomes a thin wrapper at the SAME path** (paths are the config contract —
-  `seqspec_parser_path` values in ~12 configs across hte/priv point at these basenames):
+  `seqspec_parser_path` values in ~12 configs across hte/Deployment-C point at these basenames):
 
   ```python
   """Specification parser that lists sequence zip files from the last 2 weeks. ..."""
@@ -180,7 +180,7 @@ built by the script containing `YY.WW` week folders for each of the last 20 week
 zips inside the window to exercise the `[:50]` truncation. `list_params`/`parser` need a live orch —
 they are covered by the verbatim-code-move rule plus diff review, not the harness.
 
-### T2 — lila `sequences/SDC_seq.py` (nested repo `helao/deploy/lila`)
+### T2 — Deployment-A `sequences/SDC_seq.py` (nested repo `helao/deploy/Deployment-A`)
 
 **The three variants (before):**
 
@@ -234,14 +234,14 @@ On Linux that forward-slash path is *relative*, so the harness runs from a scrat
 literal `./C:/sdc_config/mux_electrolytes.csv` fixture:
 
 ```bash
-mkdir -p /tmp/p2_equiv/lila/'C:'/sdc_config
-cd /tmp/p2_equiv/lila
+mkdir -p /tmp/p2_equiv/Deployment-A/'C:'/sdc_config
+cd /tmp/p2_equiv/Deployment-A
 # executor: read the MUX lookup loop in SDC_seq.py to determine the required CSV columns,
 # then write a fixture with rows covering the default mux_valve_no values plus one extra valve.
-PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao --cwd /tmp/p2_equiv/lila python sdc_check.py capture
+PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao --cwd /tmp/p2_equiv/Deployment-A python sdc_check.py capture
 ```
 
-Verify the fixture makes `import helao.deploy.lila.sequences.SDC_seq` succeed **before** any edit;
+Verify the fixture makes `import helao.deploy.Deployment-A.sequences.SDC_seq` succeed **before** any edit;
 the fixture is identical for capture and compare, so any fixture-shape imperfection cancels out.
 
 **Equivalence check (`sdc_check.py capture|compare`):** for each of the three public functions, call
@@ -250,7 +250,7 @@ with (a) all defaults, and (b) one non-default combo (≥2 entries in `sample_no
 branch). Dump `[m.model_dump() for m in fn(...)]` (`ShortExperimentModel` list — no uuids, fully
 deterministic) to JSON; compare byte-identical after refactor (double-capture rule from §3 applies).
 
-### T3 — mea `experiments/AMTS_exp.py` (nested repo `helao/deploy/mea`)
+### T3 — Deployment-B `experiments/AMTS_exp.py` (nested repo `helao/deploy/Deployment-B`)
 
 **Part A — `SampleModel` factory.** The block below is copy-pasted 29× (representative:
 `AMTS_exp.py:317-325`; full site list at lines 317, 383, 413, 524, 554, 669, 902, 935, 1143, 1176,
@@ -285,7 +285,7 @@ def _mea_sample(mea_global_label, mea_supplier, mea_gdl_type, comment) -> Sample
 Call sites become `"fast_samples_in": [_mea_sample(mea_global_label, mea_supplier, mea_gdl_type, comment)]`.
 Also delete the ~13 dead `MEA_sample: SampleModel = SampleModel()` assignments (each declared once
 near a function top and never referenced again — confirmed by grep). `_mea_sample` is NOT added to
-`EXPERIMENTS`. Do not touch `deploy/mea/notes/**` (excluded), even though it contains a stale copy.
+`EXPERIMENTS`. Do not touch `deploy/Deployment-B/notes/**` (excluded), even though it contains a stale copy.
 
 **Part B — `configure_leancat` (:691) vs `configure_leancat_for_ADVENT_MEA` (:983) common core.**
 Diff-confirmed: identical 3-stage skeleton (`set_valves` → flow/temp stage A → flow/temp stage B →
@@ -317,7 +317,7 @@ decorators, and keep `apm = ActionPlanMaker()` as their first statement (**manda
 `configure_leancat_for_*` sibling defs (:2083, :2337, :2545, :2779) or `AMTS_seq.py`.
 
 **Equivalence check (`/tmp/p2_equiv/mea_check.py capture|compare`):**
-`import helao.deploy.mea.experiments.AMTS_exp` works on Linux (verified). The script iterates every
+`import helao.deploy.Deployment-B.experiments.AMTS_exp` works on Linux (verified). The script iterates every
 live name in `EXPERIMENTS`, calls each function with all-default args inside `try/except`, and
 records `{name: [a.model_dump() for a in result]}` for successes plus the sorted list of names that
 raised (with exception type). Requirements: the success/failure name sets are identical pre/post;
@@ -325,7 +325,7 @@ every successful dump is byte-identical (after §3's double-capture nondetermini
 `Experiment()` fallback fields like timestamps are the likely candidates); `configure_leancat` and
 `configure_leancat_for_ADVENT_MEA` MUST be in the success set.
 
-### T4 — priv (nested repo `helao/deploy/priv`)
+### T4 — Deployment-C (nested repo `helao/deploy/Deployment-C`)
 
 **Part A — dead-code deletion in `scripts/common/helao_nbio.py`.**
 
@@ -367,18 +367,18 @@ error because `"edax"` is commented out of `JOB_MODULES` at :52-61; preserved as
 No change to `_run_job`, `JOB_MODULES`, `_summarize`, or `/run_directory`.
 
 **Equivalence check:** `py_compile` both files; import parity (`import
-helao.deploy.priv.scripts.common.helao_nbio` succeeds on Linux — verified pre-change — and must
-still succeed; attempt `import helao.deploy.priv.servers.action.batch_convert_server` pre-change:
+helao.deploy.Deployment-C.scripts.common.helao_nbio` succeeds on Linux — verified pre-change — and must
+still succeed; attempt `import helao.deploy.Deployment-C.servers.action.batch_convert_server` pre-change:
 if it imports on Linux it must still import, otherwise its gate is `py_compile` only); grep
 route-string preservation (see task table); grep-zero for the deleted symbol:
-`grep -rnw "extract_parts" helao/deploy/priv --include='*.py'` must return only `extract_parts_old`
+`grep -rnw "extract_parts" helao/deploy/Deployment-C --include='*.py'` must return only `extract_parts_old`
 / `extract_parts_json` hits.
 
 ---
 
 ## 5. Task table
 
-Groups: **A = P2-01…P2-04, fully parallel** (disjoint by repo: parent/lila/mea/priv — zero shared
+Groups: **A = P2-01…P2-04, fully parallel** (disjoint by repo: parent/Deployment-A/Deployment-B/Deployment-C — zero shared
 files). **P2-05 serial-post.** Executors: Sonnet. Each task captures its own baseline BEFORE editing,
 edits, compares, then commits **its own repo** (nested repos committed from inside their directory —
 they are invisible to parent git). Baseline scripts stay in `/tmp/p2_equiv/`, never committed.
@@ -386,10 +386,10 @@ they are invisible to parent git). Baseline scripts stay in `/tmp/p2_equiv/`, ne
 | ID | Title | Repo | Files | Depends on | Group | Verification (all must pass) |
 |----|-------|------|-------|-----------|-------|------------------------------|
 | P2-01 | hte spec parsers → `WeekWindowSpecParser` + 3 thin wrappers | parent | `helao/deploy/hte/specifications/{week_window.py (NEW), last2weeks.py, bimonthly.py, last3months.py}` | — | A | `conda run -n helao python /tmp/p2_equiv/specs_check.py capture` (×2, pre-edit) then `... compare` byte-identical (the script itself performs the production-style file-location load + `SpecParser()` instantiation of each of the 3 files, so load success is part of the gate); `conda run -n helao python -c "import helao.deploy.hte.specifications.week_window"`; `conda run -n helao python run_unit_tests.py`; `ls` confirms all 3 original paths still exist; commit on parent `feat/cards-refactor` |
-| P2-02 | lila SDC triple sequences → `_sdc_efg_mux_autoimport_core` + 3 wrappers | lila | `helao/deploy/lila/sequences/SDC_seq.py` | — | A | build CSV fixture; from `/tmp/p2_equiv/lila`: `PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao python sdc_check.py capture` (×2) then `... compare` byte-identical (defaults + non-default combo per function); `conda run -n helao python -m py_compile helao/deploy/lila/sequences/SDC_seq.py`; `grep -n "SDC_seq_EFG_MUX_autoimport" helao/deploy/lila/sequences/SDC_seq.py` shows all 3 names in `__all__` and as `def`s; `grep -c getfullargspec`-introspectable: no `**kwargs` in the 3 wrapper signatures; `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/lila` |
-| P2-03 | mea `_mea_sample` factory + leancat common-stage extraction | mea | `helao/deploy/mea/experiments/AMTS_exp.py` | — | A | `conda run -n helao python /tmp/p2_equiv/mea_check.py capture` (×2) then `... compare`: identical success/failure sets + byte-identical dumps, `configure_leancat*` both in success set; `conda run -n helao python -c "import helao.deploy.mea.experiments.AMTS_exp"`; `grep -n 'SampleModel(' helao/deploy/mea/experiments/AMTS_exp.py` → only the factory + type annotations remain (no inline `SampleModel(**{` blocks, no `= SampleModel()` dead inits); `EXPERIMENTS` list unchanged (`git diff` shows no edits in lines 15-43); `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/mea` |
-| P2-04 | priv: delete dead `extract_parts`; `/run_*` route factory | priv | `helao/deploy/priv/scripts/common/helao_nbio.py`, `helao/deploy/priv/scripts/edax/converters.py`, `helao/deploy/priv/scripts/xafs/converters.py`, `helao/deploy/priv/servers/action/batch_convert_server.py` | — | A | `conda run -n helao python -m py_compile` all 4 files; `conda run -n helao python -c "import helao.deploy.priv.scripts.common.helao_nbio"`; batch_convert_server import-parity rule (§4 T4); `grep -n '"/run_bruker"\|"/run_edax"\|"/run_xafs"\|"/run_icpms"\|f"/run_{' helao/deploy/priv/servers/action/batch_convert_server.py` confirms all 4 paths still constructed; `grep -rnw extract_parts helao/deploy/priv --include='*.py'` → zero bare-name hits; `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/priv` |
-| P2-05 | Whole-tree verification sweep + config-reference check + push | all | — | P2-01…04 | serial-post | §6 script below; then push parent + lila + mea + priv `feat/cards-refactor` branches |
+| P2-02 | Deployment-A SDC triple sequences → `_sdc_efg_mux_autoimport_core` + 3 wrappers | Deployment-A | `helao/deploy/Deployment-A/sequences/SDC_seq.py` | — | A | build CSV fixture; from `/tmp/p2_equiv/Deployment-A`: `PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao python sdc_check.py capture` (×2) then `... compare` byte-identical (defaults + non-default combo per function); `conda run -n helao python -m py_compile helao/deploy/Deployment-A/sequences/SDC_seq.py`; `grep -n "SDC_seq_EFG_MUX_autoimport" helao/deploy/Deployment-A/sequences/SDC_seq.py` shows all 3 names in `__all__` and as `def`s; `grep -c getfullargspec`-introspectable: no `**kwargs` in the 3 wrapper signatures; `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/Deployment-A` |
+| P2-03 | Deployment-B `_mea_sample` factory + leancat common-stage extraction | Deployment-B | `helao/deploy/Deployment-B/experiments/AMTS_exp.py` | — | A | `conda run -n helao python /tmp/p2_equiv/mea_check.py capture` (×2) then `... compare`: identical success/failure sets + byte-identical dumps, `configure_leancat*` both in success set; `conda run -n helao python -c "import helao.deploy.Deployment-B.experiments.AMTS_exp"`; `grep -n 'SampleModel(' helao/deploy/Deployment-B/experiments/AMTS_exp.py` → only the factory + type annotations remain (no inline `SampleModel(**{` blocks, no `= SampleModel()` dead inits); `EXPERIMENTS` list unchanged (`git diff` shows no edits in lines 15-43); `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/Deployment-B` |
+| P2-04 | Deployment-C: delete dead `extract_parts`; `/run_*` route factory | Deployment-C | `helao/deploy/Deployment-C/scripts/common/helao_nbio.py`, `helao/deploy/Deployment-C/scripts/edax/converters.py`, `helao/deploy/Deployment-C/scripts/xafs/converters.py`, `helao/deploy/Deployment-C/servers/action/batch_convert_server.py` | — | A | `conda run -n helao python -m py_compile` all 4 files; `conda run -n helao python -c "import helao.deploy.Deployment-C.scripts.common.helao_nbio"`; batch_convert_server import-parity rule (§4 T4); `grep -n '"/run_bruker"\|"/run_edax"\|"/run_xafs"\|"/run_icpms"\|f"/run_{' helao/deploy/Deployment-C/servers/action/batch_convert_server.py` confirms all 4 paths still constructed; `grep -rnw extract_parts helao/deploy/Deployment-C --include='*.py'` → zero bare-name hits; `conda run -n helao python run_unit_tests.py`; commit inside `helao/deploy/Deployment-C` |
+| P2-05 | Whole-tree verification sweep + config-reference check + push | all | — | P2-01…04 | serial-post | §6 script below; then push parent + Deployment-A + Deployment-B + Deployment-C `feat/cards-refactor` branches |
 
 Shared-file contention: none — the four group-A tasks touch four disjoint repos, and within each
 repo a single task owns every touched file. If a hotfix lands on `unstable` mid-flight, rebase the
@@ -405,29 +405,29 @@ cd /mnt/STORAGE/repos/helao/helao-async
 # 0) Global gate
 conda run -n helao python run_unit_tests.py
 
-# 1) hte/priv spec-parser paths: every config-referenced spec basename still exists and defines SpecParser
-grep -rn "seqspec_parser_path" helao/deploy/hte/configs helao/deploy/priv/configs
+# 1) hte/Deployment-C spec-parser paths: every config-referenced spec basename still exists and defines SpecParser
+grep -rn "seqspec_parser_path" helao/deploy/hte/configs helao/deploy/Deployment-C/configs
 ls helao/deploy/hte/specifications/last2weeks.py \
    helao/deploy/hte/specifications/bimonthly.py \
    helao/deploy/hte/specifications/last3months.py
 grep -l "class SpecParser" helao/deploy/hte/specifications/{last2weeks,bimonthly,last3months}.py  # all 3
 
-# 2) lila: public sequence names still defined and exported; processor literal still matches
+# 2) Deployment-A: public sequence names still defined and exported; processor literal still matches
 grep -n 'def SDC_seq_EFG_MUX_autoimport\b\|def SDC_seq_EFG_MUX_autoimport_PEIS_test\b\|def SDC_seq_EFG_MUX_autoimport_PEIS\b' \
-    helao/deploy/lila/sequences/SDC_seq.py                       # 3 hits
-grep -n '"SDC_seq_EFG_MUX_autoimport"' helao/deploy/lila/sequences/SDC_seq.py \
-    helao/deploy/lila/processors/append_ref_vshe.py              # __all__ + processor hit intact
+    helao/deploy/Deployment-A/sequences/SDC_seq.py                       # 3 hits
+grep -n '"SDC_seq_EFG_MUX_autoimport"' helao/deploy/Deployment-A/sequences/SDC_seq.py \
+    helao/deploy/Deployment-A/processors/append_ref_vshe.py              # __all__ + processor hit intact
 
-# 3) mea: string-called experiment names still defined + registered
+# 3) Deployment-B: string-called experiment names still defined + registered
 grep -n 'def configure_leancat\b\|def configure_leancat_for_ADVENT_MEA\b' \
-    helao/deploy/mea/experiments/AMTS_exp.py                     # 2 hits
+    helao/deploy/Deployment-B/experiments/AMTS_exp.py                     # 2 hits
 grep -n '"configure_leancat"\|"configure_leancat_for_ADVENT_MEA"' \
-    helao/deploy/mea/experiments/AMTS_exp.py helao/deploy/mea/sequences/AMTS_seq.py  # EXPERIMENTS + epm.add sites
+    helao/deploy/Deployment-B/experiments/AMTS_exp.py helao/deploy/Deployment-B/sequences/AMTS_seq.py  # EXPERIMENTS + epm.add sites
 
-# 4) priv: HTTP routes preserved; dead symbol gone; live symbols intact
-grep -n 'run_bruker\|run_edax\|run_xafs\|run_icpms' helao/deploy/priv/servers/action/batch_convert_server.py
-grep -rnw 'extract_parts' helao/deploy/priv --include='*.py'     # only _old/_json variants remain
-grep -n 'extract_parts_old' helao/deploy/priv/scripts/icpms/convert_icpms_csv.py  # caller untouched
+# 4) Deployment-C: HTTP routes preserved; dead symbol gone; live symbols intact
+grep -n 'run_bruker\|run_edax\|run_xafs\|run_icpms' helao/deploy/Deployment-C/servers/action/batch_convert_server.py
+grep -rnw 'extract_parts' helao/deploy/Deployment-C --include='*.py'     # only _old/_json variants remain
+grep -n 'extract_parts_old' helao/deploy/Deployment-C/scripts/icpms/convert_icpms_csv.py  # caller untouched
 
 # 5) dbpack untouched (frozen per decision)
 git diff --stat feat/cards-refactor -- helao/deploy/hte/drivers/data/dbpack_driver.py \
@@ -436,11 +436,11 @@ git diff --stat feat/cards-refactor -- helao/deploy/hte/drivers/data/dbpack_driv
 # 6) Duplication actually killed
 diff helao/deploy/hte/specifications/last2weeks.py helao/deploy/hte/specifications/bimonthly.py | head -5
     # now differ ONLY in docstrings (both WEEKS = 2), and each file is <~20 lines
-wc -l helao/deploy/hte/specifications/*.py helao/deploy/lila/sequences/SDC_seq.py
+wc -l helao/deploy/hte/specifications/*.py helao/deploy/Deployment-A/sequences/SDC_seq.py
 ```
 
-Per-repo commit inventory check: `git -C . log --oneline -1`, `git -C helao/deploy/lila log --oneline -1`,
-`git -C helao/deploy/mea log --oneline -1`, `git -C helao/deploy/priv log --oneline -1` — one P2
+Per-repo commit inventory check: `git -C . log --oneline -1`, `git -C helao/deploy/Deployment-A log --oneline -1`,
+`git -C helao/deploy/Deployment-B log --oneline -1`, `git -C helao/deploy/Deployment-C log --oneline -1` — one P2
 commit each; then push all four.
 
 ---
@@ -450,24 +450,24 @@ commit each; then push all four.
 - **No behavior change by construction + by measurement.** Every wrapper reproduces the exact
   serialized payloads (captured baselines, double-capture nondeterminism exclusion). The three
   highest-risk semantic traps are each closed by a specific rule: (1) `ActionPlanMaker` frame
-  inspection → the constructor never moves out of the public mea functions; (2) signature
+  inspection → the constructor never moves out of the public Deployment-B functions; (2) signature
   introspection by the operator UI / spec parsers → wrappers keep real named params with original
   defaults, no `**kwargs`; (3) FastAPI operationIds → factory sets `__name__`/`__doc__`.
 - **hte production exposure: minimal by design.** Only `specifications/*.py` change — loaded solely
   by the operator Bokeh UI, `py`/import-gated, and behavior-pinned by the lister harness. No driver,
   server, or control-path file in hte is touched; dbpack frozen.
-- **lila C-variant literal pinning:** wrapper C must pass the exact literals the current body pins
+- **Deployment-A C-variant literal pinning:** wrapper C must pass the exact literals the current body pins
   (they equal B's defaults, incl. the `5.5` at :4856, NOT A's `-1/200/100` values) — the baseline
   compare catches any slip. The dormant `append_ref_vshe.py` literal-match survives because names
   never change.
-- **mea leancat divergences are load-bearing until proven otherwise:** the `targets`-vs-`setpoint`
+- **Deployment-B leancat divergences are load-bearing until proven otherwise:** the `targets`-vs-`setpoint`
   `wait_for_temperature` schemas stay verbatim; only diff-proven-identical stages are extracted. If
   the executor's diff shows a stage is NOT byte-identical (beyond local-variable naming), it stays
   inline — when in doubt, extract less.
-- **priv `/run_edax` stays a silent no-op** (registry-disabled) — deliberately preserved; changing it
+- **Deployment-C `/run_edax` stays a silent no-op** (registry-disabled) — deliberately preserved; changing it
   is a behavior decision for the owner.
 - **Baseline-first discipline:** if any capture script cannot be made to run pre-change (e.g. the
-  lila CSV fixture columns can't be satisfied), the task STOPS and reports — do not refactor without
+  Deployment-A CSV fixture columns can't be satisfied), the task STOPS and reports — do not refactor without
   a working baseline. `py_compile` alone is only an acceptable gate where the plan explicitly says so.
 - **Rollback:** one commit per repo, no cross-repo dependency (unlike Increment 1, P2 introduces no
   shared parent-repo module consumed by nested repos — `week_window.py` is consumed only by hte files
@@ -484,13 +484,13 @@ commit each; then push all four.
 - `bimonthly.py` behaves as a 2-week window (byte-identical to last2weeks); intended ~8? Behavior
   decision for the hte owner; P2 preserves `WEEKS = 2`. (Also: no hte config currently references
   `bimonthly.py` — retire the file entirely?)
-- mea `wait_for_temperature` payload divergence (`targets`+`success_count` vs flat `setpoint`) —
+- Deployment-B `wait_for_temperature` payload divergence (`targets`+`success_count` vs flat `setpoint`) —
   latent bug or two supported schemas? Blocks any future unification of `configure_leancat*`.
-- priv `/run_edax` permanently returns "not available" (edax disabled in `JOB_MODULES`); and
+- Deployment-C `/run_edax` permanently returns "not available" (edax disabled in `JOB_MODULES`); and
   `xrfs_quant`/`xrfs_cal` jobs have no dedicated routes — retire the route or derive routes from the
   registry? (behavior change, owner decision).
-- priv `extract_parts_old`: misleading name + shallow recursion (re-loads the same top-level meta
+- Deployment-C `extract_parts_old`: misleading name + shallow recursion (re-loads the same top-level meta
   instead of descending into parts) — rename/fix in a later phase with icpms owner sign-off.
-- lila `SDC_seq_EFG_MUX_autoimport_PEIS` hardcodes `plate_id=1` — expose as a param later? (signature
+- Deployment-A `SDC_seq_EFG_MUX_autoimport_PEIS` hardcodes `plate_id=1` — expose as a param later? (signature
   change → operator-visible; not P2).
-- lila `stop_ce_pump: bool = "True"` (`SDC_seq.py:2252`) — still deferred to P3 (P1 carry-over).
+- Deployment-A `stop_ce_pump: bool = "True"` (`SDC_seq.py:2252`) — still deferred to P3 (P1 carry-over).

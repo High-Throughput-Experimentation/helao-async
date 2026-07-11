@@ -83,16 +83,16 @@ HELAO-async is effectively two codebases in one repo:
 
 ## Part 2 — Deployments
 
-Scope: deploy-specific code only (drivers / servers / experiments / sequences / processors / specifications). `helao/core` not re-audited here. `deploy/lila_gl` and `deploy/mea/notes` excluded per request. **No PII / hostnames / credentials from configs were read or reproduced — structure only.** Instrument `*.yml` configs were treated as sensitive and not opened.
+Scope: deploy-specific code only (drivers / servers / experiments / sequences / processors / specifications). `helao/core` not re-audited here. `deploy/Deployment-D` and `deploy/Deployment-B/notes` excluded per request. **No PII / hostnames / credentials from configs were read or reproduced — structure only.** Instrument `*.yml` configs were treated as sensitive and not opened.
 
 ### Cross-deployment scoreboard
 
 | Deployment | Clarity | Alignment | Resilience | Domain Integrity | Separation | Character |
 |-----------|:-------:|:---------:|:----------:|:----------------:|:----------:|-----------|
 | **hte** (production) | weak | mod/weak | weak | weak | weak | 7 ABC drivers vs ~15 legacy god-classes; huge campaign files |
-| **lila** | weak | moderate | weak | weak | weak | mid-migration; `ThorlabsMotor` god-class; 2/9 drivers on ABC |
-| **mea** | weak | weak | weak | weak | moderate | god-weight in exp/seq scripts; 0/4 drivers on ABC |
-| **priv** (analysis) | moderate | **strong** | moderate | weak | **strong** | no instrument drivers; analysis `BaseAnalysis` subclasses; stringly-typed numerics |
+| **Deployment-A** | weak | moderate | weak | weak | weak | mid-migration; `ThorlabsMotor` god-class; 2/9 drivers on ABC |
+| **Deployment-B** | weak | weak | weak | weak | moderate | god-weight in exp/seq scripts; 0/4 drivers on ABC |
+| **Deployment-C** (analysis) | moderate | **strong** | moderate | weak | **strong** | no instrument drivers; analysis `BaseAnalysis` subclasses; stringly-typed numerics |
 | **test** (sims) | moderate | mod/strong* | weak | weak | moderate | ABC-skip is *deliberate* (bare sim helpers); Executor contract honored |
 
 \* `test` Alignment is sound in context: sim helpers intentionally skip `HelaoDriver`, but the load-bearing `Executor` contract IS honored (per project design decision — see memory).
@@ -108,10 +108,10 @@ Migration counts:
 | Deployment | On `HelaoDriver` ABC | Legacy `action_serv: Base` |
 |-----------|---------------------|----------------------------|
 | hte | 7 (gamry, biologic, kinesis, andor, power_supply, netbooter, leancat) | ~15 (PAL, Archive, DBPack, Calc, alicat, galil ×2, nidaqmx, SM303, mecom, legato, simdos, 3× sensor) |
-| lila | 2 (stenner, advantech — exemplary) | 7 (ThorlabsMotor, USB5830, OerAL, MuxCom, Calc, 2× stenner variants) |
-| mea | 0 | 4 (actuator, robotarm, opcua/leancat, stub) — small, not god-classes |
+| Deployment-A | 2 (stenner, advantech — exemplary) | 7 (ThorlabsMotor, USB5830, OerAL, MuxCom, Calc, 2× stenner variants) |
+| Deployment-B | 0 | 4 (actuator, robotarm, opcua/leancat, stub) — small, not god-classes |
 | test | n/a (deliberate bare sims) | 5 sims (GPSim, CPSim, ArchiveSim, MotionSim, WsSim) |
-| priv | n/a (analysis) | uses core `BaseAnalysis` ABC correctly |
+| Deployment-C | n/a (analysis) | uses core `BaseAnalysis` ABC correctly |
 
 The four largest, most business-heavy hte drivers (PAL, Archive, alicat, galil_motion) are all still legacy. ABC adoption correlates directly with smaller, better-separated code.
 
@@ -126,21 +126,21 @@ The four largest, most business-heavy hte drivers (PAL, Archive, alicat, galil_m
 - `specifications/` — `last2weeks.py` and `bimonthly.py` byte-identical; `last3months.py` differs by one number. Should be one parameterized unit.
 - **Reference-quality:** `drivers/pstat/gamry/`, `drivers/pstat/biologic/`, `drivers/motion/kinesis_driver.py` — ABC + `config` seam + `DriverPoller` split + enum/technique modules.
 
-**lila (mid-migration):**
+**Deployment-A (mid-migration):**
 - `drivers/thorlabs_kinesis.py:460` — `ThorlabsMotor` god-class ~1100 lines mixing I/O + alignment logic + Bokeh UI + matrix persistence; `_motor_move:800` ~397 lines.
 - `sequences/SDC_seq.py` — three near-duplicate ~430–516-line sequence variants (`:3487`, `:3972`, `:4488`).
 - Duplicated driver families: stenner ×3, advantech ×2; parallel v1/v2 servers.
 - Type bug: `SDC_seq.py:2252` `stop_ce_pump: bool = "True"` (string default on a bool).
 - **Reference-quality:** `drivers/stenner/driver.py`, `drivers/advantech/driver.py` (ABC + poller + codec/states split) — the intended target.
 
-**mea (god-weight in scripts, not drivers):**
+**Deployment-B (god-weight in scripts, not drivers):**
 - `experiments/AMTS_exp.py` — 2897 LOC; `configure_leancat:691` ~291 lines w/ ~35 flat params; near-duplicate `configure_leancat_for_ADVENT_MEA:983` ~239 lines.
 - `SampleModel` construction block copy-pasted ~24–29× (magic strings `"MEA"`, `gethostname().lower()`).
 - `sequences/AMTS_seq.py` — 1429 LOC; `AMTS_run_echem:30` ~287 lines + two structural clones.
 - `servers/action/test_station_server.py:27` — `test_station_endpoints` ~410 lines.
 - **Strong:** drivers small + focused; `Executor` subclassing honored; core `ErrorCodes` enum used in returns.
 
-**priv (analysis / data-conversion — no instruments):**
+**Deployment-C (analysis / data-conversion — no instruments):**
 - `drivers/data/analyses/uvis_local.py:444` — `calc_abs()` ~210 lines; entire dataflow built from f-string dict keys (`f"{k}_dsat_dnse"`) instead of typed structures.
 - `scripts/common/helao_nbio.py` — 1118-line procedural grab-bag; duplicated `extract_parts`/`_old`/`_json`, S3-vs-local pairs, flag dispatcher `get_info(..., local=True)`.
 - Four near-identical `/run_<instrument>` handlers hardcoding `"bruker"/"edax"/"xafs"/"icpms"`.
@@ -154,14 +154,14 @@ The four largest, most business-heavy hte drivers (PAL, Archive, alicat, galil_m
 
 ### Deployment-level fixes (CARDS-ordered)
 
-1. **Finish the `HelaoDriver` ABC migration** (Alignment + Separation + Domain, all deployments). Priority order by risk × size: **hte PAL, hte Archive, lila ThorlabsMotor, hte galil_motion, hte alicat.** Flip `action_serv: Base` → `config: dict` + typed `DriverResponse`. Gamry/biologic/stenner/advantech are proven templates.
-2. **Kill campaign-file duplication** (Resilience). hte `specifications/` → one parameterized class; lila triple sequences and mea `configure_leancat*` → parameterize; extract the repeated `SampleModel` block (mea ~24–29×) into a factory.
-3. **Type the param/return layer** (Domain Integrity). Replace f-string-dict-key dataflows (priv `calc_abs`) and string-keyed dispatch (test `check_condition`) with enums / typed models. Push existing driver-internal enums up to the experiment layer.
-4. **De-god the analysis grab-bag** (Separation). priv `helao_nbio.py` → split I/O vs parse vs DB; delete `_old` dead variants.
+1. **Finish the `HelaoDriver` ABC migration** (Alignment + Separation + Domain, all deployments). Priority order by risk × size: **hte PAL, hte Archive, Deployment-A ThorlabsMotor, hte galil_motion, hte alicat.** Flip `action_serv: Base` → `config: dict` + typed `DriverResponse`. Gamry/biologic/stenner/advantech are proven templates.
+2. **Kill campaign-file duplication** (Resilience). hte `specifications/` → one parameterized class; Deployment-A triple sequences and Deployment-B `configure_leancat*` → parameterize; extract the repeated `SampleModel` block (Deployment-B ~24–29×) into a factory.
+3. **Type the param/return layer** (Domain Integrity). Replace f-string-dict-key dataflows (Deployment-C `calc_abs`) and string-keyed dispatch (test `check_condition`) with enums / typed models. Push existing driver-internal enums up to the experiment layer.
+4. **De-god the analysis grab-bag** (Separation). Deployment-C `helao_nbio.py` → split I/O vs parse vs DB; delete `_old` dead variants.
 
 ### Deployment bottom line
 
-The **same fault line runs through every deployment**: a small, modern, ABC-conformant core-facing layer sitting next to large legacy god-classes and copy-pasted campaign scripts. Production **hte** has the most legacy mass and the highest stakes. **priv** is the healthiest (strong Alignment + Separation). **test**'s ABC-skip is a correct deliberate boundary, not a defect. Across the board, **finishing the driver-ABC migration is the single highest-leverage move** — it simultaneously lifts Alignment, Separation, Clarity, and Domain Integrity, mirroring the framework-core finding that the weakness is the un-refactored legacy spine, not the design vocabulary.
+The **same fault line runs through every deployment**: a small, modern, ABC-conformant core-facing layer sitting next to large legacy god-classes and copy-pasted campaign scripts. Production **hte** has the most legacy mass and the highest stakes. **Deployment-C** is the healthiest (strong Alignment + Separation). **test**'s ABC-skip is a correct deliberate boundary, not a defect. Across the board, **finishing the driver-ABC migration is the single highest-leverage move** — it simultaneously lifts Alignment, Separation, Clarity, and Domain Integrity, mirroring the framework-core finding that the weakness is the un-refactored legacy spine, not the design vocabulary.
 
 ---
 
@@ -173,8 +173,8 @@ The **same fault line runs through every deployment**: a small, modern, ABC-conf
 
 | Core decision (Part 1) | Its blast radius across deployments (Part 2) |
 |---|---|
-| `Base`/`Active` invite a driver to hold a back-reference (`action_serv: Base`) rather than a `config` seam | Every legacy driver in **hte** (~15), **lila** (7), **mea** (4) inherits the god-class + inverted-dependency shape. The core affordance *is* the deployment Separation/Alignment weakness. |
-| Domain params carried as untyped `dict` (`action_params`, `to_global_params`, `SampleModel.etc`) + all-`Optional` models + non-discriminated sample `Union` | **priv** f-string-dict-key dataflows (`calc_abs`), **mea** `SampleModel` block copy-pasted ~24–29×, **hte** 257 magic-string `apm.add` params, **test** string-keyed stop-condition dispatch. The core's untyped param contract *forces* stringly-typed deployment code. |
+| `Base`/`Active` invite a driver to hold a back-reference (`action_serv: Base`) rather than a `config` seam | Every legacy driver in **hte** (~15), **Deployment-A** (7), **Deployment-B** (4) inherits the god-class + inverted-dependency shape. The core affordance *is* the deployment Separation/Alignment weakness. |
+| Domain params carried as untyped `dict` (`action_params`, `to_global_params`, `SampleModel.etc`) + all-`Optional` models + non-discriminated sample `Union` | **Deployment-C** f-string-dict-key dataflows (`calc_abs`), **Deployment-B** `SampleModel` block copy-pasted ~24–29×, **hte** 257 magic-string `apm.add` params, **test** string-keyed stop-condition dispatch. The core's untyped param contract *forces* stringly-typed deployment code. |
 | `RUNS_*` names + status strings as raw literals, no single source of truth | Re-appears as deployment-level magic strings + duplicated `HelaoPath` (**hte** `dbpack_driver`) + copy-pasted campaign specs. Same "no SoT" class, one layer down. |
 
 The lesson is exactly the CARDS "AI amplifies weak design" thesis at repo scale: a weak core affordance doesn't stay contained — every deployment author (human or AI) reproduces it, so the core's moderate-looking scores under-represent their true cost.
@@ -195,8 +195,8 @@ The lesson is exactly the CARDS "AI amplifies weak design" thesis at repo scale:
 
 **Finishing the `HelaoDriver` ABC migration + typing the param/lifecycle layer** is the highest-leverage work because each lifts **both** layers at once:
 
-1. **ABC migration** (`action_serv: Base` → `config` seam) — fixes core Separation/Alignment *and* de-god-classes ~26 legacy deployment drivers. Priority: hte PAL/Archive/galil, lila ThorlabsMotor.
-2. **Lifecycle as a guarded state + typed params** — fixes core Domain Integrity *and* removes the stringly-typed pressure that produces `calc_abs`, the mea SampleModel copy-paste, and hte's magic-string `apm.add`.
+1. **ABC migration** (`action_serv: Base` → `config` seam) — fixes core Separation/Alignment *and* de-god-classes ~26 legacy deployment drivers. Priority: hte PAL/Archive/galil, Deployment-A ThorlabsMotor.
+2. **Lifecycle as a guarded state + typed params** — fixes core Domain Integrity *and* removes the stringly-typed pressure that produces `calc_abs`, the Deployment-B SampleModel copy-paste, and hte's magic-string `apm.add`.
 3. **Central run-state enum + typed config** — fixes core Resilience *and* the deployment magic-string/duplication class.
 
 Do these at the core first; the deployments largely heal by following the corrected pattern.
