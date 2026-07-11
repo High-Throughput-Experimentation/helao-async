@@ -71,6 +71,7 @@ from helao.core.models.sample import (
     SampleType,
 )
 from helao.helpers.premodels import Action
+from helao.helpers.active_params import ActiveParams
 from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
 from helao.deploy.hte.drivers.robot import pal_driver
 from helao.deploy.hte.drivers.robot.pal_driver import PAL, PalCam
@@ -556,9 +557,17 @@ def _ensure_cam_paths():
     _CAMS_PATCHED = True
 
 
-def _make_pal(trace: list, shim: RecordingShim) -> PAL:
-    _ensure_cam_paths()
+def _make_base(trace: list) -> _FakeBase:
+    """Fresh fake ``app.base`` for one scenario (shares ``trace`` with the pal instance)."""
     ts_counter = itertools.count(1_000_000)
+    return _FakeBase(trace, ts_counter)
+
+
+def _make_pal(shim: RecordingShim) -> PAL:
+    """Construct a bare ``PAL`` instance (Stage-2 seam: no ``self.base`` slot anymore --
+    the job's ``Active`` is injected per-call via ``submit_job``, mirroring the endpoint's
+    K7b ``contain_action`` + ``PALJobExec`` seam)."""
+    _ensure_cam_paths()
     pal = PAL.__new__(PAL)
     pal.archive = shim
     pal.cams = CAMS
@@ -575,11 +584,9 @@ def _make_pal(trace: list, shim: RecordingShim) -> PAL:
     pal.triggerport_start = None
     pal.triggerport_continue = None
     pal.triggerport_done = None
-    pal.action = None
-    pal.active = None
-    pal.IO_do_meas = False
+    pal._job = None
+    pal._worker_task = None
     pal.IO_measuring = False
-    pal.IO_palcam = PalCam()
     pal.IO_continue = False
     pal.IO_error = ErrorCodes.none
     pal.IO_action_run_counter = 0
@@ -618,17 +625,17 @@ def _make_pal(trace: list, shim: RecordingShim) -> PAL:
     pal.IO_trigger_startq = asyncio.Queue()
     pal.IO_trigger_continueq = asyncio.Queue()
     pal.IO_trigger_doneq = asyncio.Queue()
-    pal.base = _FakeBase(trace, ts_counter)
 
     async def _submitjoblist_stub(palcam):
-        trace.append(
+        job = pal._job
+        job.active.trace.append(
             {
                 "domain": "driver",
                 "call": "_sendcommand_submitjoblist_helper",
                 "microcam_methods": [m.method for m in palcam.microcams],
             }
         )
-        palcam.joblist_time = pal.active.get_realtime_nowait()
+        palcam.joblist_time = job.active.get_realtime_nowait()
         return ErrorCodes.none
 
     pal._sendcommand_submitjoblist_helper = _submitjoblist_stub
@@ -643,7 +650,7 @@ def _make_pal(trace: list, shim: RecordingShim) -> PAL:
         palaction.continue_time = base + 1
         palaction.done_time = base + 2
         pal.IO_continue = True
-        trace.append(
+        pal._job.active.trace.append(
             {
                 "domain": "driver",
                 "call": "_sendcommand_triggerwait",
@@ -672,22 +679,75 @@ def _make_action(name: str, action_params: dict, det_seed: str) -> Action:
 
 
 # ---------------------------------------------------------------------------
-# generic single-job driver
+# generic single-job driver (Stage-2 seam)
+#
+# What changed vs. Stage 1: the endpoint's B4 guard (busy/estop/no-host,
+# checked BEFORE contain_action) is now simulated explicitly here, matching
+# pal_server.py's ``_pal_reject_busy``; a ``build_palcam_*`` helper replaces
+# the old ``method_*`` call; ``contain_action`` happens in the harness (the
+# endpoint's job) rather than inside the driver; ``submit_job`` replaces
+# ``_init_PAL_IOloop`` for handing the job to the worker; and since this
+# harness drives ``submit_job`` directly rather than the full
+# ``PALJobExec``/``action_loop_task`` machinery (see the separate OQ-P3
+# probe for that), the "framework tail" (stamp ``action.error_code`` from
+# the job's terminal error, then call ``active.finish()``) is emulated here
+# rather than happening for free inside ``action_loop_task``.
+#
+# What did NOT change: the RecordingActive/RecordingShim recorders and the
+# trace/final JSON SHAPE are byte-identical to Stage 1 -- only how a job
+# enters the loop changed, so a zero-delta diff against the Stage-1
+# baseline genuinely proves the pipeline (S1-S6) is unchanged.
 # ---------------------------------------------------------------------------
 
 
-async def _drive_single_job(pal: PAL, method_name: str, A: Action):
-    trace = pal.base._trace
+async def _drive_single_job(pal: PAL, base: _FakeBase, build_fn_name: str, A: Action):
+    trace = base._trace
     sleep_recorder = _SleepRecorder()
     with _patched_pal_driver_time_and_sleep(sleep_recorder):
         task = asyncio.create_task(pal._PAL_IOloop())
         await asyncio.sleep(0)
-        result = await getattr(pal, method_name)(A)
-        active_ref = pal.active
-        for _ in range(200_000):
-            if pal.active is None:
-                break
-            await asyncio.sleep(0)
+
+        # -- B4 guard: mirrors pal_server.py's `_pal_reject_busy`, run BEFORE
+        #    contain_action so a rejected call creates no artifact.
+        rejected_dict = None
+        if base.actionservermodel.estop:
+            A.error_code = ErrorCodes.estop
+            rejected_dict = A.as_dict()
+        elif pal.sshhost is None:
+            A.error_code = ErrorCodes.not_available
+            rejected_dict = A.as_dict()
+        elif pal.is_busy():
+            A.error_code = ErrorCodes.in_progress
+            rejected_dict = A.as_dict()
+
+        active_ref = None
+        endpoint_error_code = None
+        if rejected_dict is None:
+            palcam = getattr(pal, build_fn_name)(A.action_params, A.samples_in)
+            active_ref = await base.contain_action(
+                ActiveParams(action=A, file_conn_params_dict={})
+            )
+            job = await pal.submit_job(palcam, active_ref)
+            # snapshot immediately after submit_job returns -- same instant
+            # Stage 1 snapshotted `self.active.action.as_dict()`, i.e. before
+            # the job has actually run.
+            endpoint_error_code = _enum_val(active_ref.action.error_code)
+
+            for _ in range(200_000):
+                if job.done.is_set():
+                    break
+                await asyncio.sleep(0)
+
+            # framework tail (normally `action_loop_task`): the last _poll()
+            # error becomes action.error_code, then the framework finishes
+            # the action. Emulated here since this harness bypasses the
+            # Executor/action_loop_task machinery (direct submit_job).
+            if job.error is not ErrorCodes.none:
+                active_ref.action.error_code = job.error
+            await active_ref.finish()
+        else:
+            endpoint_error_code = _enum_val(rejected_dict.get("error_code"))
+
         task.cancel()
         try:
             await task
@@ -697,9 +757,7 @@ async def _drive_single_job(pal: PAL, method_name: str, A: Action):
     final = {
         "io_error": _enum_val(pal.IO_error),
         "sleep_requests": list(sleep_recorder.requests),
-        "endpoint_error_code": (
-            _enum_val(result.get("error_code")) if isinstance(result, dict) else None
-        ),
+        "endpoint_error_code": endpoint_error_code,
     }
     if active_ref is not None:
         final.update(
@@ -724,7 +782,8 @@ async def _scenario_a():
     shim = RecordingShim(trace)
     shim.seed_custom("src_a", _liquid("src_a__liquid", "a1", volume_ml=5.0, position="src_a"))
     shim.allow_dest("dst_a")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_transfer_custom_custom",
         {
@@ -743,7 +802,7 @@ async def _scenario_a():
         },
         "scenario-a",
     )
-    return await _drive_single_job(pal, "method_transfer_custom_custom", A)
+    return await _drive_single_job(pal, base, "build_palcam_transfer_custom_custom", A)
 
 
 async def _scenario_b():
@@ -753,7 +812,8 @@ async def _scenario_b():
     shim.seed_custom("anec_src", _liquid("anec_src__liquid", "b1", volume_ml=10.0, position="anec_src"))
     shim.allow_dest("Injector 2")
     shim.allow_dest("Injector 1")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_ANEC_aliquot",
         {
@@ -769,7 +829,7 @@ async def _scenario_b():
         },
         "scenario-b",
     )
-    return await _drive_single_job(pal, "method_ANEC_aliquot", A)
+    return await _drive_single_job(pal, base, "build_palcam_ANEC_aliquot", A)
 
 
 async def _scenario_c():
@@ -778,7 +838,8 @@ async def _scenario_c():
     shim = RecordingShim(trace)
     shim.seed_custom("src_c", _liquid("src_c__liquid", "c1", volume_ml=8.0, position="src_c"))
     shim.allow_dest("dst_c")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_arbitrary",
         {
@@ -804,7 +865,7 @@ async def _scenario_c():
         },
         "scenario-c",
     )
-    return await _drive_single_job(pal, "method_arbitrary", A)
+    return await _drive_single_job(pal, base, "build_palcam_arbitrary", A)
 
 
 async def _scenario_d():
@@ -819,7 +880,8 @@ async def _scenario_d():
         src, dst = f"src_d_{spacing_name}", f"dst_d_{spacing_name}"
         shim.seed_custom(src, _liquid(f"{src}__liquid", f"d_{spacing_name}", volume_ml=8.0, position=src))
         shim.allow_dest(dst)
-        pal = _make_pal(trace, shim)
+        pal = _make_pal(shim)
+        base = _make_base(trace)
         A = _make_action(
             "PAL_transfer_custom_custom",
             {
@@ -839,7 +901,7 @@ async def _scenario_d():
             f"scenario-d-{spacing_name}",
         )
         result[spacing_name] = await _drive_single_job(
-            pal, "method_transfer_custom_custom", A
+            pal, base, "build_palcam_transfer_custom_custom", A
         )
     return result
 
@@ -853,7 +915,8 @@ async def _scenario_e():
     shim.seed_custom("dst_e", _gas("dst_e__gas", "e2", volume_ml=2.0, position="dst_e"))
     shim.allow_dest("dst_e")
     shim.allow_assembly("dst_e")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_transfer_custom_custom",
         {
@@ -872,7 +935,7 @@ async def _scenario_e():
         },
         "scenario-e",
     )
-    return await _drive_single_job(pal, "method_transfer_custom_custom", A)
+    return await _drive_single_job(pal, base, "build_palcam_transfer_custom_custom", A)
 
 
 async def _scenario_f():
@@ -882,7 +945,8 @@ async def _scenario_f():
     shim.seed_custom("src_f", _liquid("src_f__liquid", "f1", volume_ml=4.0, position="src_f"))
     shim.allow_dest("hplc_injector")
     shim.mark_destroyed("hplc_injector")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_injection_custom_HPLC",
         {
@@ -897,7 +961,7 @@ async def _scenario_f():
         },
         "scenario-f",
     )
-    return await _drive_single_job(pal, "method_injection_custom_HPLC", A)
+    return await _drive_single_job(pal, base, "build_palcam_injection_custom_HPLC", A)
 
 
 async def _scenario_g():
@@ -906,7 +970,8 @@ async def _scenario_g():
     shim = RecordingShim(trace, raise_on=("unified_db.update_samples", 1))
     shim.seed_custom("src_g", _liquid("src_g__liquid", "g1", volume_ml=5.0, position="src_g"))
     shim.allow_dest("dst_g")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     A = _make_action(
         "PAL_transfer_custom_custom",
         {
@@ -925,7 +990,7 @@ async def _scenario_g():
         },
         "scenario-g",
     )
-    return await _drive_single_job(pal, "method_transfer_custom_custom", A)
+    return await _drive_single_job(pal, base, "build_palcam_transfer_custom_custom", A)
 
 
 async def _scenario_h():
@@ -934,7 +999,8 @@ async def _scenario_h():
     shim = RecordingShim(trace)
     shim.seed_custom("src_h", _liquid("src_h__liquid", "h1", volume_ml=9.0, position="src_h"))
     shim.allow_dest("dst_h")
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     pal._triggerwait_stop_after = 1  # push a stop signal right after palaction #1
     A = _make_action(
         "PAL_arbitrary",
@@ -961,14 +1027,15 @@ async def _scenario_h():
         },
         "scenario-h",
     )
-    return await _drive_single_job(pal, "method_arbitrary", A)
+    return await _drive_single_job(pal, base, "build_palcam_arbitrary", A)
 
 
 async def _scenario_i():
     """(i) busy rejection (B4): guard fires before contain_action -- no artifact."""
     trace = []
     shim = RecordingShim(trace)
-    pal = _make_pal(trace, shim)
+    pal = _make_pal(shim)
+    base = _make_base(trace)
     pal.IO_measuring = True  # simulate "PAL method already in progress"
     A = _make_action(
         "PAL_transfer_custom_custom",
@@ -988,12 +1055,21 @@ async def _scenario_i():
         },
         "scenario-i",
     )
-    result = await pal.method_transfer_custom_custom(A)
+    # -- B4 guard only: mirrors pal_server.py's `_pal_reject_busy`, run
+    #    BEFORE build_palcam_*/contain_action -- a busy rejection must touch
+    #    neither the shim nor an Active.
+    if base.actionservermodel.estop:
+        A.error_code = ErrorCodes.estop
+    elif pal.sshhost is None:
+        A.error_code = ErrorCodes.not_available
+    elif pal.is_busy():
+        A.error_code = ErrorCodes.in_progress
+    result = A.as_dict()
     return {
         "trace": trace,
         "final": {
             "endpoint_error_code": _enum_val(result.get("error_code")),
-            "active_created": pal.active is not None,
+            "active_created": len(base.created_actives) > 0,
             "n_shim_or_active_calls": len(trace),
         },
     }
