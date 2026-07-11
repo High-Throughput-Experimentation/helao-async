@@ -16,23 +16,53 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import RunDir
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+)
 
 
-class AxisCam:
+class AxisCam(HelaoDriver):
     """Driver that pulls still JPEGs from an Axis M1103 IP camera over HTTP."""
 
-    def __init__(self, action_serv: Base):
-        """Store the action server reference and read the IP from configuration.
+    def __init__(self, config: dict = {}):
+        """Store the driver config.
 
         Args:
-            action_serv: Action server providing the ``axis_ip`` config entry.
+            config: Driver-specific configuration dict, providing the
+                ``axis_ip`` entry.
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        super().__init__(config=config)
+        self.config_dict = self.config
+
+    def connect(self) -> DriverResponse:
+        """No persistent device connection; always succeeds."""
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message="no device",
+            status=DriverStatus.ok,
+        )
+
+    def get_status(self) -> DriverResponse:
+        """No physical device to poll; always reports ok."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def stop(self) -> DriverResponse:
+        """No active activity to abort; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def reset(self) -> DriverResponse:
+        """No device state to reinitialize; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def disconnect(self) -> DriverResponse:
+        """No persistent connection to release; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
 
     def acquire_image(self) -> bytes:
         """Fetch a single JPEG snapshot from the camera.
