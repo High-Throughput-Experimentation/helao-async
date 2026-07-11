@@ -248,19 +248,6 @@ class Orch(Base):
             )
             self.import_queues()
 
-    # def endpoint_queues_init(self):
-    #     """
-    #     Initializes endpoint queues for the server.
-
-    #     This method iterates over the list of fast URLs and checks if the path
-    #     starts with the server's name. For each matching URL, it creates a new
-    #     queue and assigns it to the endpoint_queues dictionary with the URL's
-    #     name as the key.
-    #     """
-    #     for urld in self.fast_urls:
-    #         if urld.get("path", "").startswith(f"/{self.server.server_name}/"):
-    #             self.endpoint_queues[urld["name"]] = zdeque([])
-
     def register_obj_uuid(self, obj_uuid_key, obj_uuid_dict, obj_type: str):
         """Insert or merge a UUID's metadata into the action/experiment/sequence history map.
 

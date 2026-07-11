@@ -31,6 +31,23 @@ reassigning the deques) is always observed. ``loop_state``/``loop_intent`` stay
 ``Orch`` attributes (reach-ins + pickle histories). Behavior is byte-identical
 to the original inline loop.
 
+Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
+``orch_status_sync.py``, the other lock owner):
+
+- ``aiolock`` -- acquired by ``StatusIngester`` (status ingestion) and
+  ``DispatchRunner`` (the dispatch critical section).
+- ``interrupt_q`` -- written by ``StatusIngester`` / ``ServerMonitor`` /
+  e-stop; read by ``DispatchRunner``.
+- ``globstat_q`` -- written by ``StatusIngester``; drained by its own
+  broadcast task.
+
+Concretely here: ``DispatchRunner`` acquires ``aiolock`` for the single
+dispatch critical section noted above (:944-1058 in the original inline
+loop); it reads ``interrupt_q`` via ``Orch.wait_for_interrupt`` (called from
+the dispatch loop, method body remains on ``Orch``, cluster B); it never
+touches ``globstat_q`` directly -- that queue is owned end-to-end by
+``StatusIngester`` in ``orch_status_sync.py``.
+
 CIRCULAR-IMPORT / MONKEYPATCH NOTE: this module must NOT import
 ``helao.core.servers.orch`` at module top (import-cycle rule). The two
 module-globals the dispatch golden-master harness rebinds
