@@ -401,8 +401,22 @@ driver ignores them (optionally logging a one-time deprecation warning), so no c
 are required for cutover. `dev_trigger == "NImax"` + the `trigger.start/continue/done` port
 block (`:303-317`), the three `IO_trigger_*q` queues (`:377-379`), `_clear_trigger_qs`
 (`:527`) and `_poll_trigger_task` (`:539-605`, the `nidaqmx` read task) are all replaced by
-the log-tail reader; the `nidaqmx` import goes with them. One new config key names the PAL
-log file path (exact path + line format → OQ-P8).
+the log-tail reader; the `nidaqmx` import goes with them.
+
+**The log file is already known per-job — no new config key.** The driver ALREADY creates the
+external PAL log: `palcam.aux_output_filepath = job.active.write_file_nowait(
+file_type="pal_auxlog_file", filename="AUX__PAL__log.txt", header="\t".join(self.palauxheader))`
+(`:1844-1848`), i.e. a **fresh `AUX__PAL__log.txt` per action, colocated with that action's
+artifacts** in the RUNS tree; the absolute path is stuffed into `microcam.rshs_pal_logfile`
+(`:1897`) and passed to the PAL program in the command params (`:1915`) so the external
+software appends rows to it. So `arm_triggers()` opens **`palcam.aux_output_filepath`** (the
+just-created file) at its post-header offset — the path is deterministic and driver-owned, and
+because it is fresh per action there is no long-lived/rotating file to reason about (`_log_offset`
+starts at the header end; §3.2.2 item 5 rotation handling becomes a defensive no-op in practice).
+The header columns are `palauxheader` (`:365-374`): tab-separated `Date  Method  Tool  Source
+DestinationTray  DestinationSlot  DestinationVial  Volume`, `\r\n`-terminated; the PAL software
+appends one such row per completed transfer. **What that row stream does NOT obviously give is
+the NI-DAQ 3-edge granularity (start/continue/done per microcam) — see OQ-P8.**
 
 #### 3.2.2 Log-tail trigger reader contract (load-bearing — implement exactly)
 
@@ -717,11 +731,22 @@ in particular still gates Design 2's busy semantics; OQ-P7 is revised; OQ-P8–O
   in §3.2.2 item 5 wants job-scoped lifetime) or a process-lifetime `DriverPoller`? Decide
   with station timing data; the recommendation stands unless the log turns out to carry
   useful idle-state lines.
-- **OQ-P8 (PAL log path + line format, Design 2 only — NEW):** the exact log file path
-  written by the external PAL software, and the line format / marker tokens that denote the
-  start/continue/done transitions, depend on the PAL software's logging configuration and
-  must be confirmed against it (and captured as fixture lines for the §4 harness) before
-  the §3.2.2 recognizers can be written. Not reproducible in this doc (station config).
+- **OQ-P8 (trigger granularity from the aux log, Design 2 only — REVISED):** the log path is
+  **RESOLVED** — it is the existing per-action `palcam.aux_output_filepath`
+  (`AUX__PAL__log.txt`, driver-created via `active.write_file_nowait(file_type="pal_auxlog_file")`,
+  colocated with the action artifacts; §3.2.2). Its columns are known
+  (`Date/Method/Tool/Source/DestinationTray/DestinationSlot/DestinationVial/Volume`, tab-sep,
+  `\r\n`). The REMAINING open item is **granularity**: the NI-DAQ path emitted THREE edges per
+  microcam (start/continue/done), but the aux log as-written appears to carry **one row per
+  COMPLETED transfer** (`Date` = completion time) — i.e. a "done"-equivalent only. Confirm against
+  the PAL software config: (a) does it also log start/continue markers (some other line/marker in
+  the same or another file), so the 3-edge `WAIT_START/WAIT_CONTINUE/WAIT_DONE` states map 1:1?
+  or (b) does Design 2 **collapse to "new aux-log row = that palaction done"**, folding away the
+  start/continue waits? Option (b) is a genuine simplification but a **behavior change vs the
+  NI-DAQ 3-edge model**, so the §4 golden master must be **re-baselined** against the log-driven
+  event stream (not the NI-DAQ trace) and B5 keeps only the done/`Date` timestamp per transfer
+  (start/continue times drop). Resolve (a)-vs-(b) BEFORE writing the §3.2.2 recognizers +
+  §3.2.3 state machine; capture real fixture rows for the §4 harness either way.
 - **OQ-P9 (log clock source, Design 2 only — NEW):** which clock stamps the log lines
   (PAL host wall clock? robot firmware?), its timezone/DST behavior and resolution, and how
   it maps onto the action clock (`get_realtime_nowait()`'s NTP-synced epoch) — B5
