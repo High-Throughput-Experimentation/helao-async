@@ -53,6 +53,10 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_tools import move_dir
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.core.servers.base import Base, Active
+from helao.core.servers.orch_global_params import (
+    apply_from_globals,
+    collect_to_globals,
+)
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
@@ -705,23 +709,12 @@ class Orch(Base):
             )
 
             # from global params
-            for k, v in self.active_sequence.from_global_seq_params.items():
-                LOGGER.info(f"mapping from global params to sequence {k}:{v}")
-                if k in self.global_params:
-                    if isinstance(v, list):
-                        for vv in v:
-                            self.active_sequence.sequence_params[vv] = (
-                                self.global_params[k]
-                            )
-                    else:
-                        self.active_sequence.sequence_params[v] = self.global_params[k]
-                    LOGGER.info(
-                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-                    )
-                else:
-                    LOGGER.info(
-                        f"global parameter {k} not found in global_params, skipping"
-                    )
+            apply_from_globals(
+                self.active_sequence.sequence_params,
+                self.active_sequence.from_global_seq_params,
+                self.global_params,
+                logger_ctx="sequence",
+            )
 
             # attach run_id (derive active_run_id from the dequeued sequence)
             self._resolve_active_run_id(self.active_sequence)
@@ -835,23 +828,12 @@ class Orch(Base):
 
         # LOGGER.info("copying global vars to experiment")
         # copy requested global param to experiment params
-        for k, v in self.active_experiment.from_global_exp_params.items():
-            LOGGER.info(f"mapping from global params to experiment -- {k}:{v}")
-            if k in self.global_params:
-                if isinstance(v, list):
-                    for vv in v:
-                        self.active_experiment.experiment_params[vv] = (
-                            self.global_params[k]
-                        )
-                else:
-                    self.active_experiment.experiment_params[v] = self.global_params[k]
-                LOGGER.info(
-                    f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-                )
-            else:
-                LOGGER.info(
-                    f"global parameter {k} not found in global_params, skipping"
-                )
+        apply_from_globals(
+            self.active_experiment.experiment_params,
+            self.active_experiment.from_global_exp_params,
+            self.global_params,
+            logger_ctx="experiment --",
+        )
 
         LOGGER.info(
             f"new active experiment is {self.active_experiment.experiment_name}"
@@ -1112,21 +1094,12 @@ class Orch(Base):
 
             # LOGGER.info("copying global vars to action")
             # copy requested global param to action params
-            for k, v in A.from_global_act_params.items():
-                LOGGER.info(f"mapping from global params to action {k}:{v}")
-                if k in self.global_params:
-                    if isinstance(v, list):
-                        for vv in v:
-                            A.action_params[vv] = self.global_params[k]
-                    else:
-                        A.action_params[v] = self.global_params[k]
-                    LOGGER.info(
-                        f"global parameter {k} found in global_params, setting to {self.global_params[k]}"
-                    )
-                else:
-                    LOGGER.info(
-                        f"global parameter {k} not found in global_params, skipping"
-                    )
+            apply_from_globals(
+                A.action_params,
+                A.from_global_act_params,
+                self.global_params,
+                logger_ctx="action",
+            )
 
             # attach run_id
             if self.active_run_id is not None:
@@ -1278,40 +1251,16 @@ class Orch(Base):
                 await self.estop_loop(stop_reason)
                 return result_action.error_code
 
-            if (
-                result_action.to_global_params
-                and result_action.orch_key == self.orch_key
-                and result_action.orch_host == self.orch_host
-                and int(result_action.orch_port) == int(self.orch_port)
-            ):
-                if isinstance(result_action.to_global_params, list):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
-                    # )
-                    for k in result_action.to_global_params:
-                        if k in result_action.action_params:
-                            LOGGER.info(f"updating {k} in global vars")
-                            self.global_params[k] = result_action.action_params[k]
-                        elif k in result_action.action_output:
-                            LOGGER.info(f"updating {k} in global vars")
-                            self.global_params[k] = result_action.action_output[k]
-                        else:
-                            LOGGER.info(f"key {k} not found in action output or params")
-                elif isinstance(result_action.to_global_params, dict):
-                    # self.print_message(
-                    #     f"copying global vars {', '.join(result_action.to_global_params.keys())} back to experiment"
-                    # )
-                    for k1, k2 in result_action.to_global_params.items():
-                        if k1 in result_action.action_params:
-                            LOGGER.info(f"updating {k2} in global vars")
-                            self.global_params[k2] = result_action.action_params[k1]
-                        elif k1 in result_action.action_output:
-                            LOGGER.info(f"updating {k2} in global vars")
-                            self.global_params[k2] = result_action.action_output[k1]
-                        else:
-                            LOGGER.info(
-                                f"key {k1} not found in action output or params"
-                            )
+            # self.print_message(
+            #     f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
+            # )
+            collect_to_globals(
+                result_action,
+                self.global_params,
+                orch_key=self.orch_key,
+                orch_host=self.orch_host,
+                orch_port=self.orch_port,
+            )
 
             # # this will recursively call the next no_wait action in queue, and return its error
             # if self.action_dq and not self.step_thru_actions:
