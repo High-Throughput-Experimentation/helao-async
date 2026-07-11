@@ -11,14 +11,7 @@ from pydantic import BaseModel, Field
 
 from .hlostatus import HloStatus
 from .status_transitions import guarded_append, guarded_replace, guarded_reset
-from .sample import (
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleModel
-)
+from .sample import SampleUnion
 from .action import ShortActionModel
 from .file import FileInfo
 from .run_use import RunUse
@@ -118,12 +111,8 @@ class ExperimentModel(ShortExperimentModel):
     experiment_finished_timestamp: Optional[datetime] = None
     planned_actions: list = []
     dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
-    samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
-    samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
+    samples_in: List[SampleUnion] = Field(default=[])
+    samples_out: List[SampleUnion] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     aux_files: List[str] = Field(default=[])
     process_list: List[UUID] = Field(default=[])  # populated by DB yml_finisher

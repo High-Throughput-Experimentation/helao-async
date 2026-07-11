@@ -427,7 +427,7 @@ class SprintIR:
             )
             self.active = await self.base.contain_action(active_params)
             for sample in samples_in:
-                sample.status = [SampleStatus.preserved]
+                sample.reset_sample_status(SampleStatus.preserved)
                 sample.inheritance = SampleInheritance.allow_both
 
             self.active.action.samples_in = []
