@@ -2,7 +2,7 @@
 
 Exposes the subset of legacy plate-database queries (platemap, info,
 print/anneal records) used by the HTE deployment, delegating each call
-to a shared :class:`helao.core.drivers.data.HTEPlateAPI` instance.
+to a shared :class:`helao.helpers.plate_api.HTEPlateAPI` instance.
 """
 
 __all__ = ["HTEdata"]
@@ -12,8 +12,13 @@ __all__ = ["HTEdata"]
 # import aiofiles
 
 
-from helao.core.servers.base import Base
-from helao.core.drivers.data import HTEPlateAPI
+from helao.helpers.plate_api import HTEPlateAPI
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+)
 
 
 # class LocalDataHandler:
@@ -112,25 +117,47 @@ from helao.core.drivers.data import HTEPlateAPI
 #         self.args = arg
 
 
-class HTEdata:
+class HTEdata(HelaoDriver):
     """Driver wrapper exposing legacy HTE plate-database queries.
 
-    Holds a reference to the owning action server and a single
-    :class:`HTEPlateAPI` instance, then proxies plate-info lookups so
-    they can be served from FastAPI endpoints.
+    Holds a single :class:`HTEPlateAPI` instance and proxies plate-info
+    lookups so they can be served from FastAPI endpoints.
     """
 
-    def __init__(self, action_serv: Base):
-        """Capture the action server and build the underlying plate API.
+    def __init__(self, config: dict = {}):
+        """Store the driver config and build the underlying plate API.
 
         Args:
-            action_serv: The hosting :class:`Base` action server, used
-                for access to its ``server_cfg`` ``params`` dict.
+            config: Driver-specific configuration dict.
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        super().__init__(config=config)
+        self.config_dict = self.config
 
         self.dataAPI = HTEPlateAPI()
+
+    def connect(self) -> DriverResponse:
+        """No physical device to connect to; always succeeds."""
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message="no device",
+            status=DriverStatus.ok,
+        )
+
+    def get_status(self) -> DriverResponse:
+        """No physical device to poll; always reports ok."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def stop(self) -> DriverResponse:
+        """No active activity to abort; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def reset(self) -> DriverResponse:
+        """No device state to reinitialize; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def disconnect(self) -> DriverResponse:
+        """No physical connection to release; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
 
     def get_platexycalibration(self, plateid: int, *args, **kwargs):
         """Return the stored XY calibration for ``plateid`` (stub, returns ``None``)."""
