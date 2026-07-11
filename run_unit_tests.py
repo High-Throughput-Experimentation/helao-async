@@ -40,6 +40,8 @@ from helao.core.tests.unit_test_sync_process_recovery import (
     sync_process_recovery_unit_test,
 )
 from helao.core.tests.unit_test_estop_sync import estop_sync_unit_test
+from helao.core.tests.unit_test_sample_status import sample_status_unit_test
+from helao.core.tests.unit_test_sample_union import sample_union_unit_test
 
 
 TESTS = [
@@ -62,6 +64,8 @@ TESTS = [
     ("sync_to_thread", sync_to_thread_unit_test),
     ("sync_process_recovery", sync_process_recovery_unit_test),
     ("estop_sync", estop_sync_unit_test),
+    ("sample_status", sample_status_unit_test),
+    ("sample_union", sample_union_unit_test),
 ]
 
 

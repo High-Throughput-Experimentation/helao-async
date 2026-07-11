@@ -12,14 +12,7 @@ from .hlostatus import HloStatus
 from .status_transitions import guarded_append, guarded_replace, guarded_reset
 from .process_contrib import ProcessContrib
 from .run_use import RunUse
-from .sample import (
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleModel
-)
+from .sample import SampleUnion
 from .file import FileInfo
 from .machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -140,12 +133,8 @@ class ActionModel(ShortActionModel):
     action_finished_timestamp: Optional[datetime] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
-    samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
+    samples_in: List[SampleUnion] = Field(default=[])
+    samples_out: List[SampleUnion] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False

@@ -769,7 +769,7 @@ class cNIMAX:
                 file_sample_list = []
 
                 for sample in self.samples_in:
-                    sample.status = [SampleStatus.preserved]
+                    sample.reset_sample_status(SampleStatus.preserved)
                     sample.inheritance = SampleInheritance.allow_both
 
                 for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):

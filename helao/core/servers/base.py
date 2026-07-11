@@ -1901,7 +1901,7 @@ class Active:
 
             if not sample.status:
                 LOGGER.info("sample.status is None. Using '{SampleStatus.preserved}'.")
-                sample.status = [SampleStatus.preserved]
+                sample.reset_sample_status(SampleStatus.preserved)
 
             if IO == "in":
                 if action.samples_in is None:

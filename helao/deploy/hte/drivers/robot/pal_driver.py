@@ -839,7 +839,7 @@ class PAL:
             if error != ErrorCodes.none:
                 if sample != NoneSample():
                     sample.inheritance = SampleInheritance.allow_both
-                    sample.status = [SampleStatus.preserved]
+                    sample.reset_sample_status(SampleStatus.preserved)
                 else:
                     error = ErrorCodes.not_available
                     LOGGER.error("error converting old liquid_sample to basemodel.")
@@ -1039,7 +1039,7 @@ class PAL:
             # sample_in.inheritance =  SampleInheritance.give_only
             # sample_in.status = [SampleStatus.preserved]
             palposition.samples_initial[0].inheritance = None
-            palposition.samples_initial[0].status = []
+            palposition.samples_initial[0].reset_sample_status()
             palposition.samples_initial[0].sample_position = palposition.position
 
         else:
@@ -1127,7 +1127,7 @@ class PAL:
             samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
             samples_out_list[0].sample_position = dest
             samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].status = [SampleStatus.created]
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
             dest_samples_initial = []  # no sample here in the beginning
             dest_samples_final = deepcopy(samples_out_list)
 
@@ -1139,7 +1139,7 @@ class PAL:
             )
             # we can only add liquid to vials (diluite them, no assembly here)
             sample_in.inheritance = SampleInheritance.receive_only
-            sample_in.status = [SampleStatus.preserved]
+            sample_in.reset_sample_status(SampleStatus.preserved)
 
             dest_samples_initial = [deepcopy(sample_in)]
             dest_samples_final = [deepcopy(sample_in)]
@@ -1235,7 +1235,7 @@ class PAL:
             samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
             samples_out_list[0].sample_position = dest
             samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].status = [SampleStatus.created]
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
             dest_samples_initial = []  # no sample here in the beginning
             dest_samples_final = deepcopy(samples_out_list)
 
@@ -1283,7 +1283,7 @@ class PAL:
                     # we can only add liquid to vials
                     # (diluite them, no assembly here)
                     sample_in.inheritance = SampleInheritance.receive_only
-                    sample_in.status = [SampleStatus.preserved]
+                    sample_in.reset_sample_status(SampleStatus.preserved)
 
                     # first add the dilute type
                     microcam.run[-1].dilute_type.append(
@@ -1322,17 +1322,14 @@ class PAL:
                     samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                     samples_out_list[0].sample_position = dest
                     samples_out_list[0].inheritance = SampleInheritance.allow_both
-                    samples_out_list[0].status = [
-                        SampleStatus.created,
-                        SampleStatus.incorporated,
-                    ]
+                    samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
 
                     # add new sample to assembly
                     sample_in.parts.append(samples_out_list[0])
                     # we can only add liquid to vials
                     # (diluite them, no assembly here)
                     sample_in.inheritance = SampleInheritance.allow_both
-                    sample_in.status = [SampleStatus.preserved]
+                    sample_in.reset_sample_status(SampleStatus.preserved)
 
                     dest_samples_initial = [deepcopy(sample_in)]
                     dest_samples_final = [deepcopy(sample_in)]
@@ -1344,7 +1341,7 @@ class PAL:
                 # we can only add liquid to vials
                 # (diluite them, no assembly here)
                 sample_in.inheritance = SampleInheritance.receive_only
-                sample_in.status = [SampleStatus.preserved]
+                sample_in.reset_sample_status(SampleStatus.preserved)
 
                 dest_samples_initial = [deepcopy(sample_in)]
                 dest_samples_final = [deepcopy(sample_in)]
@@ -1389,15 +1386,12 @@ class PAL:
                 samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                 samples_out_list[0].sample_position = dest
                 samples_out_list[0].inheritance = SampleInheritance.allow_both
-                samples_out_list[0].status = [
-                    SampleStatus.created,
-                    SampleStatus.incorporated,
-                ]
+                samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
 
                 # only now add the sample which was found in the position
                 # to the sample_in list for the exp/prg
                 sample_in.inheritance = SampleInheritance.allow_both
-                sample_in.status = [SampleStatus.incorporated]
+                sample_in.reset_sample_status(SampleStatus.incorporated)
 
                 microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 # we only add the sample to assembly so delta_vol is 0
@@ -1424,7 +1418,7 @@ class PAL:
 
                 samples_out2_list[0].sample_position = dest
                 samples_out2_list[0].inheritance = SampleInheritance.allow_both
-                samples_out2_list[0].status = [SampleStatus.created]
+                samples_out2_list[0].reset_sample_status(SampleStatus.created)
                 # add second sample out to samples_out
                 samples_out_list.append(samples_out2_list[0])
 
@@ -1503,7 +1497,7 @@ class PAL:
         samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
         samples_out_list[0].sample_position = dest
         samples_out_list[0].inheritance = SampleInheritance.receive_only
-        samples_out_list[0].status = [SampleStatus.created]
+        samples_out_list[0].reset_sample_status(SampleStatus.created)
         dest_samples_initial = []  # no sample here in the beginning
         dest_samples_final = deepcopy(samples_out_list)
 
@@ -1571,7 +1565,7 @@ class PAL:
             f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
         )
         sample_in.inheritance = SampleInheritance.receive_only
-        sample_in.status = [SampleStatus.preserved]
+        sample_in.reset_sample_status(SampleStatus.preserved)
 
         microcam.run[-1].samples_in.append(sample_in)
         microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
@@ -1657,9 +1651,9 @@ class PAL:
         # were created
         if await self.archive.custom_is_destroyed(custom=palposition.position):
             for sample in samples_out_list:
-                sample.status.append(SampleStatus.destroyed)
+                sample.append_sample_status(SampleStatus.destroyed)
             for sample in palposition.samples_final:
-                sample.status.append(SampleStatus.destroyed)
+                sample.append_sample_status(SampleStatus.destroyed)
 
         # add validated destination to run
         microcam.run[-1].dest = deepcopy(palposition)
@@ -1668,7 +1662,7 @@ class PAL:
         for sample in microcam.run[-1].samples_in:
             if sample.inheritance is None:
                 sample.inheritance = SampleInheritance.give_only
-                sample.status = [SampleStatus.preserved]
+                sample.reset_sample_status(SampleStatus.preserved)
 
         # add the samples_out to the run
         for sample in samples_out_list:
