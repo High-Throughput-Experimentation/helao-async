@@ -18,7 +18,7 @@ from helao.core.models.sample import (
     SolidSample,
     NoneSample,
 )
-from ...drivers.sensor.sprintir_driver import SprintIR, CO2MonExec
+from ...drivers.sensor.sprintir_driver import SprintIR, SprintIRPoller, CO2MonExec
 
 
 def makeApp(server_key) -> BaseAPI:
@@ -40,6 +40,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Sensor server",
         version=0.1,
         driver_classes=[SprintIR],
+        poller_class=SprintIRPoller,
     )
 
     @app.post(f"/{server_key}/acquire_co2", tags=["action"])
