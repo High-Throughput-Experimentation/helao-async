@@ -259,6 +259,20 @@ Split rule: everything the method **reads from** `active` (`action.action_params
 everything the method **does to** `active` (enqueue, `append_sample`, `finish`) moves into
 the Executor phases; what remains returns a `DriverResponse`.
 
+> **⚠️ CRITICAL (verified regression, hte Calc W1): extract param values from
+> `active.action.action_params`, NEVER from the endpoint's FastAPI function arguments.**
+> Under orchestrator dispatch the RPC carries only the `Action` model (`dispatcher.py`
+> sends `{"action": A.as_dict()}`; `zmq_rpc._coerce_args` binds only `action`), so the
+> endpoint's declared function args resolve to their **Python defaults** — the
+> experiment-authored and `from_global_act_params`-injected values live **only** in
+> `action.action_params`. Passing the function args to the driver silently substitutes
+> defaults (wrong thresholds, wrong experiment enqueued) — the exact bug class of commit
+> `e1a92179`. Keep the endpoint function-arg declarations (they define the API surface),
+> but build `p = active.action.action_params` and pass `p["key"]` (subscript, so a missing
+> key raises `KeyError` as before). `calc_uvis_abs` passing the whole `action_params` dict,
+> and `keep_min_ocv`/`check_CP_Ewe_bounds` reading `action_params[...]`, are the correct
+> references.
+
 ```python
 # BEFORE (calc_driver.py:747-762)
 async def check_co2_purge_level(self, activeobj: Active) -> dict:
