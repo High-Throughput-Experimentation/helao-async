@@ -9,9 +9,7 @@ in the world configuration.
 
 __all__ = ["Orch"]
 
-import pickle
 import os
-from datetime import datetime
 from helao.helpers import helao_logging as logging
 
 import asyncio
@@ -57,6 +55,7 @@ from helao.core.servers.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )
+from helao.core.servers.orch_persist import QueuePersister
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
@@ -196,6 +195,8 @@ class Orch(Base):
         self.import_postprocessors(
             self.seq_postprocess_libs, self.seq_postprocessors, MetaProcessor
         )
+
+        self.queue_persister = QueuePersister(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -2467,6 +2468,19 @@ class Orch(Base):
             self.status_summary = await self.ping_action_servers()
             await asyncio.sleep(self.heartbeat_interval)
 
+    def _get_queue_persister(self) -> QueuePersister:
+        """Return ``self.queue_persister``, constructing it lazily if absent.
+
+        ``__init__`` always sets this eagerly; the lazy fallback only matters
+        for test fixtures that bypass ``__init__`` (e.g. the dispatch
+        golden-master harness's ``Orch.__new__`` construction).
+        """
+        queue_persister = getattr(self, "queue_persister", None)
+        if queue_persister is None:
+            queue_persister = QueuePersister(self)
+            self.queue_persister = queue_persister
+        return queue_persister
+
     def export_queues(self, timestamp_pck: bool = False) -> str:
         """Pickle the deques, active/last sequence and experiment, and histories under ``STATES/``.
 
@@ -2476,32 +2490,7 @@ class Orch(Base):
         Returns:
             Filesystem path of the written pickle file.
         """
-        save_dir = self.world_cfg["root"]
-        queue_dict = {
-            "seq": list(self.sequence_dq),
-            "exp": list(self.experiment_dq),
-            "act": list(self.action_dq),
-            "active_exp": self.active_experiment,
-            "last_exp": self.last_experiment,
-            "active_seq": self.active_sequence,
-            "last_seq": self.last_sequence,
-            "active_counter": self.active_seq_exp_counter,
-            "last_act": self.last_action_uuid,
-            "last_dispatched_act": self.last_dispatched_action_uuid,
-            "globalstatusmodel": self.globalstatusmodel,
-            "action_history": list(self.action_history.items()),
-            "experiment_history": list(self.experiment_history.items()),
-            "sequence_history": list(self.sequence_history.items()),
-        }
-        if self.active_run_id is not None:
-            queue_dict["active_run_id"] = self.active_run_id
-        if timestamp_pck:
-            pck_name = f"queues_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck"
-        else:
-            pck_name = "queues.pck"
-        save_path = os.path.join(save_dir, "STATES", pck_name)
-        pickle.dump(queue_dict, open(save_path, "wb"))
-        return save_path
+        return self._get_queue_persister().export_queues(timestamp_pck=timestamp_pck)
 
     def import_queues(self, pck_path: Optional[str] = None) -> str:
         """Restore deques/active/last state from a previously exported pickle.
@@ -2513,59 +2502,4 @@ class Orch(Base):
         Returns:
             The path that was loaded (or attempted).
         """
-        save_dir = self.world_cfg["root"]
-        if pck_path is None:
-            save_path = os.path.join(save_dir, "STATES", "queues.pck")
-        else:
-            save_path = pck_path.strip('"').strip("'")
-        if os.path.exists(save_path):
-            queue_dict = pickle.load(open(save_path, "rb"))
-        else:
-            LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
-            return save_path
-        if self.sequence_dq or self.experiment_dq or self.action_dq:
-            LOGGER.info("Existing queues are not empty. Cannot restore.")
-        else:
-            try:
-                LOGGER.info("Restoring queues from saved pck.")
-                for x in queue_dict["act"]:
-                    self.action_dq.append(x)
-                for x in queue_dict["exp"]:
-                    self.experiment_dq.append(x)
-                for x in queue_dict["seq"]:
-                    if len(self.sequence_dq) == 0:
-                        self.active_run_id = gen_uuid()
-                    self.sequence_dq.append(x)
-                self.active_experiment = queue_dict["active_exp"]
-                self.last_experiment = queue_dict["last_exp"]
-                self.active_sequence = queue_dict["active_seq"]
-                self.last_sequence = queue_dict["last_seq"]
-                self.active_seq_exp_counter = queue_dict["active_counter"]
-                self.last_action_uuid = queue_dict["last_act"]
-                self.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
-                self.globalstatusmodel = queue_dict["globalstatusmodel"]
-                self.active_run_id = queue_dict.get("active_run_id", None)
-                self.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
-                self.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
-                self.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
-                if pck_path is None:
-                    # Consume the default queues.pck after a successful restore so
-                    # a stale file cannot be auto-replayed on a later restart
-                    # (e.g. hot-reload of an idle-empty orchestrator, which passes
-                    # --restore unconditionally). Archive rather than delete so it
-                    # stays recoverable. An explicitly-pathed restore is left
-                    # untouched (the caller chose it deliberately).
-                    try:
-                        archived = save_path.replace(
-                            ".pck",
-                            f"_imported_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck",
-                        )
-                        os.replace(save_path, archived)
-                        LOGGER.info(f"Archived restored queue pck to {archived}.")
-                    except OSError:
-                        LOGGER.warning(
-                            "Could not archive restored queue pck.", exc_info=True
-                        )
-            except Exception:
-                LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
-        return save_path
+        return self._get_queue_persister().import_queues(pck_path)
