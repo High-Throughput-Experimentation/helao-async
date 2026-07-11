@@ -2,17 +2,27 @@
 
 Manages two PXI cards (a 6289 for cell current and a 6284 for cell voltage)
 plus a third task for thermocouple monitors. The driver streams per-cell I/V
-samples via a buffer callback, runs an asyncio control loop that arms/disarms
-the tasks, and exposes simple coroutines for setting digital outputs and
-reading digital inputs (used to drive pumps, gas/liquid valves, heaters, and
-LEDs).
+samples via a buffer callback, and exposes simple coroutines for setting
+digital outputs and reading digital inputs (used to drive pumps, gas/liquid
+valves, heaters, and LEDs).
+
+Multi-cell IV measurements are driven by :class:`CellIVExec`, which owns the
+``Active`` action; the NI-DAQmx buffer callback (:meth:`cNIMAX.streamIV_callback`)
+fires on a nidaqmx-internal thread, outside the asyncio poll loop, so it
+cannot report data through ``Executor._poll``'s return value like a normal
+K6a data source. Instead, :class:`CellIVExec` hands the driver a handful of
+plain callables (``active.enqueue_data_nowait``, ``active.get_realtime_nowait``,
+``active.finish_hlo_header``) in ``arm_cell_iv`` -- the driver never holds a
+reference to ``Active``/``Base`` themselves. Thermocouple monitor channels are
+always-on and are handled by the paired :class:`cNIMAXPoller`.
 """
 
-__all__ = ["cNIMAX"]
+__all__ = ["cNIMAX", "cNIMAXPoller", "CellIVExec", "DevMonExec"]
 
 import time
 import asyncio
 import traceback
+from typing import Optional, Callable, List
 
 import nidaqmx
 from nidaqmx.constants import LineGrouping
@@ -26,46 +36,66 @@ from nidaqmx.constants import CurrentShuntResistorLocation
 from nidaqmx.constants import UnitsPreScaled
 from nidaqmx.constants import TriggerType
 
-from helao.helpers.premodels import Action
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.models.sample import SampleInheritance, SampleStatus
 from helao.core.models.file import FileConnParams, HloHeaderModel
-from helao.helpers.active_params import ActiveParams
 from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-class cNIMAX:
+class cNIMAX(HelaoDriver):
     """NI DAQmx wrapper used by the HTE action server.
 
     Reads device maps (`dev_pump`, `dev_gasvalve`, `dev_liquidvalve`,
     `dev_heat`, `dev_led`, `dev_monitor`, `dev_cellcurrent`,
-    `dev_cellvoltage`) from the server `params`, opens NI tasks via
-    `nidaqmx`, and runs background monitor and IO loops. `run_cell_IV` starts
-    a buffered IV acquisition that streams per-cell data to the active action
-    via `streamIV_callback`.
+    `dev_cellvoltage`) from `config`. NI resources (the custom current scale
+    and the thermocouple monitor task) are opened in :meth:`connect`, not at
+    construction. Always-on thermocouple polling is handled by the paired
+    :class:`cNIMAXPoller`, wired in as the server's ``poller_class``.
+    Multi-cell IV measurements are armed via :meth:`arm_cell_iv` (called from
+    :class:`CellIVExec`, which owns the ``Active`` action).
+
+    Server config parameters:
+        ``dev_pump``/``dev_gasvalve``/``dev_liquidvalve``/``dev_heat``/
+        ``dev_led``: digital-out port maps.
+        ``dev_monitor``: thermocouple channel map (K-type by default,
+            T-type when the name contains ``"Ttc_"``).
+        ``dev_cellcurrent``/``dev_cellvoltage``: analog-in port maps for the
+            multi-cell IV task; ``dev_cellcurrent_trigger``/
+            ``dev_cellvoltage_trigger``: optional shared start-trigger line.
+        ``allow_no_sample``: permit a cell-IV measurement with no validated
+            samples.
     """
 
-    def __init__(self, action_serv: Base):
-        """Initialize state, build sample DB, register custom scale and monitor loop.
+    def __init__(self, config: dict = {}):
+        """Store config and build the dynamic IO enums; no device I/O here.
 
         Args:
-            action_serv: Owning HELAO action server.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        self.world_config = action_serv.world_cfg
+        super().__init__(config=config)
+        self.config_dict = self.config
 
-        self.unified_db = UnifiedSampleDataAPI(self.base)
-        asyncio.gather(self.unified_db.init_db())
+        # set by the server's dyn_endpoints startup hook (mirrors the
+        # DriverPoller._base_hook wiring in base_api.py); used only for the
+        # synchronous estop/live-buffer reads the NI-DAQmx hardware callback
+        # needs (that callback fires on a nidaqmx-internal thread, so it
+        # cannot await anything -- see streamIV_callback). Always accessed
+        # via safe getattr so construction/unit tests work without a server.
+        self._base_hook = None
 
         self.dev_pump = self.config_dict.get("dev_pump", {})
         self.dev_pumpitems = make_str_enum(
@@ -93,23 +123,9 @@ class cNIMAX:
 
         LOGGER.info("init NI-MAX")
 
-        self.action = (
-            None  # for passing action object from technique method to measure loop
-        )
-        self.active = (
-            None  # for holding active action object, clear this at end of measurement
-        )
-        self.samples_in = []
-
-        # seems to work by just defining the scale and then only using its name
-        try:
-            self.Iscale = nidaqmx.scale.Scale.create_lin_scale(
-                "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
-            )
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"NImax error: ", exc_info=True)
-            raise e
+        # connection/device state -- populated by connect()/arm_cell_iv(), not here
+        self._connected = False
+        self.Iscale = None
         self.time_stamp = time.time()
 
         # this defines the time axis, need to calculate our own
@@ -120,18 +136,16 @@ class cNIMAX:
         self.duration = 10  # sec
         self.ttlwait = -1
         self.buffersizeread = int(self.samplingrate)
-        self.IOloopstarttime = 0
 
-        self.IO_signalq = asyncio.Queue(1)
         self.task_6289cellcurrent = None
         self.task_6284cellvoltage = None
         self.task_monitors = None
+        self.task_monitor_keys: List[str] = []
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.activeCell = [False for _ in range(9)]
 
         self.FIFO_epoch = None
-        # self.FIFO_header = ''
         self.FIFO_NImaxheader = {}
         self.FIFO_name = ""
         self.FIFO_dir = ""
@@ -157,26 +171,114 @@ class cNIMAX:
             "Ttemp_Ktc_out_reservoir_C",
         ]
 
-        # keeps track of the multi cell IV measurements in the background
-        myloop = asyncio.get_event_loop()
-        # add meas IOloop
-        self.IOloop_run = False
-        self.monitorloop_run = True
-        #        myloop.create_task(self.IOloop())  #if loop terminates immediately upon starting due to False, then
-        # starting it here is useless? maybe have another loop inside it?
-        myloop.create_task(self.monitorloop())
+        # per-run hooks into the Active action that owns the current cell-IV
+        # measurement, injected by CellIVExec._pre_exec via arm_cell_iv() and
+        # cleared by stop_cell_iv(); the streamIV_callback (NI-DAQmx hardware
+        # callback, not asyncio) calls these directly instead of returning
+        # data through _poll (see module docstring).
+        self._save_data = True
+        self._get_realtime_nowait: Optional[Callable] = None
+        self._finish_hlo_header: Optional[Callable] = None
+        self._data_sink: Optional[Callable] = None
 
-    def set_IO_signalq_nowait(self, val: bool) -> None:
-        """Replace the latest pending IO signal (non-async)."""
-        if self.IO_signalq.full():
-            _ = self.IO_signalq.get_nowait()
-        self.IO_signalq.put_nowait(val)
+        self.Heatloop_run = False
 
-    async def set_IO_signalq(self, val: bool) -> None:
-        """Replace the latest pending IO signal."""
-        if self.IO_signalq.full():
-            _ = await self.IO_signalq.get()
-        await self.IO_signalq.put(val)
+    def connect(self) -> DriverResponse:
+        """Register the current-negate scale and start the thermocouple monitor task.
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
+        try:
+            # seems to work by just defining the scale and then only using its name
+            self.Iscale = nidaqmx.scale.Scale.create_lin_scale(
+                "NEGATE3", -1.0, 0.0, UnitsPreScaled.AMPS, "AMPS"
+            )
+            self.create_monitortask()
+            if self.task_monitor_keys:
+                self.task_monitors.start()
+            self._connected = True
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("NImax connect failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+    def get_status(self) -> DriverResponse:
+        """Return whether :meth:`connect` has completed successfully.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
+        """
+        if self._connected:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    async def stop(self) -> DriverResponse:
+        """Request the in-progress cell-IV measurement (if any) to stop.
+
+        Kept async (unlike the ABC's plain signature) so the existing
+        ``await app.driver.stop()`` call site in the action server is
+        unaffected; other migrated drivers in this repo mix sync/async ABC
+        overrides the same way (e.g. ``galil_motion``'s ``reset``).
+        """
+        if self.IO_measuring:
+            self.IO_do_meas = False
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the monitor connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close the thermocouple monitor task.
+
+        Returns:
+            ``DriverResponse`` reporting close success or failure.
+        """
+        try:
+            if self.task_monitors is not None:
+                self.task_monitors.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("NImax disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        finally:
+            self.task_monitors = None
+            self._connected = False
+        return response
+
+    async def async_shutdown(self) -> DriverResponse:
+        """Close the monitor task on server shutdown (sync ``shutdown`` is omitted)."""
+        return self.disconnect()
+
+    def _get_lbuf(self, key: str):
+        """Safely read ``key`` from the action server's live buffer via ``_base_hook``.
+
+        Returns ``(None, None)`` if no ``_base_hook`` has been wired yet
+        (e.g. during construction-only unit tests).
+        """
+        if self._base_hook is not None:
+            return self._base_hook.get_lbuf(key)
+        return None, None
+
+    def _is_estopped(self) -> bool:
+        """Safely read the action server's estop flag via ``_base_hook``."""
+        actionservermodel = getattr(self._base_hook, "actionservermodel", None)
+        return bool(getattr(actionservermodel, "estop", False))
 
     def create_IVtask(self):
         """Configure the dual NI-DAQ tasks used for multi-cell IV measurements.
@@ -208,7 +310,6 @@ class cNIMAX:
             samps_per_chan=self.buffersize,
         )
         # TODO can increase the callbackbuffersize if needed
-        # self.task_6289cellcurrent.register_every_n_samples_acquired_into_buffer_event(10,self.streamCURRENT_callback)
         self.task_6289cellcurrent.register_every_n_samples_acquired_into_buffer_event(
             self.buffersizeread, self.streamIV_callback
         )
@@ -229,7 +330,6 @@ class cNIMAX:
 
         # does this globally enable lowpass or only for channels in task?
         self.task_6284cellvoltage.ai_channels.all.ai_lowpass_enable = True
-        # self.task_6284cellvoltage.ai_lowpass_enable = True
         self.task_6284cellvoltage.timing.cfg_samp_clk_timing(
             self.samplingrate,
             source="",
@@ -237,28 +337,6 @@ class cNIMAX:
             sample_mode=AcquisitionType.CONTINUOUS,
             samps_per_chan=self.buffersize,
         )
-        # #        self.task_6289cellcurrent = nidaqmx.Task()
-        #         self.task_6289cellcurrent.ai_channels.add_ai_thrmcpl_chan(
-        # #            physical_channel= 'Ktc_in_cell',
-        #             physical_channel= 'PXI-6289/ai0',
-        #             name_to_assign_to_channel="cell_temp",
-        #             min_val=0,
-        #             max_val=150,
-        #             units=TemperatureUnits.DEG_C,
-        #             thermocouple_type=ThermocoupleType.S,
-        # #            cjc_source=CJCSource.BUILT_IN,
-        #         )
-
-        #         self.task_6284cellvoltage.ai_channels.add_ai_thrmcpl_chan(
-        #  #           physical_channel= 'Ttc_in_reservoir',
-        #             physical_channel= 'PXI-6284/ai0',
-        #             name_to_assign_to_channel="reservoir_temp",
-        #             min_val=0,
-        #             max_val=150,
-        #             units=TemperatureUnits.DEG_C,
-        #             thermocouple_type=ThermocoupleType.T,
-        # #            cjc_source=CJCSource.BUILT_IN,
-        #         )
 
         # each card need its own physical trigger input
         if (
@@ -282,84 +360,12 @@ class cNIMAX:
                 trigger_edge=Edge.RISING,
             )
 
-    #     def create_Ttask(self):
-    #         """configures and starts a NImax task for nonexperiment temp measurements"""
-    #         self.task_tempinst_S = nidaqmx.Task()
-    #         self.task_tempinst_S.ai_channels.add_ai_thrmcpl_chan(
-    # #           physical_channel= 'Ktc_in_cell',
-    #             physical_channel= 'PXI-6289/ai2',
-    #             name_to_assign_to_channel="cell_temp",
-    #             min_val=0,
-    #             max_val=150,
-    #             units=TemperatureUnits.DEG_C,
-    #             thermocouple_type=ThermocoupleType.S,
-    #             # cjc_source=CJCSource.CONSTANT_USER_VALUE,
-    #             # cjc_val = 27,
-    #             # cjc_source=CJCSource.SCANNABLE_CHANNEL,
-    #             # cjc_channel= 'CJCtemp',
-    #         )
-
-    #         self.task_tempinst_S.ai_channels.all.ai_lowpass_enable = True
-    #         self.task_tempinst_S.timing.cfg_samp_clk_timing(   #timing/triggering need
-
-    #             rate= 1,
-    # #           self.Tsamplingrate,
-    #             source="",
-    #             active_edge=Edge.RISING,
-    #             sample_mode=AcquisitionType.CONTINUOUS,
-    #             samps_per_chan=self.buffersize,
-    #         )
-    #         self.task_tempinst_T = nidaqmx.Task()
-    #         self.task_tempinst_T.ai_channels.add_ai_thrmcpl_chan(
-    #            # physical_channel= 'Ttc_in_reservoir',
-    #             physical_channel= 'PXI-6284/ai2',   #temporary  cjc source ai channel instead of 2
-    #             name_to_assign_to_channel="reservoir_temp",
-    #             min_val=0,
-    #             max_val=150,
-    #             units=TemperatureUnits.DEG_C,
-    #             thermocouple_type=ThermocoupleType.T,
-    #             # cjc_source=CJCSource.CONSTANT_USER_VALUE,
-    #             # cjc_val = 27,
-    #             # cjc_source=CJCSource.SCANNABLE_CHANNEL,
-    #             # cjc_channel = 'CJCtemp',
-    #         )
-
-    #         self.task_tempinst_T.ai_channels.all.ai_lowpass_enable = True
-    #         self.task_tempinst_T.timing.cfg_samp_clk_timing(   #timing need?
-
-    #             rate= 1,
-    # #           self.Tsamplingrate,
-    #             source="",
-    #             active_edge=Edge.RISING,
-    #             sample_mode=AcquisitionType.CONTINUOUS,
-    #             samps_per_chan=self.buffersize,
-    #         )
-    #         # self.task_tempCJC = nidaqmx.Task()
-    #         # self.task_tempCJC.ai_channels.add_ai_temp_built_in_sensor_chan(
-    #         #     physical_channel= 'PXI-6284/ai0',
-    #         #     name_to_assign_to_channel="CJCtemp",
-    #         #     units=TemperatureUnits.DEG_C,
-    #         # )
-    # #         self.task_tempCJC.ai_channels.all.ai_lowpass_enable = True
-    # #         self.task_tempCJC.timing.cfg_samp_clk_timing(   #timing need?
-    # #             rate= 1,
-    # # #           self.Tsamplingrate,
-    # #             source="",
-    # #             active_edge=Edge.RISING,
-    # #             sample_mode=AcquisitionType.CONTINUOUS,
-    # #             samps_per_chan=self.buffersize,
-    # #         )
-
-    #         self.task_tempinst_S.start()
-    #         self.task_tempinst_T.start()
-    # #         self.task_tempCJC.start()
-
     def create_monitortask(self):
         """Configure the background NI-DAQ thermocouple monitoring task.
 
         Adds one analog-input thermocouple channel per `dev_monitor` entry
         (K-type by default, T-type when the name contains "Ttc_") and enables
-        the lowpass filter.
+        the lowpass filter. Called from :meth:`connect`.
         """
         self.task_monitors = nidaqmx.Task()
         self.task_monitor_keys = list(self.config_dict.get("dev_monitor", {}).keys())
@@ -378,10 +384,6 @@ class cNIMAX:
                     max_val=150,
                     units=TemperatureUnits.DEG_C,
                     thermocouple_type=TCtype,
-                    # cjc_source=CJCSource.CONSTANT_USER_VALUE,
-                    # cjc_val = 27,
-                    # cjc_source=CJCSource.SCANNABLE_CHANNEL,
-                    # cjc_channel= 'CJCtemp',
                 )
             self.task_monitors.ai_channels.all.ai_lowpass_enable = True
             self.task_monitors.timing.cfg_samp_clk_timing(
@@ -392,26 +394,6 @@ class cNIMAX:
                 samps_per_chan=self.buffersize,
             )
 
-        #        self.task_monitors.start()
-
-    async def monitorloop(self):
-        """Background loop that reads the monitor task and posts to the live buffer."""
-        self.create_monitortask()
-        if self.task_monitor_keys:
-            self.task_monitors.start()
-            while self.monitorloop_run:
-                mvalues = self.task_monitors.read()
-                if not isinstance(mvalues, list):
-                    mvalues = [mvalues]
-                datastore = {
-                    myname: mvalue
-                    for myname, mvalue in zip(self.task_monitor_keys, mvalues)
-                }
-                await self.base.put_lbuf(datastore)
-                await asyncio.sleep(0.5)
-                # self.monitorloop_run = False   #so it only runs once
-            self.task_monitors.close()
-
     def streamIV_callback(
         self, task_handle, every_n_samples_event_type, number_of_samples, callback_data
     ) -> int:
@@ -420,23 +402,29 @@ class cNIMAX:
         When a measurement is active, reads `number_of_samples` from the
         current and voltage tasks, augments each cell record with the latest
         monitor readings, and pushes the result to the active action's data
-        queue. In estop or post-stop conditions the buffer is drained and
-        tasks are closed without enqueuing data.
+        queue (via the `_data_sink` hook installed by `arm_cell_iv`). In
+        estop or post-stop conditions the buffer is drained and tasks are
+        closed without enqueuing data.
+
+        This callback fires on a nidaqmx-internal thread outside the asyncio
+        event loop, so estop/live-buffer/active access must go through the
+        synchronous `_base_hook`/injected-callable seams rather than
+        `await`-ing anything.
 
         Returns:
             0 (required by the NI-DAQmx callback protocol).
         """
-        if self.IO_do_meas and not self.base.actionservermodel.estop:
+        is_estopped = self._is_estopped()
+        if self.IO_do_meas and not is_estopped:
             try:
                 self.IO_measuring = True
 
-                if self.FIFO_epoch is None:
-                    self.FIFO_epoch = self.active.get_realtime_nowait()
+                if self.FIFO_epoch is None and self._get_realtime_nowait is not None:
+                    self.FIFO_epoch = self._get_realtime_nowait()
                     # need to correct for the first datapoints
                     self.FIFO_epoch -= number_of_samples / self.samplingrate
-                    if self.active:
-                        if self.active.action.save_data:
-                            self.active.finish_hlo_header(realtime=self.FIFO_epoch)
+                    if self._save_data and self._finish_hlo_header is not None:
+                        self._finish_hlo_header(realtime=self.FIFO_epoch)
 
                 # start seq: V then current, so read current first then Volt
                 # put callback only on current (Volt should the always have enough points)
@@ -449,10 +437,10 @@ class cNIMAX:
                 )
                 mdata = {}
                 for myname in self.task_monitor_keys:
-                    mdata[myname], _ = self.base.get_lbuf(myname)
+                    mdata[myname], _ = self._get_lbuf(myname)
 
                 # this is also what NImax seems to do
-                time = [
+                time_ = [
                     self.IVtimeoffset + i / self.samplingrate
                     for i in range(len(dataI[0]))
                 ]
@@ -462,7 +450,7 @@ class cNIMAX:
                 data_dict = {}
                 for i, _ in enumerate(self.FIFO_cell_keys):
                     cell_data_dict = {
-                        f"{self.FIFO_column_headings[0]}": time,
+                        f"{self.FIFO_column_headings[0]}": time_,
                         f"{self.FIFO_column_headings[1]}": dataI[i],
                         f"{self.FIFO_column_headings[2]}": dataV[i],
                     }
@@ -471,16 +459,14 @@ class cNIMAX:
                     data_dict[self.file_conn_keys[i]] = cell_data_dict
 
                 # push data to datalogger queue
-                if self.active:
-                    self.active.enqueue_data_nowait(
-                        datamodel=DataModel(data=data_dict, errors=[])
-                    )
+                if self._data_sink is not None:
+                    self._data_sink(datamodel=DataModel(data=data_dict, errors=[]))
 
             except Exception as e:
                 tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
                 LOGGER.error(f"canceling NImax IV stream: {repr(e), tb,}")
 
-        elif self.base.actionservermodel.estop and self.IO_do_meas:
+        elif is_estopped and self.IO_do_meas:
             _ = self.task_6289cellcurrent.read(
                 number_of_samples_per_channel=number_of_samples
             )
@@ -502,85 +488,86 @@ class cNIMAX:
             )
             # task should be already off or should be closed soon
             LOGGER.info("meas was turned off but NImax IV task is still running ...")
-            # self.task_6289cellcurrent.close()
-            # self.task_6284cellvoltage.close()
 
         return 0
 
-    async def IOloop(self):
-        """Drive the multi-cell IV task lifecycle from `IO_signalq` requests.
+    def arm_cell_iv(
+        self,
+        samplerate: int,
+        duration: float,
+        ttlwait: int,
+        file_conn_keys: list,
+        save_data: bool,
+        get_realtime_nowait: Callable,
+        finish_hlo_header: Callable,
+        enqueue_data_nowait: Callable,
+    ) -> DriverResponse:
+        """Configure and start the buffered multi-cell IV NI-DAQ tasks.
 
-        On a True signal, starts the voltage (slave) then current (master)
-        tasks, waits for the first callback to flip `IO_measuring`, polls
-        until `duration` elapses or a stop/estop is requested, then closes
-        the tasks and finalizes the active action. Handles estop transitions
-        and ignores requests when already busy or already idle.
+        Called once from `CellIVExec._pre_exec`, after the caller has
+        created the `Active` action and its 9 per-cell file connections.
+        Plain params + callables only (K7): the driver never sees `Active`.
+
+        Args:
+            samplerate: Samples per second per channel.
+            duration: Total measurement duration in seconds.
+            ttlwait: -1 disables trigger wait, else the TTL channel index.
+            file_conn_keys: One file-connection key per `FIFO_cell_keys`
+                entry, supplied by the caller that owns `active`.
+            save_data: Mirrors `active.action.save_data`; gates the one-time
+                `finish_hlo_header` call.
+            get_realtime_nowait: `active.get_realtime_nowait` (no args).
+            finish_hlo_header: `active.finish_hlo_header` (kwarg `realtime`).
+            enqueue_data_nowait: `active.enqueue_data_nowait` (kwarg `datamodel`).
+
+        Returns:
+            `DriverResponse` reporting the tasks were armed and started.
         """
-        self.IOloop_run = True  # could have another loop before that set of ifs?
+        self.IVtimeoffset = 0.0
+        self.samplingrate = samplerate
+        self.duration = duration
+        self.ttlwait = ttlwait
+        self.buffersizeread = int(self.samplingrate)
+        self.file_conn_keys = file_conn_keys
+        self.FIFO_epoch = None
+
+        self._save_data = save_data
+        self._get_realtime_nowait = get_realtime_nowait
+        self._finish_hlo_header = finish_hlo_header
+        self._data_sink = enqueue_data_nowait
+
+        self.create_IVtask()
+        self.IO_do_meas = True
+        # start slave first, then master to trigger slave (matches prior IOloop order)
+        self.task_6284cellvoltage.start()
+        self.task_6289cellcurrent.start()
+
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.busy)
+
+    def stop_cell_iv(self) -> DriverResponse:
+        """Stop an in-progress multi-cell IV measurement and close its NI tasks."""
+        self.IO_do_meas = False
+        self.IO_measuring = False
         try:
-            while self.IOloop_run:
-                self.IO_do_meas = await self.IO_signalq.get()
-                if self.IO_do_meas and not self.IO_measuring:
-                    # are we in estop?
-                    if not self.base.actionservermodel.estop:
-                        LOGGER.info("NImax IV task got measurement request")
-
-                        # start slave first
-                        self.task_6284cellvoltage.start()
-                        # then start master to trigger slave
-                        self.task_6289cellcurrent.start()
-
-                        # wait for first callback interrupt
-                        while not self.IO_measuring:
-                            await asyncio.sleep(0.1)
-                        LOGGER.info("got IO_measuring")
-
-                        # get timecode and correct for offset from first interrupt
-                        self.IOloopstarttime = (
-                            time.time()
-                        )  # -self.buffersizeread/self.samplingrate
-
-                        while (
-                            time.time() - self.IOloopstarttime < self.duration
-                        ) and self.IO_do_meas:
-                            if not self.IO_signalq.empty():
-                                self.IO_do_meas = await self.IO_signalq.get()
-                            await asyncio.sleep(0.1)
-
-                        LOGGER.info(
-                            f"NImax IV finished with IO_do_meas {self.IO_do_meas}"
-                        )
-
-                        # await self.IO_signalq.put(False)
-                        self.IO_do_meas = False
-                        self.IO_measuring = False
-                        self.task_6289cellcurrent.close()
-                        self.task_6284cellvoltage.close()
-                        _ = await self.active.finish()
-                        self.active = None
-                        self.action = None
-                        self.samples_in = []
-
-                        if self.base.actionservermodel.estop:
-                            LOGGER.info("NImax IV task is in estop.")
-                        else:
-                            LOGGER.info("setting NImax IV task to idle")
-                        LOGGER.info("NImax IV task measurement is done")
-                    else:
-                        self.IO_do_meas = False
-                        LOGGER.info("NImax IV task is in estop.")
-
-                elif self.IO_do_meas and self.IO_measuring:
-                    LOGGER.info("got measurement request but NImax IV task is busy")
-                elif not self.IO_do_meas and self.IO_measuring:
-                    LOGGER.info("got stop request, measurement will stop next cycle")
-                else:
-                    LOGGER.info("got stop request but NImax IV task is idle")
-
-            LOGGER.info(f"IOloop got IOloop_run {self.IOloop_run}")
-
-        except asyncio.CancelledError:
-            LOGGER.info("IOloop task was cancelled")
+            if self.task_6289cellcurrent is not None:
+                self.task_6289cellcurrent.close()
+            if self.task_6284cellvoltage is not None:
+                self.task_6284cellvoltage.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("error closing NImax IV tasks", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        finally:
+            self.task_6289cellcurrent = None
+            self.task_6284cellvoltage = None
+            self._data_sink = None
+            self._get_realtime_nowait = None
+            self._finish_hlo_header = None
+        return response
 
     async def Heatloop(
         self,
@@ -612,7 +599,7 @@ class cNIMAX:
         while (time.time() - heatloopstarttime < duration) and self.Heatloop_run:
             readtempdict = {}
             for i, myname in enumerate(self.config_dict["dev_monitor"]):
-                mdata[i], _ = self.base.get_lbuf(myname)
+                mdata[i], _ = self._get_lbuf(myname)
                 readtempdict[myname] = mdata[i]
             cell_temp = float(readtempdict["Ttemp_Ktc_in_cell_C"])
             reservoir_temp = float(readtempdict["Ttemp_Ttc_in_reservoir_C"])
@@ -662,7 +649,6 @@ class cNIMAX:
         err_code = ErrorCodes.none
         if do_port is not None:
             with nidaqmx.Task() as task_do_port:
-                # for pump in pumps:
                 task_do_port.do_channels.add_do_chan(
                     do_port,
                     line_grouping=LineGrouping.CHAN_PER_LINE,
@@ -720,176 +706,31 @@ class cNIMAX:
             "value": on,
         }
 
-    async def run_cell_IV(self, A: Action) -> dict:
-        """Start a buffered multi-cell IV measurement for action `A`.
-
-        Validates the inbound samples against the unified sample DB, creates
-        one file-conn per cell (splitting the active action so each cell has
-        its own output stream), configures the IV NI-DAQ task, and signals
-        the IO loop to begin. Returns an "already in progress" error if a
-        measurement is already running.
-
-        Args:
-            A: HELAO `Action` containing `SampleRate`, `Tval` (duration),
-                and `TTLwait` in `action_params`.
-
-        Returns:
-            The active action as a dict (`as_dict()`).
-        """
-        activeDict = {}
-
-        samplerate = A.action_params["SampleRate"]
-        duration = A.action_params["Tval"]
-        ttlwait = A.action_params["TTLwait"]  # -1 disables, else select TTL channel
-
-        A.error_code = ErrorCodes.none
-        if not self.IO_do_meas:
-            # first validate the provided samples
-            samples_in = await self.unified_db.get_samples(A.samples_in)
-            if not samples_in and not self.allow_no_sample:
-                LOGGER.error("NI got no valid sample, cannot start measurement!")
-                A.error_code = ErrorCodes.no_sample
-                activeDict = A.as_dict()
-            else:
-
-                self.IVtimeoffset = 0.0
-                self.file_conn_keys = []
-                self.samplingrate = samplerate
-                self.duration = duration
-                self.ttlwait = ttlwait
-                self.buffersizeread = int(self.samplingrate)
-                # save submitted action object
-                self.action = A
-                self.samples_in = samples_in
-                self.FIFO_epoch = None
-                # create active and write streaming file header
-
-                self.FIFO_NImaxheader = {}
-                file_sample_label = {}
-                file_sample_list = []
-
-                for sample in self.samples_in:
-                    sample.reset_sample_status(SampleStatus.preserved)
-                    sample.inheritance = SampleInheritance.allow_both
-
-                for i, FIFO_cell_key in enumerate(self.FIFO_cell_keys):
-                    if self.samples_in is not None:
-                        if (
-                            len(self.samples_in) == 9
-                        ):  # number of cells   ----restored to 9
-                            file_sample_list.append([self.samples_in[i]])
-                            sample_label = [self.samples_in[i].get_global_label()]
-                        else:
-                            file_sample_list.append(self.samples_in)
-                            sample_label = [
-                                sample.get_global_label() for sample in self.samples_in
-                            ]
-                    else:
-                        file_sample_list.append([])
-                        sample_label = None
-                    file_sample_label[FIFO_cell_key] = sample_label
-
-                # create the first action and then split it into child actions
-                # for the other data streams
-                self.file_conn_keys.append(self.base.dflt_file_conn_key())
-                self.active = await self.base.contain_action(
-                    ActiveParams(
-                        action=self.action,
-                        file_conn_params_dict={
-                            self.base.dflt_file_conn_key(): FileConnParams(
-                                file_conn_key=self.base.dflt_file_conn_key(),
-                                sample_global_labels=file_sample_label[
-                                    self.FIFO_cell_keys[0]
-                                ],
-                                file_type="ni_helao__file",
-                                # only add optional keys to header
-                                # rest will be added later
-                                hloheader=HloHeaderModel(
-                                    optional={"cell": self.FIFO_cell_keys[0]}
-                                ),
-                            )
-                        },
-                    )
-                )
-                # clear old samples_in first
-                self.active.action.samples_in = []
-                # now add updated samples to sample_in again
-                await self.active.append_sample(samples=file_sample_list[0], IO="in")
-
-                # now add the rest
-                for i in range(len(self.FIFO_cell_keys) - 1):
-                    new_file_conn_keys = await self.active.split(
-                        new_fileconnparams=FileConnParams(
-                            file_conn_key=self.base.dflt_file_conn_key(),
-                            sample_global_labels=file_sample_label[
-                                self.FIFO_cell_keys[i + 1]
-                            ],
-                            file_type="ni_helao__file",
-                            # only add optional keys to header
-                            # rest will be added later
-                            hloheader=HloHeaderModel(
-                                optional={"cell": self.FIFO_cell_keys[i + 1]}
-                            ),
-                        )
-                    )
-                    # add the new file_conn_key to the list
-                    if new_file_conn_keys:
-                        self.file_conn_keys.append(new_file_conn_keys[0])
-
-                    # clear old samples_in first
-                    self.active.action.samples_in = []
-
-                    # now add updated samples to sample_in again
-                    await self.active.append_sample(
-                        samples=file_sample_list[i + 1], IO="in"
-                    )
-
-                # create the cell IV task
-                self.create_IVtask()
-                await self.set_IO_signalq(True)
-
-                self.active.action.error_code = ErrorCodes.none
-
-                if self.active:
-                    activeDict = self.active.action.as_dict()
-                else:
-                    activeDict = A.as_dict()
-
-        else:
-            A.error_code = ErrorCodes.in_progress
-            activeDict = A.as_dict()
-
-        return activeDict
-
     async def read_T(self) -> dict:
         """Return the latest cached value for each monitor channel from the live buffer."""
         mdata = {}
         for myname in self.task_monitor_keys:
-            mdata[myname], _ = self.base.get_lbuf(myname)
+            mdata[myname], _ = self._get_lbuf(myname)
         print(mdata)
         return mdata
-
-    def stop_monitor(self):
-        """Signal the monitor loop to exit."""
-        self.monitorloop_run = False
 
     def stop_heatloop(self):
         """Signal the heater control loop to exit."""
         self.Heatloop_run = False
 
-    async def stop(self):
-        """Request the IV loop to stop the current measurement (if any)."""
-        # turn off cell and run before stopping meas loop
-        if self.IO_measuring:
-            await self.set_IO_signalq(False)
-
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
         """Engage or release the IO emergency stop.
 
-        When `switch` is True, drives every configured LED, pump, gas valve,
-        liquid valve, and heater output low and sets the action-server estop
-        flag. If a measurement is in progress it is also stopped and the
-        active action is marked estopped.
+        Drives every configured LED, pump, gas valve, liquid valve, and
+        heater output low (matching the pre-migration behavior, this runs
+        whether `switch` asserts or releases estop). If a cell-IV
+        measurement is in progress and `switch` is True, it is also
+        signalled to stop.
+
+        Server-side estop-flag bookkeeping (`actionservermodel.estop`) and
+        marking in-flight actions as estopped are owned by the action-server
+        framework (`base_api.py`'s `/estop` endpoint and `estop_actives()`),
+        not the driver.
 
         Args:
             switch: True to assert estop, False to release.
@@ -898,7 +739,6 @@ class cNIMAX:
             The boolean coerced `switch` value.
         """
         switch = bool(switch)
-        self.base.actionservermodel.estop = switch
 
         for do_name, do_port in self.dev_led.items():
             await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
@@ -915,29 +755,157 @@ class cNIMAX:
         for do_name, do_port in self.dev_heat.items():
             await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
 
-        if self.IO_measuring:
-            if switch:
-                await self.set_IO_signalq(False)
-                if self.active:
-                    self.active.set_estop()
+        if switch and self.IO_measuring:
+            self.IO_do_meas = False
 
         return switch
 
-    def shutdown(self):
-        """Signal all background loops to stop and wait for the active action to clear."""
-        LOGGER.info("shutting down nidaqmx")
-        self.set_IO_signalq_nowait(False)
-        retries = 0
-        while self.active is not None and retries < 10:
-            LOGGER.info(f"Got shutdown, but Active is not yet done!, retry {retries}")
-            # set it again
-            self.set_IO_signalq_nowait(False)
-            time.sleep(1)
-            retries += 1
-        # stop IOloop and monitorloop
-        self.Heatloop_run = False
-        self.monitorloop_run = False
-        self.IOloop_run = False
+
+class cNIMAXPoller(DriverPoller):
+    """Background poller that reads the NI-DAQ thermocouple monitor task."""
+
+    driver: cNIMAX
+
+    def get_data(self) -> DriverResponse:
+        """Read one sample from every configured thermocouple monitor channel.
+
+        Mirrors the pre-migration `monitorloop` body: a single synchronous
+        `task_monitors.read()`, zipped against `task_monitor_keys`.
+
+        Returns:
+            `DriverResponse` with `data={monitor_name: value, ...}`, or an
+            empty `DriverResponse` if no monitor channels are configured.
+        """
+        if not self.driver.task_monitor_keys or self.driver.task_monitors is None:
+            return DriverResponse()
+        try:
+            mvalues = self.driver.task_monitors.read()
+        except Exception:
+            LOGGER.error("NImax monitor task read failed", exc_info=True)
+            return DriverResponse()
+        if not isinstance(mvalues, list):
+            mvalues = [mvalues]
+        datastore = {
+            myname: mvalue
+            for myname, mvalue in zip(self.driver.task_monitor_keys, mvalues)
+        }
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=datastore,
+        )
+
+
+class CellIVExec(Executor):
+    """Executor that drives a synchronized multi-cell current/voltage measurement.
+
+    Owns the `Active` action created by the `/cellIV` endpoint (K7b: the
+    endpoint validates samples and calls `contain_action` for the first
+    cell's file connection; `_pre_exec` here does the remaining sample
+    bookkeeping/file-conn splitting for the other 8 cells, then arms the NI
+    tasks via `driver.arm_cell_iv`, handing it plain callables instead of
+    `Active` itself). The NI-DAQmx buffer callback pushes data directly via
+    those callables (see module docstring), so `_poll` only tracks
+    active/finished status; it does not return `data`.
+    """
+
+    def __init__(self, samples_in: list, file_sample_list: list, *args, **kwargs):
+        """Capture the pre-validated samples and per-cell sample split.
+
+        Args:
+            samples_in: Samples returned by `UnifiedSampleDataAPI.get_samples`.
+            file_sample_list: Per-`FIFO_cell_keys`-index list of samples,
+                computed by the endpoint before `contain_action`.
+            *args: Positional args forwarded to :class:`Executor`.
+            **kwargs: Keyword args forwarded to :class:`Executor` (must
+                include `active`).
+        """
+        super().__init__(*args, **kwargs)
+        LOGGER.info("CellIVExec initialized.")
+        p = self.active.action.action_params
+        # K7 CRITICAL: read from action_params (subscript), never endpoint fn-args
+        self.samplerate = p["SampleRate"]
+        self.duration = p["Tval"]
+        self.ttlwait = p["TTLwait"]
+        self.samples_in = samples_in
+        self.file_sample_list = file_sample_list
+        self.iv_start_time: Optional[float] = None
+
+    async def _pre_exec(self) -> dict:
+        """Split the container action into 9 per-cell file connections and arm the NI tasks."""
+        driver = self.active.driver
+
+        for sample in self.samples_in:
+            sample.reset_sample_status(SampleStatus.preserved)
+            sample.inheritance = SampleInheritance.allow_both
+
+        # cell 0's file_conn was already created by contain_action(); attach its samples
+        self.active.action.samples_in = []
+        await self.active.append_sample(samples=self.file_sample_list[0], IO="in")
+
+        file_conn_keys = list(self.active.action.file_conn_keys)
+
+        # split into the remaining 8 per-cell file connections
+        for i, cell_key in enumerate(driver.FIFO_cell_keys[1:], start=1):
+            sample_label = (
+                [s.get_global_label() for s in self.file_sample_list[i]]
+                if self.file_sample_list[i]
+                else None
+            )
+            new_file_conn_keys = await self.active.split(
+                new_fileconnparams=FileConnParams(
+                    file_conn_key=self.active.base.dflt_file_conn_key(),
+                    sample_global_labels=sample_label,
+                    file_type="ni_helao__file",
+                    hloheader=HloHeaderModel(optional={"cell": cell_key}),
+                )
+            )
+            if new_file_conn_keys:
+                file_conn_keys.append(new_file_conn_keys[0])
+
+            self.active.action.samples_in = []
+            await self.active.append_sample(samples=self.file_sample_list[i], IO="in")
+
+        driver.arm_cell_iv(
+            samplerate=self.samplerate,
+            duration=self.duration,
+            ttlwait=self.ttlwait,
+            file_conn_keys=file_conn_keys,
+            save_data=self.active.action.save_data,
+            get_realtime_nowait=self.active.get_realtime_nowait,
+            finish_hlo_header=self.active.finish_hlo_header,
+            enqueue_data_nowait=self.active.enqueue_data_nowait,
+        )
+        return {"error": ErrorCodes.none}
+
+    async def _poll(self) -> dict:
+        """Wait for the first NI-DAQ callback, then track elapsed time against `duration`.
+
+        Data is pushed directly to `active.enqueue_data_nowait` from the NI
+        hardware callback (see `arm_cell_iv`/`streamIV_callback`), so this
+        never returns `data` itself.
+        """
+        driver = self.active.driver
+        if not driver.IO_measuring:
+            return {"error": ErrorCodes.none, "status": HloStatus.active, "data": {}}
+        if self.iv_start_time is None:
+            self.iv_start_time = time.time()
+        elapsed = time.time() - self.iv_start_time
+        if elapsed < self.duration and driver.IO_do_meas:
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {"error": ErrorCodes.none, "status": status, "data": {}}
+
+    async def _post_exec(self) -> dict:
+        """Close the NI IV tasks and clear the driver's per-run hooks."""
+        self.active.driver.stop_cell_iv()
+        return {"error": ErrorCodes.none, "data": {}}
+
+    async def _manual_stop(self) -> dict:
+        """Close the NI IV tasks on abort (estop/manual stop)."""
+        self.active.driver.stop_cell_iv()
+        return {"error": ErrorCodes.none}
 
 
 class DevMonExec(Executor):
