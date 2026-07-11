@@ -111,6 +111,10 @@ class SampleModelAPI:
         self.column_count = len(self.column_names)
 
         self._sampleclass = sampleclass
+        # Declared model fields that have no dedicated DB column (e.g. ``etc``,
+        # ``parent_assembly_label``) are intentionally not persisted. They are
+        # dropped silently; only genuinely unexpected keys warrant a warning.
+        self._model_field_names = set(type(sampleclass).model_fields.keys())
         self._sample_type = f"{sampleclass.sample_type.value}_sample"
         self._dbfilename = gethostname().lower() + f"__{self._sample_type}.db"
         self._base = Serv_class
@@ -264,10 +268,11 @@ class SampleModelAPI:
                     dfdict[key] = str(val)
 
                 if key not in self.column_names:
-                    LOGGER.warning(
-                        f"Invalid {self._sample_type} data key '{key}', skipping it."
-                    )
                     keys_to_deletes.append(key)
+                    if key not in self._model_field_names:
+                        LOGGER.warning(
+                            f"Invalid {self._sample_type} data key '{key}', skipping it."
+                        )
 
             for key in keys_to_deletes:
                 del dfdict[key]
@@ -598,10 +603,11 @@ class SampleModelAPI:
                 keys_to_deletes = []
                 for key in dfdict.keys():
                     if key not in self.column_names:
-                        LOGGER.warning(
-                            f"Invalid {self._sample_type} data key '{key}', skipping it."
-                        )
                         keys_to_deletes.append(key)
+                        if key not in self._model_field_names:
+                            LOGGER.warning(
+                                f"Invalid {self._sample_type} data key '{key}', skipping it."
+                            )
 
                 for key in keys_to_deletes:
                     del dfdict[key]
