@@ -45,6 +45,8 @@ from helao.core.tests.unit_test_sample_union import sample_union_unit_test
 from helao.core.tests.unit_test_orch_monitor import orch_monitor_unit_test
 from helao.core.tests.unit_test_orch_status_sync import orch_status_sync_unit_test
 from helao.core.tests.unit_test_orch_queues import orch_queues_unit_test
+from helao.core.tests.unit_test_orch_unpack import orch_unpack_unit_test
+from helao.core.tests.unit_test_orch_lifecycle import orch_lifecycle_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
 
@@ -73,6 +75,8 @@ TESTS = [
     ("orch_monitor", orch_monitor_unit_test),
     ("orch_status_sync", orch_status_sync_unit_test),
     ("orch_queues", orch_queues_unit_test),
+    ("orch_unpack", orch_unpack_unit_test),
+    ("orch_lifecycle", orch_lifecycle_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
 
