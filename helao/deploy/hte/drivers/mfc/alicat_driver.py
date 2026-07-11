@@ -2,11 +2,11 @@
 
 Builds on a forked copy of the numat `alicat` serial driver (`FlowMeter`,
 `FlowController` at the bottom of this module) and wraps it in `AliCatMFC`,
-which owns one `FlowController` per configured device and runs an asyncio
-polling task that publishes status to the action-server live buffer. Three
-`Executor` subclasses (`MfcExec`, `PfcExec`, `MfcConstPresExec`,
-`MfcConstConcExec`) drive constant-flow, constant-pressure, and
-concentration-feedback sequences.
+a `HelaoDriver` that owns one `FlowController` per configured device. The
+paired `AliCatMFCPoller` publishes per-device status to the action server's
+live buffer. Three `Executor` subclasses (`MfcExec`, `PfcExec`,
+`MfcConstPresExec`, `MfcConstConcExec`) drive constant-flow, constant-pressure,
+and concentration-feedback sequences.
 
 NOTE: the factory default control setpoint on Alicat MFCs is analog and must
 be changed to serial (Menu-Control-Setpoint_setup-Setpoint_source) for this
@@ -15,7 +15,7 @@ HELAO's units at G16 (i-C4H10), G25 (He-25), and G26 (He-75); update the gas
 registers if those gases are used.
 """
 
-__all__ = ["AliCatMFC", "MfcExec", "PfcExec", "MfcConstPresExec"]
+__all__ = ["AliCatMFC", "AliCatMFCPoller", "MfcExec", "PfcExec", "MfcConstPresExec"]
 
 import time
 import json
@@ -28,56 +28,119 @@ import numpy as np
 
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.helpers.ws_utils import WsSyncClient as WSC
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-class AliCatMFC:
-    """HELAO wrapper around one or more Alicat `FlowController` instances.
+class AliCatMFC(HelaoDriver):
+    """HELAO ``HelaoDriver`` wrapper around one or more Alicat `FlowController` instances.
 
-    Reads a `devices` dict from `server_cfg["params"]`, instantiates a
-    `FlowController` per entry, queries each device's gas/info registers, and
-    runs `poll_sensor_loop` to publish per-device status to the live buffer.
-    Exposes async helpers for setting flow/pressure, swapping gases,
-    locking/unlocking the front panel, holding valves, and taring.
+    Reads a `devices` dict from `config["devices"]`; each `FlowController` is
+    opened by :meth:`connect`, not by construction. Always-on per-device status
+    polling is handled by the paired :class:`AliCatMFCPoller`, wired in as the
+    server's ``poller_class``. Exposes async helpers for setting flow/pressure,
+    swapping gases, locking/unlocking the front panel, holding valves, and
+    taring.
+
+    Server config parameters:
+        ``devices``: dict of ``{device_name: {"port": ..., "unit_id": ...}}``.
     """
 
-    def __init__(self, action_serv: Base):
-        """Connect to every configured Alicat and start the polling tasks.
+    def __init__(self, config: dict = {}):
+        """Store config; each `FlowController` is opened in :meth:`connect`.
 
         Args:
-            action_serv: Owning HELAO action server.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-
-        self.unified_db = UnifiedSampleDataAPI(self.base)
+        super().__init__(config=config)
+        self.config_dict = self.config
 
         self.fcs = {}
         self.fcs_last_mode = {}
         self.fcinfo = {}
 
-        for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
-            self.make_fc_instance(dev_name, dev_dict)
+        # built from config alone (no device I/O) so endpoint typing is
+        # available before connect() has opened any serial ports
+        self.dev_mfcs = make_str_enum(
+            "dev_mfcs", {key: key for key in self.config_dict.get("devices", {})}
+        )
 
-        self.dev_mfcs = make_str_enum("dev_mfcs", {key: key for key in self.fcs})
-
-        LOGGER.info(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
-        # query status with self.mfc.get()
-        # query pid settings with self.mfc.get_pid()
-
-        self.aloop = asyncio.get_running_loop()
         self.polling = True
-        self.poll_signalq = asyncio.Queue(1)
-        self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
-        self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.last_state = "unknown"
+
+    def connect(self) -> DriverResponse:
+        """Open every configured Alicat and query its gas/identity registers.
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
+        try:
+            for dev_name, dev_dict in self.config_dict.get("devices", {}).items():
+                self.make_fc_instance(dev_name, dev_dict)
+            LOGGER.info(f"Managing {len(self.fcs)} devices:\n{self.fcs.keys()}")
+            # query status with self.mfc.get()
+            # query pid settings with self.mfc.get_pid()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def get_status(self) -> DriverResponse:
+        """Return whether any Alicat connections have been opened.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if at least one device is
+            connected, else ``status=uninitialized``.
+        """
+        if self.fcs:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen every Alicat connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close every Alicat serial connection."""
+        try:
+            for fc in self.fcs.values():
+                fc.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
     def make_fc_instance(self, device_name: str, device_config: dict):
         """Open a `FlowController` and cache its gas list and identity info.
@@ -138,86 +201,47 @@ class AliCatMFC:
         return lines
 
     async def start_polling(self):
-        """Signal the polling loop to resume and block until it has restarted."""
-        LOGGER.info("got 'start_polling' request, raising signal")
-        # async with self.base.aiolock:
-        await self.poll_signalq.put(True)
-        while not self.polling:
-            LOGGER.info("waiting for polling loop to start")
-            await asyncio.sleep(0.1)
+        """Resume device polling (consulted by :class:`AliCatMFCPoller`)."""
+        LOGGER.info("got 'start_polling' request")
+        self.polling = True
 
     async def stop_polling(self):
-        """Signal the polling loop to pause and block until it has stopped."""
-        LOGGER.info("got 'stop_polling' request, raising signal")
-        # async with self.base.aiolock:
-        await self.poll_signalq.put(False)
-        while self.polling:
-            LOGGER.info("waiting for polling loop to stop")
-            await asyncio.sleep(0.1)
+        """Pause device polling so a raw write command doesn't race the poller."""
+        LOGGER.info("got 'stop_polling' request")
+        self.polling = False
 
-    async def poll_signal_loop(self):
-        """Consume signals from `poll_signalq` and update `self.polling`."""
-        while True:
-            self.polling = await self.poll_signalq.get()
-            LOGGER.info("polling signal received")
+    def get_device_status(self, device_name: str) -> Optional[dict]:
+        """Read one status dict from a single flow controller, reconnecting on error.
 
-    async def poll_sensor_loop(self, waittime: float = 0.1):
-        """Background loop polling each MFC and pushing status to the live buffer.
+        Mirrors the pre-migration `poll_sensor_loop` per-device branch: on a
+        `get_status` exception the controller is rebuilt via `make_fc_instance`
+        and its last known control point restored.
 
-        On a `get_status` exception, the corresponding `FlowController` is
-        rebuilt via `make_fc_instance` and its prior control point restored.
+        Args:
+            device_name: Key in `self.fcs`.
+
+        Returns:
+            The device's status dict, or `None` if the read failed or the
+            returned dict was missing an expected key.
         """
-        LOGGER.info("MFC background task has started")
-        self.last_acquire = {dev_name: 0 for dev_name in self.fcs.keys()}
-        lastupdate = 0
-        while True:
-            for dev_name, fc in self.fcs.items():
-                # LOGGER.info(f"Refreshing {dev_name} MFC")
-                if self.polling:
-                    checktime = time.time()
-                    # LOGGER.info(f"{dev_name} MFC checked at {checktime}")
-                    if checktime - lastupdate < waittime:
-                        # LOGGER.info("waiting for minimum update interval.")
-                        await asyncio.sleep(waittime - (checktime - lastupdate))
-                    # LOGGER.info(f"Retrieving {dev_name} MFC status")
-                    try:
-                        resp_dict = fc.get_status()
-                    except Exception as e:
-                        LOGGER.info(
-                            f"Exception occured on get_status() {e}. Resetting MFC."
-                        )
-                        self.make_fc_instance(
-                            dev_name, self.config_dict["devices"][dev_name]
-                        )
-                        self.fcs[dev_name]._set_control_point(
-                            self.fcs_last_mode[dev_name], 5
-                        )
-                        LOGGER.info("MFC connection restored")
-                        continue
-                    # self.base.print_message(
-                    #     f"Received {dev_name} MFC status:\n{resp_dict}"
-                    # )
-                    if all(
-                        [
-                            x in resp_dict
-                            for x in (
-                                "mass_flow",
-                                "pressure",
-                                "setpoint",
-                                "control_point",
-                            )
-                        ]
-                    ):
-                        self.fcs_last_mode[dev_name] = resp_dict["control_point"]
-                        status_dict = {dev_name: resp_dict}
-                        lastupdate = time.time()
-                        # LOGGER.info(f"Live buffer updated at {checktime}")
-                        # async with self.base.aiolock:
-                        await self.base.put_lbuf(status_dict)
-                        # LOGGER.info("status sent to live buffer")
-                    else:
-                        LOGGER.info(f"!!Received unexpected dict: {resp_dict}")
-                await asyncio.sleep(0.001)
+        fc = self.fcs[device_name]
+        try:
+            resp_dict = fc.get_status()
+        except Exception as e:
+            LOGGER.info(f"Exception occured on get_status() {e}. Resetting MFC.")
+            self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
+            self.fcs[device_name]._set_control_point(
+                self.fcs_last_mode[device_name], 5
+            )
+            LOGGER.info("MFC connection restored")
+            return None
+        if all(
+            x in resp_dict for x in ("mass_flow", "pressure", "setpoint", "control_point")
+        ):
+            self.fcs_last_mode[device_name] = resp_dict["control_point"]
+            return resp_dict
+        LOGGER.info(f"!!Received unexpected dict: {resp_dict}")
+        return None
 
     def list_gases(self, device_name: str) -> dict:
         """Return the cached gas-register dict for the named device."""
@@ -402,10 +426,6 @@ class AliCatMFC:
     #         resp = self.fcs[device_name].reset_totalizer()
     #     return resp
 
-    def manual_query_status(self, device_name: str):
-        """Return the most recent live-buffer entry for `device_name`."""
-        return self.base.get_lbuf(device_name)
-
     async def async_shutdown(self):
         """Stop polling and close all valves prior to driver shutdown."""
         await self.stop_polling()
@@ -421,9 +441,44 @@ class AliCatMFC:
 
     def shutdown(self):
         """Close every Alicat serial connection. Invoked on action-server shutdown."""
-        LOGGER.info("closing MFC connections")
-        for fc in self.fcs.values():
-            fc.close()
+        self.disconnect()
+
+
+class AliCatMFCPoller(DriverPoller):
+    """Background poller that reads status for every configured Alicat MFC/PFC."""
+
+    driver: AliCatMFC
+
+    def get_data(self) -> DriverResponse:
+        """Read one status sample from each configured flow controller.
+
+        Skips the read entirely while `self.driver.polling` is `False` (a
+        raw write is in progress), mirroring the pre-migration
+        `poll_sensor_loop`'s per-device `polling` gate.
+
+        Returns:
+            `DriverResponse` with `data={dev_name: status_dict, ...}` merged
+            across every device that returned a valid reading this cycle
+            (the pre-migration loop forwarded one `{dev_name: resp_dict}` to
+            `put_lbuf` per device per cycle; folding them into a single call
+            here is behaviorally equivalent since `DriverPoller` merges
+            `resp.data` into `live_dict` as a whole), or an empty
+            `DriverResponse` when polling is paused or no device responded.
+        """
+        if not self.driver.polling:
+            return DriverResponse()
+        status_dict = {}
+        for dev_name in list(self.driver.fcs.keys()):
+            resp_dict = self.driver.get_device_status(dev_name)
+            if resp_dict is not None:
+                status_dict[dev_name] = resp_dict
+        if not status_dict:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=status_dict,
+        )
 
 
 class MfcExec(Executor):
