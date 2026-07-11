@@ -192,13 +192,14 @@ class KDS100(HelaoDriver):
         return response
 
     def shutdown(self):
-        """Close the underlying serial port on server shutdown."""
-        self.disconnect()
+        """No-op; `async_shutdown` handles safe-state-then-disconnect ordering."""
+        return None
 
     async def async_shutdown(self):
-        """Return pumps to a safe state prior to server shutdown."""
+        """Return pumps to a safe state, then close the serial connection."""
         LOGGER.info("shutting down syringe pump(s)")
         await self.safe_state()
+        self.disconnect()
 
     async def start_polling(self):
         """Resume background status polling (consulted by :class:`KDS100Poller`)."""
@@ -624,6 +625,18 @@ class PumpExec(Executor):
             direction=self.direction,
         )
         LOGGER.info(f"start_pump returned: {start_resp}")
+        # Publish the start-transition synchronously in the same call path as
+        # the start command: PumpExec._poll's first iteration runs with no
+        # initial sleep and would otherwise read the stale pre-action status
+        # from live_buffer before KDS100Poller's next cycle publishes it,
+        # finishing the action immediately without dispensing.
+        await self.active.base.put_lbuf(
+            {
+                self.pump_name: {
+                    "status": "infusing" if self.direction == 1 else "withdrawing"
+                }
+            }
+        )
         return {"error": ErrorCodes.none}
 
     async def _poll(self) -> dict:
