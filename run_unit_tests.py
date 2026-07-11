@@ -42,6 +42,7 @@ from helao.core.tests.unit_test_sync_process_recovery import (
 from helao.core.tests.unit_test_estop_sync import estop_sync_unit_test
 from helao.core.tests.unit_test_sample_status import sample_status_unit_test
 from helao.core.tests.unit_test_sample_union import sample_union_unit_test
+from helao.core.tests.unit_test_orch_monitor import orch_monitor_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
 
@@ -67,6 +68,7 @@ TESTS = [
     ("estop_sync", estop_sync_unit_test),
     ("sample_status", sample_status_unit_test),
     ("sample_union", sample_union_unit_test),
+    ("orch_monitor", orch_monitor_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
 

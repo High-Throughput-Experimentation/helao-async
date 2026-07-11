@@ -26,7 +26,6 @@ from typing import Optional
 import time
 from collections import defaultdict
 
-import aiohttp
 import colorama
 from fastapi import WebSocket
 
@@ -45,7 +44,6 @@ from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.dispatcher import (
     async_private_dispatcher,
     async_action_dispatcher,
-    endpoints_available,
 )
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.yml_tools import move_dir
@@ -56,6 +54,7 @@ from helao.core.servers.orch_global_params import (
     collect_to_globals,
 )
 from helao.core.servers.orch_persist import QueuePersister
+from helao.core.servers.orch_monitor import ServerMonitor
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
@@ -196,7 +195,19 @@ class Orch(Base):
             self.seq_postprocess_libs, self.seq_postprocessors, MetaProcessor
         )
 
+        self._init_collaborators()
+
+    def _init_collaborators(self):
+        """Construct the collaborators extracted from ``Orch`` by CARDS P5.
+
+        Called from ``__init__`` at the point each collaborator's state was
+        previously constructed inline; test fixtures that bypass ``__init__``
+        (e.g. the dispatch golden-master harness's ``Orch.__new__``
+        construction) call this directly so collaborators exist without
+        per-collaborator lazy guards.
+        """
         self.queue_persister = QueuePersister(self)
+        self.server_monitor = ServerMonitor(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -319,54 +330,7 @@ class Orch(Base):
         Args:
             retry_limit: Maximum subscription attempts per server.
         """
-        fails = []
-        for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
-                LOGGER.info(f"trying to subscribe to {serv_key} status")
-
-                success = False
-                serv_addr = serv_dict["host"]
-                serv_port = serv_dict["port"]
-                for _ in range(retry_limit):
-                    try:
-                        response, error_code = await async_private_dispatcher(
-                            server_key=serv_key,
-                            host=serv_addr,
-                            port=serv_port,
-                            private_action="attach_client",
-                            params_dict={
-                                "client_servkey": self.server.server_name,
-                                "client_host": self.server_cfg["host"],
-                                "client_port": self.server_cfg["port"],
-                            },
-                            json_dict={},
-                        )
-                        # print(response)
-                        # print(error_code)
-                        if response is not None and error_code == ErrorCodes.none:
-                            success = True
-                            break
-                    except aiohttp.client_exceptions.ClientConnectorError:
-                        LOGGER.error(
-                            f"failed to subscribe to {serv_key} at {serv_addr}:{serv_port}, trying again in 2 seconds",
-                            exc_info=True,
-                        )
-                        await asyncio.sleep(2)
-
-                if success:
-                    LOGGER.info(f"Subscribed to {serv_key} at {serv_addr}:{serv_port}")
-                else:
-                    fails.append(serv_key)
-                    LOGGER.info(
-                        f"Failed to subscribe to {serv_key} at {serv_addr}:{serv_port}. Check connection."
-                    )
-
-        if len(fails) == 0:
-            self.init_success = True
-        else:
-            LOGGER.info(
-                "Orchestrator cannot action experiment_dq unless all FastAPI servers in config file are accessible."
-            )
+        return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
 
     async def update_nonblocking(
         self, actionmodel: Action, server_host: str, server_port: int
@@ -2389,28 +2353,7 @@ class Orch(Base):
 
     async def active_action_monitor(self):
         """Heartbeat loop that stops the orchestrator if any active action endpoint goes offline."""
-        while True:
-            if self.globalstatusmodel.loop_state == LoopStatus.started:
-                active_endpoints = [
-                    actmod.url for actmod in self.globalstatusmodel.active_dict.values()
-                ]
-                if active_endpoints:
-                    unique_endpoints = list(set(active_endpoints))
-                    _, unavail = await endpoints_available(unique_endpoints)
-                    bad_ends = [
-                        "/".join(x.strip("/").split("/")[-2:]) for x, _ in unavail
-                    ]
-                    bad_ends = [x for x in bad_ends if x not in self.ignore_heartbeats]
-                    if bad_ends:
-                        self.current_stop_message = (
-                            f"{', '.join(bad_ends)} endpoints are unavailable"
-                        )
-                        LOGGER.warning(
-                            (f"{', '.join(bad_ends)} endpoints are unavailable")
-                        )
-                        await self.stop()
-                        LOGGER.alert(f"ORCH STOPPED ~ {self.current_stop_message}")
-            await asyncio.sleep(self.heartbeat_interval)
+        return await self.server_monitor.active_action_monitor()
 
     async def ping_action_servers(self) -> dict:
         """Query every action server for its endpoint and driver status.
@@ -2420,66 +2363,11 @@ class Orch(Base):
             ``status_str`` is ``"idle"``, ``"busy [<endpoints>]"`` or
             ``"unreachable"``.
         """
-        status_summary = {}
-        for serv_key, serv_dict in self.world_cfg["servers"].items():
-            if serv_key in ["DB", "ANA"]:
-                continue
-            if "ignore_heartbeats" in serv_dict.get("params", {}):
-                continue
-            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
-                serv_addr = serv_dict["host"]
-                serv_port = serv_dict["port"]
-                try:
-                    response, error_code = await async_private_dispatcher(
-                        server_key=serv_key,
-                        host=serv_addr,
-                        port=serv_port,
-                        private_action="get_status",
-                        params_dict={
-                            "client_servkey": self.server.server_name,
-                            "client_host": self.server_cfg["host"],
-                            "client_port": self.server_cfg["port"],
-                        },
-                        json_dict={},
-                    )
-                    if response is not None and error_code == ErrorCodes.none:
-                        busy_endpoints = []
-                        driver_status = response.get("_driver_status", "unknown")
-                        for endpoint_name, endpoint_dict in response.get(
-                            "endpoints", {}
-                        ).items():
-                            if endpoint_dict["active_dict"]:
-                                busy_endpoints.append(endpoint_name)
-                        if busy_endpoints:
-                            busy_str = ", ".join(busy_endpoints)
-                            status_str = f"busy [{busy_str}]"
-                        else:
-                            status_str = "idle"
-                        status_summary[serv_key] = (status_str, driver_status)
-                    else:
-                        status_summary[serv_key] = ("unreachable", "unknown")
-                except aiohttp.client_exceptions.ClientConnectorError:
-                    status_summary[serv_key] = ("unreachable", "unknown")
-        return status_summary
+        return await self.server_monitor.ping_action_servers()
 
     async def action_server_monitor(self):
         """Heartbeat loop that refreshes ``status_summary`` via :meth:`ping_action_servers`."""
-        while True:
-            self.status_summary = await self.ping_action_servers()
-            await asyncio.sleep(self.heartbeat_interval)
-
-    def _get_queue_persister(self) -> QueuePersister:
-        """Return ``self.queue_persister``, constructing it lazily if absent.
-
-        ``__init__`` always sets this eagerly; the lazy fallback only matters
-        for test fixtures that bypass ``__init__`` (e.g. the dispatch
-        golden-master harness's ``Orch.__new__`` construction).
-        """
-        queue_persister = getattr(self, "queue_persister", None)
-        if queue_persister is None:
-            queue_persister = QueuePersister(self)
-            self.queue_persister = queue_persister
-        return queue_persister
+        return await self.server_monitor.action_server_monitor()
 
     def export_queues(self, timestamp_pck: bool = False) -> str:
         """Pickle the deques, active/last sequence and experiment, and histories under ``STATES/``.
@@ -2490,7 +2378,7 @@ class Orch(Base):
         Returns:
             Filesystem path of the written pickle file.
         """
-        return self._get_queue_persister().export_queues(timestamp_pck=timestamp_pck)
+        return self.queue_persister.export_queues(timestamp_pck=timestamp_pck)
 
     def import_queues(self, pck_path: Optional[str] = None) -> str:
         """Restore deques/active/last state from a previously exported pickle.
@@ -2502,4 +2390,4 @@ class Orch(Base):
         Returns:
             The path that was loaded (or attempted).
         """
-        return self._get_queue_persister().import_queues(pck_path)
+        return self.queue_persister.import_queues(pck_path)

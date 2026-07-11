@@ -255,6 +255,8 @@ def _make_orch(tmp_root: Path) -> Orch:
     orch.seq_postprocessors = []
     orch.seq_postprocess_libs = []
 
+    orch._init_collaborators()
+
     return orch
 
 
