@@ -536,9 +536,10 @@ class Orch(Base):
     async def loop_task_dispatch_experiment(self) -> ErrorCodes:
         """Pop the next experiment, expand its planned actions, and push them onto ``action_dq``.
 
-        Returns:
-            ``ErrorCodes.none`` on success, or a non-zero code if the experiment
-            could not be processed (for example because plate verification failed).
+        Coordinator over the extracted staging/expansion/upload/plate-gate
+        helpers. Returns ``ErrorCodes.none`` on success, or a non-zero code if
+        the experiment could not be processed (for example because plate
+        verification failed).
         """
 
         # check again if experiment_dq is empty
@@ -547,6 +548,26 @@ class Orch(Base):
             await self.intend_none()
             return ErrorCodes.none
 
+        await self._stage_experiment()
+
+        rc, staged_acts = await self._expand_experiment_actions()
+        if rc is not None:
+            return rc
+
+        await self._upload_exp_meta_s3()
+
+        rc = await self._verify_experiment_plate()
+        if rc is not None:
+            return rc
+
+        LOGGER.info("adding unpacked actions to action_dq")
+        for act in staged_acts:
+            self.action_dq.append(act)
+
+        return ErrorCodes.none
+
+    async def _stage_experiment(self) -> None:
+        """Pop the next experiment, make it active, and register it."""
         LOGGER.info("action_dq is empty, getting new actions")
         # wait for all actions in last/active experiment to finish
         # LOGGER.info("finishing last active experiment first")
@@ -620,6 +641,14 @@ class Orch(Base):
             exp_uuid=self.active_experiment.experiment_uuid
         )
 
+    async def _expand_experiment_actions(
+        self,
+    ) -> tuple[Optional[ErrorCodes], Optional[list]]:
+        """Expand the active experiment into staged actions with process bookkeeping.
+
+        Returns ``(ErrorCodes.none, None)`` when the experiment produced no
+        actions (early exit) and ``(None, staged_acts)`` otherwise.
+        """
         # additional experiment params should be stored
         # in experiment.experiment_params
         # self.print_message(
@@ -653,7 +682,7 @@ class Orch(Base):
         if unpacked_acts is None:
             LOGGER.error("no actions in experiment")
             self.action_dq = zdeque([])
-            return ErrorCodes.none
+            return ErrorCodes.none, None
 
         process_order_groups = defaultdict(list)
         process_count = 0
@@ -695,6 +724,10 @@ class Orch(Base):
         LOGGER.info(f"got: {staged_acts}")
         LOGGER.info(f"optional params: {self.active_experiment.experiment_params}")
 
+        return None, staged_acts
+
+    async def _upload_exp_meta_s3(self) -> None:
+        """Write the temporary experiment and upload its meta json to S3."""
         # write a temporary exp
         self.exp_model = self.active_experiment.get_exp()
         await self.write_active_experiment_exp()
@@ -712,6 +745,8 @@ class Orch(Base):
                     f"Error uploading initial active experiment json to s3: {e}"
                 )
 
+    async def _verify_experiment_plate(self) -> Optional[ErrorCodes]:
+        """Gate on plate verification; returns ``ErrorCodes.not_available`` on failure."""
         if self.verify_plates and PLATE_API.has_access:
             plate_found = self.verify_plate_in_params(
                 self.active_experiment.experiment_params
@@ -725,19 +760,16 @@ class Orch(Base):
                 await self.intend_none()
                 return ErrorCodes.not_available
 
-        LOGGER.info("adding unpacked actions to action_dq")
-        for act in staged_acts:
-            self.action_dq.append(act)
-
-        return ErrorCodes.none
+        return None
 
     async def loop_task_dispatch_action(self) -> ErrorCodes:
         """Dispatch the next action from ``action_dq`` honouring start conditions and loop intent.
 
-        Respects ``LoopIntent.stop``/``skip``/``estop``, waits according to the
-        action's ``ActionStartCondition``, copies requested values into and out
-        of ``global_params``, registers the dispatched action in the global
-        status model, and pauses the orchestrator if dispatch fails.
+        Coordinator over the extracted intent/start-condition/staging/dispatch
+        helpers. Respects ``LoopIntent.stop``/``skip``/``estop``, waits according
+        to the action's ``ActionStartCondition``, copies requested values into
+        and out of ``global_params``, registers the dispatched action in the
+        global status model, and pauses the orchestrator if dispatch fails.
 
         Returns:
             ``ErrorCodes`` summarising the dispatch outcome.
@@ -749,6 +781,35 @@ class Orch(Base):
             return ErrorCodes.none
 
         # LOGGER.info("actions in action_dq, processing them")
+        if await self._apply_loop_intent_before_dispatch():
+            return ErrorCodes.none
+
+        # all action blocking is handled like preempt,
+        # check Action requirements
+        A = self.action_dq.popleft()
+
+        rc = await self._wait_for_start_condition(A)
+        if rc is not None:
+            return rc
+
+        self._stage_action_for_dispatch(A)
+
+        rc, result_actiondict = await self._dispatch_action_locked(A)
+        if rc is not None:
+            return rc
+
+        rc = await self._record_dispatch_result(A, result_actiondict)
+        if rc is not None:
+            return rc
+
+        return ErrorCodes.none
+
+    async def _apply_loop_intent_before_dispatch(self) -> bool:
+        """Handle stop/skip/estop loop intent before any dispatch.
+
+        Returns ``True`` when one of the intent branches was taken (the caller
+        should short-circuit with ``ErrorCodes.none``), ``False`` otherwise.
+        """
         if self.globalstatusmodel.loop_intent == LoopIntent.stop:
             LOGGER.info("stopping orchestrator")
             # monitor status of running action_dq, then end loop
@@ -760,258 +821,288 @@ class Orch(Base):
                     LOGGER.info("got stop")
                     self.globalstatusmodel.loop_state = LoopStatus.stopped
                     break
+            return True
 
         elif self.globalstatusmodel.loop_intent == LoopIntent.skip:
             # clear action queue, forcing next experiment
             self.action_dq.clear()
             await self.intend_none()
             LOGGER.info("skipping to next experiment")
+            return True
         elif self.globalstatusmodel.loop_intent == LoopIntent.estop:
             self.action_dq.clear()
             await self.intend_none()
             LOGGER.info("estopping")
             self.globalstatusmodel.loop_state = LoopStatus.estopped
+            return True
         else:
-            # all action blocking is handled like preempt,
-            # check Action requirements
-            A = self.action_dq.popleft()
+            return False
 
-            # see async_action_dispatcher for unpacking
-            if A.start_condition == ActionStartCondition.no_wait:
-                LOGGER.info("orch is dispatching an unconditional action")
-            else:
-                if A.start_condition == ActionStartCondition.wait_for_endpoint:
-                    LOGGER.info("orch is waiting for endpoint to become available")
+    async def _wait_for_start_condition(self, A) -> Optional[ErrorCodes]:
+        """Wait according to the action's ``ActionStartCondition``.
+
+        Returns ``ErrorCodes.none`` if a wait loop is interrupted (early exit),
+        ``None`` otherwise.
+        """
+        # see async_action_dispatcher for unpacking
+        if A.start_condition == ActionStartCondition.no_wait:
+            LOGGER.info("orch is dispatching an unconditional action")
+        else:
+            if A.start_condition == ActionStartCondition.wait_for_endpoint:
+                LOGGER.info("orch is waiting for endpoint to become available")
+                endpoint_free = self.globalstatusmodel.endpoint_free(
+                    action_server=A.action_server, endpoint_name=A.action_name
+                )
+                while not endpoint_free:
+                    if not await self.wait_for_interrupt():
+                        return ErrorCodes.none
                     endpoint_free = self.globalstatusmodel.endpoint_free(
                         action_server=A.action_server, endpoint_name=A.action_name
                     )
-                    while not endpoint_free:
-                        if not await self.wait_for_interrupt():
-                            return ErrorCodes.none
-                        endpoint_free = self.globalstatusmodel.endpoint_free(
-                            action_server=A.action_server, endpoint_name=A.action_name
-                        )
-                elif A.start_condition == ActionStartCondition.wait_for_server:
-                    LOGGER.info("orch is waiting for server to become available")
+            elif A.start_condition == ActionStartCondition.wait_for_server:
+                LOGGER.info("orch is waiting for server to become available")
+                server_free = self.globalstatusmodel.server_free(
+                    action_server=A.action_server
+                )
+                while not server_free:
+                    if not await self.wait_for_interrupt():
+                        return ErrorCodes.none
                     server_free = self.globalstatusmodel.server_free(
                         action_server=A.action_server
                     )
-                    while not server_free:
-                        if not await self.wait_for_interrupt():
-                            return ErrorCodes.none
-                        server_free = self.globalstatusmodel.server_free(
-                            action_server=A.action_server
-                        )
-                elif A.start_condition == ActionStartCondition.wait_for_orch:
-                    LOGGER.info("orch is waiting for wait action to end")
+            elif A.start_condition == ActionStartCondition.wait_for_orch:
+                LOGGER.info("orch is waiting for wait action to end")
+                wait_free = self.globalstatusmodel.endpoint_free(
+                    action_server=A.orchestrator, endpoint_name="wait"
+                )
+                while not wait_free:
+                    if not await self.wait_for_interrupt():
+                        return ErrorCodes.none
                     wait_free = self.globalstatusmodel.endpoint_free(
                         action_server=A.orchestrator, endpoint_name="wait"
                     )
-                    while not wait_free:
-                        if not await self.wait_for_interrupt():
-                            return ErrorCodes.none
-                        wait_free = self.globalstatusmodel.endpoint_free(
-                            action_server=A.orchestrator, endpoint_name="wait"
-                        )
-                elif A.start_condition == ActionStartCondition.wait_for_previous:
-                    LOGGER.info("orch is waiting for previous action to finish")
+            elif A.start_condition == ActionStartCondition.wait_for_previous:
+                LOGGER.info("orch is waiting for previous action to finish")
+                previous_action_active = (
+                    self.last_action_uuid
+                    in self.globalstatusmodel.active_dict.keys()
+                )
+                while previous_action_active:
+                    if not await self.wait_for_interrupt():
+                        return ErrorCodes.none
                     previous_action_active = (
                         self.last_action_uuid
                         in self.globalstatusmodel.active_dict.keys()
                     )
-                    while previous_action_active:
-                        if not await self.wait_for_interrupt():
-                            return ErrorCodes.none
-                        previous_action_active = (
-                            self.last_action_uuid
-                            in self.globalstatusmodel.active_dict.keys()
-                        )
-                elif A.start_condition == ActionStartCondition.wait_for_all:
-                    await self.orch_wait_for_all_actions()
+            elif A.start_condition == ActionStartCondition.wait_for_all:
+                await self.orch_wait_for_all_actions()
 
-                else:  # unsupported value
-                    await self.orch_wait_for_all_actions()
+            else:  # unsupported value
+                await self.orch_wait_for_all_actions()
 
-            # LOGGER.info("copying global vars to action")
-            # copy requested global param to action params
-            apply_from_globals(
-                A.action_params,
-                A.from_global_act_params,
-                self.global_params,
-                logger_ctx="action",
-            )
+        return None
 
-            # attach run_id
-            if self.active_run_id is not None:
-                A.run_id = self.active_run_id
+    def _stage_action_for_dispatch(self, A) -> None:
+        """Fold in globals, stamp run-id/submit-order, and init the action."""
+        # LOGGER.info("copying global vars to action")
+        # copy requested global param to action params
+        apply_from_globals(
+            A.action_params,
+            A.from_global_act_params,
+            self.global_params,
+            logger_ctx="action",
+        )
 
-            # actserv_exists, _ = await endpoints_available([A.url])
-            # if not actserv_exists:
-            #     stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
-            #     self.current_stop_message = stop_message
-            #     LOGGER.warning(stop_message)
-            #     await self.stop()
-            #     LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
-            #     self.action_dq.insert(0, A)
-            #     await self.update_operator(True)
-            #     return ErrorCodes.none
+        # attach run_id
+        if self.active_run_id is not None:
+            A.run_id = self.active_run_id
 
-            LOGGER.info(
-                f"dispatching action {A.action_name} on server {A.action_server.server_name}"
-            )
-            # keep running counter of dispatched actions
-            A.orch_submit_order = self.globalstatusmodel.counter_dispatched_actions[
-                self.active_experiment.experiment_uuid
-            ]
-            self.globalstatusmodel.counter_dispatched_actions[
-                self.active_experiment.experiment_uuid
-            ] += 1
+        # actserv_exists, _ = await endpoints_available([A.url])
+        # if not actserv_exists:
+        #     stop_message = f"{A.url} is not available, orchestrator will stop. Rectify action server then resume orchestrator run."
+        #     self.current_stop_message = stop_message
+        #     LOGGER.warning(stop_message)
+        #     await self.stop()
+        #     LOGGER.alert(f"ORCH STOPPED ~ {stop_message}")
+        #     self.action_dq.insert(0, A)
+        #     await self.update_operator(True)
+        #     return ErrorCodes.none
 
-            A.init_act(time_offset=self.ntp_offset)
-            result_actiondict = None
-            async with self.aiolock:
-                try:
-                    if (
-                        self.globalstatusmodel.loop_intent == LoopIntent.estop
-                        or self.globalstatusmodel.loop_state == LoopStatus.estopped
-                    ):
-                        LOGGER.info("orchestrator estopped, not dispatching action")
-                        error_code = ErrorCodes.estop
-                    else:
-                        result_actiondict, error_code = await async_action_dispatcher(
-                            self.world_cfg, A
-                        )
-                except Exception as e:
-                    LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
-                    error_code = ErrorCodes.http
+        LOGGER.info(
+            f"dispatching action {A.action_name} on server {A.action_server.server_name}"
+        )
+        # keep running counter of dispatched actions
+        A.orch_submit_order = self.globalstatusmodel.counter_dispatched_actions[
+            self.active_experiment.experiment_uuid
+        ]
+        self.globalstatusmodel.counter_dispatched_actions[
+            self.active_experiment.experiment_uuid
+        ] += 1
 
-                for cond, stop_message in [
-                    (
-                        error_code != ErrorCodes.none,
-                        f"Dispatching {A.action_name} did not return status 200. Pausing orch.",
-                    ),
-                    (
-                        result_actiondict is None,
-                        f"Dispatching {A.action_name} returned None object. Pausing orch.",
-                    ),
-                ]:
-                    if cond:
-                        self.current_stop_message = stop_message
-                        LOGGER.warning(stop_message)
-                        await self.stop()
-                        LOGGER.info(f"Re-queuing {A.action_name}")
-                        self.action_dq.insert(0, A)
-                        return ErrorCodes.none
+        A.init_act(time_offset=self.ntp_offset)
 
-                # except asyncio.exceptions.TimeoutError:
-                #     result_actiondict, error_code = await async_private_dispatcher(
-                #         self.world_cfg,
-                #         A.action_server.server_name,
-                #         "resend_active",
-                #         params_dict={},
-                #         json_dict={"action_uuid": A.action_uuid},
-                #     )
+    async def _dispatch_action_locked(
+        self, A
+    ) -> tuple[Optional[ErrorCodes], Optional[dict]]:
+        """Run the ``aiolock`` dispatch critical section intact.
 
-                result_uuid = result_actiondict["action_uuid"]
-                self.last_action_uuid = result_uuid
-                self.track_action_uuid(UUID(result_uuid))
-                LOGGER.info(
-                    f"Action {A.action_name} dispatched with uuid: {result_uuid}"
-                )
-                self.put_lbuf_nowait(
-                    {result_uuid: {"action_name": A.action_name, "status": HloStatus.active.value}}
-                )
-
-                if not A.nonblocking:
-                    # orch gets back an active action dict, we can self-register the dispatched action in global status
-                    resmod = Action(**result_actiondict)
-                    srvname = resmod.action_server.server_name
-                    actname = resmod.action_name
-                    resuuid = resmod.action_uuid
-                    actstats = resmod.action_status
-                    srvkeys = self.globalstatusmodel.server_dict.keys()
-                    srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                    if HloStatus.active in actstats:
-                        self.globalstatusmodel.active_dict[resuuid] = resmod
-                        self.globalstatusmodel.server_dict[srvkey].endpoints[
-                            actname
-                        ].active_dict[resuuid] = resmod
-                    else:  # orch got back a nonactive result
-                        for actstat in actstats:
-                            try:
-                                if (
-                                    resuuid
-                                    in self.globalstatusmodel.nonactive_dict.get(
-                                        actstat, {}
-                                    )
-                                ):
-                                    break  # already in nonactive_dict
-
-                                # need to populate nonactive and endpoint statuses
-                                current_nonactive_status = (
-                                    self.globalstatusmodel.nonactive_dict.get(
-                                        actstat, {}
-                                    )
-                                )
-                                current_nonactive_status.update({resuuid: resmod})
-                                self.globalstatusmodel.nonactive_dict[actstat] = (
-                                    current_nonactive_status
-                                )
-
-                                current_endpoint_status = (
-                                    self.globalstatusmodel.server_dict[srvkey]
-                                    .endpoints[actname]
-                                    .nonactive_dict.get(actstat, {})
-                                )
-                                current_endpoint_status.update({resuuid: resmod})
-                                self.globalstatusmodel.server_dict[srvkey].endpoints[
-                                    actname
-                                ].nonactive_dict[actstat] = current_endpoint_status
-                            except Exception:
-                                LOGGER.info(
-                                    f"{actstat} not found in globalstatus.nonactive_dict",
-                                    exc_info=True,
-                                )
-
+        Returns ``(ErrorCodes.none, None)`` on the failure→pause→requeue early
+        exit and ``(None, result_actiondict)`` after a successful dispatch and
+        self-registration.
+        """
+        result_actiondict = None
+        async with self.aiolock:
             try:
-                result_action = Action(**result_actiondict)
-                self.active_experiment.dispatched_actions.append(result_action)
+                if (
+                    self.globalstatusmodel.loop_intent == LoopIntent.estop
+                    or self.globalstatusmodel.loop_state == LoopStatus.estopped
+                ):
+                    LOGGER.info("orchestrator estopped, not dispatching action")
+                    error_code = ErrorCodes.estop
+                else:
+                    result_actiondict, error_code = await async_action_dispatcher(
+                        self.world_cfg, A
+                    )
             except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(
-                    f"returned result is not a valid Action BaseModel: {repr(e), tb,}"
-                )
-                return ErrorCodes.critical_error
+                LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
+                error_code = ErrorCodes.http
 
-            if result_action.error_code is not ErrorCodes.none:
-                LOGGER.error(
-                    f"Action result for '{result_action.action_name}' on '{result_action.action_server.disp_name()}' has error code: {result_action.error_code}"
-                )
-                stop_reason = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
-                await self.estop_loop(stop_reason)
-                return result_action.error_code
+            for cond, stop_message in [
+                (
+                    error_code != ErrorCodes.none,
+                    f"Dispatching {A.action_name} did not return status 200. Pausing orch.",
+                ),
+                (
+                    result_actiondict is None,
+                    f"Dispatching {A.action_name} returned None object. Pausing orch.",
+                ),
+            ]:
+                if cond:
+                    self.current_stop_message = stop_message
+                    LOGGER.warning(stop_message)
+                    await self.stop()
+                    LOGGER.info(f"Re-queuing {A.action_name}")
+                    self.action_dq.insert(0, A)
+                    return ErrorCodes.none, None
 
-            # self.print_message(
-            #     f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
-            # )
-            collect_to_globals(
-                result_action,
-                self.global_params,
-                orch_key=self.orch_key,
-                orch_host=self.orch_host,
-                orch_port=self.orch_port,
+            # except asyncio.exceptions.TimeoutError:
+            #     result_actiondict, error_code = await async_private_dispatcher(
+            #         self.world_cfg,
+            #         A.action_server.server_name,
+            #         "resend_active",
+            #         params_dict={},
+            #         json_dict={"action_uuid": A.action_uuid},
+            #     )
+
+            result_uuid = result_actiondict["action_uuid"]
+            self.last_action_uuid = result_uuid
+            self.track_action_uuid(UUID(result_uuid))
+            LOGGER.info(
+                f"Action {A.action_name} dispatched with uuid: {result_uuid}"
+            )
+            self.put_lbuf_nowait(
+                {result_uuid: {"action_name": A.action_name, "status": HloStatus.active.value}}
             )
 
-            # # this will recursively call the next no_wait action in queue, and return its error
-            # if self.action_dq and not self.step_thru_actions:
-            #     nextA = self.action_dq[0]
-            #     if nextA.start_condition == ActionStartCondition.no_wait:
-            #         error_code = await self.loop_task_dispatch_action()
+            if not A.nonblocking:
+                # orch gets back an active action dict, we can self-register the dispatched action in global status
+                resmod = Action(**result_actiondict)
+                srvname = resmod.action_server.server_name
+                actname = resmod.action_name
+                resuuid = resmod.action_uuid
+                actstats = resmod.action_status
+                srvkeys = self.globalstatusmodel.server_dict.keys()
+                srvkey = [k for k in srvkeys if k[0] == srvname][0]
+                if HloStatus.active in actstats:
+                    self.globalstatusmodel.active_dict[resuuid] = resmod
+                    self.globalstatusmodel.server_dict[srvkey].endpoints[
+                        actname
+                    ].active_dict[resuuid] = resmod
+                else:  # orch got back a nonactive result
+                    for actstat in actstats:
+                        try:
+                            if (
+                                resuuid
+                                in self.globalstatusmodel.nonactive_dict.get(
+                                    actstat, {}
+                                )
+                            ):
+                                break  # already in nonactive_dict
 
-            # if error_code is not ErrorCodes.none:
-            #     return error_code
+                            # need to populate nonactive and endpoint statuses
+                            current_nonactive_status = (
+                                self.globalstatusmodel.nonactive_dict.get(
+                                    actstat, {}
+                                )
+                            )
+                            current_nonactive_status.update({resuuid: resmod})
+                            self.globalstatusmodel.nonactive_dict[actstat] = (
+                                current_nonactive_status
+                            )
 
-        return ErrorCodes.none
+                            current_endpoint_status = (
+                                self.globalstatusmodel.server_dict[srvkey]
+                                .endpoints[actname]
+                                .nonactive_dict.get(actstat, {})
+                            )
+                            current_endpoint_status.update({resuuid: resmod})
+                            self.globalstatusmodel.server_dict[srvkey].endpoints[
+                                actname
+                            ].nonactive_dict[actstat] = current_endpoint_status
+                        except Exception:
+                            LOGGER.info(
+                                f"{actstat} not found in globalstatus.nonactive_dict",
+                                exc_info=True,
+                            )
+
+        return None, result_actiondict
+
+    async def _record_dispatch_result(self, A, result_actiondict) -> Optional[ErrorCodes]:
+        """Register the dispatch result and fold returned globals back out.
+
+        Returns ``ErrorCodes.critical_error`` if the returned model is invalid,
+        the action's error code (after ``estop_loop``) if it errored, or ``None``
+        on success.
+        """
+        try:
+            result_action = Action(**result_actiondict)
+            self.active_experiment.dispatched_actions.append(result_action)
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            LOGGER.error(
+                f"returned result is not a valid Action BaseModel: {repr(e), tb,}"
+            )
+            return ErrorCodes.critical_error
+
+        if result_action.error_code is not ErrorCodes.none:
+            LOGGER.error(
+                f"Action result for '{result_action.action_name}' on '{result_action.action_server.disp_name()}' has error code: {result_action.error_code}"
+            )
+            stop_reason = f"{result_action.action_name} on {result_action.action_server.disp_name()} returned an error"
+            await self.estop_loop(stop_reason)
+            return result_action.error_code
+
+        # self.print_message(
+        #     f"copying global vars {', '.join(result_action.to_global_params)} back to experiment"
+        # )
+        collect_to_globals(
+            result_action,
+            self.global_params,
+            orch_key=self.orch_key,
+            orch_host=self.orch_host,
+            orch_port=self.orch_port,
+        )
+
+        # # this will recursively call the next no_wait action in queue, and return its error
+        # if self.action_dq and not self.step_thru_actions:
+        #     nextA = self.action_dq[0]
+        #     if nextA.start_condition == ActionStartCondition.no_wait:
+        #         error_code = await self.loop_task_dispatch_action()
+
+        # if error_code is not ErrorCodes.none:
+        #     return error_code
+
+        return None
 
     async def dispatch_loop_task(self) -> bool:
         """Drive the main orchestrator loop until the queues are exhausted or it is stopped.
