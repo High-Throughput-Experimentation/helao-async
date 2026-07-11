@@ -4,11 +4,37 @@
 > are referred to as **Deployment-A/B/C/D**. Public deployments keep their names (`hte`, `test`).
 > The alias key is held privately, out of the repo.
 
-**Status:** DRAFT plan (no code yet). Prerequisite phases P1–P3d are DONE + pushed on
-`feat/cards-refactor`. P4 is the largest, higher-risk phase (touches ~24 legacy drivers,
-several on live Windows hardware); it is split into waves so each is independently shippable
-and verifiable. P4 does **not** wait on 3e (the lifecycle-guard enforcement flip is
-independently soak-gated and orthogonal to driver migration).
+**Status:** EXECUTED 2026-07-11 (was: draft). 22 drivers migrated to the ABC across W0–W5,
+each Opus-reviewed for behavior-preservation and pushed on `feat/cards-refactor`. All
+construction-proof; Windows/hardware drivers require a station smoke test before production
+reliance. P4 does **not** wait on 3e (soak-gated, orthogonal).
+
+### Execution outcome (2026-07-11)
+- **Migrated + reviewed + pushed (22):** W0 retired dead legacy advantech/stenner pairs
+  (Deployment-A). W1 HTEdata, hte Calc, Deployment-A Calc + active-learning driver. W2 cm0134,
+  axiscam. W3 sprintir, alicat, legato, simdos, mecom. W4 Deployment-B actuator/robotarm/leancat,
+  galil_io, Deployment-A thorlabs. W5 elveflow, nidaqmx, galil_motion, spectral_products.
+- **Bugs caught by review + fixed:** hte Calc CRITICAL (endpoint passed FastAPI fn-args instead of
+  `action_params` → defaults under orch dispatch); legato CRITICAL (dropped synchronous start-status
+  publish → premature action finish); shutdown-ordering regressions (legato/alicat); spectral dropped
+  hang-backstop. nidaqmx `/cellIV` and spectral stop-paths were pre-existing DEAD code — reconstructed
+  (flagged NEW/unverified, station smoke required).
+- **Systematic rules learned (in the weaning spec):** K7 params MUST come from `action_params` not
+  fn-args; `async_shutdown` = safe_state then disconnect (sync `shutdown()` no-op); synchronous
+  state-transition publishes must not defer to the poller; poll cadence now config-driven
+  (`polling_time`) — set per-server to the legacy Hz at station bring-up.
+- **EXCLUDED — archive_driver.py:** OQ-4 resolved **NO**. It is not a device driver — 2448 lines of
+  sample/tray bookkeeping (UnifiedSampleDataAPI + state files + in-memory slots, zero hardware).
+  Forcing the ABC (connect/stop/reset for no device) is semantically wrong (same principle as
+  bare-helper sims); a separate approved plan hoists it to a sample server. Left legacy.
+- **BLOCKED — pal_driver.py (needs a design decision, not a mechanical migration):** `_PAL_IOloop` is
+  the sole process-lifetime execution path for all 14 action handlers, creates its own `Active`
+  (endpoint returns before the job runs), and `_sendcommand_main` threads `self.active` through ~20
+  order-dependent sample-DB mutations with a mid-loop `active.split()`. A faithful K7b port =
+  rewriting the physical sample-tracking pipeline into an Executor state machine — unverifiable
+  without PAL hardware. Deferred with two candidate designs: (1) Executor injects `active` into the
+  driver at job-start (partial K7b, lowest-rewrite); (2) full Executor state-machine decomposition.
+- **Frozen:** dbpack (deprecated). **Exempt:** `test` sims (bare helpers).
 
 ---
 
