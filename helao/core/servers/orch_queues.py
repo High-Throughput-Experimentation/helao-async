@@ -458,7 +458,7 @@ class RunQueues:
                 new_action = sup_action
                 new_action.action_order = EA_act.action_order
                 # will be updated again once its dispatched again
-                new_action.actual_order = EA_act.actual_order
+                new_action.action_actual_order = EA_act.action_actual_order
                 new_action.action_retry = EA_act.action_retry + 1
                 new_action.action_server.machine_name = orch.server.machine_name
                 orch.action_dq.appendleft(new_action)

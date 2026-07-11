@@ -245,28 +245,35 @@ async def _check_action_crud() -> bool:
 
 
 async def _check_supplement_error_action() -> bool:
-    """Preserved pre-existing quirk (not a harness bug, not fixed here -- spec
-    sec 3.1 rule 5 "no behavior fixes ride along"): the original inline method
-    reads/writes ``EA_act.actual_order``/``new_action.actual_order``, but the
-    real field on ``Action``/``ActionModel`` is ``action_actual_order`` --
-    ``actual_order`` was never a declared field. Against real pydantic model
-    instances (as opposed to a duck-typed stand-in) reading ``EA_act.actual_order``
-    always raises ``AttributeError``. This test asserts that pre-existing crash
-    is reproduced byte-for-byte identically post-extraction, rather than
-    papering over it -- a passing "happy path" here would mean the extraction
-    silently fixed a bug it isn't supposed to touch.
+    """P5b fix: the errored-action-retry path copied ``EA_act.actual_order`` onto
+    ``new_action.actual_order``, but the real declared field on ``Action`` is
+    ``action_actual_order`` (``actual_order`` was never a field) -- against real
+    pydantic model instances that raised ``AttributeError`` and no retry was ever
+    queued. Now corrected to ``action_actual_order``. This asserts the fixed
+    behavior: the replacement is queued to the front of ``action_dq`` with the
+    errored action's ``action_order``/``action_actual_order`` copied and
+    ``action_retry`` incremented, with no exception.
     """
     orch = _make_orch()
     errored = _mk_action(orch, "errored_act", order=5)
+    errored.action_actual_order = 3
+    errored.action_retry = 1
     check_uuid = errored.action_uuid
     orch.globalstatusmodel.nonactive_dict[HloStatus.errored] = {check_uuid: errored}
 
     replacement = _mk_action(orch, "retry_act")
-    try:
-        orch.supplement_error_action(check_uuid, replacement)
-    except AttributeError as exc:
-        return "actual_order" in str(exc)
-    return False
+    orch.supplement_error_action(check_uuid, replacement)
+
+    # zdeque stores by value, so assert on the queued action's fields (not identity)
+    if len(orch.action_dq) != 1:
+        return False
+    queued = orch.action_dq[0]
+    return (
+        queued.action_name == "retry_act"
+        and queued.action_order == 5
+        and queued.action_actual_order == 3
+        and queued.action_retry == 2
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,8 +352,8 @@ def orch_queues_unit_test() -> bool:
 
     reporter.section("supplement_error_action")
     reporter.check(
-        "preserves the pre-existing actual_order/action_actual_order field-name"
-        " bug verbatim (raises AttributeError against real Action models)",
+        "P5b fix: queues the retry to the front with action_order/action_actual_order"
+        " copied and action_retry incremented (no AttributeError)",
         lambda: res["supplement_error_action"],
     )
 
