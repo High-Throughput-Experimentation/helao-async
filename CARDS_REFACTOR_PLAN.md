@@ -1,8 +1,8 @@
 # CARDS Refactor Plan — HELAO-async
 
 > Derived from `CARDS_AUDIT.md` (2026-07-10, Parts 1–3). Branch: `feat/cards-refactor`
-> on the parent repo **and** each nested private deployment repo (lila, mea, priv).
-> `deploy/lila_gl` and `deploy/mea/notes` are **out of scope entirely**.
+> on the parent repo **and** each nested private deployment repo (Deployment-A, Deployment-B, Deployment-C).
+> `deploy/Deployment-D` and `deploy/Deployment-B/notes` are **out of scope entirely**.
 > Test gate: `conda run -n helao python run_unit_tests.py` (the only harness; launch.py runs it pre-launch).
 > Production safety: `hte` runs live hardware (Windows-only Galil/gclib, Gamry/comtypes). Early increments are pure
 > structural, validated on Linux against `helao/core`, `helao/helpers`, and the `test` deployment sims.
@@ -14,9 +14,9 @@
 | Phase | Name | CARDS card(s) strengthened | Risk | Audit evidence |
 |-------|------|---------------------------|------|----------------|
 | **P1 = INCREMENT 1** | **Single source of truth: `RunDir` enum + status-literal cleanup** | **Resilience** (primary), Clarity | **Minimal** — pure structural, byte-identical runtime strings, Linux-verifiable | Part 1 Resilience: "`RUNS_*` never centralized — raw literals across ~17 files, 80+ sites"; "status enum bypassed: dict payloads hardcode `\"status\":\"active\"` (orch.py:677,693,863,879)"; Part 3 fix #3 |
-| P2 | Kill campaign/spec duplication (parameterize, extract factories) | Resilience, Clarity | Low — no control-path changes, no hardware | Part 2: hte `specifications/` byte-identical files; lila `SDC_seq.py` triple ~430–516-line clones; mea `SampleModel` block ×24–29; mea `configure_leancat*` near-duplicates |
+| P2 | Kill campaign/spec duplication (parameterize, extract factories) | Resilience, Clarity | Low — no control-path changes, no hardware | Part 2: hte `specifications/` byte-identical files; Deployment-A `SDC_seq.py` triple ~430–516-line clones; Deployment-B `SampleModel` block ×24–29; Deployment-B `configure_leancat*` near-duplicates |
 | P3 | Guarded lifecycle + typed params + injected typed config | **Domain Integrity** (biggest Part-3 re-rating), Alignment | Medium — core models/config touched; wire/YAML shape must stay identical; validate on `test` sims | Part 1: lifecycle = unguarded `List[HloStatus]` (action.py:126, experiment.py:112, sequence.py:101); all-`Optional` models; untyped world config (base.py:148); `HelaoConfig` exists but under-used (config_loader.py:150-192); Part 3: "untyped param contract forces stringly-typed deployment code" |
-| P4 | Finish `HelaoDriver` ABC migration (non-prod wave → hte production wave) | **Separation**, Alignment, Domain Integrity | Medium → **High** (hte wave gated on hardware smoke) | Part 2 master variable: ~26 legacy `action_serv: Base` drivers; priority hte PAL (~2870 LOC), hte Archive (~2370 LOC), lila ThorlabsMotor (~1100 LOC), hte galil_motion, hte alicat; Part 3 confirmed top fix |
+| P4 | Finish `HelaoDriver` ABC migration (non-prod wave → hte production wave) | **Separation**, Alignment, Domain Integrity | Medium → **High** (hte wave gated on hardware smoke) | Part 2 master variable: ~26 legacy `action_serv: Base` drivers; priority hte PAL (~2870 LOC), hte Archive (~2370 LOC), Deployment-A ThorlabsMotor (~1100 LOC), hte galil_motion, hte alicat; Part 3 confirmed top fix |
 | P5 | Split the `Orch` god-class into collaborators | **Separation**, Clarity | **Highest** — 2545-line production orchestrator; do last, with P1–P4 seams in place | Part 1 weakest card: orch.py:80-2625, ~70 methods; `loop_task_dispatch_action` ~315 lines |
 
 **Why this order deviates from the audit's raw leverage order (ABC first):** the ABC migration's biggest targets are
@@ -42,11 +42,11 @@ members, plus replace the hardcoded `"status": "active"/"finished"` dict payload
   `helao/deploy/hte/servers/action/dbpack_server.py` (3 sites) — dbpack is **deprecated dead legacy** fully
   superseded by `sync_driver.py` (project memory). Still referenced by hte configs, so it stays untouched and
   frozen; its removal is a P2 decision item (see Open questions).
-- `helao/deploy/lila_gl/**` (excluded from the refactor entirely).
-- `helao/deploy/mea/notes/**` (excluded per audit).
+- `helao/deploy/Deployment-D/**` (excluded from the refactor entirely).
+- `helao/deploy/Deployment-B/notes/**` (excluded per audit).
 - `test` deployment **sim driver internals** beyond the literal swap — sims are deliberately bare helpers, NOT to
   be ABC-ified (standing project decision).
-- The lila `SDC_seq.py:2252` `stop_ce_pump: bool = "True"` type bug — fixing it changes a serialized param value,
+- The Deployment-A `SDC_seq.py:2252` `stop_ce_pump: bool = "True"` type bug — fixing it changes a serialized param value,
   so it is **not** pure-structural; deferred to P3 (logged in Open questions).
 
 ### The transformation
@@ -74,7 +74,7 @@ SYNC_PROGRESSION = (RunDir.ACTIVE, RunDir.FINISHED, RunDir.SYNCED)
 ALL_RUN_DIRS = tuple(RunDir)
 ```
 
-Stdlib-only; no new dependencies; safe to import from any layer (core, helpers, deployments, priv scripts).
+Stdlib-only; no new dependencies; safe to import from any layer (core, helpers, deployments, Deployment-C scripts).
 
 **Mechanical replacement rules (identical for every task):**
 1. `import` line: `from helao.core.models.run_dir import RunDir` (add `SYNC_PROGRESSION` where the
@@ -119,13 +119,13 @@ Stdlib-only; no new dependencies; safe to import from any layer (core, helpers, 
 | `helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py` | 5 | C1-07 |
 | `helao/deploy/test/tests/test_data_browser.py` | 16 | C1-08 |
 | `helao/deploy/test/runners/oersim_runner.py` | 1 | C1-08 |
-| `helao/deploy/lila/drivers/calc_driver.py` (nested repo) | 3 | C1-09 |
-| `helao/deploy/priv/scripts/common/batch_converter.py` (nested repo) | 7 | C1-10 |
-| `helao/deploy/priv/scripts/{bruker,edax,xafs,xrfs_calibration,xrfs_quantification}/converters.py` | 2+2+2+2+2 | C1-10 |
-| `helao/deploy/priv/scripts/xrfs_calibration/parquet_library.py` | 1 | C1-10 |
-| `helao/deploy/priv/scripts/icpms/{batch_process_icpms,convert_icpms_csv}.py` | 2+2 | C1-10 |
+| `helao/deploy/Deployment-A/drivers/calc_driver.py` (nested repo) | 3 | C1-09 |
+| `helao/deploy/Deployment-C/scripts/common/batch_converter.py` (nested repo) | 7 | C1-10 |
+| `helao/deploy/Deployment-C/scripts/{bruker,edax,xafs,xrfs_calibration,xrfs_quantification}/converters.py` | 2+2+2+2+2 | C1-10 |
+| `helao/deploy/Deployment-C/scripts/xrfs_calibration/parquet_library.py` | 1 | C1-10 |
+| `helao/deploy/Deployment-C/scripts/icpms/{batch_process_icpms,convert_icpms_csv}.py` | 2+2 | C1-10 |
 
-mea has zero in-scope sites (its only hit is under excluded `notes/`).
+Deployment-B has zero in-scope sites (its only hit is under excluded `notes/`).
 
 ### Parallelization
 
@@ -139,7 +139,7 @@ mea has zero in-scope sites (its only hit is under excluded `notes/`).
 
 1. `conda run -n helao python run_unit_tests.py` exits 0 (run from repo root; PYTHONPATH is set by the env).
 2. Import smoke (Linux-safe modules) exits 0 — the exact command is in the task table.
-   For deployment/priv files whose transitive deps may not import on Linux, the gate is
+   For deployment/Deployment-C files whose transitive deps may not import on Linux, the gate is
    `conda run -n helao python -m py_compile <file>` instead.
 3. `git diff` for the task's files shows **only** import additions and literal→enum substitutions
    (no whitespace/logic churn).
@@ -158,8 +158,8 @@ mea has zero in-scope sites (its only hit is under excluded `notes/`).
 | C1-06 | Swap literals in core standalone tests | parent | `helao/core/tests/unit_test_{micro_orch,sync_process_recovery,sync_to_thread,estop_sync,extra_models}.py` | C1-01 | A | `conda run -n helao python -m py_compile` each file; run each standalone script that already passes on this branch and confirm it still passes; + gate |
 | C1-07 | Swap literals in hte (non-dbpack) | parent | `helao/deploy/hte/drivers/sensor/axiscam_driver.py`, `helao/deploy/hte/processors/libs/hispec_calibrate_downsample_parquet.py` | C1-01 | A | `conda run -n helao python -m py_compile` both files + gate + grep-zero |
 | C1-08 | Swap literals in test deployment | parent | `helao/deploy/test/tests/test_data_browser.py`, `helao/deploy/test/runners/oersim_runner.py` | C1-01 | A | `conda run -n helao python -m py_compile` both; run `helao/deploy/test/tests/test_data_browser.py` if it passes pre-change; + gate |
-| C1-09 | Swap literals in lila | **lila (nested)** | `helao/deploy/lila/drivers/calc_driver.py` | C1-01 | A | `conda run -n helao python -m py_compile helao/deploy/lila/drivers/calc_driver.py` + gate + grep-zero; commit inside `helao/deploy/lila` |
-| C1-10 | Swap literals in priv scripts | **priv (nested)** | 11 files under `helao/deploy/priv/scripts/` (see table above) | C1-01 | A | `conda run -n helao python -m py_compile` each file + gate + grep-zero; commit inside `helao/deploy/priv` |
+| C1-09 | Swap literals in Deployment-A | **Deployment-A (nested)** | `helao/deploy/Deployment-A/drivers/calc_driver.py` | C1-01 | A | `conda run -n helao python -m py_compile helao/deploy/Deployment-A/drivers/calc_driver.py` + gate + grep-zero; commit inside `helao/deploy/Deployment-A` |
+| C1-10 | Swap literals in Deployment-C scripts | **Deployment-C (nested)** | 11 files under `helao/deploy/Deployment-C/scripts/` (see table above) | C1-01 | A | `conda run -n helao python -m py_compile` each file + gate + grep-zero; commit inside `helao/deploy/Deployment-C` |
 | C1-11 | Whole-tree verification sweep + commits | all | — | C1-02…C1-10 | serial-post | See below |
 
 **C1-11 verification sweep (must all pass):**
@@ -167,12 +167,12 @@ mea has zero in-scope sites (its only hit is under excluded `notes/`).
 conda run -n helao python run_unit_tests.py
 # zero raw literals outside allowed exclusions:
 grep -rnE --include='*.py' '["'\'']RUNS_(ACTIVE|FINISHED|SYNCED|DIAG|NOSYNC)["'\'']' helao/ \
-  | grep -vE 'run_dir\.py|dbpack_driver\.py|dbpack_server\.py|deploy/lila_gl/|deploy/mea/notes/'
+  | grep -vE 'run_dir\.py|dbpack_driver\.py|dbpack_server\.py|deploy/Deployment-D/|deploy/Deployment-B/notes/'
 # expected: empty output (exit 1)
 grep -n '"status": "' helao/core/servers/orch.py   # expected: empty
 conda run -n helao python -c "import helao.core.servers.orch, helao.core.servers.base, helao.core.drivers.data.sync_driver, helao.helpers.yml_tools, helao.helpers.helao_data, helao.core.runners.micro_orch"
 ```
-Then one commit per repo: parent (`feat/cards-refactor`), lila, priv — each nested repo committed from inside its
+Then one commit per repo: parent (`feat/cards-refactor`), Deployment-A, Deployment-C — each nested repo committed from inside its
 own directory (they are invisible to the parent repo's git).
 
 ---
@@ -191,7 +191,7 @@ own directory (they are invisible to the parent repo's git).
 - **Windows-only imports:** hte driver files (axiscam) may import vendor libs unavailable on Linux — that is why
   their gate is `py_compile`, not import. Do not "fix" import errors encountered during py_compile; they are out
   of scope.
-- **Nested-repo drift:** lila/mea/priv have their own remotes/branches. All are confirmed on
+- **Nested-repo drift:** Deployment-A/Deployment-B/Deployment-C have their own remotes/branches. All are confirmed on
   `feat/cards-refactor` (checked 2026-07-10). Executors must `cd` into the nested repo to commit.
 - **Rollback:** everything is on feature branches with one commit per repo per increment. Roll back with
   `git revert <sha>` (or branch reset pre-merge) independently per repo; the parent and nested commits have no
@@ -209,11 +209,11 @@ own directory (they are invisible to the parent repo's git).
 ### P2 — Kill duplication (Resilience, Clarity) — pure structural, still Linux/no-hardware
 - hte `specifications/`: `last2weeks.py` + `bimonthly.py` byte-identical, `last3months.py` differs by one number
   (audit Part 2) → one parameterized spec unit + thin named wrappers (wrappers keep existing import paths).
-- lila `SDC_seq.py`: collapse the three ~430–516-line near-duplicate sequence variants (`:3487, :3972, :4488`)
+- Deployment-A `SDC_seq.py`: collapse the three ~430–516-line near-duplicate sequence variants (`:3487, :3972, :4488`)
   into one parameterized implementation + wrappers preserving the public sequence names the configs reference.
-- mea: extract the ~24–29× copy-pasted `SampleModel` construction block into a factory in the mea repo; extract
+- Deployment-B: extract the ~24–29× copy-pasted `SampleModel` construction block into a factory in the Deployment-B repo; extract
   `configure_leancat` vs `configure_leancat_for_ADVENT_MEA` common core.
-- priv: delete `_old`/dead duplicate variants in `helao_nbio.py` (`extract_parts*`), unify the four `/run_<instrument>`
+- Deployment-C: delete `_old`/dead duplicate variants in `helao_nbio.py` (`extract_parts*`), unify the four `/run_<instrument>`
   handlers behind one parameterized handler.
 - Decision item: retire dbpack (`dbpack_driver.py` + `dbpack_server.py` + config entries) — superseded by
   `sync_driver.py`; needs a config sweep and sign-off.
@@ -230,17 +230,17 @@ own directory (they are invisible to the parent repo's git).
   `set_global` control-coupling flag (config_loader.py:129).
 - Discriminate the sample `Union` (action.py:142); begin typing `action_params` for the `test` deployment's
   experiments first (sims = safe proving ground; fixes the string-keyed `check_condition` dispatch class).
-- Fold in the lila `stop_ce_pump: bool = "True"` fix here (behavior-visible, needs a param-serialization check).
+- Fold in the Deployment-A `stop_ce_pump: bool = "True"` fix here (behavior-visible, needs a param-serialization check).
 - Gate: `run_unit_tests.py` + launching the `test` deployment group on Linux and running a sim sequence end-to-end.
 
 ### P4 — `HelaoDriver` ABC migration (Separation, Alignment, Domain Integrity)
 - Templates: `helao/deploy/hte/drivers/pstat/gamry/driver.py`, `.../biologic/driver.py`,
-  `helao/deploy/lila/drivers/stenner/driver.py`, `.../advantech/driver.py`; contract in
+  `helao/deploy/Deployment-A/drivers/stenner/driver.py`, `.../advantech/driver.py`; contract in
   `helao/core/drivers/helao_driver.py` + `helao/helpers/executor.py`.
 - Transformation per driver: `action_serv: Base` back-reference → `config: dict` seam; raw-dict returns →
   `DriverResponse`; polling → `DriverPoller`; server endpoints become thin executor adapters (gamry_server2 pattern).
-- **Wave 4a (non-production):** lila ThorlabsMotor (~1100 LOC, split I/O vs alignment vs Bokeh UI vs persistence),
-  lila stenner-variant/advantech-duplicate consolidation onto the existing ABC drivers, mea's 4 small drivers.
+- **Wave 4a (non-production):** Deployment-A ThorlabsMotor (~1100 LOC, split I/O vs alignment vs Bokeh UI vs persistence),
+  Deployment-A stenner-variant/advantech-duplicate consolidation onto the existing ABC drivers, Deployment-B's 4 small drivers.
 - **Wave 4b (production hte, gated on per-station hardware smoke):** PAL → Archive → galil_motion → alicat →
   remaining sensors, one driver per station-window. Coordinate with the existing PAL/Archive-hoist consensus plan.
 - **Never:** ABC-ify the `test` deployment sims (deliberate boundary).
@@ -263,5 +263,5 @@ Tracked in `.omc/plans/open-questions.md`:
       duplicated `HelaoPath` gets deleted or stays frozen.
 - [ ] Push policy for nested-repo `feat/cards-refactor` branches (push after each increment vs. at phase end)?
 - [ ] P4 wave-4b scheduling: which hte station gets the first ABC-migrated driver smoke test, and when?
-- [ ] `stop_ce_pump: bool = "True"` (lila SDC_seq.py:2252): confirm no downstream consumer string-matches `"True"`
+- [ ] `stop_ce_pump: bool = "True"` (Deployment-A SDC_seq.py:2252): confirm no downstream consumer string-matches `"True"`
       before fixing in P3.

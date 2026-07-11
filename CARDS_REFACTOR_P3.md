@@ -2,12 +2,12 @@
 
 > Derived from `CARDS_AUDIT.md` Part 1 (Domain Integrity findings) and Part 3 ("Domain Integrity is the
 > biggest whole-system re-rating; the untyped param contract is the root cause"), and the
-> `CARDS_REFACTOR_PLAN.md` §4 P3 sketch. Branch: `feat/cards-refactor` on parent + nested lila/mea/priv
-> (`lila_gl` excluded). Increments 1 (RunDir enum) and 2 (duplication kill) are committed and pushed.
+> `CARDS_REFACTOR_PLAN.md` §4 P3 sketch. Branch: `feat/cards-refactor` on parent + nested Deployment-A/Deployment-B/Deployment-C
+> (`Deployment-D` excluded). Increments 1 (RunDir enum) and 2 (duplication kill) are committed and pushed.
 >
 > **Risk class: MEDIUM** — touches core models + config. **Hard constraint:** all serialized shapes
 > (-act/-exp/-seq/-prc.yml, HLO headers, status-dict payloads, wire JSON, YAML config shape) stay
-> byte-identical, proven by capture/compare, **except** the lila `stop_ce_pump` fix, which is an explicit
+> byte-identical, proven by capture/compare, **except** the Deployment-A `stop_ce_pump` fix, which is an explicit
 > behavior fix. All validation on the `test` deployment sims on Linux; zero live-hardware behavior change
 > on hte. Test gate: `conda run -n helao python run_unit_tests.py`. Python via `conda run -n helao`.
 
@@ -23,7 +23,7 @@ sketched and get their own detail passes after 3a lands.**
 
 | Sub | Name | CARDS card(s) | Audit evidence | Risk | Why this position |
 |-----|------|---------------|----------------|------|-------------------|
-| **3a** | **Guarded lifecycle transitions** (+ bundled lila `stop_ce_pump` fix) | **Domain Integrity** (Part 1 §Domain: "lifecycle = unguarded `List[HloStatus]`… transitions via scattered `.append()`"; Part 3 fix #2) | action.py:126, experiment.py:112, sequence.py:101; call-site inventory §2.3 | **Low-medium** — additive methods only; field stays `List[HloStatus]`; provably zero serialized-shape change | Highest Domain-Integrity leverage per unit risk. Pure centralization: adds transition methods and routes every existing mutation through them. The serialized field shape is untouched by construction (methods never appear in pydantic dumps/schema). Creates the single chokepoint 3e's enforcement and P5's Orch split will consume. |
+| **3a** | **Guarded lifecycle transitions** (+ bundled Deployment-A `stop_ce_pump` fix) | **Domain Integrity** (Part 1 §Domain: "lifecycle = unguarded `List[HloStatus]`… transitions via scattered `.append()`"; Part 3 fix #2) | action.py:126, experiment.py:112, sequence.py:101; call-site inventory §2.3 | **Low-medium** — additive methods only; field stays `List[HloStatus]`; provably zero serialized-shape change | Highest Domain-Integrity leverage per unit risk. Pure centralization: adds transition methods and routes every existing mutation through them. The serialized field shape is untouched by construction (methods never appear in pydantic dumps/schema). Creates the single chokepoint 3e's enforcement and P5's Orch split will consume. |
 | 3b | Typed config injection | **Alignment** + Domain Integrity (Part 1: `HelaoConfig`/`ServerConfig` "exist but under-used" config_loader.py:150-192; `world_cfg["servers"][key]["host"]` base.py:148; `set_global` flag config_loader.py:129; global `CONFIG` Munch) | Same | Medium — `Base.__init__` is imported by every server | Isolated from the models, so it can't contaminate 3a's capture/compare. Needs 3a's end-to-end harness already proven. |
 | 3c | Discriminated sample `Union` | Domain Integrity (Part 1: "Sample `Union` (action.py:142) not discriminated; untyped `SampleModel` fallback catches anything") | Same | Medium — changes *validation* routing for ambiguous payloads even when output shape is identical | Validation-behavior sensitive: a discriminator can reject payloads the `SampleModel` fallback silently accepted. Needs a corpus replay (validate historical -act.yml sample blocks) before flipping — that corpus tooling is built on 3a/3b's harness. |
 | 3d | Typed `action_params` — `test` deployment first | Domain Integrity (Part 3: "untyped param contract *forces* stringly-typed deployment code"; test `check_condition:485` string-keyed dispatch) | Same | Medium — touches experiment-authoring layer; pattern must be right before hte copies it | Last because it is the pattern-setter for every deployment: get the sim proving ground right, then Part-3's "deployments heal by following the corrected pattern" does the rest. Fixes gpsim `check_condition` string dispatch as the pilot. Sims stay bare helpers — no ABC-ification (P4 boundary). |
@@ -33,7 +33,7 @@ sketched and get their own detail passes after 3a lands.**
 of every FastAPI server in the fleet — its blast radius is horizontal (every process) while its
 Domain-Integrity payoff is indirect. The lifecycle wrapper's blast radius is exactly the 25 mutation
 sites inventoried below, its payoff is the audit's #2 core fix, and its no-op proof is mechanical.
-The `stop_ce_pump` fix rides along in 3a because it is self-contained, nested-repo-isolated (lila only),
+The `stop_ce_pump` fix rides along in 3a because it is self-contained, nested-repo-isolated (Deployment-A only),
 and already evidence-cleared (§2.6).
 
 ---
@@ -50,7 +50,7 @@ Enforcement (raising) is 3e, after soak. The serialized field shape stays `List[
 in -act/-exp/-seq.yml, and in HLO output — methods on a pydantic model do not appear in `model_dump()`,
 `model_json_schema()`, or YAML emission.
 
-Bundled second task: fix lila `SDC_seq.py` `stop_ce_pump: bool = "True"` → `= True` at **both** sites
+Bundled second task: fix Deployment-A `SDC_seq.py` `stop_ce_pump: bool = "True"` → `= True` at **both** sites
 (lines 2252 **and** 2521 — the audit lists one; grep found two). This is the increment's only
 behavior-visible change (serialized param value `'True'` → `true`), pre-cleared by the consumer sweep
 in §2.6.
@@ -60,19 +60,19 @@ in §2.6.
   enum. Its mutation sites (core/models/sample.py:196,206; hte archive_driver.py ×10; hte
   pal_driver.py:1660,1662) are out of scope; logged as an open question for 3c (sample work) / P4
   (those drivers get rewritten anyway).
-- **priv converter constructor kwargs** (`action_status=[HloStatus.finished]` etc., 18 sites across
-  `helao/deploy/priv/scripts/*/converters.py`, `convert_icpms_csv.py`) — these are model *construction*,
+- **Deployment-C converter constructor kwargs** (`action_status=[HloStatus.finished]` etc., 18 sites across
+  `helao/deploy/Deployment-C/scripts/*/converters.py`, `convert_icpms_csv.py`) — these are model *construction*,
   not lifecycle *transition*; constructing a model in a terminal state is legitimate and unchanged.
 - **Local variables named `*_status`** that are not model fields: `ret_status.append(...)` in
-  galil_motion_driver.py:926-944 and lila thorlabs_kinesis.py:1288-1294 (plain lists of strings).
+  galil_motion_driver.py:926-944 and Deployment-A thorlabs_kinesis.py:1288-1294 (plain lists of strings).
 - **Mock-class field initialization in tests**: unit_test_estop_sync.py:39 (`self.action_status = [...]`
   inside a fake), hte sprintir_tests.py:115,142,171,192 (`mock_action.action_status = []`).
 - No dedup, no reordering, no removal of existing `if X not in` guards at call sites — every routed site
   performs the identical list operation it performed before.
 - No enum changes, no model field changes, no `Optional`-tightening (all-`Optional` models are a
   separate audit finding, not 3a).
-- dbpack (frozen), `deploy/lila_gl/**`, `deploy/mea/notes/**` — excluded as in P1/P2.
-- mea has **zero** in-scope status-mutation sites (verified by grep 2026-07-10) — no mea commit in 3a.
+- dbpack (frozen), `deploy/Deployment-D/**`, `deploy/Deployment-B/notes/**` — excluded as in P1/P2.
+- Deployment-B has **zero** in-scope status-mutation sites (verified by grep 2026-07-10) — no Deployment-B commit in 3a.
 
 ### 2.2 The transformation
 
@@ -192,8 +192,8 @@ Parent repo — hte deployment (py_compile-gated; Windows-only imports possible)
 These four hte sites are estop/error paths only — no nominal-run control-flow change, and the routed call
 performs the identical append. No hte launch is required or performed.
 
-Nested repos: **lila** — zero status-mutation sites (only the `stop_ce_pump` task, §2.6). **mea** — zero
-sites. **priv** — constructor kwargs only (excluded, §2.1). So 3a commits land in parent + lila only.
+Nested repos: **Deployment-A** — zero status-mutation sites (only the `stop_ce_pump` task, §2.6). **Deployment-B** — zero
+sites. **Deployment-C** — constructor kwargs only (excluded, §2.1). So 3a commits land in parent + Deployment-A only.
 
 ### 2.4 Proof that the serialized shape is unchanged (three layers)
 
@@ -258,21 +258,21 @@ counts in a polled hlo), the fallback rule is: manifest + all yml files must dif
 must diff clean; hlo data-row-count deltas are investigated individually and accepted only with a written
 cause (timing) in the T8 report. Do not weaken the yml criterion under any circumstances.
 
-### 2.6 Bundled task: lila `stop_ce_pump: bool = "True"` fix
+### 2.6 Bundled task: Deployment-A `stop_ce_pump: bool = "True"` fix
 
 Evidence collected 2026-07-10:
-- **Two** defect sites, not one: `helao/deploy/lila/sequences/SDC_seq.py:2252` and `:2521`
+- **Two** defect sites, not one: `helao/deploy/Deployment-A/sequences/SDC_seq.py:2252` and `:2521`
   (`stop_ce_pump: bool = "True"`). Both functions' docstrings even note "the default is the string
   `"True"`" (SDC_seq.py:2299, 2570) — update those two docstring lines too.
 - The param flows only as `"stop_ce_pump": stop_ce_pump` into experiment params (SDC_seq.py:2376, 2425,
   2479, …) and is consumed exclusively by truthiness in the experiment layer: `if stop_ce_pump:` at
-  SDC_exp.py:440, 1184, 1299. `grep -rn '== *"True"'` over lila returns only the two docstrings — **no
+  SDC_exp.py:440, 1184, 1299. `grep -rn '== *"True"'` over Deployment-A returns only the two docstrings — **no
   consumer string-matches "True"**, closing the open-questions carry-over.
 - Runtime behavior is therefore identical (`"True"` and `True` are both truthy). The *serialized* param
   value in -seq/-exp yml changes from `'True'` to `true` — this is the intended, declared behavior fix
   and the only serialized delta 3a is allowed to produce. It also fixes the operator-UI rendering of the
   default (bool params render as toggles, string defaults as text).
-- Every other `stop_ce_pump` default in lila is already a real bool (`= True` at SDC_exp.py:378, 534, …;
+- Every other `stop_ce_pump` default in Deployment-A is already a real bool (`= True` at SDC_exp.py:378, 534, …;
   SDC_seq literal dict values are real bools) — only the two sites change.
 
 ### 2.7 Task table
@@ -291,7 +291,7 @@ or logic churn).
 | T4 | Route premodels + micro_orch (7 sites) | parent | `helao/helpers/premodels.py`, `helao/core/runners/micro_orch.py` | T1 | A | Import smoke both modules; run `conda run -n helao python helao/core/tests/unit_test_micro_orch.py` (passes pre-change on this branch → must pass after); suite gate; grep-zero. |
 | T5 | Route hte estop/error sites (4 sites) | parent | `helao/deploy/hte/servers/action/pdu_server.py`, `helao/deploy/hte/drivers/spec/spectral_products_driver.py`, `helao/deploy/hte/drivers/sensor/sprintir_driver.py` | T1 | A | `conda run -n helao python -m py_compile` each file (Windows-only imports — do not "fix" unrelated import errors); suite gate; grep-zero. |
 | T6 | Route core standalone tests (3 sites) | parent | `helao/core/tests/unit_test_estop_sync.py`, `helao/core/tests/unit_test_orch_status.py` | T1 | A | Run both standalone scripts — pass; suite gate; grep-zero. |
-| T7 | lila `stop_ce_pump` fix (2 sites + 2 docstrings) | **lila (nested)** | `helao/deploy/lila/sequences/SDC_seq.py` | — (independent of T1) | A | `py_compile` the file; `grep -n 'bool = "True"' …/SDC_seq.py` empty; `grep -rn '== *"True"' helao/deploy/lila/` returns only nothing (docstrings updated); `python -c "import inspect,…; assert signature default is True"` for both functions; suite gate. Commit **inside** `helao/deploy/lila` (invisible to parent git). |
+| T7 | Deployment-A `stop_ce_pump` fix (2 sites + 2 docstrings) | **Deployment-A (nested)** | `helao/deploy/Deployment-A/sequences/SDC_seq.py` | — (independent of T1) | A | `py_compile` the file; `grep -n 'bool = "True"' …/SDC_seq.py` empty; `grep -rn '== *"True"' helao/deploy/Deployment-A/` returns only nothing (docstrings updated); `python -c "import inspect,…; assert signature default is True"` for both functions; suite gate. Commit **inside** `helao/deploy/Deployment-A` (invisible to parent git). |
 | T8 | Verification sweep + capture/compare + commits + push | all | — | T2–T7 | serial-post | §2.8 below. |
 
 **T8 sweep (all must pass):**
@@ -304,14 +304,14 @@ conda run -n helao python helao/core/tests/unit_test_orch_status.py
 # grep-zero: no raw lifecycle mutations remain outside the allow-list
 grep -rnE --include='*.py' \
   '\.(action_status|experiment_status|sequence_status)\s*(\.append|\.remove|\.extend|\.insert|\.clear|=\s*\[)' helao/ \
-  | grep -vE 'status_transitions\.py|deploy/lila_gl/|deploy/mea/notes/|deploy/priv/|unit_test_estop_sync\.py:39|sprintir_tests\.py'
-# expected: empty (priv = constructor kwargs; the two test hits = mock init, allow-listed)
+  | grep -vE 'status_transitions\.py|deploy/Deployment-D/|deploy/Deployment-B/notes/|deploy/Deployment-C/|unit_test_estop_sync\.py:39|sprintir_tests\.py'
+# expected: empty (Deployment-C = constructor kwargs; the two test hits = mock init, allow-listed)
 # end-to-end capture/compare per §2.5 — diff of normalized trees EMPTY; schema diff EMPTY
 ```
 Then commits: **parent** (one commit: T1–T6 + T8 artifacts referenced in message, on
-`feat/cards-refactor`) and **lila** (one commit for T7, from inside `helao/deploy/lila`). Push both
+`feat/cards-refactor`) and **Deployment-A** (one commit for T7, from inside `helao/deploy/Deployment-A`). Push both
 (per-increment push policy, as done for Increments 1–2). Commit messages state the byte-identical proof
-result and, for lila, the declared `'True'`→`true` serialized delta.
+result and, for Deployment-A, the declared `'True'`→`true` serialized delta.
 
 ### 2.8 Risk and rollback
 
@@ -332,7 +332,7 @@ result and, for lila, the declared `'True'`→`true` serialized delta.
 - **Sim nondeterminism:** mitigated by fixed seeds (GPSIM 9999) and the normalizer; escalation rule in
   §2.5 keeps the yml criterion absolute.
 - **Rollback:** one commit per repo. Parent revert is self-contained (new module + methods are additive;
-  routed sites revert with the commit). The lila commit is independent (no parent-code dependency) and
+  routed sites revert with the commit). The Deployment-A commit is independent (no parent-code dependency) and
   reverts alone. No cross-repo ordering constraint in either direction for 3a.
 
 ---
@@ -373,8 +373,8 @@ result and, for lila, the declared `'True'`→`true` serialized delta.
   same dict).
 - Sims stay bare helpers — no `HelaoDriver` ABC (standing decision; P4 boundary).
 - Success = the pattern doc + one fully-typed experiment library (OERSIM_exp) with byte-identical -act
-  params on the §2.5 harness; hte/lila/mea adoption is deliberately deferred to post-P3 follow-ups
-  (mea `wait_for_temperature` schema divergence is the known blocker there — open question).
+  params on the §2.5 harness; hte/Deployment-A/Deployment-B adoption is deliberately deferred to post-P3 follow-ups
+  (Deployment-B `wait_for_temperature` schema divergence is the known blocker there — open question).
 
 ### 3e — Flip lifecycle guards to enforcing (Domain Integrity)
 - Precondition: soak window (≥2 weeks of `test` + hte production logs after 3a merges to a deployed
@@ -395,5 +395,5 @@ result and, for lila, the declared `'True'`→`true` serialized delta.
       wrap in 3c alongside the discriminator, or fold into P4's driver rewrites?
 - [ ] 3b: do any tracked hte/test configs fail `HelaoConfig` validation today? (Must be answered before
       unconditional validation.)
-- [ ] mea `wait_for_temperature` payload divergence (targets+success_count vs flat setpoint) — carry-over;
-      blocks extending 3d's typed params to mea.
+- [ ] Deployment-B `wait_for_temperature` payload divergence (targets+success_count vs flat setpoint) — carry-over;
+      blocks extending 3d's typed params to Deployment-B.
