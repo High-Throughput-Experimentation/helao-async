@@ -14,7 +14,7 @@ __all__ = ["makeApp"]
 from typing import Optional, Union, List
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI, action_version
-from ...drivers.io.galil_io_driver import Galil, TriggerType, AiMonExec
+from ...drivers.io.galil_io_driver import Galil, GalilPoller, TriggerType, AiMonExec
 from helao.helpers.premodels import Action
 from helao.core.models.sample import (
     AssemblySample,
@@ -24,6 +24,7 @@ from helao.core.models.sample import (
     NoneSample,
 )
 from helao.core.error import ErrorCodes
+from helao.core.drivers.helao_driver import DriverResponseType
 
 from helao.helpers import helao_logging as logging
 
@@ -42,6 +43,15 @@ async def galil_dyn_endpoints(app: BaseAPI):
     """
     server_key = app.base.server.server_name
     app.driver: Galil
+
+    # gclib connection is opened here (not in the driver's __init__, per the
+    # HelaoDriver ABC's no-device-I/O-at-construction rule) so that
+    # `galil_enabled` reflects a real connection attempt before endpoint
+    # registration below decides which routes to expose -- matching the
+    # pre-migration timing where __init__ itself opened the connection
+    # before this hook ran.
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"Galil connect() returned status={connect_resp.status}")
 
     if app.driver.galil_enabled is True:
 
@@ -270,7 +280,18 @@ async def galil_dyn_endpoints(app: BaseAPI):
         ):
             """Reset the Galil controller. Emergency use only."""
             active = await app.base.setup_and_contain_action(action_abbr="reset")
-            await active.enqueue_data_dflt(datadict={"reset": await app.driver.reset()})
+            reset_resp = app.driver.reset()
+            active.action.error_code = (
+                ErrorCodes.none
+                if reset_resp.response == DriverResponseType.success
+                else ErrorCodes.unspecified
+            )
+            await active.enqueue_data_dflt(
+                datadict={
+                    "reset": reset_resp.response.value,
+                    "status": reset_resp.status.value,
+                }
+            )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -294,6 +315,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Galil IO server",
         version=2.0,
         driver_classes=[Galil],
+        poller_class=GalilPoller,
         dyn_endpoints=galil_dyn_endpoints,
     )
 
