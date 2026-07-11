@@ -4,7 +4,7 @@ Wraps the digital/analog IO portion of the `gclib` library: reads `dev_ai`,
 `dev_ao`, `dev_di`, `dev_do` port maps from the server config, opens a TCP
 connection to the Galil controller at `galil_ip_str`, and exposes async helpers
 for reading/setting digital and analog channels plus a `set_digital_cycle`
-routine that uploads a DMC toggling program. A background polling task pushes
+routine that uploads a DMC toggling program. A paired `GalilPoller` publishes
 scaled analog-input readings to the action-server live buffer.
 
 Requires gclib (Windows). After installing the Galil toolkit, install the
@@ -15,7 +15,9 @@ Python module from the helao environment:
 
 __all__ = [
     "Galil",
+    "GalilPoller",
     "TriggerType",
+    "AiMonExec",
 ]
 
 
@@ -30,11 +32,17 @@ from typing import Union, Optional, List
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
 from helao.core.models.hlostatus import HloStatus
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
 from ...drivers.io.enum import TriggerType
 
@@ -55,25 +63,33 @@ class cmd_exception(ValueError):
         self.args = arg
 
 
-class Galil:
+class Galil(HelaoDriver):
     """IO portion of a Galil controller exposed to the HELAO action server.
 
-    Reads its `params` block from the action server config: `galil_ip_str`,
-    `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the `monitor_ai` scaling
-    dict. Opens a `gclib.py()` connection on construction and starts background
-    polling/signal tasks. Public coroutines mirror digital and analog IO
-    operations and (`set_digital_cycle`) upload a DMC program to the controller.
+    Reads its `config` dict from the action server's ``params`` block:
+    `galil_ip_str`, `dev_ai`/`dev_ao`/`dev_di`/`dev_do` port maps, and the
+    `monitor_ai` scaling dict. The `gclib.py()` connection is opened by
+    :meth:`connect`, not by construction; always-on analog-input polling is
+    handled by the paired :class:`GalilPoller`, wired in as the server's
+    ``poller_class``. Public coroutines mirror digital and analog IO
+    operations and (`set_digital_cycle`) upload a DMC program to the
+    controller.
+
+    Server config parameters:
+        ``galil_ip_str``: Controller IP (direct connect string is built from
+            this).
+        ``dev_ai``/``dev_ao``/``dev_di``/``dev_do``: port-name maps.
+        ``monitor_ai``: dict of ``{ai_name: scaling}`` for the poller.
     """
 
-    def __init__(self, action_serv: Base):
-        """Connect to the Galil controller and start the polling tasks.
+    def __init__(self, config: dict = {}):
+        """Store config and build the dynamic IO enums; no device I/O here.
 
         Args:
-            action_serv: Owning HELAO action server, used for config access
-                and for pushing readings to the live buffer.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        super().__init__(config=config)
+        self.config_dict = self.config
 
         self.dev_ai = self.config_dict.get("dev_ai", {})
         self.dev_aiitems = make_str_enum("dev_ai", {key: key for key in self.dev_ai})
@@ -99,13 +115,24 @@ class Galil:
         self.digital_cycle_subthread = None
         self.digital_cycle_subthread2 = None
 
-        # if this is the main instance let us make a galil connection
-        self.g = gclib.py()
-        LOGGER.info(f"gclib version: {self.g.GVersion()}")
-        # TODO: error checking here: Galil can crash an dcarsh program
-        galil_ip = self.config_dict.get("galil_ip_str", None)
+        self.g = None
+        self.galilcmd = None
+        self.galilprgdownload = None
         self.galil_enabled = None
+
+        self.cycle_lights = False
+
+    def connect(self) -> DriverResponse:
+        """Open the `gclib.py()` handle and connect to the configured Galil IP.
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
         try:
+            self.g = gclib.py()
+            LOGGER.info(f"gclib version: {self.g.GVersion()}")
+            # TODO: error checking here: Galil can crash and crash program
+            galil_ip = self.config_dict.get("galil_ip_str", None)
             if galil_ip:
                 self.g.GOpen("%s --direct -s ALL" % (galil_ip))
                 LOGGER.info(self.g.GInfo())
@@ -113,109 +140,77 @@ class Galil:
                 # downloads a DMC program to galil
                 self.galilprgdownload = self.g.GProgramDownload
                 self.galil_enabled = True
+                response = DriverResponse(
+                    response=DriverResponseType.success, status=DriverStatus.ok
+                )
             else:
                 LOGGER.error("no Galil IP configured")
                 self.galil_enabled = False
+                response = DriverResponse(
+                    response=DriverResponseType.failed,
+                    status=DriverStatus.uninitialized,
+                )
         except Exception:
             LOGGER.error("could not connect to Galil controller", exc_info=True)
             self.galil_enabled = False
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
 
-        self.cycle_lights = False
-
-        self.aloop = asyncio.get_running_loop()
-        self.polling = True
-        self.poll_signalq = asyncio.Queue(1)
-        self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
-        self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
-
-    async def poll_sensor_loop(self, frequency: int = 4):
-        """Background task that reads `monitor_ai` channels at `frequency` Hz.
-
-        Each successful read is scaled per `monitor_ai` and pushed to the
-        action-server live buffer.
-        """
-        LOGGER.info("polling background task has started")
-        waittime = 1.0 / frequency
-        lastupdate = 0
-        while True:
-            if self.polling:
-                for ai_name, scaling in self.monitor_ai.items():
-                    status_dict = {}
-                    checktime = time.time()
-                    if checktime - lastupdate < waittime:
-                        # LOGGER.info("waiting for minimum update interval.")
-                        await asyncio.sleep(waittime - (checktime - lastupdate))
-                    ai_resp = await self.get_analog_in(ai_name)
-                    if (
-                        ai_resp.get("error_code", ErrorCodes.not_available)
-                        == ErrorCodes.none
-                    ):
-                        status_dict = {ai_name: float(ai_resp["value"]) * scaling}
-                        await self.base.put_lbuf(status_dict)
-                    lastupdate = time.time()
-                    # self.base.print_message(ai_resp)
-            await asyncio.sleep(0.01)
-
-    async def reset(self):
-        """Placeholder reset; no controller-level reset is currently performed."""
-        pass
-
-    async def start_polling(self):
-        """Signal the polling loop to resume and block until it has restarted."""
-        LOGGER.info("got 'start_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(True)
-        while not self.polling:
-            LOGGER.info("waiting for polling loop to start")
-            await asyncio.sleep(0.1)
-
-    async def stop_polling(self):
-        """Signal the polling loop to pause and block until it has stopped."""
-        LOGGER.info("got 'stop_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(False)
-        while self.polling:
-            LOGGER.info("waiting for polling loop to stop")
-            await asyncio.sleep(0.1)
-
-    async def poll_signal_loop(self):
-        """Consume signals from `poll_signalq` and update `self.polling`."""
-        while True:
-            self.polling = await self.poll_signalq.get()
-            LOGGER.info("polling signal received")
-
-    async def estop(self, switch: bool, *args, **kwargs) -> bool:
-        """Engage or release the IO emergency stop.
-
-        Args:
-            switch: True to assert estop (drives every configured AO/DO low
-                and sets the action server estop flag), False to release.
+    def get_status(self) -> DriverResponse:
+        """Return whether the Galil connection has been established.
 
         Returns:
-            The `switch` value passed in.
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
         """
-        LOGGER.info("IO Estop")
-        if switch:
-            for ao_name in self.dev_ao.keys():
-                await self.set_digital_out(
-                    on=False,
-                    value=0.0,
-                    ao_name=ao_name,
-                )
-            for do_name in self.dev_do.keys():
-                await self.set_digital_out(
-                    on=False,
-                    do_name=do_name,
-                )
-            # set flag
-            self.base.actionservermodel.estop = True
-        else:
-            # need only to set the flag
-            self.base.actionservermodel.estop = False
-        return switch
+        if self.galil_enabled:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
 
-    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs) -> dict:
-        """Read a configured analog input by name.
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Placeholder reset; no controller-level reset is currently performed."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def disconnect(self) -> DriverResponse:
+        """Close the Galil connection.
+
+        Returns:
+            ``DriverResponse`` reporting close success or failure.
+        """
+        LOGGER.info("shutting down galil io")
+        self.galil_enabled = False
+        try:
+            self.g.GClose()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def _read_analog_in(self, ai_name: str = "analog_in") -> dict:
+        """Synchronous single-shot read of a configured analog input.
+
+        Shared by :meth:`get_analog_in` (awaited by the action server) and
+        :class:`GalilPoller` (called synchronously from the poll loop).
 
         Args:
             ai_name: Key in `dev_ai` identifying the channel.
@@ -242,6 +237,44 @@ class Galil:
             "type": "analog_in",
             "value": ret,
         }
+
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Engage the IO emergency stop by driving every configured AO/DO low.
+
+        Args:
+            switch: True to assert estop (drives every configured AO/DO low),
+                False is a no-op (server-side estop-flag bookkeeping is owned
+                by the action-server framework, not the driver).
+
+        Returns:
+            The `switch` value passed in.
+        """
+        LOGGER.info("IO Estop")
+        if switch:
+            for ao_name in self.dev_ao.keys():
+                await self.set_digital_out(
+                    on=False,
+                    value=0.0,
+                    ao_name=ao_name,
+                )
+            for do_name in self.dev_do.keys():
+                await self.set_digital_out(
+                    on=False,
+                    do_name=do_name,
+                )
+        return switch
+
+    async def get_analog_in(self, ai_name: str = "analog_in", *args, **kwargs) -> dict:
+        """Read a configured analog input by name.
+
+        Args:
+            ai_name: Key in `dev_ai` identifying the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("analog_in"), and
+            the raw `value` returned by the controller.
+        """
+        return self._read_analog_in(ai_name)
 
     async def get_digital_in(self, di_name: str = "digital_in", *args, **kwargs) -> dict:
         """Read a configured digital input by name.
@@ -582,20 +615,45 @@ class Galil:
 
         return {"error_code": ErrorCodes.none}
 
-    def shutdown(self) -> set:
-        """Close the Galil connection. Invoked when the action server shuts down.
+    def shutdown(self):
+        """Close the Galil connection. Invoked when the action server shuts down."""
+        self.disconnect()
+
+
+class GalilPoller(DriverPoller):
+    """Background poller that reads the monitored analog inputs from the Galil driver."""
+
+    driver: Galil
+
+    def get_data(self) -> DriverResponse:
+        """Read every `monitor_ai` channel and scale it.
+
+        Mirrors the pre-migration `poll_sensor_loop`: for each configured
+        `monitor_ai` channel, reads the raw analog value and multiplies it by
+        the configured scaling factor, forwarding the merged dict for the
+        `DriverPoller` base class to push into the live buffer.
 
         Returns:
-            A single-element set containing "shutdown".
+            `DriverResponse` with `data={ai_name: scaled_value, ...}` merged
+            across every channel that returned a valid reading this cycle
+            (the pre-migration loop forwarded one `{ai_name: value}` to
+            `put_lbuf` per channel per cycle; folding them into a single call
+            here is behaviorally equivalent since `DriverPoller` merges
+            `resp.data` into `live_dict` as a whole), or an empty
+            `DriverResponse` if no channel returned a valid reading.
         """
-        LOGGER.info("shutting down galil io")
-        self.galil_enabled = False
-        try:
-            self.g.GClose()
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
-        return {"shutdown"}
+        status_dict = {}
+        for ai_name, scaling in self.driver.monitor_ai.items():
+            ai_resp = self.driver._read_analog_in(ai_name)
+            if ai_resp.get("error_code", ErrorCodes.not_available) == ErrorCodes.none:
+                status_dict[ai_name] = float(ai_resp["value"]) * scaling
+        if not status_dict:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=status_dict,
+        )
 
 
 class AiMonExec(Executor):
