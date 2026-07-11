@@ -56,9 +56,11 @@ from helao.core.servers.orch_persist import QueuePersister
 from helao.core.servers.orch_monitor import ServerMonitor
 from helao.core.servers.orch_status_sync import StatusIngester
 from helao.core.servers.orch_queues import RunQueues
+from helao.core.servers import orch_unpack
+from helao.core.servers.orch_unpack import PLATE_API
+from helao.core.servers.orch_lifecycle import RunLifecycle
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
-from helao.helpers.plate_api import HTEPlateAPI
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers.processors import MetaProcessor
 from helao.helpers.dequedict import DequeDict
@@ -75,9 +77,6 @@ def sanitize_sequence_label(label):
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
-
-
-PLATE_API = HTEPlateAPI()
 
 
 class Orch(Base):
@@ -211,6 +210,7 @@ class Orch(Base):
         self.server_monitor = ServerMonitor(self)
         self.status_ingester = StatusIngester(self)
         self.run_queues = RunQueues(self)
+        self.run_lifecycle = RunLifecycle(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -381,28 +381,15 @@ class Orch(Base):
             sequence_name: Sequence library entry to expand.
             sequence_params: Keyword arguments forwarded to the sequence factory.
         """
-        if sequence_name in self.sequence_lib:
-            return self.sequence_lib[sequence_name](**sequence_params)
-        else:
-            return []
+        return orch_unpack.unpack_sequence(sequence_name, sequence_params, self.sequence_lib)
 
     def get_sequence_codehash(self, sequence_name: str) -> UUID:
         """Return the cached code hash for the named sequence library entry."""
-        return self.sequence_codehash_lib[sequence_name]
+        return orch_unpack.get_sequence_codehash(sequence_name, self.sequence_codehash_lib)
 
     async def seq_unpacker(self):
         """Push every planned experiment from the active sequence onto the experiment deque."""
-        for i, experimentmodel in enumerate(self.active_sequence.planned_experiments):
-            # self.print_message(
-            #     f"unpack experiment {experimentmodel.experiment_name}"
-            # )
-            if self.seq_model.data_request_id is not None:
-                experimentmodel.data_request_id = self.seq_model.data_request_id
-            await self.add_experiment(
-                seq=self.seq_model, experimentmodel=experimentmodel
-            )
-            if i == 0:
-                self.globalstatusmodel.loop_state = LoopStatus.started
+        return await orch_unpack.seq_unpacker(self)
 
     def verify_plate_in_params(self, paramd: dict) -> bool:
         """Confirm that any ``plate_id``/``solid_plate_id`` parameter resolves to a valid platemap.
@@ -413,28 +400,7 @@ class Orch(Base):
         Returns:
             ``True`` if no plate parameter is present or a platemap was found.
         """
-        plate_found = False
-        if "solid_plate_id" in paramd or "plate_id" in paramd:
-            # check for valid plate if solid_plate_id or plate_id is a sequence parameter
-            if PLATE_API.has_access:
-                for pid_key in ["solid_plate_id", "plate_id"]:
-                    pid_val = paramd.get(pid_key, None)
-                    if pid_val is not None:
-                        platemap = PLATE_API.get_platemap_plateid(pid_val)
-                        if platemap:
-                            plate_found = True
-                            LOGGER.info(
-                                f"plate_id {pid_val} was found with a valid platemap"
-                            )
-                            break
-            else:
-                LOGGER.warning(
-                    "plate_id is a sequence parameter but there is no access to info and map file locations."
-                )
-        else:
-            # no plate parameter, so act like it's fine
-            plate_found = True
-        return plate_found
+        return orch_unpack.verify_plate_in_params(paramd)
 
     async def loop_task_dispatch_sequence(self) -> ErrorCodes:
         """Pop the next sequence, make it active, validate it, and spawn its experiment unpacker.
@@ -1725,166 +1691,19 @@ class Orch(Base):
 
     async def finish_active_sequence(self):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
-        await self.orch_wait_for_all_actions()
-        if self.active_sequence is not None:
-            self.active_sequence.replace_sequence_status(
-                HloStatus.active, HloStatus.finished
-            )
-            self.active_sequence.sequence_finished_timestamp = set_time(
-                offset=self.ntp_offset
-            )
-            self.active_sequence.finished_global_params = {
-                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
-            }
-
-            # post-process experiment object
-            if self.seq_postprocessors:
-                for spp, libname in zip(
-                    self.seq_postprocessors, self.seq_postprocess_libs
-                ):
-                    LOGGER.info(
-                        f"Running custom SEQ post-processor: {os.path.basename(libname).split('.py')[0]}"
-                    )
-                    loop = asyncio.get_running_loop()
-                    postprocessor = spp(self.active_sequence, self)
-                    await loop.run_in_executor(None, postprocessor.process)
-
-            await self.write_seq(self.active_sequence)
-            self.last_sequence = deepcopy(self.active_sequence)
-            await self.put_lbuf(
-                {
-                    self.active_sequence.sequence_uuid: {
-                        "sequence_name": self.active_sequence.sequence_name,
-                        "status": HloStatus.finished.value,
-                    }
-                }
-            )
-            self.register_obj_uuid(
-                self.active_sequence.sequence_uuid,
-                {
-                    "sequence_name": self.active_sequence.sequence_name,
-                    "sequence_params": self.active_sequence.sequence_params,
-                    "sequence_timestamp": f"{self.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_finished_timestamp": f"{self.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_status": HloStatus.finished.value,
-                    "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": (
-                        self.active_sequence.campaign_name
-                        if self.active_sequence.campaign_name
-                        else None
-                    ),
-                },
-                "sequence",
-            )
-            self.active_sequence = None
-            self.active_seq_exp_counter = 0
-            self.globalstatusmodel.counter_dispatched_actions = {}
-            # DB server call to finish_yml if DB exists
-            self.aloop.create_task(move_dir(self.last_sequence, base=self))
+        return await self.run_lifecycle.finish_active_sequence()
 
     async def finish_active_experiment(self):
         """Finalize the active experiment after waiting for actions and stopping non-blockers."""
-        # we need to wait for all actions to finish first
-        await self.orch_wait_for_all_actions()
-        while len(self.nonblocking) > 0:
-            LOGGER.info(
-                f"Stopping non-blocking action executors ({len(self.nonblocking)})"
-            )
-            await self.clear_nonblocking()
-            await asyncio.sleep(1)
-        if self.active_experiment is not None:
-            LOGGER.info(
-                f"finished exp uuid is: {self.active_experiment.experiment_uuid}, adding matching acts to it"
-            )
-            await self.put_lbuf(
-                {
-                    self.active_experiment.experiment_uuid: {
-                        "experiment_name": self.active_experiment.experiment_name,
-                        "status": HloStatus.finished.value,
-                    }
-                }
-            )
-
-            # self.active_experiment.dispatched_actions = []
-
-            # TODO use exp uuid to filter actions?
-            # self.active_experiment.dispatched_actions = (
-            #     self.globalstatusmodel.finish_experiment(
-            #         exp_uuid=self.active_experiment.experiment_uuid
-            #     )
-            # )
-            # set exp status to finished
-            self.active_experiment.replace_experiment_status(
-                HloStatus.active, HloStatus.finished
-            )
-            self.active_experiment.experiment_finished_timestamp = set_time(
-                offset=self.ntp_offset
-            )
-
-            # post-process experiment object
-            if self.exp_postprocessors:
-                for epp, libname in zip(
-                    self.exp_postprocessors, self.exp_postprocess_libs
-                ):
-                    LOGGER.info(
-                        f"Running custom EXP post-processor: {os.path.basename(libname).split('.py')[0]}"
-                    )
-                    loop = asyncio.get_running_loop()
-                    postprocessor = epp(self.active_experiment, self)
-                    await loop.run_in_executor(None, postprocessor.process)
-
-            # add finished exp to seq
-            # !!! add to dispatched_experiments
-            self.active_sequence.dispatched_experiments.append(
-                deepcopy(self.active_experiment.get_exp())
-            )
-
-            # write new updated seq
-            await self.write_active_sequence_seq()
-
-            # write final exp
-            self.active_experiment.finished_global_params = {
-                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
-            }
-            await self.write_exp(self.active_experiment)
-
-            self.last_experiment = deepcopy(self.active_experiment)
-
-            self.register_obj_uuid(
-                self.active_experiment.experiment_uuid,
-                {
-                    "experiment_name": self.active_experiment.experiment_name,
-                    "experiment_params": self.active_experiment.experiment_params,
-                    "experiment_timestamp": f"{self.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
-                    "experiment_finished_timestamp": f"{self.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
-                    "experiment_status": HloStatus.finished.value,
-                    "sequence_label": self.active_sequence.sequence_label,
-                    "campaign_name": (
-                        self.active_sequence.campaign_name
-                        if self.active_sequence.campaign_name
-                        else None
-                    ),
-                },
-                "experiment",
-            )
-            self.active_experiment = None
-
-            # DB server call to finish_yml if DB exists
-            self.aloop.create_task(move_dir(self.last_experiment, base=self))
+        return await self.run_lifecycle.finish_active_experiment()
 
     async def write_active_experiment_exp(self):
         """Persist the active experiment to disk after snapshotting initial global params."""
-        self.active_experiment.initial_global_params = {
-            k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
-        }
-        await self.write_exp(self.active_experiment)
+        return await self.run_lifecycle.write_active_experiment_exp()
 
     async def write_active_sequence_seq(self):
         """Persist the active sequence to disk after snapshotting initial global params."""
-        self.active_sequence.initial_global_params = {
-            k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
-        }
-        await self.write_seq(self.active_sequence)
+        return await self.run_lifecycle.write_active_sequence_seq()
 
     async def shutdown(self):
         """Detach subscribers, cancel orchestrator tasks, and export queues if non-empty."""
@@ -1908,7 +1727,7 @@ class Orch(Base):
 
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
-        self.wait_task = asyncio.create_task(self.dispatch_wait_task(active))
+        return self.run_lifecycle.start_wait(active)
 
     async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
         """Run a long wait action off the HTTP handler so the client doesn't time out.
@@ -1920,24 +1739,9 @@ class Orch(Base):
         Returns:
             The finished action returned by ``active.finish()``.
         """
-        # handle long waits as a separate task so HTTP timeout doesn't occur
-        waittime = active.action.action_params["waittime"]
-        LOGGER.info(" ... wait action:")
-        self.current_wait_ts = time.time()
-        last_print_time = self.current_wait_ts
-        check_time = self.current_wait_ts
-        while check_time - self.current_wait_ts < waittime:
-            if check_time - last_print_time > print_every_secs - 0.01:
-                LOGGER.info(
-                    f" ... orch waited {(check_time-self.current_wait_ts):.1f} sec / {waittime:.1f} sec"
-                )
-                last_print_time = check_time
-            await asyncio.sleep(0.01)  # 10 msec sleep
-            check_time = time.time()
-        LOGGER.info(" ... wait action done")
-        finished_action = await active.finish()
-        self.last_wait_ts = check_time
-        return finished_action
+        return await self.run_lifecycle.dispatch_wait_task(
+            active, print_every_secs=print_every_secs
+        )
 
     async def active_action_monitor(self):
         """Heartbeat loop that stops the orchestrator if any active action endpoint goes offline."""
