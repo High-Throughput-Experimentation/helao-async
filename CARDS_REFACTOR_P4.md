@@ -4,10 +4,11 @@
 > are referred to as **Deployment-A/B/C/D**. Public deployments keep their names (`hte`, `test`).
 > The alias key is held privately, out of the repo.
 
-**Status:** EXECUTED 2026-07-11 (was: draft). 22 drivers migrated to the ABC across W0–W5,
+**Status:** EXECUTED 2026-07-11 (was: draft). 23 drivers migrated to the ABC (W0–W5 + PAL),
 each Opus-reviewed for behavior-preservation and pushed on `feat/cards-refactor`. All
-construction-proof; Windows/hardware drivers require a station smoke test before production
-reliance. P4 does **not** wait on 3e (soak-gated, orthogonal).
+construction-proof (PAL additionally golden-master-verified); Windows/hardware drivers require a
+station smoke test before production reliance. P4 does **not** wait on 3e (soak-gated, orthogonal).
+Only `archive` remains legacy by design (bookkeeping, not a device driver — hoist plan owns it).
 
 ### Execution outcome (2026-07-11)
 - **Migrated + reviewed + pushed (22):** W0 retired dead legacy advantech/stenner pairs
@@ -27,13 +28,17 @@ reliance. P4 does **not** wait on 3e (soak-gated, orthogonal).
   sample/tray bookkeeping (UnifiedSampleDataAPI + state files + in-memory slots, zero hardware).
   Forcing the ABC (connect/stop/reset for no device) is semantically wrong (same principle as
   bare-helper sims); a separate approved plan hoists it to a sample server. Left legacy.
-- **BLOCKED — pal_driver.py (needs a design decision, not a mechanical migration):** `_PAL_IOloop` is
-  the sole process-lifetime execution path for all 14 action handlers, creates its own `Active`
-  (endpoint returns before the job runs), and `_sendcommand_main` threads `self.active` through ~20
-  order-dependent sample-DB mutations with a mid-loop `active.split()`. A faithful K7b port =
-  rewriting the physical sample-tracking pipeline into an Executor state machine — unverifiable
-  without PAL hardware. Deferred with two candidate designs: (1) Executor injects `active` into the
-  driver at job-start (partial K7b, lowest-rewrite); (2) full Executor state-machine decomposition.
+- **MIGRATED — pal_driver.py (Design 1, spec `CARDS_REFACTOR_P4_PAL.md`; commits `3dc9c306` harness +
+  `79e5a62f` migration):** the `_PAL_IOloop` job engine was weaned off `Base` via a `PALJob` queue +
+  `PALJobExec` — `contain_action` moved to the endpoint, `method_*` → `build_palcam_*`, framework owns
+  finish/estop/stop; the ~1650-line `_sendcommand` sample pipeline is **rename-only** (`self.active` →
+  `job.active`). Behavior proven by a **golden-master call-trace harness** (`test_pal_golden_master.py`,
+  9 scenarios) — **zero delta** vs a baseline re-derived from the pre-migration commit (S1–S6:
+  shim-call order, samples_in/out, split points, HLO rows, uuid stamping, error funnel). Opus review
+  caught + fixed a HIGH busy-wedge (`_job=False` sentinel → permanent false-busy; regression test
+  `test_pal_busy_wedge.py` fails-before/passes-after). Design 2 (full state-machine) deferred as a
+  post-migration follow-up. **Station smoke test mandatory before production** (spec §6.2).
+  `dilute`/`autodilute` left as-is (OQ-P2, pre-existing broken).
 - **Frozen:** dbpack (deprecated). **Exempt:** `test` sims (bare helpers).
 
 ---
