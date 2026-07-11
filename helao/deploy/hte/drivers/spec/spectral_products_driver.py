@@ -2,8 +2,10 @@
 
 Wraps the vendor-supplied ``SMdbUSBm.dll`` to operate the SM303 spectrometer
 in software- or externally-triggered acquisition modes. The :class:`SM303`
-class is owned by the spec action server and pushes acquired spectra into
-the active action's data stream.
+driver owns only the device I/O; the action lifecycle (sample validation,
+``Active``/file-connection bookkeeping, and the externally-triggered
+collect loop) lives in ``spec_server.py``'s ``SM303Exec``
+(:class:`helao.helpers.executor.Executor`).
 """
 
 __all__ = ["SM303"]
@@ -18,14 +20,12 @@ import numpy as np
 
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
-from helao.core.models.data import DataModel
-from helao.core.models.file import FileConnParams, HloHeaderModel
-from helao.core.models.sample import SampleInheritance, SampleStatus
-from helao.core.models.hlostatus import HloStatus
-from helao.helpers.premodels import Action
-from helao.helpers.active_params import ActiveParams
-from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.core.servers.base import Base, Active
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+)
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
 
@@ -33,30 +33,26 @@ from ...drivers.spec.enum import SpecTrigType
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-class SM303:
+class SM303(HelaoDriver):
     """Driver for the Spectral Products SM303 USB spectrometer.
 
-    Loads the vendor ``SMdbUSBm.dll`` (path from the action-server config),
-    sets up the device (TEC, integration time, trigger mode), and provides
-    synchronous single-shot acquisition (:meth:`acquire_spec_adv`) and
-    asynchronous external-trigger acquisition (:meth:`acquire_spec_extrig`)
-    that streams spectra to the active HELAO :class:`Active` object via a
-    background polling task.
+    Loads the vendor ``SMdbUSBm.dll`` (path from ``config``) and configures
+    the device (TEC, wavelength table) in :meth:`connect`. Provides
+    synchronous single-shot acquisition (:meth:`acquire_spec_adv`) and the
+    plain device-configuration primitives (:meth:`set_trigger_mode`,
+    :meth:`set_extedge_mode`, :meth:`set_integration_time`,
+    :meth:`read_data`) used by ``spec_server.py``'s ``SM303Exec`` to drive
+    externally-triggered acquisition.
     """
 
-    def __init__(self, action_serv: Base):
-        """Initialise the SM303 driver.
-
-        Reads parameters from ``action_serv.server_cfg['params']``, loads the
-        vendor DLL, configures the device, primes an async signal queue, and
-        starts the :meth:`IOloop` background task.
+    def __init__(self, config: dict = {}):
+        """Store config; no device I/O here (see :meth:`connect`).
 
         Args:
-            action_serv: Parent HELAO action server (:class:`Base`) providing
-                config, logger, sample-API and file-output integration.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        super().__init__(config=config)
+        self.config_dict = self.config
         self.lib_path = self.config_dict["lib_path"]
         self.n_pixels = self.config_dict["n_pixels"]
         self.start_margin = self.config_dict["start_margin"]
@@ -68,16 +64,14 @@ class SM303:
         # self.px_cal = self.config_dict["px_cal"]
         # assert len(self.wl_cal) == len(self.px_cal)
         # self.n_cal = len(self.wl_cal)
-        if os.path.exists(self.lib_path):
-            self.spec = ctypes.CDLL(self.lib_path)
-            self.setup_sm303()
-            self.spec.spCloseGivenChannel(self.dev_num)
-        else:
-            LOGGER.error("SMdbUSBm.dll not found.")
-            self.spec = None
+
+        # device connection state -- populated by connect()/setup_sm303(), not here
+        self.spec = None
         self.ready = False
-        self.action: Action = None
-        self.active: Active = None
+        self.model = None
+        self.pxwl = []
+        self.wl_saved = None
+
         self.trigmode: SpecTrigType = None
         self.edgemode: TriggerType = None
         self.n_avg = 1
@@ -86,14 +80,7 @@ class SM303:
         self.trigger_duration = 0
         self.start_time: float = None
         self.spec_time: float = None
-        self.IO_signalq = asyncio.Queue(1)
-        self.IO_do_meas: bool = False  # signal flag for intent (start/stop)
-        self.IO_measuring: bool = False  # status flag of measurement
-        self.event_loop = asyncio.get_event_loop()
-        self.event_loop.create_task(self.IOloop())
 
-        self.unified_db = UnifiedSampleDataAPI(self.base)
-        asyncio.gather(self.unified_db.init_db())
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
         # for saving data localy
@@ -102,78 +89,84 @@ class SM303:
         self.FIFO_column_headings = []
         self.FIFO_name = ""
 
-        # signals return to endpoint after active was created
-        self.IO_continue: bool = False
-        self.IOloop_run: bool = False
+    def connect(self) -> DriverResponse:
+        """Load the vendor DLL and run the SM303 setup sequence.
 
-    def set_IO_signalq_nowait(self, val: bool) -> None:
-        """Push ``val`` onto the IO signal queue, evicting any stale entry."""
-        if self.IO_signalq.full():
-            _ = self.IO_signalq.get_nowait()
-        self.IO_signalq.put_nowait(val)
-
-    async def set_IO_signalq(self, val: bool) -> None:
-        """Async variant of :meth:`set_IO_signalq_nowait`."""
-        if self.IO_signalq.full():
-            _ = await self.IO_signalq.get()
-        await self.IO_signalq.put(val)
-
-    async def IOloop(self):
-        """Long-running trigger/acquire/read loop driven by ``IO_signalq``.
-
-        Waits for ``True`` on the signal queue to begin an external-trigger
-        acquisition via :meth:`continuous_read`, then finishes the active
-        action and resets state. Honours the action server's e-stop.
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
         """
-        self.IOloop_run = True
+        if not os.path.exists(self.lib_path):
+            LOGGER.error("SMdbUSBm.dll not found.")
+            self.spec = None
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.uninitialized
+            )
         try:
-            while self.IOloop_run:
-                self.IO_do_meas = await self.IO_signalq.get()
-                if self.IO_do_meas:
-                    # are we in estop?
-                    if not self.base.actionservermodel.estop:
-                        LOGGER.info("Spec got measurement request")
-                        try:
-                            await asyncio.wait_for(
-                                self.continuous_read(),
-                                self.trigger_duration + self.start_margin,
-                            )
-                            self.spec.spCloseGivenChannel(self.dev_num)
-                        except asyncio.exceptions.TimeoutError:
-                            pass
-                        if self.base.actionservermodel.estop:
-                            self.IO_do_meas = False
-                            LOGGER.error("Spec is in estop after measurement.")
-                        else:
-                            LOGGER.info("setting Spec to idle")
-                            # await self.stat.set_idle()
-                        LOGGER.info("Spec measurement is done")
-                    else:
-                        self.active.action.append_action_status(HloStatus.estopped)
-                        self.IO_do_meas = False
-                        LOGGER.error("Spec is in estop.")
+            self.spec = ctypes.CDLL(self.lib_path)
+            self.setup_sm303()
+            self.spec.spCloseGivenChannel(self.dev_num)
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok if self.ready else DriverStatus.error,
+            )
+        except Exception:
+            LOGGER.error("SM303 connect failed", exc_info=True)
+            self.spec = None
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
 
-                # endpoint can return even we got errors
-                self.IO_continue = True
+    def get_status(self) -> DriverResponse:
+        """Return whether :meth:`connect` has completed successfully.
 
-                if self.active is not None:
-                    LOGGER.info("Spec finishes active action")
-                    # active_not_finished = True
-                    # while active_not_finished and self.active is not None:
-                    #     try:
-                    #         await asyncio.wait_for(self.active.finish(), 1)
-                    #         active_not_finished = False
-                    #     except asyncio.exceptions.TimeoutError:
-                    #         pass
-                    await self.active.finish()
-                    self.active = None
-                    self.action = None
-                    self.samples_in = []
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if ready, else
+            ``status=uninitialized``.
+        """
+        if self.ready and self.spec is not None:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
 
-        except asyncio.CancelledError:
-            # endpoint can return even we got errors
-            self.IO_continue = True
-            LOGGER.info("IOloop task was cancelled")
+    def stop(self) -> DriverResponse:
+        """Immediately disable the external trigger (ABC-required zero-arg stop).
+
+        Distinct from the legacy delayed ``stop(delay=0)``, which is now
+        :meth:`stop_acquisition`.
+        """
+        if self.spec is not None:
+            self.unset_external_trigger()
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the spectrometer connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close the spectrometer channel.
+
+        Returns:
+            ``DriverResponse`` reporting close success or failure.
+        """
+        try:
+            if self.spec is not None:
+                self.spec.spCloseGivenChannel(self.dev_num)
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("SM303 disconnect failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+    async def async_shutdown(self) -> DriverResponse:
+        """Close the spectrometer channel on server shutdown (sync ``shutdown`` is omitted)."""
+        return self.disconnect()
 
     def setup_sm303(self):
         """Run vendor initialisation sequence and load the wavelength table.
@@ -210,7 +203,7 @@ class SM303:
             #         ctypes.byref(self.c_wl, ctypes.sizeof(ctypes.c_double) * i),
             #     )
             # self.pxwl = [self.c_wl[i] for i in range(self.n_pixels)]
-            # self.base.print_message(
+            # LOGGER.info(
             #     f"Calibrated wavelength range: {min(self.pxwl)}, {max(self.pxwl)} over {self.n_pixels} detector pixels."
             # )
             self.wl_saved = (ctypes.c_double * 1024)()
@@ -345,101 +338,6 @@ class SM303:
         LOGGER.info("Trigger or integration time could not be set.")
         return {"error_code": ErrorCodes.not_available}
 
-    async def acquire_spec_extrig(self, A: Action) -> dict:
-        """Start an externally triggered acquisition and return the active dict.
-
-        Configures external trigger mode, edge mode and integration time from
-        the action params, validates samples, opens a HELAO ``Active`` with a
-        ``spec_helao__file`` connection (wavelength table in the header),
-        then signals :meth:`IOloop` to begin collecting and waits until the
-        active object has been activated.
-
-        Args:
-            A: The :class:`Action` request describing this acquisition.
-
-        Returns:
-            The active action's ``as_dict()`` payload.
-        """
-
-        # self.setup_sm303()
-        params = A.action_params
-        self.n_avg = params["n_avg"]
-        self.fft = params["fft"]
-        self.trigger_duration = params["duration"]
-        trigset = self.set_trigger_mode(SpecTrigType.external)
-        edgeset = self.set_extedge_mode(params["edge_mode"])
-        inttset = self.set_integration_time(params["int_time"])
-        # TODO: can perform more checks like gamry technique wrapper...
-        if trigset and edgeset and inttset:
-            A.error_code = ErrorCodes.none
-            # validate samples_in
-            samples_in = await self.unified_db.get_samples(A.samples_in)
-            if not samples_in and not self.allow_no_sample:
-                LOGGER.error(
-                    "Spec server got no valid sample, cannot start measurement!",
-                )
-                A.samples_in = []
-                A.error_code = ErrorCodes.no_sample
-                activeDict = A.as_dict()
-            else:
-                self.samples_in = samples_in
-                self.action = A
-                # LOGGER.info("Writing initial spec_helao__file")
-                spec_header = {"wl": self.pxwl}
-                dflt_conn_key = self.base.dflt_file_conn_key()
-                self.active = await self.base.contain_action(
-                    ActiveParams(
-                        action=self.action,
-                        file_conn_params_dict={
-                            dflt_conn_key: FileConnParams(
-                                file_conn_key=dflt_conn_key,
-                                sample_global_labels=[
-                                    sample.get_global_label() for sample in samples_in
-                                ],
-                                file_type="spec_helao__file",
-                                hloheader=HloHeaderModel(optional=spec_header),
-                            )
-                        },
-                    )
-                )
-                for sample in samples_in:
-                    sample.reset_sample_status(SampleStatus.preserved)
-                    sample.inheritance = SampleInheritance.allow_both
-
-                self.active.action.samples_in = []
-                # now add updated samples to sample_in again
-                await self.active.append_sample(
-                    samples=[sample_in for sample_in in self.samples_in], IO="in"
-                )
-
-                self.start_time = time.time()
-                LOGGER.info(f"start_time: {self.start_time}")
-                self.spec_time = time.time()
-                LOGGER.info(f"spec_time: {self.spec_time}")
-                self.active.finish_hlo_header(
-                    realtime=self.base.get_realtime_nowait(),
-                    file_conn_keys=self.active.action.file_conn_keys,
-                )
-                # signal the IOloop to start the measrurement
-                await self.set_IO_signalq(True)
-
-                # need to wait now for the activation of the meas routine
-                # and that the active object is activated and sets action status
-                while not self.IO_continue:
-                    await asyncio.sleep(1)
-
-                # reset continue flag
-                self.IO_continue = False
-
-                activeDict = self.active.action.as_dict()
-        else:
-            LOGGER.error(
-                f"Could not trigger_mode ('SpecTrigType.external'), edge_mode ({params['edge_mode']}), int_time ({params['int_time']}), or trigger_duration ({params['duration']}).",
-            )
-            A.error_code = ErrorCodes.critical_error
-            activeDict = A.as_dict()
-        return activeDict
-
     def read_data(self) -> int:
         """Read a single spectrum from the device into ``self.data``.
 
@@ -471,97 +369,36 @@ class SM303:
             self.data = []
         return result
 
-    async def continuous_read(self) -> dict:
-        """Background polling coroutine for external-trigger acquisitions.
+    def unset_external_trigger(self):
+        """Disable the external trigger (sets ``SP_TRIGGER_OFF``)."""
+        self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
 
-        Repeatedly calls :meth:`read_data` (via ``run_in_executor`` so that
-        the DLL call's GIL release does not break async ordering), enqueues
-        each spectrum onto the active action's data stream, and stops once
-        ``trigger_duration + start_margin`` has elapsed.
+    async def stop_acquisition(self, delay: int = 0) -> DriverResponse:
+        """Wait ``delay`` seconds, then disable the external trigger.
 
-        ``start_margin`` extends the trigger acquisition window to account
-        for the time delay between the spec and pstat actions.
-
-        Returns:
-            ``{"measure": "done_extrig"}`` on normal completion or
-            ``{"measure": "not initialized"}`` if the DLL was never loaded.
-        """
-        # first_print = True
-        await asyncio.sleep(0.01)
-
-        if self.spec is None:
-            self.IO_measuring = False
-            return {"measure": "not initialized"}
-
-        else:
-            # active object is set so we can set the continue flag
-            self.IO_continue = True
-
-        while self.IO_do_meas and (self.spec_time - self.start_time) < (
-            self.trigger_duration + self.start_margin
-        ):
-            # if first_print:
-            #     self.base.print_message(
-            #         f"entering polling loop for {self.trigger_duration:.1f} seconds"
-            #     )
-
-            # VERY IMPORTANT! ctypes dll function calls release the GIL which interrupts
-            # the synchronization of HELAO's async coroutines, so we wrap the dll call
-            # with run_in_executor to force awaitable execution order in the while loop
-            try:
-                await self.event_loop.run_in_executor(None, self.read_data)
-            except asyncio.exceptions.TimeoutError:
-                self.data = []
-            # if first_print:
-            # LOGGER.info(f"spReadDataAdvEx was called")
-            if self.data:
-                self.data = [self._data[i] for i in range(1056)][10:1034]
-                # enqueue data
-                datadict = {"epoch_s": self.spec_time}
-                datadict.update({f"ch_{i:04}": x for i, x in enumerate(self.data)})
-                # if first_print:
-                #     LOGGER.info("writing initial data")
-                await self.active.enqueue_data(
-                    datamodel=DataModel(
-                        data={self.active.action.file_conn_keys[0]: datadict},
-                        errors=[],
-                        status=HloStatus.active,
-                    )
-                )
-                self.data = []
-            await asyncio.sleep(0.01)
-            self.spec_time = time.time()
-            # first_print = False
-
-        LOGGER.info("polling loop duration complete, finishing")
-        self.trigger_duration = 0
-        self.close_spec_connection()
-        return {"measure": "done_extrig"}
-
-    def close_spec_connection(self):
-        """Disable external trigger and signal the IO loop to stop."""
-        if self.IO_measuring:
-            self.IO_do_meas = False  # will stop meas loop
-            self.IO_measuring = False
-            self.unset_external_trigger()
-            LOGGER.info("signaling IOloop to stop")
-            self.set_IO_signalq_nowait(False)
-        else:
-            pass
-
-    async def stop(self, delay: int = 0):
-        """Stop the measurement, write all data and exit the meas loop.
+        Renamed from the legacy ``stop(delay=0)`` (the ABC's zero-arg
+        ``stop()`` is a distinct immediate abort). Does not itself terminate
+        an in-progress ``SM303Exec`` poll loop -- callers (see
+        ``spec_server.py``'s ``stop_extrig_after``) are responsible for that
+        via the action-server framework's executor-stop primitive.
 
         Args:
-            delay: Optional seconds to wait before signalling stop.
+            delay: Optional seconds to wait before disabling the trigger.
+
+        Returns:
+            ``DriverResponse`` reporting the trigger was disabled.
         """
-        if self.IO_measuring:
-            await asyncio.sleep(delay=delay)
-            self.IO_do_meas = False  # will stop meas loop
-            await self.set_IO_signalq(False)
+        await asyncio.sleep(delay)
+        if self.spec is not None:
+            self.unset_external_trigger()
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
 
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
-        """Set or clear the e-stop flag, stopping the meas loop when set.
+        """Device-level e-stop hook: disable the external trigger when engaged.
+
+        Server-side estop-flag bookkeeping (``actionservermodel.estop``) and
+        terminating/finalizing in-flight actions are owned by the action-server
+        framework (``base_api.py``'s ``/estop`` endpoint), not the driver.
 
         Args:
             switch: ``True`` to engage e-stop, ``False`` to clear it.
@@ -569,26 +406,7 @@ class SM303:
         Returns:
             The applied boolean state.
         """
-        # should be the same as stop()
         switch = bool(switch)
-        self.base.actionservermodel.estop = switch
-        if self.IO_measuring:
-            if switch:
-                self.IO_do_meas = False  # will stop meas loop
-                await self.set_IO_signalq(False)
-                if self.active:
-                    # add estop status to active.status
-                    self.active.set_estop()
+        if switch and self.spec is not None:
+            self.unset_external_trigger()
         return switch
-
-    def unset_external_trigger(self):
-        """Disable the external trigger (sets ``SP_TRIGGER_OFF``)."""
-        self.spec.spSetTrgEx(ctypes.c_short(10), self.dev_num)  # 10=SP_TRIGGER_OFF
-
-    def shutdown(self) -> dict:
-        """Close the spectrometer channel and return a shutdown marker."""
-        LOGGER.info("shutting down SM303")
-        # self.unset_external_trigger()
-        # self.spec.spSetTEC(ctypes.c_long(0), self.dev_num)
-        self.spec.spCloseGivenChannel(self.dev_num)
-        return {"shutdown"}

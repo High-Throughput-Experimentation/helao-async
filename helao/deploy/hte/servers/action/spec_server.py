@@ -5,6 +5,11 @@ Provides endpoints for single and averaged spectrum acquisition, intensity
 calibration that adjusts integration time toward a target peak window, and
 externally-triggered captures. Hardware triggers are the preferred method
 for synchronising spectral capture with an illumination source.
+
+The externally-triggered acquisition lifecycle (``acquire_spec_extrig``) is
+owned here rather than by the driver: the endpoint validates samples and
+opens the ``Active`` action, and :class:`SM303Exec` drives the
+trigger/collect loop that the driver's legacy ``IOloop`` used to run.
 """
 
 __all__ = ["makeApp"]
@@ -14,36 +19,138 @@ import time
 from typing import Optional, List, Union
 from fastapi import Body
 from helao.helpers.premodels import Action
+from helao.helpers.executor import Executor
+from helao.helpers.active_params import ActiveParams
+from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.servers.base_api import BaseAPI, action_version
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
     GasSample,
     SolidSample,
     NoneSample,
+    SampleInheritance,
+    SampleStatus,
 )
-from helao.core.models.file import HloHeaderModel
+from helao.core.models.file import FileConnParams, HloHeaderModel
 from ...drivers.spec.spectral_products_driver import SM303
 
 from ...drivers.io.enum import TriggerType
+from ...drivers.spec.enum import SpecTrigType
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+class SM303Exec(Executor):
+    """Executor that drives an externally-triggered SM303 acquisition.
+
+    Owns the ``Active`` action created by the ``acquire_spec_extrig``
+    endpoint (K7b: the endpoint validates samples and calls
+    ``contain_action``). ``_pre_exec`` arms the driver's per-run state from
+    ``action_params``; ``_poll`` is the ported body of the driver's legacy
+    ``continuous_read`` loop (one iteration per call, cadence set by
+    ``poll_rate``); ``_post_exec``/``_manual_stop`` close out the device
+    channel/trigger the same way the legacy ``IOloop`` did after
+    ``continuous_read`` returned.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Initialize the executor and bind the server's driver instance."""
+        super().__init__(*args, **kwargs)
+        LOGGER.info("SM303Exec initialized.")
+        self.driver: SM303 = self.active.driver
+
+    async def _pre_exec(self) -> dict:
+        """Arm the driver's per-run acquisition state from ``action_params``."""
+        # K7 CRITICAL: read from action_params (subscript), never endpoint fn-args
+        p = self.active.action.action_params
+        self.driver.n_avg = p["n_avg"]
+        self.driver.fft = p["fft"]
+        self.driver.trigger_duration = p["duration"]
+        self.driver.start_time = time.time()
+        self.driver.spec_time = time.time()
+        LOGGER.info(f"start_time: {self.driver.start_time}")
+        LOGGER.info(f"spec_time: {self.driver.spec_time}")
+        return {"error": ErrorCodes.none}
+
+    async def _poll(self) -> dict:
+        """Read one spectrum (ported ``continuous_read`` loop body).
+
+        Uses ``run_in_executor`` for the blocking ctypes read, same as the
+        legacy loop, since the DLL call releases the GIL and would otherwise
+        break the ordering of this coroutine relative to others.
+        """
+        driver = self.driver
+        if driver.spec is None:
+            return {"error": ErrorCodes.none, "status": HloStatus.finished, "data": {}}
+
+        if (driver.spec_time - driver.start_time) >= (
+            driver.trigger_duration + driver.start_margin
+        ):
+            LOGGER.info("polling loop duration complete, finishing")
+            return {"error": ErrorCodes.none, "status": HloStatus.finished, "data": {}}
+
+        loop = asyncio.get_event_loop()
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, driver.read_data),
+                timeout=driver.trigger_duration + driver.start_margin,
+            )
+        except asyncio.exceptions.TimeoutError:
+            driver.data = []
+
+        data = {}
+        if driver.data:
+            datadict = {"epoch_s": driver.spec_time}
+            datadict.update({f"ch_{i:04}": x for i, x in enumerate(driver.data)})
+            data = datadict
+            driver.data = []
+
+        driver.spec_time = time.time()
+        return {"error": ErrorCodes.none, "status": HloStatus.active, "data": data}
+
+    async def _post_exec(self) -> dict:
+        """Close the device channel and disable the trigger (ported ``IOloop`` tail)."""
+        self.driver.trigger_duration = 0
+        if self.driver.spec is not None:
+            self.driver.unset_external_trigger()
+            self.driver.spec.spCloseGivenChannel(self.driver.dev_num)
+        return {"error": ErrorCodes.none, "data": {}}
+
+    async def _manual_stop(self) -> dict:
+        """Disable the trigger on abort (estop/manual stop)."""
+        if self.driver.spec is not None:
+            self.driver.unset_external_trigger()
+        return {"error": ErrorCodes.none}
+
+
 async def sm303_dyn_endpoints(app: BaseAPI):
     """Register SM303 spectrometer endpoints.
 
-    Disables concurrent actions on this server and attaches private and
-    action endpoints for wavelength retrieval, single/averaged acquisition,
-    intensity calibration, and external trigger control.
+    Disables concurrent actions on this server, opens the vendor DLL
+    connection (``connect()``, moved out of ``__init__`` per the
+    HelaoDriver ABC's no-device-I/O-at-construction rule), constructs the
+    shared ``UnifiedSampleDataAPI`` instance used for sample validation, and
+    attaches private and action endpoints for wavelength retrieval,
+    single/averaged acquisition, intensity calibration, and external trigger
+    control.
 
     Args:
         app: The :class:`BaseAPI` instance being configured.
     """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
+
+    app.driver: SM303
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"SM303 connect() returned status={connect_resp.status}")
+
+    app.unified_db = UnifiedSampleDataAPI(app.base)
+    await app.unified_db.init_db()
 
     @app.post("/get_wl", tags=["private"])
     def get_wl():
@@ -250,9 +357,11 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     ):
         """Arm the spectrometer for externally triggered acquisitions.
 
-        The driver waits on the configured trigger edge and captures spectra
-        as triggers arrive; results are streamed through the driver's
-        internal active-action management.
+        Validates samples and configures the trigger/edge/integration-time
+        device state (K7b: moved here from the driver's former
+        ``acquire_spec_extrig``/``contain_action`` call), then starts
+        :class:`SM303Exec`, which waits on the configured trigger edge and
+        captures spectra as triggers arrive.
 
         Args:
             action: Action wrapper supplied by the orchestrator.
@@ -266,20 +375,88 @@ async def sm303_dyn_endpoints(app: BaseAPI):
                 stopped.
 
         Returns:
-            The active action dictionary returned by the driver.
+            The active action dictionary, or a finished-with-error action
+            dict if trigger configuration or sample validation failed
+            (matching the pre-migration behavior: neither case creates an
+            ``Active`` action).
         """
         A = app.base.setup_action()
         A.action_abbr = "OPT"
+        # K7 CRITICAL: read from action_params (subscript), never endpoint fn-args
+        p = A.action_params
+
         LOGGER.info("Setting up external trigger.")
-        active_dict = await app.driver.acquire_spec_extrig(A)
+        trigset = app.driver.set_trigger_mode(SpecTrigType.external)
+        edgeset = app.driver.set_extedge_mode(p["edge_mode"])
+        inttset = app.driver.set_integration_time(p["int_time"])
+        # TODO: can perform more checks like gamry technique wrapper...
+        if not (trigset and edgeset and inttset):
+            LOGGER.error(
+                f"Could not set trigger_mode ('SpecTrigType.external'), edge_mode "
+                f"({p['edge_mode']}), int_time ({p['int_time']}), or trigger_duration "
+                f"({p['duration']})."
+            )
+            A.error_code = ErrorCodes.critical_error
+            return A.as_dict()
+
+        A.error_code = ErrorCodes.none
+        # validate samples_in
+        samples_in = await app.unified_db.get_samples(A.samples_in)
+        if not samples_in and not app.driver.allow_no_sample:
+            LOGGER.error(
+                "Spec server got no valid sample, cannot start measurement!",
+            )
+            A.samples_in = []
+            A.error_code = ErrorCodes.no_sample
+            return A.as_dict()
+
+        spec_header = {"wl": app.driver.pxwl}
+        dflt_conn_key = app.base.dflt_file_conn_key()
+        active = await app.base.contain_action(
+            ActiveParams(
+                action=A,
+                file_conn_params_dict={
+                    dflt_conn_key: FileConnParams(
+                        file_conn_key=dflt_conn_key,
+                        sample_global_labels=[
+                            sample.get_global_label() for sample in samples_in
+                        ],
+                        file_type="spec_helao__file",
+                        hloheader=HloHeaderModel(optional=spec_header),
+                    )
+                },
+            )
+        )
+        for sample in samples_in:
+            sample.reset_sample_status(SampleStatus.preserved)
+            sample.inheritance = SampleInheritance.allow_both
+
+        active.action.samples_in = []
+        # now add updated samples to sample_in again
+        await active.append_sample(samples=samples_in, IO="in")
+
+        active.finish_hlo_header(
+            realtime=active.get_realtime_nowait(),
+            file_conn_keys=active.action.file_conn_keys,
+        )
+
         LOGGER.info("External trigger task initiated.")
-        return active_dict
+        executor = SM303Exec(active=active, oneoff=False, poll_rate=0.01)
+        return active.start_executor(executor)
 
     @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
     async def stop_extrig_after(
         delay: int = 0,
     ):
         """Schedule a delayed stop of any running external-trigger capture.
+
+        Waits ``delay`` seconds (mirroring the legacy driver-side
+        ``stop(delay)``), disables the trigger via
+        ``driver.stop_acquisition``, then signals any in-progress
+        ``acquire_spec_extrig`` executor to stop via the action-server
+        framework (the legacy ``IO_signalq``-driven stop is superseded by
+        ``Active.stop_action_task``, since ``SM303Exec`` -- not a
+        driver-owned ``IOloop`` -- now drives the collect loop).
 
         Args:
             action: Action wrapper supplied by the orchestrator.
@@ -290,7 +467,13 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             The finished action dictionary.
         """
         active = await app.base.setup_and_contain_action()
-        await app.driver.stop(delay=active.action.action_params["delay"])  # type: ignore
+        stop_resp = await app.driver.stop_acquisition(
+            delay=active.action.action_params["delay"]
+        )
+        for exec_id, exec_active in list(app.base.executors.items()):
+            if exec_id.split()[0] == "acquire_spec_extrig":
+                exec_active.stop_action_task()
+        await active.enqueue_data_dflt(datadict={"stop": stop_resp})
         finished_action = await active.finish()  # type: ignore
         return finished_action.as_dict()
 
