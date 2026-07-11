@@ -51,20 +51,47 @@ from ...drivers.motion.galil_motion_driver import (
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
+from helao.helpers.active_params import ActiveParams
+from helao.helpers.sample_api import UnifiedSampleDataAPI
+from helao.core.models.file import FileConnParams
 from helao.core.error import ErrorCodes
+
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 async def galil_dyn_endpoints(app: BaseAPI):
-    """Register Galil motion endpoints once the driver is enabled.
+    """Wire the driver's ``_base_hook``, open the Galil connection, construct
+    the shared sample-DB handle, and register motion endpoints once the
+    driver reports itself enabled.
 
-    Builds a per-axis enum from the configured ``axis_id`` mapping and
-    conditionally registers the motion and platemap routes when any axis is
-    present.
+    ``BaseAPI``'s own startup handler (``base_api.py``) only constructs the
+    driver with ``config=server_params``; it never assigns a live ``Base``
+    reference nor opens the gclib connection (K1/K2/K4/K8). Unlike
+    ``thorlabs_kinesis.py`` (whose sibling server registers all endpoints
+    unconditionally, gated only on static config), this server's endpoints
+    are gated on ``app.driver.galil_enabled`` -- a value only known *after*
+    ``connect()`` runs. So ``_base_hook`` assignment and ``connect()`` are
+    done here, at the top of this ``dyn_endpoints`` callback, mirroring
+    ``nidaqmx_server.py``'s ``nidaqmx_dyn_endpoints`` (the codebase's other
+    driver with a connection-gated dynamic endpoint set) rather than a
+    separate ``@app.on_event("startup")`` hook -- this callback is itself
+    invoked synchronously from ``Base.dyn_endpoints_init()``, which runs
+    inside the *same* startup event that constructs the driver, guaranteeing
+    ``connect()`` completes before the ``galil_enabled`` gate below is read.
 
     Args:
         app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
     """
     server_key = app.base.server.server_name
+
+    app.driver._base_hook = app.base
+    # K7/sm: the sample DB is server/app-level state (mirrors
+    # `nidaqmx_server.py`'s `app.unified_db`), never driver state.
+    app.unified_db = UnifiedSampleDataAPI(app.base)
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"Galil connect() returned status={connect_resp.status}")
 
     if app.driver.galil_enabled is True:
 
@@ -116,10 +143,39 @@ async def galil_dyn_endpoints(app: BaseAPI):
         ):
             """Start the interactive plate-alignment routine.
 
-            The driver returns once the alignment matrix has been computed.
+            K7b: containing the action (``contain_action``) is done here,
+            not by the driver -- ``Galil.run_aligner_precheck`` reports
+            whether a new run may start and, if not, the exact rejection
+            code (mirroring the pre-migration nested gate precisely). Only
+            when it reports success is the ``Active`` created and handed to
+            ``Galil.start_aligner_run``, which manages the accompanying
+            Bokeh aligner UI; the final transfer matrix is delivered when
+            the user submits the alignment.
             """
             A = app.base.setup_action()
-            active_dict = await app.driver.run_aligner(A)
+            ok, error_code = app.driver.run_aligner_precheck()
+            if ok:
+                active = await app.base.contain_action(
+                    ActiveParams(
+                        action=A,
+                        file_conn_params_dict={
+                            app.base.dflt_file_conn_key(): FileConnParams(
+                                # use dflt file conn key for first
+                                # init
+                                file_conn_key=app.base.dflt_file_conn_key(),
+                                sample_global_labels=[],
+                                file_type="aligner_helao__file",
+                                # hloheader = HloHeaderModel(
+                                #     optional = None
+                                # ),
+                            )
+                        },
+                    )
+                )
+                active_dict = await app.driver.start_aligner_run(active)
+            else:
+                A.error_code = error_code
+                active_dict = A.as_dict()
             return active_dict
 
         @app.post(f"/{server_key}/stop_aligner", tags=["action"])
@@ -238,14 +294,14 @@ async def galil_dyn_endpoints(app: BaseAPI):
             ):
                 """Move xy to the platemap position of ``sample_no`` on ``plate_id``.
 
-                Looks up the sample's plate XY via :meth:`solid_get_samples_xy`
+                Looks up the sample's plate XY via :meth:`Galil.solid_get_samples_xy`
                 then performs an absolute move in the platexy frame. Sets
                 ``error_code`` to ``not_available`` if the sample has no
                 platemap coordinates.
                 """
                 active = await app.base.setup_and_contain_action()
                 datadict0 = await app.driver.solid_get_samples_xy(
-                    **active.action.action_params
+                    app.unified_db, **active.action.action_params
                 )
                 platexy = datadict0.get("platexy", [[None, None]])[0]
                 if platexy[0] is None or platexy[1] is None:
@@ -373,7 +429,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             """Return the platemap rows for ``plate_id`` via the driver."""
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
-                **active.action.action_params
+                app.unified_db, **active.action.action_params
             )
             await active.enqueue_data_dflt(datadict=datadict)
             finished_action = await active.finish()
@@ -392,7 +448,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             """
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_samples_xy(
-                **active.action.action_params
+                app.unified_db, **active.action.action_params
             )
             platexy = datadict.get("platexy", [[None, None]])[0]
             if platexy[0] is None or platexy[1] is None:
@@ -433,7 +489,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             """
             active = await app.base.setup_and_contain_action()
             datadict = await app.driver.solid_get_platemap(
-                active.action.action_params["plate_id"]
+                app.unified_db, active.action.action_params["plate_id"]
             )
             pmdlist = datadict["platemap"][0]
             pmkeys = ["sample_no", "x", "y"]
@@ -481,9 +537,18 @@ async def galil_dyn_endpoints(app: BaseAPI):
         @app.post(f"/{server_key}/reset", tags=["action"])
         async def reset(
         ):
-            """Reset the Galil controller. Emergency use only."""
+            """Reset the Galil controller. Emergency use only.
+
+            Calls :meth:`Galil.reset_controller` -- the pre-migration
+            device-level ``RS`` command -- not the ``HelaoDriver`` ABC's
+            ``reset()`` lifecycle method (which force-closes and reopens the
+            whole connection); the two were given different names to
+            resolve the K1 naming collision introduced by the ABC.
+            """
             active = await app.base.setup_and_contain_action(action_abbr="reset")
-            await active.enqueue_data_dflt(datadict={"reset": await app.driver.reset()})
+            await active.enqueue_data_dflt(
+                datadict={"reset": await app.driver.reset_controller()}
+            )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -534,7 +599,8 @@ def makeApp(server_key) -> BaseAPI:
     """Build the Galil motion FastAPI app.
 
     Constructs a :class:`BaseAPI` backed by the :class:`Galil` motion driver
-    and defers endpoint registration to :func:`galil_dyn_endpoints`.
+    and defers endpoint registration (plus the driver's ``connect()`` call)
+    to :func:`galil_dyn_endpoints`.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
