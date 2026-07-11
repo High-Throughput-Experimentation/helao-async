@@ -17,7 +17,6 @@ import sys
 from copy import deepcopy
 from typing import List
 from uuid import UUID
-import json
 import re
 import traceback
 import inspect
@@ -55,6 +54,7 @@ from helao.core.servers.orch_global_params import (
 )
 from helao.core.servers.orch_persist import QueuePersister
 from helao.core.servers.orch_monitor import ServerMonitor
+from helao.core.servers.orch_status_sync import StatusIngester
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
 from helao.helpers.plate_api import HTEPlateAPI
@@ -208,6 +208,7 @@ class Orch(Base):
         """
         self.queue_persister = QueuePersister(self)
         self.server_monitor = ServerMonitor(self)
+        self.status_ingester = StatusIngester(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -346,83 +347,13 @@ class Orch(Base):
             ``{"success": True}`` once the action's executor id has been
             added or removed from ``self.nonblocking``.
         """
-        # print(actionmodel.clean_dict())
-
-        if (
-            self.active_experiment is not None
-            and self.active_experiment.experiment_uuid
-            == actionmodel.experiment_uuid
-        ):
-            matching_experiment = True
-        else:
-            matching_experiment = False
-        self.register_action_uuid(
-            actionmodel.action_uuid,
-            {
-                "action_name": actionmodel.action_name,
-                "action_params": actionmodel.action_params,
-                "action_status": actionmodel.action_status,
-                "action_server": actionmodel.action_server.server_name,
-                "action_timestamp": f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}",
-                "action_finished_timestamp": (
-                    f"{actionmodel.action_finished_timestamp: %m-%d %H:%M:%S}"
-                    if actionmodel.action_finished_timestamp is not None
-                    else None
-                ),
-                "experiment_name": (
-                    self.active_experiment.experiment_name
-                    if matching_experiment
-                    else None
-                ),
-                "experiment_uuid": actionmodel.experiment_uuid,
-                "sequence_name": (
-                    self.active_sequence.sequence_name
-                    if self.active_sequence is not None
-                    and matching_experiment
-                    else None
-                ),
-                "sequence_label": (
-                    self.active_sequence.sequence_label
-                    if self.active_sequence is not None
-                    and matching_experiment
-                    else None
-                ),
-                "sequence_uuid": (
-                    self.active_sequence.sequence_uuid
-                    if self.active_sequence is not None
-                    and matching_experiment
-                    else None
-                ),
-            },
+        return await self.status_ingester.update_nonblocking(
+            actionmodel, server_host, server_port
         )
-        server_key = actionmodel.action_server.server_name
-        server_exec_id = (server_key, actionmodel.exec_id, server_host, server_port)
-        if "active" in actionmodel.action_status:
-            self.nonblocking.append(server_exec_id)
-        else:
-            self.nonblocking.remove(server_exec_id)
-        # put an empty object in interrupt_q to trigger orch dispatch loop
-        await self.interrupt_q.put(self.globalstatusmodel)
-        return {"success": True}
 
     async def clear_nonblocking(self) -> list:
         """Send ``stop_executor`` to every tracked non-blocking action and return their responses."""
-        resp_tups = []
-        for server_key, exec_id, server_host, server_port in self.nonblocking:
-            LOGGER.info(
-                f"Sending stop_executor request to {server_key} on {server_host}:{server_port} for executor {exec_id}"
-            )
-            # print(server_key, exec_id, server_host, server_port)
-            response, error_code = await async_private_dispatcher(
-                server_key=server_key,
-                host=server_host,
-                port=server_port,
-                private_action="stop_executor",
-                params_dict={"executor_id": exec_id},
-                json_dict={},
-            )
-            resp_tups.append((response, error_code))
-        return resp_tups
+        return await self.status_ingester.clear_nonblocking()
 
     async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
@@ -440,130 +371,15 @@ class Orch(Base):
         Returns:
             ``True`` if the model was applied, ``False`` if ``actionservermodel`` was ``None``.
         """
-
-        # LOGGER.debug(
-        #     f"received status from server: {actionservermodel.action_server.server_name}"
-        # )
-
-        if actionservermodel is None:
-            return False
-
-        async with self.aiolock:
-            # update GlobalStatusModel with new ActionServerModel
-            # and sort the new status dict
-            if actionservermodel.last_action_uuid is not None:
-                # find last action uuid in action server model:
-                for (
-                    endpoint_name,
-                    endpoint_model,
-                ) in actionservermodel.endpoints.items():
-                    for status, act_dict in endpoint_model.nonactive_dict.items():
-                        for act_uuid, act_model in act_dict.items():
-                            if act_uuid == actionservermodel.last_action_uuid:
-                                if (
-                                    self.active_experiment is not None
-                                    and self.active_experiment.experiment_uuid
-                                    == act_model.experiment_uuid
-                                ):
-                                    matching_experiment = True
-                                else:
-                                    matching_experiment = False
-                                self.register_action_uuid(
-                                    act_uuid,
-                                    {
-                                        "action_name": act_model.action_name,
-                                        "action_params": act_model.action_params,
-                                        "action_status": act_model.action_status,
-                                        "action_server": act_model.action_server.server_name,
-                                        "action_timestamp": f"{act_model.action_timestamp: %m-%d %H:%M:%S}",
-                                        "action_finished_timestamp": (
-                                            f"{act_model.action_finished_timestamp: %m-%d %H:%M:%S}"
-                                            if act_model.action_finished_timestamp
-                                            is not None
-                                            else None
-                                        ),
-                                        "experiment_name": (
-                                            self.active_experiment.experiment_name
-                                            if matching_experiment
-                                            else None
-                                        ),
-                                        "experiment_uuid": act_model.experiment_uuid,
-                                        "sequence_name": (
-                                            self.active_sequence.sequence_name
-                                            if self.active_sequence is not None
-                                            and matching_experiment
-                                            else None
-                                        ),
-                                        "sequence_label": (
-                                            self.active_sequence.sequence_label
-                                            if self.active_sequence is not None
-                                            and matching_experiment
-                                            else None
-                                        ),
-                                        "sequence_uuid": (
-                                            self.active_sequence.sequence_uuid
-                                            if self.active_sequence is not None
-                                            and matching_experiment
-                                            else None
-                                        ),
-                                    },
-                                )
-                                break
-
-            recent_nonactive = self.globalstatusmodel.update_global_with_acts(
-                actionservermodel=actionservermodel
-            )
-            for act_uuid, act_status in recent_nonactive:
-                await self.put_lbuf({act_uuid: {"status": act_status}})
-
-            # check if one action is in estop in the error list:
-            estop_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
-                hlostatus=HloStatus.estopped,
-            )
-
-            error_uuids = self.globalstatusmodel.find_hlostatus_in_finished(
-                hlostatus=HloStatus.errored,
-            )
-
-            if estop_uuids and self.globalstatusmodel.loop_state == LoopStatus.started:
-                await self.estop_loop(reason=f"due to action uuid(s): {estop_uuids}")
-            elif (
-                error_uuids and self.globalstatusmodel.loop_state == LoopStatus.started
-            ):
-                self.globalstatusmodel.orch_state = OrchStatus.error
-            elif not self.globalstatusmodel.active_dict:
-                # no uuids in active action dict
-                self.globalstatusmodel.orch_state = OrchStatus.idle
-            else:
-                self.globalstatusmodel.orch_state = OrchStatus.busy
-                LOGGER.info(f"running_states: {self.globalstatusmodel.active_dict}")
-
-            # now push it to the interrupt_q
-            await self.interrupt_q.put(self.globalstatusmodel)
-            # await self.globstat_q.put(self.globalstatusmodel.as_json())
-
-            return True
+        return await self.status_ingester.update_status(actionservermodel)
 
     async def ws_globstat(self, websocket: WebSocket):
         """Stream global status updates over ``websocket`` until the client disconnects."""
-        LOGGER.info("got new global status subscriber")
-        await websocket.accept()
-        gs_sub = self.globstat_q.subscribe()
-        try:
-            async for globstat_msg in gs_sub:
-                await websocket.send_text(json.dumps(globstat_msg.as_dict()))
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.warning(
-                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
-            )
-            if gs_sub in self.globstat_q.subscribers:
-                self.globstat_q.remove(gs_sub)
+        return await self.status_ingester.ws_globstat(websocket)
 
     async def globstat_broadcast_task(self):
         """Drain ``globstat_q`` indefinitely so subscribers can read messages eagerly."""
-        async for _ in self.globstat_q.subscribe():
-            await asyncio.sleep(0.01)
+        return await self.status_ingester.globstat_broadcast_task()
 
     def unpack_sequence(self, sequence_name: str, sequence_params) -> List[Experiment]:
         """Invoke the named sequence factory and return the list of planned experiments.
