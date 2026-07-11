@@ -371,13 +371,91 @@ an artifact for rejected calls. Preserve B4 by checking `app.driver.is_busy()` /
 
 ### 3.2 Design 2 — full Executor state-machine decomposition
 
+> **REVISED 2026-07-11 — target architecture drops both hardware edges.** The PAL robot is
+> directly connected to the host running the PAL action server, so (1) command submission is
+> a **local subprocess only** (the SSH/paramiko path is deleted) and (2) trigger
+> start/continue/done transitions are read by **tailing the log file the external PAL
+> software writes** (the NI-DAQ TTL monitoring is deleted). Both changes *shrink* the device
+> I/O surface Design 2 always wanted and make it Linux-fakeable. Line refs in this
+> subsection were re-verified 2026-07-11 on the current tip (post recipe step 3, so some
+> differ from the §1 baseline refs).
+
 **Essence:** delete `_PAL_IOloop` entirely; one `PALMethodExec(Executor, oneoff=False,
 concurrent=False)` per action reconstructs the job semantics in the framework; the driver
-shrinks to a stateless device API (`HelaoDriver` over SSH/subprocess + trigger reads).
+shrinks to a stateless device API: **local-subprocess job submission + a log-tail trigger
+reader** — no SSH, no NI-DAQ.
 
-**State-machine mapping** (each `_poll` iteration advances at most one transition;
-`_poll` must never block longer than `poll_rate` — the legacy `await`-driven flow becomes
-explicit states so `stop_action_task`/estop can interrupt between any two):
+#### 3.2.1 Revised driver device API (the entire surface)
+
+| Device call | Behavior |
+|---|---|
+| `submit_joblist(palcam) -> DriverResponse` | `kill_PAL()` first (B7), write the aux-log header locally, then the **existing localhost path only**: `subprocess.Popen(f"PAL {joblist} /start /quit", shell=True)` (`:2028-2033`) with `palcam.joblist_time` stamped at submit. The SSH/paramiko branch (`:2038-2129`: RSAKey/SSHClient, cygwin mkdir/touch/echo, `tmux new-window PAL ...`) is **deleted**, and with it the `import paramiko` (`:23`). |
+| `kill_PAL() -> DriverResponse` | local only (`kill_PAL_local`, `:3209`); `kill_PAL_cygwin` (`:3166`, SSH `taskkill`) deleted with the SSH path. |
+| `arm_triggers() -> DriverResponse` | open/reset the **log-tail trigger reader** (§3.2.2) at a tracked offset: record the log file's current EOF byte offset, clear the partial-line buffer and pending-event queue, start the reader poll task. |
+| `read_trigger_events() -> list[TriggerEvent]` | drain the `(kind, timestamp)` events parsed since the last call, in file order (`kind ∈ {start, continue, done}`); consumed by the Exec's `WAIT_*` states. Timestamps are **parsed from the log lines** (§3.2.2 item 4) — the CellIV injected-callables trick (`get_realtime_nowait` handed into the poller) is no longer needed for triggers. |
+| `disarm_triggers() -> DriverResponse` | stop the reader poll task; no handle is held between polls, so nothing to close but the task. |
+| `connect/get_status/stop/reset/disconnect` | ABC lifecycle; `connect` validates that the PAL executable is invocable and the configured log path exists — **no SSH probe, no NI-DAQ task**. |
+
+Config consequences: `host`/`user`/`key` (`:294-296`) become **vestigial** — the Design-2
+driver ignores them (optionally logging a one-time deprecation warning), so no config edits
+are required for cutover. `dev_trigger == "NImax"` + the `trigger.start/continue/done` port
+block (`:303-317`), the three `IO_trigger_*q` queues (`:377-379`), `_clear_trigger_qs`
+(`:527`) and `_poll_trigger_task` (`:539-605`, the `nidaqmx` read task) are all replaced by
+the log-tail reader; the `nidaqmx` import goes with them. One new config key names the PAL
+log file path (exact path + line format → OQ-P8).
+
+#### 3.2.2 Log-tail trigger reader contract (load-bearing — implement exactly)
+
+The external PAL software appends trigger/progress lines to its log file while a job runs.
+The reader converts that file into the same ordered start/continue/done event stream the
+NI-DAQ edges used to provide. Rules:
+
+1. **Non-locking read — MUST NOT lock out the writer.** Open the file **read-only, binary**,
+   and never hold a handle across polls: each poll is open → seek → read → close. Never open
+   with `"a"`/`"r+"`/write modes; never take advisory or mandatory locks
+   (`msvcrt.locking`/`fcntl.flock`). On Windows this is safe because CPython's `open()`
+   maps to `CreateFile` with `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE` — a
+   read-only open does not deny the PAL software's writer handle. Conversely, if the PAL
+   software opened the log with a deny-read share mode, our open raises `PermissionError`:
+   treat that as **transient** (skip this poll, retry next), never as a job error, and never
+   "work around" it by copying/renaming the file.
+2. **Offset-tracked tailing.** Keep `_log_offset` = bytes consumed so far. Each poll:
+   `stat()` the file; if `size > _log_offset`, open, `seek(_log_offset)`, read to EOF,
+   close, and advance `_log_offset` by the bytes actually read. Consumed lines are never
+   reprocessed; bytes appended between polls are picked up next poll — nothing is missed
+   because the offset only ever advances over bytes that were read.
+3. **Partial-line safety.** The writer appends concurrently, so a read may end **mid-line
+   with no trailing newline**. Split each chunk on newlines and parse **only
+   newline-terminated lines**; keep the trailing unterminated fragment in `_partial_buf` and
+   prepend it to the next poll's bytes, so a line split across two polls is parsed **exactly
+   once**, when its newline arrives. A partial line must never produce a trigger event.
+4. **Idempotent + monotonic event mapping.** Each complete line is matched against three
+   marker recognizers — start / continue / done (the exact marker tokens and line format
+   depend on the PAL software's log configuration → OQ-P8). A matched line yields exactly
+   one `TriggerEvent(kind, timestamp)`, where the **timestamp is parsed from the log line
+   itself** (clock source/timezone mapping to the action clock → OQ-P9), appended to the
+   pending-event queue in file order. Because the offset only moves forward and each
+   complete line is parsed once, re-polling can never duplicate an event. The Exec's
+   `WAIT_START → WAIT_CONTINUE → WAIT_DONE` sequence consumes events monotonically; an
+   out-of-order marker (e.g. `done` while waiting on `start`) is a **fail-loud job error**
+   (B6 funnel), never a silent skip.
+5. **Rotation/truncation robustness.** If `stat()` reports `size < _log_offset` (truncated)
+   or the file identity changed (rotation — creation time / volume+file index where
+   available), log a warning, reset `_log_offset = 0`, clear `_partial_buf`, and rescan from
+   the top of the new file. `arm_triggers()` always (re)starts at current EOF, so stale
+   pre-job lines are never parsed (the PAL software's actual rotation policy → OQ-P10). A
+   missing file is transient at poll time (retry) but a hard failure at `connect()`
+   validation.
+6. **Cadence and B5.** Reader poll interval ~0.1-0.25 s (vs. the NI-DAQ task's 10 ms edge
+   loop, `:601`). Detection latency no longer skews B5: the recorded trigger timestamp is
+   the writer's own log timestamp, not the detection time — a late poll delays the state
+   *transition*, not the recorded *time*.
+
+#### 3.2.3 State-machine mapping
+
+(each `_poll` iteration advances at most one transition; `_poll` must never block longer
+than `poll_rate` — the legacy `await`-driven flow becomes explicit states so
+`stop_action_task`/estop can interrupt between any two):
 
 | Legacy code | Exec home / state |
 |---|---|
@@ -386,31 +464,47 @@ explicit states so `stop_action_task`/estop can interrupt between any two):
 | `meas_start_helper` (`:2341-2357`) | `_pre_exec`: `finish_hlo_header` + samples_in refresh |
 | totalruns × spacing scheduler (`:2237-2307`) | states `SPACING_WAIT(run)` — deadline arithmetic kept, `asyncio.sleep` replaced by deadline checks per `_poll` |
 | `_sendcommand_prechecks` (`:1684`) | `_pre_exec` (per run: state `PRECHECK(run)` since positions are re-resolved per deepcopied run_palcam) |
-| `_sendcommand_submitjoblist_helper` (`:1850`) | state `SUBMIT(run)` — driver method `submit_joblist(palcam) -> DriverResponse` (kill_PAL + Popen/SSH); trigger poller becomes a driver-owned task started/stopped by `arm_triggers()/disarm_triggers()` (CellIV `arm_*` shape, callables injected for timestamps) |
-| `_sendcommand_triggerwait` (`:1782`) | states `WAIT_START/WAIT_CONTINUE/WAIT_DONE(run,i,rep)` with per-state timeout accounting (`self.timeout`) |
-| split rule (`:529-530`) | state transition `(i>0, new palaction)` → `await self.active.split()` in the Exec |
-| pipeline steps 1-9 (`:575-767`) | state `SAMPLE_PIPELINE(run,i,rep)` — moved verbatim into an Exec method (shim + `self.active` both available) |
-| 20 s drain + pid wait (`:771-780`, `:2362-2365`) | state `DRAIN` → `_post_exec` |
-| `meas_end_helper` error stamp + finish (`:2395-2400`) | framework `action_loop_task` (finish) + `_post_exec` (error propagation) |
-| busy semantics (`:2198`) | `concurrent=False` queues on `local_action_task_queue` (`base.py:1266-1267`) — **behavior change**: legacy *rejects* with `in_progress`, framework *queues*; must add an explicit endpoint busy-rejection to preserve B4 (→ OQ-P1) |
-| `stop`/`estop`/`shutdown` (`:3071-3109`) | `_manual_stop` + ABC `stop()/disconnect()`; estop fully framework-owned |
+| `_sendcommand_submitjoblist_helper` (`:1989`) | state `SUBMIT(run)` — driver `submit_joblist(palcam) -> DriverResponse` (**local** `kill_PAL` + **local** `Popen` only; SSH branch deleted, §3.2.1); `arm_triggers()` opens the log-tail reader at the current EOF offset before submit, `disarm_triggers()` closes it in `DRAIN`/`_post_exec` |
+| `_sendcommand_triggerwait` (`:1921`) | states `WAIT_START/WAIT_CONTINUE/WAIT_DONE(run,i,rep)` — each `_poll` drains `read_trigger_events()` and advances on the expected marker; per-state timeout accounting (`self.timeout`) and the `start/continue/done_timeout` error codes preserved |
+| split rule (`:529-530` baseline) | state transition `(i>0, new palaction)` → `await self.active.split()` in the Exec |
+| pipeline steps 1-9 (`:575-767` baseline) | state `SAMPLE_PIPELINE(run,i,rep)` — moved verbatim into an Exec method (shim + `self.active` both available) |
+| 20 s drain + pid wait (`:771-780`, `:2362-2365` baseline) | state `DRAIN` → `_post_exec` |
+| `meas_end_helper` error stamp + finish (`:2395-2400` baseline) | framework `action_loop_task` (finish) + `_post_exec` (error propagation) |
+| busy semantics (`:2198` baseline) | `concurrent=False` queues on `local_action_task_queue` (`base.py:1266-1267`) — **behavior change**: legacy *rejects* with `in_progress`, framework *queues*; must add an explicit endpoint busy-rejection to preserve B4 (→ OQ-P1) |
+| `stop`/`estop`/`shutdown` (`:3071-3109` baseline) | `_manual_stop` + ABC `stop()/disconnect()`; estop fully framework-owned |
 
-**Tradeoffs / risk / size:**
+**Tradeoffs / risk / size (revised):**
 
 - ✅ The clean CARDS end state: driver = device I/O only (`submit_joblist`, `kill_PAL`,
-  trigger arm/read, ssh probe); full Separation + Resilience; job logic testable per state.
+  log-tail reader arm/read/disarm — §3.2.1 is the *whole* surface); full Separation +
+  Resilience; job logic testable per state.
 - ✅ Estop/stop become uniformly framework-mediated (no bespoke queue signaling).
-- ❌ The 9-step pipeline and the scheduler are **rewritten across an async boundary**: every
-  state cut is an opportunity to reorder an `await` against the shim or lose a uuid
-  re-stamp — exactly the class of error that corrupts the physical sample ledger and that
-  only a live station would catch. The call-trace golden master (§5) mitigates but cannot
-  cover trigger-timing interleavings (`_poll` cadence vs. NI-DAQ edge queues).
-- ❌ `_poll`-based trigger waits add up to `poll_rate` latency per transition (3 triggers ×
-  microcams × repeats × runs) and change `IO_signalq` drain timing — B5 timestamps come from
-  the trigger queues (unchanged) but stop-responsiveness timing differs.
-- ❌ Rewrite size: ~1,200-1,500 lines restructured (loop + main + init + all method plumbing),
-  plus a new driver API surface. Review burden ≈ a full W-wave on its own.
-- **Risk: HIGH without hardware in the loop; MEDIUM with a station-resident test budget.**
+- ✅ **NEW — hardware-decoupled device edges.** Both edges are now fake-able on Linux: a
+  temp-file log fixture (a test "writer" appending marker lines, including deliberate
+  mid-line flushes) plus a stub local subprocess stand in for the entire device surface.
+  The trigger-timing interleavings this section previously wrote off as "only a live
+  station would catch" are now coverable: the log-fixture harness can script
+  start/continue/done arrival orders, timeouts, partial-line splits, and concurrent-write
+  races **deterministically**, and the §4 golden master extends over them. This also
+  strengthens the eventual case for executing Design 2 (post-Design-1): the
+  hardware-verification asymmetry that §3.3 weighed against it now applies only to the
+  pipeline rewrite, not the device edges.
+- ✅ Two dependency classes leave the driver: `paramiko` and `nidaqmx` imports deleted.
+- ❌ The 9-step pipeline and the scheduler are still **rewritten across an async boundary**:
+  every state cut is an opportunity to reorder an `await` against the shim or lose a uuid
+  re-stamp — the sample-ledger-corruption class remains the dominant risk. The call-trace
+  golden master (§4/§5) is the mitigation, and it now also covers trigger interleavings
+  (above), narrowing the "only a station would catch it" residue to the real PAL binary,
+  the real log format (OQ-P8), and real archive state.
+- ❌ `_poll`-based trigger waits add up to `poll_rate` + reader-poll latency per transition
+  (3 triggers × microcams × repeats × runs) and stop-responsiveness timing differs from the
+  legacy `await`-driven drain — but B5 *timestamps* are log-parsed and therefore unaffected
+  by detection latency (§3.2.2 item 6).
+- ❌ Rewrite size: ~1,200-1,500 lines restructured (loop + main + init + all method
+  plumbing) plus the new driver API surface — partially offset by ~250 lines of SSH/NI-DAQ
+  code deleted outright. Review burden ≈ a full W-wave on its own.
+- **Risk: MEDIUM without hardware in the loop (was HIGH — the SSH/NI-DAQ edges were the
+  untestable part); LOW-MEDIUM with a station-resident test budget.**
 
 ### 3.3 RECOMMENDATION — Design 1, with Design 2 as a post-migration follow-up
 
@@ -455,6 +549,18 @@ trigger timestamps, and identical sample-DB state, the migrated code produces:
   action's `error_code` (B6), and busy/estop/no-host rejections return the same codes with
   no artifact (B4).
 
+**B5 under the revised Design 2 — timestamp source change (added 2026-07-11).** The
+S-contract above is otherwise unchanged, but the *source* of the B5 trigger timestamps
+changes when Design 2 executes: `PalAction.start_time/continue_time/done_time`
+(`pal_driver.py:156-158`) are **parsed from the PAL log entries** (§3.2.2 item 4) instead of
+`active.get_realtime_nowait()` captured at NI-DAQ edge detection (`_poll_trigger_task`).
+`joblist_time` is unchanged (`get_realtime_nowait()` at submit). These times still land in
+the HLO row (`epoch_start/continue/done`) and in `sample_creation_timecode = continue_time`,
+so **log-parsed timestamps must be captured deterministically for the golden master**: the
+harness's log fixture scripts exact timestamp strings and the trace asserts the parsed
+values verbatim (S2/S4 embed them). The log-clock ↔ action-clock mapping (OQ-P9) must be
+settled before the Design-2 cutover.
+
 **Verification without hardware — call-trace golden master.** Extend the proven harness
 pattern of `helao/deploy/hte/tests/test_pal_ioloop_c1_guard.py` (constructs `PAL` via
 `__new__`, fakes `Active`, stubs the shim, drives the **real** loop):
@@ -462,8 +568,11 @@ pattern of `helao/deploy/hte/tests/test_pal_ioloop_c1_guard.py` (constructs `PAL
 1. **Recorder fixtures:** a `RecordingActive` (logs every `split/enqueue_data/append_sample/
    write_file_nowait/finish_hlo_header/finish` call + a live fake `action` whose uuid rotates
    on split, mirroring `base.py:1970`) and a `RecordingShim` (scripted canned samples;
-   logs S1). Stub `_sendcommand_submitjoblist_helper` (no SSH/Popen; still calls the
+   logs S1). Stub `_sendcommand_submitjoblist_helper` (no subprocess; still calls the
    recorder for `joblist_time`) and `_sendcommand_triggerwait` (inject fixed timestamps).
+   *(For the revised Design 2: replace the triggerwait stub with a real temp-file log
+   fixture driven through the §3.2.2 reader — scripted marker lines with fixed timestamp
+   strings, including mid-line-flush and split-across-polls cases.)*
 2. **Scenario matrix** (drives every load-bearing branch): (a) single microcam, 1 run;
    (b) 3 microcams incl. an `archive` dest (next-empty-vial path) → 2 splits; (c) microcam
    with `repeat=2` (B2 quirk); (d) `totalruns=3` with linear + geometric spacing (spacing
@@ -478,7 +587,7 @@ pattern of `helao/deploy/hte/tests/test_pal_ioloop_c1_guard.py` (constructs `PAL
    (OpenAPI param-shape diff — endpoints keep their fn-args), the C1 guard test unmodified.
 
 **This does not replace the station smoke test (§6.2) — it proves ordering/bookkeeping, not
-the PAL binary, SSH, NI-DAQ edges, or real archive state.**
+the PAL binary, the station's real log format/clock (OQ-P8/P9), or real archive state.**
 
 ---
 
@@ -537,24 +646,44 @@ the PAL binary, SSH, NI-DAQ edges, or real archive state.**
 
 ### 6.2 Station smoke-test checklist (live PAL, deferred to first hardware session)
 
-- [ ] `connect()` → SSH reachability + `get_status` idle; `disconnect()` clean.
+*(Revised 2026-07-11 for the local-command + log-file trigger architecture, §3.2. The PAL
+robot is directly connected to the action-server host: there is no SSH host to reach and no
+NI-DAQ trigger wiring to observe. On the Design-1 code those legacy paths are simply
+unexercised/vestigial at a locally connected station.)*
+
+- [ ] `connect()` → PAL executable invocable + configured log path exists + `get_status`
+      idle; `disconnect()` clean. (No SSH probe — dropped with the SSH path.)
+- [ ] Local command execution: the driver's `PAL <job> /start /quit` `Popen` actually starts
+      a run on the directly connected robot (process launches, robot moves, exit observed by
+      the pid wait).
 - [ ] `PAL_deepclean` (no sample mutations) end-to-end — action finishes, HLO + act.yml in
       RUNS tree, syncer accepts.
 - [ ] `PAL_archive` single run — vial assigned matches archive state; sample volumes/
       lineage in SAMPLE server DB diffed against a pre-migration reference run.
 - [ ] Multi-microcam method (`PAL_ANEC_aliquot`) — split chain: N actions, parent/child
-      uuids, one HLO row each; GC injector triggers observed (B5 timestamps sane).
+      uuids, one HLO row each; start/continue/done markers **parsed from the live PAL log**
+      for every palaction (B5 timestamps sane vs. wall clock and monotonically ordered).
+- [ ] Log-parse under concurrent write: poll the reader while the PAL software is actively
+      writing — no missed or duplicated events; provoke a mid-line read (tight poll
+      interval) and confirm the split line is parsed exactly once when its newline lands
+      (§3.2.2 items 2-4).
+- [ ] Reader does not lock the writer: PAL software keeps writing without sharing-violation
+      errors for the full run; confirm the reader holds no handle between polls
+      (§3.2.2 item 1).
 - [ ] `totalruns > 1` with linear spacing — inter-run timing within tolerance.
 - [ ] `/stop` mid-job between palactions — loop drains, action finishes with clean status.
 - [ ] `/estop` mid-trigger-wait — executor stopped via framework, PAL binary killed,
       action estopped, **no fabricated artifacts**, server recovers after estop clear.
 - [ ] Busy rejection: second method call during a job → `in_progress`, no artifact (B4).
-- [ ] `kill_PAL` endpoint on both localhost and SSH paths.
+- [ ] `kill_PAL` endpoint kills a locally started PAL process (local path only).
 - [ ] Hot-reload/shutdown while idle: safe-state ordering (no write-after-close).
 
 ---
 
 ## 7. Open questions (append to `.omc/plans/open-questions.md`)
+
+*(2026-07-11 Design-2 revision: OQ-P1–OQ-P6 are unchanged and **still applicable** — OQ-P1
+in particular still gates Design 2's busy semantics; OQ-P7 is revised; OQ-P8–OQ-P10 added.)*
 
 - **OQ-P1 (busy semantics):** preserve legacy *reject-with-`in_progress`* (recommended —
   experiments are authored around it) or adopt framework queueing via `concurrent=False`?
@@ -580,7 +709,26 @@ the PAL binary, SSH, NI-DAQ edges, or real archive state.**
   samples while the HLO keeps every row. Preserve as-is for the migration (recommended —
   byte-for-byte rule); file separately whether repeats *should* split like `i > 0`
   microcams do.
-- **OQ-P7 (trigger poller home, Design 2 only):** if/when Design 2 executes, do NI-DAQ
-  trigger edges stay a per-job driver task (`arm_triggers()` CellIV-style) or become a
-  `DriverPoller`? Edges are job-scoped and consumed as queues, not live values — the poller
-  is likely the wrong home; decide with station timing data.
+- **OQ-P7 (trigger reader home, Design 2 only — REVISED 2026-07-11):** originally "NI-DAQ
+  edges: per-job task or `DriverPoller`?". The NI-DAQ framing is obsolete — the trigger
+  source is now the log-tail reader (§3.2.2). The residual question: is the reader a
+  per-job task opened/closed by `arm_triggers()/disarm_triggers()` (recommended — trigger
+  events are job-scoped and consumed as a queue, not live values, and the per-job EOF reset
+  in §3.2.2 item 5 wants job-scoped lifetime) or a process-lifetime `DriverPoller`? Decide
+  with station timing data; the recommendation stands unless the log turns out to carry
+  useful idle-state lines.
+- **OQ-P8 (PAL log path + line format, Design 2 only — NEW):** the exact log file path
+  written by the external PAL software, and the line format / marker tokens that denote the
+  start/continue/done transitions, depend on the PAL software's logging configuration and
+  must be confirmed against it (and captured as fixture lines for the §4 harness) before
+  the §3.2.2 recognizers can be written. Not reproducible in this doc (station config).
+- **OQ-P9 (log clock source, Design 2 only — NEW):** which clock stamps the log lines
+  (PAL host wall clock? robot firmware?), its timezone/DST behavior and resolution, and how
+  it maps onto the action clock (`get_realtime_nowait()`'s NTP-synced epoch) — B5
+  timestamps move from the action clock to this clock (§4), so any skew/format decision
+  must be explicit before cutover.
+- **OQ-P10 (log rotation/truncation policy, Design 2 only — NEW):** does the PAL software
+  rotate, truncate, or recreate its log (per job? per day? size-based?)? §3.2.2 item 5
+  defines the reader's defensive behavior either way, but the actual policy determines
+  whether rotation can occur *mid-job* (which would need station verification of the
+  reset-and-rescan path).
