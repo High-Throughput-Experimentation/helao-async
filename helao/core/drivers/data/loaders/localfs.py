@@ -20,6 +20,7 @@ from helao.helpers.yml_tools import yml_load
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_bytes
 from helao.core.drivers.data.loaders.model_base import HelaoDataModelMixin
+from helao.core.models.run_dir import RunDir
 
 
 def parse_seq_path(ymlp, target) -> tuple:
@@ -194,7 +195,12 @@ class LocalLoader:
         self._yml_paths = {}
         self.target = os.path.abspath(os.path.normpath(data_path.strip('"').strip("'")))
         target_state = self.target.split("RUNS_")[-1].split(os.sep)[0]
-        states = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG")
+        states = (
+            RunDir.ACTIVE.value,
+            RunDir.FINISHED.value,
+            RunDir.SYNCED.value,
+            RunDir.DIAG.value,
+        )
         state_dir = f"RUNS_{target_state}"
         if self.target.endswith(".zip"):
             process_dir = self.target.replace(state_dir, "PROCESSES").replace(

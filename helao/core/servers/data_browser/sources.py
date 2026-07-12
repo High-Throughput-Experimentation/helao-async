@@ -11,6 +11,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from helao.core.models.run_dir import RunDir
 from helao.core.servers.data_browser.readers import make_zip_locator
 
 INDEX_COLUMNS = [
@@ -194,7 +195,7 @@ def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
     Returns (locator, available).
     """
     root = Path(root)
-    exp_path = root / "RUNS_FINISHED" / date_str / seq_dirname / exp_dirname
+    exp_path = root / RunDir.FINISHED.value / date_str / seq_dirname / exp_dirname
     if exp_path.is_dir():
         # direct action-dir children first (the normal layout)
         for act_dir in sorted(p for p in exp_path.iterdir() if p.is_dir()):
@@ -205,7 +206,7 @@ def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
         for cand in exp_path.rglob("*"):
             if cand.is_file() and cand.name == file_name:
                 return str(cand), True
-    zip_path = root / "RUNS_SYNCED" / date_str / f"{seq_dirname}.zip"
+    zip_path = root / RunDir.SYNCED.value / date_str / f"{seq_dirname}.zip"
     if zip_path.is_file():
         try:
             with zipfile.ZipFile(zip_path) as zf:
@@ -299,18 +300,18 @@ class DerivedSourceIndex(SourceIndex):
         return rows
 
 
-SOURCES = ["RUNS_FINISHED", "RUNS_DIAG", "RUNS_SYNCED", "PROCESSES", "ANALYSES"]
-GROUPS = {"RUNS": ["RUNS_FINISHED", "RUNS_DIAG", "RUNS_SYNCED"],
+SOURCES = [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value, "PROCESSES", "ANALYSES"]
+GROUPS = {"RUNS": [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value],
           "DERIVED": ["PROCESSES", "ANALYSES"]}
 
 
 def build_source_index(root, source):
     """Return the SourceIndex for a source name."""
-    if source == "RUNS_FINISHED":
+    if source == RunDir.FINISHED:
         return RunsSourceIndex(root, "FINISHED")
-    if source == "RUNS_DIAG":
+    if source == RunDir.DIAG:
         return RunsSourceIndex(root, "DIAG")
-    if source == "RUNS_SYNCED":
+    if source == RunDir.SYNCED:
         return RunsSourceIndex(root, "SYNCED")
     if source in ("PROCESSES", "ANALYSES"):
         return DerivedSourceIndex(root, source)

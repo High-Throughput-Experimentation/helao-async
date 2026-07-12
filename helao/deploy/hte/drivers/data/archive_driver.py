@@ -1028,7 +1028,7 @@ class Archive:
     ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Append ``newstatus`` to each sample's existing status list."""
         for sample in samples:
-            sample.status.append(newstatus)
+            sample.append_sample_status(newstatus)
         return samples
 
     async def custom_unloadall(
@@ -1179,7 +1179,7 @@ class Archive:
                             custom=custom, load_sample_in=new_samples[0]
                         )
                         if tmp_loaded:
-                            tmp_sample.status.append(SampleStatus.created)
+                            tmp_sample.append_sample_status(SampleStatus.created)
                     else:
                         LOGGER.error(
                             "could not convert reference to real sample during custom_unload"
@@ -1286,7 +1286,7 @@ class Archive:
             customs_dict = self.positions.customs_dict[custom].as_dict()
 
         self.write_config()  # save current state of table
-        sample.status = [SampleStatus.loaded]
+        sample.reset_sample_status(SampleStatus.loaded)
         return loaded, sample, customs_dict
 
     async def _unload_unpack_samples_helper(
@@ -1309,7 +1309,7 @@ class Archive:
         for sample in samples:
             if sample.sample_type == SampleType.assembly:
                 sample.inheritance = SampleInheritance.allow_both
-                sample.status = [SampleStatus.destroyed]
+                sample.reset_sample_status(SampleStatus.destroyed)
                 ret_samples_in.append(sample)
                 for part in sample.parts:
                     if part.sample_type == SampleType.assembly:
@@ -1327,16 +1327,16 @@ class Archive:
                         #     ret_samples_out.append(sample)
                         for sample in tmp_samples_out:
                             sample.inheritance = SampleInheritance.allow_both
-                            sample.status = [SampleStatus.recovered]
+                            sample.reset_sample_status(SampleStatus.recovered)
                             ret_samples_out.append(sample)
 
                     else:
                         part.inheritance = SampleInheritance.allow_both
-                        part.status = [SampleStatus.recovered]
+                        part.reset_sample_status(SampleStatus.recovered)
                         ret_samples_out.append(part)
             else:
                 sample.inheritance = SampleInheritance.allow_both
-                sample.status = [SampleStatus.preserved]
+                sample.reset_sample_status(SampleStatus.preserved)
                 ret_samples_in.append(sample)
 
         return ret_samples_in, ret_samples_out
@@ -1550,7 +1550,7 @@ class Archive:
             return ErrorCodes.not_available, [], []
 
         samples_in[0].inheritance = SampleInheritance.give_only
-        samples_in[0].status = [SampleStatus.preserved]
+        samples_in[0].reset_sample_status(SampleStatus.preserved)
         # save a deepcopy of initial state as we will return only initial
         # samples_in and final samples_out
         samples_in_initial.append(deepcopy(samples_in[0]))
@@ -1653,9 +1653,9 @@ class Archive:
 
             # set sample status
             custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.status = [SampleStatus.merged]
+            custom_sample.reset_sample_status(SampleStatus.merged)
             samples_out[0].inheritance = SampleInheritance.allow_both
-            samples_out[0].status.append(SampleStatus.merged)
+            samples_out[0].append_sample_status(SampleStatus.merged)
 
             # add the custom sample to the samples_in
             samples_in.append(custom_sample)
@@ -1741,7 +1741,7 @@ class Archive:
                     combine_liquids=combine_liquids,
                 )
                 if combine_liquids:  # there's only 1 liquid in new ref
-                    new_liquid_mixture[0].status.append(SampleStatus.merged)
+                    new_liquid_mixture[0].append_sample_status(SampleStatus.merged)
                     # calculate volumes, dilutions
                     new_liquid_mixture[0].sample_position = custom
                     new_liquid_mixture[0].volume_ml = loaded_liquid[0].volume_ml
@@ -1759,7 +1759,7 @@ class Archive:
                     new_assembly_parts.append(liquid_samples_out[0])
                     # set inheritance and status for sample transfered out of source_liquid_in
                     samples_out[0].inheritance = SampleInheritance.allow_both
-                    samples_out[0].status.append(SampleStatus.merged)
+                    samples_out[0].append_sample_status(SampleStatus.merged)
                     LOGGER.info("liquid recovered")
                 else:
                     # add them separately
@@ -1780,7 +1780,7 @@ class Archive:
                 LOGGER.info("gas recovered")
 
             # old assembly, mark as incorporated
-            custom_sample.status = [SampleStatus.recovered]
+            custom_sample.reset_sample_status(SampleStatus.recovered)
             LOGGER.info("old assembly status set to recovered")
 
             # add the old assembly to the samples_in which already contains source_liquid_in
@@ -1834,8 +1834,8 @@ class Archive:
 
             # set sample status
             custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.status = [SampleStatus.incorporated]
-            samples_out[0].status.append(SampleStatus.incorporated)
+            custom_sample.reset_sample_status(SampleStatus.incorporated)
+            samples_out[0].append_sample_status(SampleStatus.incorporated)
 
             # add the custom sample to the samples_in
             samples_in.append(custom_sample)
@@ -1941,7 +1941,7 @@ class Archive:
             return ErrorCodes.not_available, [], []
 
         samples_in[0].inheritance = SampleInheritance.give_only
-        samples_in[0].status = [SampleStatus.preserved]
+        samples_in[0].reset_sample_status(SampleStatus.preserved)
         # save a deepcopy of initial state as we will return only initial
         # samples_in and final samples_out
         samples_in_initial.append(deepcopy(samples_in[0]))
@@ -2042,9 +2042,9 @@ class Archive:
 
             # set sample status
             custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.status = [SampleStatus.merged]
+            custom_sample.reset_sample_status(SampleStatus.merged)
             samples_out[0].inheritance = SampleInheritance.allow_both
-            samples_out[0].status.append(SampleStatus.merged)
+            samples_out[0].append_sample_status(SampleStatus.merged)
 
             # add the custom sample to the samples_in
             samples_in.append(custom_sample)
@@ -2128,7 +2128,7 @@ class Archive:
                     combine_gases=combine_gases,
                 )
                 if combine_gases:  # there's only 1 gas in new ref
-                    new_gas_mixture[0].status.append(SampleStatus.merged)
+                    new_gas_mixture[0].append_sample_status(SampleStatus.merged)
                     # calculate volumes, dilutions
                     new_gas_mixture[0].sample_position = custom
                     new_gas_mixture[0].volume_ml = loaded_gas[0].volume_ml
@@ -2144,7 +2144,7 @@ class Archive:
                     new_assembly_parts.append(gas_samples_out[0])
                     # set inheritance and status for sample transfered out of source_gas_in
                     samples_out[0].inheritance = SampleInheritance.allow_both
-                    samples_out[0].status.append(SampleStatus.merged)
+                    samples_out[0].append_sample_status(SampleStatus.merged)
                     LOGGER.info("gas recovered")
                 else:
                     # add them separately
@@ -2165,7 +2165,7 @@ class Archive:
                 LOGGER.info("liquid recovered")
 
             # old assembly, mark as incorporated
-            custom_sample.status = [SampleStatus.recovered]
+            custom_sample.reset_sample_status(SampleStatus.recovered)
             LOGGER.info("old assembly status set to recovered")
 
             # add the old assembly to the samples_in which already contains source_gas_in
@@ -2217,8 +2217,8 @@ class Archive:
 
             # set sample status
             custom_sample.inheritance = SampleInheritance.allow_both
-            custom_sample.status = [SampleStatus.incorporated]
-            samples_out[0].status.append(SampleStatus.incorporated)
+            custom_sample.reset_sample_status(SampleStatus.incorporated)
+            samples_out[0].append_sample_status(SampleStatus.incorporated)
 
             # add the custom sample to the samples_in
             samples_in.append(custom_sample)
@@ -2361,13 +2361,13 @@ class Archive:
             sample.action_uuid = [action.action_uuid]
             sample.sample_creation_action_uuid = action.action_uuid
             sample.sample_creation_experiment_uuid = action.experiment_uuid
-            sample.status = [SampleStatus.created]
+            sample.reset_sample_status(SampleStatus.created)
             sample.inheritance = SampleInheritance.receive_only
             # need to update the parts of an assembly first
             if sample.sample_type == SampleType.assembly:
                 sample.parts = await self.unified_db.get_samples(samples=sample.parts)
                 for part in sample.parts:
-                    part.status = [SampleStatus.incorporated]
+                    part.reset_sample_status(SampleStatus.incorporated)
                     part.inheritance = SampleInheritance.allow_both
                     part.action_uuid = [action.action_uuid]
                 # now write all samples back to the db

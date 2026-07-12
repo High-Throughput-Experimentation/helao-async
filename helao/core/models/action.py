@@ -9,16 +9,10 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .hlostatus import HloStatus
+from .status_transitions import guarded_append, guarded_replace, guarded_reset
 from .process_contrib import ProcessContrib
 from .run_use import RunUse
-from .sample import (
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleModel
-)
+from .sample import SampleUnion
 from .file import FileInfo
 from .machine import MachineModel
 from helao.core.version import get_hlo_version
@@ -139,12 +133,8 @@ class ActionModel(ShortActionModel):
     action_finished_timestamp: Optional[datetime] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
-    samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample, SampleModel]
-    ] = Field(default=[])
+    samples_in: List[SampleUnion] = Field(default=[])
+    samples_out: List[SampleUnion] = Field(default=[])
     files: List[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False
@@ -172,3 +162,15 @@ class ActionModel(ShortActionModel):
     def url(self) -> str:
         """Return the HTTP endpoint URL on the action server for this action."""
         return f"http://{self.action_server.hostname}:{self.action_server.port}/{self.action_server.server_name}/{self.action_name}"
+
+    def append_action_status(self, s: HloStatus) -> None:
+        """Guarded append onto ``action_status`` (see status_transitions.guarded_append)."""
+        guarded_append(self.action_status, s, owner=f"action {self.action_uuid}/{self.action_name}")
+
+    def replace_action_status(self, old: HloStatus, new: HloStatus) -> None:
+        """Guarded swap-or-append onto ``action_status`` (see status_transitions.guarded_replace)."""
+        guarded_replace(self.action_status, old, new, owner=f"action {self.action_uuid}/{self.action_name}")
+
+    def reset_action_status(self, *statuses: HloStatus) -> None:
+        """Guarded wholesale reset of ``action_status`` (see status_transitions.guarded_reset)."""
+        guarded_reset(self.action_status, statuses, owner=f"action {self.action_uuid}/{self.action_name}")

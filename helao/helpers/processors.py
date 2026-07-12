@@ -13,6 +13,7 @@ from glob import glob
 from typing import List
 
 from helao.core.models.file import FileInfo
+from helao.core.models.run_dir import RunDir
 
 from .premodels import Action
 
@@ -42,7 +43,7 @@ class HloPostProcessor(ABC):
         """
         self.action = action
         if action.manual_action:
-            save_root = str(save_root).replace("RUNS_ACTIVE", "RUNS_DIAG")
+            save_root = str(save_root).replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         self.output_dir = os.path.join(save_root, action.action_output_dir)
         exp_dir = os.path.dirname(self.output_dir)
         exp_yml_paths = glob(os.path.join(exp_dir, "*.yml"))

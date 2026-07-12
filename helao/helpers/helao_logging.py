@@ -223,7 +223,15 @@ class DedupTimedRotatingFileHandler(TimedRotatingFileHandler):
             super().emit(record)
             return
 
-        message = record.getMessage()
+        try:
+            message = record.getMessage()
+        except Exception:
+            # A malformed log call (e.g. printf-style args with no % placeholders)
+            # must not propagate out of emit() and kill the calling coroutine.
+            # Defer to the stdlib handler, which routes formatting errors through
+            # handleError() instead of raising.
+            super().emit(record)
+            return
         now = time.monotonic()
 
         if message != self._dedup_last_message:

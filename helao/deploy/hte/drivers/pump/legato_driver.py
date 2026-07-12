@@ -1,11 +1,13 @@
 """KD Scientific Legato 100 series syringe pump driver.
 
-Provides a serial control wrapper (`KDS100`) that talks to one or more daisy-chained
-syringe pumps over a single COM port, plus a `PumpExec` executor that runs an
-infuse/withdraw action and reports status via the action server's live buffer.
+Provides a ``HelaoDriver`` serial control wrapper (`KDS100`) that talks to one
+or more daisy-chained syringe pumps over a single COM port, a `KDS100Poller`
+that publishes per-pump status into the action server's live buffer, plus a
+`PumpExec` executor that runs an infuse/withdraw action and reports status
+via the action server's live buffer.
 """
 
-__all__ = []
+__all__ = ["KDS100", "KDS100Poller", "PumpExec"]
 
 import serial
 import io
@@ -13,21 +15,20 @@ import time
 import asyncio
 from typing import Any, Optional
 
-# import traceback
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
-# from helao.helpers.sample_api import UnifiedSampleDataAPI
-
-
-# from functools import partial
-# from bokeh.server.server import Server
-# from helao.helpers.active_params import ActiveParams
 
 """ Notes:
 
@@ -70,7 +71,7 @@ General workflow:
 8. poll status flags or promp
 9. issue manual stop
 
-Try polling task for updating base.live_buffer dictionary
+Pump status is published to the action server's live buffer by KDS100Poller.
 
 TODO: if polling task works, send pump status (position?) to bokeh visualizer w/o write
 
@@ -92,72 +93,123 @@ ulmap = {
 }
 
 
-class KDS100:
-    """Driver for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
+class KDS100(HelaoDriver):
+    """HELAO ``HelaoDriver`` wrapper for KD Scientific Legato 100 syringe pump(s) on an RS-232 chain.
 
-    Opens the serial port specified in ``action_serv.server_cfg['params']`` and
-    spawns two background tasks: one that listens for start/stop polling signals
-    and another that polls each configured pump for status and pushes the
-    parsed state into the action server's live buffer.
+    The serial port specified in ``config['port']`` is opened by :meth:`connect`,
+    not by construction. Always-on per-pump status polling is handled by the
+    paired :class:`KDS100Poller`, wired in as the server's ``poller_class``.
+
+    Server config parameters:
+        ``port``: Serial port for the daisy-chained pump(s).
+        ``pumps``: dict of ``{pump_name: {"address": ..., "diameter": ...}}``.
     """
 
-    def __init__(self, action_serv: Base):
-        """Open the serial connection and start polling tasks.
+    def __init__(self, config: dict = {}):
+        """Store config; the serial connection is opened in :meth:`connect`.
 
         Args:
-            action_serv: Action server providing the configuration dict and
-                live buffer used to publish pump state.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        # self.unified_db = UnifiedSampleDataAPI(self.base)
-        # self.bokehapp = None
+        super().__init__(config=config)
+        self.config_dict = self.config
 
-        # read pump addr and strings from config dict
-        self.com = serial.Serial(
-            port=self.config_dict["port"],
-            baudrate=115200,
-            parity=serial.PARITY_NONE,
-            stopbits=serial.STOPBITS_ONE,
-            timeout=0.05,
-            xonxoff=False,
-            rtscts=False,
-        )
-        self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
-
-        self.aloop = asyncio.get_running_loop()
+        self.com = None
+        self.sio = None
         self.com_lock = False
         self.polling = True
-        self.poll_signalq = asyncio.Queue(1)
-        self.poll_signal_task = self.aloop.create_task(self.poll_signal_loop())
-        self.polling_task = self.aloop.create_task(self.poll_sensor_loop())
         self.present_volume_ul = 0.0
         self.last_state = "unknown"
 
+    def connect(self) -> DriverResponse:
+        """Open the serial connection to the daisy-chained pump(s).
+
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
+        """
+        try:
+            self.com = serial.Serial(
+                port=self.config_dict["port"],
+                baudrate=115200,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                timeout=0.05,
+                xonxoff=False,
+                rtscts=False,
+            )
+            self.sio = io.TextIOWrapper(io.BufferedRWPair(self.com, self.com))
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def get_status(self) -> DriverResponse:
+        """Return whether the serial connection has been opened.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
+        """
+        if self.com is not None:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the serial connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close the underlying serial port."""
+        try:
+            if self.com is not None:
+                self.com.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        finally:
+            self.com = None
+        return response
+
+    def shutdown(self):
+        """No-op; `async_shutdown` handles safe-state-then-disconnect ordering."""
+        return None
+
+    async def async_shutdown(self):
+        """Return pumps to a safe state, then close the serial connection."""
+        LOGGER.info("shutting down syringe pump(s)")
+        await self.safe_state()
+        self.disconnect()
+
     async def start_polling(self):
-        """Signal the background poller to begin reading pump status."""
-        LOGGER.info("got 'start_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(True)
-        while not self.polling:
-            LOGGER.info("waiting for polling loop to start")
-            await asyncio.sleep(0.1)
+        """Resume background status polling (consulted by :class:`KDS100Poller`)."""
+        LOGGER.info("got 'start_polling' request")
+        self.polling = True
 
     async def stop_polling(self):
-        """Signal the background poller to pause."""
-        LOGGER.info("got 'stop_polling' request, raising signal")
-        async with self.base.aiolock:
-            await self.poll_signalq.put(False)
-        while self.polling:
-            LOGGER.info("waiting for polling loop to stop")
-            await asyncio.sleep(0.1)
-
-    async def poll_signal_loop(self):
-        """Initialize pump(s) into a safe state then route polling start/stop signals."""
-        await self.safe_state()
-        while True:
-            self.polling = await self.poll_signalq.get()
-            LOGGER.info("polling signal received")
+        """Pause background status polling so a raw command doesn't race the poller."""
+        LOGGER.info("got 'stop_polling' request")
+        self.polling = False
 
     async def send(self, pump_name: str, cmd: str) -> list:
         """Send a command to the addressed pump and return the parsed response lines.
@@ -188,86 +240,41 @@ class KDS100:
         self.com_lock = False
         return resp
 
-    async def poll_sensor_loop(self, frequency: int = 10):
-        """Continuously query each pump and publish status to the live buffer.
+    def _send_sync(self, pump_name: str, cmd: str) -> list:
+        """Synchronous status-query variant of :meth:`send`, used only by :class:`KDS100Poller`.
+
+        ``DriverPoller.get_data`` is called synchronously (see
+        ``helao_driver.py``), so the poller cannot ``await`` :meth:`send`.
+        The wire protocol is identical; only the lock-wait sleep is blocking
+        instead of cooperative.
 
         Args:
-            frequency: Target polling rate in Hz.
+            pump_name: Key in the config ``pumps`` dict identifying the target pump.
+            cmd: Pump command string; a trailing carriage return is added if missing.
+
+        Returns:
+            List of non-empty response lines stripped of whitespace.
         """
-        LOGGER.info("polling background task has started")
-        waittime = 1.0 / frequency
-        lastupdate = 0
-        while True:
-            if self.polling:
-                for plab, pdict in self.config_dict.get("pumps", {}).items():
-                    checktime = time.time()
-                    if checktime - lastupdate < waittime:
-                        # LOGGER.info("waiting for minimum update interval.")
-                        await asyncio.sleep(waittime - (checktime - lastupdate))
-                    addr = pdict["address"]
-                    status_resp = await self.send(plab, "status")
-                    # LOGGER.info(f"received status: {status_resp}")
-                    lastupdate = time.time()
-                    status_prompt = status_resp[-1]
-                    status = status_resp[0]
-                    # LOGGER.info(f"current status: {status}")
-                    addrstate_rate, pumptime, pumpvol, flags = status.split()
-                    raddr = int(addrstate_rate[:2])
-                    # self.base.print_message(
-                    #     f"received address: {raddr}, config address: {addr}"
-                    # )
-                    if addr == raddr:
-                        state = None
-                        state_split = None
-                        for k, v in STATES.items():
-                            if addrstate_rate[2:].startswith(k):
-                                state_split = k
-                            if status_prompt[2:].startswith(k):
-                                state = v
-                            else:
-                                continue
-                        if state != self.last_state:
-                            LOGGER.info(
-                                f"pump state changed from '{self.last_state}' to '{state}'"
-                            )
-                            self.last_state = state
-                        rate = int(addrstate_rate.split(state_split)[-1])
-                        pumptime = int(pumptime)
-                        pumpvol = int(pumpvol)
-                        # LOGGER.info(f"flags: {flags.lower()}")
-                        (
-                            motor_dir,
-                            limit_status,
-                            stall_status,
-                            trig_input,
-                            dir_port,
-                            target_reached,
-                        ) = flags.lower()
-                        status_dict = {
-                            plab: {
-                                "status": state,
-                                "rate_fL": rate,
-                                "pump_time_ms": pumptime,
-                                "pump_volume_fL": pumpvol,
-                                "motor_direction": motor_dir,
-                                "limit_switch_state": limit_status,
-                                "stall_status": stall_status,
-                                "trigger_input_state": trig_input,
-                                "direction_port": dir_port,
-                                "target_reached": target_reached,
-                            }
-                        }
-                        # self.base.print_message(status_dict[plab]["status"])
-                        await self.base.put_lbuf(status_dict)
-                        # LOGGER.info("status sent to live buffer")
-                    else:
-                        LOGGER.info("pump address does not match config")
-                # await asyncio.sleep(0.01)
-            else:
-                await asyncio.sleep(0.05)
+        if not cmd.endswith("\r"):
+            cmd = cmd + "\r"
+        addr = self.config_dict["pumps"][pump_name]["address"]
+        command_str = f"{addr:02}@{cmd}"
+        while self.com_lock:
+            time.sleep(0.1)
+        self.com_lock = True
+        self.sio.write(command_str)
+        self.sio.flush()
+        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
+        if resp:
+            while not resp[-1].endswith("\x11"):
+                time.sleep(0.1)
+                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
+                resp += newlines
+        self.com_lock = False
+        return resp
 
     def update_status_from_response(self, response):
-        """Parse the first response line and patch the live-buffer status for that pump.
+        """Parse the first response line and log the pump's post-command status.
 
         Args:
             response: List of response lines previously returned by ``send``.
@@ -286,8 +293,6 @@ class KDS100:
             else:
                 continue
         LOGGER.info(f"command response returned status: {state}")
-        status_dict = {"status": state}
-        self.base.live_buffer[pump_name][0].update(status_dict)
 
     async def start_pump(self, pump_name: str, direction: int) -> Any:
         """Start pump motion.
@@ -498,14 +503,86 @@ class KDS100:
                 LOGGER.info(f"Server returned: {diameter_resp[0]}")
             self.update_status_from_response(diameter_resp)
 
-    async def async_shutdown(self):
-        """Return pumps to safe state and close the serial port on server shutdown."""
-        # this gets called when the server is shut down
-        # or reloaded to ensure a clean
-        # disconnect ... just restart or terminate the server
-        LOGGER.info("shutting down syringe pump(s)")
-        await self.safe_state()
-        self.com.close()
+
+class KDS100Poller(DriverPoller):
+    """Background poller that reads status for every configured KDS100 pump."""
+
+    driver: KDS100
+
+    def get_data(self) -> DriverResponse:
+        """Read one status sample from each configured pump.
+
+        Skips the read entirely while `self.driver.polling` is `False`,
+        mirroring the pre-migration `poll_sensor_loop`'s polling gate.
+
+        Returns:
+            `DriverResponse` with `data={pump_name: status_dict, ...}` merged
+            across every pump that returned a matching-address reading this
+            cycle (the pre-migration loop forwarded one `{pump_name:
+            status_dict}` to `put_lbuf` per pump per cycle; folding them into
+            a single call here is behaviorally equivalent since `DriverPoller`
+            merges `resp.data` into `live_dict` as a whole), or an empty
+            `DriverResponse` when polling is paused or no pump responded.
+        """
+        if not self.driver.polling:
+            return DriverResponse()
+        status_dict = {}
+        for plab, pdict in self.driver.config_dict.get("pumps", {}).items():
+            addr = pdict["address"]
+            status_resp = self.driver._send_sync(plab, "status")
+            if not status_resp:
+                continue
+            status_prompt = status_resp[-1]
+            status = status_resp[0]
+            addrstate_rate, pumptime, pumpvol, flags = status.split()
+            raddr = int(addrstate_rate[:2])
+            if addr != raddr:
+                LOGGER.info("pump address does not match config")
+                continue
+            state = None
+            state_split = None
+            for k, v in STATES.items():
+                if addrstate_rate[2:].startswith(k):
+                    state_split = k
+                if status_prompt[2:].startswith(k):
+                    state = v
+                else:
+                    continue
+            if state != self.driver.last_state:
+                LOGGER.info(
+                    f"pump state changed from '{self.driver.last_state}' to '{state}'"
+                )
+                self.driver.last_state = state
+            rate = int(addrstate_rate.split(state_split)[-1])
+            pumptime = int(pumptime)
+            pumpvol = int(pumpvol)
+            (
+                motor_dir,
+                limit_status,
+                stall_status,
+                trig_input,
+                dir_port,
+                target_reached,
+            ) = flags.lower()
+            status_dict[plab] = {
+                "status": state,
+                "rate_fL": rate,
+                "pump_time_ms": pumptime,
+                "pump_volume_fL": pumpvol,
+                "motor_direction": motor_dir,
+                "limit_switch_state": limit_status,
+                "stall_status": stall_status,
+                "trigger_input_state": trig_input,
+                "direction_port": dir_port,
+                "target_reached": target_reached,
+            }
+        if not status_dict:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data=status_dict,
+        )
 
 
 class PumpExec(Executor):
@@ -548,6 +625,18 @@ class PumpExec(Executor):
             direction=self.direction,
         )
         LOGGER.info(f"start_pump returned: {start_resp}")
+        # Publish the start-transition synchronously in the same call path as
+        # the start command: PumpExec._poll's first iteration runs with no
+        # initial sleep and would otherwise read the stale pre-action status
+        # from live_buffer before KDS100Poller's next cycle publishes it,
+        # finishing the action immediately without dispensing.
+        await self.active.base.put_lbuf(
+            {
+                self.pump_name: {
+                    "status": "infusing" if self.direction == 1 else "withdrawing"
+                }
+            }
+        )
         return {"error": ErrorCodes.none}
 
     async def _poll(self) -> dict:

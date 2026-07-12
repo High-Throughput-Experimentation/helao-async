@@ -7,7 +7,7 @@ from pydantic import BaseModel, validator, root_validator, Field
 from pydantic.tools import parse_obj_as
 
 import datetime
-from typing import List, Optional, Union, Literal
+from typing import List, Optional, Union, Literal, Annotated
 from typing import ForwardRef
 
 from helao.core.version import get_hlo_version
@@ -24,6 +24,7 @@ __all__ = [
     "AssemblySample",
     "SampleList",
     "SampleUnion",
+    "TypedSampleUnion",
     "object_to_sample",
     "SampleInheritance",
     "SampleStatus",
@@ -158,10 +159,34 @@ class SampleModel(BaseModel, HelaoDict):
     comment: Optional[str] = None
     etc: dict = Field(default={})
 
+    def append_sample_status(self, new_status: "SampleStatus") -> None:
+        """Append `new_status` to `status` via the guarded (log-only) transition."""
+        from helao.core.models.status_transitions import sample_guarded_append
+
+        sample_guarded_append(
+            self.status, new_status, owner=f"sample {self.global_label or self.sample_type}"
+        )
+
+    def remove_sample_status(self, old_status: "SampleStatus") -> None:
+        """Remove `old_status` from `status` via the guarded (log-only) transition."""
+        from helao.core.models.status_transitions import sample_guarded_remove
+
+        sample_guarded_remove(
+            self.status, old_status, owner=f"sample {self.global_label or self.sample_type}"
+        )
+
+    def reset_sample_status(self, *new_statuses: "SampleStatus") -> None:
+        """Replace `status` wholesale via the guarded (log-only) transition."""
+        from helao.core.models.status_transitions import sample_guarded_reset
+
+        sample_guarded_reset(
+            self.status, new_statuses, owner=f"sample {self.global_label or self.sample_type}"
+        )
+
     def create_initial_exp_dict(self) -> dict:
         """Return a dict of the shared sample fields used in experiment records."""
         if not isinstance(self.status, list):
-            self.status = [self.status]
+            self.status = [self.status]  # not a lifecycle transition — list coercion
 
         return {
             "global_label": self.get_global_label(),
@@ -193,17 +218,17 @@ class SampleModel(BaseModel, HelaoDict):
         if hasattr(self, "volume_ml"):
             self.volume_ml = 0
             if SampleStatus.destroyed not in self.status:
-                self.status.append(SampleStatus.destroyed)
+                self.append_sample_status(SampleStatus.destroyed)
             if SampleStatus.preserved in self.status:
-                self.status.remove(SampleStatus.preserved)
+                self.remove_sample_status(SampleStatus.preserved)
 
     def destroy_sample(self):
         """Mark the sample as destroyed (zeroing volume and updating status)."""
         self.zero_volume()
         if SampleStatus.preserved in self.status:
-            self.status.remove(SampleStatus.preserved)
+            self.remove_sample_status(SampleStatus.preserved)
         if SampleStatus.destroyed not in self.status:
-            self.status.append(SampleStatus.destroyed)
+            self.append_sample_status(SampleStatus.destroyed)
 
     def get_vol_ml(self) -> float:
         """Return `volume_ml` if defined on the subclass, else 0.0."""
@@ -378,17 +403,7 @@ class AssemblySample(SampleModel):
     """
 
     sample_type: Literal[SampleType.assembly] = SampleType.assembly
-    # parts: List[SampleUnion] = Field(default=[])
-    parts: List[
-        Union[
-            AssemblySample,
-            LiquidSample,
-            GasSample,
-            SolidSample,
-            NoneSample,
-            SampleModel,
-        ]
-    ] = Field(default=[])
+    parts: List[SampleUnion] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
     parent_assembly_label: Optional[str] = None
 
@@ -442,28 +457,18 @@ class SampleList(BaseModel, HelaoDict):
         samples (Optional[List]): The contained samples (union of sample types).
     """
 
-    samples: Optional[
-        List[
-            Union[
-                AssemblySample,
-                LiquidSample,
-                GasSample,
-                SolidSample,
-                NoneSample,
-                SampleModel,
-            ]
-        ]
-    ] = Field(default=[])
+    samples: Optional[List[SampleUnion]] = Field(default=[])
 
 
-SampleUnion = Union[
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleModel,
+# Design C, two-stage nested union (CARDS P3 3c, D1): the four enum-tagged
+# subtypes get true discriminator routing; NoneSample and the SampleModel
+# fallback sit in the outer (smart) union so today's acceptance surface is
+# preserved by construction. See CARDS_REFACTOR_P3C.md D1.
+TypedSampleUnion = Annotated[
+    Union[AssemblySample, LiquidSample, GasSample, SolidSample],
+    Field(discriminator="sample_type"),
 ]
+SampleUnion = Union[TypedSampleUnion, NoneSample, SampleModel]
 
 
 def object_to_sample(data):

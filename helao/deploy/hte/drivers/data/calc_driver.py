@@ -3,8 +3,8 @@
 Provides UV-Vis figure-of-merit calculations and loop-control helpers
 (CO2 purge thresholding and syringe-volume top-up) that read locally
 saved ``.hlo``/``.yml`` data through :class:`FileMapper` and, when
-appropriate, request additional experiments from the orchestrator via
-:func:`async_private_dispatcher`.
+appropriate, return an ``"__insert_experiment__"`` payload for the
+calling action server to dispatch to the orchestrator.
 """
 
 import time
@@ -18,10 +18,14 @@ from ruamel.yaml import YAML
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base, Active
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+)
 from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
-from helao.helpers.dispatcher import async_private_dispatcher
 
 
 def handlenan_savgol_filter(
@@ -98,21 +102,44 @@ def squeeze_foms(d) -> dict:
     return sd
 
 
-class Calc:
+class Calc(HelaoDriver):
     """In-sequence figure-of-merit and loop-control driver."""
 
-    def __init__(self, action_serv: Base):
-        """Capture the action server context and shared YAML loader.
+    def __init__(self, config: dict = {}):
+        """Store the driver config and shared YAML loader.
 
         Args:
-            action_serv: Hosting :class:`Base` action server.
+            config: Driver-specific configuration dict.
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        super().__init__(config=config)
+        self.config_dict = self.config
         self.yaml = YAML(typ="safe")
-        self.world_config = self.base.app.helao_cfg
 
-    def gather_seq_data(self, seq_reldir: str, action_name: str) -> dict:
+    def connect(self) -> DriverResponse:
+        """No physical device to connect to; always succeeds."""
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message="no device",
+            status=DriverStatus.ok,
+        )
+
+    def get_status(self) -> DriverResponse:
+        """No physical device to poll; always reports ok."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def stop(self) -> DriverResponse:
+        """No active activity to abort; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def reset(self) -> DriverResponse:
+        """No device state to reinitialize; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def disconnect(self) -> DriverResponse:
+        """No physical connection to release; always succeeds."""
+        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+
+    def gather_seq_data(self, seq_absdir: str, action_name: str) -> dict:
         """Load ``.hlo``/``.yml`` action results for one action name.
 
         Uses :class:`FileMapper` to walk ACTIVE/FINISHED/SYNCED for the
@@ -120,8 +147,6 @@ class Calc:
         ``meta``, ``data``, ``actd`` (action yaml) and ``expd``
         (experiment yaml) entries.
         """
-        active_save_dir = self.base.helaodirs.save_root.__str__()
-        seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
         paths = [x for x in FM.relstrs if action_name in x]
         hlos = sorted([x for x in paths if x.endswith(".hlo")])
@@ -157,13 +182,11 @@ class Calc:
 
         return hlo_dict
 
-    def gather_seq_exps(self, seq_reldir: str, exp_name: str) -> dict:
+    def gather_seq_exps(self, seq_absdir: str, exp_name: str) -> dict:
         """Return a ``{yml_path: experiment_dict}`` map for ``exp_name``.
 
         Pass ``"*"`` for ``exp_name`` to include every ``exp.yml``.
         """
-        active_save_dir = self.base.helaodirs.save_root.__str__()
-        seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
         if exp_name == "*":
             paths = FM.relstrs
@@ -176,10 +199,8 @@ class Calc:
             yml_dict[ep] = expd
         return yml_dict
 
-    def get_seq_dict(self, seq_reldir: str) -> dict:
+    def get_seq_dict(self, seq_absdir: str) -> dict:
         """Return the parsed ``seq.yml`` dict for the given sequence directory."""
-        active_save_dir = self.base.helaodirs.save_root.__str__()
-        seq_absdir = os.path.join(active_save_dir, seq_reldir)
         FM = FileMapper(seq_absdir)
         ymls = [x for x in FM.relstrs if x.endswith("seq.yml")]
         yml_dict = {}
@@ -188,7 +209,7 @@ class Calc:
             yml_dict = seqd
         return yml_dict
 
-    def calc_uvis_abs(self, activeobj: Active) -> tuple:
+    def calc_uvis_abs(self, seq_absdir: str, action_params: dict) -> tuple:
         """Compute UV-Vis figures of merit for T, R or TR sequences.
 
         Walks the spectra from ``acquire_spec`` actions in the current
@@ -196,15 +217,18 @@ class Calc:
         Savitzky-Golay smoothing and reference adjustment, and produces
         per-sample scalar FOMs plus binned/full-resolution arrays.
 
+        Args:
+            seq_absdir: Absolute path to the current sequence directory.
+            action_params: The calling action's ``action_params``.
+
         Returns:
             ``(datadict, arraydict)`` containing scalar FOMs and the
             intermediate array outputs respectively. Returns an empty
             dict when references or data are missing.
         """
-        seq_reldir = activeobj.action.get_sequence_dir()
-        hlo_dict = self.gather_seq_data(seq_reldir, "acquire_spec")
+        hlo_dict = self.gather_seq_data(seq_absdir, "acquire_spec")
 
-        params = activeobj.action.action_params
+        params = action_params
         skip_nspec = params.get("skip_nspec", 0)
         spec_types = ["T", "R"]
         ru_keys = ("ref_dark", "ref_light", "data")
@@ -744,35 +768,39 @@ class Calc:
 
         return datadict, arraydict
 
-    async def check_co2_purge_level(self, activeobj: Active) -> dict:
+    async def check_co2_purge_level(
+        self,
+        seq_absdir: str,
+        co2_ppm_thresh: float,
+        purge_if,
+        present_syringe_volume_ul: float,
+        repeat_experiment_name: str,
+        repeat_experiment_params: dict,
+        repeat_experiment_kwargs: dict,
+    ) -> dict:
         """Decide whether to repeat a CO2-purge experiment.
 
         Reads the latest ``acquire_co2`` HLO in the current sequence,
         averages ``co2_ppm``, and compares to ``co2_ppm_thresh`` using
         the ``purge_if`` flag (``"above"``/``"below"`` strings or a
         numeric symmetric pct-difference threshold). When the condition
-        is satisfied (and ``max_repeats`` has not been hit) requests the
-        orchestrator to insert another ``repeat_experiment_name`` at the
-        head of the queue.
+        is satisfied (and ``max_repeats`` has not been hit) the returned
+        dict carries an ``"__insert_experiment__"`` payload requesting the
+        orchestrator insert another ``repeat_experiment_name`` at the head
+        of the queue; the caller is responsible for dispatching it.
 
         Returns:
             ``{"epoch": <float>, "mean_co2_ppm": <float>, "redo_purge":
-            <bool>}``.
+            <bool>}``, plus ``"__insert_experiment__"`` when a follow-up
+            experiment should be queued.
         """
-        params = activeobj.action.action_params
-        co2_ppm_thresh = params["co2_ppm_thresh"]
-        purge_if = params["purge_if"]
-        present_syringe_volume_ul = params["present_syringe_volume_ul"]
-        repeat_experiment_name = params["repeat_experiment_name"]
-        repeat_experiment_params = params["repeat_experiment_params"]
-        kwargs = params["repeat_experiment_kwargs"]
-        seq_reldir = activeobj.action.get_sequence_dir()
-        # seq_dict = self.get_seq_dict(seq_reldir)
+        kwargs = repeat_experiment_kwargs
+        # seq_dict = self.get_seq_dict(seq_absdir)
 
         max_repeats = repeat_experiment_params.get("max_repeats", 5)
 
-        hlo_dict = self.gather_seq_data(seq_reldir, "acquire_co2")
-        all_exps = self.gather_seq_exps(seq_reldir, "*")
+        hlo_dict = self.gather_seq_data(seq_absdir, "acquire_co2")
+        all_exps = self.gather_seq_exps(seq_absdir, "*")
         latest = hlo_dict[sorted(hlo_dict.keys())[-1]]
 
         mean_co2_ppm = np.mean(latest["data"]["co2_ppm"])
@@ -831,6 +859,7 @@ class Calc:
             else:
                 break
 
+        insert_experiment_payload = None
         if loop_condition and num_consecutive_repeats > max_repeats:
             LOGGER.info(
                 f"mean_co2_ppm: {mean_co2_ppm} does not meet threshold condition but max_repeats ({max_repeats}) reached. Exiting."
@@ -845,50 +874,47 @@ class Calc:
                 **kwargs,
             )
             LOGGER.info("queueing repeat experiment request on Orch")
-            resp, error = await async_private_dispatcher(
-                self.base.orch_key,
-                self.base.orch_host,
-                self.base.orch_port,
-                "insert_experiment",
-                params_dict={},
-                json_dict={
-                    "idx": 0,
-                    "experiment": rep_exp.clean_dict(),
-                },
-            )
-            LOGGER.info(f"insert_experiment got response: {resp}")
-            LOGGER.info(f"insert_experiment returned error: {error}")
+            insert_experiment_payload = {
+                "idx": 0,
+                "experiment": rep_exp.clean_dict(),
+            }
         else:
             LOGGER.info(
                 f"mean_co2_ppm: {mean_co2_ppm} meets threshold condition. Exiting."
             )
 
-        return_dict = {
+        return_dict: dict = {
             "epoch": float(time.time()),
             "mean_co2_ppm": float(mean_co2_ppm),
             "redo_purge": bool(loop_condition),
         }
+        if insert_experiment_payload is not None:
+            return_dict["__insert_experiment__"] = insert_experiment_payload
         return return_dict
 
-    async def fill_syringe_volume_check(self, activeobj: Active) -> dict:
+    async def fill_syringe_volume_check(
+        self,
+        check_volume_ul: float,
+        target_volume_ul: float,
+        present_volume_ul: float,
+        repeat_experiment_name: str,
+        repeat_experiment_params: dict,
+        repeat_experiment_kwargs: dict,
+    ) -> dict:
         """Insert a refill experiment if syringe volume is below ``check_volume_ul``.
 
         When ``present_volume_ul`` is below the threshold (or
-        ``check_volume_ul`` is 0) the orchestrator is asked to insert
+        ``check_volume_ul`` is 0) the returned dict carries an
+        ``"__insert_experiment__"`` payload requesting
         ``repeat_experiment_name`` with a ``fill_volume_ul`` parameter
-        that tops the syringe back to ``target_volume_ul``.
+        that tops the syringe back to ``target_volume_ul``; the caller is
+        responsible for dispatching it.
 
         Returns:
-            ``{"epoch": <float>, "syringe_present_volume_ul": <float>}``.
+            ``{"epoch": <float>, "syringe_present_volume_ul": <float>}``,
+            plus ``"__insert_experiment__"`` when a refill should be queued.
         """
-        params = activeobj.action.action_params
-        check_volume_ul = params["check_volume_ul"]
-        target_volume_ul = params["target_volume_ul"]
-        present_volume_ul = params["present_volume_ul"]
-
-        repeat_experiment_name = params["repeat_experiment_name"]
-        repeat_experiment_params = params["repeat_experiment_params"]
-        kwargs = params["repeat_experiment_kwargs"]
+        kwargs = repeat_experiment_kwargs
 
         if present_volume_ul < check_volume_ul:
             fill_needed = True
@@ -908,6 +934,7 @@ class Calc:
                 f"current syringe volume: {present_volume_ul} does meet threshold condition. No action needed."
             )
 
+        insert_experiment_payload = None
         if fill_needed:
             rep_exp = Experiment(
                 experiment_name=repeat_experiment_name,
@@ -915,24 +942,17 @@ class Calc:
                 **kwargs,
             )
             LOGGER.info("queueing repeat experiment request on Orch")
-            resp, error = await async_private_dispatcher(
-                self.base.orch_key,
-                self.base.orch_host,
-                self.base.orch_port,
-                "insert_experiment",
-                params_dict={},
-                json_dict={
-                    "idx": 0,
-                    "experiment": rep_exp.clean_dict(),
-                },
-            )
-            LOGGER.info(f"insert_experiment got response: {resp}")
-            LOGGER.info(f"insert_experiment returned error: {error}")
+            insert_experiment_payload = {
+                "idx": 0,
+                "experiment": rep_exp.clean_dict(),
+            }
 
-        return_dict = {
+        return_dict: dict = {
             "epoch": float(time.time()),
             "syringe_present_volume_ul": float(present_volume_ul),
         }
+        if insert_experiment_payload is not None:
+            return_dict["__insert_experiment__"] = insert_experiment_payload
         return return_dict
 
     def shutdown(self):

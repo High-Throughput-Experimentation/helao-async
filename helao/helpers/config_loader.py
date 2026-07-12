@@ -2,15 +2,24 @@
 
 Locates a ``.yml`` or ``.py`` config from a path or a bare prefix, populates
 a few path-related keys derived from the surrounding repo layout, and
-optionally publishes the result as the module-level :data:`CONFIG` Munch.
+optionally publishes the result as the module-level :data:`CONFIG` dict.
+
+``CONFIG`` is, by design, the raw launcher-augmented dict returned by
+:func:`read_config` — never a validated ``HelaoConfig`` dump. See
+:func:`install_global_config` for why.
 """
 
-__all__ = ["read_config", "load_global_config", "CONFIG"]
+__all__ = [
+    "read_config",
+    "read_validated_config",
+    "install_global_config",
+    "load_global_config",
+    "CONFIG",
+]
 
 import os
 from glob import glob
-from munch import munchify, Munch
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
@@ -26,7 +35,7 @@ from pydantic import BaseModel
 # else:
 #     LOGGER = logging.LOGGER
 
-CONFIG: Munch = None
+CONFIG: Optional[dict] = None
 
 
 def read_config(confArg, *args, **kwargs):
@@ -126,25 +135,48 @@ def read_config(confArg, *args, **kwargs):
     return config
 
 
-def load_global_config(confArg: str, set_global: bool = False) -> dict:
-    """Read a config and optionally publish it as the module-level :data:`CONFIG`.
-
-    Args:
-        confArg: Path or prefix passed through to :func:`read_config`.
-        set_global: When true, validate the loaded dict against
-            :class:`HelaoConfig` and store the resulting Munch on
-            ``CONFIG``.
+def read_validated_config(conf_arg: str) -> Tuple[dict, "HelaoConfig"]:
+    """Read a config and validate it against :class:`HelaoConfig`. Pure — no module state.
 
     Returns:
-        The raw config dict from :func:`read_config`.
+        ``(config_dict, validated)``: the raw dict from :func:`read_config`
+        (the runtime source of truth) and its validated typed view. The typed
+        view ignores keys the schema does not declare (``loaded_config_path``,
+        per-server ``action_vis``/``deployment``/...); it is a schema gate and
+        typed accessor, not a replacement for the dict.
     """
-    config_dict = read_config(confArg)
+    config_dict = read_config(conf_arg)
+    return config_dict, HelaoConfig(**config_dict)
+
+
+def install_global_config(config_dict: dict) -> dict:
+    """Publish ``config_dict`` as the module-level :data:`CONFIG` (explicit mutation).
+
+    Installs the object AS-IS. Never install ``HelaoConfig(...).model_dump()``
+    here: pydantic drops launcher-added keys (``loaded_config_path``,
+    ``deployment``, ``restore_queues_on_startup``, per-server extras) and would
+    break fast_launcher's ``server_config`` same-object aliasing (its ``--restore``
+    mutation must stay visible through ``HelaoFastAPI.server_cfg``).
+    """
+    global CONFIG
+    CONFIG = config_dict
+    return CONFIG
+
+
+def load_global_config(confArg: str, set_global: bool = False) -> dict:
+    """DEPRECATED shim — use :func:`read_validated_config` + :func:`install_global_config`.
+
+    Historical behavior: with ``set_global=True`` this stored a munchified
+    ``HelaoConfig`` dump on ``CONFIG`` and returned the raw dict; both in-repo
+    callers immediately overwrote ``CONFIG`` with that raw return value, so the
+    validated dump was never observable at runtime. The shim now validates and
+    installs the raw dict directly — the identical net module state.
+    """
     if set_global:
-        global CONFIG
-        CONFIG = munchify(
-            HelaoConfig(**config_dict).model_dump(exclude_unset=True, exclude_none=True)
-        )
-    return config_dict
+        config_dict, _validated = read_validated_config(confArg)
+        install_global_config(config_dict)
+        return config_dict
+    return read_config(confArg)
 
 
 class OrchServerParams(BaseModel):

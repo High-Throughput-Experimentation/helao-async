@@ -26,6 +26,8 @@ from .yml_tools import yml_load
 from .hlo_data import read_hlo_bytes
 from .file_mapper import FileMapper
 
+from helao.core.models.run_dir import RunDir
+
 
 class HelaoData:
     """Navigate a sequence/experiment/action output tree or zipped sequence.
@@ -122,7 +124,7 @@ class HelaoData:
                     # and os.path.dirname(p) == self.ymldir
                 ]
                 nosync_path = os.path.dirname(self.target).replace(
-                    "RUNS_SYNCED", "RUNS_NOSYNC"
+                    RunDir.SYNCED.value, RunDir.NOSYNC.value
                 )
             else:
                 if os.path.isdir(self.target):
@@ -167,10 +169,10 @@ class HelaoData:
                     for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
                     if x.split(".")[-1] not in skip_exts and os.path.isfile(x)
                 ]
-                nosync_path = self.ymldir.replace("RUNS_SYNCED", "RUNS_NOSYNC")
+                nosync_path = self.ymldir.replace(RunDir.SYNCED.value, RunDir.NOSYNC.value)
 
             if os.path.exists(nosync_path):
-                self._nosync_files = [p for p in self._data_files if "RUNS_NOSYNC" in p]
+                self._nosync_files = [p for p in self._data_files if RunDir.NOSYNC.value in p]
 
             self.children = self.seq + self.exp + self.act
         else:
@@ -226,14 +228,14 @@ class HelaoData:
         """
         if self.target.endswith(".zip"):
             return self._data_files
-        return [p for p in self._data_files if "RUNS_NOSYNC" not in p]
+        return [p for p in self._data_files if RunDir.NOSYNC.value not in p]
 
     @property
     def nosync_files(self) -> list:
         """Return paths of data files that live under ``RUNS_NOSYNC``."""
         if self.target.endswith(".zip"):
             return self._nosync_files
-        return [p for p in self._data_files if "RUNS_NOSYNC" in p]
+        return [p for p in self._data_files if RunDir.NOSYNC.value in p]
 
     @staticmethod
     def _runs_relpath(p: str) -> str:
@@ -285,7 +287,7 @@ class HelaoData:
             A ``(meta, data)`` tuple where ``meta`` is the parsed YAML header
             and ``data`` is a dict of column lists.
         """
-        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
+        if self.target.endswith(".zip") and RunDir.NOSYNC.value not in hlotarget:
             member = self._resolve_zip_member(hlotarget)
             return read_hlo_bytes(
                 self.read_file(member), keep_keys=keep_keys, omit_keys=omit_keys
@@ -309,7 +311,7 @@ class HelaoData:
             A tuple of an empty metadata dict and a dict-of-lists view of the
             Parquet contents.
         """
-        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
+        if self.target.endswith(".zip") and RunDir.NOSYNC.value not in hlotarget:
             with TemporaryDirectory() as tmpdir:
                 with zipfile.ZipFile(self.target, "r") as zf:
                     parquet_path = zf.extract(hlotarget, tmpdir)
@@ -335,7 +337,7 @@ class HelaoData:
         Returns:
             A tuple of an empty metadata dict and the parsed JSON object.
         """
-        if self.target.endswith(".zip") and "RUNS_NOSYNC" not in hlotarget:
+        if self.target.endswith(".zip") and RunDir.NOSYNC.value not in hlotarget:
             json_dict = orjson.loads(self.read_file(hlotarget))
         else:
             fm = FileMapper(hlotarget)

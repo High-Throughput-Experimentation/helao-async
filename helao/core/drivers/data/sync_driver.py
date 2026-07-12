@@ -55,6 +55,7 @@ from helao.helpers.file_utils import zip_dir
 from helao.core.models.helaodirs import HelaoDirs
 from helao.helpers.dispatcher import async_action_dispatcher
 from helao.core.models.machine import MachineModel
+from helao.core.models.run_dir import RunDir, SYNC_PROGRESSION
 
 from glob import glob
 
@@ -107,15 +108,15 @@ def move_to_synced(file_path: Path) -> Union[Path, bool]:
         The new ``Path`` on success, or ``False`` on ``PermissionError``.
     """
     parts = list(file_path.parts)
-    target_path = Path(str(file_path).replace("RUNS_FINISHED", "RUNS_SYNCED"))
-    if "RUNS_SYNCED" in parts:
+    target_path = Path(str(file_path).replace(RunDir.FINISHED.value, RunDir.SYNCED.value))
+    if RunDir.SYNCED in parts:
         LOGGER.debug(f"File {file_path} is already synced. Skipping.")
         return target_path
     elif not file_path.exists():
         LOGGER.debug(f"File {file_path} does not exist. Skipping.")
         return target_path
-    state_index = parts.index("RUNS_FINISHED")
-    parts[state_index] = "RUNS_SYNCED"
+    state_index = parts.index(RunDir.FINISHED)
+    parts[state_index] = RunDir.SYNCED.value
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -139,8 +140,8 @@ def revert_to_finished(file_path: Path) -> Union[Path, bool]:
         ValueError: If ``RUNS_SYNCED`` is not present in the path.
     """
     parts = list(file_path.parts)
-    state_index = parts.index("RUNS_SYNCED")
-    parts[state_index] = "RUNS_FINISHED"
+    state_index = parts.index(RunDir.SYNCED)
+    parts[state_index] = RunDir.FINISHED.value
     target_path = Path(*parts)
     target_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -356,7 +357,7 @@ class HelaoYml:
         Raises:
             ValueError: If no valid status segment is present.
         """
-        valid_statuses = ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED")
+        valid_statuses = SYNC_PROGRESSION
         return [any([x in valid_statuses]) for x in self.parts].index(True)
 
     @property
@@ -367,17 +368,17 @@ class HelaoYml:
     @property
     def active_path(self) -> Path:
         """``self.target`` rewritten under ``RUNS_ACTIVE``."""
-        return Path(self.rename("RUNS_ACTIVE"))
+        return Path(self.rename(RunDir.ACTIVE.value))
 
     @property
     def finished_path(self) -> Path:
         """``self.target`` rewritten under ``RUNS_FINISHED``."""
-        return Path(self.rename("RUNS_FINISHED"))
+        return Path(self.rename(RunDir.FINISHED.value))
 
     @property
     def synced_path(self) -> Path:
         """``self.target`` rewritten under ``RUNS_SYNCED``."""
-        return Path(self.rename("RUNS_SYNCED"))
+        return Path(self.rename(RunDir.SYNCED.value))
 
     def cleanup(self) -> str:
         """Remove empty parent directories under the ``RUNS_*`` root.
@@ -803,7 +804,7 @@ class SyncDriver:
             root_path: Base path containing the ``RUNS_*`` trees.
         """
         today = datetime.strptime(datetime.now().strftime("%y%m%d"), "%y%m%d")
-        chkdirs = ["RUNS_ACTIVE", "RUNS_FINISHED"]
+        chkdirs = [RunDir.ACTIVE.value, RunDir.FINISHED.value]
         for cd in chkdirs:
             seq_dates = glob(os.path.join(root_path, cd, "*", "*"))
             for datedir in seq_dates:
@@ -1349,7 +1350,7 @@ class SyncDriver:
                 path_parts = prog.yml.target.parts
                 await asyncio.to_thread(zip_dir, prog.yml.target.parent, zip_target)
                 root_path = Path(
-                    *path_parts[: path_parts.index("RUNS_SYNCED")]
+                    *path_parts[: path_parts.index(RunDir.SYNCED)]
                 ).as_posix()
                 self.cleanup_root(root_path)
                 LOGGER.debug("Removing sequence from progress.")
@@ -1816,7 +1817,7 @@ class SyncDriver:
             List of pending sequence yml file paths.
         """
         finished_dir = str(self.helaodirs.save_root).replace(
-            "RUNS_ACTIVE", "RUNS_FINISHED"
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
         if omit_manual_exps:
@@ -1834,7 +1835,7 @@ class SyncDriver:
             List of pending action yml file paths.
         """
         finished_dir = str(self.helaodirs.save_root).replace(
-            "RUNS_ACTIVE", "RUNS_FINISHED"
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
         if omit_manual_exps:
@@ -1852,7 +1853,7 @@ class SyncDriver:
             List of pending experiment yml file paths.
         """
         finished_dir = str(self.helaodirs.save_root).replace(
-            "RUNS_ACTIVE", "RUNS_FINISHED"
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
         )
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
         if omit_manual_exps:
@@ -1880,10 +1881,10 @@ class SyncDriver:
         async def reset_and_queue(pp, rank: int = 0):
             """Reset any stale ``.progress`` sibling under ``RUNS_SYNCED`` and enqueue ``pp``."""
             if os.path.exists(
-                pp.replace("RUNS_FINISHED", "RUNS_SYNCED").replace(".yml", ".progress")
+                pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(".yml", ".progress")
             ):
                 self.reset_sync(
-                    os.path.dirname(pp).replace("RUNS_FINISHED", "RUNS_SYNCED")
+                    os.path.dirname(pp).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
                 )
             await self.enqueue_yml(pp, rank)
 
@@ -1926,7 +1927,7 @@ class SyncDriver:
         if not os.path.exists(sync_path):
             LOGGER.info(f"{sync_path} does not exist.")
             return False
-        if "RUNS_SYNCED" not in sync_path:
+        if RunDir.SYNCED not in sync_path:
             LOGGER.info(f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}")
             return False
         ## if path is a zip
@@ -1935,7 +1936,7 @@ class SyncDriver:
             if any(x.endswith("-seq.prg") for x in zf.namelist()):
                 seqzip_dir = os.path.dirname(sync_path)
                 dest = os.path.join(
-                    seqzip_dir.replace("RUNS_SYNCED", "RUNS_FINISHED"),
+                    seqzip_dir.replace(RunDir.SYNCED.value, RunDir.FINISHED.value),
                     os.path.basename(sync_path).replace(".zip", ""),
                 )
                 os.makedirs(dest, exist_ok=True)
@@ -2043,7 +2044,7 @@ class SyncDriver:
             if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                tp = os.path.dirname(fp.replace("RUNS_SYNCED", "RUNS_FINISHED"))
+                tp = os.path.dirname(fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value))
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")

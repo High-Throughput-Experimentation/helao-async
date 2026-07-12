@@ -33,6 +33,7 @@ from helao.core.tests._test_utils import TestReporter
 from helao.core.drivers.data.sync_driver import SyncDriver
 from helao.helpers.yml_tools import yml_dumps
 from helao.core.models.helaodirs import HelaoDirs
+from helao.core.models.run_dir import RunDir
 
 
 def _write_yml(path: Path, meta: dict) -> None:
@@ -51,7 +52,7 @@ def _ts(second: int) -> str:
 def _make_driver(tmp_root: str) -> SyncDriver:
     hd = HelaoDirs(
         root=Path(tmp_root),
-        save_root=Path(tmp_root) / "RUNS_ACTIVE",
+        save_root=Path(tmp_root) / RunDir.ACTIVE.value,
         process_root=Path(tmp_root) / "PROCESSES",
     )
     cfg = {"aws_bucket": "test-bucket", "max_tasks": 1}
@@ -124,7 +125,7 @@ async def _run_checks() -> dict:
         try:
             root = Path(tmp_root)
             # no process_order_groups => legacy_experiment == True
-            exp_yml = _make_exp_tree(root, "RUNS_FINISHED", _uuid(1001))
+            exp_yml = _make_exp_tree(root, RunDir.FINISHED.value, _uuid(1001))
             a0 = _make_action(exp_yml, 0, process_finish=False)
             a1 = _make_action(exp_yml, 1, process_finish=True)  # finisher
 
@@ -155,10 +156,10 @@ async def _run_checks() -> dict:
             # exp in FINISHED, both contributing actions ALREADY in SYNCED
             # (cross-run resume: they'd never be re-enqueued). Fresh .prg.
             exp_yml = _make_exp_tree(
-                root, "RUNS_FINISHED", _uuid(1002), process_order_groups={0: [0, 1]}
+                root, RunDir.FINISHED.value, _uuid(1002), process_order_groups={0: [0, 1]}
             )
             synced_exp_yml = _make_exp_tree(
-                root, "RUNS_SYNCED", _uuid(1002), process_order_groups={0: [0, 1]}
+                root, RunDir.SYNCED.value, _uuid(1002), process_order_groups={0: [0, 1]}
             )
             _make_action(synced_exp_yml, 0)
             _make_action(synced_exp_yml, 1)
@@ -195,10 +196,10 @@ async def _run_checks() -> dict:
             root = Path(tmp_root)
             # group 1 is planned but its action (order 1) never dispatched/synced
             exp_yml = _make_exp_tree(
-                root, "RUNS_FINISHED", _uuid(1003), process_order_groups={0: [0], 1: [1]}
+                root, RunDir.FINISHED.value, _uuid(1003), process_order_groups={0: [0], 1: [1]}
             )
             synced_exp_yml = _make_exp_tree(
-                root, "RUNS_SYNCED", _uuid(1003), process_order_groups={0: [0], 1: [1]}
+                root, RunDir.SYNCED.value, _uuid(1003), process_order_groups={0: [0], 1: [1]}
             )
             _make_action(synced_exp_yml, 0)  # only group 0 has an action
 
@@ -228,7 +229,7 @@ async def _run_checks() -> dict:
 
             root = Path(tmp_root)
             exp_yml = _make_exp_tree(
-                root, "RUNS_FINISHED", _uuid(1004), process_order_groups={0: [0]}
+                root, RunDir.FINISHED.value, _uuid(1004), process_order_groups={0: [0]}
             )
 
             def _split_meta(split: int) -> dict:
@@ -283,10 +284,10 @@ async def _run_checks() -> dict:
             root = Path(tmp_root)
             # action order 0 declared in BOTH group 0 and group 1
             exp_yml = _make_exp_tree(
-                root, "RUNS_FINISHED", _uuid(1005), process_order_groups={0: [0], 1: [0]}
+                root, RunDir.FINISHED.value, _uuid(1005), process_order_groups={0: [0], 1: [0]}
             )
             synced_exp_yml = _make_exp_tree(
-                root, "RUNS_SYNCED", _uuid(1005), process_order_groups={0: [0], 1: [0]}
+                root, RunDir.SYNCED.value, _uuid(1005), process_order_groups={0: [0], 1: [0]}
             )
             _make_action(synced_exp_yml, 0)
 
