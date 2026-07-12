@@ -107,6 +107,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import helao.core.servers.base as base_module
+import helao.core.servers.active_finalizer as finalizer_module
 import helao.helpers.premodels as premodels_module
 from helao.core.servers.base import Base, Active
 from helao.core.error import ErrorCodes
@@ -536,6 +537,14 @@ class _PatchedBaseGlobals:
                     "event": "private_dispatch",
                     "action": private_action,
                     "json_keys": sorted((json_dict or {}).keys()),
+                    # record the EXPORTED VALUES (not just key names) so the
+                    # global-param fold-out is frozen by value, and the dict-form
+                    # rename mapping (k1 -> k2) is observable (which OUTPUT key
+                    # carries which value). JSON-safe + key-sorted for stable text.
+                    "json_values": {
+                        str(k): _json_safe(v)
+                        for k, v in sorted((json_dict or {}).items())
+                    },
                 }
             )
             return {}, ErrorCodes.none
@@ -550,12 +559,24 @@ class _PatchedBaseGlobals:
             (base_module, "async_copy"): base_module.async_copy,
             (base_module, "set_time"): base_module.set_time,
             (premodels_module, "set_time"): premodels_module.set_time,
+            # The finish/split close-out (move_dir / async_private_dispatcher /
+            # set_time) was extracted to ``active_finalizer`` in P6 S8; the moved
+            # ``_finish`` resolves these three from the finalizer module's own
+            # namespace, so they must be patched there too (else the real
+            # disk-move/RPC/wall-clock would run and the finish trace + fixed
+            # timestamps would diverge from the frozen baseline).
+            (finalizer_module, "move_dir"): finalizer_module.move_dir,
+            (finalizer_module, "async_private_dispatcher"): finalizer_module.async_private_dispatcher,
+            (finalizer_module, "set_time"): finalizer_module.set_time,
         }
         base_module.move_dir = _fake_move_dir
         base_module.async_private_dispatcher = _fake_private_dispatcher
         base_module.async_copy = _fake_async_copy
         base_module.set_time = _fixed_set_time
         premodels_module.set_time = _fixed_set_time
+        finalizer_module.move_dir = _fake_move_dir
+        finalizer_module.async_private_dispatcher = _fake_private_dispatcher
+        finalizer_module.set_time = _fixed_set_time
         return self
 
     def __exit__(self, *exc):
@@ -975,6 +996,87 @@ async def _scenario_finalizer_global_params(save_root: Path) -> dict:
     return {"trace": trace}
 
 
+async def _scenario_finalizer_global_params_dict(save_root: Path) -> dict:
+    """Dict-form ``to_global_params`` rename mapping (``k1 -> k2``).
+
+    ``finish``/``_finish`` folds ``to_global_params`` out to the orch. The list
+    form (scenario 8) exports each key under its own name; the DICT form renames
+    ``src_key`` (read from ``action_output``) to ``dest_key`` on export. With the
+    private-dispatch trace now recording VALUES, this freezes that the renamed
+    OUTPUT key carries the source value -- an otherwise untested branch of the
+    fold-out that a broken rename (wrong key, dropped value) would silently
+    change."""
+    trace: list = []
+    base = _make_base(save_root, trace)
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action(
+            "gpdict",
+            to_global_params={"src_key": "dest_key"},
+            action_output={"src_key": "RENAMED_VALUE"},
+        )
+        active = Active(base, _active_params(base, action))
+        await active.myinit()
+        await _ticks()
+
+        await active.enqueue_data_dflt({"t": 0, "v": 0})
+        await _drain_data(active)
+
+        await active.finish()
+        await _ticks(10)
+        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+    return {"trace": trace}
+
+
+async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
+    """GAP#3: reach ``finish()`` with a data packet STILL IN FLIGHT.
+
+    Every other scenario drains each enqueued packet (``_drain_data``) before the
+    next lifecycle step, so ``num_data_queued == num_data_written`` at finish
+    entry and the finished-packet write-drain loop in ``_finish`` (roughly
+    base.py:1618-1645 -- the retry+``sleep(0.1)`` that lets the threadpool file
+    writes complete BEFORE the file connections are closed) never has anything to
+    flush: its late-data-vs-file-close race is unobservable.
+
+    Here we open the file with one drained packet, then enqueue a SECOND packet
+    with ``enqueue_data_nowait`` and IMMEDIATELY call ``finish()`` with NO drain
+    in between. Because ``enqueue_data_nowait`` is fully synchronous, the data
+    logger cannot have run yet, so ``num_data_queued > num_data_written`` holds
+    deterministically at finish entry (recorded as ``undrained``). The OBSERVABLE
+    consequence frozen here is the drained ``.hlo`` bytes: the late row
+    (``t=1, v=111``) MUST be present in the file after finish -- i.e. the drain
+    flushed it before ``_finish`` closed and cleared ``file_conn_dict``. If the
+    drain were skipped/broken the late write would be lost (file closed first),
+    the row would vanish from the ``.hlo`` whole-record multiset, and ``--check``
+    would fail (the BITE)."""
+    trace: list = []
+    base = _make_base(save_root, trace)
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action("fdrain")
+        active = Active(base, _active_params(base, action))
+        await active.myinit()
+        await _ticks()
+
+        dflt = base.dflt_file_conn_key()
+        # first packet drained normally: opens the file + writes the header row
+        await active.enqueue_data_dflt({"t": 0, "v": 0})
+        await _drain_data(active)
+
+        # late packet: enqueue synchronously (nowait) then finish immediately, so
+        # it is still in flight at finish entry. No await between the enqueue and
+        # the flag read => the data logger has not consumed it => strictly
+        # undrained, deterministically.
+        active.enqueue_data_nowait(
+            DataModel(data={dflt: {"t": 1, "v": 111}}, errors=[], status=HloStatus.active)
+        )
+        undrained = active.num_data_queued > active.num_data_written
+        trace.append({"event": "pre_finish", "undrained": undrained})
+
+        await active.finish()
+        await _ticks(10)
+        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+    return {"trace": trace}
+
+
 async def _scenario_nonblocking(save_root: Path) -> dict:
     """Non-blocking action: ``add_status`` short-circuits (no ``status_q`` put) and
     ``send_nonblocking_status`` fans one packet per subscriber out through
@@ -1132,6 +1234,8 @@ SCENARIOS = {
     "9_nonblocking_status": _scenario_nonblocking,
     "10_executor_concurrent": _scenario_executor_concurrent,
     "11_executor_oneoff": _scenario_executor_oneoff,
+    "12_finalizer_global_params_dict": _scenario_finalizer_global_params_dict,
+    "13_finish_late_data_drain": _scenario_finish_late_data_drain,
 }
 
 

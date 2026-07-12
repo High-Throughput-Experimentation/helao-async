@@ -92,6 +92,7 @@ from helao.core.servers.base_endpoints import EndpointManager
 from helao.core.servers.active_data_file import DataFileWriter
 from helao.core.servers.active_data_stream import DataStreamer
 from helao.core.servers.active_executor import ExecutorRunner
+from helao.core.servers.active_finalizer import ActionFinalizer
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -980,6 +981,18 @@ class Active:
         # (all initialized above); those state attributes stay on Active.
         self.executor_runner = ExecutorRunner(self)
 
+        # per-Active action-finalization collaborator (CARDS P6 S8, the LAST and
+        # highest-risk Active extraction). Constructed at the end of __init__
+        # alongside the other collaborators: finish/split/substitute are only
+        # called post-init (by the executor loop, drivers, and the orch's
+        # finish_active_* handlers), so nothing in __init__ needs it yet. It
+        # back-refs this Active and reads action/action_list/listen_uuids/
+        # num_data_*/file_conn_dict/data_logger/finish_lock/active_uuid/base at
+        # call time (all initialized above); those state attributes stay on
+        # Active and are never cached here (a cached counter/list = a finish that
+        # closes before late data lands, or a lost split child).
+        self.action_finalizer = ActionFinalizer(self)
+
     def executor_done_callback(self, futr):
         """Log any exception raised by the executor task on completion."""
         return self.executor_runner.executor_done_callback(futr)
@@ -1353,15 +1366,15 @@ class Active:
 
     async def split_and_keep_active(self):
         """Split the current action while leaving every previous action open."""
-        await self.split(uuid_list=[])
+        return await self.action_finalizer.split_and_keep_active()
 
     async def split_and_finish_prev_uuids(self):
         """Split the current action and finish every previously held action."""
-        await self.split(uuid_list=None)
+        return await self.action_finalizer.split_and_finish_prev_uuids()
 
     async def finish_all(self):
         """Finish every action tracked by this active wrapper."""
-        await self.finish(finish_uuid_list=None)
+        return await self.action_finalizer.finish_all()
 
     async def split(
         self,
@@ -1382,110 +1395,13 @@ class Active:
         Returns:
             The keys of the newly created file connections.
         """
-
-        try:
-            new_file_conn_keys = []
-
-            LOGGER.info("got split action request")
-            # add split status to current action
-            if HloStatus.split not in self.action.action_status:
-                self.action.append_action_status(HloStatus.split)
-            # make a copy of prev_action
-            prev_action = deepcopy(self.action)
-            prev_action_list = deepcopy(self.action_list)
-            # set the data_stream_status
-            prev_action.data_stream_status = HloStatus.split
-            self.action.data_stream_status = HloStatus.active
-            # increase split counter for new action
-            # needs to happen before init_act
-            # as its also used in the fodler name
-            self.action.action_split += 1
-
-            # now re-init current action
-            # force action init (new action uuid and timestamp)
-            self.action.init_act(time_offset=self.base.ntp_offset, force=True)
-            self.action_list += prev_action_list
-            # add new action uuid to listen_uuids
-            self.add_new_listen_uuid(self.action.action_uuid)
-            # remove previous listen_uuid to stop writing to previous hlo file
-            self.listen_uuids.remove(prev_action.action_uuid)
-
-            # add child and parent action uuids
-            prev_action.child_action_uuid = self.action.action_uuid
-            self.action.parent_action_uuid = prev_action.action_uuid
-
-            # reset action sample list and others
-            self.action.samples_in = []
-            self.action.samples_out = []
-            self.action.child_action_uuid = None
-            self.action.files = []
-
-            # reset all of the new actions file_conn uuids
-            self.action.file_conn_keys = []
-
-            # grab all fileconns from prev_action
-            # some action are multi file out and each split action
-            # needs to create the same number of new files
-            for file_conn_key in prev_action.file_conn_keys:
-                # await asyncio.sleep(0.1)
-                LOGGER.info("Creating new file_conn for split action")
-                current_epoch_ns = await self.get_realtime()
-                new_file_conn_key = self.base.new_file_conn_key(
-                    key=str(current_epoch_ns)
-                )
-                if new_fileconnparams is None:
-                    # get last file conn
-                    new_file_conn = self.file_conn_dict[file_conn_key].deepcopy()
-                    # modify last file_conn
-                    new_file_conn.params.file_conn_key = new_file_conn_key
-                    # reset some of the file conn parameters
-                    new_file_conn.reset_file_conn()
-                    # add new timestamp
-                    new_file_conn.params.hloheader.epoch_ns = current_epoch_ns
-                else:
-                    new_file_conn = FileConn(params=new_fileconnparams)
-                    new_file_conn.params.file_conn_key = new_file_conn_key
-
-                new_file_conn_keys.append(new_file_conn_key)
-                # add the new one to active file conn dict
-                self.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
-                # and add the new file_conn_uuid to the new split action
-                self.action.file_conn_keys = [
-                    new_file_conn.params.file_conn_key
-                ] + self.action.file_conn_keys
-                self.num_data_queued = 0
-                self.num_data_written = 0
-
-            # TODO:
-            # update other action settings?
-            # - sample name
-
-            # # prepend new action to previous action list
-            # self.action_list.append(prev_action)
-
-            # send status for new split action
-            await self.add_status()
-
-            # finish selected actions
-            if uuid_list is None:
-                # default: finish all except current one
-                await self.finish(
-                    finish_uuid_list=[act.action_uuid for act in self.action_list[1:]]
-                )
-
-            else:
-                # use the supplied uuid list
-                await self.finish(finish_uuid_list=uuid_list)
-        except Exception:
-            LOGGER.error("Active.split() failed", exc_info=True)
-
-        return new_file_conn_keys
+        return await self.action_finalizer.split(
+            uuid_list=uuid_list, new_fileconnparams=new_fileconnparams
+        )
 
     async def substitute(self):
         """Close every open HLO file for this active so a new active can take over."""
-        for filekey in self.file_conn_dict:
-            if self.file_conn_dict[filekey].file:
-                await self.file_conn_dict[filekey].file.close()
+        return await self.action_finalizer.substitute()
 
     async def finish(
         self,
@@ -1508,225 +1424,14 @@ class Active:
         Returns:
             The current ``self.action`` after finalisation.
         """
-        async with self.finish_lock:
-            return await self._finish(finish_uuid_list=finish_uuid_list)
+        return await self.action_finalizer.finish(finish_uuid_list=finish_uuid_list)
 
     async def _finish(
         self,
         finish_uuid_list: Optional[List[UUID]] = None,
     ) -> Action:
         """Finalization body for :meth:`finish`; must be called under ``finish_lock``."""
-        if finish_uuid_list is None:
-            finish_uuid_list = [action.action_uuid for action in self.action_list]
-
-        for action in self.action_list:
-            if action.action_uuid not in finish_uuid_list:
-                continue
-            if HloStatus.finished in action.action_status:
-                continue
-
-            try:
-                # set status to finish
-                # (replace active with finish)
-                action.replace_action_status(HloStatus.active, HloStatus.finished)
-                action.action_finished_timestamp = set_time(offset=self.base.ntp_offset)
-
-                if action.error_code != ErrorCodes.none:
-                    if HloStatus.errored not in action.action_status:
-                        action.append_action_status(HloStatus.errored)
-
-                # send globalparams
-                if action.to_global_params:
-                    export_params = {}
-                    if isinstance(action.to_global_params, list):
-                        for k in action.to_global_params:
-                            if k in action.action_params:
-                                LOGGER.info(f"updating {k} in orch global vars")
-                                export_params[k] = action.action_params[k]
-                            elif k in action.action_output:
-                                LOGGER.info(f"updating {k} in orch global vars")
-                                export_params[k] = action.action_output[k]
-                            else:
-                                LOGGER.info(
-                                    f"key {k} not found in action output or params"
-                                )
-                    elif isinstance(action.to_global_params, dict):
-                        for k1, k2 in action.to_global_params.items():
-                            if k1 in action.action_params:
-                                LOGGER.info(f"updating {k2} in global vars")
-                                export_params[k2] = action.action_params[k1]
-                            elif k1 in action.action_output:
-                                LOGGER.info(f"updating {k2} in global vars")
-                                export_params[k2] = action.action_output[k1]
-                            else:
-                                LOGGER.info(
-                                    f"key {k1} not found in action output or params"
-                                )
-                    _, error_code = await async_private_dispatcher(
-                        server_key=action.orch_key,
-                        host=action.orch_host,
-                        port=action.orch_port,
-                        private_action="update_global_params",
-                        json_dict=export_params,
-                    )
-                    if error_code == ErrorCodes.none:
-                        LOGGER.info("Successfully updated global params.")
-            except Exception:
-                LOGGER.error(
-                    f"Failed to update global params for action {action.action_uuid}",
-                    exc_info=True,
-                )
-
-        # check if all actions are fininshed
-        # if yes close dataLOGGER etc
-        all_finished = True
-        for action in self.action_list:
-            if HloStatus.finished not in action.action_status:
-                # at least one is not finished
-                all_finished = False
-                break
-
-        if all_finished:
-            LOGGER.info("finish active: sending finish data_stream_status package")
-            retry_counter = 0
-            while (
-                not all(
-                    [
-                        action.data_stream_status != HloStatus.active
-                        for action in self.action_list
-                    ]
-                )
-                and retry_counter < 5
-            ):
-                try:
-                    await self.enqueue_data(
-                        datamodel=DataModel(
-                            data={}, errors=[], status=HloStatus.finished
-                        )
-                    )
-                    LOGGER.debug(
-                        f"Waiting for data_stream finished package: {[action.data_stream_status for action in self.action_list]}"
-                    )
-                    await asyncio.sleep(0.1)
-                except Exception:
-                    LOGGER.error(
-                        "Failed to enqueue finished data stream package",
-                        exc_info=True,
-                    )
-                retry_counter += 1
-
-            LOGGER.debug("checking if all queued data has written.")
-            write_retries = 5
-            write_iter = 0
-            while (
-                self.num_data_queued > self.num_data_written
-                and write_iter < write_retries
-            ):
-                try:
-                    LOGGER.info(
-                        f"num_queued {self.num_data_queued} > num_written {self.num_data_written}, sleeping for 0.1 second."
-                    )
-                    for action in self.action_list:
-                        if action.data_stream_status != HloStatus.active:
-                            await self.enqueue_data(
-                                datamodel=DataModel(
-                                    data={}, errors=[], status=HloStatus.finished
-                                )
-                            )
-                            LOGGER.info(
-                                f"Setting datastream to finished: {action.data_stream_status}"
-                            )
-                except Exception:
-                    LOGGER.error(
-                        "Failed to requeue finished data stream package",
-                        exc_info=True,
-                    )
-                write_iter += 1
-                await asyncio.sleep(0.1)
-
-            try:
-                # self.action_list[-1] is the very first action
-                if self.action_list[-1].manual_action:
-                    await self.finish_manual_action()
-
-                # all actions are finished
-                LOGGER.debug("finishing data logging.")
-                for filekey in self.file_conn_dict:
-                    if self.file_conn_dict[filekey].file:
-                        await self.file_conn_dict[filekey].file.close()
-                self.file_conn_dict = {}
-
-                # finish the data writer
-                self.data_logger.cancel()
-            except Exception:
-                LOGGER.error("Failed to finish data logging", exc_info=True)
-
-            save_root = str(self.base.helaodirs.save_root)
-            if self.action.manual_action:
-                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-            try:
-                # call custom hlo post-processor if it exists
-                if self.base.hlo_postprocessors:
-                    for hpp, libname in zip(
-                        self.base.hlo_postprocessors, self.base.hlo_postprocess_libs
-                    ):
-                        LOGGER.info(
-                            f"Running custom HLO post-processor: {os.path.basename(libname).split('.py')[0]}"
-                        )
-                        loop = asyncio.get_running_loop()
-                        postprocessor = hpp(self.action, save_root)
-                        updated_file_list = await loop.run_in_executor(
-                            None, postprocessor.process
-                        )
-                        self.action.files = updated_file_list
-            except Exception:
-                LOGGER.error("Failed to run custom HLO post-processor", exc_info=True)
-            try:
-                l10 = self.base.actives.pop(self.active_uuid, None)
-                if l10 is not None:
-                    self.base.history[l10.action.action_uuid] = copy(l10.action)
-            except Exception:
-                LOGGER.error(
-                    "Failed to remove active from base.actives or last_10_active",
-                    exc_info=True,
-                )
-            LOGGER.info("all active action are done, closing active")
-
-            # DB server call to finish_yml if DB exists
-            for action in self.action_list:
-                try:
-                    # write final act meta file (overwrite existing one)
-                    await self.base.write_act(action=action)
-                except Exception:
-                    LOGGER.error(
-                        f"Failed to write act meta file for action {action.action_uuid}",
-                        exc_info=True,
-                    )
-                try:
-                    # send the last status
-                    await self.add_status(action=action)
-                except Exception:
-                    LOGGER.error(
-                        f"Failed to send last status for action {action.action_uuid}",
-                        exc_info=True,
-                    )
-                if not self.action.manual_action:
-                    try:
-                        self.base.aloop.create_task(move_dir(action, base=self.base))
-                        # pop from local action task queue
-                    except Exception:
-                        LOGGER.error(
-                            f"Failed to move directory for action {action.action_uuid}",
-                            exc_info=True,
-                        )
-                else:
-                    LOGGER.info(
-                        f"Action {action.action_uuid} is a manual action, skipping directory move."
-                    )
-                if action.action_uuid in self.base.local_action_task_queue:
-                    self.base.local_action_task_queue.remove(action.action_uuid)
-
-        return self.action
+        return await self.action_finalizer._finish(finish_uuid_list=finish_uuid_list)
 
     async def track_file(
         self,
@@ -1755,29 +1460,7 @@ class Active:
 
     async def finish_manual_action(self):
         """Finalize a manual action by writing its synthesized experiment and sequence meta files."""
-        # self.action_list[-1] is the very first action
-        if self.action_list[-1].manual_action:
-            exp = deepcopy(self.action_list[-1])
-            exp.reset_experiment_status(HloStatus.finished)
-            exp.reset_sequence_status(HloStatus.finished)
-            exp.samples_in = []
-            exp.samples_out = []
-            exp.files = []
-
-            # add actions to experiment
-            for action in self.action_list:
-                exp.dispatched_actions.append(action.get_act())
-
-            # add experiment to sequence
-            exp.dispatched_experiments.append(action.get_exp())
-
-            # this will write the correct
-            # sequence and experiment meta files for
-            # manual operation
-            # create and write exp file for manual action
-            await self.base.write_exp(exp)
-            # create and write seq file for manual action
-            await self.base.write_seq(exp)
+        return await self.action_finalizer.finish_manual_action()
 
     async def send_nonblocking_status(self, retry_limit: int = 3):
         """Push the action's status to every status subscriber, retrying on failure.
