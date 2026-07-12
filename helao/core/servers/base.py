@@ -90,6 +90,7 @@ from helao.core.servers.base_meta_writer import MetaFileWriter
 from helao.core.servers.base_action_queue import ActionQueueDispatcher
 from helao.core.servers.base_endpoints import EndpointManager
 from helao.core.servers.active_data_file import DataFileWriter
+from helao.core.servers.active_data_stream import DataStreamer
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -898,6 +899,15 @@ class Active:
         self.num_data_queued = 0
         self.num_data_written = 0
 
+        # per-Active data-streaming collaborator (CARDS P6 S6). Constructed here
+        # (before init_act below) because add_new_listen_uuid -- called during
+        # __init__ -- now routes through it. Same per-Active pattern as
+        # data_file_writer: it only back-refs this Active and reads
+        # listen_uuids/num_data_*/file_conn_dict/base.data_q at call time, all
+        # of which are already initialized above. myinit() launches the drain
+        # loop via the log_data_task delegator.
+        self.data_stream = DataStreamer(self)
+
         # this updates timestamp and uuid
         # only if they are None
         # They are None in manual, but already set in orch mode
@@ -1133,15 +1143,13 @@ class Active:
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """Forward to :meth:`Base.get_realtime` for NTP-corrected nanoseconds."""
-        return await self.base.get_realtime(epoch_ns=epoch_ns, offset=offset)
+        return await self.data_stream.get_realtime(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
     ) -> int:
         """Return NTP-corrected nanoseconds from the base controller (non-async)."""
-        return int(
-            np.floor(self.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset))
-        )
+        return self.data_stream.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     async def write_live_data(self, output_str: str, file_conn_key: UUID):
         """Append ``output_str`` (with a trailing newline) to the open file for ``file_conn_key``.
@@ -1149,62 +1157,37 @@ class Active:
         Returns:
             None
         """
-        if file_conn_key in self.file_conn_dict:
-            if self.file_conn_dict[file_conn_key].file:
-                if not output_str.endswith("\n"):
-                    output_str += "\n"
-                await self.file_conn_dict[file_conn_key].file.write(output_str)
+        return await self.data_stream.write_live_data(output_str, file_conn_key)
 
     async def enqueue_data_dflt(self, datadict: dict):
         """Enqueue ``datadict`` against the default file-connection key as an active ``DataModel``."""
-        await self.enqueue_data(
-            datamodel=DataModel(
-                data={self.base.dflt_file_conn_key(): datadict},
-                errors=[],
-                status=HloStatus.active,
-            )
-        )
+        return await self.data_stream.enqueue_data_dflt(datadict)
 
     def _build_data_package(
         self, datamodel: DataModel, action: Optional[Action] = None
     ) -> tuple:
         """Return ``(DataPackageModel, has_data)`` derived from ``datamodel`` and ``action``."""
-        if action is None:
-            action = self.action
-        return self.assemble_data_msg(datamodel=datamodel, action=action), bool(datamodel.data)
+        return self.data_stream._build_data_package(datamodel, action)
 
     async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
         """Publish ``datamodel`` onto the data queue and bump the queued counter if it had data."""
-        msg, has_data = self._build_data_package(datamodel, action)
-        await self.base.data_q.put(msg)
-        if has_data:
-            self.num_data_queued += 1
+        return await self.data_stream.enqueue_data(datamodel, action)
 
     def enqueue_data_nowait(
         self, datamodel: DataModel, action: Optional[Action] = None
     ):
         """Non-awaiting variant of :meth:`enqueue_data`."""
-        msg, has_data = self._build_data_package(datamodel, action)
-        self.base.data_q.put_nowait(msg)
-        if has_data:
-            self.num_data_queued += 1
+        return self.data_stream.enqueue_data_nowait(datamodel, action)
 
     def assemble_data_msg(
         self, datamodel: DataModel, action: Optional[Action] = None
     ) -> DataPackageModel:
         """Wrap a ``DataModel`` and ``Action`` into a ``DataPackageModel`` for the data queue."""
-        if action is None:
-            action = self.action
-        return DataPackageModel(
-            action_uuid=action.action_uuid,
-            action_name=action.action_name,
-            datamodel=datamodel,
-            errors=datamodel.errors,
-        )
+        return self.data_stream.assemble_data_msg(datamodel, action)
 
     def add_new_listen_uuid(self, new_uuid: UUID):
         """Track ``new_uuid`` as a data-stream source for this active's data logger."""
-        self.listen_uuids.append(new_uuid)
+        return self.data_stream.add_new_listen_uuid(new_uuid)
 
     def _get_action_for_file_conn_key(self, file_conn_key: UUID):
         """Return the action whose ``file_conn_keys`` contains ``file_conn_key``, or ``None``."""
@@ -1230,116 +1213,7 @@ class Active:
         HLO ``%%`` separator before the first data row, and serialises dict
         payloads as JSON. Runs until cancelled when the action finishes.
         """
-        if not self.action.save_data:
-            LOGGER.info("data writing disabled")
-            return
-
-        # self.base.print_message(
-        #     f"starting data LOGGER for active action: {self.action.action_uuid}",
-        #     info=True,
-        # )
-
-        dq_sub = self.base.data_q.subscribe()
-
-        try:
-            async for data_msg in dq_sub:
-                # check if the new data_msg is in listen_uuids
-                if data_msg.action_uuid not in self.listen_uuids:
-                    continue
-
-                data_status = data_msg.datamodel.status
-                data_dict = data_msg.datamodel.data
-
-                self.action.data_stream_status = data_status
-
-                if data_status not in (None, HloStatus.active):
-                    LOGGER.debug(
-                        f"data_stream: skipping package for status: {data_status}"
-                    )
-                    continue
-
-                for file_conn_key, sample_data in data_dict.items():
-                    output_action = self._get_action_for_file_conn_key(
-                        file_conn_key=file_conn_key
-                    )
-                    if output_action is None:
-                        LOGGER.error(
-                            "data LOGGER could not find action for file_conn_key"
-                        )
-                        continue
-
-                    if file_conn_key not in self.file_conn_dict:
-                        if output_action.save_data:
-                            LOGGER.warning(
-                                f"'{file_conn_key}' does not exist in file_conn '{self.file_conn_dict}'."
-                            )
-                        else:
-                            # got data but saving is disabled,
-                            # e.g. no file was created,
-                            # e.g. file_conn_key is not in self.file_conn_dict
-                            LOGGER.info(
-                                "data logging is disabled for action '{output_action.action_name}'"
-                            )
-
-                        continue
-
-                    # check if we need to create the file first
-                    if self.file_conn_dict[file_conn_key].file is None:
-                        if not self.file_conn_dict[file_conn_key].params.json_data_keys:
-                            jsonkeys = [key for key in sample_data.keys()]
-                            LOGGER.debug(
-                                "no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}"
-                            )
-
-                            self.file_conn_dict[file_conn_key].params.json_data_keys = (
-                                jsonkeys
-                            )
-
-                        LOGGER.debug(f"creating output file for {file_conn_key}")
-                        # create the file for this data stream
-                        await self.log_data_set_output_file(file_conn_key=file_conn_key)
-
-                    # write only data if the file connection is open
-                    if self.file_conn_dict[file_conn_key].file:
-                        # check if separator was already written
-                        # else add it
-                        if not self.file_conn_dict[file_conn_key].added_hlo_separator:
-                            self.file_conn_dict[file_conn_key].added_hlo_separator = (
-                                True
-                            )
-                            await self.write_live_data(
-                                output_str="%%\n",
-                                file_conn_key=file_conn_key,
-                            )
-
-                        if isinstance(sample_data, dict):
-                            try:
-                                output_str = json.dumps(sample_data)
-                            except TypeError:
-                                LOGGER.error("Data is not json serializable.")
-                                output_str = json.dumps(
-                                    {"error": "data was not serializable"}
-                                )
-                            await self.write_live_data(
-                                output_str=output_str,
-                                file_conn_key=file_conn_key,
-                            )
-                        else:
-                            await self.write_live_data(
-                                output_str=sample_data, file_conn_key=file_conn_key
-                            )
-                    else:
-                        LOGGER.error("output file closed?")
-                if data_dict:
-                    self.num_data_written += 1
-
-        except asyncio.CancelledError:
-            LOGGER.debug("removing data_q subscription for active")
-            if dq_sub in self.base.data_q.subscribers:
-                self.base.data_q.remove(dq_sub)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"data LOGGER task failed with error: {repr(e), tb,}")
+        return await self.data_stream.log_data_task()
 
     def _resolve_output_path(
         self,
