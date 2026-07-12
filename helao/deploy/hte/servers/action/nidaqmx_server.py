@@ -1,11 +1,13 @@
 """FastAPI action server for an NI DAQmx instrument.
 
-Wraps :class:`cNIMAX` and the :class:`DevMonExec` executor and dynamically
-exposes digital-output endpoints for each populated device group declared
-in ``server_params`` (mastercell, activecell, pump, gasvalve, liquidvalve,
+Wraps :class:`cNIMAX` and its :class:`CellIVExec` (multi-cell IV) and
+:class:`DevMonExec` (monitor acquisition) executors, and dynamically exposes
+digital-output endpoints for each populated device group declared in
+``server_params`` (mastercell, activecell, pump, gasvalve, liquidvalve,
 multivalve, led, fswbcd, heater) plus digital-input endpoints for foot
 switches, multi-cell IV measurement, monitor acquisition, and a
-temperature-controlled heat loop.
+temperature-controlled heat loop. Thermocouple monitor channels are
+always-on, polled by :class:`cNIMAXPoller`.
 """
 
 __all__ = ["makeApp"]
@@ -29,7 +31,7 @@ from typing import List, Union
 
 
 from helao.core.servers.base_api import BaseAPI
-from ...drivers.io.nidaqmx_driver import cNIMAX, DevMonExec
+from ...drivers.io.nidaqmx_driver import cNIMAX, cNIMAXPoller, CellIVExec, DevMonExec
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,
@@ -37,9 +39,36 @@ from helao.core.models.sample import (
     SolidSample,
     NoneSample,
 )
+from helao.core.models.file import FileConnParams, HloHeaderModel
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
+from helao.helpers.active_params import ActiveParams
+from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.error import ErrorCodes
+
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+async def nidaqmx_dyn_endpoints(app: BaseAPI):
+    """Open the NI-DAQ connection and wire the seams the driver needs from the server.
+
+    Called once at startup (after the driver is constructed): opens the
+    thermocouple monitor task and NEGATE3 scale via `connect()` (not in
+    `__init__`, per the HelaoDriver ABC's no-device-I/O-at-construction
+    rule), wires `_base_hook` so the NI-DAQmx hardware callback can do its
+    synchronous estop/live-buffer reads, and constructs the single shared
+    `UnifiedSampleDataAPI` instance the `cellIV` endpoint validates samples
+    against (mirrors the pre-migration one-instance-per-server pattern).
+    """
+    app.driver: cNIMAX
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"NI-MAX connect() returned status={connect_resp.status}")
+    app.driver._base_hook = app.base
+
+    app.unified_db = UnifiedSampleDataAPI(app.base)
+    await app.unified_db.init_db()
 
 
 def makeApp(server_key) -> BaseAPI:
@@ -62,6 +91,8 @@ def makeApp(server_key) -> BaseAPI:
         description="NIdaqmx server",
         version=2.0,
         driver_classes=[cNIMAX],
+        poller_class=cNIMAXPoller,
+        dyn_endpoints=nidaqmx_dyn_endpoints,
     )
     dev_monitor = app.server_params.get("dev_monitor", {})
     dev_monitoritems = make_str_enum("dev_monitor", {key: key for key in dev_monitor})
@@ -424,8 +455,14 @@ def makeApp(server_key) -> BaseAPI:
         ):
             """Run a synchronised multi-cell current/voltage measurement.
 
-            Delegates to ``driver.run_cell_IV`` which streams I and V samples
-            for every configured cell channel.
+            Validates the inbound samples against the unified sample DB,
+            creates one file-conn per cell (via :class:`CellIVExec`, which
+            splits the active action so each cell has its own output
+            stream), configures the IV NI-DAQ task, and starts the executor.
+            Returns an "already in progress" error if a measurement is
+            already running, or a "no sample" error if sample validation
+            fails (matching the pre-migration ``run_cell_IV`` behavior:
+            neither case creates an ``Active`` action).
 
             Args:
                 action: Action wrapper supplied by the orchestrator.
@@ -436,12 +473,65 @@ def makeApp(server_key) -> BaseAPI:
                 TTLwait: Trigger channel to wait on; ``-1`` disables waiting.
 
             Returns:
-                The active action dictionary returned by the driver.
+                The active action dictionary from ``start_executor``, or a
+                finished-with-error action dict if validation failed.
             """
             A = app.base.setup_action()
             A.action_abbr = "multiCV"
-            active_dict = await app.driver.run_cell_IV(A)
-            return active_dict
+            A.error_code = ErrorCodes.none
+
+            if app.driver.IO_do_meas:
+                A.error_code = ErrorCodes.in_progress
+                return A.as_dict()
+
+            samples_in = await app.unified_db.get_samples(A.samples_in)
+            if not samples_in and not app.driver.allow_no_sample:
+                LOGGER.error("NI got no valid sample, cannot start measurement!")
+                A.error_code = ErrorCodes.no_sample
+                return A.as_dict()
+
+            cell_keys = app.driver.FIFO_cell_keys
+            file_sample_label = {}
+            file_sample_list = []
+            for i, cell_key in enumerate(cell_keys):
+                if samples_in is not None:
+                    if len(samples_in) == 9:  # number of cells ---- restored to 9
+                        file_sample_list.append([samples_in[i]])
+                        sample_label = [samples_in[i].get_global_label()]
+                    else:
+                        file_sample_list.append(samples_in)
+                        sample_label = [
+                            sample.get_global_label() for sample in samples_in
+                        ]
+                else:
+                    file_sample_list.append([])
+                    sample_label = None
+                file_sample_label[cell_key] = sample_label
+
+            active = await app.base.contain_action(
+                ActiveParams(
+                    action=A,
+                    file_conn_params_dict={
+                        app.base.dflt_file_conn_key(): FileConnParams(
+                            file_conn_key=app.base.dflt_file_conn_key(),
+                            sample_global_labels=file_sample_label[cell_keys[0]],
+                            file_type="ni_helao__file",
+                            # only add optional keys to header
+                            # rest will be added later
+                            hloheader=HloHeaderModel(optional={"cell": cell_keys[0]}),
+                        )
+                    },
+                )
+            )
+            executor = CellIVExec(
+                samples_in=samples_in,
+                file_sample_list=file_sample_list,
+                active=active,
+                oneoff=False,
+                poll_rate=0.1,
+            )
+            active_action_dict = active.start_executor(executor)
+            return active_action_dict
 
     if dev_monitor:
 
@@ -547,9 +637,14 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post("/monloop", tags=["private"])
         async def monloop():
-            """Run the driver's blocking monitor loop until ``stop_monitor``."""
-            # A =  app.base.setup_action()
-            A = await app.driver.monitorloop()
+            """(Re)start the always-on thermocouple monitor poller.
+
+            The monitor task is now polled continuously by ``cNIMAXPoller``
+            (wired as this server's ``poller_class``) rather than a
+            driver-owned background loop; this endpoint is kept for
+            compatibility and simply un-pauses that poller.
+            """
+            await app.poller._start_polling()
 
         @app.post(f"/{server_key}/heatloop", tags=["action"])
         async def heatloop(
@@ -625,8 +720,8 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post("/stopmonloop", tags=["private"])
         async def monloopstop():
-            """Signal the driver's monitor loop to exit."""
-            app.driver.stop_monitor()
+            """Pause the always-on thermocouple monitor poller."""
+            await app.poller._stop_polling()
 
         @app.post("/stopheatloop", tags=["private"])
         async def heatloopstop():

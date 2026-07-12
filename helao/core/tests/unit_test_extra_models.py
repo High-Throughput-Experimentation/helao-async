@@ -39,6 +39,7 @@ from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.process import ProcessModel, ShortProcessModel
 from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.run_dir import RunDir
 from helao.core.models.run_use import RunUse
 from helao.core.models.s3locator import S3Locator
 from helao.core.tests._test_utils import TestReporter
@@ -121,14 +122,14 @@ def extra_models_unit_test() -> bool:
         )
         hd2 = HelaoDirs(
             root=Path("/tmp/helao"),
-            save_root=Path("/tmp/helao/RUNS_FINISHED"),
+            save_root=Path(f"/tmp/helao/{RunDir.FINISHED.value}"),
             log_root=Path("/tmp/helao/LOGS"),
         )
         dumped = hd2.as_dict()
         reporter.check(
             "HelaoDirs.as_dict serialises Path values to posix strings",
             lambda: dumped["root"] == "/tmp/helao"
-            and dumped["save_root"] == "/tmp/helao/RUNS_FINISHED",
+            and dumped["save_root"] == f"/tmp/helao/{RunDir.FINISHED.value}",
         )
 
         reporter.section("S3Locator url property")

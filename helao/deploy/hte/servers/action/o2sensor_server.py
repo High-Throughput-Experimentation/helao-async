@@ -18,7 +18,7 @@ from helao.core.models.sample import (
     SolidSample,
     NoneSample,
 )
-from ...drivers.sensor.cm0134_driver import CM0134, O2MonExec
+from ...drivers.sensor.cm0134_driver import CM0134, CM0134Poller, O2MonExec
 
 
 def makeApp(server_key) -> BaseAPI:
@@ -41,6 +41,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Sensor server",
         version=0.1,
         driver_classes=[CM0134],
+        poller_class=CM0134Poller,
     )
 
     @app.post(f"/{server_key}/acquire_o2", tags=["action"])

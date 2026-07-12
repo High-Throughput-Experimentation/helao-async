@@ -63,7 +63,7 @@ def makeApp(server_key) -> BaseAPI:
             on=active.action.action_params["on"],
         )
         if driver_resp.response != DriverResponseType.success:
-            active.action.action_status.append(HloStatus.errored)
+            active.action.append_action_status(HloStatus.errored)
             active.action.error_code = ErrorCodes.cmd_error
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -88,7 +88,7 @@ def makeApp(server_key) -> BaseAPI:
             on=active.action.action_params["on"],
         )
         if driver_resp.response != DriverResponseType.success:
-            active.action.action_status.append(HloStatus.errored)
+            active.action.append_action_status(HloStatus.errored)
             active.action.error_code = ErrorCodes.cmd_error
         finished_action = await active.finish()
         return finished_action.as_dict()

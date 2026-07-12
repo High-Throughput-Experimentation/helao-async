@@ -10,6 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, field_validator
 
 from .hlostatus import HloStatus
+from .status_transitions import guarded_append, guarded_replace, guarded_reset
 from .experiment import (
     ShortExperimentModel,
 )
@@ -125,3 +126,15 @@ class SequenceModel(ShortSequenceModel):
     manual_action: bool = False
     initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})
+
+    def append_sequence_status(self, s: HloStatus) -> None:
+        """Guarded append onto ``sequence_status`` (see status_transitions.guarded_append)."""
+        guarded_append(self.sequence_status, s, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")
+
+    def replace_sequence_status(self, old: HloStatus, new: HloStatus) -> None:
+        """Guarded swap-or-append onto ``sequence_status`` (see status_transitions.guarded_replace)."""
+        guarded_replace(self.sequence_status, old, new, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")
+
+    def reset_sequence_status(self, *statuses: HloStatus) -> None:
+        """Guarded wholesale reset of ``sequence_status`` (see status_transitions.guarded_reset)."""
+        guarded_reset(self.sequence_status, statuses, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")

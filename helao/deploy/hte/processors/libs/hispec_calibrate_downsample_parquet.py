@@ -9,6 +9,7 @@ the spectral time axis. Used by
 """
 
 from helao.helpers.hlo_data import read_hlo
+from helao.core.models.run_dir import RunDir
 import pandas as pd
 import numpy as np
 import os
@@ -97,10 +98,10 @@ def read_CV_hlo(
             default_current_header,
         ]
 
-    if not os.path.exists(hlo_path) and "RUNS_ACTIVE" in hlo_path:
-        hlo_path = hlo_path.replace("RUNS_ACTIVE", "RUNS_FINISHED")
-    if not os.path.exists(hlo_path) and "RUNS_FINISHED" in hlo_path:
-        hlo_path = hlo_path.replace("RUNS_FINISHED", "RUNS_SYNCED")
+    if not os.path.exists(hlo_path) and RunDir.ACTIVE.value in hlo_path:
+        hlo_path = hlo_path.replace(RunDir.ACTIVE.value, RunDir.FINISHED.value)
+    if not os.path.exists(hlo_path) and RunDir.FINISHED.value in hlo_path:
+        hlo_path = hlo_path.replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
     if not os.path.exists(hlo_path):
         raise FileNotFoundError(f"File {hlo_path} not found")
 

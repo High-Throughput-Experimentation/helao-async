@@ -80,7 +80,7 @@ def orch_status_unit_test() -> bool:
             lambda: act_active.action_uuid in endpoint.active_dict,
         )
 
-        act_active.action_status.append(HloStatus.finished)
+        act_active.append_action_status(HloStatus.finished)
         endpoint.sort_status()
         reporter.check(
             "finished action moved out of active_dict",
@@ -166,7 +166,7 @@ def orch_status_unit_test() -> bool:
         # Tag the action with the experiment, mark it finished, and let
         # the global model promote it through update_global_with_acts.
         new_act.experiment_uuid = exp_uuid
-        new_act.action_status.append(HloStatus.finished)
+        new_act.append_action_status(HloStatus.finished)
         recent_nonactive = gsm.update_global_with_acts(as_model2)
         reporter.check(
             "update_global_with_acts reports the newly finished action",

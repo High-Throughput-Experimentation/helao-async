@@ -1,5 +1,6 @@
 import os
 from socket import gethostname
+from typing import Optional
 from fastapi import FastAPI
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
@@ -13,8 +14,6 @@ config, logger, machine model, action-aware route class, and co-located ZMQ
 RPC dispatcher; and :class:`HelaoBokehAPI`, the equivalent helper for Bokeh
 visualizer/operator apps.
 """
-
-CONFIG = config_loader.CONFIG
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
 
@@ -45,12 +44,20 @@ class HelaoFastAPI(FastAPI):
         rpc_dispatcher: ZMQ dispatcher mirroring POST endpoints.
     """
 
-    def __init__(self, helao_srv: str, *args, **kwargs):
+    def __init__(
+        self,
+        helao_srv: str,
+        *args,
+        helao_cfg: Optional[dict] = None,
+        **kwargs,
+    ):
         """Initialize the FastAPI app and register startup/shutdown hooks.
 
         Args:
             helao_srv: Server key used to look up this server's configuration.
             *args: Forwarded to :class:`fastapi.FastAPI`.
+            helao_cfg: Optional config dict to use instead of the module-level
+                ``config_loader.CONFIG`` (injection seam for tests/callers).
             **kwargs: Forwarded to :class:`fastapi.FastAPI`.
         """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
@@ -61,7 +68,7 @@ class HelaoFastAPI(FastAPI):
         from helao.core.servers.base_api import ActionAPIRoute
 
         self.router.route_class = ActionAPIRoute
-        self.helao_cfg = CONFIG
+        self.helao_cfg = helao_cfg if helao_cfg is not None else config_loader.CONFIG
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
@@ -131,15 +138,17 @@ class HelaoBokehAPI:
         vis: Placeholder object overwritten by the concrete visualizer.
     """
 
-    def __init__(self, helao_srv: str, doc):
+    def __init__(self, helao_srv: str, doc, helao_cfg: Optional[dict] = None):
         """Initialize logging, machine identity, and the Bokeh document title.
 
         Args:
             helao_srv: Server key used to look up this server's configuration.
             doc: The Bokeh ``Document`` to populate.
+            helao_cfg: Optional config dict to use instead of the module-level
+                ``config_loader.CONFIG`` (injection seam for tests/callers).
         """
         self.helao_srv = helao_srv
-        self.helao_cfg = CONFIG
+        self.helao_cfg = helao_cfg if helao_cfg is not None else config_loader.CONFIG
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]
         self.server_params = self.server_cfg.get("params", {})
         if logging.LOGGER is None:

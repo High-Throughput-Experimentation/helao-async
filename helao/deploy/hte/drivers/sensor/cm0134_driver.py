@@ -1,11 +1,12 @@
 """CM-0134 oxygen sensor driver (RS-485 / Modbus).
 
-Provides :class:`CM0134`, a Modbus driver that polls O2 ppm values into the
-action server's live buffer, and :class:`O2MonExec`, an executor that records
-those values for a configured duration.
+Provides :class:`CM0134`, a ``HelaoDriver`` Modbus driver for the sensor, the
+paired :class:`CM0134Poller` that publishes O2 ppm readings into the action
+server's live buffer, and :class:`O2MonExec`, an executor that records those
+values for a configured duration.
 """
 
-__all__ = ["CM0134", "O2MonExec"]
+__all__ = ["CM0134", "CM0134Poller", "O2MonExec"]
 
 import time
 import asyncio
@@ -15,18 +16,24 @@ import minimalmodbus
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+    DriverPoller,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-class CM0134:
-    """Modbus-RTU driver for the CM-0134 oxygen sensor.
+class CM0134(HelaoDriver):
+    """Modbus-RTU HelaoDriver for the CM-0134 oxygen sensor.
 
-    Opens a Modbus serial connection on construction and starts a background
-    polling task that pushes O2 ppm readings into the action server's live
-    buffer under the ``o2_ppm`` key.
+    The Modbus serial connection is opened by :meth:`connect`, not by
+    construction; always-on O2 ppm polling is handled by the paired
+    :class:`CM0134Poller`, wired in as the server's ``poller_class``.
 
     Server config parameters:
         ``device``: COM port or device path (e.g. ``"COM7"`` or
@@ -37,58 +44,126 @@ class CM0134:
         ``allow_no_sample``: Whether actions can run without samples.
     """
 
-    def __init__(self, action_serv: Base):
-        """Open the Modbus connection and spawn the polling task.
+    def __init__(self, config: dict = {}):
+        """Store config; the Modbus connection is opened in :meth:`connect`.
 
         Args:
-            action_serv: Action server providing configuration and live buffer.
+            config: Driver configuration (the server's ``params`` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        self.inst = minimalmodbus.Instrument(
-            self.config_dict.get("device", "COM7"), self.config_dict.get("address", 254)
-        )
-        self.inst.serial.baudrate = self.config_dict.get("baudrate", 9600)
-        self.action = None
-        self.active = None
+        super().__init__(config=config)
+        self.config_dict = self.config
+        self.inst = None
         self.start_margin = self.config_dict.get("start_margin", 0)
         self.start_time = 0
         self.last_rec_time = 0
-        self.event_loop = asyncio.get_event_loop()
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
         self.allow_no_sample = self.config_dict.get("allow_no_sample", True)
-        self.polling_task = self.event_loop.create_task(self.poll_sensor_loop())
 
-    async def poll_sensor_loop(self, frequency: int = 2):
-        """Continuously read O2 ppm from the sensor and publish to the live buffer.
+    def connect(self) -> DriverResponse:
+        """Open the Modbus serial connection to the sensor.
 
-        Args:
-            frequency: Target polling rate in Hz.
+        Returns:
+            ``DriverResponse`` reporting connection success or failure.
         """
-        waittime = 1.0 / frequency
-        LOGGER.info("Starting polling loop")
-        while True:
-            try:
-                o2_level = self.inst.read_register(1, functioncode=4) * 10
-            except minimalmodbus.NoResponseError as err:
-                LOGGER.info(f"NoResponseError: Driver polling rate is too fast. {err}")
-                continue
-            except serial.SerialException as err:
-                LOGGER.info(f"Device {self.config_dict['device']} is in use. {err}")
-                continue
-            if o2_level:
-                msg_dict = {"o2_ppm": int(o2_level)}
-                await self.base.put_lbuf(msg_dict)
-            await asyncio.sleep(waittime)
+        try:
+            self.inst = minimalmodbus.Instrument(
+                self.config_dict.get("device", "COM7"),
+                self.config_dict.get("address", 254),
+            )
+            self.inst.serial.baudrate = self.config_dict.get("baudrate", 9600)
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        return response
+
+    def get_status(self) -> DriverResponse:
+        """Return whether the Modbus instrument has been opened.
+
+        Returns:
+            ``DriverResponse`` with ``status=ok`` if connected, else
+            ``status=uninitialized``.
+        """
+        if self.inst is not None:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
+    def stop(self) -> DriverResponse:
+        """No active operation to abort; reports current status."""
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the Modbus connection."""
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Close the underlying serial port."""
+        try:
+            if self.inst is not None:
+                self.inst.serial.close()
+            response = DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("disconnect failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+        finally:
+            self.inst = None
+        return response
 
     def shutdown(self):
-        """Cancel the polling task and close the underlying serial port."""
+        """Close the underlying serial port on server shutdown."""
+        self.disconnect()
+
+    def read_o2_ppm(self):
+        """Read one O2 ppm value from the sensor, or ``None`` on a transient error."""
         try:
-            self.polling_task.cancel()
-        except asyncio.CancelledError:
-            LOGGER.info("closed sensor polling loop task")
-        self.inst.serial.close()
+            o2_level = self.inst.read_register(1, functioncode=4) * 10
+        except minimalmodbus.NoResponseError as err:
+            LOGGER.info(f"NoResponseError: Driver polling rate is too fast. {err}")
+            return None
+        except serial.SerialException as err:
+            LOGGER.info(f"Device {self.config_dict.get('device')} is in use. {err}")
+            return None
+        return o2_level
+
+
+class CM0134Poller(DriverPoller):
+    """Background poller that reads O2 ppm from the CM0134 sensor."""
+
+    driver: CM0134
+
+    def get_data(self) -> DriverResponse:
+        """Read one O2 ppm sample from the driver.
+
+        Returns:
+            ``DriverResponse`` with ``data={"o2_ppm": <int>}`` when a reading
+            was obtained, or an empty ``DriverResponse`` when the read was
+            transiently skipped (matches the pre-migration ``continue``/
+            falsy-reading behavior of ``poll_sensor_loop``).
+        """
+        o2_level = self.driver.read_o2_ppm()
+        if not o2_level:
+            return DriverResponse()
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.ok,
+            data={"o2_ppm": int(o2_level)},
+        )
 
 
 class O2MonExec(Executor):

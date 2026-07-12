@@ -12,6 +12,17 @@ Requires gclib (Windows). After installing the Galil toolkit, install the
 Python module from the helao environment:
 
 `python "c:\\Program Files (x86)\\Galil\\gclib\\source\\wrappers\\python\\setup.py" install`
+
+Migration note (CARDS P4): construction (`__init__`) only stores `config`
+and cheap config-derived attributes (K1/K8). Everything that needs the live
+hosting `Base` -- persistent calibration file paths (K4), the aligner's
+Bokeh host/port (K2/K8), opening the gclib connection, and starting the
+aligner's Bokeh `Server` thread (K8) -- is deferred to `connect()`, which
+the hosting server calls only after assigning `_base_hook` (mirrors
+`thorlabs_kinesis.py`'s pattern, itself following the `leancat_driver.py`
+precedent). The aligner's `Active` is no longer created by this driver
+(K7b): the `/run_aligner` endpoint now calls `contain_action` itself and
+hands the resulting `active` to `start_aligner_run`.
 """
 
 __all__ = ["Galil", "MoveModes", "TransformationModes"]
@@ -24,7 +35,6 @@ import json
 import os
 from socket import gethostname
 from copy import deepcopy
-from typing import Optional
 import traceback
 
 
@@ -33,14 +43,15 @@ from bokeh.server.server import Server
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base
 from helao.core.error import ErrorCodes
-from helao.helpers.premodels import Action
 from helao.core.servers.vis import HelaoVis
-from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.helpers.active_params import ActiveParams
-from helao.core.models.file import FileConnParams
 from helao.core.models.sample import SolidSample
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+)
 
 from ...layouts.aligner import Aligner
 from ...drivers.motion.enum import MoveModes, TransformationModes
@@ -58,7 +69,7 @@ class cmd_exception(ValueError):
         self.args = arg
 
 
-class Galil:
+class Galil(HelaoDriver):
     """Galil motion controller driver attached to a HELAO action server.
 
     Maintains the plate transformation matrix on disk (`<host>_last_plate_calib.json`),
@@ -68,60 +79,30 @@ class Galil:
     `query_axis_moving`), homing/setup (`setaxisref`), and aligner-UI control.
     """
 
-    def __init__(self, action_serv: Base):
-        """Connect to the controller, load calibration matrices, and start the aligner.
+    def __init__(self, config: dict = {}):
+        """Store config and config-derived attributes only; no device I/O, no
+        Bokeh, and no `_base_hook`-dependent reads here (K1/K8).
 
         Args:
-            action_serv: Owning HELAO action server, used for config access
-                and on-disk paths.
+            config: Driver configuration (the server's `params` dict).
         """
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        self.unified_db = UnifiedSampleDataAPI(self.base)
+        super().__init__(config=config)
+        self.config_dict = self.config
+
+        # Assigned externally (server startup, mirroring `thorlabs_kinesis.py`'s
+        # `_base_hook` pattern) so `connect()` can read `helaodirs`/`server_cfg`
+        # (K2/K4) without this driver ever holding a live `Base` reference at
+        # construction time.
+        self._base_hook = None
 
         self.dflt_matrix = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
 
+        # Populated in connect(): the paths depend on self._base_hook.helaodirs
+        # (K4), which isn't available until the server assigns the hook.
         self.file_backup_transfermatrix = None
-        if self.base.helaodirs.states_root is not None:
-            self.file_backup_transfermatrix = os.path.join(
-                self.base.helaodirs.states_root,
-                f"{gethostname().lower()}_last_plate_calib.json",
-            )
-
-        self.plate_transfermatrix = self.load_transfermatrix(
-            file=self.file_backup_transfermatrix
-        )
-        if self.plate_transfermatrix is None:
-            self.plate_transfermatrix = self.dflt_matrix
-
-        self.save_transfermatrix(file=self.file_backup_transfermatrix)
-        LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
-
+        self.plate_transfermatrix = self.dflt_matrix
         self.M_instr = None
-        Mplate = self.load_transfermatrix(
-            file=os.path.join(
-                self.base.helaodirs.db_root,
-                "plate_calib",
-                f"{gethostname().lower()}_instrument_calib.json",
-            )
-        )
-
-        if Mplate is not None:
-            self.M_instr = self.convert_Mplate_to_Minstr(Mplate=Mplate.tolist())
-
-        if self.M_instr is None:
-            LOGGER.info("Did not find refernce plate, loading Minstr from config")
-
-            self.M_instr = self.config_dict.get(
-                "M_instr",
-                [
-                    [1, 0, 0, 0],
-                    [0, 1, 0, 0],
-                    [0, 0, 1, 0],
-                    [0, 0, 0, 1],
-                ],
-            )
-        LOGGER.info(f"Minstr is: {self.M_instr}")
+        self.transform = None
 
         self.motor_timeout = self.config_dict.get("timeout", 60)
         self.motor_max_speed_count_sec = self.config_dict.get(
@@ -135,59 +116,10 @@ class Galil:
         # else need to create empty ones
         self.axis_id = self.config_dict.get("axis_id", {})
 
-        # Mplatexy is identity matrix by default
-        self.transform = TransformXY(self.base, self.M_instr, self.axis_id)
-        # only here for testing: will overwrite the default identity matrix
-        self.transform.update_Mplatexy(Mxy=self.plate_transfermatrix)
-
-        # if this is the main instance let us make a galil connection
-        self.g = gclib.py()
-        LOGGER.info(f"gclib version: {self.g.GVersion()}")
-        # TODO: error checking here: Galil can crash an dcarsh program
-        galil_ip = self.config_dict.get("galil_ip_str", None)
-        self.galil_enabled = None
+        # gclib connection is opened in connect(), never here (K8)
+        self.g = None
         self.galilcmd = None
-        try:
-            if galil_ip:
-                self.g.GOpen("%s --direct -s ALL" % (galil_ip))
-                LOGGER.info(self.g.GInfo())
-                self.galilcmd = self.g.GCommand  # alias the command callable
-                # The SH commands tells the controller to use the current
-                # motor position as the command position and to enable servo control here.
-                # The SH command changes the coordinate system.
-                # Therefore, all position commands given prior to SH,
-                # must be repeated. Otherwise, the controller produces incorrect motion.
-                self.galilcmd("PF 10.4")
-                axis_init = [
-                    ("MT", 2),  # Specifies Step motor with active low step pulses
-                    ("CE", 4),  # Configure Encoder: Normal pulse and direction
-                    ("TW", 32000),  # Timeout for IN Position (MC) in ms
-                    (
-                        "SD",
-                        256000,
-                    ),  # sets the linear deceleration rate of the motors when a limit switch has been reached.
-                ]
-                for axl in self.axis_id.values():
-                    cmd = f"MG _MO{axl}"
-                    LOGGER.info(f"init axis {axl}: {cmd}")
-                    q = self.galilcmd(cmd)
-                    LOGGER.info(f"Motor off?: {q} {float(q)==1}")
-                    if float(q) == 1:
-                        cmd = f"SH{axl}"
-                        LOGGER.info(f"init axis {axl}: {cmd}")
-                        self.galilcmd(cmd)
-                    for ac, av in axis_init:
-                        cmd = f"{ac}{axl}={av}"
-                        LOGGER.info(f"init axis {axl}: {cmd}")
-                        self.galilcmd(cmd)
-
-                self.galil_enabled = True
-            else:
-                LOGGER.error("no Galil IP configured")
-                self.galil_enabled = False
-        except Exception:
-            LOGGER.error("Galil connection error", exc_info=True)
-            self.galil_enabled = False
+        self.galil_enabled = None
 
         # block gamry
         self.blocked = False
@@ -198,9 +130,201 @@ class Galil:
         self.aligning_enabled = False
         self.aligner_plateid = None
         self.aligner_active = None
-        self.aligner_enabled = self.base.server_params.get("enable_aligner", False)
-        if self.aligner_enabled and self.galil_enabled:
-            self.start_aligner()
+        # identical to the pre-migration `self.base.server_params.get(...)`
+        # read: `server_api.py:74` makes `config` and `server_params` the
+        # same dict object (K1).
+        self.aligner_enabled = self.config_dict.get("enable_aligner", False)
+
+    @property
+    def base(self):
+        """Backward-compatible alias for `_base_hook`.
+
+        `layouts/aligner.py` (out of this migration's scope) reads
+        `motor.base.helaodirs` / `motor.base.get_main_error` directly; this
+        keeps that working without touching the Bokeh aligner module.
+        """
+        return self._base_hook
+
+    def connect(self) -> DriverResponse:
+        """Load plate calibration, build the axis transform, open the gclib
+        connection to the controller, and (if enabled) start the Bokeh
+        aligner.
+
+        Deferred here rather than `__init__` (K8) because the calibration
+        file paths come from `self._base_hook.helaodirs` (K4) and the
+        aligner's host/port come from `self._base_hook.server_cfg` (K2),
+        neither of which exist until the hosting server assigns
+        `_base_hook` post-construction; and because opening the gclib
+        connection and starting the aligner's Bokeh `Server` thread must
+        not happen at construction time (K8).
+
+        Returns:
+            `DriverResponse` reporting whether the Galil connection is enabled.
+        """
+        try:
+            helaodirs = getattr(self._base_hook, "helaodirs", None)
+
+            self.file_backup_transfermatrix = None
+            if helaodirs is not None and helaodirs.states_root is not None:
+                self.file_backup_transfermatrix = os.path.join(
+                    helaodirs.states_root,
+                    f"{gethostname().lower()}_last_plate_calib.json",
+                )
+
+            self.plate_transfermatrix = self.load_transfermatrix(
+                file=self.file_backup_transfermatrix
+            )
+            if self.plate_transfermatrix is None:
+                self.plate_transfermatrix = self.dflt_matrix
+
+            self.save_transfermatrix(file=self.file_backup_transfermatrix)
+            LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
+
+            self.M_instr = None
+            if helaodirs is not None:
+                Mplate = self.load_transfermatrix(
+                    file=os.path.join(
+                        helaodirs.db_root,
+                        "plate_calib",
+                        f"{gethostname().lower()}_instrument_calib.json",
+                    )
+                )
+
+                if Mplate is not None:
+                    self.M_instr = self.convert_Mplate_to_Minstr(
+                        Mplate=Mplate.tolist()
+                    )
+
+            if self.M_instr is None:
+                LOGGER.info("Did not find refernce plate, loading Minstr from config")
+
+                self.M_instr = self.config_dict.get(
+                    "M_instr",
+                    [
+                        [1, 0, 0, 0],
+                        [0, 1, 0, 0],
+                        [0, 0, 1, 0],
+                        [0, 0, 0, 1],
+                    ],
+                )
+            LOGGER.info(f"Minstr is: {self.M_instr}")
+
+            # Mplatexy is identity matrix by default
+            self.transform = TransformXY(self.M_instr, self.axis_id)
+            # only here for testing: will overwrite the default identity matrix
+            self.transform.update_Mplatexy(Mxy=self.plate_transfermatrix)
+
+            # if this is the main instance let us make a galil connection
+            self.g = gclib.py()
+            LOGGER.info(f"gclib version: {self.g.GVersion()}")
+            # TODO: error checking here: Galil can crash an dcarsh program
+            galil_ip = self.config_dict.get("galil_ip_str", None)
+            self.galil_enabled = None
+            self.galilcmd = None
+            try:
+                if galil_ip:
+                    self.g.GOpen("%s --direct -s ALL" % (galil_ip))
+                    LOGGER.info(self.g.GInfo())
+                    self.galilcmd = self.g.GCommand  # alias the command callable
+                    # The SH commands tells the controller to use the current
+                    # motor position as the command position and to enable servo control here.
+                    # The SH command changes the coordinate system.
+                    # Therefore, all position commands given prior to SH,
+                    # must be repeated. Otherwise, the controller produces incorrect motion.
+                    self.galilcmd("PF 10.4")
+                    axis_init = [
+                        ("MT", 2),  # Specifies Step motor with active low step pulses
+                        ("CE", 4),  # Configure Encoder: Normal pulse and direction
+                        ("TW", 32000),  # Timeout for IN Position (MC) in ms
+                        (
+                            "SD",
+                            256000,
+                        ),  # sets the linear deceleration rate of the motors when a limit switch has been reached.
+                    ]
+                    for axl in self.axis_id.values():
+                        cmd = f"MG _MO{axl}"
+                        LOGGER.info(f"init axis {axl}: {cmd}")
+                        q = self.galilcmd(cmd)
+                        LOGGER.info(f"Motor off?: {q} {float(q)==1}")
+                        if float(q) == 1:
+                            cmd = f"SH{axl}"
+                            LOGGER.info(f"init axis {axl}: {cmd}")
+                            self.galilcmd(cmd)
+                        for ac, av in axis_init:
+                            cmd = f"{ac}{axl}={av}"
+                            LOGGER.info(f"init axis {axl}: {cmd}")
+                            self.galilcmd(cmd)
+
+                    self.galil_enabled = True
+                else:
+                    LOGGER.error("no Galil IP configured")
+                    self.galil_enabled = False
+            except Exception:
+                LOGGER.error("Galil connection error", exc_info=True)
+                self.galil_enabled = False
+
+            if self.aligner_enabled and self.galil_enabled and self.bokehapp is None:
+                self.start_aligner()
+
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok if self.galil_enabled else DriverStatus.uninitialized,
+            )
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+    def get_status(self) -> DriverResponse:
+        """Report whether the Galil connection is open, busy, or uninitialized."""
+        if not self.galil_enabled:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.uninitialized
+            )
+        return DriverResponse(
+            response=DriverResponseType.success,
+            status=DriverStatus.busy if self.motor_busy else DriverStatus.ok,
+        )
+
+    async def stop(self) -> DriverResponse:
+        """Abort motion on every configured axis (device stays enabled)."""
+        try:
+            await self.stop_axis(self.get_all_axis())
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            LOGGER.error("stop failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+    def reset(self) -> DriverResponse:
+        """Force-close and reopen the Galil connection (ABC lifecycle method).
+
+        This is distinct from the pre-migration `reset` device command (an
+        emergency `RS` controller reset, preserved below as
+        `reset_controller`); the ABC contract asks for "reinitialize the
+        driver, force-closing any existing connection" (K1 naming
+        collision -- see `reset_controller`).
+        """
+        self.disconnect()
+        return self.connect()
+
+    def disconnect(self) -> DriverResponse:
+        """Release the Galil connection (ABC lifecycle method).
+
+        Delegates to `shutdown` -- the action server's FastAPI shutdown
+        event still looks up `shutdown`/`async_shutdown` by duck-typed
+        `getattr` (`base_api.py`'s `shutdown_event`) regardless of
+        `HelaoDriver` status, so both call paths close the same connection
+        identically.
+        """
+        self.shutdown()
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def convert_Mplate_to_Minstr(self, Mplate) -> list:
         """Embed a 3x3 plate matrix into a 4x4 instrument matrix.
@@ -223,11 +347,23 @@ class Galil:
         return Minstr
 
     def start_aligner(self):
-        """Launch the embedded Bokeh aligner server on `bokeh_port`."""
-        servHost = self.base.server_cfg["host"]
-        servPort = self.base.server_params.get(
-            "bokeh_port", self.base.server_cfg["port"] + 1000
-        )
+        """Launch the embedded Bokeh aligner server on `bokeh_port`.
+
+        `host`/`port` (and the `bokeh_port` fallback) live on the server's
+        top-level `server_cfg` entry, not inside `self.config` (only
+        `server_cfg["params"]` is handed to a migrated driver), so these
+        are read via `self._base_hook.server_cfg` (K2/K8) -- safe here
+        because `connect` (the only caller) runs after the hosting server
+        assigns `_base_hook`.
+        """
+        server_cfg = getattr(self._base_hook, "server_cfg", None)
+        if server_cfg is None:
+            LOGGER.warning(
+                "start_aligner: _base_hook/server_cfg not set; aligner not started"
+            )
+            return
+        servHost = server_cfg["host"]
+        servPort = self.config_dict.get("bokeh_port", server_cfg["port"] + 1000)
         servPy = "Aligner"
 
         self.bokehapp = Server(
@@ -243,7 +379,7 @@ class Galil:
     def makeBokehApp(self, doc, motor):
         """Bokeh document factory that attaches an `Aligner` to `doc`."""
         app = HelaoVis(
-            server_key=self.base.server.server_name,
+            server_key=self._base_hook.server.server_name,
             doc=doc,
         )
 
@@ -340,50 +476,56 @@ class Galil:
         else:
             return ErrorCodes.not_available
 
-    async def run_aligner(self, A: Action) -> dict:
-        """Start an aligner session for the supplied action, returning its active dict.
+    def run_aligner_precheck(self):
+        """Whether a new aligner run may start, and the code to report if not.
 
-        Args:
-            A: HELAO action containing `plateid_or_pmpath` in its
-                `action_params`.
+        Exact port of the nested gate from the pre-migration `run_aligner`:
+        the outer check (motor not blocked and Galil enabled) reports
+        `ErrorCodes.in_progress` on failure; only if that passes does the
+        inner check (aligner enabled and constructed) run, reporting
+        `ErrorCodes.not_available` on failure. Kept as one driver-owned
+        decision (K7: the driver decides, the endpoint acts on the verdict)
+        so the two rejection reasons can never be attributed backwards.
 
         Returns:
-            The active action's dict, with `in_progress` set if the driver is
-            blocked or `not_available` if the aligner is not enabled.
+            `(True, ErrorCodes.none)` if a run may start, else
+            `(False, <ErrorCodes>)`.
         """
-        if not self.blocked and self.galil_enabled:
-            if not self.aligner_enabled or not self.aligner:
-                A.error_code = ErrorCodes.not_available
-                activeDict = A.as_dict()
-            else:
-                self.blocked = True
-                self.aligner_plateid = A.action_params["plateid_or_pmpath"]
-                # A.error_code = ErrorCodes.none
-                self.aligner_active = await self.base.contain_action(
-                    ActiveParams(
-                        action=A,
-                        file_conn_params_dict={
-                            self.base.dflt_file_conn_key(): FileConnParams(
-                                # use dflt file conn key for first
-                                # init
-                                file_conn_key=self.base.dflt_file_conn_key(),
-                                sample_global_labels=[],
-                                file_type="aligner_helao__file",
-                                # hloheader = HloHeaderModel(
-                                #     optional = None
-                                # ),
-                            )
-                        },
-                    )
-                )
-                self.aligning_enabled = True
-                activeDict = self.aligner_active.action.as_dict()
+        if self.blocked or not self.galil_enabled:
+            return False, ErrorCodes.in_progress
+        if not self.aligner_enabled or not self.aligner:
+            return False, ErrorCodes.not_available
+        return True, ErrorCodes.none
 
-                _ = await self.query_axis_moving(axis=self.get_all_axis())
+    async def start_aligner_run(self, active) -> dict:
+        """Attach a server-contained `Active` to the aligner and begin tracking motion.
 
-        else:
-            A.error_code = ErrorCodes.in_progress
-            activeDict = A.as_dict()
+        K7b: creating the `Active` (`contain_action`) is no longer done by
+        this driver -- the `/run_aligner` endpoint now calls
+        `app.base.contain_action(...)` itself (after checking
+        `run_aligner_precheck`) and passes the result in as `active`. This
+        method does exactly what the tail of the pre-migration
+        `run_aligner` did once the `Active` existed: stores the plate id,
+        stores `active` as `self.aligner_active` (consumed directly by
+        `layouts/aligner.py`, out of this migration's scope), flips the
+        busy/aligning flags, and kicks off a motion-status query.
+
+        Args:
+            active: An `Active` already returned by `contain_action` for
+                this run_aligner request; its `action.action_params` must
+                carry `plateid_or_pmpath`.
+
+        Returns:
+            The active action dict.
+        """
+        self.blocked = True
+        self.aligner_plateid = active.action.action_params["plateid_or_pmpath"]
+        self.aligner_active = active
+        self.aligning_enabled = True
+        activeDict = self.aligner_active.action.as_dict()
+
+        _ = await self.query_axis_moving(axis=self.get_all_axis())
+
         return activeDict
 
     async def motor_move(self, active) -> dict:
@@ -459,8 +601,6 @@ class Galil:
             axis = [axis]
         if not isinstance(d_mm, list):
             d_mm = [d_mm]
-
-        error = ErrorCodes.none
 
         stopping = False  # no stopping of any movement by other actions
         mode = MoveModes(mode)
@@ -609,7 +749,7 @@ class Galil:
         # expected time for each move, used for axis stop check
         timeofmove = []
 
-        if self.base.actionservermodel.estop:
+        if self._is_estopped():
             self.motor_busy = False
             return {
                 "moved_axis": None,
@@ -677,9 +817,10 @@ class Galil:
                 if speed > self.motor_max_speed_count_sec:
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"motor numerical error for axis '{ax}': {repr(e), tb,}")
+            except Exception:
+                LOGGER.error(
+                    f"motor numerical error for axis '{ax}'", exc_info=True
+                )
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -735,9 +876,8 @@ class Galil:
                 # time = counts/ counts_per_second
 
                 # continue
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                LOGGER.error(f"motor error: '", exc_info=True)
+            except Exception:
+                LOGGER.error("motor error", exc_info=True)
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
@@ -759,20 +899,20 @@ class Galil:
         # wait for expected axis move time before checking if axis stoppped
         LOGGER.info(f"axis expected to stop in {tmax} sec")
 
-        if not self.base.actionservermodel.estop:
+        if not self._is_estopped():
 
             # check if all axis stopped
             tstart = time.time()
 
             while (
                 time.time() - tstart < self.motor_timeout
-            ) and not self.base.actionservermodel.estop:
+            ) and not self._is_estopped():
                 qmove = await self.query_axis_moving(axis=axis)
                 await asyncio.sleep(0.5)
                 if all(status == "stopped" for status in qmove["motor_status"]):
                     break
 
-            if not self.base.actionservermodel.estop:
+            if not self._is_estopped():
                 # stop of motor movement (motor still on)
                 if time.time() - tstart > self.motor_timeout:
                     await self.stop_axis(axis)
@@ -948,32 +1088,49 @@ class Galil:
         await self.update_aligner(msg=msg)
         return msg
 
-    async def reset(self):
-        """Send the Galil `RS` reset command, restoring saved state and parameters."""
+    async def reset_controller(self):
+        """Send the Galil `RS` reset command, restoring saved state and parameters.
+
+        Renamed from the pre-migration `reset` (K1: the ABC's `reset()`
+        lifecycle method has different semantics -- force-close/reopen the
+        connection -- so this device-level emergency reset command keeps
+        its own name). The `/reset` endpoint calls this method, not the ABC
+        `reset()`.
+        """
         if self.galil_enabled:
             return self.galilcmd("RS")
         else:
             return ""
 
+    def _is_estopped(self) -> bool:
+        """Read the server's estop flag via the safe base hook.
+
+        Server-side estop-flag bookkeeping (`actionservermodel.estop`) is
+        owned by the action-server framework (`base_api.py`'s `/estop`
+        endpoint sets it directly), so this driver only reads it -- and only
+        through `self._base_hook` (never a live `self.base`), defaulting to
+        `False` if the hook isn't wired up yet.
+        """
+        asm = getattr(self._base_hook, "actionservermodel", None)
+        return bool(getattr(asm, "estop", False))
+
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
-        """Engage or release the motion emergency stop.
+        """Engage the motion emergency stop.
 
         Args:
-            switch: True stops every axis and disables its motor, False
-                only clears the action-server estop flag.
+            switch: True stops every axis and disables its motor, False is
+                a no-op (server-side estop-flag bookkeeping is owned by the
+                action-server framework, not the driver -- see
+                `base_api.py`'s `/estop` endpoint, which calls this hook
+                and then sets `actionservermodel.estop` itself).
 
         Returns:
             The `switch` value passed in.
         """
         LOGGER.info("Axis Estop")
-        if switch == True:
+        if switch:
             await self.stop_axis(self.get_all_axis())
             await self.motor_off(self.get_all_axis())
-            # set flag (move command need to check for it)
-            self.base.actionservermodel.estop = True
-        else:
-            # need only to set the flag
-            self.base.actionservermodel.estop = False
         return switch
 
     async def stop_axis(self, axis) -> dict:
@@ -1178,25 +1335,38 @@ class Galil:
         """Restore the plate transformation matrix to the identity default."""
         self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
 
-    async def solid_get_platemap(
-        self, plate_id: Optional[int] = None, **kwargs
-    ) -> dict:
-        """Look up the platemap for a solid sample by plate ID via the unified DB."""
+    async def solid_get_platemap(self, unified_db, plate_id=None, **kwargs) -> dict:
+        """Look up the platemap for a solid sample by plate ID via the unified DB.
+
+        Args:
+            unified_db: `UnifiedSampleDataAPI` instance owned by the action
+                server (K7/sm: the sample DB is server/app-level state, not
+                driver state -- see `galil_motion.py`'s `app.unified_db`).
+            plate_id: Plate ID to look up.
+        """
         return {
-            "platemap": await self.unified_db.get_platemap(
+            "platemap": await unified_db.get_platemap(
                 [SolidSample(plate_id=plate_id)]
             )
         }
 
     async def solid_get_samples_xy(
         self,
-        plate_id: Optional[int] = None,
-        sample_no: Optional[int] = None,
+        unified_db,
+        plate_id=None,
+        sample_no=None,
         **kwargs,
     ) -> dict:
-        """Resolve the plate-frame xy coordinates of a solid sample via the unified DB."""
+        """Resolve the plate-frame xy coordinates of a solid sample via the unified DB.
+
+        Args:
+            unified_db: `UnifiedSampleDataAPI` instance owned by the action
+                server (K7/sm, see `solid_get_platemap`).
+            plate_id: Plate ID of the sample.
+            sample_no: Sample number on the plate.
+        """
         return {
-            "platexy": await self.unified_db.get_samples_xy(
+            "platexy": await unified_db.get_samples_xy(
                 [SolidSample(plate_id=plate_id, sample_no=sample_no)]
             )
         }
@@ -1213,17 +1383,20 @@ class TransformXY:
     system matrix.
     """
 
-    def __init__(self, action_serv: Base, Minstr, seq=None):
+    def __init__(self, Minstr, seq=None):
         """Initialize the matrices and precompute the system matrix.
 
         Args:
-            action_serv: Owning HELAO action server (used for logging).
             Minstr: 4x4 motor-to-instrument calibration matrix.
             seq: Optional ordered sequence of axes/rotations (e.g. ['x','y','z',
                 'Rz']) describing the kinematic chain; None uses the default
                 xy-only transform.
+
+        Migration note (K2/K8): the pre-migration constructor also took an
+        `action_serv: Base` argument, stored as `self.base`, and never read
+        again anywhere in this class -- dropped here (mirrors
+        `thorlabs_kinesis.py`'s identical `TransformXY`).
         """
-        self.base = action_serv
         # instrument specific matrix
         # motor to instrument
         self.Minstrxyz = np.asmatrix(Minstr)  # np.asmatrix(np.identity(4))

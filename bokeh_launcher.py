@@ -66,7 +66,8 @@ if __name__ == "__main__":
     server_key = sys.argv[2]
     confArg = sys.argv[1]
     if config_loader.CONFIG is None:
-        config_loader.CONFIG = config_loader.load_global_config(confArg, True)
+        config_dict, _validated = config_loader.read_validated_config(confArg)
+        config_loader.install_global_config(config_dict)
     CONFIG = config_loader.CONFIG
 
     all_servers_config = CONFIG["servers"]

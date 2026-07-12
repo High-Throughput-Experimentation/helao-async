@@ -111,7 +111,7 @@ class Sequence(SequenceModel):
         if force or self.sequence_uuid is None:
             self.sequence_uuid = gen_uuid()
         if force or not self.sequence_status:
-            self.sequence_status = [HloStatus.active]
+            self.reset_sequence_status(HloStatus.active)
         if force or self.sequence_output_dir is None:
             self.sequence_output_dir = self.get_sequence_dir()
 
@@ -181,7 +181,7 @@ class Experiment(Sequence, ExperimentModel):
         if force or self.experiment_uuid is None:
             self.experiment_uuid = gen_uuid()
         if force or not self.experiment_status:
-            self.experiment_status = [HloStatus.active]
+            self.reset_experiment_status(HloStatus.active)
         if force or self.experiment_output_dir is None:
             self.experiment_output_dir = self.get_experiment_dir()
 
@@ -365,7 +365,7 @@ class Action(Experiment, ActionModel):
         if force or self.action_uuid is None:
             self.action_uuid = gen_uuid()
         if force or not self.action_status:
-            self.action_status = [HloStatus.active]
+            self.reset_action_status(HloStatus.active)
         if force or self.action_output_dir is None:
             self.action_output_dir = self.get_action_dir()
 

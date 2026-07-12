@@ -24,16 +24,24 @@ import paramiko
 import time
 import traceback
 from copy import deepcopy
+from dataclasses import dataclass, field as dc_field
 from typing import List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
 import aiofiles
 import subprocess
 import psutil
 
+from helao.helpers import config_loader
 from helao.helpers.premodels import Action
-from helao.core.servers.base import Base, Active
+from helao.core.servers.base import Active
 from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
+from helao.core.drivers.helao_driver import (
+    HelaoDriver,
+    DriverResponse,
+    DriverStatus,
+    DriverResponseType,
+)
 
 from helao.core.models.sample import (
     AssemblySample,
@@ -231,27 +239,55 @@ class PalCam(BaseModel, HelaoDict):
     aux_output_filepath: Optional[str] = None
 
 
-class PAL:
-    """Driver for the PAL liquid-handler robot.
+@dataclass
+class PALJob:
+    """One submitted PAL job: the resolved ``PalCam`` plus the framework-owned
+    ``Active`` this job's samples/HLO rows are recorded against.
 
-    Initialization opens the archive sample database, reads SSH and NI-DAQ
-    trigger settings from configuration, builds the in-memory ``CAMS`` table
-    from cam-file paths, and spawns ``_PAL_IOloop`` which awaits job
-    submissions. Hardware triggers (``start``, ``continue``, ``done``) are
-    optionally read via NI-DAQmx when ``dev_trigger`` is ``"NImax"``.
+    Replaces the old ``IO_signalq(1)`` bool handshake + the
+    ``IO_palcam``/``self.active``/``self.action`` slots (CARDS P4 Design 1,
+    K7b). The driver treats ``active`` as an opaque action context: it is
+    lent the job for its duration (``split()``/``enqueue_data``/
+    ``append_sample``/``write_file_nowait``) but never creates or finishes it
+    -- the endpoint calls ``contain_action``; the framework
+    (``PALJobExec``/``action_loop_task``) finishes it once ``done`` is set.
+
+    Attributes:
+        palcam: Job descriptor with resolved microcams.
+        active: Injected ``Active`` action context (opaque to the driver).
+        done: Set by the job-loop worker when this job's run is over
+            (success, error, or stop); polled by ``PALJobExec._poll``.
+        error: Terminal ``ErrorCodes`` for this job, stamped by the job-loop
+            worker before ``done`` is set (mirrors the legacy C1 guard).
     """
 
-    def __init__(self, action_serv: Base):
-        """Configure SSH/trigger ports, build the CAM table, and start the IO loop.
+    palcam: PalCam
+    active: "Active"
+    done: asyncio.Event = dc_field(default_factory=asyncio.Event)
+    error: ErrorCodes = ErrorCodes.none
+
+
+class PAL(HelaoDriver):
+    """Driver for the PAL liquid-handler robot.
+
+    Owns only the job-loop engine and device I/O (SSH/subprocess submission,
+    NI-DAQ trigger polling, the ordered sample-pipeline mutations against the
+    archive shim). The ``Active`` action context for each job is created by
+    the calling endpoint and handed in via :meth:`submit_job` (CARDS P4
+    Design 1); the driver never reaches a server/base object. The job-loop
+    worker (``_PAL_IOloop``) is started lazily on the first :meth:`submit_job`
+    or :meth:`connect` call (K8: no tasks spawned at construction).
+    """
+
+    def __init__(self, config: dict = {}):
+        """Store config, build the CAM table, and prepare (but do not start) the IO loop.
 
         Args:
-            action_serv: Action server providing the configuration dict and
-                world configuration used to bootstrap the archive driver.
+            config: Driver configuration (the server's ``params`` dict).
         """
-
-        self.base = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
-        self.world_config = action_serv.world_cfg
+        super().__init__(config=config)
+        self.config_dict = self.config
+        self.world_config = self.config_dict.get("world_config") or config_loader.CONFIG or {}
 
         self.archive = SampleArchiveShim(self.world_config)
 
@@ -280,15 +316,12 @@ class PAL:
             LOGGER.info(f"PAL done trigger port: {self.triggerport_done}")
             self.triggers = True
 
-        # for passing action object from technique method to measure loop
-        self.action: Action = None
-        self.active: Active = None
-
-        # for global IOloop
-        self.IO_do_meas = False
+        # for global IOloop: the in-flight PALJob (None when idle), replacing
+        # the old self.action/self.active/IO_palcam slots (Design 1, K7b).
+        self._job: Optional[PALJob] = None
+        # job-loop worker task; created lazily by submit_job()/connect() (K8)
+        self._worker_task: Optional[asyncio.Task] = None
         self.IO_measuring = False  # status flag of measurement
-        # holds the parameters for the PAL
-        self.IO_palcam = PalCam()
         # check for that to final FASTapi post
         self.IO_continue = False
         self.IO_error = ErrorCodes.none
@@ -296,10 +329,6 @@ class PAL:
         # counts the total submission
         # for split actions
         self.IO_action_run_counter: int = 0
-
-        myloop = asyncio.get_event_loop()
-        # add meas IOloop
-        myloop.create_task(self._PAL_IOloop())
 
         self.FIFO_column_headings = [
             "samples_in",
@@ -392,6 +421,109 @@ class PAL:
             _ = await self.IO_signalq.get()
         await self.IO_signalq.put(val)
 
+    def is_busy(self) -> bool:
+        """Return whether a job is currently in flight.
+
+        Mirrors the legacy ``_init_PAL_IOloop`` busy condition (``not
+        IO_do_meas and not IO_measuring``); callers (``pal_server.py``
+        endpoints) check this BEFORE ``contain_action`` so a rejected call
+        creates no artifact (B4).
+        """
+        return self._job is not None or self.IO_measuring
+
+    def _ensure_worker_started(self) -> None:
+        """Lazily start the job-loop worker task (K8: no tasks at construction)."""
+        if self._worker_task is None:
+            self.IOloop_run = True
+            loop = asyncio.get_event_loop()
+            self._worker_task = loop.create_task(self._PAL_IOloop())
+
+    async def submit_job(self, palcam: PalCam, active: "Active") -> PALJob:
+        """Validate tool names and enqueue ``palcam`` for the IO-loop worker.
+
+        Ported body of legacy ``_init_PAL_IOloop`` minus the busy/estop/
+        no-host guard (now the endpoint's B4 check, run before
+        ``contain_action``) and minus ``contain_action`` itself (now the
+        endpoint's job, per K7b). ``active`` must already be a live
+        ``Active`` for an already-contained action.
+
+        Args:
+            palcam: Job descriptor built by one of the ``build_palcam_*``
+                helpers.
+            active: ``Active`` action context created by the calling
+                endpoint.
+
+        Returns:
+            The :class:`PALJob` handed to the worker. If a microcam's tool
+            name does not resolve, the job is rejected in place: ``error``
+            is set and ``done`` is already set (it is never queued).
+        """
+        self._ensure_worker_started()
+        LOGGER.info("submitting PAL job")
+        self.IO_error = ErrorCodes.none
+        job = PALJob(palcam=palcam, active=active)
+        # do a check of the PAL tool
+        for microcam in palcam.microcams:
+            microcam.tool = self.check_tool(req_tool=microcam.tool)
+            if microcam.tool is None:
+                self.IO_error = ErrorCodes.not_available
+                break
+        job.error = self.IO_error
+        active.action.error_code = job.error
+        if job.error is ErrorCodes.none:
+            self.IO_continue = False
+            await self.set_IO_signalq(job)
+        else:
+            LOGGER.error("Error during PAL job submission")
+            job.done.set()
+        return job
+
+    def connect(self) -> DriverResponse:
+        """Validate host config and ensure the job-loop worker is running.
+
+        No device I/O happens here (K8): the worker task is started lazily,
+        same as the first :meth:`submit_job`.
+        """
+        self._ensure_worker_started()
+        if self.sshhost is None:
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.uninitialized
+            )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    def get_status(self) -> DriverResponse:
+        """Return busy/ok based on whether a job is currently in flight."""
+        status = DriverStatus.busy if self.is_busy() else DriverStatus.ok
+        return DriverResponse(response=DriverResponseType.success, status=status)
+
+    def reset(self) -> DriverResponse:
+        """Drain the IO signal queue and reset the idle IO flags."""
+        self.set_IO_signalq_nowait(False)
+        self.IO_measuring = False
+        self.IO_continue = False
+        self.IO_error = ErrorCodes.none
+        return DriverResponse(
+            response=DriverResponseType.success, status=self.get_status().status
+        )
+
+    def disconnect(self) -> DriverResponse:
+        """Abort any in-flight job, then stop the worker loop.
+
+        Abort-then-close in one path (weaning shutdown-ordering rule): the
+        in-flight job is signalled to stop before the worker task itself is
+        cancelled.
+        """
+        self.stop()
+        self.IOloop_run = False
+        if self._worker_task is not None:
+            self._worker_task.cancel()
+            self._worker_task = None
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.uninitialized
+        )
+
     async def _clear_trigger_qs(self):
         """Drain the start/continue/done trigger queues, logging any stale entries."""
         while not self.IO_trigger_startq.empty():
@@ -411,6 +543,7 @@ class PAL:
         prev_done = False
         if not self.triggers:
             return
+        job = self._job
         try:
             with nidaqmx.Task() as task:
                 LOGGER.info(
@@ -438,7 +571,7 @@ class PAL:
                     new_done = data[2][0]
                     if (new_start ^ prev_start) and new_start:
                         self.IO_trigger_startq.put_nowait(
-                            self.active.get_realtime_nowait()
+                            job.active.get_realtime_nowait()
                         )
                         prev_start = deepcopy(new_start)
                         LOGGER.info("IOq: got PAL 'start' trigger poll")
@@ -447,7 +580,7 @@ class PAL:
 
                     if (new_continue ^ prev_continue) and new_continue:
                         self.IO_trigger_continueq.put_nowait(
-                            self.active.get_realtime_nowait()
+                            job.active.get_realtime_nowait()
                         )
                         prev_continue = deepcopy(new_continue)
                         LOGGER.info("IOq: got PAL 'continue' trigger poll")
@@ -457,7 +590,7 @@ class PAL:
 
                     if (new_done ^ prev_done) and new_done:
                         self.IO_trigger_doneq.put_nowait(
-                            self.active.get_realtime_nowait()
+                            job.active.get_realtime_nowait()
                         )
                         prev_done = deepcopy(new_done)
                         LOGGER.info("IOq: got PAL 'done' trigger poll")
@@ -486,6 +619,7 @@ class PAL:
             :class:`ErrorCodes` representing the final outcome of the job.
         """
         error = ErrorCodes.none
+        job = self._job
 
         # check if we have free vial slots
         # and update the microcams with correct positions and samples_out
@@ -527,13 +661,13 @@ class PAL:
                 # if split, last action is finished when pal endpoint is done
                 # and will update exp and seq
                 if i > 0:
-                    _ = await self.active.split()
+                    _ = await job.active.split()
 
-                self.active.action.samples_in = []
-                self.active.action.samples_out = []
-                self.active.action.action_sub_name = microcam.method
-                self.IO_palcam.samples_in = []
-                self.IO_palcam.samples_out = []
+                job.active.action.samples_in = []
+                job.active.action.samples_out = []
+                job.active.action.action_sub_name = microcam.method
+                job.palcam.samples_in = []
+                job.palcam.samples_out = []
                 LOGGER.info("waiting now for palaction")
                 # waiting now for all three PAL triggers
                 # continue is used as the sampling timestamp
@@ -544,7 +678,7 @@ class PAL:
                 if error is not ErrorCodes.none:
                     # there is not much we can do here
                     # as we have not control of pal directly
-                    self.active.action.error_code = error
+                    job.active.action.error_code = error
                     LOGGER.error(f"Got error after triggerwait: '{error}'")
                     return ErrorCodes.critical_error
 
@@ -579,7 +713,7 @@ class PAL:
                 )
                 # update the action_uuid
                 for sample in palaction.samples_in:
-                    sample.action_uuid = [self.active.action.action_uuid]
+                    sample.action_uuid = [job.active.action.action_uuid]
                 # as palaction.samples_in contains both source and dest samples
                 # we had them saved separately (this is for the hlo file)
 
@@ -591,7 +725,7 @@ class PAL:
                 )
                 # update the action_uuid
                 for sample in palaction.source.samples_initial:
-                    sample.action_uuid = [self.active.action.action_uuid]
+                    sample.action_uuid = [job.active.action.action_uuid]
 
                 # dest can also contain ref samples, and these are not yet in the db
                 for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
@@ -613,7 +747,7 @@ class PAL:
                         return ErrorCodes.bug
                 # update the action_uuid
                 for sample in palaction.dest.samples_initial:
-                    sample.action_uuid = [self.active.action.action_uuid]
+                    sample.action_uuid = [job.active.action.action_uuid]
 
                 # -- (2) -- update sample_out
                 # only samples in sample_out should be new ones (ref samples)
@@ -642,14 +776,14 @@ class PAL:
                                 )
                                 for sample in tmp_part:
                                     sample.action_uuid = [
-                                        self.active.action.action_uuid
+                                        job.active.action.action_uuid
                                     ]
                                 sample_out.parts[part_i] = deepcopy(tmp_part[0])
                             else:
                                 # the assembly contains a ref sample which
                                 # first need to be updated and converted
                                 part.sample_creation_timecode = palaction.continue_time
-                                part.action_uuid = [self.active.action.action_uuid]
+                                part.action_uuid = [job.active.action.action_uuid]
                                 tmp_part = await self.archive.unified_db.new_samples(
                                     samples=[part]
                                 )
@@ -658,11 +792,11 @@ class PAL:
                             sample_out.source.append(part.get_global_label())
                         # update the action_uuid
                         for sample in sample_out.parts:
-                            sample.action_uuid = [self.active.action.action_uuid]
+                            sample.action_uuid = [job.active.action.action_uuid]
 
                 # update the action_uuid
                 for sample in palaction.samples_out:
-                    sample.action_uuid = [self.active.action.action_uuid]
+                    sample.action_uuid = [job.active.action.action_uuid]
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
@@ -677,10 +811,10 @@ class PAL:
                 # need a deep copy, else the next modifications would also
                 # modify these samples
                 for sample_in in palaction.samples_in:
-                    self.IO_palcam.samples_in.append(deepcopy(sample_in))
+                    job.palcam.samples_in.append(deepcopy(sample_in))
                 # add palaction sample_out to main palcam
                 for sample in palaction.samples_out:
-                    self.IO_palcam.samples_out.append(deepcopy(sample))
+                    job.palcam.samples_out.append(deepcopy(sample))
 
                 # -- (5) -- convert pal action samples_in
                 # from initial to final
@@ -700,7 +834,7 @@ class PAL:
                             samples=sample_out.parts
                         )
                     # update the action_uuid
-                    sample_out.action_uuid = [self.active.action.action_uuid]
+                    sample_out.action_uuid = [job.active.action.action_uuid]
                     # save it back to the db
                     await self.archive.unified_db.update_samples([sample_out])
 
@@ -708,8 +842,8 @@ class PAL:
                 error = await self._sendcommand_update_archive_helper(palaction)
 
                 # -- (8) -- write data (hlo file)
-                if self.active:
-                    if self.active.action.save_data:
+                if job.active:
+                    if job.active.action.save_data:
                         logdata = [
                             [
                                 sample.get_global_label()
@@ -740,16 +874,16 @@ class PAL:
                         tmpdata = {
                             k: [v] for k, v in zip(self.FIFO_column_headings, logdata)
                         }
-                        # self.active.action.file_conn_keys holds the current
+                        # job.active.action.file_conn_keys holds the current
                         # active file conn keys
                         # cannot use the one which we used for contain action
                         # as action.split will generate a new one
                         # but will always update the one in
-                        # self.active.action.file_conn_keys[0]
+                        # job.active.action.file_conn_keys[0]
                         # to the current one
-                        await self.active.enqueue_data(
+                        await job.active.enqueue_data(
                             datamodel=DataModel(
-                                data={self.active.action.file_conn_keys[0]: tmpdata},
+                                data={job.active.action.file_conn_keys[0]: tmpdata},
                                 errors=[],
                             )
                         )
@@ -758,12 +892,12 @@ class PAL:
                 # (9) add samples_in/out to active.action
                 # add sample in and out to exp
 
-                await self.active.append_sample(
-                    samples=self.IO_palcam.samples_in, IO="in"
+                await job.active.append_sample(
+                    samples=job.palcam.samples_in, IO="in"
                 )
 
-                await self.active.append_sample(
-                    samples=self.IO_palcam.samples_out, IO="out"
+                await job.active.append_sample(
+                    samples=job.palcam.samples_out, IO="out"
                 )
 
                 self.IO_action_run_counter += 1
@@ -839,7 +973,7 @@ class PAL:
             if error != ErrorCodes.none:
                 if sample != NoneSample():
                     sample.inheritance = SampleInheritance.allow_both
-                    sample.status = [SampleStatus.preserved]
+                    sample.reset_sample_status(SampleStatus.preserved)
                 else:
                     error = ErrorCodes.not_available
                     LOGGER.error("error converting old liquid_sample to basemodel.")
@@ -1039,7 +1173,7 @@ class PAL:
             # sample_in.inheritance =  SampleInheritance.give_only
             # sample_in.status = [SampleStatus.preserved]
             palposition.samples_initial[0].inheritance = None
-            palposition.samples_initial[0].status = []
+            palposition.samples_initial[0].reset_sample_status()
             palposition.samples_initial[0].sample_position = palposition.position
 
         else:
@@ -1078,6 +1212,7 @@ class PAL:
             contains the newly created reference sample (or is empty if the
             vial already held a sample and is being diluted).
         """
+        job = self._job
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1117,7 +1252,7 @@ class PAL:
                 ].samples_in,  # this should hold a sample already from "check source call"
                 sample_out_type=microcam.cam.sample_out_type,
                 sample_position=dest,
-                action=self.active.action,
+                action=job.active.action,
             )
 
             if error != ErrorCodes.none:
@@ -1127,7 +1262,7 @@ class PAL:
             samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
             samples_out_list[0].sample_position = dest
             samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].status = [SampleStatus.created]
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
             dest_samples_initial = []  # no sample here in the beginning
             dest_samples_final = deepcopy(samples_out_list)
 
@@ -1139,7 +1274,7 @@ class PAL:
             )
             # we can only add liquid to vials (diluite them, no assembly here)
             sample_in.inheritance = SampleInheritance.receive_only
-            sample_in.status = [SampleStatus.preserved]
+            sample_in.reset_sample_status(SampleStatus.preserved)
 
             dest_samples_initial = [deepcopy(sample_in)]
             dest_samples_final = [deepcopy(sample_in)]
@@ -1179,6 +1314,7 @@ class PAL:
         Returns:
             Tuple of the resolved :class:`PALposition` and the new output samples.
         """
+        job = self._job
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1226,7 +1362,7 @@ class PAL:
                 samples_in=microcam.run[-1].samples_in,
                 sample_out_type=microcam.cam.sample_out_type,
                 sample_position=dest,
-                action=self.active.action,
+                action=job.active.action,
             )
 
             if error != ErrorCodes.none:
@@ -1235,7 +1371,7 @@ class PAL:
             samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
             samples_out_list[0].sample_position = dest
             samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].status = [SampleStatus.created]
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
             dest_samples_initial = []  # no sample here in the beginning
             dest_samples_final = deepcopy(samples_out_list)
 
@@ -1283,7 +1419,7 @@ class PAL:
                     # we can only add liquid to vials
                     # (diluite them, no assembly here)
                     sample_in.inheritance = SampleInheritance.receive_only
-                    sample_in.status = [SampleStatus.preserved]
+                    sample_in.reset_sample_status(SampleStatus.preserved)
 
                     # first add the dilute type
                     microcam.run[-1].dilute_type.append(
@@ -1313,7 +1449,7 @@ class PAL:
                         ].samples_in,  # this should hold a sample already from "check source call"
                         sample_out_type=microcam.cam.sample_out_type,
                         sample_position=dest,
-                        action=self.active.action,
+                        action=job.active.action,
                     )
 
                     if error != ErrorCodes.none:
@@ -1322,17 +1458,14 @@ class PAL:
                     samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                     samples_out_list[0].sample_position = dest
                     samples_out_list[0].inheritance = SampleInheritance.allow_both
-                    samples_out_list[0].status = [
-                        SampleStatus.created,
-                        SampleStatus.incorporated,
-                    ]
+                    samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
 
                     # add new sample to assembly
                     sample_in.parts.append(samples_out_list[0])
                     # we can only add liquid to vials
                     # (diluite them, no assembly here)
                     sample_in.inheritance = SampleInheritance.allow_both
-                    sample_in.status = [SampleStatus.preserved]
+                    sample_in.reset_sample_status(SampleStatus.preserved)
 
                     dest_samples_initial = [deepcopy(sample_in)]
                     dest_samples_final = [deepcopy(sample_in)]
@@ -1344,7 +1477,7 @@ class PAL:
                 # we can only add liquid to vials
                 # (diluite them, no assembly here)
                 sample_in.inheritance = SampleInheritance.receive_only
-                sample_in.status = [SampleStatus.preserved]
+                sample_in.reset_sample_status(SampleStatus.preserved)
 
                 dest_samples_initial = [deepcopy(sample_in)]
                 dest_samples_final = [deepcopy(sample_in)]
@@ -1380,7 +1513,7 @@ class PAL:
                     samples_in=microcam.run[-1].samples_in,
                     sample_out_type=microcam.cam.sample_out_type,
                     sample_position=dest,
-                    action=self.active.action,
+                    action=job.active.action,
                 )
 
                 if error != ErrorCodes.none:
@@ -1389,15 +1522,12 @@ class PAL:
                 samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                 samples_out_list[0].sample_position = dest
                 samples_out_list[0].inheritance = SampleInheritance.allow_both
-                samples_out_list[0].status = [
-                    SampleStatus.created,
-                    SampleStatus.incorporated,
-                ]
+                samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
 
                 # only now add the sample which was found in the position
                 # to the sample_in list for the exp/prg
                 sample_in.inheritance = SampleInheritance.allow_both
-                sample_in.status = [SampleStatus.incorporated]
+                sample_in.reset_sample_status(SampleStatus.incorporated)
 
                 microcam.run[-1].samples_in.append(deepcopy(sample_in))
                 # we only add the sample to assembly so delta_vol is 0
@@ -1416,7 +1546,7 @@ class PAL:
                     samples_in=tmp_samples_in,
                     sample_out_type=SampleType.assembly,
                     sample_position=dest,
-                    action=self.active.action,
+                    action=job.active.action,
                 )
 
                 if error != ErrorCodes.none:
@@ -1424,7 +1554,7 @@ class PAL:
 
                 samples_out2_list[0].sample_position = dest
                 samples_out2_list[0].inheritance = SampleInheritance.allow_both
-                samples_out2_list[0].status = [SampleStatus.created]
+                samples_out2_list[0].reset_sample_status(SampleStatus.created)
                 # add second sample out to samples_out
                 samples_out_list.append(samples_out2_list[0])
 
@@ -1455,6 +1585,7 @@ class PAL:
         Args:
             microcam: Microcam supplying the volume requirement.
         """
+        job = self._job
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1492,7 +1623,7 @@ class PAL:
             ].samples_in,  # this should hold a sample already from "check source call"
             sample_out_type=microcam.cam.sample_out_type,
             sample_position=dest,
-            action=self.active.action,
+            action=job.active.action,
         )
 
         LOGGER.info(f"new reference sample for empty vial: {samples_out_list}")
@@ -1503,7 +1634,7 @@ class PAL:
         samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
         samples_out_list[0].sample_position = dest
         samples_out_list[0].inheritance = SampleInheritance.receive_only
-        samples_out_list[0].status = [SampleStatus.created]
+        samples_out_list[0].reset_sample_status(SampleStatus.created)
         dest_samples_initial = []  # no sample here in the beginning
         dest_samples_final = deepcopy(samples_out_list)
 
@@ -1529,6 +1660,7 @@ class PAL:
         Args:
             microcam: Microcam carrying the requested tray-relative cursor.
         """
+        job = self._job
         samples_out_list: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
@@ -1571,7 +1703,7 @@ class PAL:
             f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
         )
         sample_in.inheritance = SampleInheritance.receive_only
-        sample_in.status = [SampleStatus.preserved]
+        sample_in.reset_sample_status(SampleStatus.preserved)
 
         microcam.run[-1].samples_in.append(sample_in)
         microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
@@ -1657,9 +1789,9 @@ class PAL:
         # were created
         if await self.archive.custom_is_destroyed(custom=palposition.position):
             for sample in samples_out_list:
-                sample.status.append(SampleStatus.destroyed)
+                sample.append_sample_status(SampleStatus.destroyed)
             for sample in palposition.samples_final:
-                sample.status.append(SampleStatus.destroyed)
+                sample.append_sample_status(SampleStatus.destroyed)
 
         # add validated destination to run
         microcam.run[-1].dest = deepcopy(palposition)
@@ -1668,7 +1800,7 @@ class PAL:
         for sample in microcam.run[-1].samples_in:
             if sample.inheritance is None:
                 sample.inheritance = SampleInheritance.give_only
-                sample.status = [SampleStatus.preserved]
+                sample.reset_sample_status(SampleStatus.preserved)
 
         # add the samples_out to the run
         for sample in samples_out_list:
@@ -1699,6 +1831,7 @@ class PAL:
         Returns:
             ``ErrorCodes.none`` on success or the first failure encountered.
         """
+        job = self._job
         error = ErrorCodes.none
         palcam.joblist = []
 
@@ -1708,7 +1841,7 @@ class PAL:
         # if PAL is on an exernal machine, this will be empty
         # but we need the correct outputpath to create it on the
         # other machine
-        palcam.aux_output_filepath = self.active.write_file_nowait(
+        palcam.aux_output_filepath = job.active.write_file_nowait(
             file_type="pal_auxlog_file",
             filename="AUX__PAL__log.txt",
             output_str="",
@@ -1867,6 +2000,7 @@ class PAL:
             ``ErrorCodes.none`` on success or an SSH/CMD error code on failure.
         """
 
+        job = self._job
         error = ErrorCodes.none
         # kill PAL if program is open
         error = await self.kill_PAL()
@@ -1895,7 +2029,7 @@ class PAL:
             LOGGER.info(f"PAL command: '{cmd_to_execute}'")
             try:
                 # result = os.system(cmd_to_execute)
-                palcam.joblist_time = self.active.get_realtime_nowait()
+                palcam.joblist_time = job.active.get_realtime_nowait()
                 self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
                 LOGGER.info(f"PAL command send: {self.PAL_pid}")
             except Exception:
@@ -1980,7 +2114,7 @@ class PAL:
 
             try:
                 if error is ErrorCodes.none:
-                    palcam.joblist_time = self.active.get_realtime_nowait()
+                    palcam.joblist_time = job.active.get_realtime_nowait()
                     (
                         mysshclient_stdin,
                         mysshclient_stdout,
@@ -2027,13 +2161,14 @@ class PAL:
             if an archive update fails.
         """
 
+        job = self._job
         # update source and dest final samples
         palaction.source.samples_final = await self.archive.unified_db.get_samples(
             samples=palaction.source.samples_initial
         )
         # update the action_uuid
         for sample in palaction.source.samples_final:
-            sample.action_uuid = [self.active.action.action_uuid]
+            sample.action_uuid = [job.active.action.action_uuid]
 
         if palaction.dest.samples_final:
             # should always only contain one sample
@@ -2052,7 +2187,7 @@ class PAL:
 
         # update the action_uuid
         for sample in palaction.dest.samples_final:
-            sample.action_uuid = [self.active.action.action_uuid]
+            sample.action_uuid = [job.active.action.action_uuid]
 
         error = ErrorCodes.none
         retval = False
@@ -2129,98 +2264,24 @@ class PAL:
                     sample, palaction.samples_in_delta_vol_ml[i], palaction.dilute[i]
                 )
 
-    async def _init_PAL_IOloop(self, A: Action, palcam: PalCam) -> dict:
-        """Validate state and tools, create the active action, and signal the IO loop.
-
-        Returns immediately with an error-carrying dict if the PAL is busy,
-        in estop, or no SSH host is configured. Otherwise it stores ``palcam``
-        on ``self.IO_palcam`` and pushes ``True`` into the IO signal queue.
-
-        Args:
-            A: HELAO action carrying ``error_code``.
-            palcam: Job descriptor to execute.
-
-        Returns:
-            Dict representation of the active (or failed) action.
-        """
-        activeDict = {}
-        try:
-            if (
-                self.sshhost is not None
-                and not self.IO_do_meas
-                and not self.IO_measuring
-                and not self.base.actionservermodel.estop
-            ):
-                LOGGER.info("init PAL IO loop")
-                self.IO_error = ErrorCodes.none
-                # do a check of the PAL tool
-                for microcam in palcam.microcams:
-                    microcam.tool = self.check_tool(req_tool=microcam.tool)
-                    if microcam.tool is None:
-                        self.IO_error = ErrorCodes.not_available
-                        break
-
-                A.error_code = self.IO_error
-                self.IO_palcam = palcam
-                self.action = A
-
-                self.active = await self.base.contain_action(
-                    ActiveParams(
-                        action=self.action,
-                        file_conn_params_dict={
-                            self.base.dflt_file_conn_key(): FileConnParams(
-                                file_conn_key=self.base.dflt_file_conn_key(),
-                                # sample_global_labels=[],
-                                file_type="pal_helao__file",
-                            )
-                        },
-                    )
-                )
-
-                if self.IO_error is ErrorCodes.none:
-                    self.IO_continue = False
-                    await self.set_IO_signalq(True)
-                    # wait for first continue trigger
-                    # LOGGER.info("waiting for first continue")
-                    # while not self.IO_continue:
-                    #     await asyncio.sleep(0.01)
-                    # LOGGER.info("got first continue")
-                else:
-                    LOGGER.error("Error during PAL IOloop init")
-
-                activeDict = self.active.action.as_dict()
-
-            elif self.base.actionservermodel.estop:
-                LOGGER.error("PAL is in estop.")
-                A.error_code = ErrorCodes.estop
-                activeDict = A.as_dict()
-
-            elif self.sshhost is None:
-                LOGGER.error("No PAL host specified.")
-                A.error_code = ErrorCodes.not_available
-                activeDict = A.as_dict()
-
-            else:
-                LOGGER.error("PAL method already in progress.")
-                A.error_code = ErrorCodes.in_progress
-                activeDict = A.as_dict()
-        except Exception:
-            LOGGER.error("init_PAL_IOloop failed", exc_info=True)
-        return activeDict
-
     async def _PAL_IOloop(self) -> None:
-        """Long-running task that schedules ``totalruns`` of ``IO_palcam``.
+        """Long-running task that schedules ``totalruns`` of the current job's ``palcam``.
 
-        Waits for ``IO_do_meas``, applies the configured spacing method
-        between runs, calls :meth:`_sendcommand_main` for each run, and
-        clears trigger tasks on completion.
+        Waits for a submitted :class:`PALJob`, applies the configured
+        spacing method between runs, calls :meth:`_sendcommand_main` for
+        each run, and clears trigger tasks on completion. Replaces the old
+        ``IO_do_meas`` bool with ``self._job`` (Design 1, K7b): the queue now
+        carries a :class:`PALJob` (truthy) or ``False`` (stop signal) instead
+        of ``True``/``False``.
         """
         self.IOloop_run = True
         while self.IOloop_run:
             try:
                 # await asyncio.sleep(0.01)
-                self.IO_do_meas = await self.IO_signalq.get()
-                if self.IO_do_meas:
+                signal = await self.IO_signalq.get()
+                if signal:
+                    self._job = signal
+                    job = self._job
                     self.IO_measuring = True
                     try:
                         # create active and check sample_in
@@ -2235,76 +2296,76 @@ class PAL:
                         diff_time = 0.0
 
                         # for multipe runs we don't wait for first trigger
-                        if self.IO_palcam.totalruns > 1:
+                        if job.palcam.totalruns > 1:
                             self.IO_continue = True
 
                         # loop over the requested runs of one complete
                         # microcam list run
-                        for run in range(self.IO_palcam.totalruns):
-                            LOGGER.info(f"PAL run {run+1} of {self.IO_palcam.totalruns}")
+                        for run in range(job.palcam.totalruns):
+                            LOGGER.info(f"PAL run {run+1} of {job.palcam.totalruns}")
                             # need to make a deepcopy as we modify this object during the run
                             # but each run should start from the same initial
                             # params again
-                            run_palcam = deepcopy(self.IO_palcam)
+                            run_palcam = deepcopy(job.palcam)
                             run_palcam.cur_run = run
 
                             # # if sampleperiod list is empty
                             # # set it to default
-                            # if not self.IO_palcam.sampleperiod:
-                            #     self.IO_palcam.sampleperiod = [0.0]
+                            # if not job.palcam.sampleperiod:
+                            #     job.palcam.sampleperiod = [0.0]
 
                             # get the scheduled time for next PAL command
-                            # self.IO_palcam.timeoffset corrects for offset
+                            # job.palcam.timeoffset corrects for offset
                             # between send ssh and continue (or any other offset)
 
-                            if len(self.IO_palcam.sampleperiod) < (run + 1):
+                            if len(job.palcam.sampleperiod) < (run + 1):
                                 LOGGER.info("len(sampleperiod) < (run), using 0.0")
                                 sampleperiod = 0.0
                             else:
-                                sampleperiod = self.IO_palcam.sampleperiod[run]
+                                sampleperiod = job.palcam.sampleperiod[run]
 
                             cur_time = time.time()
-                            if self.IO_palcam.spacingmethod == Spacingmethod.linear:
+                            if job.palcam.spacingmethod == Spacingmethod.linear:
                                 LOGGER.info("PAL linear scheduling")
                                 LOGGER.info(
                                     f"time since last PAL run {(cur_time-last_run_time)}"
                                 )
                                 LOGGER.info(
-                                    f"requested time between PAL runs {sampleperiod-self.IO_palcam.timeoffset}",
+                                    f"requested time between PAL runs {sampleperiod-job.palcam.timeoffset}",
                                 )
                                 diff_time = (
                                     sampleperiod
                                     - (cur_time - last_run_time)
-                                    - self.IO_palcam.timeoffset
+                                    - job.palcam.timeoffset
                                 )
-                            elif self.IO_palcam.spacingmethod == Spacingmethod.geometric:
+                            elif job.palcam.spacingmethod == Spacingmethod.geometric:
                                 LOGGER.info("PAL geometric scheduling")
                                 timepoint = (
-                                    self.IO_palcam.spacingfactor**run
+                                    job.palcam.spacingfactor**run
                                 ) * sampleperiod
                                 LOGGER.info(
                                     f"time since last PAL run {(cur_time-last_run_time)}"
                                 )
                                 LOGGER.info(
-                                    f"requested time between PAL runs {timepoint-prev_timepoint-self.IO_palcam.timeoffset}"
+                                    f"requested time between PAL runs {timepoint-prev_timepoint-job.palcam.timeoffset}"
                                 )
                                 diff_time = (
                                     timepoint
                                     - prev_timepoint
                                     - (cur_time - last_run_time)
-                                    - self.IO_palcam.timeoffset
+                                    - job.palcam.timeoffset
                                 )
                                 prev_timepoint = timepoint  # todo: consider time lag
-                            elif self.IO_palcam.spacingmethod == Spacingmethod.custom:
+                            elif job.palcam.spacingmethod == Spacingmethod.custom:
                                 LOGGER.info("PAL custom scheduling")
                                 LOGGER.info(f"time since PAL start {(cur_time-start_time)}")
                                 LOGGER.info(
-                                    f"time for next PAL run since start {sampleperiod-self.IO_palcam.timeoffset}"
+                                    f"time for next PAL run since start {sampleperiod-job.palcam.timeoffset}"
                                 )
                                 diff_time = (
                                     sampleperiod
                                     - (cur_time - start_time)
-                                    - self.IO_palcam.timeoffset
+                                    - job.palcam.timeoffset
                                 )
 
                             # only wait for positive time
@@ -2341,29 +2402,44 @@ class PAL:
                         # update samples_in/out in exp
                         # and other cleanup
                         await self._PAL_IOloop_meas_end_helper()
+                else:
+                    # drained a stop signal (False) while idle -- do NOT store
+                    # it in the busy slot (is_busy() treats any non-None
+                    # self._job as busy), or the loop wedges BUSY forever
+                    # with no job to ever clear it.
+                    self._job = None
             except Exception:
                 LOGGER.error("_PAL_IOloop failed", exc_info=True)
 
     async def _PAL_IOloop_meas_start_helper(self) -> None:
         """Finalize the HLO header and refresh ``samples_in`` from the archive."""
         self.IO_action_run_counter = 0
+        job = self._job
 
-        LOGGER.info(f"Active action uuid is {self.active.action.action_uuid}")
-        if self.active:
-            self.active.finish_hlo_header(
-                file_conn_keys=self.active.action.file_conn_keys,
-                realtime=await self.active.get_realtime(),
+        LOGGER.info(f"Active action uuid is {job.active.action.action_uuid}")
+        if job.active:
+            job.active.finish_hlo_header(
+                file_conn_keys=job.active.action.file_conn_keys,
+                realtime=await job.active.get_realtime(),
             )
 
-        LOGGER.info(f"PAL_samples_in: {self.IO_palcam.samples_in}")
+        LOGGER.info(f"PAL_samples_in: {job.palcam.samples_in}")
         # update sample list with correct information from db if possible
         LOGGER.info("getting current sample information for all sample_in from db")
-        self.IO_palcam.samples_in = await self.archive.unified_db.get_samples(
-            samples=self.IO_palcam.samples_in
+        job.palcam.samples_in = await self.archive.unified_db.get_samples(
+            samples=job.palcam.samples_in
         )
 
     async def _PAL_IOloop_meas_end_helper(self) -> None:
-        """Wait for the PAL process to exit, cancel trigger task, and finish the action."""
+        """Wait for the PAL process to exit, cancel trigger task, and stamp the job terminal.
+
+        Replaces the legacy driver-owned ``active.finish()`` call: the
+        terminal ``IO_error`` is still stamped onto ``active.action`` (C1
+        guard, unchanged) but the job is now marked ``done`` instead of
+        being finished directly -- the framework (``PALJobExec``/
+        ``action_loop_task``) finishes the action once ``_poll`` reports a
+        terminal status (Design 1, K7b).
+        """
 
         if self.PAL_pid is not None:
             LOGGER.info("waiting for PAL pid to finish")
@@ -2376,13 +2452,11 @@ class PAL:
 
         self.IO_continue = True
         # done sending all PAL commands
-        self.IO_do_meas = False
+        job = self._job
+        self._job = None
         self.IO_action_run_counter = 0
 
-        if self.base.actionservermodel.estop:
-            LOGGER.info("PAL is in estop.")
-        else:
-            LOGGER.info("setting PAL to idle")
+        LOGGER.info("setting PAL to idle")
 
         self.IO_measuring = False
         LOGGER.info("PAL is done")
@@ -2392,225 +2466,209 @@ class PAL:
         # need to check here again in case estop was triggered during
         # measurement
         # need to set the current meas to idle first
-        if self.active is not None:
+        if job is not None:
             # C1: a shim raise in the IO loop sets a terminal IO_error but
             # never stamps the action; base._finish only reads
             # action.error_code, so stamp it here (the single choke point all
             # IO-loop exits funnel through) to fail loud instead of silently
             # finalizing a SAMPLE outage as success.
             if self.IO_error is not ErrorCodes.none:
-                self.active.action.error_code = self.IO_error
-            last_active = self.active
-            self.active = None
-            self.action = None
-            _ = await last_active.finish()
+                job.active.action.error_code = self.IO_error
+            job.error = self.IO_error
+            job.done.set()
 
-    async def method_arbitrary(self, A: Action) -> dict:
+    def build_palcam_arbitrary(self, params: dict, samples_in) -> PalCam:
         """Run a PAL job whose :class:`PalCam` is supplied directly via action params.
 
         Args:
-            A: Action whose ``action_params`` is unpacked into :class:`PalCam`.
+            params: ``action_params`` dict unpacked directly into :class:`PalCam`.
+            samples_in: Resolved input samples from the action.
         """
-        palcam = PalCam(**A.action_params)
-        palcam.samples_in = A.samples_in
-        return await self._init_PAL_IOloop(A=A, palcam=palcam)
+        palcam = PalCam(**params)
+        palcam.samples_in = samples_in
+        return palcam
 
-    async def method_transfer_tray_tray(self, A: Action) -> dict:
+    def build_palcam_transfer_tray_tray(self, params: dict, samples_in) -> PalCam:
         """Transfer liquid between two tray vials using the ``transfer_tray_tray`` cam."""
         palcam = PalCam(
-            samples_in=A.samples_in,
-            totalruns=len(A.action_params.get("sampleperiod", [])),
-            sampleperiod=A.action_params.get("sampleperiod", []),
-            spacingmethod=A.action_params.get("spacingmethod", Spacingmethod.linear),
-            spacingfactor=A.action_params.get("spacingfactor", 1.0),
-            timeoffset=A.action_params.get("timeoffset", 0.0),
+            samples_in=samples_in,
+            totalruns=len(params.get("sampleperiod", [])),
+            sampleperiod=params.get("sampleperiod", []),
+            spacingmethod=params.get("spacingmethod", Spacingmethod.linear),
+            spacingfactor=params.get("spacingfactor", 1.0),
+            timeoffset=params.get("timeoffset", 0.0),
             microcams=[
                 PalMicroCam(
                     **{
                         "method": "transfer_tray_tray",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("source_tray", 0),
-                                "slot": A.action_params.get("source_slot", 0),
-                                "vial": A.action_params.get("source_vial", 0),
+                                "tray": params.get("source_tray", 0),
+                                "slot": params.get("source_slot", 0),
+                                "vial": params.get("source_vial", 0),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("dest_tray", 0),
-                                "slot": A.action_params.get("dest_slot", 0),
-                                "vial": A.action_params.get("dest_vial", 0),
+                                "tray": params.get("dest_tray", 0),
+                                "slot": params.get("dest_slot", 0),
+                                "vial": params.get("dest_vial", 0),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_transfer_custom_tray(self, A: Action) -> dict:
+    def build_palcam_transfer_custom_tray(self, params: dict, samples_in) -> PalCam:
         """Transfer liquid from a custom position into a tray vial."""
         palcam = PalCam(
-            samples_in=A.samples_in,
-            totalruns=len(A.action_params.get("sampleperiod", [])),
-            sampleperiod=A.action_params.get("sampleperiod", []),
-            spacingmethod=A.action_params.get("spacingmethod", Spacingmethod.linear),
-            spacingfactor=A.action_params.get("spacingfactor", 1.0),
-            timeoffset=A.action_params.get("timeoffset", 0.0),
+            samples_in=samples_in,
+            totalruns=len(params.get("sampleperiod", [])),
+            sampleperiod=params.get("sampleperiod", []),
+            spacingmethod=params.get("spacingmethod", Spacingmethod.linear),
+            spacingfactor=params.get("spacingfactor", 1.0),
+            timeoffset=params.get("timeoffset", 0.0),
             microcams=[
                 PalMicroCam(
                     **{
                         "method": "transfer_custom_tray",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("dest_tray", 0),
-                                "slot": A.action_params.get("dest_slot", 0),
-                                "vial": A.action_params.get("dest_vial", 0),
+                                "tray": params.get("dest_tray", 0),
+                                "slot": params.get("dest_slot", 0),
+                                "vial": params.get("dest_vial", 0),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_transfer_tray_custom(self, A: Action) -> dict:
+    def build_palcam_transfer_tray_custom(self, params: dict, samples_in) -> PalCam:
         """Transfer liquid from a tray vial to a custom position."""
         palcam = PalCam(
-            samples_in=A.samples_in,
-            totalruns=len(A.action_params.get("sampleperiod", [])),
-            sampleperiod=A.action_params.get("sampleperiod", []),
-            spacingmethod=A.action_params.get("spacingmethod", Spacingmethod.linear),
-            spacingfactor=A.action_params.get("spacingfactor", 1.0),
-            timeoffset=A.action_params.get("timeoffset", 0.0),
+            samples_in=samples_in,
+            totalruns=len(params.get("sampleperiod", [])),
+            sampleperiod=params.get("sampleperiod", []),
+            spacingmethod=params.get("spacingmethod", Spacingmethod.linear),
+            spacingfactor=params.get("spacingfactor", 1.0),
+            timeoffset=params.get("timeoffset", 0.0),
             microcams=[
                 PalMicroCam(
                     **{
                         "method": "transfer_tray_custom",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("source_tray", 0),
-                                "slot": A.action_params.get("source_slot", 0),
-                                "vial": A.action_params.get("source_vial", 0),
+                                "tray": params.get("source_tray", 0),
+                                "slot": params.get("source_slot", 0),
+                                "vial": params.get("source_vial", 0),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_transfer_custom_custom(self, A: Action) -> dict:
+    def build_palcam_transfer_custom_custom(self, params: dict, samples_in) -> PalCam:
         """Transfer liquid between two custom positions."""
         palcam = PalCam(
-            samples_in=A.samples_in,
-            totalruns=len(A.action_params.get("sampleperiod", [])),
-            sampleperiod=A.action_params.get("sampleperiod", []),
-            spacingmethod=A.action_params.get("spacingmethod", Spacingmethod.linear),
-            spacingfactor=A.action_params.get("spacingfactor", 1.0),
-            timeoffset=A.action_params.get("timeoffset", 0.0),
+            samples_in=samples_in,
+            totalruns=len(params.get("sampleperiod", [])),
+            sampleperiod=params.get("sampleperiod", []),
+            spacingmethod=params.get("spacingmethod", Spacingmethod.linear),
+            spacingfactor=params.get("spacingfactor", 1.0),
+            timeoffset=params.get("timeoffset", 0.0),
             microcams=[
                 PalMicroCam(
                     **{
                         "method": "transfer_custom_custom",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_archive(self, A: Action) -> dict:
+    def build_palcam_archive(self, params: dict, samples_in) -> PalCam:
         """Archive a sample from a custom position into the next empty tray vial."""
         palcam = PalCam(
-            samples_in=A.samples_in,
-            totalruns=len(A.action_params.get("sampleperiod", [])),
-            sampleperiod=A.action_params.get("sampleperiod", []),
-            spacingmethod=A.action_params.get("spacingmethod", Spacingmethod.linear),
-            spacingfactor=A.action_params.get("spacingfactor", 1.0),
-            timeoffset=A.action_params.get("timeoffset", 0.0),
+            samples_in=samples_in,
+            totalruns=len(params.get("sampleperiod", [])),
+            sampleperiod=params.get("sampleperiod", []),
+            spacingmethod=params.get("spacingmethod", Spacingmethod.linear),
+            spacingfactor=params.get("spacingfactor", 1.0),
+            timeoffset=params.get("timeoffset", 0.0),
             microcams=[
                 PalMicroCam(
                     **{
                         "method": "archive",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
     # async def method_fill(self, A: Action) -> dict:
     #     palcam = PalCam(
@@ -2670,10 +2728,10 @@ class PAL:
     #         palcam = palcam,
     #     )
 
-    async def method_deepclean(self, A: Action) -> dict:
+    def build_palcam_deepclean(self, params: dict, samples_in) -> PalCam:
         """Run the PAL ``deepclean`` cam with all four wash stages enabled by default."""
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2683,20 +2741,17 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "deepclean",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
-                        "wash1": A.action_params.get("wash1", 1),
-                        "wash2": A.action_params.get("wash2", 1),
-                        "wash3": A.action_params.get("wash3", 1),
-                        "wash4": A.action_params.get("wash4", 1),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
+                        "wash1": params.get("wash1", 1),
+                        "wash2": params.get("wash2", 1),
+                        "wash3": params.get("wash3", 1),
+                        "wash4": params.get("wash4", 1),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
     # async def method_dilute(self, A: Action) -> dict:
     #     palcam = PalCam(
@@ -2756,25 +2811,25 @@ class PAL:
     #         palcam = palcam,
     #     )
 
-    async def method_injection_tray_GC(self, A: Action) -> dict:
+    def build_palcam_injection_tray_GC(self, params: dict, samples_in) -> PalCam:
         """Inject a tray sample into the GC, optionally starting the GC method.
 
         The action parameter ``startGC`` selects between ``start`` and ``wait``
         cam variants for the configured ``sampletype`` (gas or liquid).
         """
-        start = A.action_params.get("startGC", "start")
+        start = params.get("startGC", "start")
 
         if start == True:
             start = "start"
         elif start == False:
             start = "wait"
 
-        sampletype = A.action_params.get("sampletype", GCsampletype.none)
+        sampletype = params.get("sampletype", GCsampletype.none)
 
         method = f"injection_tray_GC_{str(sampletype)}_{start}"
 
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2784,49 +2839,46 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": method,
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("source_tray", 0),
-                                "slot": A.action_params.get("source_slot", 0),
-                                "vial": A.action_params.get("source_vial", 0),
+                                "tray": params.get("source_tray", 0),
+                                "slot": params.get("source_slot", 0),
+                                "vial": params.get("source_vial", 0),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_injection_custom_GC(self, A: Action) -> dict:
+    def build_palcam_injection_custom_GC(self, params: dict, samples_in) -> PalCam:
         """Inject a custom-position sample into the GC, optionally starting the GC method."""
-        start = A.action_params.get("startGC", None)
+        start = params.get("startGC", None)
 
         if start == True:
             start = "start"
         elif start == False:
             start = "wait"
 
-        sampletype = A.action_params.get("sampletype", GCsampletype.none)
+        sampletype = params.get("sampletype", GCsampletype.none)
 
         method = f"injection_custom_GC_{str(sampletype.name)}_{start}"
 
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2836,35 +2888,32 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": method,
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_injection_tray_HPLC(self, A: Action) -> dict:
+    def build_palcam_injection_tray_HPLC(self, params: dict, samples_in) -> PalCam:
         """Inject a tray sample into the HPLC."""
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2874,38 +2923,35 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_tray_HPLC",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
                                 "position": _positiontype.tray,
-                                "tray": A.action_params.get("source_tray", 0),
-                                "slot": A.action_params.get("source_slot", 0),
-                                "vial": A.action_params.get("source_vial", 0),
+                                "tray": params.get("source_tray", 0),
+                                "slot": params.get("source_slot", 0),
+                                "vial": params.get("source_vial", 0),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_injection_custom_HPLC(self, A: Action) -> dict:
+    def build_palcam_injection_custom_HPLC(self, params: dict, samples_in) -> PalCam:
         """Inject a custom-position sample into the HPLC."""
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2915,35 +2961,32 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_custom_HPLC",
-                        "tool": A.action_params.get("tool", None),
-                        "volume_ul": A.action_params.get("volume_ul", 0),
+                        "tool": params.get("tool", None),
+                        "volume_ul": params.get("volume_ul", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
                             **{
-                                "position": A.action_params.get("dest", None),
+                                "position": params.get("dest", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 )
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_ANEC_GC(self, A: Action) -> dict:
+    def build_palcam_ANEC_GC(self, params: dict, samples_in) -> PalCam:
         """ANEC GC injection: wait at Injector 2 then start at Injector 1."""
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -2953,11 +2996,11 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_custom_GC_gas_wait",
-                        "tool": A.action_params.get("toolGC", None),
-                        "volume_ul": A.action_params.get("volume_ul_GC", 0),
+                        "tool": params.get("toolGC", None),
+                        "volume_ul": params.get("volume_ul_GC", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
@@ -2974,11 +3017,11 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_custom_GC_gas_start",
-                        "tool": A.action_params.get("toolGC", None),
-                        "volume_ul": A.action_params.get("volume_ul_GC", 0),
+                        "tool": params.get("toolGC", None),
+                        "volume_ul": params.get("volume_ul_GC", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
@@ -2994,15 +3037,12 @@ class PAL:
                 ),
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
-        )
+        return palcam
 
-    async def method_ANEC_aliquot(self, A: Action) -> dict:
+    def build_palcam_ANEC_aliquot(self, params: dict, samples_in) -> PalCam:
         """ANEC GC injection followed by an archival aliquot from the same source."""
         palcam = PalCam(
-            samples_in=A.samples_in,
+            samples_in=samples_in,
             totalruns=1,
             sampleperiod=[],
             spacingmethod=Spacingmethod.linear,
@@ -3012,11 +3052,11 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_custom_GC_gas_wait",
-                        "tool": A.action_params.get("toolGC", None),
-                        "volume_ul": A.action_params.get("volume_ul_GC", 0),
+                        "tool": params.get("toolGC", None),
+                        "volume_ul": params.get("volume_ul_GC", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
@@ -3033,11 +3073,11 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "injection_custom_GC_gas_start",
-                        "tool": A.action_params.get("toolGC", None),
-                        "volume_ul": A.action_params.get("volume_ul_GC", 0),
+                        "tool": params.get("toolGC", None),
+                        "volume_ul": params.get("volume_ul_GC", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
                         "requested_dest": PALposition(
@@ -3054,48 +3094,42 @@ class PAL:
                 PalMicroCam(
                     **{
                         "method": "archive",
-                        "tool": A.action_params.get("toolarchive", None),
-                        "volume_ul": A.action_params.get("volume_ul_archive", 0),
+                        "tool": params.get("toolarchive", None),
+                        "volume_ul": params.get("volume_ul_archive", 0),
                         "requested_source": PALposition(
                             **{
-                                "position": A.action_params.get("source", None),
+                                "position": params.get("source", None),
                             }
                         ),
-                        "wash1": A.action_params.get("wash1", 0),
-                        "wash2": A.action_params.get("wash2", 0),
-                        "wash3": A.action_params.get("wash3", 0),
-                        "wash4": A.action_params.get("wash4", 0),
+                        "wash1": params.get("wash1", 0),
+                        "wash2": params.get("wash2", 0),
+                        "wash3": params.get("wash3", 0),
+                        "wash4": params.get("wash4", 0),
                     }
                 ),
             ],
         )
-        return await self._init_PAL_IOloop(
-            A=A,
-            palcam=palcam,
+        return palcam
+
+    def shutdown(self) -> None:
+        """Sync no-op; :meth:`disconnect` owns abort-then-close (weaning shutdown-ordering rule)."""
+        return None
+
+    def stop(self) -> DriverResponse:
+        """Signal the in-flight job (if any) to stop after its current palaction.
+
+        Sync per the ``HelaoDriver`` ABC (legacy ``stop()`` was async and
+        awaited queue space; ``set_IO_signalq_nowait`` never blocks since
+        the queue is drained by the worker before a job starts running).
+        """
+        if self._job is not None:
+            self.set_IO_signalq_nowait(False)
+        return DriverResponse(
+            response=DriverResponseType.success, status=self.get_status().status
         )
 
-    def shutdown(self):
-        """Cancel any active job, stop the IO loop, and wait for the active action to clear."""
-        LOGGER.info("shutting down pal")
-        self.set_IO_signalq_nowait(False)
-        retries = 0
-        while self.active is not None and retries < 10:
-            LOGGER.info(f"Got shutdown, but Active is not yet done!, retry {retries}")
-            # set it again
-            self.set_IO_signalq_nowait(False)
-            time.sleep(1)
-            retries += 1
-        # stop IOloop
-        self.IOloop_run = False
-
-    async def stop(self):
-        """Stop the current measurement loop by signalling ``False`` on the IO queue."""
-        # turn off cell and run before stopping meas loop
-        if self.IO_do_meas:
-            await self.set_IO_signalq(False)
-
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
-        """Toggle the emergency stop flag and abort any active PAL action.
+        """Abort any in-flight PAL job. The estop flag itself is framework-owned.
 
         Args:
             switch: Truthy to engage estop, falsy to clear.
@@ -3106,12 +3140,10 @@ class PAL:
             Coerced boolean form of ``switch``.
         """
         switch = bool(switch)
-        self.base.actionservermodel.estop = switch
-        if self.IO_do_meas:
+        if self._job is not None:
             if switch:
-                await self.set_IO_signalq(False)
-                if self.active is not None:
-                    self.active.set_estop()
+                self.set_IO_signalq_nowait(False)
+                self._job.active.set_estop()
         return switch
 
     async def kill_PAL(self) -> ErrorCodes:

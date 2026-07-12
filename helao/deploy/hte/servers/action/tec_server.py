@@ -21,6 +21,7 @@ from helao.core.models.sample import (
 )
 from ...drivers.temperature_control.mecom_driver import (
     MeerstetterTEC,
+    MeerstetterTECPoller,
     TECMonExec,
     TECWaitExec,
 )
@@ -44,6 +45,7 @@ def makeApp(server_key) -> BaseAPI:
         description="Sensor server",
         version=0.1,
         driver_classes=[MeerstetterTEC],
+        poller_class=MeerstetterTECPoller,
     )
 
     @app.post(f"/{server_key}/record_tec", tags=["action"])

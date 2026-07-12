@@ -34,6 +34,7 @@ from helao.core.tests._test_utils import TestReporter
 from helao.core.drivers.data.sync_driver import SyncDriver, move_to_synced
 from helao.helpers.file_utils import zip_dir
 from helao.core.models.helaodirs import HelaoDirs
+from helao.core.models.run_dir import RunDir
 
 # Blocking duration injected into the fake uploader. The "responsive" check
 # asserts the loop stall stayed well under this; a regression that drops the
@@ -84,7 +85,7 @@ def _make_driver(tmp_root: str) -> SyncDriver:
     """Build a SyncDriver with no AWS/API configured (``s3``/``api_host`` None)."""
     hd = HelaoDirs(
         root=Path(tmp_root),
-        save_root=Path(tmp_root) / "RUNS_ACTIVE",
+        save_root=Path(tmp_root) / RunDir.ACTIVE.value,
         process_root=Path(tmp_root) / "PROCESSES",
     )
     cfg = {"aws_bucket": "test-bucket", "max_tasks": 1}
@@ -121,7 +122,7 @@ async def _run_checks() -> dict:
             # real move_to_synced + zip_dir via to_thread
             fin = (
                 Path(tmp_root)
-                / "RUNS_FINISHED"
+                / RunDir.FINISHED.value
                 / "26.23"
                 / "0610"
                 / "120000__seq__lab"
@@ -138,12 +139,12 @@ async def _run_checks() -> dict:
             out["move_returned_path"] = isinstance(moved, Path)
             out["moved_into_synced"] = (
                 isinstance(moved, Path)
-                and "RUNS_SYNCED" in str(moved)
+                and RunDir.SYNCED in str(moved)
                 and moved.exists()
             )
             out["moved_out_of_finished"] = not data.exists()
 
-            synced_dir = Path(str(fin).replace("RUNS_FINISHED", "RUNS_SYNCED"))
+            synced_dir = Path(str(fin).replace(RunDir.FINISHED.value, RunDir.SYNCED.value))
             await asyncio.to_thread(move_to_synced, seq_yml)
             zip_target = synced_dir.parent / f"{synced_dir.name}.zip"
             await asyncio.to_thread(zip_dir, synced_dir, zip_target)

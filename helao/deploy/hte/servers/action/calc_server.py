@@ -8,6 +8,7 @@ CO2-purge checks, syringe-fill checks, OCV clamping, CP Ewe bounds). Unlike
 
 __all__ = ["makeApp"]
 
+import os
 import json
 import numpy as np
 from time import time_ns
@@ -17,6 +18,7 @@ from fastapi import Body
 from helao.core.models.file import HloHeaderModel, HloFileGroup
 from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI, action_version
+from helao.helpers.dispatcher import async_private_dispatcher
 from ...drivers.data.calc_driver import Calc
 from helao.helpers import helao_logging as logging
 
@@ -67,7 +69,12 @@ def makeApp(server_key) -> BaseAPI:
         vector embedded in the file header.
         """
         active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
-        datadict, arraydict = app.driver.calc_uvis_abs(active)
+        seq_absdir = os.path.join(
+            str(active.base.helaodirs.save_root), active.action.get_sequence_dir()
+        )
+        datadict, arraydict = app.driver.calc_uvis_abs(
+            seq_absdir, active.action.action_params
+        )
         await active.enqueue_data_dflt(datadict=datadict)
         for k, ad in arraydict.items():
             # convert ad to strings
@@ -121,8 +128,32 @@ def makeApp(server_key) -> BaseAPI:
         used by the experiment to decide whether to schedule a repeat purge.
         """
         active = await app.base.setup_and_contain_action(action_abbr="checkCO2")
-        result = await app.driver.check_co2_purge_level(active)
+        seq_absdir = os.path.join(
+            str(active.base.helaodirs.save_root), active.action.get_sequence_dir()
+        )
+        p = active.action.action_params
+        result = await app.driver.check_co2_purge_level(
+            seq_absdir,
+            p["co2_ppm_thresh"],
+            p["purge_if"],
+            p["present_syringe_volume_ul"],
+            p["repeat_experiment_name"],
+            p["repeat_experiment_params"],
+            p["repeat_experiment_kwargs"],
+        )
+        insert_experiment_payload = result.pop("__insert_experiment__", None)
         LOGGER.info(f"result dict was: {result}")
+        if insert_experiment_payload is not None:
+            resp, error = await async_private_dispatcher(
+                active.base.orch_key,
+                active.base.orch_host,
+                active.base.orch_port,
+                "insert_experiment",
+                params_dict={},
+                json_dict=insert_experiment_payload,
+            )
+            LOGGER.info(f"insert_experiment got response: {resp}")
+            LOGGER.info(f"insert_experiment returned error: {error}")
         await active.enqueue_data_dflt(datadict=result)
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -144,8 +175,28 @@ def makeApp(server_key) -> BaseAPI:
         active = await app.base.setup_and_contain_action(
             action_abbr="syringefillvolume"
         )
-        result = await app.driver.fill_syringe_volume_check(active)
+        p = active.action.action_params
+        result = await app.driver.fill_syringe_volume_check(
+            p["check_volume_ul"],
+            p["target_volume_ul"],
+            p["present_volume_ul"],
+            p["repeat_experiment_name"],
+            p["repeat_experiment_params"],
+            p["repeat_experiment_kwargs"],
+        )
+        insert_experiment_payload = result.pop("__insert_experiment__", None)
         LOGGER.info(f"result dict was: {result}")
+        if insert_experiment_payload is not None:
+            resp, error = await async_private_dispatcher(
+                active.base.orch_key,
+                active.base.orch_host,
+                active.base.orch_port,
+                "insert_experiment",
+                params_dict={},
+                json_dict=insert_experiment_payload,
+            )
+            LOGGER.info(f"insert_experiment got response: {resp}")
+            LOGGER.info(f"insert_experiment returned error: {error}")
         await active.enqueue_data_dflt(datadict=result)
         finished_action = await active.finish()
         return finished_action.as_dict()
