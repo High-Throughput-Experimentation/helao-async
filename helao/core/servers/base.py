@@ -91,6 +91,7 @@ from helao.core.servers.base_action_queue import ActionQueueDispatcher
 from helao.core.servers.base_endpoints import EndpointManager
 from helao.core.servers.active_data_file import DataFileWriter
 from helao.core.servers.active_data_stream import DataStreamer
+from helao.core.servers.active_executor import ExecutorRunner
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -971,14 +972,17 @@ class Active:
         # the file helpers through the Active delegators below.
         self.data_file_writer = DataFileWriter(self)
 
+        # per-Active executor-orchestration collaborator (CARDS P6 S7).
+        # Constructed at the end of __init__ alongside the other collaborators:
+        # start_executor is only called post-init by drivers, so nothing in
+        # __init__ needs it yet. It back-refs this Active and reads
+        # manual_stop/action_loop_running/action_task/action/base at call time
+        # (all initialized above); those state attributes stay on Active.
+        self.executor_runner = ExecutorRunner(self)
+
     def executor_done_callback(self, futr):
         """Log any exception raised by the executor task on completion."""
-        try:
-            _ = futr.result()
-        except Exception as exc:
-            LOGGER.info(
-                f"{traceback.format_exception(type(exc), exc, exc.__traceback__)}"
-            )
+        return self.executor_runner.executor_done_callback(futr)
 
     def start_executor(self, executor: Executor) -> dict:
         """Launch the action loop task for ``executor`` and return the action dict.
@@ -986,17 +990,11 @@ class Active:
         Non-concurrent executors register on the unified local queue so the
         loop task stalls until previous actions finish.
         """
-        # append action_uuid to local queue before running task if concurrency not allowed
-        if not executor.concurrent:
-            self.base.local_action_task_queue.append(executor.active.action.action_uuid)
-        self.action_task = self.base.aloop.create_task(self.action_loop_task(executor))
-        self.action_task.add_done_callback(self.executor_done_callback)
-        LOGGER.info("Executor task started.")
-        return self.action.as_dict()
+        return self.executor_runner.start_executor(executor)
 
     async def oneoff_executor(self, executor: Executor):
         """Run ``executor`` inline (no polling loop) and return its action result."""
-        return await self.action_loop_task(executor)
+        return await self.executor_runner.oneoff_executor(executor)
 
     async def update_act_file(self):
         """Rewrite the action's meta YAML to reflect the current state."""
@@ -1828,112 +1826,11 @@ class Active:
         Returns:
             The action returned by :meth:`finish`.
         """
-        # stall action_loop task if concurrency is not allowed
-        while (
-            self.base.local_action_task_queue
-            and self.base.local_action_task_queue[0] != self.action.action_uuid
-            and not executor.concurrent
-        ):
-            await asyncio.sleep(0.1)
-
-        if self.action.nonblocking:
-            await self.send_nonblocking_status()
-        LOGGER.info("action_loop_task started")
-        # pre-action operations
-        setup_state = await executor._pre_exec()
-        setup_error = setup_state.get("error", ErrorCodes.none)
-        if setup_error == ErrorCodes.none:
-            self.action_loop_running = True
-        else:
-            LOGGER.info("Error encountered during executor setup.")
-            self.action.error_code = setup_error
-            return await self.finish()
-
-        # shortcut to active exectuors
-        LOGGER.info(f"Registering exec_id: '{executor.exec_id}' with server")
-        self.base.executors[executor.exec_id] = self
-
-        # action operations
-        LOGGER.info("Running executor._exec() method")
-        try:
-            result = await executor._exec()
-        except Exception:
-            LOGGER.error("Executor._exec() failed", exc_info=True)
-            result = {}
-        error = result.get("error", ErrorCodes.none)
-        data = result.get("data", {})
-        if data:
-            datamodel = DataModel(
-                data={self.action.file_conn_keys[0]: data},
-                errors=[],
-                status=HloStatus.active,
-            )
-            self.enqueue_data_nowait(datamodel)  # write and broadcast
-
-        # polling loop for ongoing action
-        if not executor.oneoff:
-            LOGGER.info("entering executor polling loop")
-            while self.action_loop_running:
-                try:
-                    result = await executor._poll()
-                except Exception:
-                    LOGGER.error("Executor._poll() failed", exc_info=True)
-                    result = {}
-                # LOGGER.info(f"got result: {result}")
-                error = result.get("error", ErrorCodes.none)
-                status = result.get("status", HloStatus.finished)
-                data = result.get("data", {})
-                if data:
-                    # LOGGER.info(f"got data from poll iter: {data}")
-                    datamodel = DataModel(
-                        data={self.action.file_conn_keys[0]: data},
-                        errors=[],
-                        status=HloStatus.active,
-                    )
-                    self.enqueue_data_nowait(datamodel)  # write and broadcast
-
-                if status == HloStatus.active:
-                    await asyncio.sleep(executor.poll_rate)
-                else:
-                    LOGGER.info("exiting executor polling loop")
-                    self.action_loop_running = False
-
-        if error != ErrorCodes.none:
-            self.action.error_code = error
-        self.action_loop_running = False
-
-        # in case of manual stop, perform driver operations
-        if self.manual_stop:
-            result = await executor._manual_stop()
-            error = result.get("error", {})
-            if error != ErrorCodes.none:
-                LOGGER.info("Error encountered during manual stop.")
-
-        # post-action operations
-        cleanup_state = await executor._post_exec()
-        cleanup_error = cleanup_state.get("error", {})
-        data = cleanup_state.get("data", {})
-        if data:
-            datamodel = DataModel(
-                data={self.action.file_conn_keys[0]: data},
-                errors=[],
-                status=HloStatus.active,  # must be active for data writer to write
-            )
-            self.enqueue_data_nowait(datamodel)  # write and broadcast
-        if cleanup_error != ErrorCodes.none:
-            LOGGER.info("Error encountered during executor cleanup.")
-
-        _ = self.base.executors.pop(executor.exec_id)
-        retval = await self.finish()
-        if self.action.nonblocking:
-            await self.send_nonblocking_status()
-        return retval
+        return await self.executor_runner.action_loop_task(executor)
 
     def stop_action_task(self):
         """Signal the polling loop to exit on the next iteration and request a manual stop."""
-        LOGGER.info("Stop action request received. Stopping poll.")
-        self.manual_stop = True
-        self.action_loop_running = False
+        return self.executor_runner.stop_action_task()
 
 
 class DummyBase:

@@ -116,6 +116,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.dequedict import DequeDict
+from helao.helpers.executor import Executor
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
 
@@ -651,6 +652,57 @@ async def _drain_data(active: Active, timeout_s: float = 5.0):
 
 
 # ---------------------------------------------------------------------------
+# fake Executor (GAP#1: the Active lifecycle is executor-free in scenarios 1-9,
+# so start_executor / action_loop_task / oneoff_executor are otherwise
+# unexercised by the golden master).
+# ---------------------------------------------------------------------------
+
+
+class _FakeExecutor(Executor):
+    """Deterministic scripted :class:`Executor` for the golden master.
+
+    Conforms to the four-phase contract in ``helao/helpers/executor.py`` by
+    overriding ``_pre_exec`` / ``_exec`` / ``_poll`` / ``_post_exec`` /
+    ``_manual_stop`` to return fixed ``{"data": {...}, "error": ...}`` /
+    ``{"status": ...}`` dicts. Determinism is guaranteed WITHOUT wall-clock
+    waits: ``poll_rate=0`` makes ``action_loop_task``'s inter-poll
+    ``asyncio.sleep(poll_rate)`` a bare yield, and ``max_polls`` bounds the poll
+    loop (the ``max_polls``-th ``_poll`` returns a terminal ``HloStatus`` so the
+    loop exits after a fixed number of iterations). Data values are pinned
+    functions of the phase / poll index so the enqueued packets and streamed
+    ``.hlo`` rows are byte/multiset-stable run-to-run.
+    """
+
+    def __init__(self, active, *, oneoff: bool, max_polls: int = 0, **kwargs):
+        super().__init__(active, poll_rate=0.0, oneoff=oneoff, concurrent=True, **kwargs)
+        self._max_polls = max_polls
+        self._poll_count = 0
+
+    async def _pre_exec(self) -> dict:
+        return {"error": ErrorCodes.none}
+
+    async def _exec(self) -> dict:
+        return {"data": {"t": 0, "v": 0}, "error": ErrorCodes.none}
+
+    async def _poll(self) -> dict:
+        self._poll_count += 1
+        status = (
+            HloStatus.active if self._poll_count < self._max_polls else HloStatus.finished
+        )
+        return {
+            "data": {"t": self._poll_count, "v": self._poll_count * 10},
+            "error": ErrorCodes.none,
+            "status": status,
+        }
+
+    async def _post_exec(self) -> dict:
+        return {"data": {"t": -1, "v": -1}, "error": ErrorCodes.none}
+
+    async def _manual_stop(self) -> dict:
+        return {"error": ErrorCodes.none}
+
+
+# ---------------------------------------------------------------------------
 # scenarios -- each returns {"trace": [...]} and writes files under save_root
 # ---------------------------------------------------------------------------
 
@@ -994,6 +1046,80 @@ async def _scenario_nonblocking(save_root: Path) -> dict:
     return {"trace": trace}
 
 
+async def _scenario_executor_concurrent(save_root: Path) -> dict:
+    """Concurrent executor driven via ``start_executor`` + ``action_loop_task``.
+
+    ``start_executor`` creates the ``action_task`` (and registers
+    ``executor_done_callback``); awaiting it runs the full state machine:
+    ``_pre_exec`` -> ``_exec`` (one data packet) -> a bounded ``_poll`` loop
+    (``max_polls=3``, three more data packets, ``poll_rate=0``) -> ``_post_exec``
+    (one data packet) -> ``finish``. Freezes the enqueued executor data + the
+    ``action_loop_running`` transitions + the finish/status trace + streamed
+    ``.hlo`` bytes."""
+    trace: list = []
+    base = _make_base(save_root, trace)
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action("cexec")
+        active = Active(base, _active_params(base, action))
+        await active.myinit()
+        await _ticks()
+
+        executor = _FakeExecutor(active, oneoff=False, max_polls=3)
+        returned = active.start_executor(executor)
+        # start_executor only schedules the task (no await between create_task
+        # and here) -> the loop has not run yet, so action_loop_running is still
+        # False and action_task is a live Task. Deterministic snapshot.
+        trace.append(
+            {
+                "event": "post_start_executor",
+                "returned_action": returned is not None,
+                "action_loop_running": active.action_loop_running,
+                "has_action_task": active.action_task is not None,
+            }
+        )
+
+        await active.action_task
+        await _ticks(10)
+        trace.append(
+            {
+                "event": "post_action_task",
+                "action_loop_running": active.action_loop_running,
+                "manual_stop": active.manual_stop,
+                "action_status": _status_list(active.action),
+            }
+        )
+    return {"trace": trace}
+
+
+async def _scenario_executor_oneoff(save_root: Path) -> dict:
+    """One-off executor driven via ``oneoff_executor`` (``oneoff=True``).
+
+    ``oneoff_executor`` awaits ``action_loop_task`` inline with no poll loop:
+    ``_pre_exec`` -> ``_exec`` (one data packet) -> ``_post_exec`` (one data
+    packet) -> ``finish``. Freezes the enqueued data + terminal state + trace +
+    streamed ``.hlo`` bytes."""
+    trace: list = []
+    base = _make_base(save_root, trace)
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action("oexec")
+        active = Active(base, _active_params(base, action))
+        await active.myinit()
+        await _ticks()
+
+        executor = _FakeExecutor(active, oneoff=True)
+        returned = await active.oneoff_executor(executor)
+        await _ticks(10)
+        trace.append(
+            {
+                "event": "post_oneoff_executor",
+                "returned_action": returned is not None,
+                "action_loop_running": active.action_loop_running,
+                "action_status": _status_list(active.action),
+            }
+        )
+    return {"trace": trace}
+
+
 SCENARIOS = {
     "1_basic_data_and_file": _scenario_basic,
     "2_save_data_false": _scenario_save_data_false,
@@ -1004,6 +1130,8 @@ SCENARIOS = {
     "7_multifile_aux_listen": _scenario_multifile_aux,
     "8_finalizer_global_params": _scenario_finalizer_global_params,
     "9_nonblocking_status": _scenario_nonblocking,
+    "10_executor_concurrent": _scenario_executor_concurrent,
+    "11_executor_oneoff": _scenario_executor_oneoff,
 }
 
 

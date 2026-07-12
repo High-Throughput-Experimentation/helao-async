@@ -55,6 +55,7 @@ from helao.core.tests.unit_test_base_status import base_status_unit_test
 from helao.core.tests.unit_test_base_meta_writer import base_meta_writer_unit_test
 from helao.core.tests.unit_test_active_data_file import active_data_file_unit_test
 from helao.core.tests.unit_test_active_data_stream import active_data_stream_unit_test
+from helao.core.tests.unit_test_active_executor import active_executor_unit_test
 from helao.core.tests.unit_test_base_endpoints import base_endpoints_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
@@ -92,6 +93,7 @@ TESTS = [
     ("base_meta_writer", base_meta_writer_unit_test),
     ("active_data_file", active_data_file_unit_test),
     ("active_data_stream", active_data_stream_unit_test),
+    ("active_executor", active_executor_unit_test),
     ("base_endpoints", base_endpoints_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
