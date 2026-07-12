@@ -22,6 +22,22 @@ bodies. Behavior is byte-identical to the original inline methods.
 Note: ``Active`` has its own, distinct ``get_realtime``/``get_realtime_nowait``
 methods (a thin forward to ``self.base.get_realtime``/``get_realtime_nowait``)
 -- those stay on ``Active`` and are untouched by this module.
+
+Lock/queue ownership map (Base-server data-plane; duplicated verbatim in
+``base_status.py``, ``base_live_buffer.py``, and ``active_data_stream.py`` --
+the three queue owners):
+
+- ``status_q`` (on ``Base``) -- written by ``StatusBroadcaster`` (status
+  packages) + ``Active.add_status``; subscribed by
+  ``StatusBroadcaster.ws_status``.
+- ``live_q`` (on ``Base``) -- written by ``LiveBuffer.put_lbuf``; drained by
+  ``LiveBuffer.live_buffer_task``; relayed by ``StatusBroadcaster.ws_live``.
+- ``data_q`` (on ``Base``) -- written by ``DataStreamer.enqueue_data*`` (via
+  ``Active``); drained by ``DataStreamer.log_data_task``; relayed by
+  ``StatusBroadcaster.ws_data``.
+- Active per-action collaborators (``data_file_writer``/``data_stream``/
+  ``executor_runner``/``action_finalizer``) hold only ``self.active``; Base
+  collaborators hold only ``self.base``; all read shared state at call time.
 """
 
 from time import time

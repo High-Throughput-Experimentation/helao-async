@@ -39,7 +39,7 @@ import pyzstd
 from fastapi import WebSocket
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.dispatcher import async_private_dispatcher  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.core.models.run_dir import RunDir
@@ -47,10 +47,10 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.helao_logging import print_message
 from helao.helpers import async_copy
 from helao.helpers.yml_tools import yml_dumps
-from helao.helpers.yml_tools import move_dir
+from helao.helpers.yml_tools import move_dir  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.ws_utils import WsPublisher
-from helao.helpers.time_utils import set_time
+from helao.helpers.time_utils import set_time  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.time_utils import read_saved_offset
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.status_transitions import guarded_replace
