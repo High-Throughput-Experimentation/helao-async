@@ -61,12 +61,17 @@ sources reach ``Active``'s output and are handled as follows:
    (``_mk_action``) for baseline readability, but correctness does not depend
    on that -- only on structural stability, which the normalizer captures.
 2. Async flush/chunk boundaries in streamed ``.hlo`` data. The ``--check``
-   gate compares ``.hlo`` files by (a) NORMALIZED header bytes (exact) and
+   gate compares ``.hlo`` files by (a) NORMALIZED header bytes (exact),
    (b) per-data-key VALUE MULTISETS of the JSON data lines (copied from
-   ``.omc/artifacts/p3/compare_runs.py``), never raw-line equality, so a
-   chunk split at a different offset still compares equal. Non-``.hlo`` files
-   (``-act.yml`` / ``-exp.yml`` / ``-seq.yml``) and the side-effect trace are
-   compared as exact normalized bytes.
+   ``.omc/artifacts/p3/compare_runs.py``), and (c) a WHOLE-RECORD MULTISET
+   that explodes each parallel-list data line into position-paired per-index
+   records and multisets the entire record dict -- never raw-line equality, so
+   a chunk split at a different offset still compares equal. The whole-record
+   check (added in S6) catches a cross-key transpose / split / regroup that
+   leaves the per-key pools of (b) unchanged; both are kept because neither
+   strictly subsumes the other. Non-``.hlo`` files (``-act.yml`` /
+   ``-exp.yml`` / ``-seq.yml``) and the side-effect trace are compared as exact
+   normalized bytes.
 
 Frozen reference: ``.omc/artifacts/p6/baseline_S0a/`` holds one
 ``<scenario>.trace.jsonl`` (normalized side-effect trace) and one
@@ -276,6 +281,60 @@ def _merge_data_multisets(data_lines):
     return per_key
 
 
+def _explode_records(rec: dict):
+    """Explode one JSON data-line dict into per-index WHOLE records.
+
+    A parallel-list line ``{"t_s":[0,1,2],"erhe_v":[10,11,12]}`` becomes the
+    three records ``{"t_s":0,"erhe_v":10}``, ``{"t_s":1,"erhe_v":11}``,
+    ``{"t_s":2,"erhe_v":12}`` -- values are POSITION-PAIRED within the line.
+    Scalar-valued keys broadcast across every index (so a line mixing a scalar
+    ``epoch`` with parallel arrays keeps ``epoch`` on each record); a line with
+    no list values yields exactly one record (the dict itself).
+
+    Raises:
+        ValueError: if the line's list-valued keys have unequal lengths, so
+            they cannot be position-paired (surfaced as a data diff by the
+            caller rather than silently mispaired).
+    """
+    list_keys = {k: v for k, v in rec.items() if isinstance(v, list)}
+    scalar_keys = {k: v for k, v in rec.items() if not isinstance(v, list)}
+    if not list_keys:
+        return [rec]
+    lengths = {len(v) for v in list_keys.values()}
+    if len(lengths) != 1:
+        raise ValueError(
+            "parallel-list keys have mismatched lengths: "
+            f"{ {k: len(v) for k, v in list_keys.items()} }"
+        )
+    (n,) = tuple(lengths)
+    records = []
+    for i in range(n):
+        r = dict(scalar_keys)
+        for k, v in list_keys.items():
+            r[k] = v[i]
+        records.append(r)
+    return records
+
+
+def _whole_record_multiset(data_lines):
+    """Multiset (``Counter``) of WHOLE per-index records across all data lines.
+
+    Complements :func:`_merge_data_multisets` (which pools each key
+    independently and so cannot see which values CO-OCCUR): exploding each line
+    into position-paired records and keying the multiset on the entire record
+    dict absorbs async chunk-boundary REGROUPING (records are matched by value,
+    line order ignored) while still catching a drop, duplicate, transpose, or
+    split-across-lines that leaves the per-key pools unchanged."""
+    counter = Counter()
+    for line in data_lines:
+        rec = json.loads(line)
+        if not isinstance(rec, dict):
+            raise ValueError(f"data line is not a JSON object: {line!r}")
+        for record in _explode_records(rec):
+            counter[_multiset_key(record)] += 1
+    return counter
+
+
 def _compare_norm(name: str, ref_text: str, cur_text: str) -> "list[str]":
     """Apply the 3-part P3 contract between two ``.norm`` snapshots. Returns a
     list of human-readable failure strings (empty == match)."""
@@ -315,6 +374,23 @@ def _compare_norm(name: str, ref_text: str, cur_text: str) -> "list[str]":
                     failures.append(
                         f"[{name} .hlo data multiset] {rel} key={key!r}: "
                         f"baseline={dict(ms_ref[key])} current={dict(ms_cur[key])}"
+                    )
+            # whole-record multiset: catches cross-key transpose / split /
+            # regroup that the per-key pools above are blind to (see
+            # _whole_record_multiset). Kept alongside the per-key check
+            # (belt-and-suspenders) since neither strictly subsumes the other's
+            # failure message.
+            try:
+                wr_ref = _whole_record_multiset(d_ref)
+                wr_cur = _whole_record_multiset(d_cur)
+            except (ValueError, json.JSONDecodeError) as exc:
+                failures.append(f"[{name} .hlo whole-record-parse] {rel}: {exc}")
+            else:
+                if wr_ref != wr_cur:
+                    failures.append(
+                        f"[{name} .hlo whole-record multiset] {rel}: "
+                        f"only-in-baseline={sorted(set(wr_ref - wr_cur))} "
+                        f"only-in-current={sorted(set(wr_cur - wr_ref))}"
                     )
         elif body_ref != body_cur:
             failures.append(f"[{name} text] {rel}")
