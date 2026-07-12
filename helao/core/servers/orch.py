@@ -199,7 +199,12 @@ class Orch(Base):
         (e.g. the dispatch golden-master harness's ``Orch.__new__``
         construction) call this directly so collaborators exist without
         per-collaborator lazy guards.
+
+        Calls ``super()`` first so the ``Base`` collaborators (``live_buffer_mgr``,
+        ``status_broadcaster``, CARDS P6) are also built on ``Orch`` instances --
+        the orchestrator inherits and delegates those status/live-buffer methods.
         """
+        super()._init_collaborators()
         self.queue_persister = QueuePersister(self)
         self.server_monitor = ServerMonitor(self)
         self.status_ingester = StatusIngester(self)

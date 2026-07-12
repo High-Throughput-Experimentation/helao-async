@@ -88,6 +88,7 @@ from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
 from helao.core.servers.base_live_buffer import LiveBuffer
+from helao.core.servers.base_status import StatusBroadcaster
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -236,6 +237,7 @@ class Base:
         per-collaborator lazy guards.
         """
         self.live_buffer_mgr = LiveBuffer(self)
+        self.status_broadcaster = StatusBroadcaster(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the asyncio event loop.
@@ -526,20 +528,12 @@ class Base:
         Returns:
             ``(response, error_code)`` from the dispatcher.
         """
-        json_dict = {
-            "actionservermodel": self.actionservermodel.get_fastapi_json(
-                action_name=action_name,
-            ),
-        }
-        response, error_code = await async_private_dispatcher(
-            server_key=client_servkey,
-            host=client_host,
-            port=client_port,
-            private_action="update_status",
-            params_dict={"regular_task": "true" if action_name is None else "false"},
-            json_dict=json_dict,
+        return await self.status_broadcaster.send_statuspackage(
+            client_servkey=client_servkey,
+            client_host=client_host,
+            client_port=client_port,
+            action_name=action_name,
         )
-        return response, error_code
 
     async def send_nbstatuspackage(
         self,
@@ -559,25 +553,12 @@ class Base:
         Returns:
             ``(response, error_code)`` from the dispatcher.
         """
-        # needs private dispatcher
-        json_dict = {
-            "actionmodel": actionmodel.as_dict(),
-        }
-        params_dict = {
-            "server_host": self.server_cfg["host"],
-            "server_port": self.server_cfg["port"],
-        }
-        LOGGER.info(f"sending non-blocking status: {json_dict}")
-        response, error_code = await async_private_dispatcher(
-            server_key=client_servkey,
-            host=client_host,
-            port=client_port,
-            private_action="update_nonblocking",
-            params_dict=params_dict,
-            json_dict=json_dict,
+        return await self.status_broadcaster.send_nbstatuspackage(
+            client_servkey=client_servkey,
+            client_host=client_host,
+            client_port=client_port,
+            actionmodel=actionmodel,
         )
-        LOGGER.info(f"update_nonblocking request got response: {response}")
-        return response, error_code
 
     async def attach_client(
         self, client_servkey: str, client_host: str, client_port: int, retry_limit=5
@@ -593,63 +574,15 @@ class Base:
         Returns:
             ``True`` if the initial snapshot was delivered, ``False`` otherwise.
         """
-        success = False
-        combo_key = (
-            client_servkey,
-            client_host,
-            client_port,
+        return await self.status_broadcaster.attach_client(
+            client_servkey, client_host, client_port, retry_limit=retry_limit
         )
-        LOGGER.info("attaching status subscriber")
-
-        if combo_key in self.status_clients:
-            LOGGER.info(
-                f"Client {combo_key} is already subscribed to {self.server.server_name} status updates."
-            )
-            # self.detach_client(client_servkey, client_host, client_port)  # refresh
-        self.status_clients.add(combo_key)
-
-        # sends current status of all endpoints (action_name = None)
-        for _ in range(retry_limit):
-            response, error_code = await self.send_statuspackage(
-                client_servkey=client_servkey,
-                client_host=client_host,
-                client_port=client_port,
-                action_name=None,
-            )
-            if response is not None and error_code == ErrorCodes.none:
-                LOGGER.info(
-                    f"Added {combo_key} to {self.server.server_name} status subscriber list."
-                )
-                success = True
-                break
-            else:
-                LOGGER.error(
-                    f"Failed to add {combo_key} to {self.server.server_name} status subscriber list."
-                )
-
-            if success:
-                LOGGER.info(
-                    f"Attached {combo_key} to status ws on {self.server.server_name}."
-                )
-            else:
-                LOGGER.error(
-                    f"failed to attach {combo_key} to status ws on {self.server.server_name} after {retry_limit} attempts."
-                )
-
-        return success
 
     def detach_client(self, client_servkey: str, client_host: str, client_port: int):
         """Remove a remote client from this server's status subscriber set."""
-        combo_key = (
-            client_servkey,
-            client_host,
-            client_port,
+        return self.status_broadcaster.detach_client(
+            client_servkey, client_host, client_port
         )
-        if combo_key in self.status_clients:
-            self.status_clients.remove(combo_key)
-            LOGGER.info(f"Client {combo_key} will no longer receive status updates.")
-        else:
-            LOGGER.info(f"Client {combo_key} is not subscribed.")
 
     async def _ws_relay(
         self,
@@ -666,34 +599,21 @@ class Base:
             label: Short identifier used in log lines.
             use_as_dict: When True, call ``msg.as_dict()`` before serialising.
         """
-        LOGGER.info(f"got new {label} subscriber")
-        await websocket.accept()
-        sub = queue.subscribe()
-        try:
-            async for msg in sub:
-                payload = msg.as_dict() if use_as_dict else msg
-                await websocket.send_bytes(pyzstd.compress(pickle.dumps(payload)))
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(
-                f"{label.capitalize()} websocket client "
-                f"{websocket.client[0]}:{websocket.client[1]} disconnected. "
-                f"{repr(e), tb,}"
-            )
-            if sub in queue.subscribers:
-                queue.remove(sub)
+        await self.status_broadcaster._ws_relay(
+            websocket, queue, label, use_as_dict=use_as_dict
+        )
 
     async def ws_status(self, websocket: WebSocket) -> None:
         """Stream compressed status messages over ``websocket`` until the client disconnects."""
-        await self._ws_relay(websocket, self.status_q, "status")
+        await self.status_broadcaster.ws_status(websocket)
 
     async def ws_data(self, websocket: WebSocket) -> None:
         """Stream compressed data packets over ``websocket`` until the client disconnects."""
-        await self._ws_relay(websocket, self.data_q, "data")
+        await self.status_broadcaster.ws_data(websocket)
 
     async def ws_live(self, websocket: WebSocket) -> None:
         """Stream compressed live-buffer updates over ``websocket`` until disconnect."""
-        await self._ws_relay(websocket, self.live_q, "live_buffer", use_as_dict=False)
+        await self.status_broadcaster.ws_live(websocket)
 
     async def live_buffer_task(self):
         """Subscribe to the live queue and fold every published message into ``live_buffer``."""
@@ -717,19 +637,9 @@ class Base:
 
     async def regular_status_task(self, delay: float = 10, retry_limit: int = 5):
         """Periodically push the action-server status to every subscribed client."""
-        while True:
-            for combo_key in self.status_clients.copy():
-                client_servkey, client_host, client_port = combo_key
-                for _ in range(retry_limit):
-                    response, error_code = await self.send_statuspackage(
-                        action_name=None,
-                        client_servkey=client_servkey,
-                        client_host=client_host,
-                        client_port=client_port,
-                    )
-                    if response and error_code == ErrorCodes.none:
-                        break
-            await asyncio.sleep(delay)
+        await self.status_broadcaster.regular_status_task(
+            delay=delay, retry_limit=retry_limit
+        )
 
     async def _dispatch_queued_action(self, action_queue, queue_label: str) -> None:
         """Pop one queued action, redispatch it with ``no_wait``, and requeue on failure.
@@ -769,97 +679,11 @@ class Base:
         Args:
             retry_limit: Number of attempts to deliver each status update to a subscriber.
         """
-        LOGGER.info(f"{self.server.server_name} status log task created.")
-
-        try:
-            # get the new Action (status) from the queue
-            async for status_msg in self.status_q.subscribe():
-                # add it to the correct "EndpointModel"
-                # in the "ActionServerModel"
-                if status_msg.action_name not in self.actionservermodel.endpoints:
-                    # a new endpoints became available
-                    self.actionservermodel.endpoints[status_msg.action_name] = (
-                        EndpointModel(endpoint_name=status_msg.action_name)
-                    )
-                self.actionservermodel.endpoints[
-                    status_msg.action_name
-                ].active_dict.update({status_msg.action_uuid: status_msg})
-                self.actionservermodel.last_action_uuid = status_msg.action_uuid
-
-                # sort the status (nonactive_dict is empty at this point)
-                self.actionservermodel.endpoints[status_msg.action_name].sort_status()
-                LOGGER.info(
-                    f"log_status_task sending status {status_msg.action_status} for action {status_msg.action_name} with uuid {status_msg.action_uuid} on {status_msg.action_server.disp_name()} to subscribers ({self.status_clients})."
-                )
-                if len(self.status_clients) == 0 and self.orch_key is not None:
-                    await self.attach_client(
-                        self.orch_key, self.orch_host, self.orch_port
-                    )
-
-                for combo_key in self.status_clients.copy():
-                    client_servkey, client_host, client_port = combo_key
-                    LOGGER.debug(
-                        f"log_status_task trying to send status to {client_servkey}."
-                    )
-                    success = False
-                    for _ in range(retry_limit):
-                        response, error_code = await self.send_statuspackage(
-                            action_name=status_msg.action_name,
-                            client_servkey=client_servkey,
-                            client_host=client_host,
-                            client_port=client_port,
-                        )
-
-                        if response and error_code == ErrorCodes.none:
-                            success = True
-                            break
-
-                    if success:
-                        LOGGER.info(f"Pushed status message to {client_servkey}.")
-                    else:
-                        LOGGER.error(
-                            f"Failed to push status message to {client_servkey} after {retry_limit} attempts."
-                        )
-                    sleep(0.3)
-                # now delete the errored and finsihed statuses after
-                # all are send to the subscribers
-                self.actionservermodel.endpoints[
-                    status_msg.action_name
-                ].clear_finished()
-                LOGGER.debug("all log_status_task messages sent.")
-
-                active_nonqueued = {
-                    endpoint: [
-                        auuid
-                        for auuid, act in endmod.active_dict.items()
-                        if not act.action_params.get("queued_on_actserv", False)
-                        or act.action_params.get("queued_launch", False)
-                    ]
-                    for endpoint, endmod in self.actionservermodel.endpoints.items()
-                }
-                active_nq = [x for y in active_nonqueued.values() for x in y]
-
-                if not self.server_params.get("allow_concurrent_actions", True):
-                    if len(self.local_action_queue) > 0 and not active_nq:
-                        await self.process_unified_queue()
-                else:
-                    if len(
-                        self.endpoint_queues[status_msg.action_name]
-                    ) > 0 and not active_nonqueued.get(status_msg.action_name, []):
-                        await self.process_endpoint_queue(status_msg)
-
-            LOGGER.info("log_status_task done.")
-
-        # except asyncio.CancelledError:
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"status logger task was cancelled with error: {repr(e), tb,}")
+        await self.status_broadcaster.log_status_task(retry_limit=retry_limit)
 
     async def detach_subscribers(self):
         """Signal the status and data queues to terminate and yield long enough to drain them."""
-        await self.status_q.put(StopAsyncIteration)
-        await self.data_q.put(StopAsyncIteration)
-        await asyncio.sleep(1)
+        await self.status_broadcaster.detach_subscribers()
 
     async def get_realtime(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
@@ -1019,7 +843,9 @@ class Base:
         ``replace_sequence_status``) for new call sites; this shim delegates to
         ``guarded_replace`` for callers still holding a bare ``status_list`` reference.
         """
-        guarded_replace(status_list, old_status, new_status)
+        return self.status_broadcaster.replace_status(
+            status_list, old_status, new_status
+        )
 
     def get_main_error(self, errors) -> ErrorCodes:
         """Return the first non-``none`` error code, or the input itself if not a list."""
