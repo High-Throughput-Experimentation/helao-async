@@ -352,6 +352,13 @@ def _check_finalization_guards() -> bool:
     ok &= should_close_out_sequence(0, 1, True) is False
     ok &= should_close_out_sequence(0, 0, False) is False
 
+    # E-STOP: the clean close-out is skipped so estop_finish_active is the sole
+    # finalizer (else exp/seq get a duplicate 'finished' + lose 'estopped').
+    ok &= should_close_out_experiment(0, True, OrchStatus.estopped) is False
+    ok &= should_close_out_experiment(0, True, LoopStatus.started) is True
+    ok &= should_close_out_sequence(0, 0, True, OrchStatus.estopped) is False
+    ok &= should_close_out_sequence(0, 0, True, LoopStatus.started) is True
+
     # should_set_stopped == loop_state != OrchStatus.estopped (Q2: uses OrchStatus,
     # and LoopStatus.estopped compares equal to OrchStatus.estopped by str value)
     ok &= should_set_stopped(LoopStatus.stopped) is True

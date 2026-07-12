@@ -314,8 +314,17 @@ class OrchAPI(HelaoFastAPI):
             return result_dict
 
         @self.post("/update_global_params", tags=["private"])
-        async def update_global_params(params: dict):
-            """Merge ``params`` into the orchestrator's ``global_params`` dictionary."""
+        async def update_global_params(params: dict = {}):
+            """Merge ``params`` into the orchestrator's ``global_params`` dictionary.
+
+            Keep the plain ``dict`` annotation (the RPC coercion layer only wraps a
+            flat body into a body-style param when ``ann is dict``; ``Optional[dict]``
+            would break that and silently drop non-empty payloads). The ``{}`` default
+            tolerates an empty RPC body as a no-op without a missing-arg TypeError; it
+            is only ever read (``.update`` FROM it), never mutated, so the shared
+            default is safe.
+            """
+            params = params or {}
             LOGGER.info(f"Updated global params with {params}.")
             # if self.orch.active_experiment is not None:
             #     self.orch.active_experiment.global_params.update(params)

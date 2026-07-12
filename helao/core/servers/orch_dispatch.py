@@ -313,16 +313,34 @@ class ExportQueues:
 # ===========================================================================
 
 
-def should_close_out_experiment(n_acts: int, active_exp_present: bool) -> bool:
-    """Guard for :class:`CloseOutExperiment` (:1234-1236)."""
-    return (n_acts == 0) and active_exp_present
+def should_close_out_experiment(
+    n_acts: int, active_exp_present: bool, loop_state=None
+) -> bool:
+    """Guard for :class:`CloseOutExperiment` (:1234-1236).
+
+    Under E-STOP the clean close-out is skipped -- estop_finish_active is the
+    sole finalizer -- so the experiment is not double-finalized.
+    """
+    return (
+        (n_acts == 0)
+        and active_exp_present
+        and loop_state != OrchStatus.estopped
+    )
 
 
 def should_close_out_sequence(
-    n_exps: int, n_acts: int, active_seq_present: bool
+    n_exps: int, n_acts: int, active_seq_present: bool, loop_state=None
 ) -> bool:
-    """Guard for :class:`CloseOutSequence` (:1239-1243)."""
-    return (n_exps == 0) and (n_acts == 0) and active_seq_present
+    """Guard for :class:`CloseOutSequence` (:1239-1243).
+
+    Skipped under E-STOP (estop_finish_active finalizes the sequence instead).
+    """
+    return (
+        (n_exps == 0)
+        and (n_acts == 0)
+        and active_seq_present
+        and loop_state != OrchStatus.estopped
+    )
 
 
 def should_set_stopped(loop_state) -> bool:
@@ -651,14 +669,24 @@ class DispatchRunner:
         """Run one finalization step with its guard re-checked against LIVE state."""
         orch = self.orch
         if isinstance(step, CloseOutExperiment):                                # :1234-1238
-            if not orch.action_dq and orch.active_experiment is not None:
+            # Guard delegated to the pure policy helper so the decision-table unit
+            # test is authoritative for runtime (no helper/runtime drift). The
+            # estop branch skips the clean close-out so estop_finish_active is the
+            # sole finalizer (else both paths finalize -> duplicate 'finished' +
+            # lost 'estopped').
+            if should_close_out_experiment(
+                len(orch.action_dq),
+                orch.active_experiment is not None,
+                orch.globalstatusmodel.loop_state,
+            ):
                 LOGGER.info("finishing final experiment")
                 await orch.finish_active_experiment()
         elif isinstance(step, CloseOutSequence):                                # :1239-1245
-            if (
-                not orch.experiment_dq
-                and not orch.action_dq
-                and orch.active_sequence is not None
+            if should_close_out_sequence(
+                len(orch.experiment_dq),
+                len(orch.action_dq),
+                orch.active_sequence is not None,
+                orch.globalstatusmodel.loop_state,
             ):
                 LOGGER.info("finishing final sequence")
                 await orch.finish_active_sequence()

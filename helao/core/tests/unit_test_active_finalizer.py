@@ -382,6 +382,25 @@ async def _check_delegators_forward() -> bool:
     ]
 
 
+async def _check_empty_global_params_skips_dispatch() -> bool:
+    """Issue-1 regression: when to_global_params keys resolve to nothing (e.g. an
+    estop interrupts before the action produces output), finish must NOT dispatch
+    update_global_params with an empty body -- that reached the RPC handler with no
+    args and crashed on the required `params`. An empty update is a no-op."""
+    base = _make_base(tempfile.mkdtemp())
+    active = _mk_active(base)
+    active.action.to_global_params = ["never_produced_key"]  # absent from params/output
+    calls = []
+    with _PatchGlobals():
+        async def _recording_dispatch(*args, **kwargs):
+            calls.append(kwargs.get("private_action"))
+            return {}, ErrorCodes.none
+
+        finalizer_module.async_private_dispatcher = _recording_dispatch
+        await active.finish()
+    return "update_global_params" not in calls
+
+
 async def _run_checks() -> dict:
     return {
         "collaborator_wired": await _check_collaborator_wired(),
@@ -389,6 +408,7 @@ async def _run_checks() -> dict:
         "split_keep_active_then_finish_all": await _check_split_keep_active_then_finish_all(),
         "substitute_closes_open_files": await _check_substitute_closes_open_files(),
         "delegators_forward": await _check_delegators_forward(),
+        "empty_global_params_skips_dispatch": await _check_empty_global_params_skips_dispatch(),
     }
 
 
@@ -432,6 +452,13 @@ def active_finalizer_unit_test() -> bool:
     reporter.check(
         "Active finalizer delegators forward to active.action_finalizer",
         lambda: res["delegators_forward"],
+    )
+
+    reporter.section("empty global-params skips RPC (Issue-1 estop regression)")
+    reporter.check(
+        "finish does not dispatch update_global_params when to_global_params "
+        "resolves to nothing (empty body crashed the RPC handler)",
+        lambda: res["empty_global_params_skips_dispatch"],
     )
 
     return reporter.success()
