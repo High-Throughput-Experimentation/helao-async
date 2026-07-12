@@ -37,10 +37,9 @@ import numpy as np
 import pyzstd
 
 from fastapi import WebSocket
-from fastapi.dependencies.utils import get_flat_params
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.dispatcher import async_private_dispatcher, async_action_dispatcher
+from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.core.models.run_dir import RunDir
@@ -50,7 +49,6 @@ from helao.helpers import async_copy
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_tools import move_dir
 from helao.helpers.premodels import Action, Experiment, Sequence
-from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.time_utils import set_time
 from helao.helpers.time_utils import read_saved_offset
@@ -70,7 +68,7 @@ from helao.core.models.sample import (
 from helao.core.models.action import ActionModel
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.machine import MachineModel
-from helao.core.models.server import ActionServerModel, EndpointModel
+from helao.core.models.server import ActionServerModel
 from helao.core.version import get_filehash
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.zdeque import zdeque
@@ -89,6 +87,8 @@ from helao.helpers.dequedict import DequeDict
 from helao.core.servers.base_live_buffer import LiveBuffer
 from helao.core.servers.base_status import StatusBroadcaster
 from helao.core.servers.base_meta_writer import MetaFileWriter
+from helao.core.servers.base_action_queue import ActionQueueDispatcher
+from helao.core.servers.base_endpoints import EndpointManager
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -239,6 +239,8 @@ class Base:
         self.live_buffer_mgr = LiveBuffer(self)
         self.status_broadcaster = StatusBroadcaster(self)
         self.meta_writer = MetaFileWriter(self)
+        self.action_queue = ActionQueueDispatcher(self)
+        self.endpoint_mgr = EndpointManager(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the asyncio event loop.
@@ -279,14 +281,11 @@ class Base:
 
     def dyn_endpoints_init(self):
         """Initialize endpoint status entries via the configured ``dyn_endpoints`` callback."""
-        asyncio.gather(self.init_endpoint_status(self.dyn_endpoints))
+        self.endpoint_mgr.dyn_endpoints_init()
 
     def endpoint_queues_init(self):
         """Create a per-endpoint action queue for every action route on this server."""
-        for urld in self.fast_urls:
-            if urld.get("path", "").strip("/").startswith(self.server.server_name):
-                endpoint_name = urld["path"].strip("/").split("/")[-1]
-                self.endpoint_queues[endpoint_name] = zdeque([])
+        self.endpoint_mgr.endpoint_queues_init()
 
     def print_message(self, *args, **kwargs):
         """Forward a log message through the shared HELAO logger.
@@ -313,51 +312,11 @@ class Base:
         Args:
             dyn_endpoints: Optional async callable invoked with the FastAPI app.
         """
-        if callable(dyn_endpoints):
-            await dyn_endpoints(app=self.app)
-        for route in self.app.routes:
-            # print(route.path)
-            if route.path.startswith(f"/{self.server.server_name}"):
-                self.actionservermodel.endpoints.update(
-                    {route.name: EndpointModel(endpoint_name=route.name)}
-                )
-                self.actionservermodel.endpoints[route.name].sort_status()
-        LOGGER.info(
-            f"Found {len(self.actionservermodel.endpoints.keys())} endpoints for status monitoring on {self.server.server_name}."
-        )
-        self.fast_urls = self.get_endpoint_urls()
-        self.endpoint_queues_init()
+        await self.endpoint_mgr.init_endpoint_status(dyn_endpoints=dyn_endpoints)
 
     def get_endpoint_urls(self) -> list:
         """Return a list of route descriptors (path/name/params) for every endpoint."""
-        url_list = []
-        for route in self.app.routes:
-            routeD = {"path": route.path, "name": route.name}
-            if "dependant" in dir(route):
-                flatParams = get_flat_params(route.dependant)
-                paramD = {
-                    par.name: {
-                        "outer_type": (
-                            str(par.field_info.annotation).split("'")[1]
-                            if len(str(par.field_info.annotation).split("'")) >= 2
-                            else str(par.field_info.annotation)
-                        ),
-                        # "type": (
-                        #     str(par.type_).split("'")[1]
-                        #     if len(str(par.type_).split("'")) >= 2
-                        #     else str(par.type_)
-                        # ),
-                        # "required": par.required,
-                        # "shape": par.shape,
-                        # "default": par.default if par.default is not ... else None,
-                    }
-                    for par in flatParams
-                }
-                routeD["params"] = paramD
-            else:
-                routeD["params"] = []
-            url_list.append(routeD)
-        return url_list
+        return self.endpoint_mgr.get_endpoint_urls()
 
     def _get_action(self) -> Action:
         """Build the per-request ``Action`` from the current ``ACTION_CTX``.
@@ -649,30 +608,15 @@ class Base:
             action_queue: Deque of ``(action, extra_params)`` tuples.
             queue_label: Human-readable label used in log messages.
         """
-        qact, qpars = None, {}
-        try:
-            qact, qpars = action_queue.popleft()
-            LOGGER.info(f"{qact.action_name} was previously queued")
-            LOGGER.info(f"running queued {qact.action_name}")
-            qact.start_condition = ASC.no_wait
-            qact.action_params["queued_launch"] = True
-            await async_action_dispatcher(self.world_cfg, qact, qpars)
-        except Exception:
-            LOGGER.error(f"Failed to process {queue_label} queue", exc_info=True)
-            if qact is not None:
-                LOGGER.info(f"re-queueing {qact.action_name}")
-                action_queue.appendleft((qact, qpars))
+        await self.action_queue._dispatch_queued_action(action_queue, queue_label)
 
     async def process_unified_queue(self) -> None:
         """Dispatch the next queued action when the server disallows concurrency."""
-        await self._dispatch_queued_action(self.local_action_queue, "local unified")
+        await self.action_queue.process_unified_queue()
 
     async def process_endpoint_queue(self, status_msg: ActionModel) -> None:
         """Dispatch the next queued action for the endpoint that just transitioned status."""
-        await self._dispatch_queued_action(
-            self.endpoint_queues[status_msg.action_name],
-            f"endpoint '{status_msg.action_name}'",
-        )
+        await self.action_queue.process_endpoint_queue(status_msg)
 
     async def log_status_task(self, retry_limit: int = 5):
         """Subscribe to the status queue, broadcast to subscribers, and drive endpoint/unified queues.
