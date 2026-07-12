@@ -84,6 +84,7 @@ from helao.helpers import config_loader
 from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
+from helao.core.servers.base_primitives import Timer  # re-export: base.Timer stays importable
 from helao.core.servers.base_live_buffer import LiveBuffer
 from helao.core.servers.base_status import StatusBroadcaster
 from helao.core.servers.base_meta_writer import MetaFileWriter
@@ -100,18 +101,6 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
 colorama.init(strip=not sys.stdout.isatty())
-
-
-class Timer:
-    """Monotonic time source that returns nanoseconds aligned to the wall clock."""
-
-    def __init__(self):
-        """Capture the offset between the wall clock and the monotonic counter."""
-        self._offset_ns = time_ns() - perf_counter_ns()
-
-    def time_ns(self) -> int:
-        """Return the current time in nanoseconds derived from the monotonic counter."""
-        return self._offset_ns + perf_counter_ns()
 
 
 class Base:

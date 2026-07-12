@@ -45,6 +45,7 @@ from time import time
 import numpy as np
 
 from helao.helpers import helao_logging as logging
+from helao.core.servers.base_primitives import Timer
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -122,8 +123,6 @@ class LiveBuffer:
         else:
             offset_ns = int(np.floor(offset * 1e9))
         if epoch_ns is None:
-            from helao.core.servers.base import Timer
-
             timer = Timer()
             real_time = timer.time_ns() + offset_ns
         else:
