@@ -230,9 +230,34 @@ Cluster E (e-stop: `estop_loop`/`estop_actions`/`estop_finish_active`) stays in 
 
 ---
 
-## Appendix — P6 (planned): `Base` / `Active` decomposition (`base.py`)
+## Appendix — P6 (COMPLETE 2026-07-11): `Base` / `Active` decomposition (`base.py`)
 
-Fix #1 ("split the god-classes") is only half done: P5 split `Orch`; `base.py` holds the **other** core god-class pair and is the same tier. Plan drafted in `CARDS_REFACTOR_P6.md` (not started; prereq-gated).
+Fix #1 ("split the god-classes") is now **done for both core god-classes**: P5 split `Orch`, P6 split `base.py`'s `Base` + `Active`. Plan: `CARDS_REFACTOR_P6.md`. Executed S0a–S9 (behavior-harness first, then 8 extraction stages + sweep), each independently Opus-reviewed (0 blocking) and gated by the `Active` output golden master (`--check`, grown from 8→13 scenarios as coverage gaps were closed just-in-time), the dispatch golden master (9/9, regression guard), and three fleet-level OERSIM e2e milestones (after the Base cluster, after Active data/file, after Active finalizer) — all PASS.
+
+### Outcome
+- `base.py`: **2557 → 1547 lines (−40%)**, now a thin composition root (`Base`/`Active` + delegators).
+- 9 collaborator modules extracted (~2330 lines relocated): **Base** → `LiveBuffer`, `StatusBroadcaster`, `MetaFileWriter`, `ActionQueueDispatcher`, `EndpointManager`; **Active** → `DataFileWriter`, `DataStreamer`, `ExecutorRunner`, `ActionFinalizer`.
+- The dispatch FSM inversion (P5) + the Active data/finish state machine (P6) are now each behind narrow, unit-testable collaborators with call-time state resolution (no cached mutables) and a frozen delegator surface (Active `finish` alone has 265 reach-ins; `start_executor` 71; `enqueue_data_dflt` 165 — all preserved).
+- One real cross-class defect was caught by review and fixed+pinned: `Orch._init_collaborators` overrode `Base`'s without `super()`, which would have `AttributeError`'d every inherited status/live delegator at `Orch.myinit` — now `super()`-chained with a regression test.
+- Folded in the P5b `Active._finish` item.
+
+### Card re-score (framework core, both P5 + P6)
+
+| CARD | pre-refactor | **post-P5+P6 (core)** | Why |
+|------|:---:|:---:|---|
+| **Separation** | weak (weakest) | **strong** | both core god-classes (`Orch`, `Base`/`Active`) decomposed into single-responsibility collaborators; the "fuse networking+persistence+state-machine+broadcast" root cause is gone from core |
+| **Clarity** | weak → moderate | **strong** | no remaining 200–315-line multi-concern methods in the core servers; dispatch + data/finish are explicit, unit-testable |
+| Domain Integrity | moderate (whole-system weak) | **unchanged** | typed-params + guarded-lifecycle is the remaining core lever (separate work) |
+| Resilience | moderate | **moderate (up)** | behavior pinned by 2 golden masters + ~15 new collaborator unit-test modules + e2e milestones |
+| Alignment | moderate | **moderate** | HelaoDriver ABC migration across deployments remains the lever |
+
+**Net:** core **Separation & Clarity are now strong** — the two weakest-and-tied cards, fully addressed for `helao/core/servers`. Whole-system Separation is still gated by the ~26 legacy deployment god-classes (P4 ABC migration, hardware-gated). Remaining core lever: Domain Integrity (typed params + guarded lifecycle state).
+
+---
+
+### (superseded) P6 plan note — kept for history
+
+Fix #1 ("split the god-classes") was half done after P5 (`Orch`); `base.py` held the **other** core god-class pair, same tier. Plan drafted in `CARDS_REFACTOR_P6.md`.
 
 ### The target
 `base.py` = **2557 lines**, two god-classes:
