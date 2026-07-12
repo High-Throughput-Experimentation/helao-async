@@ -226,4 +226,25 @@ Highest-leverage fix #1 ("Split `Orch`") is **done** on `feat/cards-refactor`. T
 **Net:** the pre-P5 weakest-and-tied cards (Separation, Clarity) — which shared the single root cause "god-classes fuse networking + persistence + state-machine + broadcast" — are materially lifted for the framework core. The remaining core levers are the ones P5 deliberately did **not** touch: **Domain Integrity** (typed params + guarded lifecycle state) and the **`HelaoDriver` ABC migration** across deployments (fix #1's deployment half, tracked separately under P4). Whole-system Separation is still gated by the ~26 legacy deployment god-classes, so the deployment-level scoreboard is unchanged until those migrate.
 
 ### Deliberately deferred to P5b
-Cluster E (e-stop: `estop_loop`/`estop_actions`/`estop_finish_active`) stays in `orch.py` — freshly redesigned + production-verified, extracted only after one production soak of the inverted dispatch shape. Also P5b: the `supplement_error_action` `actual_order`/`action_actual_order` field-name bug (pre-existing), `dilute`/`autodilute`, and `Active._finish`.
+Cluster E (e-stop: `estop_loop`/`estop_actions`/`estop_finish_active`) stays in `orch.py` — freshly redesigned + production-verified, extracted only after one production soak of the inverted dispatch shape. Also P5b: the `supplement_error_action` `actual_order`/`action_actual_order` field-name bug (fixed 2026-07-11), the `/latest_*_uuids` `last_50_*_uuids` AttributeError (fixed 2026-07-11), `dilute`/`autodilute`, and `Active._finish` (now folded into P6-S8).
+
+---
+
+## Appendix — P6 (planned): `Base` / `Active` decomposition (`base.py`)
+
+Fix #1 ("split the god-classes") is only half done: P5 split `Orch`; `base.py` holds the **other** core god-class pair and is the same tier. Plan drafted in `CARDS_REFACTOR_P6.md` (not started; prereq-gated).
+
+### The target
+`base.py` = **2557 lines**, two god-classes:
+- **`Base`** (~1054 lines, 47 methods) — parent of every action server; fuses endpoint setup + action containment + **status WS/broadcast** + **live buffer** + status tasks + action-queue dispatch + **file/meta output** + executor mgmt.
+- **`Active`** (~1362 lines, 41 methods — *larger than `Base`*) — one per action, every deployment; fuses executor orchestration + **data streaming** + **file I/O** + sample tracking + the **finish/split lifecycle**.
+
+This is exactly the audit's named root cause ("god-classes fuse networking + persistence + state-machine + broadcast"), and `base.py` is the #2 hot-path file in the repo.
+
+### Why it's a separate, gated phase (not a P5b follow-on)
+- **Blast radius = the whole fleet.** `Orch` touches only orchestrators; `Base` is the parent of every action server and `Active` is created for every action. Reach-in surface: **`active.*` in 91 files / 26 members** (`active.action` 909×, `active.finish` 265×, `active.enqueue_data_dflt` 165×), **`self.base.*` in 25 files / 48 members** — ~5× wider than P5's 117 (and spread across every deployment, not concentrated in one adapter).
+- **No behavior harness exists** — one must be built first (P6-S0: an `Active` output golden master over hlo-file/meta bytes + status wire packets + finish/split transitions, plus the OERSIM action-server e2e). `Active`'s async data-enqueue→file→finish chain is harder to pin than P5's decision trace.
+- **Must wait for the P5 production soak** — P6 stacks on P5's collaborator idiom; prove it in prod first.
+
+### Card impact (projected)
+Completing P6 would move core **Separation** and **Clarity** to strong across *both* core god-classes (P5 did the orchestrator half). Domain Integrity / Alignment unchanged (separate levers). Deployment-level scoreboard still gated on the driver-ABC migration. Recommended sequence: P5 merge → P5 soak → P6-S0 harness → P6 staged S1→S8 (cleanest first: `LiveBuffer`/`StatusBroadcaster`; hardest last: `Active` `DataStreamer` then `ActionFinalizer`).
