@@ -26,7 +26,6 @@ from time import time, time_ns, sleep, perf_counter_ns
 from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
 from glob import glob
-import hashlib
 from copy import deepcopy, copy
 import traceback
 
@@ -89,6 +88,7 @@ from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
 from helao.core.servers.base_live_buffer import LiveBuffer
 from helao.core.servers.base_status import StatusBroadcaster
+from helao.core.servers.base_meta_writer import MetaFileWriter
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -238,6 +238,7 @@ class Base:
         """
         self.live_buffer_mgr = LiveBuffer(self)
         self.status_broadcaster = StatusBroadcaster(self)
+        self.meta_writer = MetaFileWriter(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the asyncio event loop.
@@ -732,17 +733,7 @@ class Base:
         ``os.replace()``-ing it in makes the swap atomic: readers only ever see
         a complete file and the last writer wins cleanly.
         """
-        if not output_str.endswith("\n"):
-            output_str += "\n"
-        output_path = os.path.dirname(output_file)
-        os.makedirs(output_path, exist_ok=True)
-        tmp_file = os.path.join(
-            output_path,
-            f".{os.path.basename(output_file)}.{uuid1().hex}.tmp",
-        )
-        async with aiofiles.open(tmp_file, mode="w") as f:
-            await f.write(output_str)
-        os.replace(tmp_file, output_file)
+        await self.meta_writer._write_meta_atomic(output_file, output_str)
 
     async def write_act(self, action: Action):
         """Write the action's metadata to ``<output_dir>/<timestamp>-act.yml`` if ``save_act``.
@@ -750,26 +741,7 @@ class Base:
         Args:
             action: ``Action`` whose metadata should be persisted.
         """
-        if action.save_act:
-            act_dict = action.get_act().clean_dict()
-            save_root = str(self.helaodirs.save_root)
-            if action.manual_action:
-                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-            output_path = os.path.join(save_root, action.action_output_dir)
-            output_file = os.path.join(
-                output_path,
-                f"{action.action_timestamp.strftime('%y%m%d.%H%M%S%f')}-act.yml",
-            )
-
-            LOGGER.info(f"writing to act meta file: {output_path}")
-
-            output_dict = {"file_type": "action"}
-            output_dict.update(act_dict)
-            await self._write_meta_atomic(output_file, yml_dumps(output_dict))
-        else:
-            LOGGER.info(
-                f"writing meta file for action '{action.action_name}' is disabled."
-            )
+        await self.meta_writer.write_act(action)
 
     async def write_exp(self, experiment: Experiment):
         """Write the experiment's metadata to ``<experiment_dir>/<timestamp>-exp.yml``.
@@ -777,20 +749,7 @@ class Base:
         Args:
             experiment: ``Experiment`` whose metadata should be persisted.
         """
-        exp_dict = experiment.get_exp().clean_dict()
-        save_root = str(self.helaodirs.save_root)
-        if experiment.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        output_path = os.path.join(save_root, experiment.get_experiment_dir())
-        output_file = os.path.join(
-            output_path,
-            f"{experiment.experiment_timestamp.strftime('%y%m%d.%H%M%S%f')}-exp.yml",
-        )
-
-        LOGGER.info(f"writing to exp meta file: {output_file}")
-        output_dict = {"file_type": "experiment"}
-        output_dict.update(exp_dict)
-        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
+        await self.meta_writer.write_exp(experiment)
 
     async def write_seq(self, sequence: Sequence):
         """Write the sequence's metadata to ``<sequence_dir>/<timestamp>-seq.yml``.
@@ -798,21 +757,7 @@ class Base:
         Args:
             sequence: ``Sequence`` whose metadata should be persisted.
         """
-        seq_dict = sequence.get_seq().clean_dict()
-        sequence_dir = sequence.get_sequence_dir()
-        save_root = str(self.helaodirs.save_root)
-        if sequence.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        output_path = os.path.join(save_root, sequence_dir)
-        output_file = os.path.join(
-            output_path,
-            f"{sequence.sequence_timestamp.strftime('%y%m%d.%H%M%S%f')}-seq.yml",
-        )
-
-        LOGGER.info(f"writing to seq meta file: {output_file}")
-        output_dict = {"file_type": "sequence"}
-        output_dict.update(seq_dict)
-        await self._write_meta_atomic(output_file, yml_dumps(output_dict))
+        await self.meta_writer.write_seq(sequence)
 
     def new_file_conn_key(self, key: str) -> UUID:
         """Return a UUID derived from the MD5 hash of ``key``.
@@ -820,19 +765,11 @@ class Base:
         Args:
             key: Arbitrary string used to seed the hash.
         """
-        # return shortuuid.decode(key)
-        # Instansiate new md5_hash
-        md5_hash = hashlib.md5()
-        # Pass the_string to the md5_hash as bytes
-        md5_hash.update(key.encode("utf-8"))
-        # Generate the hex md5 hash of all the read bytes
-        the_md5_hex_str = md5_hash.hexdigest()
-        # Return a String repersenation of the uuid of the md5 hash
-        return UUID(the_md5_hex_str)
+        return self.meta_writer.new_file_conn_key(key)
 
     def dflt_file_conn_key(self) -> UUID:
         """Return the default file-connection key (``md5(str(None))``)."""
-        return self.new_file_conn_key(str(None))
+        return self.meta_writer.dflt_file_conn_key()
 
     def replace_status(
         self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus
