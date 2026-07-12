@@ -51,6 +51,7 @@ from helao.core.tests.unit_test_orch_dispatch_policy import (
     orch_dispatch_policy_unit_test,
 )
 from helao.core.tests.unit_test_base_live_buffer import base_live_buffer_unit_test
+from helao.core.tests.unit_test_base_status import base_status_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
 
 
@@ -83,6 +84,7 @@ TESTS = [
     ("orch_lifecycle", orch_lifecycle_unit_test),
     ("orch_dispatch_policy", orch_dispatch_policy_unit_test),
     ("base_live_buffer", base_live_buffer_unit_test),
+    ("base_status", base_status_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
 

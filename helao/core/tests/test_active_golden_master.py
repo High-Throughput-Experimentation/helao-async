@@ -847,6 +847,77 @@ async def _scenario_finalizer_global_params(save_root: Path) -> dict:
     return {"trace": trace}
 
 
+async def _scenario_nonblocking(save_root: Path) -> dict:
+    """Non-blocking action: ``add_status`` short-circuits (no ``status_q`` put) and
+    ``send_nonblocking_status`` fans one packet per subscriber out through
+    ``base.send_nbstatuspackage``.
+
+    ``base.send_nbstatuspackage`` is replaced with a RECORDING fake (records its
+    args onto the trace, returns success). This freezes two things the other
+    eight scenarios never touch: (1) the ABSENCE of ``status_packet`` events
+    (every ``add_status`` call is suppressed because ``action.nonblocking`` is
+    True), and (2) the ``nbstatus_packet`` records emitted per status client."""
+    trace: list = []
+    base = _make_base(save_root, trace)
+
+    # >=1 status subscriber (single entry -> deterministic set iteration order)
+    base.status_clients.add(("NBCLIENT", "127.0.0.1", 9000))
+
+    async def _fake_send_nbstatuspackage(
+        client_servkey, client_host, client_port, actionmodel
+    ):
+        trace.append(
+            {
+                "event": "nbstatus_packet",
+                "client_servkey": client_servkey,
+                "client_host": client_host,
+                "client_port": client_port,
+                "action_name": actionmodel.action_name,
+                "action_uuid": str(actionmodel.action_uuid),
+                "action_status": [_json_safe(s) for s in actionmodel.action_status],
+                "nonblocking": actionmodel.nonblocking,
+            }
+        )
+        return {"success": True}, ErrorCodes.none
+
+    # instance-attribute override shadows the (later delegator) Base method, so
+    # this baseline is stable across the S2 extraction.
+    base.send_nbstatuspackage = _fake_send_nbstatuspackage
+
+    with _PatchedBaseGlobals(trace):
+        action = _mk_action("nonblock", nonblocking=True)
+        active = Active(base, _active_params(base, action))
+        # myinit() ends in add_status(); nonblocking suppresses the status_q put
+        await active.myinit()
+        await _ticks()
+        trace.append(
+            {
+                "event": "post_myinit",
+                "nonblocking": active.action.nonblocking,
+                "action_status": _status_list(active.action),
+            }
+        )
+
+        await active.enqueue_data_dflt({"t": 0, "v": 0})
+        await _drain_data(active)
+
+        # exercise the nonblocking sender directly (executor-free lifecycle)
+        await active.send_nonblocking_status()
+        await _ticks()
+        trace.append(
+            {
+                "event": "post_send_nonblocking",
+                "num_status_clients": len(base.status_clients),
+                "action_status": _status_list(active.action),
+            }
+        )
+
+        await active.finish()
+        await _ticks(10)
+        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+    return {"trace": trace}
+
+
 SCENARIOS = {
     "1_basic_data_and_file": _scenario_basic,
     "2_save_data_false": _scenario_save_data_false,
@@ -856,6 +927,7 @@ SCENARIOS = {
     "6_manual_action": _scenario_manual,
     "7_multifile_aux_listen": _scenario_multifile_aux,
     "8_finalizer_global_params": _scenario_finalizer_global_params,
+    "9_nonblocking_status": _scenario_nonblocking,
 }
 
 

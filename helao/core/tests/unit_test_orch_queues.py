@@ -306,6 +306,25 @@ def _check_get_active_and_last() -> bool:
     return empty_ok and seq_ok and exp_ok
 
 
+def _check_base_collaborator_seam() -> bool:
+    """Regression: Orch._init_collaborators must call super() so the Base
+    collaborators (live_buffer_mgr, status_broadcaster; CARDS P6) exist on
+    Orch instances -- otherwise every inherited status/live delegator raises
+    AttributeError at Orch.myinit (found in P6-S2 review)."""
+    orch = _make_orch()
+    return all(
+        hasattr(orch, a)
+        for a in (
+            "live_buffer_mgr",
+            "status_broadcaster",
+            "queue_persister",
+            "status_ingester",
+            "run_queues",
+            "dispatch_runner",
+        )
+    )
+
+
 async def _run_checks() -> dict:
     return {
         "uuid_tracking": _check_uuid_tracking(),
@@ -314,6 +333,7 @@ async def _run_checks() -> dict:
         "action_crud": await _check_action_crud(),
         "supplement_error_action": await _check_supplement_error_action(),
         "get_active_and_last": _check_get_active_and_last(),
+        "base_collaborator_seam": _check_base_collaborator_seam(),
     }
 
 
@@ -361,6 +381,12 @@ def orch_queues_unit_test() -> bool:
     reporter.check(
         "return {} when unset, else the active/last summary per the `last` flag",
         lambda: res["get_active_and_last"],
+    )
+
+    reporter.section("Base collaborator seam")
+    reporter.check(
+        "Orch._init_collaborators calls super() -> Base live_buffer_mgr/status_broadcaster built on Orch",
+        lambda: res["base_collaborator_seam"],
     )
 
     return reporter.success()
