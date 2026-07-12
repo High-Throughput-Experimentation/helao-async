@@ -89,6 +89,7 @@ from helao.core.servers.base_status import StatusBroadcaster
 from helao.core.servers.base_meta_writer import MetaFileWriter
 from helao.core.servers.base_action_queue import ActionQueueDispatcher
 from helao.core.servers.base_endpoints import EndpointManager
+from helao.core.servers.active_data_file import DataFileWriter
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -953,6 +954,13 @@ class Active:
         # both run the finalization (and its write_act) for this active at once
         self.finish_lock = asyncio.Lock()
 
+        # per-Active data-file collaborator (CARDS P6 S5). Constructed last: it
+        # only holds a back-ref to this Active and reads file_conn_dict/action/
+        # base at call time, so every attribute its methods touch already exists.
+        # myinit() (the external lifecycle entry) runs after __init__ and reaches
+        # the file helpers through the Active delegators below.
+        self.data_file_writer = DataFileWriter(self)
+
     def executor_done_callback(self, futr):
         """Log any exception raised by the executor task on completion."""
         try:
@@ -982,7 +990,7 @@ class Active:
 
     async def update_act_file(self):
         """Rewrite the action's meta YAML to reflect the current state."""
-        await self.base.write_act(self.action)
+        return await self.data_file_writer.update_act_file()
 
     async def myinit(self):
         """Start the data-logger task, create the action's output dir, and broadcast initial status."""
@@ -1052,60 +1060,16 @@ class Active:
         Returns:
             ``(header_str, FileInfo)`` ready for use by the data writer.
         """
-        filenum = 0
-        if action is None:
-            action = self.action
-        if action is not None:
-            if file_conn_key in action.file_conn_keys:
-                filenum = action.file_conn_keys.index(file_conn_key)
-        if isinstance(header, dict):
-            # {} is "{}\n" if not filtered
-            if header:
-                header = yml_dumps(header)
-            else:
-                header = ""
-        elif isinstance(header, list):
-            if header:
-                header = "\n".join(header) + "\n"
-            else:
-                header = ""
-        elif header is None:
-            header = ""
-
-        if json_data_keys is None:
-            json_data_keys = []
-
-        # determine ending of file
-        if file_group == HloFileGroup.helao_files:
-            file_ext = "hlo"
-        else:  # aux_files
-            file_ext = "csv"
-
-        if filename is None:  # generate filename
-            filename = f"{action.action_abbr}-{action.orch_submit_order}.{action.action_order}.{action.action_retry}.{action.action_split}__{filenum}.{file_ext}"
-
-        if file_sample_label is None:
-            file_sample_label = []
-        if not isinstance(file_sample_label, list):
-            file_sample_label = [file_sample_label]
-
-        file_info = FileInfo(
-            file_type=file_type,
-            file_name=filename,
-            data_keys=json_data_keys,
-            sample=file_sample_label,
-            action_uuid=action.action_uuid,
-            run_use=action.run_use,
-            nosync=(
-                True if not action.sync_data and filename.endswith(".hlo") else False
-            ),
+        return self.data_file_writer.init_datafile(
+            header,
+            file_type,
+            json_data_keys,
+            file_sample_label,
+            filename,
+            file_group,
+            file_conn_key=file_conn_key,
+            action=action,
         )
-
-        if header:
-            if not header.endswith("\n"):
-                header += "\n"
-
-        return header, file_info
 
     def finish_hlo_header(
         self,
@@ -1120,20 +1084,9 @@ class Active:
             realtime: Epoch nanoseconds to stamp; defaults to the current
                 NTP-corrected time.
         """
-        # needs to be a sync function
-        if realtime is None:
-            realtime = self.get_realtime_nowait()
-
-        if file_conn_keys is None:
-            # get all fileconn_keys
-            file_conn_keys = []
-            for action in self.action_list:
-                for filekey in action.file_conn_keys:
-                    file_conn_keys.append(filekey)
-
-        for file_conn_key in file_conn_keys:
-            if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
-                self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = realtime
+        return self.data_file_writer.finish_hlo_header(
+            file_conn_keys=file_conn_keys, realtime=realtime
+        )
 
     async def add_status(self, action=None):
         """Publish the action's current status to the status queue (no-op for nonblocking actions).
@@ -1268,76 +1221,7 @@ class Active:
         Args:
             file_conn_key: Connection key identifying the target file slot.
         """
-
-        LOGGER.info(f"creating file for file conn: {file_conn_key}")
-
-        # get the action for the file_conn_key
-        output_action = self._get_action_for_file_conn_key(file_conn_key=file_conn_key)
-
-        if output_action is None:
-            LOGGER.error("data LOGGER could not find action for file_conn_key")
-            return
-
-        # add some missing information to the hloheader
-        if output_action.action_abbr is not None:
-            self.file_conn_dict[file_conn_key].params.hloheader.action_name = (
-                output_action.action_abbr
-            )
-        else:
-            self.file_conn_dict[file_conn_key].params.hloheader.action_name = (
-                output_action.action_name
-            )
-
-        self.file_conn_dict[file_conn_key].params.hloheader.column_headings = (
-            self.file_conn_dict[file_conn_key].params.json_data_keys
-        )
-        # epoch_ns should have been set already
-        # else we need to add it now because the header is now written
-        # before data can be added to the file
-        if self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
-            LOGGER.debug("realtime_ns was not set, adding it now.")
-            self.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
-                await self.get_realtime()
-            )
-
-        header, file_info = self.init_datafile(
-            header=self.file_conn_dict[file_conn_key].params.hloheader.clean_dict(),
-            file_type=self.file_conn_dict[file_conn_key].params.file_type,
-            json_data_keys=self.file_conn_dict[file_conn_key].params.json_data_keys,
-            file_sample_label=self.file_conn_dict[
-                file_conn_key
-            ].params.sample_global_labels,
-            filename=None,  # always autogen a filename
-            file_group=self.file_conn_dict[file_conn_key].params.file_group,
-            file_conn_key=file_conn_key,
-            action=output_action,
-        )
-        output_action.files.append(file_info)
-        filename = file_info.file_name
-        save_root = str(self.base.helaodirs.save_root)
-        if self.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        output_path = os.path.join(save_root, output_action.action_output_dir)
-        output_file = os.path.join(output_path, filename)
-
-        os.makedirs(output_path, exist_ok=True)
-
-        LOGGER.info(f"writing data to: {output_file}")
-        # create output file and set connection. Open with truncation ("w+")
-        # rather than append: this is the one-time creation of a fresh log
-        # file (filenames encode retry/split so there is no legitimate
-        # same-path append), and appending to any stale bytes left by a crash
-        # or re-run would push a spurious separator/header ahead of the real
-        # header and corrupt the .hlo layout.
-        self.file_conn_dict[file_conn_key].file = await aiofiles.open(
-            output_file, mode="w+"
-        )
-
-        if header:
-            LOGGER.debug("adding header to new file")
-            if not header.endswith("\n"):
-                header += "\n"
-            await self.file_conn_dict[file_conn_key].file.write(header)
+        return await self.data_file_writer.log_data_set_output_file(file_conn_key)
 
     async def log_data_task(self):
         """Subscribe to the data queue and write matching packets to the active's HLO files.
@@ -1473,31 +1357,15 @@ class Active:
         ``action.save_data`` is True, otherwise ``None``. Used by both
         :meth:`write_file` and :meth:`write_file_nowait`.
         """
-        if not action.save_data:
-            return None
-        header, file_info = self.init_datafile(
-            header=header,
-            file_type=file_type,
-            json_data_keys=json_data_keys,
-            file_sample_label=file_sample_label,
-            filename=filename,
-            file_group=file_group,
+        return self.data_file_writer._resolve_output_path(
+            file_type,
+            filename,
+            file_group,
+            header,
+            file_sample_label,
+            json_data_keys,
+            action,
         )
-        save_root = str(self.base.helaodirs.save_root)
-        if action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        output_path = os.path.join(save_root, action.action_output_dir)
-        output_file = os.path.join(output_path, file_info.file_name)
-        if os.name == "nt":
-            output_file = str(pathlib.PureWindowsPath(output_file))
-        elif os.name == "posix":
-            output_file = str(
-                pathlib.PurePosixPath(pathlib.PureWindowsPath(output_file))
-            ).strip("\\")
-        else:
-            LOGGER.info("could not detect OS, path seps may be mixed")
-        os.makedirs(output_path, exist_ok=True)
-        return header, file_info, output_path, output_file
 
     async def write_file(
         self,
@@ -1512,22 +1380,17 @@ class Active:
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file asynchronously and return its path, or ``None`` if save is disabled."""
-        if action is None:
-            action = self.action
-        result = self._resolve_output_path(
-            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+        return await self.data_file_writer.write_file(
+            output_str,
+            file_type,
+            filename=filename,
+            file_group=file_group,
+            header=header,
+            sample_str=sample_str,
+            file_sample_label=file_sample_label,
+            json_data_keys=json_data_keys,
+            action=action,
         )
-        if result is None:
-            return None
-        header, file_info, output_path, output_file = result
-        action.files.append(file_info)
-        LOGGER.info(f"writing non stream data to: {output_file}")
-        async with aiofiles.open(output_file, mode="a+") as f:
-            if header:
-                await f.write(header)
-            await f.write("%%\n")
-            await f.write(output_str)
-        return output_file
 
     def write_file_nowait(
         self,
@@ -1542,22 +1405,17 @@ class Active:
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file synchronously and return its path, or ``None`` if save is disabled."""
-        if action is None:
-            action = self.action
-        result = self._resolve_output_path(
-            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+        return self.data_file_writer.write_file_nowait(
+            output_str,
+            file_type,
+            filename=filename,
+            file_group=file_group,
+            header=header,
+            sample_str=sample_str,
+            file_sample_label=file_sample_label,
+            json_data_keys=json_data_keys,
+            action=action,
         )
-        if result is None:
-            return None
-        header, file_info, output_path, output_file = result
-        LOGGER.info(f"writing non stream data to: {output_file}")
-        with open(output_file, mode="a+") as f:
-            if header:
-                f.write(header)
-            f.write("%%\n")
-            f.write(output_str)
-        action.files.append(file_info)
-        return output_file
 
     def set_sample_action_uuid(
         self,
@@ -2015,41 +1873,13 @@ class Active:
             samples: Samples associated with the file (used to build labels).
             action: Target action; defaults to ``self.action``.
         """
-        if action is None:
-            action = self.action
-        save_root = str(self.base.helaodirs.save_root)
-        if action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        if os.path.dirname(file_path) != os.path.join(
-            save_root, action.action_output_dir
-        ):
-            action.aux_file_paths.append(file_path)
-
-        file_info = FileInfo(
-            file_type=file_type,
-            file_name=os.path.basename(file_path),
-            # data_keys = json_data_keys,
-            sample=[sample.get_global_label() for sample in samples],
-            action_uuid=action.action_uuid,
-            run_use=action.run_use,
+        return await self.data_file_writer.track_file(
+            file_type, file_path, samples, action=action
         )
-
-        action.files.append(file_info)
-        LOGGER.info(f"{file_info.file_name} added to files_technique / aux_files list.")
 
     async def relocate_files(self):
         """Copy any tracked auxiliary file paths into the action's output directory."""
-        save_root = str(self.base.helaodirs.save_root)
-        if self.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        for x in self.action.aux_file_paths:
-            new_path = os.path.join(
-                save_root,
-                self.action.action_output_dir,
-                os.path.basename(x),
-            )
-            if x != new_path:
-                await async_copy(x, new_path)
+        return await self.data_file_writer.relocate_files()
 
     async def finish_manual_action(self):
         """Finalize a manual action by writing its synthesized experiment and sequence meta files."""
