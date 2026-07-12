@@ -18,7 +18,6 @@ __all__ = ["dispatcher_unit_test"]
 
 import asyncio
 import socket
-import sys
 import traceback
 
 from helao.core.error import ErrorCodes

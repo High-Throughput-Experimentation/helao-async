@@ -16,13 +16,10 @@ from importlib.util import module_from_spec
 from importlib.machinery import SourceFileLoader
 
 import asyncio
-import json
 import os
 import sys
-import pickle
-import pathlib
 from socket import gethostname
-from time import time, time_ns, sleep, perf_counter_ns
+from time import time
 from typing import List, Dict, Optional, Union
 from uuid import UUID, uuid1
 from glob import glob
@@ -31,10 +28,7 @@ import traceback
 
 import aiodebug.hang_inspection
 import aiodebug.log_slow_callbacks
-import aiofiles
 import colorama
-import numpy as np
-import pyzstd
 
 from fastapi import WebSocket
 
@@ -45,15 +39,13 @@ from helao.helpers.helao_dirs import helao_dirs
 from helao.core.models.run_dir import RunDir
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.helao_logging import print_message
-from helao.helpers import async_copy
-from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.yml_tools import move_dir  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.ws_utils import WsPublisher
+from helao.helpers import async_copy  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.time_utils import set_time  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.time_utils import read_saved_offset
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.status_transitions import guarded_replace
 from helao.core.models.sample import (
     SampleType,
     AssemblySample,
@@ -76,7 +68,6 @@ from helao.core.models.file import (
     FileConn,
     FileConnParams,
     HloFileGroup,
-    FileInfo,
     HloHeaderModel,
 )
 from helao.core.error import ErrorCodes
@@ -84,7 +75,7 @@ from helao.helpers import config_loader
 from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
-from helao.core.servers.base_primitives import Timer  # re-export: base.Timer stays importable
+from helao.core.servers.base_primitives import Timer  # noqa: F401 -- re-export: base.Timer stays importable for backward compatibility
 from helao.core.servers.base_live_buffer import LiveBuffer
 from helao.core.servers.base_status import StatusBroadcaster
 from helao.core.servers.base_meta_writer import MetaFileWriter

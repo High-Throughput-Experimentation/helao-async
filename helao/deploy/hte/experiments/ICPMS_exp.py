@@ -6,7 +6,7 @@ __all__ = [
 
 from socket import gethostname
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.premodels import ActionPlanMaker
 from helao.core.models.machine import MachineModel as MM
 from helao.helpers.lib_decorators import experiment
 

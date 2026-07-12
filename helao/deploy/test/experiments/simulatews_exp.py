@@ -12,7 +12,7 @@ from socket import gethostname
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.premodels import ActionPlanMaker
 from helao.helpers.lib_decorators import experiment
 
 

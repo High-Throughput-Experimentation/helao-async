@@ -130,12 +130,6 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  PAL:
-    host: hte-eche-11.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params: {}
   ANDOR:
     host: hte-eche-11.htejcap.caltech.edu
     port: 8011

@@ -117,12 +117,6 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  PAL:
-    host: 127.0.0.1
-    port: 8007
-    group: action
-    fast: pal_server
-    params: {}
   VIS:
     host: 127.0.0.1
     port: 5001

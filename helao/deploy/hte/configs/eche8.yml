@@ -104,12 +104,6 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  PAL:
-    host: hte-eche-08.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params: {}
   VIS:
     host: hte-eche-08.htejcap.caltech.edu
     port: 5001

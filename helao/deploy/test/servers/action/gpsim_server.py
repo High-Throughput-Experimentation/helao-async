@@ -10,10 +10,8 @@ active-learning stop condition.
 __all__ = ["makeApp"]
 
 from typing import Union
-from fastapi import Body
 
 from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
 from ...drivers.data.gpsim_driver import GPSim, GPSimExec
 
 from helao.helpers import helao_logging as logging

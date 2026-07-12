@@ -19,11 +19,10 @@ and the loader enums:
 
 __all__ = ["extra_models_unit_test"]
 
-import sys
 import traceback
 from datetime import datetime
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from helao.core.drivers.data.enum import YmlType
 from helao.core.error import ErrorCodes

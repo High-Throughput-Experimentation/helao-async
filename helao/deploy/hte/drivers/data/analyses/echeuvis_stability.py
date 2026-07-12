@@ -13,7 +13,6 @@ from copy import copy
 from typing import List
 from uuid import UUID
 from datetime import datetime
-import traceback
 
 import pandas as pd
 import numpy as np
@@ -22,7 +21,6 @@ from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
 from helao.core.version import get_filehash
-from helao.helpers.time_utils import gen_uuid
 
 from helao.helpers import helao_logging as logging
 

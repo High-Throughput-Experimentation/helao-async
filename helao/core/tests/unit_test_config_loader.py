@@ -16,14 +16,12 @@ and parses through the :class:`HelaoConfig` pydantic schema cleanly.
 __all__ = ["config_loader_unit_test"]
 
 import os
-import sys
 import tempfile
 import traceback
 
 from helao.helpers import config_loader
 from helao.helpers.config_loader import (
     HelaoConfig,
-    OrchServerParams,
     ServerConfig,
     install_global_config,
     load_global_config,

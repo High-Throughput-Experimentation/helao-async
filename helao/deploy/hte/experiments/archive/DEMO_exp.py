@@ -9,7 +9,7 @@ __all__ = [
 ###
 from socket import gethostname
 
-from helao.helpers.premodels import Experiment, ActionPlanMaker
+from helao.helpers.premodels import ActionPlanMaker
 from helao.core.models.machine import MachineModel
 from helao.helpers.constants import REF_TABLE
 from helao.helpers.lib_decorators import experiment

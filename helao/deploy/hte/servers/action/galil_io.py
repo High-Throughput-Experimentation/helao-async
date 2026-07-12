@@ -15,7 +15,6 @@ from typing import Optional, Union, List
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.io.galil_io_driver import Galil, GalilPoller, TriggerType, AiMonExec
-from helao.helpers.premodels import Action
 from helao.core.models.sample import (
     AssemblySample,
     LiquidSample,

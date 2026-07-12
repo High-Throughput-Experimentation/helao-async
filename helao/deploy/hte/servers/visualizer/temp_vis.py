@@ -1,4 +1,3 @@
-import asyncio
 from functools import partial
 from datetime import datetime
 

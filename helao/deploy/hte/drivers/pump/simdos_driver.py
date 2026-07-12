@@ -10,7 +10,6 @@ __all__ = ["SIMDOS", "SIMDOSPoller", "RunExec"]
 
 import serial
 import time
-import asyncio
 from enum import IntEnum, Enum
 from typing import Any, Optional
 

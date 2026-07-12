@@ -19,10 +19,8 @@ __all__ = ["micro_orch_unit_test"]
 import asyncio
 import random
 import socket
-import sys
 import traceback
 from copy import deepcopy
-from datetime import datetime
 from typing import Any, Dict
 
 from helao.core.models.hlostatus import HloStatus
@@ -40,7 +38,6 @@ import zipfile
 from datetime import datetime as _dt
 from helao.helpers.premodels import Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps as _yml_dumps
-from helao.core.runners.micro_orch import MicroOrch as _MO  # alias to reach new methods
 
 
 def _make_orch(root: str, world_servers: dict = None) -> MicroOrch:

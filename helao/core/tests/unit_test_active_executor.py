@@ -30,7 +30,6 @@ checked against genuine filesystem behavior.
 __all__ = ["active_executor_unit_test"]
 
 import asyncio
-import os
 import tempfile
 import traceback
 from datetime import datetime

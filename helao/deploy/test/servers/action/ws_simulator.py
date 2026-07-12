@@ -29,7 +29,6 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.base import Base, Executor
 from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
 
 
 class WsSim:

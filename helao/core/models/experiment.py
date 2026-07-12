@@ -3,7 +3,7 @@
 __all__ = ["ShortExperimentModel", "ExperimentModel"]
 
 from datetime import datetime
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict
 from uuid import UUID
 from pathlib import Path
 

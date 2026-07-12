@@ -19,7 +19,6 @@ from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
 from helao.core.version import get_filehash
-from helao.helpers.time_utils import gen_uuid
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput

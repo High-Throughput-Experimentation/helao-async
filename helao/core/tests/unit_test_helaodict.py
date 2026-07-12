@@ -16,8 +16,6 @@ serializer relies on. This module pins down its handling of:
 
 __all__ = ["helaodict_unit_test"]
 
-import math
-import sys
 import traceback
 from datetime import date, datetime
 from enum import Enum
