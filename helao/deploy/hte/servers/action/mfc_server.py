@@ -13,7 +13,6 @@ __all__ = ["makeApp"]
 
 from typing import Optional, List, Union
 from fastapi import Body
-from helao.helpers.premodels import Action
 from helao.core.servers.base_api import BaseAPI, action_version
 from helao.core.models.sample import (
     AssemblySample,

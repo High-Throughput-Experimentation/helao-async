@@ -17,7 +17,6 @@ __all__ = ["artifact_generation_unit_test"]
 
 import json
 import os
-import sys
 import tempfile
 import traceback
 

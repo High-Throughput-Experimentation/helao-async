@@ -11,7 +11,6 @@ through ``model_dump``/``HelaoDict.as_dict``.
 
 __all__ = ["action_experiment_sequence_unit_test"]
 
-import sys
 import traceback
 from datetime import datetime
 from uuid import UUID

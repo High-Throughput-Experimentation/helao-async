@@ -41,7 +41,6 @@ from helao.core.models.sample import (
 )
 from helao.core.models.file import FileConnParams, HloHeaderModel
 from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.error import ErrorCodes

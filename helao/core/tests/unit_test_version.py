@@ -10,7 +10,6 @@ fallback for nonexistent files.
 __all__ = ["version_unit_test"]
 
 import os
-import sys
 import tempfile
 import traceback
 

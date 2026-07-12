@@ -17,19 +17,15 @@ __all__ = ["makeApp"]
 
 
 import time
-import asyncio
-from tracemalloc import start
-from fastapi import Body
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.file import HloHeaderModel
 
 from helao.core.servers.base_api import BaseAPI
-from helao.helpers.premodels import Action
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
-from ...drivers.power_supply.power_supply_driver import PowerSupplyDriver, DriverStatus, DriverResponseType
+from ...drivers.power_supply.power_supply_driver import PowerSupplyDriver, DriverResponseType
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

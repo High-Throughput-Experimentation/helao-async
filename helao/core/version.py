@@ -1,6 +1,5 @@
 """Helpers for resolving HELAO version strings and source-file git hashes."""
 
-from fsspec.implementations.http import ex
 import os
 import inspect
 import subprocess

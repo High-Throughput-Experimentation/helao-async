@@ -73,8 +73,7 @@ from helao.core.models.sample import (
 from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
-from helao.deploy.hte.drivers.robot import pal_driver
-from helao.deploy.hte.drivers.robot.pal_driver import PAL, PalCam
+from helao.deploy.hte.drivers.robot.pal_driver import PAL
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 BASELINE_DIR = REPO_ROOT / ".omc" / "artifacts" / "p4pal" / "baseline"

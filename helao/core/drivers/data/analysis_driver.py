@@ -28,7 +28,6 @@ from typing import Optional, Tuple
 from uuid import UUID
 
 import json
-import pandas as pd
 
 from helao.core.servers.base import Base
 from helao.core.servers.base_api import BaseAPI

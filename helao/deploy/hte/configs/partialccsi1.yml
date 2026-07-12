@@ -88,12 +88,6 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  PAL:
-    host: hte-ccsi-01.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params: {}
   VIS:
     host: hte-ccsi-01.htejcap.caltech.edu
     port: 5001

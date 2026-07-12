@@ -16,7 +16,6 @@ __all__ = [
     "close_all_sync_rpc_clients",
 ]
 
-import traceback
 import asyncio
 from typing import Dict, Tuple
 

@@ -7,11 +7,8 @@ Korad/RND). Implements the HELAO `HelaoDriver` interface (`connect`,
 helpers for setting/reading voltage and current.
 """
 
-import time
-from typing import Optional
 import pyvisa as pv
 from pyvisa.resources.serial import SerialInstrument
-import time
 import asyncio
 
 # print(dir(pv.ResourceManager))
@@ -23,7 +20,6 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import numpy as np
-import pandas as pd
 
 from helao.core.drivers.helao_driver import (
     HelaoDriver,

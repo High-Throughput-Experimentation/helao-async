@@ -33,7 +33,6 @@ from fastapi import Body, WebSocket, WebSocketDisconnect, Request
 from fastapi.routing import APIRoute
 from fastapi.exception_handlers import http_exception_handler
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from helao.core.models.hlostatus import HloStatus
 from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK

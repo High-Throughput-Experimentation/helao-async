@@ -18,7 +18,6 @@ the per-request ``Action`` context:
 __all__ = ["base_api_unit_test"]
 
 import asyncio
-import sys
 import traceback
 
 from helao.core.models.machine import MachineModel

@@ -20,7 +20,6 @@ instead drive its ``get_data`` default-implementation contract.
 __all__ = ["helao_driver_unit_test"]
 
 import asyncio
-import sys
 import traceback
 from datetime import datetime
 

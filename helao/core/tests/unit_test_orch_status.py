@@ -17,7 +17,6 @@ models and helper methods that orchestrator code drives directly:
 
 __all__ = ["orch_status_unit_test"]
 
-import sys
 import traceback
 from uuid import uuid4
 

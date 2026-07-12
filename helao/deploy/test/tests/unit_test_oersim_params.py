@@ -47,7 +47,6 @@ from helao.deploy.test.param_models import (
 )
 from helao.deploy.test.experiments.OERSIM_exp import (
     OERSIM_sub_load_plate,
-    OERSIM_sub_measure_CP,
     OERSIM_sub_decision,
     OERSIM_sub_activelearn,
 )

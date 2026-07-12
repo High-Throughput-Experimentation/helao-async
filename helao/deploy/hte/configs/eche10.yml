@@ -135,12 +135,6 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  PAL:
-    host: hte-eche-10.htejcap.caltech.edu
-    port: 8007
-    group: action
-    fast: pal_server
-    params: {}
   SPEC_T:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8011

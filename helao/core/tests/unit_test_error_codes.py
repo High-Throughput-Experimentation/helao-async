@@ -8,7 +8,6 @@ distinct string value, and round-trips cleanly through that value.
 
 __all__ = ["error_codes_unit_test"]
 
-import sys
 import traceback
 
 from helao.core.error import ErrorCodes

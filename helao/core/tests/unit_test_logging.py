@@ -14,7 +14,6 @@ __all__ = ["logging_unit_test"]
 import logging
 import logging.handlers
 import os
-import sys
 import tempfile
 import time
 import traceback
