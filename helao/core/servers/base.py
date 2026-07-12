@@ -87,6 +87,7 @@ from helao.helpers import config_loader
 from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
+from helao.core.servers.base_live_buffer import LiveBuffer
 from pydantic import ValidationError
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -222,6 +223,19 @@ class Base:
         self.ntp_last_sync, self.ntp_offset = read_saved_offset(
             os.path.join(self.helaodirs.log_root, "ntpLastSync.txt")
         )
+
+        self._init_collaborators()
+
+    def _init_collaborators(self):
+        """Construct the collaborators extracted from ``Base`` by CARDS P6.
+
+        Called from ``__init__`` at the point each collaborator's state was
+        previously constructed inline; test fixtures that bypass ``__init__``
+        (e.g. the Active output golden-master harness's ``Base.__new__``
+        construction) call this directly so collaborators exist without
+        per-collaborator lazy guards.
+        """
+        self.live_buffer_mgr = LiveBuffer(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the asyncio event loop.
@@ -683,26 +697,23 @@ class Base:
 
     async def live_buffer_task(self):
         """Subscribe to the live queue and fold every published message into ``live_buffer``."""
-        LOGGER.info(f"{self.server.server_name} live buffer task created.")
-        async for live_msg in self.live_q.subscribe():
-            self.live_buffer.update(live_msg)
+        return await self.live_buffer_mgr.live_buffer_task()
 
-    @staticmethod
-    def _stamp_lbuf_dict(live_dict: dict) -> dict:
+    def _stamp_lbuf_dict(self, live_dict: dict) -> dict:
         """Wrap each value in a ``(value, now())`` tuple for the live buffer."""
-        return {k: (v, time()) for k, v in live_dict.items()}
+        return self.live_buffer_mgr._stamp_lbuf_dict(live_dict)
 
     async def put_lbuf(self, live_dict: dict) -> None:
         """Timestamp ``live_dict`` and publish it to the live queue (awaited put)."""
-        await self.live_q.put(self._stamp_lbuf_dict(live_dict))
+        return await self.live_buffer_mgr.put_lbuf(live_dict)
 
     def put_lbuf_nowait(self, live_dict: dict) -> None:
         """Timestamp ``live_dict`` and publish it to the live queue without awaiting."""
-        self.live_q.put_nowait(self._stamp_lbuf_dict(live_dict))
+        return self.live_buffer_mgr.put_lbuf_nowait(live_dict)
 
     def get_lbuf(self, live_key):
         """Return the most recent ``(value, timestamp)`` tuple stored under ``live_key``."""
-        return self.live_buffer[live_key]
+        return self.live_buffer_mgr.get_lbuf(live_key)
 
     async def regular_status_task(self, delay: float = 10, retry_limit: int = 5):
         """Periodically push the action-server status to every subscribed client."""
@@ -862,7 +873,7 @@ class Base:
         Returns:
             NTP-corrected wall-clock time in nanoseconds.
         """
-        return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+        return await self.live_buffer_mgr.get_realtime(epoch_ns=epoch_ns, offset=offset)
 
     def get_realtime_nowait(
         self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
@@ -876,19 +887,7 @@ class Base:
         Returns:
             NTP-corrected wall-clock time in nanoseconds.
         """
-        if offset is None:
-            if self.ntp_offset is not None:
-                offset_ns = int(np.floor(self.ntp_offset * 1e9))
-            else:
-                offset_ns = 0
-        else:
-            offset_ns = int(np.floor(offset * 1e9))
-        if epoch_ns is None:
-            timer = Timer()
-            real_time = timer.time_ns() + offset_ns
-        else:
-            real_time = epoch_ns + offset_ns
-        return int(np.floor(real_time))
+        return self.live_buffer_mgr.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     async def shutdown(self):
         """Detach all subscribers and cancel the status logger background task."""
