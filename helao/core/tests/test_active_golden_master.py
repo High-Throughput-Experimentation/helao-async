@@ -423,6 +423,9 @@ def _make_base(save_root: Path, trace: list) -> Base:
     base.local_action_task_queue = []
     base.hlo_postprocessors = []
     base.hlo_postprocess_libs = []
+    base.live_q = MultisubscriberQueue()
+    base.live_buffer = {}
+    base._init_collaborators()
     return base
 
 
