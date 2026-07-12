@@ -308,15 +308,21 @@ class ActionFinalizer:
                                 LOGGER.info(
                                     f"key {k1} not found in action output or params"
                                 )
-                    _, error_code = await async_private_dispatcher(
-                        server_key=action.orch_key,
-                        host=action.orch_host,
-                        port=action.orch_port,
-                        private_action="update_global_params",
-                        json_dict=export_params,
-                    )
-                    if error_code == ErrorCodes.none:
-                        LOGGER.info("Successfully updated global params.")
+                    # Skip the RPC when nothing resolved (e.g. an estop interrupts
+                    # before the action produces its to_global_params output): an
+                    # empty json_dict reaches update_global_params with no args and
+                    # its required `params` cannot be filled -> TypeError. An empty
+                    # update is a no-op anyway.
+                    if export_params:
+                        _, error_code = await async_private_dispatcher(
+                            server_key=action.orch_key,
+                            host=action.orch_host,
+                            port=action.orch_port,
+                            private_action="update_global_params",
+                            json_dict=export_params,
+                        )
+                        if error_code == ErrorCodes.none:
+                            LOGGER.info("Successfully updated global params.")
             except Exception:
                 LOGGER.error(
                     f"Failed to update global params for action {action.action_uuid}",
