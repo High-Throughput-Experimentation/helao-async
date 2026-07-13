@@ -49,6 +49,7 @@ from helao.core.servers.orch_monitor import ServerMonitor
 from helao.core.servers.orch_status_sync import StatusIngester
 from helao.core.servers.orch_queues import RunQueues
 from helao.core.servers import orch_unpack
+from helao.core.servers.orch_unpack import PLATE_API  # noqa: F401  re-export: preserves monkeypatch point helao.core.servers.orch.PLATE_API
 from helao.core.servers.orch_lifecycle import RunLifecycle
 from helao.core.servers.orch_dispatch import DispatchRunner
 from helao.helpers.zdeque import zdeque
