@@ -1370,7 +1370,7 @@ class Archive:
         combine_liquids: bool = False,
         combine_gases: bool = False,
     ) -> Tuple[
-        bool,
+        ErrorCodes,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
         """Build new reference samples (liquid/gas/assembly) from ``samples_in``.
@@ -1501,7 +1501,7 @@ class Archive:
         dilute_liquids: bool = True,
         action: Optional[Action] = None,
     ) -> Tuple[
-        bool,
+        ErrorCodes,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
@@ -1899,7 +1899,7 @@ class Archive:
         dilute_gases: bool = True,
         action: Optional[Action] = None,
     ) -> Tuple[
-        bool,
+        ErrorCodes,
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
         List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
