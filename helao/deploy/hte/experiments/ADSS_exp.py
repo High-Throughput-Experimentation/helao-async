@@ -70,6 +70,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
+from helao.core.models.echem_params import resolve_potential_versus
 from helao.helpers.constants import REF_TABLE
 
 from helao.deploy.hte.drivers.motion.galil_motion_driver import (
@@ -974,6 +975,7 @@ def ADSS_sub_CA(
 
     # calculate potential
     versus = 0  # for vs rhe
+    potential_versus = resolve_potential_versus(potential_versus)
     if potential_versus == "oer":
         versus = 1.23
     if ref_type == "rhe":
@@ -1178,6 +1180,7 @@ def ADSS_sub_CA_photo(
 
     # calculate potential
     versus = 0  # for vs rhe
+    potential_versus = resolve_potential_versus(potential_versus)
     if potential_versus == "oer":
         versus = 1.23
     if ref_type == "rhe":
