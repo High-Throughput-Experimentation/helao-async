@@ -126,6 +126,7 @@ class Sequence(SequenceModel):
         sequence_day = self.sequence_timestamp.strftime("%m%d")
         plate = self.sequence_params.get("plate_id", "")
         smpno = self.sequence_params.get("plate_sample_no_list", [])
+        append_plate = ""
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
             if f"-{serial}" not in self.sequence_label:
@@ -133,8 +134,6 @@ class Sequence(SequenceModel):
                     append_plate = f"-{serial}-{smpno[0]}"
                 else:
                     append_plate = f"-{serial}"
-        else:
-            append_plate = ""
 
         return os.path.join(
             year_week,
