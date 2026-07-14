@@ -399,7 +399,11 @@ class DataFileWriter:
             file_type=file_type,
             file_name=os.path.basename(file_path),
             # data_keys = json_data_keys,
-            sample=[sample.get_global_label() for sample in samples],
+            sample=[
+                label
+                for sample in samples
+                if (label := sample.get_global_label()) is not None
+            ],
             action_uuid=action.action_uuid,
             run_use=action.run_use,
         )

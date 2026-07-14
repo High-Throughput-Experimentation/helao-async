@@ -165,9 +165,9 @@ class OrchAPI(HelaoFastAPI):
                             self.poller = poller_class(
                                 driver_inst, self.server_cfg.get("polling_time", 0.1)
                             )
-                            self.poller._base_hook = self.base
+                            self.poller._base_hook = self.orch
                     else:
-                        driver_inst = driver_class(self.base)
+                        driver_inst = driver_class(self.orch)
                     driver_dict[driver_class.__name__] = driver_inst
                 self.drivers = Drivers(**driver_dict)
                 self.driver = self.drivers[0]
