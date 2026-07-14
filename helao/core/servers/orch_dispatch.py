@@ -625,6 +625,19 @@ class DispatchRunner:
                 await self._exec_pause(pause)
             return error_code
         if isinstance(step, FinishThenDispatchExperiment):  # :1206-1213
+            # The step was chosen from a snapshot; an EXTERNAL estop (e.g. the
+            # status ingester's estop_loop) can flip loop_state and run
+            # estop_finish_active concurrently between that decision and here.
+            # Re-read live state and bail without the clean finish so
+            # estop_finish_active stays the sole finalizer -- else both paths
+            # finalize the same experiment (duplicate 'finished' + lost
+            # 'estopped'). Mirrors should_close_out_experiment and the in-lock
+            # estop recheck at :846.
+            if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+                LOGGER.info(
+                    "orchestrator estopped, not finishing/dispatching experiment"
+                )
+                return ErrorCodes.estop
             LOGGER.info(
                 "!!!waiting for all actions to finish before dispatching next experiment"
             )
@@ -633,6 +646,11 @@ class DispatchRunner:
             LOGGER.info("!!!dispatching next experiment")
             return await orch.loop_task_dispatch_experiment()
         if isinstance(step, FinishThenDispatchSequence):  # :1215-1222
+            # Same external-estop race guard as FinishThenDispatchExperiment
+            # above -- skip the clean sequence close-out under estop.
+            if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+                LOGGER.info("orchestrator estopped, not finishing/dispatching sequence")
+                return ErrorCodes.estop
             LOGGER.info(
                 "!!!waiting for all actions to finish before dispatching next sequence"
             )
