@@ -9,12 +9,10 @@ in the world configuration.
 
 __all__ = ["Orch"]
 
-import os
 from helao.helpers import helao_logging as logging
 
 import asyncio
 import sys
-from copy import deepcopy
 from typing import List
 from uuid import UUID
 import re
@@ -26,22 +24,20 @@ import time
 import colorama
 from fastapi import WebSocket
 
-from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
-from helao.core.models.hlostatus import HloStatus
-from helao.core.models.status_transitions import guarded_append, guarded_replace
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.models.orchstatus import LoopStatus, LoopIntent
 from helao.core.error import ErrorCodes
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.time_utils import set_time
 from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.dispatcher import (
-    async_action_dispatcher,
+    async_action_dispatcher,  # noqa: F401  re-export: EstopController + orch_dispatch import it from here so orch stays the single golden-master patch point
 )
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-from helao.helpers.yml_tools import move_dir
+from helao.helpers.yml_tools import (
+    move_dir,  # noqa: F401  re-export: EstopController + orch_lifecycle import it from here so orch stays the single golden-master patch point
+)
 from helao.helpers.premodels import Sequence, Experiment, Action
 from helao.core.servers.base import Base, Active
 from helao.core.servers.orch_persist import QueuePersister
@@ -49,9 +45,12 @@ from helao.core.servers.orch_monitor import ServerMonitor
 from helao.core.servers.orch_status_sync import StatusIngester
 from helao.core.servers.orch_queues import RunQueues
 from helao.core.servers import orch_unpack
-from helao.core.servers.orch_unpack import PLATE_API  # noqa: F401  re-export: preserves monkeypatch point helao.core.servers.orch.PLATE_API
+from helao.core.servers.orch_unpack import (
+    PLATE_API,
+)  # noqa: F401  re-export: preserves monkeypatch point helao.core.servers.orch.PLATE_API
 from helao.core.servers.orch_lifecycle import RunLifecycle
 from helao.core.servers.orch_dispatch import DispatchRunner
+from helao.core.servers.orch_estop import EstopController
 from helao.helpers.zdeque import zdeque
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.helpers.processors import MetaProcessor
@@ -65,6 +64,7 @@ def sanitize_sequence_label(label):
     if not label:
         return label
     return re.sub(r"[\s_]+", "_", label)
+
 
 # ANSI color codes converted to the Windows versions
 # strip colors if stdout is redirected
@@ -209,6 +209,7 @@ class Orch(Base):
         self.run_queues = RunQueues(self)
         self.run_lifecycle = RunLifecycle(self)
         self.dispatch_runner = DispatchRunner(self)
+        self.estop_controller = EstopController(self)
 
     def exception_handler(self, loop, context):
         """Log uncaught coroutine exceptions caught by the orchestrator's event loop."""
@@ -366,11 +367,15 @@ class Orch(Base):
             sequence_name: Sequence library entry to expand.
             sequence_params: Keyword arguments forwarded to the sequence factory.
         """
-        return orch_unpack.unpack_sequence(sequence_name, sequence_params, self.sequence_lib)
+        return orch_unpack.unpack_sequence(
+            sequence_name, sequence_params, self.sequence_lib
+        )
 
     def get_sequence_codehash(self, sequence_name: str) -> UUID:
         """Return the cached code hash for the named sequence library entry."""
-        return orch_unpack.get_sequence_codehash(sequence_name, self.sequence_codehash_lib)
+        return orch_unpack.get_sequence_codehash(
+            sequence_name, self.sequence_codehash_lib
+        )
 
     async def seq_unpacker(self):
         """Push every planned experiment from the active sequence onto the experiment deque."""
@@ -486,34 +491,14 @@ class Orch(Base):
     async def estop_loop(self, reason: str = ""):
         """Emergency-stop the orchestrator and fan out an ``estop`` to every action server.
 
+        Delegates to :class:`EstopController` (CARDS P5b). Kept as an ``Orch``
+        delegator because it is the public surface orch_api, the status ingester,
+        and the dispatch loop (and the golden-master spy) call.
+
         Args:
             reason: Free-form text appended to the stop message and alert.
         """
-        reason_suffix = f"{' ' + reason if reason else ''}"
-        LOGGER.info("estopping orch")
-
-        # set globalstatusmodel.loop_state to estop
-        self.globalstatusmodel.loop_state = LoopStatus.estopped
-        self.active_run_id = None
-
-        # force stop all running actions in the status dict (for this orch)
-        await self.estop_actions(switch=False)  # don't latch actionserver model
-
-        # reset loop intend
-        await self.intend_none()
-
-        # finalize + move the active experiment/sequence with estopped status so
-        # the partial run is not stranded in RUNS_ACTIVE and can be synced
-        try:
-            await self.estop_finish_active()
-        except Exception:
-            LOGGER.error(
-                "error finalizing estopped experiment/sequence", exc_info=True
-            )
-
-        self.current_stop_message = "E-STOP" + reason_suffix
-        LOGGER.warning("E-STOP" + reason_suffix)
-        LOGGER.alert("ORCH E-STOP")
+        return await self.estop_controller.estop_loop(reason=reason)
 
     async def stop_loop(self):
         """Signal the dispatch loop to stop after the current iteration via :meth:`intend_stop`."""
@@ -522,177 +507,23 @@ class Orch(Base):
     async def estop_actions(self, switch: bool):
         """Signal every registered action server to emergency-stop (or release).
 
-        Each server's ``/estop`` endpoint stops its executors and finalizes any
-        in-flight actions with ``estopped`` status (moving them to
-        ``RUNS_FINISHED`` via their normal lifecycle). No placeholder ``estop``
-        action artifact is generated -- an idle server writes nothing, and estop
-        is recorded purely through the ``*_status`` fields of the actions (and,
-        orch-side, the experiment/sequence) that were actually running.
+        Delegates to :class:`EstopController` (CARDS P5b).
 
         Args:
             switch: ``True`` to latch the per-server estop flag, ``False`` to
-                release it. Finalization of in-flight actions happens regardless;
-                on release there are simply none left to finalize.
+                release it.
         """
-        LOGGER.info("estopping all servers")
-
-        for (
-            action_server_key,
-            actionservermodel,
-        ) in self.globalstatusmodel.server_dict.items():
-            # A minimal estop action -- the endpoint ignores the action payload
-            # entirely now (it operates on whatever actions were already running),
-            # so no experiment/sequence identity needs to be attached.
-            A = Action(
-                action_name="estop",
-                action_server=actionservermodel.action_server.as_dict(),
-                action_params={"switch": switch},
-                start_condition=ActionStartCondition.no_wait,
-            )
-            LOGGER.info(
-                f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}"
-            )
-            try:
-                # pass switch as an explicit query/RPC param so it reliably
-                # reaches the endpoint's `switch` parameter
-                _ = await async_action_dispatcher(
-                    self.world_cfg, A, params={"switch": switch}
-                )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                # no estop endpoint for this action server?
-                LOGGER.error(
-                    f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}"
-                )
+        return await self.estop_controller.estop_actions(switch)
 
     async def estop_finish_active(self):
         """Finalize the active experiment and sequence with estopped status on e-stop.
 
-        The clean finish path (:meth:`finish_active_experiment` /
-        :meth:`finish_active_sequence`) waits for all actions and is never reached
-        on e-stop, so the active experiment and sequence would otherwise stay
-        stranded in ``RUNS_ACTIVE`` and never be enqueued for sync. This marks
-        them ``estopped`` (leaving ``active`` swapped to ``finished`` so they read
-        as terminal), persists the yml, and schedules a background promotion to
-        ``RUNS_FINISHED`` so the syncer can ship the partial run.
-
-        It does NOT wait for actions inline: the e-stop already halted them and
-        each action server finalizes its own in-flight actions independently
-        (they may live on other machines). The background promotion, however,
-        does wait for co-located child directories to clear before moving -- see
-        :meth:`_estop_promote`.
+        Delegates to :class:`EstopController` (CARDS P5b). Marks the active
+        experiment/sequence ``estopped``, persists the yml, and schedules a
+        background promotion to ``RUNS_FINISHED`` so the syncer can ship the
+        partial run.
         """
-
-        def _mark_estopped(status_list: list, owner: str):
-            guarded_replace(
-                status_list,
-                HloStatus.active,
-                HloStatus.finished,
-                owner=owner,
-            )
-            if HloStatus.estopped not in status_list:
-                guarded_append(status_list, HloStatus.estopped, owner=owner)
-
-        exp_to_move = None
-        seq_to_move = None
-
-        if self.active_experiment is not None:
-            _mark_estopped(self.active_experiment.experiment_status, owner="experiment_status")
-            self.active_experiment.experiment_finished_timestamp = set_time(
-                offset=self.ntp_offset
-            )
-            self.active_experiment.finished_global_params = {
-                k: v for k, v in self.global_params.items() if k != "_fast_samples_in"
-            }
-            try:
-                if self.active_sequence is not None:
-                    self.active_sequence.dispatched_experiments.append(
-                        deepcopy(self.active_experiment.get_exp())
-                    )
-                    await self.write_active_sequence_seq()
-                await self.write_exp(self.active_experiment)
-            except Exception:
-                LOGGER.error("error writing estopped experiment", exc_info=True)
-            self.last_experiment = deepcopy(self.active_experiment)
-            exp_to_move = self.last_experiment
-            self.active_experiment = None
-
-        if self.active_sequence is not None:
-            _mark_estopped(self.active_sequence.sequence_status, owner="sequence_status")
-            self.active_sequence.sequence_finished_timestamp = set_time(
-                offset=self.ntp_offset
-            )
-            try:
-                await self.write_seq(self.active_sequence)
-            except Exception:
-                LOGGER.error("error writing estopped sequence", exc_info=True)
-            self.last_sequence = deepcopy(self.active_sequence)
-            seq_to_move = self.last_sequence
-            self.active_sequence = None
-            self.active_seq_exp_counter = 0
-            self.globalstatusmodel.counter_dispatched_actions = {}
-
-        # Promote in a background task, experiment before sequence, so the
-        # sequence dir's child experiment dir is gone before the sequence moves.
-        if exp_to_move is not None or seq_to_move is not None:
-            self.aloop.create_task(
-                self._estop_promote_all(exp_to_move, seq_to_move)
-            )
-
-    async def _estop_promote_all(self, exp_to_move, seq_to_move):
-        """Promote an estopped experiment then sequence to RUNS_FINISHED, in order."""
-        if exp_to_move is not None:
-            await self._estop_promote(exp_to_move, "experiment")
-        if seq_to_move is not None:
-            await self._estop_promote(seq_to_move, "sequence")
-
-    async def _estop_promote(self, hobj, kind: str, max_wait: int = 30) -> bool:
-        """Move an estopped exp/seq to RUNS_FINISHED once its child dirs have cleared.
-
-        :func:`move_dir` promotes only an exp/seq's *top-level* files and then
-        ``rmtree``s the whole directory, so moving while a co-located child
-        action is still finalizing in ``RUNS_ACTIVE`` would delete that action's
-        data. We wait (bounded) for child subdirectories to be vacated by the
-        (possibly co-located) action servers; if they don't clear, we leave the
-        record in ``RUNS_ACTIVE`` (data preserved) rather than destroy in-flight
-        children -- ``finish_pending`` can promote it later. For remote action
-        servers there are no local child dirs, so this returns immediately.
-
-        Returns:
-            True if the record was moved, False if left in place.
-        """
-        save_dir = str(self.helaodirs.save_root)
-        subdir = (
-            hobj.get_experiment_dir()
-            if kind == "experiment"
-            else hobj.get_sequence_dir()
-        )
-        ydir = os.path.normpath(os.path.join(save_dir, subdir))
-
-        def _child_dirs():
-            if not os.path.isdir(ydir):
-                return []
-            return [e.path for e in os.scandir(ydir) if e.is_dir()]
-
-        waited = 0
-        while _child_dirs() and waited < max_wait:
-            await asyncio.sleep(1)
-            waited += 1
-        remaining = _child_dirs()
-        if remaining:
-            LOGGER.warning(
-                f"estop: {kind} {ydir} still has {len(remaining)} child dir(s) in "
-                f"RUNS_ACTIVE after {max_wait}s; leaving it in place (data "
-                f"preserved) to avoid deleting in-flight child actions. Run "
-                f"finish_pending once children clear to sync it."
-            )
-            return False
-        try:
-            await move_dir(hobj, base=self)
-            return True
-        except Exception:
-            LOGGER.error(f"error moving estopped {kind} to RUNS_FINISHED", exc_info=True)
-            return False
+        return await self.estop_controller.estop_finish_active()
 
     async def skip(self):
         """Request a skip while running, or clear ``action_dq`` if the loop is idle."""
@@ -740,22 +571,18 @@ class Orch(Base):
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
     async def clear_estop(self):
-        """Clear estopped UUIDs, release the estop on every action server, and resume to ``stopped``."""
-        # which were estopped first
-        LOGGER.info("clearing estopped uuids")
-        self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.estopped)
-        # release estop for all action servers
-        await self.estop_actions(switch=False)
-        # set orch status from estop back to stopped
-        self.globalstatusmodel.loop_state = LoopStatus.stopped
-        await self.interrupt_q.put("cleared_estop")
+        """Clear estopped UUIDs, release the estop on every action server, and resume to ``stopped``.
+
+        Delegates to :class:`EstopController` (CARDS P5b); called by orch_api.
+        """
+        return await self.estop_controller.clear_estop()
 
     async def clear_error(self):
-        """Clear errored UUIDs from the finished dict and signal the interrupt queue."""
-        # currently only resets the error dict
-        LOGGER.info("clearing errored uuids")
-        self.globalstatusmodel.clear_in_finished(hlostatus=HloStatus.errored)
-        await self.interrupt_q.put("cleared_errored")
+        """Clear errored UUIDs from the finished dict and signal the interrupt queue.
+
+        Delegates to :class:`EstopController` (CARDS P5b); called by orch_api.
+        """
+        return await self.estop_controller.clear_error()
 
     async def clear_sequences(self):
         """Empty the sequence deque."""
@@ -975,9 +802,7 @@ class Orch(Base):
             ]
         ):
             export_path = self.export_queues(timestamp_pck=False)
-            LOGGER.info(
-                f"Orch queues are not empty, exported queues to {export_path}"
-            )
+            LOGGER.info(f"Orch queues are not empty, exported queues to {export_path}")
 
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
