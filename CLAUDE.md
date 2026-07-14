@@ -36,7 +36,17 @@ Other utilities:
 - `python cli.py <config_prefix>` — interactive REPL that introspects each FastAPI server's endpoints and lets you invoke them.
 - `python run_unit_tests.py` — runs `helao.core.tests.unit_test_sample_models.sample_model_unit_test`. `launch.py` runs this automatically before launching anything and aborts on failure.
 
-There is no pytest harness, no linter config, and no project-wide build step. New "tests" are typically standalone scripts under `helao/core/tests/` or `helao/deploy/<deployment>/tests/`.
+There is no pytest harness and no project-wide build step. New "tests" are typically standalone scripts under `helao/core/tests/` or `helao/deploy/<deployment>/tests/`.
+
+### Formatting
+
+`black` (default settings, line length 88) is the project code formatter. Run it on the files you touch before committing:
+
+```
+black <changed_files>          # run inside the `helao` conda env
+```
+
+There is no separate linter config; `ty` (Astral type checker) may be used as a stricter secondary pass over the pyright default (`ty.toml` pins Python 3.12), but `pyright` (`pyrightconfig.json`, basic mode) remains the authoritative type checker — do not remove `# type: ignore` directives that pyright needs.
 
 ## Architecture
 
