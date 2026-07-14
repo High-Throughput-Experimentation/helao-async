@@ -106,6 +106,8 @@ from types import SimpleNamespace
 from typing import Optional
 
 import helao.core.servers.orch as orch_module
+import helao.core.servers.orch_monitor as orch_monitor_module
+import helao.core.servers.orch_status_sync as orch_status_sync_module
 from helao.core.servers.orch import Orch
 from helao.core.error import ErrorCodes
 from helao.core.models.action_start_condition import ActionStartCondition
@@ -438,11 +440,17 @@ class _PatchedOrchGlobals:
 
     def __enter__(self):
         self._orig_action_dispatcher = orch_module.async_action_dispatcher
-        self._orig_private_dispatcher = orch_module.async_private_dispatcher
+        # CARDS P5 relocated the private-dispatch callers out of ``orch``; the
+        # symbol now lives in the ServerMonitor / StatusIngester collaborator
+        # modules (677c6ca5 dropped the unused ``orch`` import). Patch both so
+        # any private dispatch a scenario triggers is stubbed, matching the
+        # original network-isolation intent.
+        self._orig_private_dispatcher = orch_status_sync_module.async_private_dispatcher
         self._orig_move_dir = orch_module.move_dir
         self._orig_plate_api = orch_module.PLATE_API
         orch_module.async_action_dispatcher = self._action_dispatcher
-        orch_module.async_private_dispatcher = self._private_dispatcher
+        orch_status_sync_module.async_private_dispatcher = self._private_dispatcher
+        orch_monitor_module.async_private_dispatcher = self._private_dispatcher
         orch_module.move_dir = self._move_dir_fn
         # HTEPlateAPI.has_access is a read-only property; rebind the whole
         # module-global to a minimal fake rather than mutating the singleton.
@@ -451,7 +459,8 @@ class _PatchedOrchGlobals:
 
     def __exit__(self, *exc):
         orch_module.async_action_dispatcher = self._orig_action_dispatcher
-        orch_module.async_private_dispatcher = self._orig_private_dispatcher
+        orch_status_sync_module.async_private_dispatcher = self._orig_private_dispatcher
+        orch_monitor_module.async_private_dispatcher = self._orig_private_dispatcher
         orch_module.move_dir = self._orig_move_dir
         orch_module.PLATE_API = self._orig_plate_api
         return False
@@ -929,7 +938,12 @@ async def _scenario_2(tmp_root: Path) -> dict:
             _seed_server_dict(orch, [(server_name, action_name)])
             a = _bare_action(orch, server_name, action_name, {"n": action_name})
             if condition is None:
-                a.start_condition = 99  # unsupported value -> else-branch fallback
+                # Inject an out-of-range value to exercise the dispatch
+                # else-branch fallback. ``Action`` now enables
+                # ``validate_assignment`` (7ee179e8), which rejects a raw ``99``
+                # on normal assignment, so bypass the validator to plant the
+                # unsupported value the same way the pre-validation harness did.
+                object.__setattr__(a, "start_condition", 99)
             else:
                 a.start_condition = condition
             orch.action_dq.append(a)
