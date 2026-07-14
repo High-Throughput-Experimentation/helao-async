@@ -141,7 +141,7 @@ class KinesisMotorExec(Executor):
         Returns:
             Dict containing ``error`` set to :attr:`ErrorCodes.none`.
         """
-        self.axis.stop(immediate=True, sync=True)
+        self.driver.stop(self.axis_name)
         return {"error": ErrorCodes.none}
 
 

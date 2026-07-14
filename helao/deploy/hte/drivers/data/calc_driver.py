@@ -398,7 +398,7 @@ class Calc(HelaoDriver):
 
         if not specd:
             LOGGER.info("Missing references and/or data. Cannot calculate FOMs.")
-            return {}
+            return {}, {}
 
         pred = {}
         binds = []
