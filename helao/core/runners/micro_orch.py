@@ -150,6 +150,7 @@ class MicroOrch:
         # hard pandas import at module load for callers that never read back.
         if loader_factory is None:
             from helao.core.drivers.data.loaders.localfs import LocalLoader
+
             loader_factory = LocalLoader
         self.loader_factory = loader_factory
         # Run tracking (Task 4 populates this).
@@ -523,7 +524,9 @@ class MicroOrch:
         await self._write_action_parent_exp(action)
         rel_dir = action.get_action_dir()
         loaded = await self._load_finished(rel_dir, "act")
-        self._track_run("action", action.action_uuid, action.action_name, loaded.yml_path)
+        self._track_run(
+            "action", action.action_uuid, action.action_name, loaded.yml_path
+        )
         return loaded
 
     async def _write_action_parent_exp(self, action: Action) -> None:
@@ -544,7 +547,7 @@ class MicroOrch:
         dump = action.model_dump()
         exp_fields = set(Experiment.model_fields)
         exp_kwargs = {k: v for k, v in dump.items() if k in exp_fields}
-        experiment = Experiment(**exp_kwargs)
+        experiment = Experiment.model_validate(exp_kwargs)
         experiment.reset_experiment_status(HloStatus.finished)
         experiment.experiment_finished_timestamp = set_time(offset=0)
         await self._write_exp(experiment)
@@ -676,7 +679,7 @@ class MicroOrch:
         for dump in terminal_results:
             if isinstance(dump, dict):
                 try:
-                    experiment.dispatched_actions.append(Action(**dump))
+                    experiment.dispatched_actions.append(Action.model_validate(dump))
                 except Exception:
                     LOGGER.exception("could not rebuild Action from terminal dump")
 
@@ -763,8 +766,8 @@ class MicroOrch:
                 # samples_in/out/files). Build the model directly; do NOT
                 # re-run get_exp(), which would reset the aggregates.
                 sequence.dispatched_experiments.append(
-                    ExperimentModel(
-                        **{k: v for k, v in exp_result.json.items() if k != "file_type"}
+                    ExperimentModel.model_validate(
+                        {k: v for k, v in exp_result.json.items() if k != "file_type"}
                     )
                 )
             else:
@@ -892,7 +895,9 @@ class MicroOrch:
             raise RuntimeError(
                 "world_cfg['root'] is required to persist or read back artifacts"
             )
-        return os.path.join(root, RunDir.DIAG.value if manual else RunDir.FINISHED.value)
+        return os.path.join(
+            root, RunDir.DIAG.value if manual else RunDir.FINISHED.value
+        )
 
     async def _write_meta_atomic(self, output_file: str, output_str: str) -> None:
         """Atomically write ``output_str`` to ``output_file`` (temp + os.replace)."""
@@ -1002,9 +1007,7 @@ class MicroOrch:
     # run tracking
     # ------------------------------------------------------------------
 
-    def _track_run(
-        self, run_type: str, uuid: Any, name: str, yml_path: str
-    ) -> dict:
+    def _track_run(self, run_type: str, uuid: Any, name: str, yml_path: str) -> dict:
         """Append a RunRecord for a finished artifact and return it.
 
         ``state`` (RUNS_FINISHED/RUNS_DIAG) and ``rel_dir`` (the artifact's

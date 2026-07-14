@@ -108,7 +108,9 @@ def move_to_synced(file_path: Path) -> Union[Path, bool]:
         The new ``Path`` on success, or ``False`` on ``PermissionError``.
     """
     parts = list(file_path.parts)
-    target_path = Path(str(file_path).replace(RunDir.FINISHED.value, RunDir.SYNCED.value))
+    target_path = Path(
+        str(file_path).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
+    )
     if RunDir.SYNCED in parts:
         LOGGER.debug(f"File {file_path} is already synced. Skipping.")
         return target_path
@@ -944,9 +946,7 @@ class SyncDriver:
                     await self._acquire_hierarchy_locks(locks, yml_path)
                     await self.sync_yml(yml_path=yml_path, rank=rank)
             except Exception:
-                LOGGER.error(
-                    f"Error in syncer worker for {yml_path}", exc_info=True
-                )
+                LOGGER.error(f"Error in syncer worker for {yml_path}", exc_info=True)
             finally:
                 self.running_tasks.pop(yml_path.name, None)
 
@@ -1180,7 +1180,9 @@ class SyncDriver:
                             )
                             try:
                                 parquet_path = str(fp).replace(".hlo", ".parquet")
-                                await asyncio.to_thread(hlo_to_parquet, fp, parquet_path)
+                                await asyncio.to_thread(
+                                    hlo_to_parquet, fp, parquet_path
+                                )
                                 msg = Path(parquet_path)
                             except Exception:
                                 LOGGER.error(
@@ -1216,7 +1218,9 @@ class SyncDriver:
                                 if x["file_name"]
                                 == str(fp.relative_to(prog.yml.targetdir))
                             ][0]
-                            fileinfo = FileInfo(**meta["files"].pop(file_idx))
+                            fileinfo = FileInfo.model_validate(
+                                meta["files"].pop(file_idx)
+                            )
                             fileinfo.file_name = str(
                                 fp.relative_to(prog.yml.targetdir)
                             ).replace("\\", "/")
@@ -1523,7 +1527,7 @@ class SyncDriver:
 
             # fold this action into the process meta
             process_meta["dispatched_actions_abbr"].append(
-                ShortActionModel(**act_meta).clean_dict(strip_private=True)
+                ShortActionModel.model_validate(act_meta).clean_dict(strip_private=True)
             )
             if act_idx == min(exp_prog.dict["process_groups"][pidx]):
                 process_meta["process_timestamp"] = act_meta["action_timestamp"]
@@ -1542,9 +1546,7 @@ class SyncDriver:
                     # copy mutable contribs so multiple groups (and repeated
                     # folds) never alias the same list/dict object
                     process_meta[new_name] = (
-                        copy(contrib)
-                        if isinstance(contrib, (list, dict))
-                        else contrib
+                        copy(contrib) if isinstance(contrib, (list, dict)) else contrib
                     )
                 elif isinstance(contrib, dict):
                     process_meta[new_name].update(contrib)
@@ -1693,7 +1695,7 @@ class SyncDriver:
                     continue
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
-                model = ProcessModel(**meta).clean_dict(strip_private=True)
+                model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
                 # write to local yml
                 save_dir = os.path.dirname(
                     os.path.join(
@@ -1721,7 +1723,7 @@ class SyncDriver:
                 continue
             if all(i in exp_prog.dict["process_actions_done"] for i in gids):
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = ProcessModel(**meta).clean_dict(strip_private=True)
+                model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
                 api_success = await self.to_api(model, "process")
                 if api_success:
                     exp_prog.dict["process_api"].append(pidx)
@@ -1879,10 +1881,14 @@ class SyncDriver:
         async def reset_and_queue(pp, rank: int = 0):
             """Reset any stale ``.progress`` sibling under ``RUNS_SYNCED`` and enqueue ``pp``."""
             if os.path.exists(
-                pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(".yml", ".progress")
+                pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(
+                    ".yml", ".progress"
+                )
             ):
                 self.reset_sync(
-                    os.path.dirname(pp).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
+                    os.path.dirname(pp).replace(
+                        RunDir.FINISHED.value, RunDir.SYNCED.value
+                    )
                 )
             await self.enqueue_yml(pp, rank)
 
@@ -2042,7 +2048,9 @@ class SyncDriver:
             if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                tp = os.path.dirname(fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value))
+                tp = os.path.dirname(
+                    fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value)
+                )
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")

@@ -205,8 +205,8 @@ def ANEC_sub_load_solid(
         "archive_custom_load",
         {
             "custom": "cell1_we",
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -219,8 +219,7 @@ def ANEC_sub_load_solid(
 
 
 @experiment(version=4)
-def ANEC_sub_alloff(
-) -> list:
+def ANEC_sub_alloff() -> list:
     """Turn off both peristaltic pumps and close every NI gas/liquid valve.
 
     Returns:
@@ -247,8 +246,7 @@ def ANEC_sub_alloff(
 
 
 @experiment(version=2)
-def ANEC_sub_heatoff(
-) -> list:
+def ANEC_sub_heatoff() -> list:
     """Cancel TEC recording and disable the TEC controller.
 
     Returns:
@@ -296,8 +294,7 @@ def ANEC_sub_setheat(
 
 
 @experiment(version=2)
-def ANEC_sub_normal_state(
-) -> list:
+def ANEC_sub_normal_state() -> list:
     """Drive the ANEC valves and pumps to the canonical idle/normal state.
 
     Resulting configuration:
@@ -373,8 +370,8 @@ def ANEC_sub_flush_fill_cell(
     # (3) Create liquid sample and add to assembly
     ## the hostname.lower() used in ORCH_HOST is incompatible with older liquids that were created with all-caps hostname
     liquid_sample_in = LiquidSample(
-                sample_no=reservoir_liquid_sample_no, machine_name=gethostname().lower()
-            )
+        sample_no=reservoir_liquid_sample_no, machine_name=gethostname().lower()
+    )
     liquid_sample_in.global_label = liquid_sample_in.get_global_label()
     apm.add(
         SAMPLE_server,
@@ -404,8 +401,7 @@ def ANEC_sub_unload_cell() -> list:
 
 
 @experiment(version=1)
-def ANEC_sub_unload_liquid(
-) -> list:
+def ANEC_sub_unload_liquid() -> list:
     """Unload all samples then re-load the previously tracked solid at ``cell1_we``.
 
     Returns:

@@ -40,7 +40,6 @@ from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
 from helao.helpers.lib_decorators import experiment
 
-
 EXPERIMENTS = __all__
 
 PSTAT_server = MachineModel(
@@ -113,8 +112,8 @@ def ECHE_sub_add_liquid(
         "archive_custom_add_liquid",
         {
             "custom": solid_custom_position,
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": reservoir_liquid_sample_no,
                     "machine_name": gethostname().lower(),
                 }
@@ -154,8 +153,8 @@ def ECHE_sub_load_solid(
         "archive_custom_load",
         {
             "custom": solid_custom_position,
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",

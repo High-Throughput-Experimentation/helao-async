@@ -134,26 +134,26 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class DispatchSnapshot:
     """Top-of-iteration snapshot for the outer dispatch ladder (no lock held)."""
 
-    loop_state: LoopStatus              # orch.globalstatusmodel.loop_state (:1127/:1166)
-    loop_intent: LoopIntent             # orch.globalstatusmodel.loop_intent (:1166)
-    n_acts: int                         # len(orch.action_dq) (:1127/:1171)
-    n_exps: int                         # len(orch.experiment_dq) (:1127/:1206)
-    n_seqs: int                         # len(orch.sequence_dq) (:1127/:1215)
-    na_drivers: Tuple[str, ...]         # unknown drivers in orch.status_summary (:1141-1143)
-    step_thru_actions: bool             # orch.step_thru_actions (:1179)
-    step_thru_experiments: bool         # orch.step_thru_experiments (:1188)
-    step_thru_sequences: bool           # orch.step_thru_sequences (:1199)
+    loop_state: LoopStatus  # orch.globalstatusmodel.loop_state (:1127/:1166)
+    loop_intent: LoopIntent  # orch.globalstatusmodel.loop_intent (:1166)
+    n_acts: int  # len(orch.action_dq) (:1127/:1171)
+    n_exps: int  # len(orch.experiment_dq) (:1127/:1206)
+    n_seqs: int  # len(orch.sequence_dq) (:1127/:1215)
+    na_drivers: Tuple[str, ...]  # unknown drivers in orch.status_summary (:1141-1143)
+    step_thru_actions: bool  # orch.step_thru_actions (:1179)
+    step_thru_experiments: bool  # orch.step_thru_experiments (:1188)
+    step_thru_sequences: bool  # orch.step_thru_sequences (:1199)
 
 
 @dataclass(frozen=True)
 class FinalizationSnapshot:
     """Post-loop snapshot for the finalization plan (guards re-checked live)."""
 
-    n_acts: int                         # len(orch.action_dq) (:1235/:1241)
-    n_exps: int                         # len(orch.experiment_dq) (:1240)
-    active_experiment_present: bool     # orch.active_experiment is not None (:1235)
-    active_sequence_present: bool       # orch.active_sequence is not None (:1242)
-    loop_state: LoopStatus              # orch.globalstatusmodel.loop_state (:1247, Q2)
+    n_acts: int  # len(orch.action_dq) (:1235/:1241)
+    n_exps: int  # len(orch.experiment_dq) (:1240)
+    active_experiment_present: bool  # orch.active_experiment is not None (:1235)
+    active_sequence_present: bool  # orch.active_sequence is not None (:1242)
+    loop_state: LoopStatus  # orch.globalstatusmodel.loop_state (:1247, Q2)
 
 
 # ===========================================================================
@@ -321,11 +321,7 @@ def should_close_out_experiment(
     Under E-STOP the clean close-out is skipped -- estop_finish_active is the
     sole finalizer -- so the experiment is not double-finalized.
     """
-    return (
-        (n_acts == 0)
-        and active_exp_present
-        and loop_state != OrchStatus.estopped
-    )
+    return (n_acts == 0) and active_exp_present and loop_state != OrchStatus.estopped
 
 
 def should_close_out_sequence(
@@ -391,23 +387,23 @@ class DispatchPolicy:
             or snap.loop_intent == LoopIntent.estop
         ):  # :1166
             return StopLoop()
-        if snap.n_acts:                                     # :1171
+        if snap.n_acts:  # :1171
             return LaunchAction()
-        if snap.n_exps:                                     # :1206
+        if snap.n_exps:  # :1206
             return FinishThenDispatchExperiment()
-        if snap.n_seqs:                                     # :1215
+        if snap.n_seqs:  # :1215
             return FinishThenDispatchSequence()
-        return LogQueuesEmpty()                             # :1223 else (dead-but-present)
+        return LogQueuesEmpty()  # :1223 else (dead-but-present)
 
     # --- post-action step-thru sub-decision (:1179-1205) ---
 
     def evaluate_step_thru(self, snap: DispatchSnapshot) -> Optional[PauseLoop]:
         """Select a :class:`PauseLoop` per the enabled step-thru flag, else ``None``."""
-        if snap.n_acts and snap.step_thru_actions:                              # :1179
+        if snap.n_acts and snap.step_thru_actions:  # :1179
             return PauseLoop(
                 reason="Step-thru actions is enabled, use 'Start Orch' to dispatch next action."
             )
-        if (not snap.n_acts) and snap.n_exps and snap.step_thru_experiments:    # :1185
+        if (not snap.n_acts) and snap.n_exps and snap.step_thru_experiments:  # :1185
             return PauseLoop(
                 reason="Step-thru experiments is enabled, use 'Start Orch' to dispatch next experiment."
             )
@@ -416,7 +412,7 @@ class DispatchPolicy:
             and (not snap.n_exps)
             and snap.n_seqs
             and snap.step_thru_sequences
-        ):                                                                      # :1195
+        ):  # :1195
             return PauseLoop(
                 reason="Step-thru sequences is enabled, use 'Start Orch' to dispatch next sequence."
             )
@@ -427,41 +423,41 @@ class DispatchPolicy:
     def pre_dispatch_intent_step(self, loop_intent):
         """Select the pre-dispatch intent step from the live ``loop_intent``."""
         if loop_intent == LoopIntent.stop:
-            return DrainForStop()                                              # :813
+            return DrainForStop()  # :813
         if loop_intent == LoopIntent.skip:
-            return SkipClearActions()                                          # :826
+            return SkipClearActions()  # :826
         if loop_intent == LoopIntent.estop:
-            return EstopClearActions()                                         # :832
-        return ProceedDispatch()                                              # :838
+            return EstopClearActions()  # :832
+        return ProceedDispatch()  # :838
 
     # --- start-condition sub-decision (:848-901) ---
 
     def start_condition_step(self, sc):
         """Select the start-condition step (log_msg + pure predicate) for the head action."""
-        if sc == ActionStartCondition.no_wait:                                # :848
+        if sc == ActionStartCondition.no_wait:  # :848
             return NoWaitProceed()
-        if sc == ActionStartCondition.wait_for_endpoint:                      # :851
+        if sc == ActionStartCondition.wait_for_endpoint:  # :851
             return AwaitEndpointFree(
                 log_msg="orch is waiting for endpoint to become available",
                 predicate=lambda gsm, A, orch: gsm.endpoint_free(
                     action_server=A.action_server, endpoint_name=A.action_name
                 ),
             )
-        if sc == ActionStartCondition.wait_for_server:                        # :862
+        if sc == ActionStartCondition.wait_for_server:  # :862
             return AwaitServerFree(
                 log_msg="orch is waiting for server to become available",
                 predicate=lambda gsm, A, orch: gsm.server_free(
                     action_server=A.action_server
                 ),
             )
-        if sc == ActionStartCondition.wait_for_orch:                          # :873
+        if sc == ActionStartCondition.wait_for_orch:  # :873
             return AwaitWaitEndpointFree(
                 log_msg="orch is waiting for wait action to end",
                 predicate=lambda gsm, A, orch: gsm.endpoint_free(
                     action_server=A.orchestrator, endpoint_name="wait"
                 ),
             )
-        if sc == ActionStartCondition.wait_for_previous:                      # :884
+        if sc == ActionStartCondition.wait_for_previous:  # :884
             # Original loops `while previous_action_active`; generic runner loop
             # is `while not predicate`, so the predicate is the NEGATION.
             return AwaitPreviousActionDone(
@@ -469,9 +465,9 @@ class DispatchPolicy:
                 predicate=lambda gsm, A, orch: orch.last_action_uuid
                 not in gsm.active_dict.keys(),
             )
-        if sc == ActionStartCondition.wait_for_all:                           # :897
+        if sc == ActionStartCondition.wait_for_all:  # :897
             return WaitAllActions()
-        return WaitAllActions()                                              # :900-901 fallback
+        return WaitAllActions()  # :900-901 fallback
 
     # --- finalization (:1234-1261) ---
 
@@ -540,21 +536,21 @@ class DispatchRunner:
         (after triggering an E-STOP). Mirrors ``orch.py:1116-1273``.
         """
         orch = self.orch
-        LOGGER.info("--- started operator orch ---")                            # :1116
+        LOGGER.info("--- started operator orch ---")  # :1116
         LOGGER.info(
             f"current orch status: {orch.globalstatusmodel.orch_state}"
-        )                                                                        # :1117
-        orch.globalstatusmodel.loop_state = LoopStatus.started                  # :1124 (before try)
+        )  # :1117
+        orch.globalstatusmodel.loop_state = LoopStatus.started  # :1124 (before try)
         try:
-            await self._loop()                                                  # inner while
-            await self._finalize()                                              # post-loop (:1234-1261)
-            return True                                                         # :1263
+            await self._loop()  # inner while
+            await self._finalize()  # post-loop (:1234-1261)
+            return True  # :1263
         # except asyncio.CancelledError:   -- stays commented out (:1265-1267)
-        except Exception:                                                       # :1269
+        except Exception:  # :1269
             LOGGER.error("serious orch exception occurred")
             LOGGER.error("ERROR: ", exc_info=True)
             await orch.estop_loop()
-            return False                                                        # :1273
+            return False  # :1273
 
     # ----- 4.2 _loop() -- the inverted while -----
 
@@ -564,17 +560,17 @@ class DispatchRunner:
             snap = self._snapshot()
             step = self.policy.next_step(snap)
             if isinstance(step, ExitLoop):
-                return                                                          # while-cond false -> :1231
-            error_code = ErrorCodes.unspecified                                 # :1130 per-iteration default
-            self._log_deques()                                                  # :1131-1139
+                return  # while-cond false -> :1231
+            error_code = ErrorCodes.unspecified  # :1130 per-iteration default
+            self._log_deques()  # :1131-1139
             if isinstance(step, DriverHealthWait):
                 # driver-health runs once then FALLS THROUGH to the ladder in
                 # the SAME iteration (orch.py:1140-1164 has no `continue`).
                 await self._exec_driver_health(step)
-                snap = self._snapshot()                                          # re-read post-stop() live state
+                snap = self._snapshot()  # re-read post-stop() live state
                 step = self.policy.ladder_step(snap)
             error_code = await self._execute(step, error_code)
-            if error_code is not ErrorCodes.none:                               # :1227-1229
+            if error_code is not ErrorCodes.none:  # :1227-1229
                 LOGGER.error(f"stopping orch with error code: {error_code}")
                 await orch.intend_stop()
 
@@ -616,21 +612,19 @@ class DispatchRunner:
     async def _execute(self, step, error_code):
         """Run the effect for one terminal outer-ladder step; return the resulting error_code."""
         orch = self.orch
-        if isinstance(step, StopLoop):                                          # :1166-1170
+        if isinstance(step, StopLoop):  # :1166-1170
             await orch.stop_loop()
-            return error_code                                                   # unchanged unspecified (Q1)
-        if isinstance(step, LaunchAction):                                      # :1171-1205
+            return error_code  # unchanged unspecified (Q1)
+        if isinstance(step, LaunchAction):  # :1171-1205
             LOGGER.info("!!!checking conditions for next action")
             error_code = await orch.loop_task_dispatch_action()
-            while (
-                orch.last_dispatched_action_uuid not in orch.action_history.keys()
-            ):
-                await asyncio.sleep(0.2)                                         # :1174-1178 history-poll
+            while orch.last_dispatched_action_uuid not in orch.action_history.keys():
+                await asyncio.sleep(0.2)  # :1174-1178 history-poll
             pause = self.policy.evaluate_step_thru(self._snapshot())
             if pause is not None:
                 await self._exec_pause(pause)
             return error_code
-        if isinstance(step, FinishThenDispatchExperiment):                      # :1206-1213
+        if isinstance(step, FinishThenDispatchExperiment):  # :1206-1213
             LOGGER.info(
                 "!!!waiting for all actions to finish before dispatching next experiment"
             )
@@ -638,7 +632,7 @@ class DispatchRunner:
             await orch.finish_active_experiment()
             LOGGER.info("!!!dispatching next experiment")
             return await orch.loop_task_dispatch_experiment()
-        if isinstance(step, FinishThenDispatchSequence):                        # :1215-1222
+        if isinstance(step, FinishThenDispatchSequence):  # :1215-1222
             LOGGER.info(
                 "!!!waiting for all actions to finish before dispatching next sequence"
             )
@@ -646,10 +640,10 @@ class DispatchRunner:
             await orch.finish_active_sequence()
             LOGGER.info("!!!dispatching next sequence")
             return await orch.loop_task_dispatch_sequence()
-        if isinstance(step, LogQueuesEmpty):                                    # :1223-1225
+        if isinstance(step, LogQueuesEmpty):  # :1223-1225
             LOGGER.info("all queues are empty")
             LOGGER.info("--- stopping operator orch ---")
-            return error_code                                                   # unchanged unspecified (Q1)
+            return error_code  # unchanged unspecified (Q1)
         raise AssertionError(f"unhandled DispatchStep: {step!r}")
 
     async def _exec_pause(self, step: PauseLoop) -> None:
@@ -668,7 +662,7 @@ class DispatchRunner:
     async def _execute_finalization(self, step) -> None:
         """Run one finalization step with its guard re-checked against LIVE state."""
         orch = self.orch
-        if isinstance(step, CloseOutExperiment):                                # :1234-1238
+        if isinstance(step, CloseOutExperiment):  # :1234-1238
             # Guard delegated to the pure policy helper so the decision-table unit
             # test is authoritative for runtime (no helper/runtime drift). The
             # estop branch skips the clean close-out so estop_finish_active is the
@@ -681,7 +675,7 @@ class DispatchRunner:
             ):
                 LOGGER.info("finishing final experiment")
                 await orch.finish_active_experiment()
-        elif isinstance(step, CloseOutSequence):                                # :1239-1245
+        elif isinstance(step, CloseOutSequence):  # :1239-1245
             if should_close_out_sequence(
                 len(orch.experiment_dq),
                 len(orch.action_dq),
@@ -690,12 +684,12 @@ class DispatchRunner:
             ):
                 LOGGER.info("finishing final sequence")
                 await orch.finish_active_sequence()
-        elif isinstance(step, SetLoopStopped):                                  # :1247-1248 (Q2)
+        elif isinstance(step, SetLoopStopped):  # :1247-1248 (Q2)
             if orch.globalstatusmodel.loop_state != OrchStatus.estopped:
                 orch.globalstatusmodel.loop_state = LoopStatus.stopped
-        elif isinstance(step, ClearIntent):                                     # :1249
+        elif isinstance(step, ClearIntent):  # :1249
             await orch.intend_none()
-        elif isinstance(step, ExportQueues):                                    # :1251-1261
+        elif isinstance(step, ExportQueues):  # :1251-1261
             if any(
                 [
                     len(x) > 0
@@ -730,30 +724,30 @@ class DispatchRunner:
         )
         if not isinstance(intent_step, ProceedDispatch):
             await self._exec_pre_dispatch_intent(intent_step)
-            return ErrorCodes.none                                              # :784-785 short-circuit
+            return ErrorCodes.none  # :784-785 short-circuit
 
-        A = orch.action_dq.popleft()                                            # :789
+        A = orch.action_dq.popleft()  # :789
 
-        rc = await self._wait_for_start_condition(A)                            # :791-793
+        rc = await self._wait_for_start_condition(A)  # :791-793
         if rc is not None:
             return rc
 
-        self._stage_action_for_dispatch(A)                                      # :795
+        self._stage_action_for_dispatch(A)  # :795
 
-        rc, result_actiondict = await self._dispatch_action_locked(A)           # :797-799
+        rc, result_actiondict = await self._dispatch_action_locked(A)  # :797-799
         if rc is not None:
             return rc
 
-        rc = await self._record_dispatch_result(A, result_actiondict)          # :801-803
+        rc = await self._record_dispatch_result(A, result_actiondict)  # :801-803
         if rc is not None:
             return rc
 
-        return ErrorCodes.none                                                  # :805
+        return ErrorCodes.none  # :805
 
     async def _exec_pre_dispatch_intent(self, step) -> None:
         """Run the effect for the pre-dispatch loop-intent step (:813-837), verbatim bodies."""
         orch = self.orch
-        if isinstance(step, DrainForStop):                                      # :813-824
+        if isinstance(step, DrainForStop):  # :813-824
             LOGGER.info("stopping orchestrator")
             # monitor status of running action_dq, then end loop
             while orch.globalstatusmodel.loop_state != LoopStatus.stopped:
@@ -764,12 +758,12 @@ class DispatchRunner:
                     LOGGER.info("got stop")
                     orch.globalstatusmodel.loop_state = LoopStatus.stopped
                     break
-        elif isinstance(step, SkipClearActions):                                # :826-831
+        elif isinstance(step, SkipClearActions):  # :826-831
             # clear action queue, forcing next experiment
             orch.action_dq.clear()
             await orch.intend_none()
             LOGGER.info("skipping to next experiment")
-        elif isinstance(step, EstopClearActions):                               # :832-837
+        elif isinstance(step, EstopClearActions):  # :832-837
             orch.action_dq.clear()
             await orch.intend_none()
             LOGGER.info("estopping")
@@ -788,7 +782,7 @@ class DispatchRunner:
         # see async_action_dispatcher for unpacking
         step = self.policy.start_condition_step(A.start_condition)
         if isinstance(step, NoWaitProceed):
-            LOGGER.info("orch is dispatching an unconditional action")           # :849
+            LOGGER.info("orch is dispatching an unconditional action")  # :849
             return None
         if isinstance(step, WaitAllActions):
             # wait_for_all (:897-898) AND unsupported fallback (:900-901): no
@@ -796,11 +790,11 @@ class DispatchRunner:
             await orch.orch_wait_for_all_actions()
             return None
         # the four Await* conditions: log once, then loop while not satisfied
-        LOGGER.info(step.log_msg)                                               # :852/:863/:874/:885
+        LOGGER.info(step.log_msg)  # :852/:863/:874/:885
         predicate = step.predicate
         while not predicate(orch.globalstatusmodel, A, orch):
             if not await orch.wait_for_interrupt():
-                return ErrorCodes.none                                          # :858/:869/:880/:892
+                return ErrorCodes.none  # :858/:869/:880/:892
         return None
 
     def _stage_action_for_dispatch(self, A) -> None:
@@ -883,16 +877,19 @@ class DispatchRunner:
             result_uuid = result_actiondict["action_uuid"]
             orch.last_action_uuid = result_uuid
             orch.track_action_uuid(UUID(result_uuid))
-            LOGGER.info(
-                f"Action {A.action_name} dispatched with uuid: {result_uuid}"
-            )
+            LOGGER.info(f"Action {A.action_name} dispatched with uuid: {result_uuid}")
             orch.put_lbuf_nowait(
-                {result_uuid: {"action_name": A.action_name, "status": HloStatus.active.value}}
+                {
+                    result_uuid: {
+                        "action_name": A.action_name,
+                        "status": HloStatus.active.value,
+                    }
+                }
             )
 
             if not A.nonblocking:
                 # orch gets back an active action dict, we can self-register the dispatched action in global status
-                resmod = Action(**result_actiondict)
+                resmod = Action.model_validate(result_actiondict)
                 srvname = resmod.action_server.server_name
                 actname = resmod.action_name
                 resuuid = resmod.action_uuid
@@ -907,19 +904,14 @@ class DispatchRunner:
                 else:  # orch got back a nonactive result
                     for actstat in actstats:
                         try:
-                            if (
-                                resuuid
-                                in orch.globalstatusmodel.nonactive_dict.get(
-                                    actstat, {}
-                                )
+                            if resuuid in orch.globalstatusmodel.nonactive_dict.get(
+                                actstat, {}
                             ):
                                 break  # already in nonactive_dict
 
                             # need to populate nonactive and endpoint statuses
                             current_nonactive_status = (
-                                orch.globalstatusmodel.nonactive_dict.get(
-                                    actstat, {}
-                                )
+                                orch.globalstatusmodel.nonactive_dict.get(actstat, {})
                             )
                             current_nonactive_status.update({resuuid: resmod})
                             orch.globalstatusmodel.nonactive_dict[actstat] = (
@@ -949,7 +941,7 @@ class DispatchRunner:
         """Register the dispatch result and fold returned globals back out (:1060-1105), verbatim."""
         orch = self.orch
         try:
-            result_action = Action(**result_actiondict)
+            result_action = Action.model_validate(result_actiondict)
             orch.active_experiment.dispatched_actions.append(result_action)
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))

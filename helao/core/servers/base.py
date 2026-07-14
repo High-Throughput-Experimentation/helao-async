@@ -33,17 +33,25 @@ import colorama
 from fastapi import WebSocket
 
 from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.dispatcher import async_private_dispatcher  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
+from helao.helpers.dispatcher import (
+    async_private_dispatcher,
+)  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.executor import Executor
 from helao.helpers.helao_dirs import helao_dirs
 from helao.core.models.run_dir import RunDir
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.helao_logging import print_message
-from helao.helpers.yml_tools import move_dir  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
+from helao.helpers.yml_tools import (
+    move_dir,
+)  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.ws_utils import WsPublisher
-from helao.helpers import async_copy  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
-from helao.helpers.time_utils import set_time  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
+from helao.helpers import (
+    async_copy,
+)  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
+from helao.helpers.time_utils import (
+    set_time,
+)  # noqa: F401 -- unused by base.py directly; retained as a `base` module attribute for golden-master save/restore patching (S8 LOW item)
 from helao.helpers.time_utils import read_saved_offset
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
@@ -75,7 +83,9 @@ from helao.helpers import config_loader
 from helao.helpers.config_loader import HelaoConfig, ServerConfig
 from helao.helpers.processors import HloPostProcessor
 from helao.helpers.dequedict import DequeDict
-from helao.core.servers.base_primitives import Timer  # noqa: F401 -- re-export: base.Timer stays importable for backward compatibility
+from helao.core.servers.base_primitives import (
+    Timer,
+)  # noqa: F401 -- re-export: base.Timer stays importable for backward compatibility
 from helao.core.servers.base_live_buffer import LiveBuffer
 from helao.core.servers.base_status import StatusBroadcaster
 from helao.core.servers.base_meta_writer import MetaFileWriter
@@ -140,7 +150,9 @@ class Base:
         # defaults to validating the same dict the shim exposes.
         try:
             self.typed_cfg: HelaoConfig = (
-                helao_cfg if helao_cfg is not None else HelaoConfig(**self.world_cfg)
+                helao_cfg
+                if helao_cfg is not None
+                else HelaoConfig.model_validate(self.world_cfg)
             )
         except ValidationError as exc:
             raise ValueError(
@@ -173,7 +185,9 @@ class Base:
         self.run_type = self.typed_cfg.run_type.lower()
 
         self.actives: Dict[UUID, Active] = {}
-        self.history = DequeDict(maxlen=200)  # store history of active actions (contained)
+        self.history = DequeDict(
+            maxlen=200
+        )  # store history of active actions (contained)
         self.executors = {}  # shortcut to running Executors
         # basemodel to describe the full action server
         self.actionservermodel = ActionServerModel(action_server=self.server)
@@ -640,7 +654,9 @@ class Base:
         Returns:
             NTP-corrected wall-clock time in nanoseconds.
         """
-        return self.live_buffer_mgr.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+        return self.live_buffer_mgr.get_realtime_nowait(
+            epoch_ns=epoch_ns, offset=offset
+        )
 
     async def shutdown(self):
         """Detach all subscribers and cancel the status logger background task."""

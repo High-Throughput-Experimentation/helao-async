@@ -117,8 +117,8 @@ def CCSI_sub_load_solid(
         "archive_custom_load",
         {
             "custom": "cell1_we",
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -217,8 +217,7 @@ def CCSI_sub_load_gas(
 
 
 @experiment(version=1)
-def CCSI_sub_alloff(
-) -> list:
+def CCSI_sub_alloff() -> list:
     """Turn the recirculating pump off and close every CCSI gas/liquid valve.
 
     Returns:
@@ -668,8 +667,7 @@ def CCSI_sub_n2drain(
 
 
 @experiment(version=1)
-def CCSI_sub_initialization_end_state(
-) -> list:
+def CCSI_sub_initialization_end_state() -> list:
     """Place the system into its post-initialization state: pump off and valve 1A closed.
 
     Returns:
@@ -699,8 +697,7 @@ def CCSI_sub_initialization_end_state(
 
 
 @experiment(version=1)
-def CCSI_sub_peripumpoff(
-) -> list:
+def CCSI_sub_peripumpoff() -> list:
     """Stop the recirculation dose pump (CSIL variant).
 
     Returns:

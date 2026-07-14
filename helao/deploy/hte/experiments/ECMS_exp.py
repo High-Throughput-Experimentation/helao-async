@@ -117,8 +117,8 @@ def ECMS_sub_load_solid(
         "archive_custom_load",
         {
             "custom": "cell1_we",
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -199,8 +199,7 @@ def ECMS_sub_load_gas(
 
 
 @experiment(version=1)
-def ECMS_sub_normal_state(
-) -> list:
+def ECMS_sub_normal_state() -> list:
     """Drive the ECMS station to its idle/normal state.
 
     Closes all CO2 / calibration-gas MFC valves, closes every NI gas valve
@@ -276,8 +275,7 @@ def ECMS_sub_normal_state(
 
 
 @experiment(version=1)
-def ECMS_sub_alloff(
-) -> list:
+def ECMS_sub_alloff() -> list:
     """Turn off both peristaltic pumps, close MFC valves, and close every NI valve.
 
     Returns:
@@ -693,8 +691,7 @@ def ECMS_sub_headspace_purge_and_Arbaseline(
 
 
 @experiment(version=1)
-def ECMS_sub_electrolyte_recirculation_on(
-) -> list:
+def ECMS_sub_electrolyte_recirculation_on() -> list:
     """Open the recirculation valves and start the recirculation pump in reverse direction.
 
     Returns:
@@ -712,8 +709,7 @@ def ECMS_sub_electrolyte_recirculation_on(
 
 
 @experiment(version=1)
-def ECMS_sub_electrolyte_recirculation_off(
-) -> list:
+def ECMS_sub_electrolyte_recirculation_off() -> list:
     """Stop the recirculation pump and close the recirculation valves.
 
     Returns:

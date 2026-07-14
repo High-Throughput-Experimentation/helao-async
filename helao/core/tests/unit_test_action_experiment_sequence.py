@@ -260,7 +260,7 @@ def action_experiment_sequence_unit_test() -> bool:
             "ActionModel.as_dict has files entry with file_name",
             lambda: dumped["files"][0]["file_name"] == "out.hlo",
         )
-        rebuilt = ActionModel(**am2.model_dump())
+        rebuilt = ActionModel.model_validate(am2.model_dump())
         reporter.check(
             "ActionModel rebuilt from model_dump preserves url",
             lambda: rebuilt.url == am2.url,

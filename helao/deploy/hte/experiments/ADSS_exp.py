@@ -81,7 +81,6 @@ from helao.deploy.hte.drivers.robot.pal_driver import Spacingmethod, PALtools
 from helao.core.models.run_use import RunUse
 from helao.helpers.lib_decorators import experiment
 
-
 EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
@@ -127,8 +126,7 @@ def ADSS_sub_unloadall_customs() -> list:
 
 
 @experiment(version=2)
-def ADSS_sub_unload_liquid(
-) -> list:
+def ADSS_sub_unload_liquid() -> list:
     """Unload the liquid sample at ``cell1_we`` while keeping the solid in place.
 
     Returns:
@@ -156,8 +154,7 @@ def ADSS_sub_unload_liquid(
 
 
 @experiment(version=2)
-def ADSS_sub_unload_solid(
-) -> list:
+def ADSS_sub_unload_solid() -> list:
     """Unload the solid sample at ``cell1_we`` while keeping the liquid in place.
 
     Returns:
@@ -215,8 +212,8 @@ def ADSS_sub_load_solid(
         "archive_custom_load",
         {
             "custom": solid_custom_position,
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -263,8 +260,8 @@ def ADSS_sub_load_liquid(
         "archive_custom_add_liquid",
         {
             "custom": liquid_custom_position,
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
@@ -306,8 +303,8 @@ def ADSS_sub_load_liquid_only(
         "archive_custom_add_liquid",
         {
             "custom": liquid_custom_position,
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
@@ -355,8 +352,8 @@ def ADSS_sub_PAL_load_gas(
         "archive_custom_add_gas",
         {
             "custom": custom_position,
-            "source_gas_in": GasSample(
-                **{
+            "source_gas_in": GasSample.model_validate(
+                {
                     "sample_no": reservoir_gas_sample_no,
                     "machine_name": gethostname(),
                 }
@@ -375,8 +372,7 @@ def ADSS_sub_PAL_load_gas(
 
 
 @experiment(version=1)
-def ADSS_sub_unload_gas_only(
-) -> list:
+def ADSS_sub_unload_gas_only() -> list:
     """Unload only the gas sample at ``cell1_we`` while keeping liquid and solid.
 
     Returns:
@@ -450,8 +446,8 @@ def ADSS_sub_load(
         "archive_custom_load",
         {
             "custom": solid_custom_position,
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -482,8 +478,8 @@ def ADSS_sub_load(
             "archive_custom_add_liquid",
             {
                 "custom": liquid_custom_position,
-                "source_liquid_in": LiquidSample(
-                    **{
+                "source_liquid_in": LiquidSample.model_validate(
+                    {
                         "sample_no": liquid_sample_no,
                         "machine_name": gethostname(),
                     }
@@ -1975,8 +1971,8 @@ def ADSS_sub_insitu_actions(
                     "archive_custom_add_liquid",
                     {
                         "custom": "cell1_we",
-                        "source_liquid_in": LiquidSample(
-                            **{
+                        "source_liquid_in": LiquidSample.model_validate(
+                            {
                                 "sample_no": electrolyte_sample_no,
                                 "machine_name": gethostname(),
                             }
@@ -2007,8 +2003,8 @@ def ADSS_sub_insitu_actions(
             "archive_custom_add_liquid",
             {
                 "custom": "cell1_we",
-                "source_liquid_in": LiquidSample(
-                    **{
+                "source_liquid_in": LiquidSample.model_validate(
+                    {
                         "sample_no": electrolyte_sample_no,
                         "machine_name": gethostname(),
                     }
@@ -2060,8 +2056,8 @@ def ADSS_sub_add_liquid(
         "archive_custom_add_liquid",
         {
             "custom": "cell1_we",
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }
@@ -2344,8 +2340,7 @@ def ADSS_sub_heat(
 
 
 @experiment(version=1)
-def ADSS_sub_stopheat(
-) -> list:
+def ADSS_sub_stopheat() -> list:
     """Stop the heat loop and the monitoring loop.
 
     Returns:
@@ -2792,8 +2787,7 @@ def ADSS_sub_clean_cell(
 
 
 @experiment(version=1)
-def ADSS_sub_move_to_clean_cell(
-) -> list:
+def ADSS_sub_move_to_clean_cell() -> list:
     """Lift Z, query the built-in clean-cell reference XY, move there, then seal.
 
     Returns:
@@ -3213,8 +3207,8 @@ def ADSS_sub_transfer_liquid_in(
         "archive_custom_add_liquid",
         {
             "custom": destination,
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": liquid_sample_no,
                     "machine_name": gethostname(),
                 }

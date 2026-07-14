@@ -150,19 +150,28 @@ _FIXED_DT = datetime(2026, 1, 2, 3, 4, 5, 678901)
 # order. grouped=True: group(1) is a stable prefix kept verbatim, the value is
 # elided to a fixed placeholder.
 _PATTERNS = [
-    ("UUID", re.compile(
-        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"), False),
+    (
+        "UUID",
+        re.compile(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+        ),
+        False,
+    ),
     ("ISOTS", re.compile(r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?"), False),
     # %y%m%d.%H%M%S(%f) dir/file stamps, e.g. 260102.030405123456
     ("DIRTS", re.compile(r"\b\d{6}\.\d{6,18}\b"), False),
     # bare %H%M%S sequence-dir stamp ("HMS__name__label"); no leading date/dot.
     ("SEQTS", re.compile(r"\b\d{6}(?=__)"), False),
-    ("EPOCHNS", re.compile(r"\b1[6-9]\d{17}\b"), False),        # epoch nanoseconds
+    ("EPOCHNS", re.compile(r"\b1[6-9]\d{17}\b"), False),  # epoch nanoseconds
     ("EPOCH", re.compile(r"\b1[6-9]\d{8}(?:\.\d+)?\b"), False),  # epoch seconds
     # hlo_version embeds a git describe/short-SHA token that moves every commit
     ("HLOVER", re.compile(r"(hlo_version['\"]?\s*[:=]\s*)\S+"), True),
     # *_codehash fields are derived from source; change when authored source is edited
-    ("CODEHASH", re.compile(r"([a-z_]*codehash['\"]?\s*[:=]\s*)['\"]?[0-9a-f]{6,40}['\"]?"), True),
+    (
+        "CODEHASH",
+        re.compile(r"([a-z_]*codehash['\"]?\s*[:=]\s*)['\"]?[0-9a-f]{6,40}['\"]?"),
+        True,
+    ),
 ]
 
 
@@ -175,8 +184,10 @@ class _Normalizer:
     def sub(self, text: str) -> str:
         for name, rx, grouped in _PATTERNS:
             if grouped:
+
                 def repl(m, name=name):
                     return m.group(1) + f"<{name}>"
+
             else:
                 table = self.maps[name]
 
@@ -185,6 +196,7 @@ class _Normalizer:
                     if tok not in table:
                         table[tok] = f"<{name}:{len(table)}>"
                     return table[tok]
+
             text = rx.sub(repl, text)
         return text
 
@@ -246,7 +258,7 @@ def _split_hlo(body: str):
         return body, []
     idx = lines.index("%%")
     header = "\n".join(lines[:idx])
-    data_lines = [line for line in lines[idx + 1:] if line.strip()]
+    data_lines = [line for line in lines[idx + 1 :] if line.strip()]
     return header, data_lines
 
 
@@ -469,7 +481,10 @@ def _data_record(datapackage):
         "status": _json_safe(dm.status),
         "file_conn_keys": sorted(str(k) for k in dm.data.keys()),
         "data_keys": sorted(
-            k for payload in dm.data.values() if isinstance(payload, dict) for k in payload
+            k
+            for payload in dm.data.values()
+            if isinstance(payload, dict)
+            for k in payload
         ),
     }
 
@@ -486,7 +501,11 @@ def _make_base(save_root: Path, trace: list) -> Base:
     base.server = MachineModel(
         server_name=SERVER_NAME, machine_name=MACHINE, hostname="127.0.0.1", port=8000
     )
-    base.world_cfg = {"dummy": False, "simulation": False, "root": str(save_root.parent)}
+    base.world_cfg = {
+        "dummy": False,
+        "simulation": False,
+        "root": str(save_root.parent),
+    }
     base.ntp_offset = NTP_OFFSET
     base.helaodirs = SimpleNamespace(save_root=str(save_root))
     base.aloop = asyncio.get_running_loop()
@@ -525,12 +544,21 @@ class _PatchedBaseGlobals:
 
         async def _fake_move_dir(hobj, base=None, retry_delay=5):
             self._trace.append(
-                {"event": "move_dir", "action_uuid": str(getattr(hobj, "action_uuid", None))}
+                {
+                    "event": "move_dir",
+                    "action_uuid": str(getattr(hobj, "action_uuid", None)),
+                }
             )
             return None
 
         async def _fake_private_dispatcher(
-            server_key, host, port, private_action, params_dict=None, json_dict=None, **kwargs
+            server_key,
+            host,
+            port,
+            private_action,
+            params_dict=None,
+            json_dict=None,
+            **kwargs,
         ):
             self._trace.append(
                 {
@@ -555,7 +583,10 @@ class _PatchedBaseGlobals:
 
         self._orig = {
             (base_module, "move_dir"): base_module.move_dir,
-            (base_module, "async_private_dispatcher"): base_module.async_private_dispatcher,
+            (
+                base_module,
+                "async_private_dispatcher",
+            ): base_module.async_private_dispatcher,
             (base_module, "async_copy"): base_module.async_copy,
             (base_module, "set_time"): base_module.set_time,
             (premodels_module, "set_time"): premodels_module.set_time,
@@ -566,7 +597,10 @@ class _PatchedBaseGlobals:
             # disk-move/RPC/wall-clock would run and the finish trace + fixed
             # timestamps would diverge from the frozen baseline).
             (finalizer_module, "move_dir"): finalizer_module.move_dir,
-            (finalizer_module, "async_private_dispatcher"): finalizer_module.async_private_dispatcher,
+            (
+                finalizer_module,
+                "async_private_dispatcher",
+            ): finalizer_module.async_private_dispatcher,
             (finalizer_module, "set_time"): finalizer_module.set_time,
         }
         base_module.move_dir = _fake_move_dir
@@ -628,7 +662,7 @@ def _mk_action(action_name: str, manual: bool = False, **overrides) -> Action:
             experiment_timestamp=_seed_ts(0),
         )
     fields.update(overrides)
-    return Action(**fields)
+    return Action.model_validate(fields)
 
 
 def _active_params(base: Base, action: Action, aux_uuids=None) -> ActiveParams:
@@ -695,7 +729,9 @@ class _FakeExecutor(Executor):
     """
 
     def __init__(self, active, *, oneoff: bool, max_polls: int = 0, **kwargs):
-        super().__init__(active, poll_rate=0.0, oneoff=oneoff, concurrent=True, **kwargs)
+        super().__init__(
+            active, poll_rate=0.0, oneoff=oneoff, concurrent=True, **kwargs
+        )
         self._max_polls = max_polls
         self._poll_count = 0
 
@@ -708,7 +744,9 @@ class _FakeExecutor(Executor):
     async def _poll(self) -> dict:
         self._poll_count += 1
         status = (
-            HloStatus.active if self._poll_count < self._max_polls else HloStatus.finished
+            HloStatus.active
+            if self._poll_count < self._max_polls
+            else HloStatus.finished
         )
         return {
             "data": {"t": self._poll_count, "v": self._poll_count * 10},
@@ -736,7 +774,9 @@ async def _scenario_basic(save_root: Path) -> dict:
         active = Active(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
-        trace.append({"event": "post_myinit", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_myinit", "action_status": _status_list(active.action)}
+        )
 
         for i in range(3):
             await active.enqueue_data_dflt({"t": i, "v": i * 10})
@@ -753,7 +793,9 @@ async def _scenario_basic(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -777,7 +819,9 @@ async def _scenario_save_data_false(save_root: Path) -> dict:
         await _drain_data(active)
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -865,7 +909,9 @@ async def _scenario_substitute(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -890,11 +936,15 @@ async def _scenario_error_estop(save_root: Path) -> dict:
             }
         )
         active.set_estop()
-        trace.append({"event": "post_set_estop", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_set_estop", "action_status": _status_list(active.action)}
+        )
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -919,7 +969,9 @@ async def _scenario_manual(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -936,10 +988,14 @@ async def _scenario_multifile_aux(save_root: Path) -> dict:
             action=action,
             file_conn_params_dict={
                 dflt: FileConnParams(
-                    file_conn_key=dflt, json_data_keys=["t", "v"], file_type="gm__file_a"
+                    file_conn_key=dflt,
+                    json_data_keys=["t", "v"],
+                    file_type="gm__file_a",
                 ),
                 second: FileConnParams(
-                    file_conn_key=second, json_data_keys=["a", "b"], file_type="gm__file_b"
+                    file_conn_key=second,
+                    json_data_keys=["a", "b"],
+                    file_type="gm__file_b",
                 ),
             },
             aux_listen_uuids=[aux_uuid],
@@ -957,20 +1013,26 @@ async def _scenario_multifile_aux(save_root: Path) -> dict:
 
         for i in range(2):
             await active.enqueue_data(
-                DataModel(data={dflt: {"t": i, "v": i}}, errors=[], status=HloStatus.active)
+                DataModel(
+                    data={dflt: {"t": i, "v": i}}, errors=[], status=HloStatus.active
+                )
             )
             await _drain_data(active)
         for i in range(2):
             await active.enqueue_data(
                 DataModel(
-                    data={second: {"a": i * 2, "b": i * 3}}, errors=[], status=HloStatus.active
+                    data={second: {"a": i * 2, "b": i * 3}},
+                    errors=[],
+                    status=HloStatus.active,
                 )
             )
             await _drain_data(active)
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -992,7 +1054,9 @@ async def _scenario_finalizer_global_params(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -1023,7 +1087,9 @@ async def _scenario_finalizer_global_params_dict(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -1066,14 +1132,18 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
         # the flag read => the data logger has not consumed it => strictly
         # undrained, deterministically.
         active.enqueue_data_nowait(
-            DataModel(data={dflt: {"t": 1, "v": 111}}, errors=[], status=HloStatus.active)
+            DataModel(
+                data={dflt: {"t": 1, "v": 111}}, errors=[], status=HloStatus.active
+            )
         )
         undrained = active.num_data_queued > active.num_data_written
         trace.append({"event": "pre_finish", "undrained": undrained})
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -1144,7 +1214,9 @@ async def _scenario_nonblocking(save_root: Path) -> dict:
 
         await active.finish()
         await _ticks(10)
-        trace.append({"event": "post_finish", "action_status": _status_list(active.action)})
+        trace.append(
+            {"event": "post_finish", "action_status": _status_list(active.action)}
+        )
     return {"trace": trace}
 
 
@@ -1336,8 +1408,12 @@ def run_check() -> int:
             print(f"  PASS     {name}")
 
     # report stale references
-    expected = {f"{n}.trace.jsonl" for n in SCENARIOS} | {f"{n}.runs.norm" for n in SCENARIOS}
-    for extra in sorted(p.name for p in BASELINE_S0A_DIR.glob("*") if p.name not in expected):
+    expected = {f"{n}.trace.jsonl" for n in SCENARIOS} | {
+        f"{n}.runs.norm" for n in SCENARIOS
+    }
+    for extra in sorted(
+        p.name for p in BASELINE_S0A_DIR.glob("*") if p.name not in expected
+    ):
         print(f"  EXTRA    {extra}: no current scenario")
         any_fail = True
 
@@ -1375,7 +1451,9 @@ def run_determinism_selftest() -> int:
     if any_fail:
         print("DETERMINISM SELF-TEST FAILED")
         return 1
-    print(f"DETERMINISM SELF-TEST PASSED: {len(SCENARIOS)} scenarios byte/multiset-stable 2x")
+    print(
+        f"DETERMINISM SELF-TEST PASSED: {len(SCENARIOS)} scenarios byte/multiset-stable 2x"
+    )
     return 0
 
 

@@ -37,9 +37,7 @@ def _repo_root() -> str:
 
 
 def _demo0_path() -> str:
-    return os.path.join(
-        _repo_root(), "helao", "deploy", "test", "configs", "demo0.yml"
-    )
+    return os.path.join(_repo_root(), "helao", "deploy", "test", "configs", "demo0.yml")
 
 
 def _make_stub_app(config_dict: dict, server_name: str = "ORCH") -> SimpleNamespace:
@@ -65,7 +63,7 @@ def config_seam_unit_test() -> bool:
     config_dict["root"] = tmp_root
     # Re-validate against the tempdir root so the injected typed_cfg matches
     # the dict the stub app exposes (root differs from the on-disk value).
-    validated = HelaoConfig(**config_dict)
+    validated = HelaoConfig.model_validate(config_dict)
 
     # Pre-seed LOGS/ntpLastSync.txt: Base.__init__ reads this file
     # unconditionally (pre-existing behavior, out of scope for the config
@@ -79,7 +77,9 @@ def config_seam_unit_test() -> bool:
 
     # Legacy inline dict navigation, computed independently for comparison.
     legacy_orch_keys = [
-        k for k, d in config_dict.get("servers", {}).items() if d["group"] == "orchestrator"
+        k
+        for k, d in config_dict.get("servers", {}).items()
+        if d["group"] == "orchestrator"
     ]
     legacy_orch_key = legacy_orch_keys[0]
     legacy_orch_host = config_dict["servers"][legacy_orch_key]["host"]
@@ -111,8 +111,7 @@ def config_seam_unit_test() -> bool:
     )
     reporter.check(
         "typed_server_cfg.host matches world_cfg dict nav",
-        lambda: b1.typed_server_cfg.host
-        == b1.world_cfg["servers"]["ORCH"]["host"],
+        lambda: b1.typed_server_cfg.host == b1.world_cfg["servers"]["ORCH"]["host"],
     )
 
     # Negative: missing run_type must raise ValueError (ValidationError wrap).
@@ -127,9 +126,7 @@ def config_seam_unit_test() -> bool:
             return True
         return False
 
-    reporter.check(
-        "missing run_type raises ValueError", _missing_run_type_raises
-    )
+    reporter.check("missing run_type raises ValueError", _missing_run_type_raises)
 
     # HelaoFastAPI / HelaoBokehAPI: injected helao_cfg used instead of
     # config_loader.CONFIG. Save/restore module-level CONFIG around the check.

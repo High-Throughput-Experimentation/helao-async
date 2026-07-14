@@ -80,7 +80,9 @@ def _queue_counts(orch) -> dict:
 
 async def _prepend_sequences(orch, sequences) -> list:
     """Coerce ``sequences`` to ``Sequence`` instances and prepend them on the orch."""
-    seqs = [s if isinstance(s, Sequence) else Sequence(**s) for s in sequences]
+    seqs = [
+        s if isinstance(s, Sequence) else Sequence.model_validate(s) for s in sequences
+    ]
     return await orch.prepend_sequences(sequences=seqs)
 
 
@@ -144,7 +146,9 @@ class OrchAPI(HelaoFastAPI):
         self.driver = None
         self.poller = None
 
-        self.middleware("http")(_make_app_entry_middleware(server_key, lambda: self.orch))
+        self.middleware("http")(
+            _make_app_entry_middleware(server_key, lambda: self.orch)
+        )
         self.exception_handler(StarletteHTTPException)(
             _make_http_exception_handler(server_key, lambda: self.orch)
         )
@@ -416,7 +420,7 @@ class OrchAPI(HelaoFastAPI):
         async def append_sequence(sequence: Sequence = Body({}, embed=True)):
             """Append a sequence to the orchestrator and return its UUID."""
             if not isinstance(sequence, Sequence):
-                sequence = Sequence(**sequence)
+                sequence = Sequence.model_validate(sequence)
             seq_uuid = await self.orch.add_sequence(sequence=sequence)
             return {"sequence_uuid": seq_uuid}
 
@@ -604,7 +608,7 @@ class OrchAPI(HelaoFastAPI):
         async def append_split_sequences(sequence: Sequence = Body({}, embed=True)):
             """Split a sequence by sample and append the sub-sequences; return their UUIDs."""
             if not isinstance(sequence, Sequence):
-                sequence = Sequence(**sequence)
+                sequence = Sequence.model_validate(sequence)
             result = await self.orch.add_split_sequences(sequence=sequence)
             return {"sequence_uuids": result}
 
@@ -638,8 +642,7 @@ class OrchAPI(HelaoFastAPI):
             return active_action_dict
 
         @self.post(f"/{server_key}/cancel_wait", tags=["action"])
-        async def cancel_wait(
-        ):
+        async def cancel_wait():
             """Action endpoint that stops every running ``wait`` executor and finishes the action."""
             active = await self.orch.setup_and_contain_action()
             for exec_id, executor in self.orch.executors.items():

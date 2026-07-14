@@ -157,7 +157,7 @@ class DataRequestsClient:
         self._ensure_client_open()
         response = self.client.post("/data-requests/", json=item.model_dump())
         response.raise_for_status()
-        return ReadDataRequest(**response.json())
+        return ReadDataRequest.model_validate(response.json())
 
     def update_data_request(self, item: UpdateDataRequestModel) -> ReadDataRequest:
         """Update an existing data request.
@@ -174,7 +174,7 @@ class DataRequestsClient:
         payload["id"] = str(payload["id"])
         response = self.client.put("/data-requests/", json=payload)
         response.raise_for_status()
-        return ReadDataRequest(**response.json())
+        return ReadDataRequest.model_validate(response.json())
 
     def read_data_request(self, data_request_id: UUID) -> ReadDataRequest:
         """Retrieve a single data request by id.
@@ -188,7 +188,7 @@ class DataRequestsClient:
         self._ensure_client_open()
         response = self.client.get(f"/data-requests/id/{data_request_id}")
         response.raise_for_status()
-        return ReadDataRequest(**response.json())
+        return ReadDataRequest.model_validate(response.json())
 
     def delete_data_request(self, data_request_id: UUID):
         """Delete a data request by id.
@@ -212,7 +212,7 @@ class DataRequestsClient:
         self._ensure_client_open()
         response = self.client.post(f"/data-requests/acknowledge/{data_request_id}")
         response.raise_for_status()
-        return ReadDataRequest(**response.json())
+        return ReadDataRequest.model_validate(response.json())
 
     def set_status(self, status: Status, data_request_id: str) -> ReadDataRequest:
         """Set the status of a data request.
@@ -227,7 +227,7 @@ class DataRequestsClient:
         self._ensure_client_open()
         response = self.client.post(f"/data-requests/status/{status}/{data_request_id}")
         response.raise_for_status()
-        return ReadDataRequest(**response.json())
+        return ReadDataRequest.model_validate(response.json())
 
     def read_data_requests(
         self, status: Optional[Status] = None
@@ -245,7 +245,7 @@ class DataRequestsClient:
         params = {"status": status} if status else {}
         response = self.client.get("/data-requests/", params=params)
         response.raise_for_status()
-        return [ReadDataRequest(**item) for item in response.json()]
+        return [ReadDataRequest.model_validate(item) for item in response.json()]
 
     def close(self):
         """Close the underlying ``httpx.Client`` if it has been opened."""
