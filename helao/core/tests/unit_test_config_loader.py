@@ -81,16 +81,14 @@ def config_loader_unit_test() -> bool:
         )
 
         # validate via the HelaoConfig pydantic schema
-        parsed = HelaoConfig(**config)
+        parsed = HelaoConfig.model_validate(config)
         reporter.check(
             "HelaoConfig parses demo0.yml without error",
             lambda: parsed.run_type == "simulation",
         )
         reporter.check(
             "HelaoConfig.servers entries are ServerConfig instances",
-            lambda: all(
-                isinstance(v, ServerConfig) for v in parsed.servers.values()
-            ),
+            lambda: all(isinstance(v, ServerConfig) for v in parsed.servers.values()),
         )
         reporter.check(
             "Orchestrator entry round-trips OrchServerParams (dict or model)",

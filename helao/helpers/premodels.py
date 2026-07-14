@@ -86,9 +86,9 @@ class Sequence(SequenceModel):
         The returned model carries ``dispatched_experiments_abbr`` populated
         from ``ShortExperimentModel`` views of the completed experiments.
         """
-        seq = SequenceModel(**self.model_dump())
+        seq = SequenceModel.model_validate(self.model_dump())
         seq.dispatched_experiments_abbr = [
-            ShortExperimentModel(**exp.model_dump())
+            ShortExperimentModel.model_validate(exp.model_dump())
             for exp in self.dispatched_experiments
         ]
         # either we have a plan at the beginning or not
@@ -200,7 +200,7 @@ class Experiment(Sequence, ExperimentModel):
         the contents of ``dispatched_actions`` via
         ``_experiment_update_from_actlist``.
         """
-        exp = ExperimentModel(**self.model_dump())
+        exp = ExperimentModel.model_validate(self.model_dump())
         # now add all actions
         self._experiment_update_from_actlist(exp=exp)
         return exp
@@ -226,7 +226,9 @@ class Experiment(Sequence, ExperimentModel):
                 f"updating exp with act {actm.action_name} on {actm.action_server.disp_name()}, uuid:{actm.action_uuid}"
             )
 
-            exp.dispatched_actions_abbr.append(ShortActionModel(**actm.model_dump()))
+            exp.dispatched_actions_abbr.append(
+                ShortActionModel.model_validate(actm.model_dump())
+            )
             for file in actm.files:
                 if file.action_uuid is None:
                     file.action_uuid = actm.action_uuid
@@ -329,7 +331,7 @@ class Action(Experiment, ActionModel):
 
     def get_act(self) -> ActionModel:
         """Return a plain ``ActionModel`` snapshot of this action."""
-        return ActionModel(**self.model_dump())
+        return ActionModel.model_validate(self.model_dump())
 
     def init_act(self, time_offset: float = 0, force: Optional[bool] = False):
         """Initialise action identity, promoting it to a manual run if needed.
@@ -537,7 +539,7 @@ class ActionPlanMaker:
         action_dict.update(kwargs)
         if "run_use" not in kwargs:
             action_dict["run_use"] = self._experiment.run_use
-        self.planned_actions.append(Action(**action_dict))
+        self.planned_actions.append(Action.model_validate(action_dict))
 
     @property
     def experiment(self) -> Experiment:

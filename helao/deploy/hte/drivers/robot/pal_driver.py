@@ -284,7 +284,9 @@ class PAL(HelaoDriver):
         """
         super().__init__(config=config)
         self.config_dict = self.config
-        self.world_config = self.config_dict.get("world_config") or config_loader.CONFIG or {}
+        self.world_config = (
+            self.config_dict.get("world_config") or config_loader.CONFIG or {}
+        )
 
         self.archive = SampleArchiveShim(self.world_config)
 
@@ -772,9 +774,7 @@ class PAL(HelaoDriver):
                                     samples=[part]
                                 )
                                 for sample in tmp_part:
-                                    sample.action_uuid = [
-                                        job.active.action.action_uuid
-                                    ]
+                                    sample.action_uuid = [job.active.action.action_uuid]
                                 sample_out.parts[part_i] = deepcopy(tmp_part[0])
                             else:
                                 # the assembly contains a ref sample which
@@ -889,13 +889,9 @@ class PAL(HelaoDriver):
                 # (9) add samples_in/out to active.action
                 # add sample in and out to exp
 
-                await job.active.append_sample(
-                    samples=job.palcam.samples_in, IO="in"
-                )
+                await job.active.append_sample(samples=job.palcam.samples_in, IO="in")
 
-                await job.active.append_sample(
-                    samples=job.palcam.samples_out, IO="out"
-                )
+                await job.active.append_sample(samples=job.palcam.samples_out, IO="out")
 
                 self.IO_action_run_counter += 1
 
@@ -1455,7 +1451,9 @@ class PAL(HelaoDriver):
                     samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                     samples_out_list[0].sample_position = dest
                     samples_out_list[0].inheritance = SampleInheritance.allow_both
-                    samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
+                    samples_out_list[0].reset_sample_status(
+                        SampleStatus.created, SampleStatus.incorporated
+                    )
 
                     # add new sample to assembly
                     sample_in.parts.append(samples_out_list[0])
@@ -1519,7 +1517,9 @@ class PAL(HelaoDriver):
                 samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
                 samples_out_list[0].sample_position = dest
                 samples_out_list[0].inheritance = SampleInheritance.allow_both
-                samples_out_list[0].reset_sample_status(SampleStatus.created, SampleStatus.incorporated)
+                samples_out_list[0].reset_sample_status(
+                    SampleStatus.created, SampleStatus.incorporated
+                )
 
                 # only now add the sample which was found in the position
                 # to the sample_in list for the exp/prg
@@ -2355,7 +2355,9 @@ class PAL(HelaoDriver):
                                 prev_timepoint = timepoint  # todo: consider time lag
                             elif job.palcam.spacingmethod == Spacingmethod.custom:
                                 LOGGER.info("PAL custom scheduling")
-                                LOGGER.info(f"time since PAL start {(cur_time-start_time)}")
+                                LOGGER.info(
+                                    f"time since PAL start {(cur_time-start_time)}"
+                                )
                                 LOGGER.info(
                                     f"time for next PAL run since start {sampleperiod-job.palcam.timeoffset}"
                                 )
@@ -2366,7 +2368,9 @@ class PAL(HelaoDriver):
                                 )
 
                             # only wait for positive time
-                            LOGGER.info(f"PAL waits {diff_time} for sending next command")
+                            LOGGER.info(
+                                f"PAL waits {diff_time} for sending next command"
+                            )
                             if diff_time > 0:
                                 await asyncio.sleep(diff_time)
 
@@ -2391,9 +2395,7 @@ class PAL(HelaoDriver):
                                 self.IO_trigger_task = None
 
                     except Exception:
-                        LOGGER.error(
-                            "_PAL_IOloop measurement failed", exc_info=True
-                        )
+                        LOGGER.error("_PAL_IOloop measurement failed", exc_info=True)
                         self.IO_error = ErrorCodes.not_available
                     finally:
                         # update samples_in/out in exp
@@ -2481,7 +2483,7 @@ class PAL(HelaoDriver):
             params: ``action_params`` dict unpacked directly into :class:`PalCam`.
             samples_in: Resolved input samples from the action.
         """
-        palcam = PalCam(**params)
+        palcam = PalCam.model_validate(params)
         palcam.samples_in = samples_in
         return palcam
 
@@ -2495,21 +2497,21 @@ class PAL(HelaoDriver):
             spacingfactor=params.get("spacingfactor", 1.0),
             timeoffset=params.get("timeoffset", 0.0),
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "transfer_tray_tray",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("source_tray", 0),
                                 "slot": params.get("source_slot", 0),
                                 "vial": params.get("source_vial", 0),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("dest_tray", 0),
                                 "slot": params.get("dest_slot", 0),
@@ -2536,18 +2538,18 @@ class PAL(HelaoDriver):
             spacingfactor=params.get("spacingfactor", 1.0),
             timeoffset=params.get("timeoffset", 0.0),
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "transfer_custom_tray",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("dest_tray", 0),
                                 "slot": params.get("dest_slot", 0),
@@ -2574,21 +2576,21 @@ class PAL(HelaoDriver):
             spacingfactor=params.get("spacingfactor", 1.0),
             timeoffset=params.get("timeoffset", 0.0),
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "transfer_tray_custom",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("source_tray", 0),
                                 "slot": params.get("source_slot", 0),
                                 "vial": params.get("source_vial", 0),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2612,18 +2614,18 @@ class PAL(HelaoDriver):
             spacingfactor=params.get("spacingfactor", 1.0),
             timeoffset=params.get("timeoffset", 0.0),
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "transfer_custom_custom",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2647,13 +2649,13 @@ class PAL(HelaoDriver):
             spacingfactor=params.get("spacingfactor", 1.0),
             timeoffset=params.get("timeoffset", 0.0),
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "archive",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
@@ -2735,8 +2737,8 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "deepclean",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
@@ -2833,21 +2835,21 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": method,
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("source_tray", 0),
                                 "slot": params.get("source_slot", 0),
                                 "vial": params.get("source_vial", 0),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2882,18 +2884,18 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": method,
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2917,21 +2919,21 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_tray_HPLC",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": _positiontype.tray,
                                 "tray": params.get("source_tray", 0),
                                 "slot": params.get("source_slot", 0),
                                 "vial": params.get("source_vial", 0),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2955,18 +2957,18 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_custom_HPLC",
                         "tool": params.get("tool", None),
                         "volume_ul": params.get("volume_ul", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": params.get("dest", None),
                             }
                         ),
@@ -2990,18 +2992,18 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_custom_GC_gas_wait",
                         "tool": params.get("toolGC", None),
                         "volume_ul": params.get("volume_ul_GC", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "Injector 2",
                             }
                         ),
@@ -3011,18 +3013,18 @@ class PAL(HelaoDriver):
                         "wash4": 0,
                     }
                 ),
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_custom_GC_gas_start",
                         "tool": params.get("toolGC", None),
                         "volume_ul": params.get("volume_ul_GC", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "Injector 1",
                             }
                         ),
@@ -3046,18 +3048,18 @@ class PAL(HelaoDriver):
             spacingfactor=1.0,
             timeoffset=0.0,
             microcams=[
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_custom_GC_gas_wait",
                         "tool": params.get("toolGC", None),
                         "volume_ul": params.get("volume_ul_GC", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "Injector 2",
                             }
                         ),
@@ -3067,18 +3069,18 @@ class PAL(HelaoDriver):
                         "wash4": 0,
                     }
                 ),
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "injection_custom_GC_gas_start",
                         "tool": params.get("toolGC", None),
                         "volume_ul": params.get("volume_ul_GC", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "Injector 1",
                             }
                         ),
@@ -3088,13 +3090,13 @@ class PAL(HelaoDriver):
                         "wash4": 0,
                     }
                 ),
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "archive",
                         "tool": params.get("toolarchive", None),
                         "volume_ul": params.get("volume_ul_archive", 0),
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": params.get("source", None),
                             }
                         ),

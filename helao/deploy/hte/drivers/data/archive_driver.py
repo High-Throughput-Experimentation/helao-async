@@ -122,9 +122,7 @@ class Archive:
                 self.base.helaodirs.states_root,
                 f"{host}_PAL_archive.json",
             )
-            if not os.path.exists(self.archivejson) and os.path.exists(
-                legacy_json
-            ):
+            if not os.path.exists(self.archivejson) and os.path.exists(legacy_json):
                 try:
                     shutil.copy2(legacy_json, self.archivejson)
                     LOGGER.info(
@@ -303,7 +301,7 @@ class Archive:
             with open(self.archivejson, "r") as f:
                 try:
                     data = json.load(f)
-                    return Positions(**data)
+                    return Positions.model_validate(data)
                 except Exception as e:
                     tb = "".join(
                         traceback.format_exception(type(e), e, e.__traceback__)
@@ -1451,14 +1449,14 @@ class Archive:
             if sample_out_type == SampleType.liquid:
                 # this is a sample reference, it needs to be added
                 # to the db later
-                samples.append(LiquidSample(**sample_dict))
+                samples.append(LiquidSample.model_validate(sample_dict))
 
             elif sample_out_type == SampleType.gas:
-                samples.append(GasSample(**sample_dict))
+                samples.append(GasSample.model_validate(sample_dict))
 
             elif sample_out_type == SampleType.assembly:
                 sample_dict.update({"parts": samples_in})
-                samples.append(AssemblySample(**sample_dict))
+                samples.append(AssemblySample.model_validate(sample_dict))
 
             else:
                 LOGGER.error(
@@ -1474,18 +1472,18 @@ class Archive:
             ):
                 LOGGER.info(f"combining liquids '{source}' into new liquid reference")
                 sample_dict.update({"parts": samples_in})
-                samples.append(LiquidSample(**sample_dict))
+                samples.append(LiquidSample.model_validate(sample_dict))
             if (
                 all(sample.sample_type == SampleType.gas for sample in samples_in)
                 and combine_gases
             ):
                 LOGGER.info(f"combining gases '{source}' into new gas reference")
                 sample_dict.update({"parts": samples_in})
-                samples.append(GasSample(**sample_dict))
+                samples.append(GasSample.model_validate(sample_dict))
 
             else:
                 sample_dict.update({"parts": samples_in})
-                samples.append(AssemblySample(**sample_dict))
+                samples.append(AssemblySample.model_validate(sample_dict))
 
         else:
             # this should never happen, else we found a bug
@@ -1561,7 +1559,9 @@ class Archive:
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
             if isinstance(custom_sample, NoneSample):
-                LOGGER.error(f"A blank sample is loaded in custom position '{custom}', unload it first.")
+                LOGGER.error(
+                    f"A blank sample is loaded in custom position '{custom}', unload it first."
+                )
                 error = ErrorCodes.no_sample
                 return error, [], []
             else:
@@ -1952,7 +1952,9 @@ class Archive:
         if custom in self.positions.customs_dict:
             custom_sample = deepcopy(self.positions.customs_dict[custom].sample)
             if isinstance(custom_sample, NoneSample):
-                LOGGER.error(f"A blank sample is loaded in custom position '{custom}', unload it first.")
+                LOGGER.error(
+                    f"A blank sample is loaded in custom position '{custom}', unload it first."
+                )
                 error = ErrorCodes.no_sample
                 return error, [], []
             else:

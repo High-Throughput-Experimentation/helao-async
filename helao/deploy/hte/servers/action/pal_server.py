@@ -153,11 +153,12 @@ def makeApp(server_key) -> BaseAPI:
                 },
             )
         )
-        return active.start_executor(PALJobExec(palcam=palcam, active=active, oneoff=False))
+        return active.start_executor(
+            PALJobExec(palcam=palcam, active=active, oneoff=False)
+        )
 
     @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop(
-    ):
+    async def stop():
         """Request a controlled stop on the PAL driver.
 
         Args:
@@ -176,8 +177,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/kill_PAL", tags=["action"])
-    async def kill_PAL(
-    ):
+    async def kill_PAL():
         """Kill the PAL process via the driver and record the error code.
 
         Args:
@@ -199,21 +199,21 @@ def makeApp(server_key) -> BaseAPI:
         @app.post(f"/{server_key}/PAL_run_method", tags=["action"])
         async def PAL_run_method(
             micropal: list = [
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "fillfixed",
                         "tool": "LS3",
                         "volume_ul": 500,
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": "elec_res1",
                                 "tray": None,
                                 "slot": None,
                                 "vial": None,
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "lcfc_res",
                                 "tray": None,
                                 "slot": None,
@@ -226,21 +226,21 @@ def makeApp(server_key) -> BaseAPI:
                         "wash4": 0,
                     }
                 ),
-                PalMicroCam(
-                    **{
+                PalMicroCam.model_validate(
+                    {
                         "method": "fillfixed",
                         "tool": "LS3",
                         "volume_ul": 500,
-                        "requested_source": PALposition(
-                            **{
+                        "requested_source": PALposition.model_validate(
+                            {
                                 "position": "elec_res1",
                                 "tray": None,
                                 "slot": None,
                                 "vial": None,
                             }
                         ),
-                        "requested_dest": PALposition(
-                            **{
+                        "requested_dest": PALposition.model_validate(
+                            {
                                 "position": "lcfc_res",
                                 "tray": None,
                                 "slot": None,
@@ -416,7 +416,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_injection_tray_GC(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_injection_tray_GC(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     if (
@@ -463,7 +465,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_injection_custom_GC(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_injection_custom_GC(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     if "injection_custom_HPLC" in _cams:
@@ -501,7 +505,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_injection_custom_HPLC(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_injection_custom_HPLC(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     if "injection_tray_HPLC" in _cams:
@@ -543,7 +549,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_injection_tray_HPLC(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_injection_tray_HPLC(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     #    if "transfer_tray_tray" in _cams:
@@ -598,7 +606,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_transfer_tray_tray(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_transfer_tray_tray(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     #    if "transfer_tray_custom" in _cams:
@@ -649,7 +659,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_transfer_tray_custom(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_transfer_tray_custom(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     #    if "transfer_custom_tray" in _cams:
@@ -700,7 +712,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_transfer_custom_tray(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_transfer_custom_tray(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     if "transfer_custom_custom" in _cams:
@@ -746,7 +760,9 @@ def makeApp(server_key) -> BaseAPI:
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
-            palcam = app.driver.build_palcam_transfer_custom_custom(A.action_params, A.samples_in)
+            palcam = app.driver.build_palcam_transfer_custom_custom(
+                A.action_params, A.samples_in
+            )
             return await _pal_start(A, palcam)
 
     if "archive" in _cams:

@@ -111,9 +111,15 @@ class RunQueues:
             sequence.sequence_codehash is None
             and sequence.sequence_name in orch.sequence_codehash_lib
         ):
-            sequence.sequence_codehash = orch.sequence_codehash_lib[sequence.sequence_name]
-            sequence.sequence_codepath = orch.sequence_codepath_lib[sequence.sequence_name]
-            sequence.sequence_funcname = orch.sequence_lib[sequence.sequence_name].__name__
+            sequence.sequence_codehash = orch.sequence_codehash_lib[
+                sequence.sequence_name
+            ]
+            sequence.sequence_codepath = orch.sequence_codepath_lib[
+                sequence.sequence_name
+            ]
+            sequence.sequence_funcname = orch.sequence_lib[
+                sequence.sequence_name
+            ].__name__
         sequence.sequence_label = sanitize_sequence_label(sequence.sequence_label)
 
     def _ensure_run_id(self) -> UUID:
@@ -345,7 +351,7 @@ class RunQueues:
         seq_dict = seq.model_dump()
         if not isinstance(experimentmodel, Experiment):
             experimentmodel_dict = experimentmodel.model_dump()
-            D = Experiment(**experimentmodel_dict)
+            D = Experiment.model_validate(experimentmodel_dict)
         else:
             D = experimentmodel
         for k in seq_dict.keys():

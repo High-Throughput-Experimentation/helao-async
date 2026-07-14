@@ -160,8 +160,8 @@ def HISPEC_sub_add_liquid(
         "archive_custom_add_liquid",
         {
             "custom": solid_custom_position,
-            "source_liquid_in": LiquidSample(
-                **{
+            "source_liquid_in": LiquidSample.model_validate(
+                {
                     "sample_no": reservoir_liquid_sample_no,
                     "machine_name": gethostname().lower(),
                 }
@@ -201,8 +201,8 @@ def HISPEC_sub_load_solid(
         "archive_custom_load",
         {
             "custom": solid_custom_position,
-            "load_sample_in": SolidSample(
-                **{
+            "load_sample_in": SolidSample.model_validate(
+                {
                     "sample_no": solid_sample_no,
                     "plate_id": solid_plate_id,
                     "machine_name": "legacy",
@@ -448,6 +448,7 @@ def HISPEC_sub_shutdown() -> list:
     apm.add(SAMPLE_server, "archive_custom_unloadall", {"destroy_liquid": True})
     return apm.planned_actions  # returns complete action list to orch
 
+
 @experiment(version=1)
 def HISPEC_sub_check_CP_Ewe_bounds(
     Ewe_V__mean_final: float = 0.3,
@@ -462,8 +463,11 @@ def HISPEC_sub_check_CP_Ewe_bounds(
         limited value to the orch global parameter ``limited_Ewe_V__mean_final``.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
-    apm.add(CALC_server, "check_CP_Ewe_bounds", {"Ewe_V__mean_final": Ewe_V__mean_final},
-    to_global_params={"limited_Ewe_V__mean_final": "Ewe_V__mean_final"}
+    apm.add(
+        CALC_server,
+        "check_CP_Ewe_bounds",
+        {"Ewe_V__mean_final": Ewe_V__mean_final},
+        to_global_params={"limited_Ewe_V__mean_final": "Ewe_V__mean_final"},
     )
 
     return apm.planned_actions  # returns complete action list to orch
@@ -881,7 +885,7 @@ def HISPEC_sub_CP(
         },
         from_global_act_params={"_fast_samples_in": "fast_samples_in"},
         start_condition=ActionStartCondition.wait_for_previous,
-    technique_name="CP",
+        technique_name="CP",
         process_finish=False,
         process_contrib=[
             ProcessContrib.files,
@@ -897,7 +901,7 @@ def HISPEC_sub_CP(
         "check_CP_Ewe_bounds",
         {},
         # global act params inherits from global params - we need to call from this to give the correct name
-        #consume the value for the action
+        # consume the value for the action
         from_global_act_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final"},
         # now write a new value to the global params
         to_global_params={"CP_Ewe_V__mean_final": "CP_Ewe_V__mean_final_limited"},

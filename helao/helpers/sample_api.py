@@ -214,12 +214,10 @@ class SampleModelAPI:
 
     def _create_init_db(self):
         """Create the sample table with an autoincrementing ``idx`` PK."""
-        self._cur.execute(
-            f"""CREATE TABLE {self._sample_type}(
+        self._cur.execute(f"""CREATE TABLE {self._sample_type}(
               idx INTEGER PRIMARY KEY AUTOINCREMENT,
               {self.columns}
-              );"""
-        )
+              );""")
 
         LOGGER.info(f"{self._sample_type} table created")
         # commit changes
@@ -663,8 +661,8 @@ class LiquidSampleAPI(SampleModelAPI):
         counts = await old_liquid_sample_db.count_samples()
         LOGGER.info(f"old db sample count: {counts}")
         for i in range(counts):
-            sample = LiquidSample(
-                **{"sample_no": i + 1, "machine_name": gethostname().lower()}
+            sample = LiquidSample.model_validate(
+                {"sample_no": i + 1, "machine_name": gethostname().lower()}
             )
             sample = await old_liquid_sample_db.get_samples(sample)
             sample.server_name = "PAL"
@@ -808,9 +806,7 @@ class SolidSampleAPI(SampleModelAPI):
                         machine_name=sample.machine_name,
                     )
                 )
-                LOGGER.info(
-                    "loading non-legacy solid sample"
-                )
+                LOGGER.info("loading non-legacy solid sample")
 
         return ret_samples
 
@@ -896,6 +892,7 @@ class OldLiquidSampleAPI:
         Returns:
             The same sample with ``sample_no`` populated.
         """
+
         async def write_sample_no_jsonfile(filename, datadict):
             """Write a per-sample JSON sidecar next to the CSV index."""
             self.fjson = await aiofiles.open(
@@ -1032,7 +1029,7 @@ class OldLiquidSampleAPI:
                 )
                 del liquid_sample_jsondict["DUID"]
 
-            ret_liquid_sample = LiquidSample(**liquid_sample_jsondict)
+            ret_liquid_sample = LiquidSample.model_validate(liquid_sample_jsondict)
             LOGGER.info(f"data json content: {ret_liquid_sample.model_dump()}")
 
             return ret_liquid_sample
@@ -1162,9 +1159,7 @@ class UnifiedSampleDataAPI:
 
         return retval
 
-    async def list_new_samples(
-        self, limit: int = 10
-    ) -> dict:
+    async def list_new_samples(self, limit: int = 10) -> dict:
         """Return a per-type dict of the most recent samples (up to ``limit`` each)."""
         retdict = {
             "liquid": await self.liquidAPI.list_new_samples(limit),

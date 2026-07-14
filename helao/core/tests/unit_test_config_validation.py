@@ -34,7 +34,7 @@ def config_validation_unit_test() -> bool:
         for path in paths:
             name = f"{deployment}/{os.path.basename(path)}"
             try:
-                parsed = HelaoConfig(**read_config(path))
+                parsed = HelaoConfig.model_validate(read_config(path))
                 ok = all(
                     isinstance(v, ServerConfig) for v in (parsed.servers or {}).values()
                 )

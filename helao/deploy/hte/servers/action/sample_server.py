@@ -166,7 +166,9 @@ def makeApp(server_key) -> BaseAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
             dict,
         ] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            LiquidSample.model_validate(
+                {"sample_no": 1, "machine_name": gethostname().lower()}
+            ),
             embed=True,
         ),
         tray: Optional[int] = None,
@@ -255,9 +257,7 @@ def makeApp(server_key) -> BaseAPI:
             /vial location.
         """
         active = await app.base.setup_and_contain_action()
-        datadict = await app.driver.tray_new_position(
-            **active.action.action_params
-        )
+        datadict = await app.driver.tray_new_position(**active.action.action_params)
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
@@ -268,7 +268,9 @@ def makeApp(server_key) -> BaseAPI:
         sample: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            LiquidSample.model_validate(
+                {"sample_no": 1, "machine_name": gethostname().lower()}
+            ),
             embed=True,
         ),
         tray: Optional[int] = None,
@@ -323,9 +325,7 @@ def makeApp(server_key) -> BaseAPI:
             action_abbr="traytojson",
             file_type="palvialtable_helao__file",
         )
-        datadict = await app.driver.tray_export_json(
-            **active.action.action_params
-        )
+        datadict = await app.driver.tray_export_json(**active.action.action_params)
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
@@ -419,8 +419,8 @@ def makeApp(server_key) -> BaseAPI:
         active = await app.base.setup_and_contain_action(
             action_abbr="load_sample",
         )
-        active.action.action_params["load_sample_in"] = SolidSample(
-            **active.action.action_params
+        active.action.action_params["load_sample_in"] = SolidSample.model_validate(
+            active.action.action_params
         )
         loaded, loaded_sample, customs_dict = await app.driver.custom_load(
             **active.action.action_params
@@ -439,7 +439,9 @@ def makeApp(server_key) -> BaseAPI:
         load_sample_in: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ] = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            LiquidSample.model_validate(
+                {"sample_no": 1, "machine_name": gethostname().lower()}
+            ),
             embed=True,
         ),
     ):
@@ -610,7 +612,9 @@ def makeApp(server_key) -> BaseAPI:
     async def archive_custom_add_liquid(
         custom: dev_customitems = None,
         source_liquid_in: LiquidSample = Body(
-            LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            LiquidSample.model_validate(
+                {"sample_no": 1, "machine_name": gethostname().lower()}
+            ),
             embed=True,
         ),
         volume_ml: float = 0.0,
@@ -663,7 +667,9 @@ def makeApp(server_key) -> BaseAPI:
     async def archive_custom_add_gas(
         custom: dev_customitems = None,
         source_gas_in: GasSample = Body(
-            GasSample(**{"sample_no": 1, "machine_name": gethostname().lower()}),
+            GasSample.model_validate(
+                {"sample_no": 1, "machine_name": gethostname().lower()}
+            ),
             embed=True,
         ),
         volume_ml: float = 0.0,
@@ -716,7 +722,11 @@ def makeApp(server_key) -> BaseAPI:
         fast_samples_in: List[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
-            [LiquidSample(**{"sample_no": 1, "machine_name": gethostname().lower()})],
+            [
+                LiquidSample.model_validate(
+                    {"sample_no": 1, "machine_name": gethostname().lower()}
+                )
+            ],
             embed=True,
         ),
     ):
@@ -753,8 +763,8 @@ def makeApp(server_key) -> BaseAPI:
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
             [
-                LiquidSample(
-                    **{
+                LiquidSample.model_validate(
+                    {
                         "machine_name": gethostname().lower(),
                         "source": [],
                         "volume_ml": 0.0,
@@ -856,8 +866,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/get_loaded_positions", tags=["action"])
-    async def get_positions(
-    ):
+    async def get_positions():
         """Snapshot the archive's loaded positions into ``action_params``.
 
         Populates ``_positions`` (full archive dict), ``_tray_pos`` (loaded

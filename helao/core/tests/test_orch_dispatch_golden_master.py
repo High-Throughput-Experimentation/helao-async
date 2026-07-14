@@ -161,7 +161,10 @@ def _make_orch(tmp_root: Path) -> Orch:
     os.makedirs(str(tmp_root / "STATES"), exist_ok=True)
 
     orch.server = MachineModel(
-        server_name=ORCH_SERVER_NAME, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=8000
+        server_name=ORCH_SERVER_NAME,
+        machine_name=ORCH_MACHINE,
+        hostname="127.0.0.1",
+        port=8000,
     )
     orch.server_cfg = {"host": "127.0.0.1", "port": 8000}
     orch.server_params = {}
@@ -273,16 +276,28 @@ def _install_recording_stubs(orch: Orch, trace: list) -> None:
     # uuid -- never logged verbatim (would break determinism); only the
     # structurally deterministic value payload (name/status) is recorded.
     async def _put_lbuf(live_dict):
-        trace.append({"event": "put_lbuf", "entries": [_json_safe(v) for v in live_dict.values()]})
+        trace.append(
+            {
+                "event": "put_lbuf",
+                "entries": [_json_safe(v) for v in live_dict.values()],
+            }
+        )
 
     def _put_lbuf_nowait(live_dict):
-        trace.append({"event": "put_lbuf_nowait", "entries": [_json_safe(v) for v in live_dict.values()]})
+        trace.append(
+            {
+                "event": "put_lbuf_nowait",
+                "entries": [_json_safe(v) for v in live_dict.values()],
+            }
+        )
 
     async def _write_seq(sequence):
         trace.append({"event": "write_seq", "sequence_name": sequence.sequence_name})
 
     async def _write_exp(experiment):
-        trace.append({"event": "write_exp", "experiment_name": experiment.experiment_name})
+        trace.append(
+            {"event": "write_exp", "experiment_name": experiment.experiment_name}
+        )
 
     orch.put_lbuf = _put_lbuf
     orch.put_lbuf_nowait = _put_lbuf_nowait
@@ -360,7 +375,10 @@ def _wrap_wait_for_interrupt(orch: Orch, trace: list) -> None:
 
     async def _spy(pending_action=None):
         trace.append(
-            {"event": "wait_for_interrupt_enter", "has_pending": pending_action is not None}
+            {
+                "event": "wait_for_interrupt_enter",
+                "has_pending": pending_action is not None,
+            }
         )
         result = await orig(pending_action)
         trace.append({"event": "wait_for_interrupt_exit", "result": result})
@@ -440,8 +458,22 @@ class _PatchedOrchGlobals:
 
 
 def _make_fake_private_dispatcher(trace: list):
-    async def _fake(server_key, host, port, private_action, params_dict=None, json_dict=None, **kwargs):
-        trace.append({"event": "private_dispatch", "server": server_key, "action": private_action})
+    async def _fake(
+        server_key,
+        host,
+        port,
+        private_action,
+        params_dict=None,
+        json_dict=None,
+        **kwargs,
+    ):
+        trace.append(
+            {
+                "event": "private_dispatch",
+                "server": server_key,
+                "action": private_action,
+            }
+        )
         return {}, ErrorCodes.none
 
     return _fake
@@ -449,8 +481,14 @@ def _make_fake_private_dispatcher(trace: list):
 
 def _make_fake_move_dir(trace: list):
     async def _fake(hobj, base=None, retry_delay=5):
-        kind = "sequence" if hasattr(hobj, "sequence_uuid") and not hasattr(hobj, "experiment_uuid") else (
-            "experiment" if hasattr(hobj, "experiment_uuid") and hobj.experiment_uuid is not None else "unknown"
+        kind = (
+            "sequence"
+            if hasattr(hobj, "sequence_uuid") and not hasattr(hobj, "experiment_uuid")
+            else (
+                "experiment"
+                if hasattr(hobj, "experiment_uuid") and hobj.experiment_uuid is not None
+                else "unknown"
+            )
         )
         trace.append({"event": "move_dir", "kind": kind})
         return None
@@ -476,15 +514,21 @@ async def _deliver_finish_status(
         endpoints={
             endpoint_name: EndpointModel(
                 endpoint_name=endpoint_name,
-                nonactive_dict={HloStatus.finished: {finished_action.action_uuid: finished_action}},
+                nonactive_dict={
+                    HloStatus.finished: {finished_action.action_uuid: finished_action}
+                },
             )
         },
         last_action_uuid=finished_action.action_uuid,
     )
-    trace.append({"event": "status_ping", "action_name": endpoint_name, "phase": "finished"})
+    trace.append(
+        {"event": "status_ping", "action_name": endpoint_name, "phase": "finished"}
+    )
     await orch.update_status(asm)
     if is_nonblocking:
-        await orch.update_nonblocking(finished_action.get_act(), server_host, server_port)
+        await orch.update_nonblocking(
+            finished_action.get_act(), server_host, server_port
+        )
 
 
 def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] = None):
@@ -501,7 +545,9 @@ def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] 
     script = script or {}
     call_counters: dict = {}
 
-    async def _fake_async_action_dispatcher(world_cfg, A: Action, params: Optional[dict] = None):
+    async def _fake_async_action_dispatcher(
+        world_cfg, A: Action, params: Optional[dict] = None
+    ):
         name = A.action_name
         call_counters[name] = call_counters.get(name, 0) + 1
         directive = script.get(name, {})
@@ -512,9 +558,12 @@ def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] 
                 "server": A.action_server.server_name,
                 "action_name": name,
                 "params": _json_safe(dict(A.action_params)),
-                "start_condition": A.start_condition
-                if isinstance(A.start_condition, int) and not isinstance(A.start_condition, ActionStartCondition)
-                else _enum_val(A.start_condition),
+                "start_condition": (
+                    A.start_condition
+                    if isinstance(A.start_condition, int)
+                    and not isinstance(A.start_condition, ActionStartCondition)
+                    else _enum_val(A.start_condition)
+                ),
                 "submit_order": A.orch_submit_order,
                 "nonblocking": A.nonblocking,
                 "extra_params": _json_safe(dict(params)) if params else {},
@@ -559,7 +608,9 @@ def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] 
         skip_ping = directive.get("skip_ping", False) or resp.action_uuid is None
         if not skip_ping:
             finished = deepcopy(resp)
-            finished.action_status = [HloStatus.finished]  # replaces active, matches real replace-status semantics
+            finished.action_status = [
+                HloStatus.finished
+            ]  # replaces active, matches real replace-status semantics
             if orch.active_experiment is not None:
                 finished.experiment_uuid = orch.active_experiment.experiment_uuid
             orch.aloop.create_task(
@@ -584,7 +635,10 @@ def _seed_server_dict(orch: Orch, pairs) -> None:
         if key not in orch.globalstatusmodel.server_dict:
             orch.globalstatusmodel.server_dict[key] = ActionServerModel(
                 action_server=MachineModel(
-                    server_name=server_name, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=1
+                    server_name=server_name,
+                    machine_name=ORCH_MACHINE,
+                    hostname="127.0.0.1",
+                    port=1,
                 )
             )
         asm = orch.globalstatusmodel.server_dict[key]
@@ -592,7 +646,9 @@ def _seed_server_dict(orch: Orch, pairs) -> None:
             asm.endpoints[action_name] = EndpointModel(endpoint_name=action_name)
 
 
-def _seed_active_action(orch: Orch, server_name: str, endpoint_name: str, tag: str) -> Action:
+def _seed_active_action(
+    orch: Orch, server_name: str, endpoint_name: str, tag: str
+) -> Action:
     """Insert a fake 'currently active' action to make a start-condition wait genuinely block."""
     import uuid as _uuid_mod
     from datetime import datetime as _dt
@@ -603,7 +659,10 @@ def _seed_active_action(orch: Orch, server_name: str, endpoint_name: str, tag: s
         action_timestamp=_dt.now(),
         experiment_uuid=_uuid_mod.uuid4(),
         action_server=MachineModel(
-            server_name=server_name, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=1
+            server_name=server_name,
+            machine_name=ORCH_MACHINE,
+            hostname="127.0.0.1",
+            port=1,
         ),
         orchestrator=orch.server,
         action_status=[HloStatus.active],
@@ -611,30 +670,44 @@ def _seed_active_action(orch: Orch, server_name: str, endpoint_name: str, tag: s
     )
     _seed_server_dict(orch, [(server_name, endpoint_name)])
     key = (server_name, ORCH_MACHINE)
-    orch.globalstatusmodel.server_dict[key].endpoints[endpoint_name].active_dict[a.action_uuid] = a
+    orch.globalstatusmodel.server_dict[key].endpoints[endpoint_name].active_dict[
+        a.action_uuid
+    ] = a
     orch.globalstatusmodel.active_dict[a.action_uuid] = a
     return a
 
 
-def _schedule_clear_active(orch: Orch, seeded: Action, trace: list, ticks: int = 2) -> None:
+def _schedule_clear_active(
+    orch: Orch, seeded: Action, trace: list, ticks: int = 2
+) -> None:
     """Background task: deliver a 'finished' status for a previously-seeded fake active action."""
 
     async def _clear():
         for _ in range(ticks):
             await asyncio.sleep(0)
         finished = deepcopy(seeded)
-        finished.action_status = [HloStatus.finished]  # replaces active, matches real replace-status semantics
+        finished.action_status = [
+            HloStatus.finished
+        ]  # replaces active, matches real replace-status semantics
         asm = ActionServerModel(
             action_server=finished.action_server,
             endpoints={
                 finished.action_name: EndpointModel(
                     endpoint_name=finished.action_name,
-                    nonactive_dict={HloStatus.finished: {finished.action_uuid: finished}},
+                    nonactive_dict={
+                        HloStatus.finished: {finished.action_uuid: finished}
+                    },
                 )
             },
             last_action_uuid=finished.action_uuid,
         )
-        trace.append({"event": "status_ping", "action_name": finished.action_name, "phase": "seed_cleared"})
+        trace.append(
+            {
+                "event": "status_ping",
+                "action_name": finished.action_name,
+                "phase": "seed_cleared",
+            }
+        )
         await orch.update_status(asm)
 
     orch.aloop.create_task(_clear())
@@ -645,21 +718,31 @@ def _schedule_clear_active(orch: Orch, seeded: Action, trace: list, ticks: int =
 # ---------------------------------------------------------------------------
 
 
-def _plan_action(experiment: Experiment, action_server: str, action_name: str, action_params: dict, **kwargs) -> Action:
+def _plan_action(
+    experiment: Experiment,
+    action_server: str,
+    action_name: str,
+    action_params: dict,
+    **kwargs,
+) -> Action:
     """Mirror ``ActionPlanMaker.add``'s construction exactly (proven production pattern)."""
     action_dict = experiment.as_dict()
     action_dict.update(
         {
-            "action_server": MachineModel(server_name=action_server, machine_name=ORCH_MACHINE).as_dict(),
+            "action_server": MachineModel(
+                server_name=action_server, machine_name=ORCH_MACHINE
+            ).as_dict(),
             "action_name": action_name,
             "action_params": action_params,
-            "start_condition": kwargs.pop("start_condition", ActionStartCondition.no_wait),
+            "start_condition": kwargs.pop(
+                "start_condition", ActionStartCondition.no_wait
+            ),
             "to_global_params": kwargs.pop("to_global_params", []),
             "from_global_act_params": kwargs.pop("from_global_act_params", {}),
         }
     )
     action_dict.update(kwargs)
-    return Action(**action_dict)
+    return Action.model_validate(action_dict)
 
 
 def _generic_experiment(experiment: Experiment, actions_spec=None):
@@ -696,18 +779,26 @@ def _install_generic_libs(orch: Orch) -> None:
 
 
 def _mk_sequence(experiments_spec) -> Sequence:
-    seq = Sequence(sequence_name="generic_seq", sequence_params={"experiments_spec": experiments_spec})
+    seq = Sequence(
+        sequence_name="generic_seq",
+        sequence_params={"experiments_spec": experiments_spec},
+    )
     return seq
 
 
-def _bare_action(orch: Orch, server_name: str, action_name: str, action_params: dict, **kwargs) -> Action:
+def _bare_action(
+    orch: Orch, server_name: str, action_name: str, action_params: dict, **kwargs
+) -> Action:
     """Directly-constructed standalone action (bypasses experiment unpacking) for scenarios
     that drive ``loop_task_dispatch_action``/``wait_for_interrupt`` directly."""
     a = Action(
         action_name=action_name,
         action_params=action_params,
         action_server=MachineModel(
-            server_name=server_name, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=1
+            server_name=server_name,
+            machine_name=ORCH_MACHINE,
+            hostname="127.0.0.1",
+            port=1,
         ),
         orchestrator=orch.server,
         **kwargs,
@@ -766,7 +857,9 @@ async def _scenario_1(tmp_root: Path) -> dict:
 
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script={})
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -811,14 +904,26 @@ async def _scenario_2(tmp_root: Path) -> dict:
     ]
 
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         for action_name, server_name, condition, seed_block in conditions:
-            endpoint_for_block = "wait" if condition == ActionStartCondition.wait_for_orch else action_name
-            block_server = orch.server.server_name if condition == ActionStartCondition.wait_for_orch else server_name
+            endpoint_for_block = (
+                "wait"
+                if condition == ActionStartCondition.wait_for_orch
+                else action_name
+            )
+            block_server = (
+                orch.server.server_name
+                if condition == ActionStartCondition.wait_for_orch
+                else server_name
+            )
             seeded = None
             if seed_block:
-                seeded = _seed_active_action(orch, block_server, endpoint_for_block, tag=action_name)
+                seeded = _seed_active_action(
+                    orch, block_server, endpoint_for_block, tag=action_name
+                )
                 _schedule_clear_active(orch, seeded, trace)
 
             _seed_server_dict(orch, [(server_name, action_name)])
@@ -829,9 +934,21 @@ async def _scenario_2(tmp_root: Path) -> dict:
                 a.start_condition = condition
             orch.action_dq.append(a)
 
-            trace.append({"event": "scenario2_condition", "action_name": action_name, "condition": condition.value if condition else 99})
+            trace.append(
+                {
+                    "event": "scenario2_condition",
+                    "action_name": action_name,
+                    "condition": condition.value if condition else 99,
+                }
+            )
             error_code = await orch.loop_task_dispatch_action()
-            trace.append({"event": "scenario2_result", "action_name": action_name, "error_code": _enum_val(error_code)})
+            trace.append(
+                {
+                    "event": "scenario2_result",
+                    "action_name": action_name,
+                    "error_code": _enum_val(error_code),
+                }
+            )
 
     final = {
         "act_dq": len(orch.action_dq),
@@ -853,7 +970,15 @@ async def _scenario_3(tmp_root: Path) -> dict:
     orch.aloop = asyncio.get_running_loop()
     _install_all_spies(orch, trace)
 
-    _seed_server_dict(orch, [("SRV1", "act_produce_list"), ("SRV1", "act_consume_list"), ("SRV1", "act_produce_dict"), ("SRV1", "act_consume_dict")])
+    _seed_server_dict(
+        orch,
+        [
+            ("SRV1", "act_produce_list"),
+            ("SRV1", "act_consume_list"),
+            ("SRV1", "act_produce_dict"),
+            ("SRV1", "act_consume_dict"),
+        ],
+    )
 
     seq = _mk_sequence(
         [
@@ -878,7 +1003,9 @@ async def _scenario_3(tmp_root: Path) -> dict:
                             "server": "SRV1",
                             "name": "act_consume_dict",
                             "params": {},
-                            "from_global_act_params": {"gp_dict_key": "injected_param2"},
+                            "from_global_act_params": {
+                                "gp_dict_key": "injected_param2"
+                            },
                         },
                     ]
                 },
@@ -893,7 +1020,9 @@ async def _scenario_3(tmp_root: Path) -> dict:
     }
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script=script)
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -933,7 +1062,10 @@ async def _scenario_4(tmp_root: Path) -> dict:
     final = {
         "wait_for_interrupt_result": result,
         "act_dq_len": len(orch.action_dq),
-        "act_dq_front_is_pending": (len(orch.action_dq) > 0 and orch.action_dq[0].action_name == "pending_action"),
+        "act_dq_front_is_pending": (
+            len(orch.action_dq) > 0
+            and orch.action_dq[0].action_name == "pending_action"
+        ),
         "loop_intent": _enum_val(orch.globalstatusmodel.loop_intent),
     }
     return {"trace": trace, "final": final}
@@ -1013,7 +1145,9 @@ async def _scenario_5(tmp_root: Path) -> dict:
 
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script={})
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -1040,7 +1174,12 @@ async def _scenario_6(tmp_root: Path) -> dict:
     _install_all_spies(orch, trace)
 
     _seed_server_dict(
-        orch, [("SRV1", "act_prime"), ("SRV1", "act_will_fail"), ("SRV1", "act_never_reached")]
+        orch,
+        [
+            ("SRV1", "act_prime"),
+            ("SRV1", "act_will_fail"),
+            ("SRV1", "act_never_reached"),
+        ],
     )
 
     # a priming action dispatches+completes first for the same reason as
@@ -1066,7 +1205,9 @@ async def _scenario_6(tmp_root: Path) -> dict:
     script = {"act_will_fail": {"dispatch_error_code": ErrorCodes.http}}
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script=script)
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -1113,7 +1254,9 @@ async def _scenario_7(tmp_root: Path) -> dict:
     script = {"act_bad_result": {"result_error_code": ErrorCodes.critical_error}}
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script=script)
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -1149,7 +1292,12 @@ async def _scenario_8(tmp_root: Path) -> dict:
                 "experiment_name": "generic_exp",
                 "experiment_params": {
                     "actions_spec": [
-                        {"server": "SRV1", "name": "act_nonblocking", "params": {}, "nonblocking": True},
+                        {
+                            "server": "SRV1",
+                            "name": "act_nonblocking",
+                            "params": {},
+                            "nonblocking": True,
+                        },
                         {"server": "SRV1", "name": "act_after", "params": {}},
                     ]
                 },
@@ -1160,7 +1308,9 @@ async def _scenario_8(tmp_root: Path) -> dict:
 
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script={})
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
 
@@ -1208,7 +1358,9 @@ async def _scenario_9(tmp_root: Path) -> dict:
     await orch.add_sequence(seq)
     fake_dispatcher = make_fake_action_dispatcher(orch, trace, script={})
     with _PatchedOrchGlobals(
-        fake_dispatcher, _make_fake_private_dispatcher(trace), _make_fake_move_dir(trace)
+        fake_dispatcher,
+        _make_fake_private_dispatcher(trace),
+        _make_fake_move_dir(trace),
     ):
         await _drain(orch)
     dispatch_calls_a = [e for e in trace if e.get("event") == "dispatch_call"]
@@ -1232,18 +1384,28 @@ async def _scenario_9(tmp_root: Path) -> dict:
         [
             {
                 "experiment_name": "generic_exp",
-                "experiment_params": {"actions_spec": [{"server": "SRV1", "name": "act_exp1", "params": {}}]},
+                "experiment_params": {
+                    "actions_spec": [
+                        {"server": "SRV1", "name": "act_exp1", "params": {}}
+                    ]
+                },
             },
             {
                 "experiment_name": "generic_exp",
-                "experiment_params": {"actions_spec": [{"server": "SRV1", "name": "act_exp2", "params": {}}]},
+                "experiment_params": {
+                    "actions_spec": [
+                        {"server": "SRV1", "name": "act_exp2", "params": {}}
+                    ]
+                },
             },
         ]
     )
     await orch2.add_sequence(seq2)
     fake_dispatcher2 = make_fake_action_dispatcher(orch2, trace2, script={})
     with _PatchedOrchGlobals(
-        fake_dispatcher2, _make_fake_private_dispatcher(trace2), _make_fake_move_dir(trace2)
+        fake_dispatcher2,
+        _make_fake_private_dispatcher(trace2),
+        _make_fake_move_dir(trace2),
     ):
         await _drain(orch2)
     dispatch_calls_b = [e for e in trace2 if e.get("event") == "dispatch_call"]
@@ -1254,9 +1416,12 @@ async def _scenario_9(tmp_root: Path) -> dict:
         "dispatch_calls_count": len(dispatch_calls_b),
     }
 
-    combined_trace = [{"event": "section", "name": "step_thru_actions"}] + trace + [
-        {"event": "section", "name": "step_thru_experiments"}
-    ] + trace2
+    combined_trace = (
+        [{"event": "section", "name": "step_thru_actions"}]
+        + trace
+        + [{"event": "section", "name": "step_thru_experiments"}]
+        + trace2
+    )
     return {"trace": combined_trace, "final": result}
 
 
@@ -1311,7 +1476,11 @@ async def capture_queues_pck_fixture(tmp_root: Path) -> dict:
         [
             {
                 "experiment_name": "generic_exp",
-                "experiment_params": {"actions_spec": [{"server": "SRV1", "name": "act_pck", "params": {"k": "v"}}]},
+                "experiment_params": {
+                    "actions_spec": [
+                        {"server": "SRV1", "name": "act_pck", "params": {"k": "v"}}
+                    ]
+                },
             },
         ]
     )
@@ -1321,7 +1490,11 @@ async def capture_queues_pck_fixture(tmp_root: Path) -> dict:
         [
             {
                 "experiment_name": "generic_exp",
-                "experiment_params": {"actions_spec": [{"server": "SRV1", "name": "act_pck2", "params": {}}]},
+                "experiment_params": {
+                    "actions_spec": [
+                        {"server": "SRV1", "name": "act_pck2", "params": {}}
+                    ]
+                },
             },
         ]
     )
@@ -1400,7 +1573,13 @@ def _diff_against_baseline_s0(captured: dict) -> list:
     for name in SCENARIOS:
         fname = f"{name}.jsonl"
         if fname not in s0_files:
-            results.append((name, "MISSING_S0_REFERENCE", f"{fname} not found under {BASELINE_S0_DIR}"))
+            results.append(
+                (
+                    name,
+                    "MISSING_S0_REFERENCE",
+                    f"{fname} not found under {BASELINE_S0_DIR}",
+                )
+            )
             continue
         s0_bytes = (BASELINE_S0_DIR / fname).read_bytes()
         captured_bytes = captured[name].encode("utf-8")
@@ -1410,7 +1589,13 @@ def _diff_against_baseline_s0(captured: dict) -> list:
             results.append((name, "DELTA", f"byte diff vs {BASELINE_S0_DIR / fname}"))
 
     for extra in sorted(s0_files - expected_files):
-        results.append((extra, "EXTRA_S0_REFERENCE", f"{extra} under {BASELINE_S0_DIR} has no current scenario"))
+        results.append(
+            (
+                extra,
+                "EXTRA_S0_REFERENCE",
+                f"{extra} under {BASELINE_S0_DIR} has no current scenario",
+            )
+        )
 
     return results
 
@@ -1441,7 +1626,9 @@ def run_check_mode() -> int:
     if any_fail:
         print(f"CHECK FAILED: trace diverged from frozen reference ({BASELINE_S0_DIR})")
         return 1
-    print(f"CHECK PASSED: all {len(SCENARIOS)} scenarios byte-identical to {BASELINE_S0_DIR}")
+    print(
+        f"CHECK PASSED: all {len(SCENARIOS)} scenarios byte-identical to {BASELINE_S0_DIR}"
+    )
     return 0
 
 
@@ -1449,13 +1636,35 @@ async def _run_and_check(tmp_root: Path) -> list:
     failures = []
 
     r1 = await _scenario_1(tmp_root / "chk1")
-    _check(r1["final"]["loop_state"] == "stopped", "s1: loop did not stop cleanly", failures)
-    _check(r1["final"]["seq_dq"] == 0 and r1["final"]["exp_dq"] == 0 and r1["final"]["act_dq"] == 0, "s1: queues not drained", failures)
-    _check(len(r1["final"]["dispatch_calls"]) == 3, "s1: expected 3 dispatch calls", failures)
+    _check(
+        r1["final"]["loop_state"] == "stopped",
+        "s1: loop did not stop cleanly",
+        failures,
+    )
+    _check(
+        r1["final"]["seq_dq"] == 0
+        and r1["final"]["exp_dq"] == 0
+        and r1["final"]["act_dq"] == 0,
+        "s1: queues not drained",
+        failures,
+    )
+    _check(
+        len(r1["final"]["dispatch_calls"]) == 3,
+        "s1: expected 3 dispatch calls",
+        failures,
+    )
 
     r2 = await _scenario_2(tmp_root / "chk2")
-    _check(len(r2["final"]["dispatch_calls"]) == 7, "s2: expected 7 dispatch calls (one per condition)", failures)
-    _check(r2["final"]["act_dq"] == 0, "s2: action_dq should be drained after each direct dispatch", failures)
+    _check(
+        len(r2["final"]["dispatch_calls"]) == 7,
+        "s2: expected 7 dispatch calls (one per condition)",
+        failures,
+    )
+    _check(
+        r2["final"]["act_dq"] == 0,
+        "s2: action_dq should be drained after each direct dispatch",
+        failures,
+    )
 
     r3 = await _scenario_3(tmp_root / "chk3")
     calls3 = r3["final"]["dispatch_calls"]
@@ -1472,8 +1681,16 @@ async def _run_and_check(tmp_root: Path) -> list:
     )
 
     r4 = await _scenario_4(tmp_root / "chk4")
-    _check(r4["final"]["wait_for_interrupt_result"] is False, "s4: expected wait_for_interrupt to signal bail-out (False)", failures)
-    _check(r4["final"]["act_dq_front_is_pending"], "s4: pending action must be requeued at the front", failures)
+    _check(
+        r4["final"]["wait_for_interrupt_result"] is False,
+        "s4: expected wait_for_interrupt to signal bail-out (False)",
+        failures,
+    )
+    _check(
+        r4["final"]["act_dq_front_is_pending"],
+        "s4: pending action must be requeued at the front",
+        failures,
+    )
 
     r5 = await _scenario_5(tmp_root / "chk5")
     _check(r5["final"]["act_dq"] == 0, "s5: skip must clear action_dq", failures)
@@ -1489,7 +1706,11 @@ async def _run_and_check(tmp_root: Path) -> list:
         "s6: failed action + never-reached action must remain queued",
         failures,
     )
-    _check(r6["final"]["act_dq_front"] == "act_will_fail", "s6: requeued action must be the one that failed", failures)
+    _check(
+        r6["final"]["act_dq_front"] == "act_will_fail",
+        "s6: requeued action must be the one that failed",
+        failures,
+    )
     _check(
         len(r6["final"]["dispatch_calls"]) == 2,
         "s6: only the priming + failing actions should have dispatched (act_never_reached must not)",
@@ -1497,19 +1718,45 @@ async def _run_and_check(tmp_root: Path) -> list:
     )
 
     r7 = await _scenario_7(tmp_root / "chk7")
-    _check(r7["final"]["loop_state"] == "estopped", "s7: loop must end estopped", failures)
+    _check(
+        r7["final"]["loop_state"] == "estopped", "s7: loop must end estopped", failures
+    )
     _check(r7["final"]["estop_loop_called"], "s7: estop_loop must be invoked", failures)
-    _check(r7["final"]["estop_dispatch_count"] >= 1, "s7: estop_actions must fan out an estop dispatch", failures)
+    _check(
+        r7["final"]["estop_dispatch_count"] >= 1,
+        "s7: estop_actions must fan out an estop dispatch",
+        failures,
+    )
 
     r8 = await _scenario_8(tmp_root / "chk8")
-    _check(r8["final"]["loop_state"] == "stopped", "s8: loop did not stop cleanly", failures)
-    _check(r8["final"]["nonblocking_list_final_len"] == 0, "s8: nonblocking list must drain back to empty", failures)
+    _check(
+        r8["final"]["loop_state"] == "stopped",
+        "s8: loop did not stop cleanly",
+        failures,
+    )
+    _check(
+        r8["final"]["nonblocking_list_final_len"] == 0,
+        "s8: nonblocking list must drain back to empty",
+        failures,
+    )
     active_events = [e for e in r8["final"]["nonblocking_events"] if e["active"]]
-    _check(len(active_events) >= 1, "s8: nonblocking action must register as active at least once", failures)
+    _check(
+        len(active_events) >= 1,
+        "s8: nonblocking action must register as active at least once",
+        failures,
+    )
 
     r9 = await _scenario_9(tmp_root / "chk9")
-    _check(r9["final"]["step_thru_actions"]["act_dq"] == 1, "s9a: one action must remain unqueued after step-thru stop", failures)
-    _check(r9["final"]["step_thru_actions"]["dispatch_calls_count"] == 1, "s9a: only first action should dispatch", failures)
+    _check(
+        r9["final"]["step_thru_actions"]["act_dq"] == 1,
+        "s9a: one action must remain unqueued after step-thru stop",
+        failures,
+    )
+    _check(
+        r9["final"]["step_thru_actions"]["dispatch_calls_count"] == 1,
+        "s9a: only first action should dispatch",
+        failures,
+    )
     # step_thru_experiments's `self.stop()` only flags loop_intent -- it is
     # consulted by loop_task_dispatch_action (which checks it up front), not
     # by loop_task_dispatch_experiment, so the 2nd experiment still gets
@@ -1535,7 +1782,9 @@ async def _run_and_check(tmp_root: Path) -> list:
 
     fixture = await capture_queues_pck_fixture(tmp_root / "chkpck")
     _check(fixture["exported_ok"], "pck: export_queues did not write a file", failures)
-    _check(fixture["keys_match"], "pck: exported payload missing expected keys", failures)
+    _check(
+        fixture["keys_match"], "pck: exported payload missing expected keys", failures
+    )
     _check(fixture["restored_ok"], "pck: import_queues round-trip mismatch", failures)
 
     return failures
@@ -1578,11 +1827,14 @@ def main():
         print("ALL 9 SCENARIO CHECKS PASSED (1-9) + queues.pck fixture")
 
     with tempfile.TemporaryDirectory() as baseline_tmp:
-        baseline_texts = asyncio.run(run_all_scenarios(BASELINE_DIR, Path(baseline_tmp)))
-    print(f"Dev/record-mode scratch traces written to: {BASELINE_DIR} (NOT the frozen gate -- see baseline_S0/, run with --check to verify against it)")
+        baseline_texts = asyncio.run(
+            run_all_scenarios(BASELINE_DIR, Path(baseline_tmp))
+        )
+    print(
+        f"Dev/record-mode scratch traces written to: {BASELINE_DIR} (NOT the frozen gate -- see baseline_S0/, run with --check to verify against it)"
+    )
 
-    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2, \
-        tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
+    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2, tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
         run1 = asyncio.run(run_all_scenarios(Path(d1), Path(t1)))
         run2 = asyncio.run(run_all_scenarios(Path(d2), Path(t2)))
         det_failures = []
@@ -1592,7 +1844,9 @@ def main():
         if det_failures:
             print(f"DETERMINISM CHECK FAILED for: {det_failures}")
         else:
-            print("DETERMINISM CHECK PASSED: two capture runs byte-identical for all 9 scenarios")
+            print(
+                "DETERMINISM CHECK PASSED: two capture runs byte-identical for all 9 scenarios"
+            )
 
     if failures or det_failures:
         raise SystemExit(1)

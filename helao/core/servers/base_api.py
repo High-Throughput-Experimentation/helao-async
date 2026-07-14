@@ -180,6 +180,7 @@ def _collect_default_params(sig: inspect.Signature) -> dict:
     """
     try:
         from fastapi.params import Param as _FastAPIParam, Depends as _FastAPIDepends
+
         marker_types: tuple = (_FastAPIParam, _FastAPIDepends)
     except ImportError:
         marker_types = ()
@@ -270,9 +271,7 @@ def _build_action_endpoint_signature(fn: Callable, sig: inspect.Signature):
         ``accepted_names`` is the set of parameter names ``fn`` itself declares.
     """
     params = list(sig.parameters.values())
-    accepts_var_keyword = any(
-        p.kind is inspect.Parameter.VAR_KEYWORD for p in params
-    )
+    accepts_var_keyword = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params)
     accepted_names = {
         p.name
         for p in params
@@ -334,8 +333,8 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
         for the duration of the call.
     """
     sig = inspect.signature(fn)
-    exposed_sig, accepts_var_keyword, accepted_names = (
-        _build_action_endpoint_signature(fn, sig)
+    exposed_sig, accepts_var_keyword, accepted_names = _build_action_endpoint_signature(
+        fn, sig
     )
     default_params = _collect_default_params(exposed_sig)
     is_async = asyncio.iscoroutinefunction(fn)
@@ -351,9 +350,7 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
         @functools.wraps(fn)
         async def wrapper(**kwargs):
             action = _build_action_from_kwargs(kwargs, default_params)
-            token = ACTION_CTX.set(
-                ActionInvocation(action=action, endpoint_func=fn)
-            )
+            token = ACTION_CTX.set(ActionInvocation(action=action, endpoint_func=fn))
             try:
                 return await fn(**_forward_kwargs(kwargs))
             finally:
@@ -364,9 +361,7 @@ def wrap_action_endpoint(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(**kwargs):
             action = _build_action_from_kwargs(kwargs, default_params)
-            token = ACTION_CTX.set(
-                ActionInvocation(action=action, endpoint_func=fn)
-            )
+            token = ACTION_CTX.set(ActionInvocation(action=action, endpoint_func=fn))
             try:
                 return fn(**_forward_kwargs(kwargs))
             finally:
@@ -445,7 +440,7 @@ def _make_app_entry_middleware(server_key: str, get_srv) -> Callable:
                     action_dict["action_params"] = action_dict.get("action_params", {})
                     action_dict["action_params"]["queued_on_actserv"] = True
                     extra_params = {}
-                    action = Action(**action_dict)
+                    action = Action.model_validate(action_dict)
                     action.action_uuid = gen_uuid()
                     for d in (request.query_params, request.path_params):
                         for k, v in d.items():
@@ -472,7 +467,7 @@ def _make_app_entry_middleware(server_key: str, get_srv) -> Callable:
                 action_dict["action_params"] = action_dict.get("action_params", {})
                 action_dict["action_params"]["queued_on_actserv"] = True
                 extra_params = {}
-                action = Action(**action_dict)
+                action = Action.model_validate(action_dict)
                 action.action_uuid = gen_uuid()
                 for d in (request.query_params, request.path_params):
                     for k, v in d.items():
@@ -638,7 +633,9 @@ class BaseAPI(HelaoFastAPI):
         self.driver: Any = None
         self.poller = None
 
-        self.middleware("http")(_make_app_entry_middleware(server_key, lambda: self.base))
+        self.middleware("http")(
+            _make_app_entry_middleware(server_key, lambda: self.base)
+        )
         self.exception_handler(StarletteHTTPException)(
             _make_http_exception_handler(server_key, lambda: self.base)
         )
@@ -867,4 +864,3 @@ class BaseAPI(HelaoFastAPI):
                 "estopped_actions": estopped_actions,
                 "driver": driver_resp,
             }
-

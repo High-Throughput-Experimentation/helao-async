@@ -27,7 +27,6 @@ from helao.core.models.sample import (
 from helao.core.models.machine import MachineModel
 from helao.helpers.lib_decorators import experiment
 
-
 EXPERIMENTS = __all__
 
 PAL_server = MachineModel(
@@ -79,8 +78,8 @@ def create_liquid_sample(
         "db_new_samples",
         {
             "fast_samples_in": [
-                LiquidSample(
-                    **{
+                LiquidSample.model_validate(
+                    {
                         "machine_name": gethostname().lower(),
                         "source": source,
                         "volume_ml": volume_ml,
@@ -134,8 +133,8 @@ def create_gas_sample(
         "db_new_samples",
         {
             "fast_samples_in": [
-                GasSample(
-                    **{
+                GasSample.model_validate(
+                    {
                         "machine_name": gethostname().lower(),
                         "source": source,
                         "volume_ml": volume_ml,
@@ -223,8 +222,8 @@ def create_assembly_sample(
         "db_new_samples",
         {
             "fast_samples_in": [
-                AssemblySample(
-                    **{
+                AssemblySample.model_validate(
+                    {
                         "machine_name": gethostname().lower(),
                         "parts": parts,
                         # "source": source,
@@ -387,8 +386,8 @@ def create_and_load_liquid_sample(
         "db_new_samples",
         {
             "fast_samples_in": [
-                LiquidSample(
-                    **{
+                LiquidSample.model_validate(
+                    {
                         "machine_name": gethostname().lower(),
                         "source": source,
                         "volume_ml": volume_ml,

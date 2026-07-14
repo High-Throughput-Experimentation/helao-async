@@ -146,7 +146,7 @@ def read_validated_config(conf_arg: str) -> Tuple[dict, "HelaoConfig"]:
         typed accessor, not a replacement for the dict.
     """
     config_dict = read_config(conf_arg)
-    return config_dict, HelaoConfig(**config_dict)
+    return config_dict, HelaoConfig.model_validate(config_dict)
 
 
 def install_global_config(config_dict: dict) -> dict:
