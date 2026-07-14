@@ -65,7 +65,6 @@ the three queue owners):
 """
 
 import asyncio
-import json
 import traceback
 from typing import Optional
 from uuid import UUID
@@ -76,6 +75,7 @@ from helao.helpers import helao_logging as logging
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.hlostatus import HloStatus
 from helao.helpers.premodels import Action
+from helao.helpers.to_json import hlo_json_dumps
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -258,10 +258,10 @@ class DataStreamer:
 
                         if isinstance(sample_data, dict):
                             try:
-                                output_str = json.dumps(sample_data)
+                                output_str = hlo_json_dumps(sample_data)
                             except TypeError:
                                 LOGGER.error("Data is not json serializable.")
-                                output_str = json.dumps(
+                                output_str = hlo_json_dumps(
                                     {"error": "data was not serializable"}
                                 )
                             await self.active.write_live_data(

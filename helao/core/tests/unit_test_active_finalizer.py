@@ -253,9 +253,9 @@ async def _check_finish_drains_late_data() -> bool:
             undrained_at_entry is True
             and result is active.action
             and HloStatus.finished in active.action.action_status
-            and any('"v": 0' in r for r in rows)
+            and any('"v":0' in r.replace(" ", "") for r in rows)
             # the late, undrained row survived the finish drain
-            and any('"v": 111' in r for r in rows)
+            and any('"v":111' in r.replace(" ", "") for r in rows)
             and active.file_conn_dict == {}
             # everything queued was written before close (no lost data)
             and active.num_data_written >= active.num_data_queued
@@ -303,7 +303,7 @@ async def _check_split_keep_active_then_finish_all() -> bool:
             HloStatus.finished in a.action_status for a in active.action_list
         )
         rows = _read_hlo_rows(save_root)
-        child_row_written = any('"v": 999' in r for r in rows)
+        child_row_written = any('"v":999' in r.replace(" ", "") for r in rows)
 
         return (
             child_forked
