@@ -7,7 +7,7 @@ from typing import List, Optional
 from uuid import UUID
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .hlostatus import HloStatus
 from .status_transitions import guarded_append, guarded_replace, guarded_reset
@@ -37,6 +37,10 @@ class ShortSequenceModel(BaseModel, HelaoDict):
         run_sequence_parameter_variable (Optional[List[str]]): Variables the run wires through.
         from_global_seq_params (dict): Params injected from the global sequence context.
     """
+
+    # validate_assignment coerces str->UUID on attribute assignment (not just at
+    # construction) so ``seq.campaign_uuid = "<uuid-str>"`` stores a real UUID.
+    model_config = ConfigDict(validate_assignment=True)
 
     sequence_name: Optional[str] = None
     sequence_params: dict = {}

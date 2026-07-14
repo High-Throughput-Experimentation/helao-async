@@ -19,6 +19,7 @@ import importlib
 import html as _html
 from enum import Enum
 from typing import List, Optional
+from uuid import UUID
 from pybase64 import b64decode
 from socket import gethostname
 import inspect
@@ -1219,6 +1220,26 @@ class BokehOperator:
             parts.append(_html.escape(str(codehash)))
         return f"<i>{' · '.join(parts)}</i>" if parts else ""
 
+    def _resolve_campaign_uuid(self, campaign_name: str):
+        """Resolve the campaign UUID from operator input.
+
+        Empty input hashes ``campaign_name`` into a deterministic UUID. A
+        non-empty value is parsed as a UUID; a malformed entry is logged and
+        falls back to hashing the typed string so the operator never crashes
+        on a typo (the model now validates on assignment).
+        """
+        entered = self.input_campaign_uuid.value.strip()
+        if entered == "":
+            return md5_string(campaign_name)
+        try:
+            return UUID(entered)
+        except ValueError:
+            LOGGER.warning(
+                f"campaign_uuid input '{entered}' is not a valid UUID; "
+                "hashing it into a deterministic UUID instead"
+            )
+            return md5_string(entered)
+
     def _capture_metadata(self, seq: Sequence) -> None:
         """Stamp label / campaign / comment from the current inputs onto ``seq``."""
         seq.sequence_label = self.input_sequence_label.value
@@ -1227,10 +1248,7 @@ class BokehOperator:
         campaign_name = self.input_campaign_name.value
         if campaign_name != "":
             seq.campaign_name = campaign_name
-            if self.input_campaign_uuid.value.strip() == "":
-                seq.campaign_uuid = md5_string(campaign_name)
-            else:
-                seq.campaign_uuid = self.input_campaign_uuid.value.strip()
+            seq.campaign_uuid = self._resolve_campaign_uuid(campaign_name)
 
     def _build_param_header(self, mode: str):
         """Load-last-params button + save-params checkbox row for ``mode``
@@ -1644,10 +1662,7 @@ class BokehOperator:
         campaign_name = self.input_campaign_name.value
         if campaign_name != "":
             seq.campaign_name = campaign_name
-            if self.input_campaign_uuid.value.strip() == "":
-                seq.campaign_uuid = md5_string(campaign_name)
-            else:
-                seq.campaign_uuid = self.input_campaign_uuid.value.strip()
+            seq.campaign_uuid = self._resolve_campaign_uuid(campaign_name)
         self.vis.doc.add_next_tick_callback(partial(self.backend.add_sequence, seq))
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
