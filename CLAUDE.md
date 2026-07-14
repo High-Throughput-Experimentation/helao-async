@@ -40,10 +40,12 @@ There is no pytest harness and no project-wide build step. New "tests" are typic
 
 ### Formatting
 
-`black` (default settings, line length 88) is the project code formatter. Run it on the files you touch before committing:
+`black` (default settings, line length 88) is the project code formatter.
+
+**Rule: always run `black` on the changed files as the final step before every commit** — after all edits are complete and verification has passed, immediately prior to `git add`/`git commit`. This applies to the parent repo and each nested deployment repo independently (format and commit within the repo that owns the files).
 
 ```
-black <changed_files>          # run inside the `helao` conda env
+black <changed_files>          # run inside the `helao` conda env, right before committing
 ```
 
 There is no separate linter config; `ty` (Astral type checker) may be used as a stricter secondary pass over the pyright default (`ty.toml` pins Python 3.12), but `pyright` (`pyrightconfig.json`, basic mode) remains the authoritative type checker — do not remove `# type: ignore` directives that pyright needs.
