@@ -786,8 +786,7 @@ class Aligner:
             width=self.totalwidth,
             height=200,
         )
-        self.css_styles = Div(
-            text="""<style>
+        self.css_styles = Div(text="""<style>
             .custom_button_Marker1 button.bk.bk-btn.bk-btn-default {
                 color: black;
                 background-color: #ff0000;
@@ -812,8 +811,7 @@ class Aligner:
                 color: black;
                 background-color: #FF69B4;
             }
-            </style>"""
-        )
+            </style>""")
 
         self.vis.doc.add_root(self.css_styles)
         self.vis.doc.add_root(
@@ -1344,9 +1342,6 @@ class Aligner:
         point alignment routine depending on how many valid pairs are
         available. Updates the displayed matrix on the UI.
         """
-        global calib_ptsplate, calib_ptsmotor
-        global TransferMatrix
-        global cutoff
         validpts = []
 
         # check for duplicate points
