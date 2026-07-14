@@ -1,0 +1,14 @@
+# ty (Astral type checker) configuration.
+# Interpreter/deps are auto-detected from the active `helao` conda env
+# (run via `conda run -n helao ty check` or with the env activated).
+# This repo's authoritative type checker is pyright (see pyrightconfig.json);
+# ty is used as a secondary, stricter pass.
+
+[environment]
+python-version = "3.12"
+
+[rules]
+# `# type: ignore` comments in this repo are pyright directives. ty does not
+# need them and would flag them as unused, but removing them would break
+# pyright suppression, so silence ty's report for this rule.
+unused-type-ignore-comment = "ignore"

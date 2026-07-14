@@ -519,10 +519,8 @@ class HelaoYml:
         """
         # with self.filelock:
         self.target.write_text(
-            str(
-                yml_dumps(meta_dict),
-                encoding="utf-8",
-            )
+            yml_dumps(meta_dict),
+            encoding="utf-8",
         )
 
 

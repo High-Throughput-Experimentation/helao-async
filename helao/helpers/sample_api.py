@@ -877,7 +877,8 @@ class OldLiquidSampleAPI:
 
     async def count_samples(self) -> int:
         """Return the number of liquid sample rows in the legacy CSV index."""
-        _ = await self._open_db("a+")
+        if not await self._open_db("a+"):
+            return 0
         counter = 0
         await self.fdb.seek(0)
         async for line in self.fdb:

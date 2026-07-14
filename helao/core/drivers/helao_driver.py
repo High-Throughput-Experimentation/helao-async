@@ -114,8 +114,8 @@ class HelaoDriver(ABC):
 
     @property
     def _uptime(self) -> str:
-        """Time since instantiation formatted as ``YYYY-MM-DD HH:MM:SS,mmm``."""
-        return (datetime.now() - self.timestamp).strftime("%F %T,%f")[:-3]
+        """Time since instantiation as a duration string (``H:MM:SS.ffffff``)."""
+        return str(datetime.now() - self.timestamp)
 
     @abstractmethod
     def connect(self) -> DriverResponse:

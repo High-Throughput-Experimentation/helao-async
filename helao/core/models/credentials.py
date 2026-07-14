@@ -1,5 +1,6 @@
 """Credential settings loaded from a `.env` file for AWS, DB, and plate APIs."""
 
+from typing import ClassVar
 from pydantic import SecretStr, PostgresDsn
 from pydantic_settings import BaseSettings
 from textwrap import dedent
@@ -50,6 +51,12 @@ class HelaoCredentials(BaseSettings):
     PLATE_API_JSON: str = ""
     PLATE_API_KEY: str = ""
     PLATE_API: str = ""
+
+    # Keys shown when ``display(simple=True)`` and keys always rendered
+    # uncommented regardless of whether they were explicitly set. Empty by
+    # default; populate to opt specific fields into those views.
+    _simple_params: ClassVar[set[str]] = set()
+    _always_set: ClassVar[set[str]] = set()
 
     def __init__(self, _env_file: str | Path, **kwargs):
         """Load settings from `_env_file`.

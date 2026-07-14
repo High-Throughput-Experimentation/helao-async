@@ -71,8 +71,7 @@ class Vis:
 
         if self.helaodirs.root is None:
             raise ValueError(
-                "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
-                error=True,
+                "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written."
             )
 
     def print_message(self, *args, **kwargs):
