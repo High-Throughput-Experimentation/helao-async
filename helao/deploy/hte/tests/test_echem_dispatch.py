@@ -12,6 +12,10 @@ Covers potential_versus (ECHE_sub_CA), ref_type (ECHE_sub_CA), and WE_versus
 sites are hardened identically but are not exercised here — neither is
 offline-importable on Linux (Windows-only gclib dependency); see the import
 comment below.
+
+Also covers ref_type dispatch in the hte SEQUENCE module ECHE_seq.py (Task
+4b), via ECHE_CV's "ECHE_sub_preCV" experiment_params, captured with a
+patched ExperimentPlanMaker.add.
 """
 
 __all__ = ["echem_dispatch_test"]
@@ -23,6 +27,7 @@ import helao.helpers.premodels as premodels_mod
 from helao.helpers.constants import REF_TABLE
 from helao.core.tests._test_utils import TestReporter
 from helao.deploy.hte.experiments.ECHE_exp import ECHE_sub_CA
+from helao.deploy.hte.sequences.ECHE_seq import ECHE_CV
 
 # ANEC_exp.py is NOT offline-importable on Linux (it imports
 # helao.deploy.hte.drivers.motion.galil_motion_driver -> gclib, a Windows-only
@@ -51,6 +56,26 @@ def _capture_actions(fn, **kwargs):
 
 def _action_by_name(actions, name):
     return next(a for a in actions if a.action_name == name)
+
+
+def _capture_experiments(fn, **kwargs):
+    captured = []
+    orig_add = premodels_mod.ExperimentPlanMaker.add
+
+    def patched_add(self, *a, **kw):
+        orig_add(self, *a, **kw)
+        captured.append(self.planned_experiments[-1])
+
+    premodels_mod.ExperimentPlanMaker.add = patched_add
+    try:
+        fn(**kwargs)
+    finally:
+        premodels_mod.ExperimentPlanMaker.add = orig_add
+    return captured
+
+
+def _experiment_by_name(experiments, name):
+    return next(e for e in experiments if e.experiment_name == name)
 
 
 def _raises_value_error(fn):
@@ -183,12 +208,43 @@ def _check_we_versus(reporter):
     )
 
 
+def _check_seq_ref_type(reporter):
+    reporter.section("ref_type dispatch (ECHE_seq.ECHE_CV -> ECHE_sub_preCV)")
+    # Baseline kwargs match the real ECHE_CV signature (ECHE_seq.py:623-642);
+    # a single sample keeps the internal loop to one "ECHE_sub_preCV" add.
+    base = dict(
+        plate_sample_no_list=[2],
+        solution_ph=7.0,
+        ref_offset__V=0.0,
+        CV1_Vinit_vsRHE=0.7,
+    )
+
+    # leakless -> CA_potential = CV1_Vinit_vsRHE - ref_offset__V
+    #             - REF_TABLE['leakless'] - 0.059*solution_ph
+    experiments = _capture_experiments(ECHE_CV, ref_type="leakless", **base)
+    pre_cv = _experiment_by_name(experiments, "ECHE_sub_preCV")
+    expected = 0.7 - 1.0 * 0.0 - REF_TABLE["leakless"] - 0.059 * 7.0
+    reporter.check(
+        "ref_type='leakless' -> identical ECHE_sub_preCV CA_potential",
+        lambda e=pre_cv, exp=expected: e.experiment_params["CA_potential"] == exp,
+    )
+
+    # unknown value now raises (was opaque KeyError)
+    reporter.check(
+        "ref_type='bogus' raises ValueError (was KeyError)",
+        lambda: _raises_value_error(
+            lambda: _capture_experiments(ECHE_CV, ref_type="bogus", **base)
+        ),
+    )
+
+
 def echem_dispatch_test() -> bool:
     reporter = TestReporter("echem_dispatch")
     try:
         _check_potential_versus(reporter)
         _check_ref_type(reporter)
         _check_we_versus(reporter)
+        _check_seq_ref_type(reporter)
         return reporter.success()
     except Exception as exc:  # noqa: BLE001
         tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))

@@ -24,9 +24,8 @@ __all__ = [
 
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.core.models.electrolyte import Electrolyte
-from helao.helpers.constants import REF_TABLE
+from helao.core.models.echem_params import ref_offset
 from helao.helpers.lib_decorators import sequence
-
 
 SEQUENCES = __all__
 
@@ -527,7 +526,7 @@ def ECHE_CV_CA_CV(
             {
                 "CA_potential": CV1_Vinit_vsRHE
                 - 1.0 * ref_offset__V
-                - REF_TABLE[ref_type]
+                - ref_offset(ref_type)
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -586,7 +585,7 @@ def ECHE_CV_CA_CV(
             {
                 "CA_potential": CV3_Vinit_vsRHE
                 - 1.0 * ref_offset__V
-                - REF_TABLE[ref_type]
+                - ref_offset(ref_type)
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV3_samplerate_mV / (CV3_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -693,7 +692,7 @@ def ECHE_CV(
             {
                 "CA_potential": CV1_Vinit_vsRHE
                 - 1.0 * ref_offset__V
-                - REF_TABLE[ref_type]
+                - ref_offset(ref_type)
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV1_samplerate_mV / (CV1_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
@@ -1047,7 +1046,7 @@ def ECHE_CV_led(
             {
                 "CA_potential": CV_Vinit_vsRHE
                 - 1.0 * ref_offset__V
-                - REF_TABLE[ref_type]
+                - ref_offset(ref_type)
                 - 0.059 * solution_ph,
                 "samplerate_sec": CV_samplerate_mV / (CV_scanrate_voltsec * 1000),
                 "CA_duration_sec": preCV_duration,
