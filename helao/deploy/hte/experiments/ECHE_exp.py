@@ -34,6 +34,7 @@ from helao.core.models.sample import SolidSample, LiquidSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
+from helao.core.models.echem_params import resolve_potential_versus
 from helao.helpers.constants import REF_TABLE
 
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
@@ -361,6 +362,7 @@ def ECHE_sub_CA_led(
 
     # # calculate potential
     versus = 0  # for vs rhe
+    potential_versus = resolve_potential_versus(potential_versus)
     if potential_versus == "oer":
         versus = 1.23
     if ref_type == "rhe":
@@ -565,6 +567,7 @@ def ECHE_sub_CA(
     #     - 0.059 * solution_ph
     # # calculate potential
     versus = 0  # for vs rhe
+    potential_versus = resolve_potential_versus(potential_versus)
     if potential_versus == "oer":
         versus = 1.23
     if ref_type == "rhe":
