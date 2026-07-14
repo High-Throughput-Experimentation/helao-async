@@ -7,7 +7,7 @@ from typing import List, Optional, Dict
 from uuid import UUID
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .hlostatus import HloStatus
 from .status_transitions import guarded_append, guarded_replace, guarded_reset
@@ -39,6 +39,10 @@ class ShortExperimentModel(BaseModel, HelaoDict):
         data_request_id (Optional[UUID]): Optional data-request linkage.
         from_global_exp_params (dict): Params injected from the global experiment context.
     """
+
+    # validate_assignment coerces str->UUID on attribute assignment (not just at
+    # construction) so ``exp.campaign_uuid = "<uuid-str>"`` stores a real UUID.
+    model_config = ConfigDict(validate_assignment=True)
 
     experiment_uuid: Optional[UUID] = None
     experiment_name: Optional[str] = None

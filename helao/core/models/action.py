@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Optional, Union
 from uuid import UUID
 from pathlib import Path
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .hlostatus import HloStatus
 from .status_transitions import guarded_append, guarded_replace, guarded_reset
@@ -39,6 +39,12 @@ class ShortActionModel(BaseModel, HelaoDict):
         orch_host (Optional[str]): Hostname of the owning orchestrator.
         orch_port (Optional[int]): Port of the owning orchestrator.
     """
+
+    # validate_assignment coerces str->UUID (and other lax coercions) on
+    # attribute assignment, not just at construction, so post-construction
+    # assignments like ``act.campaign_uuid = "<uuid-str>"`` store a real UUID
+    # instead of leaking a str to the pydantic serializer.
+    model_config = ConfigDict(validate_assignment=True)
 
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     action_uuid: Optional[UUID] = None
