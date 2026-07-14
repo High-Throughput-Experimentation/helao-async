@@ -70,8 +70,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
-from helao.core.models.echem_params import resolve_potential_versus
-from helao.helpers.constants import REF_TABLE
+from helao.core.models.echem_params import resolve_potential_versus, ref_offset
 
 from helao.deploy.hte.drivers.motion.galil_motion_driver import (
     MoveModes,
@@ -986,7 +985,7 @@ def ADSS_sub_CA(
             - 1.0 * ref_offset__V
             + versus
             - 0.059 * ph
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
     print(f"ADSS_sub_CA potential: {potential}")
 
@@ -1191,7 +1190,7 @@ def ADSS_sub_CA_photo(
             - 1.0 * ref_offset__V
             + versus
             - 0.059 * ph
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
     print(f"ADSS_sub_CA potential: {potential}")
 
@@ -1378,19 +1377,19 @@ def ADSS_sub_CV(
         {
             "Vinit__V": Vinit_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * ph,
             "Vapex1__V": Vapex1_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * ph,
             "Vapex2__V": Vapex2_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * ph,
             "Vfinal__V": Vfinal_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,

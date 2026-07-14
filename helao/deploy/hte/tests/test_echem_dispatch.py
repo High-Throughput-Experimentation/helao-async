@@ -7,10 +7,11 @@ before, and (2) an out-of-catalog reference-frame value now raises a
 catalogued ValueError instead of silently mis-handling / KeyError /
 UnboundLocalError.
 
-Covers potential_versus (ECHE_sub_CA) and WE_versus (ECMS_sub_CV) dispatch.
-ANEC_exp.py's WE_versus sites are hardened identically but are not exercised
-here — ANEC_exp is not offline-importable on Linux (Windows-only gclib
-dependency); see the import comment below.
+Covers potential_versus (ECHE_sub_CA), ref_type (ECHE_sub_CA), and WE_versus
+(ECMS_sub_CV) dispatch. ANEC_exp.py's and ADSS_exp.py's ref_type/WE_versus
+sites are hardened identically but are not exercised here — neither is
+offline-importable on Linux (Windows-only gclib dependency); see the import
+comment below.
 """
 
 __all__ = ["echem_dispatch_test"]
@@ -106,6 +107,42 @@ def _check_potential_versus(reporter):
     )
 
 
+def _check_ref_type(reporter):
+    reporter.section("ref_type dispatch (ECHE_sub_CA)")
+    # Baseline kwargs match the real ECHE_sub_CA signature (ECHE_exp.py:511-524),
+    # same base values as _check_potential_versus.
+    base = dict(
+        CA_potential=1.0,
+        ref_offset__V=0.0,
+        solution_ph=7.0,
+        samplerate_sec=0.1,
+        CA_duration_sec=1.0,
+        gamry_i_range="auto",
+    )
+
+    # leakless -> uses the else branch (ref_type != "rhe"):
+    # potential = CA_potential - ref_offset__V + versus(0) - 0.059*ph - REF_TABLE['leakless']
+    actions = _capture_actions(
+        ECHE_sub_CA, potential_versus="rhe", ref_type="leakless", **base
+    )
+    run_ca = _action_by_name(actions, "run_CA")
+    expected = 1.0 - 0.0 + 0.0 - 0.059 * 7.0 - REF_TABLE["leakless"]
+    reporter.check(
+        "ref_type='leakless' -> identical Vval__V",
+        lambda a=run_ca, e=expected: a.action_params["Vval__V"] == e,
+    )
+
+    # unknown value now raises (was opaque KeyError)
+    reporter.check(
+        "ref_type='bogus' raises ValueError (was KeyError)",
+        lambda: _raises_value_error(
+            lambda: _capture_actions(
+                ECHE_sub_CA, potential_versus="rhe", ref_type="bogus", **base
+            )
+        ),
+    )
+
+
 def _check_we_versus(reporter):
     reporter.section("WE_versus dispatch (ECMS_sub_CV)")
     # Baseline kwargs match the real ECMS_sub_CV signature (ECMS_exp.py:931-944):
@@ -150,6 +187,7 @@ def echem_dispatch_test() -> bool:
     reporter = TestReporter("echem_dispatch")
     try:
         _check_potential_versus(reporter)
+        _check_ref_type(reporter)
         _check_we_versus(reporter)
         return reporter.success()
     except Exception as exc:  # noqa: BLE001

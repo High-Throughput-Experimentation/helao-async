@@ -34,8 +34,7 @@ from helao.core.models.sample import SolidSample, LiquidSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
-from helao.core.models.echem_params import resolve_potential_versus
-from helao.helpers.constants import REF_TABLE
+from helao.core.models.echem_params import resolve_potential_versus, ref_offset
 
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
@@ -373,7 +372,7 @@ def ECHE_sub_CA_led(
             - 1.0 * ref_offset__V
             + versus
             - 0.059 * solution_ph
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
@@ -578,7 +577,7 @@ def ECHE_sub_CA(
             - 1.0 * ref_offset__V
             + versus
             - 0.059 * solution_ph
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
     print(f"ECHE_sub_CA potential: {potential}")
     apm.add(
@@ -734,19 +733,19 @@ def ECHE_sub_CV_led(
         {
             "Vinit__V": Vinit_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vapex1__V": Vapex1_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vapex2__V": Vapex2_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vfinal__V": Vfinal_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
@@ -837,19 +836,19 @@ def ECHE_sub_CV(
         {
             "Vinit__V": Vinit_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vapex1__V": Vapex1_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vapex2__V": Vapex2_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "Vfinal__V": Vfinal_vsRHE
             - 1.0 * ref_offset__V
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
             - 0.059 * solution_ph,
             "ScanRate__V_s": scanrate_voltsec,
             "AcqInterval__s": samplerate_sec,
