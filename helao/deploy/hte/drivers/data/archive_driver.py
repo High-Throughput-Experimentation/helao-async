@@ -316,6 +316,7 @@ class Archive:
         # else:
         # self.positions.trays_dict = []
         # self.positions.customs_dict = {}
+        return Positions()
 
     def write_config(self):
         """Serialise the current :attr:`positions` to the archive JSON."""
@@ -425,7 +426,7 @@ class Archive:
         error = ErrorCodes.not_available
 
         if load_sample_in is None:
-            return False, NoneSample(), {}
+            return error, sample
 
         LOGGER.info("!!!load_sample_in:", load_sample_in)
         # check if sample actually exists

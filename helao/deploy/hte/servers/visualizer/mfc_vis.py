@@ -203,7 +203,7 @@ class C_vis(LiveVisualizer):
                 except Exception:
                     LOGGER.error(f"Error processing {mvar}", exc_info=True)
                     LOGGER.info(f"datasource {self.datasource.data[mvar]}")
-                    LOGGER.info(f"data_dict {self.data_dict[mvar]}")
+                    LOGGER.info(f"data_dict {data_dict[mvar]}")
                     data_dict[f"{mvar}_mean"] = data_dict[mvar]
 
         for dev_name in self.devices:
