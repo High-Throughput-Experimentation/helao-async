@@ -186,8 +186,13 @@ class DataFileWriter:
                     file_conn_keys.append(filekey)
 
         for file_conn_key in file_conn_keys:
-            if self.active.file_conn_dict[file_conn_key].params.hloheader.epoch_ns is None:
-                self.active.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = realtime
+            if (
+                self.active.file_conn_dict[file_conn_key].params.hloheader.epoch_ns
+                is None
+            ):
+                self.active.file_conn_dict[file_conn_key].params.hloheader.epoch_ns = (
+                    realtime
+                )
 
     async def log_data_set_output_file(self, file_conn_key: UUID):
         """Open the HLO output file for ``file_conn_key`` and write its header.
@@ -199,7 +204,9 @@ class DataFileWriter:
         LOGGER.info(f"creating file for file conn: {file_conn_key}")
 
         # get the action for the file_conn_key
-        output_action = self.active._get_action_for_file_conn_key(file_conn_key=file_conn_key)
+        output_action = self.active._get_action_for_file_conn_key(
+            file_conn_key=file_conn_key
+        )
 
         if output_action is None:
             LOGGER.error("data LOGGER could not find action for file_conn_key")
@@ -228,9 +235,13 @@ class DataFileWriter:
             )
 
         header, file_info = self.active.init_datafile(
-            header=self.active.file_conn_dict[file_conn_key].params.hloheader.clean_dict(),
+            header=self.active.file_conn_dict[
+                file_conn_key
+            ].params.hloheader.clean_dict(),
             file_type=self.active.file_conn_dict[file_conn_key].params.file_type,
-            json_data_keys=self.active.file_conn_dict[file_conn_key].params.json_data_keys,
+            json_data_keys=self.active.file_conn_dict[
+                file_conn_key
+            ].params.json_data_keys,
             file_sample_label=self.active.file_conn_dict[
                 file_conn_key
             ].params.sample_global_labels,
@@ -324,7 +335,13 @@ class DataFileWriter:
         if action is None:
             action = self.active.action
         result = self.active._resolve_output_path(
-            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+            file_type,
+            filename,
+            file_group,
+            header,
+            file_sample_label,
+            json_data_keys,
+            action,
         )
         if result is None:
             return None
@@ -354,7 +371,13 @@ class DataFileWriter:
         if action is None:
             action = self.active.action
         result = self.active._resolve_output_path(
-            file_type, filename, file_group, header, file_sample_label, json_data_keys, action
+            file_type,
+            filename,
+            file_group,
+            header,
+            file_sample_label,
+            json_data_keys,
+            action,
         )
         if result is None:
             return None

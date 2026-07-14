@@ -125,19 +125,27 @@ class Calc(HelaoDriver):
 
     def get_status(self) -> DriverResponse:
         """No physical device to poll; always reports ok."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def stop(self) -> DriverResponse:
         """No active activity to abort; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """No device state to reinitialize; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def disconnect(self) -> DriverResponse:
         """No physical connection to release; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def gather_seq_data(self, seq_absdir: str, action_name: str) -> dict:
         """Load ``.hlo``/``.yml`` action results for one action name.

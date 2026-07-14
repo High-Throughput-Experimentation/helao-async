@@ -37,7 +37,7 @@ class DriverStatus(StrEnum):
         "uninitialized"  # driver connection to device has not been established
     )
     unknown = "unknown"  # driver is in an unknown state
-    retry = "retry" # driver is operation failed and suggests retry
+    retry = "retry"  # driver is operation failed and suggests retry
 
 
 class DriverResponseType(StrEnum):
