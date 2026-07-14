@@ -58,8 +58,8 @@ from helao.core.tests.unit_test_active_data_stream import active_data_stream_uni
 from helao.core.tests.unit_test_active_executor import active_executor_unit_test
 from helao.core.tests.unit_test_active_finalizer import active_finalizer_unit_test
 from helao.core.tests.unit_test_base_endpoints import base_endpoints_unit_test
+from helao.core.tests.unit_test_echem_params import echem_params_unit_test
 from helao.deploy.test.tests.unit_test_oersim_params import oersim_params_unit_test
-
 
 TESTS = [
     ("sample_models", sample_model_unit_test),
@@ -97,6 +97,7 @@ TESTS = [
     ("active_executor", active_executor_unit_test),
     ("active_finalizer", active_finalizer_unit_test),
     ("base_endpoints", base_endpoints_unit_test),
+    ("echem_params", echem_params_unit_test),
     ("oersim_params", oersim_params_unit_test),
 ]
 
