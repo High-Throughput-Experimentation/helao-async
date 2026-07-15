@@ -763,8 +763,6 @@ def ECMS_sub_CA(
         potential_vsRef = (
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
         )
-    else:
-        raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
         SAMPLE_server,
         "archive_custom_query_sample",
@@ -960,6 +958,9 @@ def ECMS_sub_CV(
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
         MS_equilibrium_time: Post-CV wait for the MS signal to settle (s).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1717,8 +1718,6 @@ def ECMS_sub_CA_CO2flow(
         potential_vsRef = (
             WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
         )
-    else:
-        raise ValueError("WE_versus must be either 'ref' or 'rhe'")
     apm.add(
         SAMPLE_server,
         "archive_custom_query_sample",
