@@ -184,3 +184,49 @@ named in tracked parent-repo files; see the deployment-alias convention).
 Per-stage: unit equivalence + per-site dispatch unit tests + dispatch GM 9/9 + active GM
 13/13 + `run_unit_tests.py` PASS + import check. Behavior-delta audit evidence recorded per
 hardened site. Run `black` on changed files before each commit; commit + push per increment.
+
+## Phase 1 outcome (2026-07-14)
+
+Phase 1 LANDED on branch `feat/cards-domain-enums` (off `unstable` @ `8e09e626`); NOT yet
+merged — merge is the user's call, hte-production is separately soak/station-gated. Every
+task Opus/Sonnet-reviewed 0-blocking, gated by dispatch GM 9/9 + active GM 13/13 +
+`run_unit_tests.py` PASS. Final whole-branch Opus review: **APPROVE-WITH-FOLLOWUPS**, 0
+Critical/High; wire byte-identity invariant confirmed held across every hunk (coerced value
+is local-only; `ActionPlanMaker`/`ExperimentPlanMaker` snapshot caller locals *before* the
+coercion line runs — proven at runtime via `self.pars` capturing the raw string).
+
+Shipped:
+- Core module `helao/core/models/echem_params.py` — `RefType{leakless,inhouse,rhe}` /
+  `PotentialVersus{rhe,oer}` / `WEVersus{ref,rhe}` / `BubbleGas{N2,O2}` StrEnums +
+  `resolve_*` coercion + `ref_offset()`. Unit test `unit_test_echem_params.py` (18/18),
+  registered in `run_unit_tests.py`.
+- Dispatch hardening (behavior delta = out-of-catalog value now raises catalogued
+  `ValueError` instead of silent-rhe / `UnboundLocalError` / `KeyError`):
+  `potential_versus` ECHE_exp×2 + ADSS_exp×2; `WE_versus` ANEC_exp×7 + ECMS_exp×3;
+  `ref_type`→`ref_offset()` 39 experiment sites + 4 `ECHE_seq.py` sites (a missed-sweep
+  file the plan under-scoped to `experiments/` — caught in review, fixed as Task 4b).
+- Dispatch test `helao/deploy/hte/tests/test_echem_dispatch.py` (10/10 live for the
+  offline-importable functions ECHE_exp/ECMS_exp/ECHE_seq).
+
+Verification cliff (unchanged from the P4 program): `ADSS_exp.py` and `ANEC_exp.py` are not
+offline-importable on Linux (Windows-only `gclib`), so their edits are **construction-proof
+only** — behavior-verify at station smoke. `BubbleGas` has no dispatch consumer (future
+annotation-only; Task 5 CUT as YAGNI).
+
+Cut / deferred:
+- Task 5 (BubbleGas/Electrolyte annotation) CUT — no consumer, no bug, pure annotation churn.
+- Non-blocking follow-ups from final review: (1) add `Raises: ValueError` docstring line to
+  the 8 hardened functions for parity with `ECMS_sub_CA`; (2) delete now-dead
+  `else: raise ValueError` at `ECMS_sub_CA:767` / `ECMS_sub_CA_CO2flow:1721` (harmless);
+  (3) fix stale `ADSS_seq.py:88` docstring listing `"ref"` as a `potential_versus` value
+  (pre-existing doc bug, file untouched by this branch — do NOT fold in here).
+
+Remaining live risk (station gate, not a code defect): a saved hte config carrying a param
+value outside the enum member sets now raises instead of silently mis-dispatching — the
+intended, audited behavior delta. Widen the relevant enum if station smoke surfaces a
+legitimate out-of-catalog value.
+
+**Phase 2 (private deployments)** — not started; its own future plan. Each private
+deployment imports the Phase-1 core enums where the same domain applies (mostly it doesn't);
+Deployment-C adds its own `RefElectrodeType` + `none`-bearing bubble-gas enums for its
+distinct params (see Phase 2 section above).
