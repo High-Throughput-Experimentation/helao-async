@@ -924,6 +924,9 @@ def ANEC_sub_CA(
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
 
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -990,6 +993,9 @@ def ANEC_sub_HeatCA(
         ref_type: Reference electrode key into ``REF_TABLE``.
         pH: Solution pH (used in RHE conversion).
         target_temperature_degc: TEC setpoint (deg C).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1146,6 +1152,9 @@ def ANEC_sub_photo_CA(
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches CA.
 
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
+
     Returns:
         List of planned actions for the orchestrator.
     """
@@ -1248,6 +1257,9 @@ def ANEC_sub_CV(
         SampleRate: Acquisition interval (s).
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1353,6 +1365,9 @@ def ANEC_sub_HeatCV(
         IErange: Gamry current-range setting.
         ref_offset__V: Reference offset (V).
         target_temperature_degc: TEC setpoint (deg C).
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1498,6 +1513,9 @@ def ANEC_sub_photo_CV(
         toggle_illum_duty: Illumination duty cycle.
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches the CV.
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.
@@ -1794,6 +1812,9 @@ def ANEC_sub_photo_LSV(
         toggle_illum_duty: Illumination duty cycle.
         toggle_illum_period: Toggle period (s).
         toggle_illum_time: Total toggle duration (s); ``-1`` matches the sweep.
+
+    Raises:
+        ValueError: If ``WE_versus`` is not ``"ref"`` or ``"rhe"``.
 
     Returns:
         List of planned actions for the orchestrator.

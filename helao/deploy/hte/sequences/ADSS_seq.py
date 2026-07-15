@@ -85,7 +85,7 @@ def ADSS_CA_cell_1potential(
         liquid_sample_no: Reservoir liquid sample number.
         liquid_sample_volume_ul: Cell fill volume (uL).
         CA_potential_vs: CA potential in the selected frame.
-        potential_versus: Frame label (``"oer"``/``"rhe"``/``"ref"``).
+        potential_versus: Frame label (``"oer"``/``"rhe"``).
         ph: Solution pH.
         ref_type: Reference electrode type label.
         ref_offset__V: Reference electrode offset (V).
@@ -463,7 +463,7 @@ def ADSS_PA_CVs_CAs_cell(
         CV_samplerate_sec: CV sample interval (s).
         number_of_postCAs: Reserved hint (unused at runtime).
         CA_potentials_vs: CA potentials in the chosen frame.
-        potential_versus: Frame label for CAs (``"rhe"``/``"ref"``).
+        potential_versus: Frame label for CAs (``"rhe"``/``"oer"``).
         CA_duration_sec: Per-CA durations (s).
         CA_samplerate_sec: CA sample interval (s).
         gamry_i_range: Gamry current range string.
