@@ -46,7 +46,7 @@ from helao.core.models.action_start_condition import ActionStartCondition as asc
 from helao.core.models.sample import SolidSample, LiquidSample, GasSample
 from helao.core.models.machine import MachineModel
 from helao.core.models.process_contrib import ProcessContrib
-from helao.helpers.constants import REF_TABLE
+from helao.core.models.echem_params import resolve_we_versus, ref_offset
 
 # from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
@@ -756,11 +756,12 @@ def ECMS_sub_CA(
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    WE_versus = resolve_we_versus(WE_versus)
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
         )
     else:
         raise ValueError("WE_versus must be either 'ref' or 'rhe'")
@@ -964,6 +965,7 @@ def ECMS_sub_CV(
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    WE_versus = resolve_we_versus(WE_versus)
     if WE_versus == "ref":
         potential_init_vsRef = WE_potential_init__V - 1.0 * ref_offset__V
         potential_apex1_vsRef = WE_potential_apex1__V - 1.0 * ref_offset__V
@@ -974,25 +976,25 @@ def ECMS_sub_CV(
             WE_potential_init__V
             - 1.0 * ref_offset__V
             - 0.059 * pH
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
         potential_apex1_vsRef = (
             WE_potential_apex1__V
             - 1.0 * ref_offset__V
             - 0.059 * pH
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
         potential_apex2_vsRef = (
             WE_potential_apex2__V
             - 1.0 * ref_offset__V
             - 0.059 * pH
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
         potential_final_vsRef = (
             WE_potential_final__V
             - 1.0 * ref_offset__V
             - 0.059 * pH
-            - REF_TABLE[ref_type]
+            - ref_offset(ref_type)
         )
 
     apm.add(
@@ -1708,11 +1710,12 @@ def ECMS_sub_CA_CO2flow(
         List of planned actions for the orchestrator.
     """
     apm = ActionPlanMaker()  # exposes function parameters via apm.pars
+    WE_versus = resolve_we_versus(WE_versus)
     if WE_versus == "ref":
         potential_vsRef = WE_potential__V - 1.0 * ref_offset__V
     elif WE_versus == "rhe":
         potential_vsRef = (
-            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - REF_TABLE[ref_type]
+            WE_potential__V - 1.0 * ref_offset__V - 0.059 * pH - ref_offset(ref_type)
         )
     else:
         raise ValueError("WE_versus must be either 'ref' or 'rhe'")
