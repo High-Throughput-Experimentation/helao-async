@@ -39,7 +39,7 @@ dependencies:
   - msgspec
   - munch
   - ntplib
-  - numpy=1
+  - numpy
   - orjson
   - pandas
   - panel
@@ -63,7 +63,7 @@ dependencies:
   - pyserial
   - python-dotenv
   - python-multipart
-  - python=3.12
+  - python=3.14
   - pyusb
   - pyvisa
   - pyvisa-py
