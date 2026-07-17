@@ -22,6 +22,7 @@ from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.sync import SyncPort
 from helao.hexagon.ports.transport import TransportPort
 from helao.hexagon.ports.auxiliary import StatePersistencePort
+from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
 
 __all__ = [
     "ACTION_REQUIRED",
@@ -30,15 +31,6 @@ __all__ = [
     "PortWiring",
     "UnwiredPortError",
 ]
-
-
-class UnwiredPortError(RuntimeError):
-    """A consumed port has no adapter wired — composition must not start."""
-
-
-class HexagonDeferred(NotImplementedError):
-    """A port member whose legacy bridge is deliberately deferred to a later
-    slice (documented at the raise site) — loud, never silent."""
 
 
 # Ports each P1b1 composition genuinely consumes (fail-loud is meaningful,
