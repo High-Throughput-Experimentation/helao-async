@@ -1,0 +1,63 @@
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_golden
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
+  OPERATOR:
+    group: operator
+    bokeh: standalone_operator
+    host: 127.0.0.1
+    port: 5001
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (golden capture)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_live_vis
+    params: {}
+    hlo_postprocess_libs:
+      - hlo_to_csv
+  LIVE:
+    host: 127.0.0.1
+    port: 5002
+    group: visualizer
+    bokeh: live_visualizer
+    params:
+      doc_name: Websocket Live Visualizer
+  DATABROWSE:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: data_browser
+    params:
+      doc_name: Data Browser
+      max_points: 50000
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sim_db_server
+    params:
+      aws_bucket: helao-sim
+      s3_record: true
