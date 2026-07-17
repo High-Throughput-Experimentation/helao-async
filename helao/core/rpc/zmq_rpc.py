@@ -27,6 +27,7 @@ from pydantic import BaseModel
 
 try:
     import numpy as _np_mod
+
     _np: Any = _np_mod
 except ImportError:  # numpy is optional in some deployments
     _np = None
@@ -183,6 +184,7 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             try:
                 import typing
+
                 hints = typing.get_type_hints(fn)
             except Exception:
                 hints = {n: p.annotation for n, p in params.items()}
@@ -192,9 +194,7 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
             ann = hints.get(name, param.annotation)
             is_dict = ann is dict
             is_model = (
-                isinstance(ann, type)
-                and not is_dict
-                and issubclass(ann, BaseModel)
+                isinstance(ann, type) and not is_dict and issubclass(ann, BaseModel)
             )
             if is_dict:
                 out[name] = remaining
@@ -273,9 +273,18 @@ class RPCDispatcher:
         # Allow reusing the address quickly across restarts.
         self._socket.setsockopt(zmq.LINGER, 0)
         endpoint = f"tcp://{host}:{port}"
-        self._socket.bind(endpoint)
+        try:
+            self._socket.bind(endpoint)
+        except Exception:
+            # Leave no half-open socket behind so the caller can retry serve()
+            # (e.g. with a fallback host) without leaking the ROUTER socket.
+            self._socket.close(linger=0)
+            self._socket = None
+            raise
         self._endpoint = endpoint
-        self._task = asyncio.create_task(self._recv_loop(), name=f"rpc-{self.server_key}")
+        self._task = asyncio.create_task(
+            self._recv_loop(), name=f"rpc-{self.server_key}"
+        )
         LOGGER.info(f"RPC dispatcher for {self.server_key!r} listening on {endpoint}")
 
     async def close(self) -> None:
@@ -307,7 +316,9 @@ class RPCDispatcher:
             #                 auto-prepends an empty delimiter that must
             #                 be echoed back so REQ accepts the reply).
             if len(frames) < 2:
-                LOGGER.warning(f"RPC dispatcher dropped malformed frames (n={len(frames)})")
+                LOGGER.warning(
+                    f"RPC dispatcher dropped malformed frames (n={len(frames)})"
+                )
                 continue
             identity = frames[0]
             payload = frames[-1]
@@ -334,9 +345,7 @@ class RPCDispatcher:
                 resp = RPCResponse(id=req_id, ok=True, result=_to_jsonable(result))
         except Exception as e:  # noqa: BLE001
             LOGGER.exception(f"RPC dispatch error for method (id={req_id})")
-            resp = RPCResponse(
-                id=req_id, ok=False, error=f"{type(e).__name__}: {e}"
-            )
+            resp = RPCResponse(id=req_id, ok=False, error=f"{type(e).__name__}: {e}")
         try:
             assert self._socket is not None
             await self._socket.send_multipart(envelope + [_RESP_ENCODER.encode(resp)])
