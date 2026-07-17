@@ -26,10 +26,18 @@ from harness.treepass import explode_zips
 
 
 def mutate_param_value(root: Path) -> str:
-    """Append a key to an -act.yml: action_params are bit-exact (D7)."""
+    """Mutate an existing action_params value in an -act.yml: action_params
+    are bit-exact (D7)."""
     act = sorted(root.rglob("*-act.yml"))[0]
-    act.write_text(act.read_text() + "mutation_marker: 1\n")
-    return f"appended top-level key to {act.name}"
+    text = act.read_text()
+    old, new = "duration: 2.0", "duration: 2.5"
+    if old not in text:
+        raise RuntimeError(f"no {old!r} found in {act}")
+    mutated = text.replace(old, new, 1)
+    if mutated == text:
+        raise RuntimeError(f"replace of {old!r} did not change {act}")
+    act.write_text(mutated)
+    return f"mutated action_params.duration in {act.name}"
 
 
 def mutate_drop_file(root: Path) -> str:
