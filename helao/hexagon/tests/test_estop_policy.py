@@ -36,8 +36,9 @@ def test_derive_topology_rejects_unknown_role():
 
 
 def test_driver_fault_edge_orders_orch_recorders_private():
-    """The Deployment-B execute_gamry_stop cascade, now policy-emitted:
-    ORCH* /stop -> recorder keys /stop_record -> PSTAT keys /stop_private."""
+    """A private deployment's driver-resident emergency-stop cascade, now
+    policy-emitted: ORCH* /stop -> recorder keys /stop_record -> PSTAT keys
+    /stop_private."""
     p = ep.EstopPolicy(topo())
     cmds = p.commands_for(ep.DriverFaultEdge(source="opcua_monitor"))
     assert [type(c) for c in cmds] == [ep.StopOrch, ep.StopRecorders, ep.StopPrivate]
