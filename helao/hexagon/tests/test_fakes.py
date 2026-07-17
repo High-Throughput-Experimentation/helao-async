@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 
-from helao.hexagon.tests import fakes
+from helao.hexagon.adapters import fakes
 from helao.hexagon.ports.artifact_store import ArtifactStorePort
 from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.data_sink import DataSinkPort
