@@ -87,6 +87,16 @@ def test_absent_equals_empty():
     }
 
 
+def test_nan_is_dropped_like_clean_dict():
+    """clean_dict maps NaN -> None (nan2None) then prunes the None as empty,
+    so a NaN field ends up absent, not a present null. canonicalize must
+    match: a NaN-valued key compares equal to that key being missing."""
+    with_nan = canonicalize({"a": float("nan"), "b": 1})
+    without_a = canonicalize({"b": 1})
+    assert with_nan == without_a == {"b": 1}
+    assert "a" not in with_nan
+
+
 def test_non_volatile_content_diffs_are_reported():
     m1, m2 = UuidMapper(), UuidMapper()
     g = normalize_meta({"action_params": {"duration": 2.0}}, m1)
