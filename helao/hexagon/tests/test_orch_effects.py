@@ -3,7 +3,6 @@ rules, DD-3 live re-checks. Uses a recording stub orch (app-layer unit
 tests; the launched smoke exercises the real Orch)."""
 
 import asyncio
-from types import SimpleNamespace
 
 import pytest
 
@@ -52,8 +51,8 @@ class _StubOrch:
     def __init__(self):
         self.globalstatusmodel = _GSM()
         self.action_dq, self.experiment_dq, self.sequence_dq = [], [], []
-        self.active_experiment = None
-        self.active_sequence = None
+        self.active_experiment: object | None = None
+        self.active_sequence: object | None = None
         self.active_run_id = "RUN"
         self.status_summary = {}
         self.step_thru_actions = False
@@ -126,12 +125,12 @@ class _AlertSpy:
     def __init__(self):
         self.alerts = []
 
-    def info(self, m): ...
-    def warning(self, m): ...
-    def error(self, m, exc_info=False): ...
+    def info(self, msg): ...
+    def warning(self, msg): ...
+    def error(self, msg, exc_info=False): ...
 
-    def alert(self, m):
-        self.alerts.append(m)
+    def alert(self, msg):
+        self.alerts.append(msg)
 
     def file_logger(self, server_key, log_root):
         raise AssertionError("unused")
