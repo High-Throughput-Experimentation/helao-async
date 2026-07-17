@@ -104,6 +104,33 @@ def test_diff_meta_reports_absent_keys_and_list_lengths():
     ]
 
 
+def test_volatile_field_raw_difference_does_not_diff():
+    """Two captures with different raw timestamps/uuids/hosts normalize to the
+    same tokens, so a real content diff is the ONLY thing diff_meta reports."""
+    m1, m2 = UuidMapper(), UuidMapper()
+    g = normalize_meta(
+        {
+            "action_uuid": U1,
+            "action_timestamp": "2025-07-16 13:14:21.123456",
+            "orch_host": "10.0.0.1",
+            "action_params": {"duration": 2.0},
+        },
+        m1,
+    )
+    c = normalize_meta(
+        {
+            "action_uuid": U2,
+            "action_timestamp": "2025-07-16 14:00:00.000000",
+            "orch_host": "192.168.1.5",
+            "action_params": {"duration": 3.0},
+        },
+        m2,
+    )
+    assert diff_meta(g, c) == [
+        {"key": "action_params.duration", "golden": 2.0, "candidate": 3.0}
+    ]
+
+
 def test_prg_compares_only_terminal_booleans():
     g = {"yml": "/abs/a", "s3": True, "api": True, "files_pending": ["x"]}
     c = {"yml": "/abs/b", "s3": True, "api": True, "files_pending": []}
