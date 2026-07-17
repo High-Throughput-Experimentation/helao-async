@@ -29,7 +29,7 @@ from harness.hlo_pass import (
     normalize_hlo_header,
     row_tolerance_for,
 )
-from harness.manifest import ProvenanceManifest
+from harness.manifest import ProvenanceManifest, content_mask_mode
 from harness.uuidmap import UuidMapper
 from harness.yaml_pass import diff_meta, load_yml_plain, normalize_meta
 
@@ -112,8 +112,22 @@ def diff_s3_record(
         g = json.loads(_load_bytes(gpath))
         c = json.loads(_load_bytes(cpath))
         return diff_meta(normalize_meta(g, mg), normalize_meta(c, mc))
-    # other raw_data misc uploads: exact bytes (content-masked files are
-    # handled by the parity dispatcher's aux branch before reaching here)
+    # other raw_data misc uploads (e.g. the hlo_to_csv postprocess output,
+    # re-uploaded to S3 alongside the .hlo): honor the SAME manifest-resident
+    # content_masked_files lever the on-disk copy gets via the parity
+    # dispatcher's AUX_FILE branch (§6.4) — S3_SIM classifies everything
+    # under it as S3_RECORD, not AUX_FILE, so that branch never sees these
+    # and unseeded-random-derived files would otherwise be exact-byte
+    # compared here and spuriously fail.
+    mode = content_mask_mode(norm, manifest)
+    if mode == "skip":
+        return []
+    if mode == "line-count":
+        g_n = len(_load_bytes(gpath).splitlines())
+        c_n = len(_load_bytes(cpath).splitlines())
+        if g_n != c_n:
+            return [{"key": "line_count", "golden": g_n, "candidate": c_n}]
+        return []
     if _load_bytes(gpath) != _load_bytes(cpath):
         return [{"key": "<bytes>", "golden": "differs", "candidate": "differs"}]
     return []

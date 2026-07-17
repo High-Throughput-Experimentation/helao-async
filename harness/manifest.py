@@ -8,8 +8,9 @@ no capture provenance and must fail loudly, not silently pass).
 from __future__ import annotations
 
 import dataclasses
+import fnmatch
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ruamel.yaml import YAML
 
@@ -74,3 +75,18 @@ class ProvenanceManifest:
         with open(path) as f:
             data = _yaml.load(f)
         return cls(**{k: v for k, v in dict(data).items()})
+
+
+def content_mask_mode(norm: str, manifest: "ProvenanceManifest") -> Optional[str]:
+    """Look up a normalized path's ``content_masked_files`` mode, if any.
+
+    Shared by the parity dispatcher (AUX_FILE rows) and the S3 pass (raw
+    uploads under ``S3_SIM/`` classify as S3_RECORD, not AUX_FILE, but a
+    masked-random-data file like a WsSim ``*.csv`` postprocess output is
+    uploaded to S3 too and must be masked there the same way, per the same
+    manifest-resident §6.4 lever — not a second, diverging code path).
+    """
+    for pattern, mode in (manifest.content_masked_files or {}).items():
+        if fnmatch.fnmatch(norm, pattern):
+            return mode
+    return None
