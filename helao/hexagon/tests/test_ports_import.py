@@ -79,6 +79,23 @@ PORT_MODULES = {
     "helao.hexagon.ports.status": ["StatusPort"],
 }
 
+PORT_MODULES.update(
+    {
+        "helao.hexagon.ports.clock": ["ClockPort"],
+        "helao.hexagon.ports.logging": ["LoggingPort"],
+        "helao.hexagon.ports.config": ["ConfigPort"],
+        "helao.hexagon.ports.analysis": ["AnalysisArtifactPort"],
+        "helao.hexagon.ports.sample_state": ["SampleStatePort"],
+        "helao.hexagon.ports.auxiliary": [
+            "StatePersistencePort",
+            "PlateInfoPort",
+            "LibraryPort",
+            "HealthPort",
+            "NotifyPort",
+        ],
+    }
+)
+
 
 def test_core_port_modules_import():
     for modname, names in PORT_MODULES.items():
