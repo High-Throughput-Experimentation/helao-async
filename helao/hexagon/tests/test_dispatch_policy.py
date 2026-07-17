@@ -57,7 +57,9 @@ def snap(**kw) -> DispatchSnapshot:
         step_thru_sequences=False,
     )
     base.update(kw)
-    return DispatchSnapshot(**base)
+    # base's inferred value type is a union of all field types, so pyright
+    # cannot re-derive each field's precise literal type through **base.
+    return DispatchSnapshot(**base)  # type: ignore[reportArgumentType]
 
 
 # --- while-cond / exit ---
