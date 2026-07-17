@@ -41,6 +41,11 @@ RE_META_YML = re.compile(r"^\d{6}\.\d{12}-(seq|exp|act)\.yml$")  # %y%m%d.%H%M%S
 RE_META_PRG = re.compile(r"^\d{6}\.\d{12}-(seq|exp|act)\.prg$")
 RE_SEQ_ZIP = re.compile(r"^\d{6}(__.+)\.zip$")
 RE_SEQ_ZIPDIR = re.compile(r"^\d{6}(__.+)\.zipdir$")  # explode_zips target
+# reset_sync (sync_driver.py) renames a synced zip to ``.orig`` in place
+# (same base name, still a valid zip archive) — same grammar + explode
+# treatment as the ``.zip``/``.zipdir`` pair above.
+RE_SEQ_ORIG = re.compile(r"^\d{6}(__.+)\.orig$")
+RE_SEQ_ORIGDIR = re.compile(r"^\d{6}(__.+)\.origdir$")  # explode_zips target
 
 TOP_IGNORED = {"LOGS", "STATES", "DATABASE", "USER_CONFIG"}
 
@@ -68,6 +73,12 @@ def normalize_name(part: str) -> str:
     m = RE_SEQ_ZIPDIR.match(part)
     if m:
         return f"TS{m.group(1)}.zipdir"
+    m = RE_SEQ_ORIG.match(part)
+    if m:
+        return f"TS{m.group(1)}.orig"
+    m = RE_SEQ_ORIGDIR.match(part)
+    if m:
+        return f"TS{m.group(1)}.origdir"
     m = RE_EXP_DIR.match(part)
     if m:
         return f"TS{m.group(1)}"
@@ -106,6 +117,11 @@ def classify_file(relpath: str) -> ArtifactRow:
     if name.endswith(".parquet"):
         return ArtifactRow.PARQUET
     if name.endswith(".zip"):
+        return ArtifactRow.SEQ_ZIP
+    if name.endswith(".orig"):
+        # reset_sync's renamed-in-place zip sidecar (see RE_SEQ_ORIG above) —
+        # same artifact type as SEQ_ZIP, just not exploded until treepass
+        # explicitly handles the ``.orig`` extension too.
         return ArtifactRow.SEQ_ZIP
     if name.endswith(".lock"):
         return ArtifactRow.LOCK

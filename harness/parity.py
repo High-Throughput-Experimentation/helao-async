@@ -8,7 +8,6 @@ unnormalized difference fails; phase gates cite the printed run_id.
 from __future__ import annotations
 
 import argparse
-import fnmatch
 import json
 import sys
 import tempfile
@@ -20,7 +19,7 @@ from typing import Optional
 from harness import HARNESS_VERSION
 from harness.classify import ArtifactRow
 from harness.hlo_pass import diff_hlo
-from harness.manifest import ManifestMissingError, ProvenanceManifest
+from harness.manifest import ManifestMissingError, ProvenanceManifest, content_mask_mode
 from harness.s3_pass import diff_s3_record, internal_s3_checks
 from harness.treepass import (
     diff_member_sets,
@@ -37,15 +36,8 @@ from harness.yaml_pass import (
 )
 
 
-def _content_mask_mode(norm: str, manifest: ProvenanceManifest) -> Optional[str]:
-    for pattern, mode in (manifest.content_masked_files or {}).items():
-        if fnmatch.fnmatch(norm, pattern):
-            return mode
-    return None
-
-
 def _diff_aux(norm, gpath, cpath, manifest):
-    mode = _content_mask_mode(norm, manifest)
+    mode = content_mask_mode(norm, manifest)
     if mode == "skip":
         return []
     if mode == "line-count":

@@ -24,20 +24,36 @@ from typing import Callable, Dict
 from harness.parity import run_parity
 from harness.treepass import explode_zips
 
+_DURATION_RE = re.compile(r"duration: (\d+(?:\.\d+)?)")
+
 
 def mutate_param_value(root: Path) -> str:
-    """Mutate an existing action_params value in an -act.yml: action_params
-    are bit-exact (D7)."""
-    act = sorted(root.rglob("*-act.yml"))[0]
-    text = act.read_text()
-    old, new = "duration: 2.0", "duration: 2.5"
-    if old not in text:
-        raise RuntimeError(f"no {old!r} found in {act}")
-    mutated = text.replace(old, new, 1)
-    if mutated == text:
-        raise RuntimeError(f"replace of {old!r} did not change {act}")
-    act.write_text(mutated)
-    return f"mutated action_params.duration in {act.name}"
+    """Mutate an existing numeric action_params value in an -act.yml:
+    action_params are bit-exact (D7).
+
+    A real multi-action sequence (e.g. GM-1/GM-5's ORCH ``wait`` + SIM
+    ``acquire_data`` actions) has action files whose params differ by
+    action type, so the alphabetically-first ``-act.yml`` is not guaranteed
+    to carry a ``duration`` param at all (ORCH ``wait`` carries `waittime`
+    instead) — and the value itself is scenario-parameterized (GM-1 uses
+    `data_duration: 4.0`, the synthetic single-action fixture in
+    synthtree.py hardcodes 2.0), so a fixed literal target string is not
+    general. Search every action file, in sorted order for capture-
+    independence, for the first `duration: <float>` occurrence and perturb
+    that value rather than assuming a fixed old/new literal pair.
+    """
+    for act in sorted(root.rglob("*-act.yml")):
+        text = act.read_text()
+        m = _DURATION_RE.search(text)
+        if m:
+            old_val = m.group(1)
+            new_val = str(float(old_val) + 0.5)
+            mutated = text[: m.start()] + f"duration: {new_val}" + text[m.end() :]
+            act.write_text(mutated)
+            return (
+                f"mutated action_params.duration in {act.name} ({old_val} -> {new_val})"
+            )
+    raise RuntimeError(f"no 'duration: <float>' found in any -act.yml under {root}")
 
 
 def mutate_drop_file(root: Path) -> str:
