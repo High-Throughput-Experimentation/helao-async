@@ -109,8 +109,18 @@ class HelaoFastAPI(FastAPI):
                 if isinstance(route, APIRoute) and "POST" in route.methods:
                     self.rpc_dispatcher.register(route.path, route.endpoint)
 
+            # Bind the ROUTER to the wildcard interface, not the configured
+            # host.  libzmq's ``bind(tcp://<fqdn>:port)`` resolves the name and
+            # binds a single concrete address; when that address is not a
+            # currently-assigned local interface (e.g. a config host set to the
+            # machine's FQDN whose DNS record points at an IPv6/stale address)
+            # the bind fails with ``Address not available`` (WSAEADDRNOTAVAIL on
+            # Windows).  Uvicorn tolerates this because asyncio binds every
+            # resolved addrinfo; ZMQ does not.  Binding ``0.0.0.0`` accepts on
+            # all local interfaces, so callers dialing the concrete config host
+            # still reach it.
             await self.rpc_dispatcher.serve(
-                host=self.server_cfg["host"],
+                host="0.0.0.0",
                 port=derive_rpc_port(self.server_cfg["port"]),
             )
 
