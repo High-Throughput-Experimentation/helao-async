@@ -7,9 +7,9 @@ guard sites orch_dispatch.py carries. State deltas follow DD-2. Never issues
 an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
-import logging
 from typing import Optional
 
+from helao.helpers import helao_logging
 from helao.hexagon.app.wiring import PortWiring
 from helao.hexagon.domain.dispatch_policy import (
     DispatchPolicy,
@@ -49,7 +49,34 @@ from helao.hexagon.domain.orchestration import (
     WaitAllActionsIdle,
 )
 
-LOGGER = logging.getLogger(__name__)
+
+class _LazyServerLogger:
+    """Resolves ``helao_logging.LOGGER`` at call time instead of binding a
+    stdlib ``logging.getLogger(__name__)`` at import time: the latter always
+    returns a real (but unrouted, unhandled) logger object, so it never
+    raises -- it just silently drops every record instead of reaching
+    ``<root>/LOGS/<server_key>.log``. Same call-time-resolution rationale as
+    ``LegacyLoggingAdapter._log()`` (logging_adapter.py): the launcher installs
+    the per-server singleton onto ``helao_logging.LOGGER`` after this module
+    is imported, and bare unit tests never install it at all (``None``)."""
+
+    def info(self, msg, *args, **kwargs):
+        lg = helao_logging.LOGGER
+        if lg is not None:
+            lg.info(msg, *args, **kwargs)
+
+    def warning(self, msg, *args, **kwargs):
+        lg = helao_logging.LOGGER
+        if lg is not None:
+            lg.warning(msg, *args, **kwargs)
+
+    def error(self, msg, *args, **kwargs):
+        lg = helao_logging.LOGGER
+        if lg is not None:
+            lg.error(msg, *args, **kwargs)
+
+
+LOGGER = _LazyServerLogger()
 
 __all__ = ["OrchCommandRunner", "apply_state_delta", "derive_state"]
 
