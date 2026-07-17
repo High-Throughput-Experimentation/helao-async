@@ -42,8 +42,11 @@ def test_driver_fault_edge_orders_orch_recorders_private():
     p = ep.EstopPolicy(topo())
     cmds = p.commands_for(ep.DriverFaultEdge(source="opcua_monitor"))
     assert [type(c) for c in cmds] == [ep.StopOrch, ep.StopRecorders, ep.StopPrivate]
+    assert isinstance(cmds[0], ep.StopOrch)
     assert cmds[0].key == "ORCH"
+    assert isinstance(cmds[1], ep.StopRecorders)
     assert cmds[1].keys == ("RECORD1", "RECORD2")
+    assert isinstance(cmds[2], ep.StopPrivate)
     assert cmds[2].keys == ("PSTAT1",)
 
 
@@ -61,6 +64,7 @@ def test_orch_estop_request_full_sequence():
     p = ep.EstopPolicy(topo())
     cmds = p.commands_for(ep.OrchEstopRequest(reason="operator"))
     assert [type(c) for c in cmds] == [EstopFanout, FinishActiveEstopped]
+    assert isinstance(cmds[0], EstopFanout)
     assert cmds[0].switch is False
 
 

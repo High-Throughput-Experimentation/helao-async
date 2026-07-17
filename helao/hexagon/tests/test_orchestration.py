@@ -22,7 +22,9 @@ def st(**kw) -> fsm.OrchestrationState:
         step_thru_sequences=False,
     )
     base.update(kw)
-    return fsm.OrchestrationState(**base)
+    # base's inferred value type is a union of all field types, so pyright
+    # cannot re-derive each field's precise literal type through **base.
+    return fsm.OrchestrationState(**base)  # type: ignore[reportArgumentType]
 
 
 def kinds(cmds):
@@ -47,6 +49,7 @@ def test_t2_start_with_everything_empty_refuses():
     s, cmds = fsm.step(st(), fsm.StartRequested())
     assert s.loop_state == LoopStatus.stopped
     assert kinds(cmds) == [fsm.RefuseStart]
+    assert isinstance(cmds[0], fsm.RefuseStart)
     assert "empty" in cmds[0].reason
 
 
@@ -56,6 +59,7 @@ def test_t3_start_under_estop_refuses():
     )
     assert s.loop_state == LoopStatus.estopped
     assert kinds(cmds) == [fsm.RefuseStart]
+    assert isinstance(cmds[0], fsm.RefuseStart)
     assert "E-STOP" in cmds[0].reason
 
 
@@ -102,6 +106,7 @@ def test_t9_estop_transition_state_and_command_order(event):
         fsm.AlertOperator,
     ]
     fanout = cmds[1]
+    assert isinstance(fanout, fsm.EstopFanout)
     assert fanout.switch is False
 
 
@@ -145,6 +150,7 @@ def test_t10_clear_estop():
         fsm.ReleaseServersEstop,
         fsm.InterruptWake,
     ]
+    assert isinstance(cmds[2], fsm.InterruptWake)
     assert cmds[2].message == "cleared_estop"
 
 
@@ -159,6 +165,7 @@ def test_t11_clear_error_leaves_loop_state():
     s, cmds = fsm.step(s0, fsm.ClearErrorRequested())
     assert s.loop_state == LoopStatus.stopped
     assert kinds(cmds) == [fsm.ClearErroredFromFinished, fsm.InterruptWake]
+    assert isinstance(cmds[1], fsm.InterruptWake)
     assert cmds[1].message == "cleared_errored"
 
 
@@ -230,18 +237,21 @@ def test_status_changed_busy_idle():
 def test_iterate_dispatches_head_action_with_live_recheck_guard():
     s, cmds = fsm.step(st(loop_state=LoopStatus.started, n_acts=1), fsm.LoopIterate())
     assert kinds(cmds) == [fsm.DispatchHeadAction]
+    assert isinstance(cmds[0], fsm.DispatchHeadAction)
     assert cmds[0].requires_live_estop_recheck is True
 
 
 def test_iterate_finish_then_dispatch_experiment_guarded():
     s, cmds = fsm.step(st(loop_state=LoopStatus.started, n_exps=1), fsm.LoopIterate())
     assert kinds(cmds) == [fsm.FinishThenDispatchExperimentCmd]
+    assert isinstance(cmds[0], fsm.FinishThenDispatchExperimentCmd)
     assert cmds[0].requires_live_estop_recheck is True
 
 
 def test_iterate_finish_then_dispatch_sequence_guarded():
     s, cmds = fsm.step(st(loop_state=LoopStatus.started, n_seqs=1), fsm.LoopIterate())
     assert kinds(cmds) == [fsm.FinishThenDispatchSequenceCmd]
+    assert isinstance(cmds[0], fsm.FinishThenDispatchSequenceCmd)
     assert cmds[0].requires_live_estop_recheck is True
 
 
@@ -251,6 +261,7 @@ def test_iterate_driver_health_is_nonterminal_command():
         fsm.LoopIterate(),
     )
     assert kinds(cmds) == [fsm.RetryDriverHealth]
+    assert isinstance(cmds[0], fsm.RetryDriverHealth)
     assert cmds[0].na_drivers == ("PSTAT",)
 
 
@@ -308,7 +319,9 @@ def test_t4_exit_finalization_closes_out_and_stops():
     assert s.loop_state == LoopStatus.stopped
     assert s.loop_intent == LoopIntent.none
     assert kinds(cmds) == [fsm.CloseOutExperimentCmd, fsm.CloseOutSequenceCmd]
-    assert all(c.requires_live_estop_recheck for c in cmds)
+    for c in cmds:
+        assert isinstance(c, (fsm.CloseOutExperimentCmd, fsm.CloseOutSequenceCmd))
+        assert c.requires_live_estop_recheck
 
 
 def test_t4_exit_under_estop_keeps_estopped_and_skips_closeout():
