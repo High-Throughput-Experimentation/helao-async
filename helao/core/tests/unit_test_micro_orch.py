@@ -77,8 +77,9 @@ def _port_pair_free(port: int) -> bool:
     if rpc_port > 65535:
         return False
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as http_s, \
-                socket.socket(socket.AF_INET, socket.SOCK_STREAM) as rpc_s:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as http_s, socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        ) as rpc_s:
             http_s.bind(("127.0.0.1", port))
             rpc_s.bind(("127.0.0.1", rpc_port))
         return True
@@ -124,9 +125,7 @@ class _FakeActionServer:
         self.dispatcher = RPCDispatcher(server_key)
         self.attach_calls = 0
         self.action_calls: list = []
-        self.dispatcher.register(
-            f"{server_key}/{action_name}", self._run_action
-        )
+        self.dispatcher.register(f"{server_key}/{action_name}", self._run_action)
         self.dispatcher.register("attach_client", self._attach_client)
         self.dispatcher.register("detach_client", self._detach_client)
 
@@ -192,7 +191,11 @@ class _FakeDataActionServer:
         # produce a sample_out so the experiment aggregates something
         action_dict.setdefault("samples_out", [])
         # write artifacts to disk like a real server would
-        state = RunDir.DIAG.value if action_dict.get("manual_action") else RunDir.FINISHED.value
+        state = (
+            RunDir.DIAG.value
+            if action_dict.get("manual_action")
+            else RunDir.FINISHED.value
+        )
         out_dir = action_dict.get("action_output_dir")
         if out_dir:
             abs_dir = os.path.join(self.root, state, out_dir)
@@ -223,6 +226,7 @@ class _FakeDataActionServer:
 def _demo_exp_func(experiment, wait_time: float = 0.0):
     """Experiment function: plan two actions on the FAKE server via ActionPlanMaker."""
     from helao.helpers.premodels import ActionPlanMaker
+
     apm = ActionPlanMaker()
     apm.add("FAKE", "ping", {"wait_time": wait_time})
     apm.add("FAKE", "ping", {"wait_time": wait_time})
@@ -242,6 +246,7 @@ async def _drive_run_experiment(reporter: TestReporter) -> None:
                 _demo_exp_func, experiment=Experiment(experiment_name="runexp")
             )
             from helao.core.drivers.data.loaders.localfs import HelaoExperiment
+
             reporter.check(
                 "run_experiment returns a HelaoExperiment",
                 lambda: isinstance(loaded, HelaoExperiment),
@@ -269,6 +274,7 @@ async def _drive_run_experiment(reporter: TestReporter) -> None:
             )
             aloaded = await orch.run_action(act)
             from helao.core.drivers.data.loaders.localfs import HelaoAction
+
             reporter.check(
                 "run_action returns a HelaoAction",
                 lambda: isinstance(aloaded, HelaoAction),
@@ -289,6 +295,7 @@ async def _drive_run_experiment(reporter: TestReporter) -> None:
 def _demo_seq_func(cycles: int = 2):
     """Sequence function: plan ``cycles`` demo experiments via ExperimentPlanMaker."""
     from helao.helpers.premodels import ExperimentPlanMaker
+
     epm = ExperimentPlanMaker()
     for _ in range(cycles):
         epm.add("demo_exp", {"wait_time": 0.0})
@@ -305,10 +312,9 @@ async def _drive_run_sequence(reporter: TestReporter) -> None:
         async with _make_orch(
             root, {"FAKE": {"host": "127.0.0.1", "port": fake_port}}
         ) as orch:
-            loaded = await orch.run_sequence(
-                _demo_seq_func, experiment_lib, cycles=2
-            )
+            loaded = await orch.run_sequence(_demo_seq_func, experiment_lib, cycles=2)
             from helao.core.drivers.data.loaders.localfs import HelaoSequence
+
             reporter.check(
                 "run_sequence returns a HelaoSequence",
                 lambda: isinstance(loaded, HelaoSequence),
@@ -324,7 +330,7 @@ async def _drive_run_sequence(reporter: TestReporter) -> None:
             reporter.check(
                 "all experiments nested under one sequence dir",
                 lambda: len(
-                    {c["action_output_dir"].split(os.sep)[2] for c in fake.action_calls}
+                    {c["action_output_dir"].split("/")[2] for c in fake.action_calls}
                 )
                 == 1,
             )
@@ -396,6 +402,7 @@ async def _drive_zip_roundtrip(reporter: TestReporter) -> None:
             orch.zip_runs(zip_path)
 
         from helao.core.drivers.data.loaders.localfs import LocalLoader
+
         loader = LocalLoader(zip_path)
         reporter.check(
             "loader indexed exactly one sequence",
@@ -515,6 +522,7 @@ async def _drive_yml_writers(reporter: TestReporter) -> None:
             lambda: os.sep + RunDir.DIAG.value + os.sep in exp_file,
         )
         from helao.helpers.yml_tools import yml_load
+
         with open(exp_file) as f:
             exp_meta = yml_load(f.read())
         reporter.check(
@@ -605,6 +613,7 @@ async def _drive_load_finished(reporter: TestReporter) -> None:
 
         loaded = await orch._load_finished(rel_dir, "exp")
         from helao.core.drivers.data.loaders.localfs import HelaoExperiment
+
         reporter.check(
             "_load_finished returns a HelaoExperiment",
             lambda: isinstance(loaded, HelaoExperiment),
@@ -637,8 +646,12 @@ def _check_track_run(reporter: TestReporter) -> None:
     try:
         orch = _make_orch(root)
         yml_path = os.path.join(
-            root, RunDir.DIAG.value, "26.24", "0616",
-            "120000__seq--x__manual", "260616.120001000000__exp--x",
+            root,
+            RunDir.DIAG.value,
+            "26.24",
+            "0616",
+            "120000__seq--x__manual",
+            "260616.120001000000__exp--x",
             "260616.120001000000-exp.yml",
         )
         os.makedirs(os.path.dirname(yml_path), exist_ok=True)
@@ -655,7 +668,9 @@ def _check_track_run(reporter: TestReporter) -> None:
             "record rel_dir is relative to the state root",
             lambda: rec["rel_dir"]
             == os.path.join(
-                "26.24", "0616", "120000__seq--x__manual",
+                "26.24",
+                "0616",
+                "120000__seq--x__manual",
                 "260616.120001000000__exp--x",
             ),
         )
