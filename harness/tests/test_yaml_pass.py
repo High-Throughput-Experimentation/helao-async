@@ -131,6 +131,38 @@ def test_volatile_field_raw_difference_does_not_diff():
     ]
 
 
+def test_sample_machine_name_is_identity_not_host():
+    """machine_name is host identity on MachineModel (orchestrator/action_server)
+    but sample identity inside samples_in/out — collapsing it there would mask
+    a real difference (failure mode F1)."""
+    m1, m2 = UuidMapper(), UuidMapper()
+    g = normalize_meta(
+        {
+            "orchestrator": {"machine_name": "orch-host-a"},
+            "samples_in": [{"machine_name": "plate-a", "global_label": "x"}],
+        },
+        m1,
+    )
+    c = normalize_meta(
+        {
+            "orchestrator": {"machine_name": "orch-host-b"},
+            "samples_in": [{"machine_name": "plate-b", "global_label": "x"}],
+        },
+        m2,
+    )
+    # orchestrator.machine_name collapses to HOST on both sides -> no diff there
+    assert g["orchestrator"] == {"machine_name": "HOST"}
+    assert c["orchestrator"] == {"machine_name": "HOST"}
+    diffs = diff_meta(g, c)
+    assert diffs == [
+        {
+            "key": "samples_in[0].machine_name",
+            "golden": "plate-a",
+            "candidate": "plate-b",
+        }
+    ]
+
+
 def test_prg_compares_only_terminal_booleans():
     g = {"yml": "/abs/a", "s3": True, "api": True, "files_pending": ["x"]}
     c = {"yml": "/abs/b", "s3": True, "api": True, "files_pending": []}
