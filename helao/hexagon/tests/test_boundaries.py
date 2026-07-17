@@ -178,6 +178,34 @@ def test_checker_flags_banned_import(tmp_path):
         victim.unlink()
 
 
+def test_checker_flags_banned_relative_import(tmp_path):
+    """Mutation self-test: relative imports (node.level>0 branch of
+    _absolutize) must resolve to their absolute module path and be
+    classified with the same allow-list as absolute imports.
+
+    Domain modules import sibling models via `from . import x`; this
+    exercises that resolution plus a `from ..foo import y` climb past the
+    domain package boundary, which must be flagged like the absolute
+    equivalent `import helao.hexagon.app`.
+    """
+    victim = HEXAGON_ROOT / "domain" / "_boundary_selftest_rel_tmp.py"
+    victim.write_text("from . import x\nfrom ..app import z\n")
+    try:
+        # from . import x  (level=1, no module) -> resolves to the victim's
+        # own package, helao.hexagon.domain -- allowed, on the allow-list.
+        # from ..app import z  (level=2) -> climbs one package above domain
+        # (helao.hexagon) then appends "app" -> helao.hexagon.app -- banned.
+        resolved = _imported_modules(victim)
+        assert resolved == [
+            (1, "helao.hexagon.domain"),
+            (2, "helao.hexagon.app"),
+        ]
+        hits = iter_violations(victim)
+        assert [(m, layer) for _, m, layer in hits] == [("helao.hexagon.app", "domain")]
+    finally:
+        victim.unlink()
+
+
 def test_checker_allows_domain_allowlist(tmp_path):
     victim = HEXAGON_ROOT / "domain" / "_boundary_selftest_ok_tmp.py"
     victim.write_text(
