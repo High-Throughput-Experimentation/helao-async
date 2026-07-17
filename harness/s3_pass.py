@@ -42,8 +42,8 @@ def _load_bytes(path: Path) -> bytes:
 
 
 def _manifest_entry_key(entry: tuple) -> str:
-    bucket, key, gzip = entry
-    suffix = ":gzip" if gzip else ""
+    bucket, key, is_gz = entry
+    suffix = ":gzip" if is_gz else ""
     return f"s3_manifest.{bucket}/{key}{suffix}"
 
 

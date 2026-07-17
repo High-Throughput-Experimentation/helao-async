@@ -84,13 +84,17 @@ def _stable_key(item: Any) -> str:
 
 
 def canonicalize(d: dict) -> dict:
-    """absent == empty (§5.3): drop None/''/[]/{}; NaN -> None like clean_dict."""
+    """absent == empty (§5.3): drop None/''/[]/{}, and NaN.
+
+    clean_dict's `as_dict()` maps NaN -> None (`nan2None`), and its
+    `_cleanupdict` pruning then drops that None as empty — so a NaN field is
+    effectively DROPPED (absent), never a present null. Match that here.
+    """
     out = {}
     for k, v in d.items():
         if v is None or v == "" or v == [] or v == {}:
             continue
         if isinstance(v, float) and math.isnan(v):
-            out[k] = None
             continue
         out[k] = v
     return out
