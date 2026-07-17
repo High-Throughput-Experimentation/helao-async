@@ -16,7 +16,6 @@ from helao.helpers.premodels import Action
 from .hlostatus import HloStatus
 from helao.core.helaodict import HelaoDict
 
-
 # additional finished categories which contain one of these
 # will be added to their own categories, sequence defines priority
 # all of these need additional "finish" else the action is still "active"
@@ -319,9 +318,11 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         if hlostatus in self.nonactive_dict:
             self.nonactive_dict[hlostatus] = {}
         elif HloStatus.finished in self.nonactive_dict:
-            # can only be in finsihed, but need to look for substatus
-            for key in self.nonactive_dict[HloStatus.finished].keys():
-                del self.nonactive_dict[HloStatus.finished][key]
+            # can only be in finished; clear the whole finished bucket.
+            # (Was: `for key in ....keys(): del ....[key]`, which raised
+            # "dictionary changed size during iteration" whenever the bucket
+            # was non-empty — a live RuntimeError on the clear_estop path.)
+            self.nonactive_dict[HloStatus.finished] = {}
 
     def new_experiment(self, exp_uuid: UUID):
         """Initialize the dispatched-action counter for a new experiment."""
