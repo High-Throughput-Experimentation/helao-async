@@ -64,3 +64,24 @@ def test_domain_models_reexports():
 def test_domain_models_all_matches():
     mod = importlib.import_module("helao.hexagon.domain.models")
     assert sorted(mod.__all__) == sorted(MODEL_EXPORTS)
+
+
+PORT_MODULES = {
+    "helao.hexagon.ports.hardware": [
+        "HardwarePort",
+        "ExclusiveAccess",
+        "driver_response_to_error_code",
+    ],
+    "helao.hexagon.ports.data_sink": ["DataSinkPort"],
+    "helao.hexagon.ports.artifact_store": ["ArtifactStorePort"],
+    "helao.hexagon.ports.sync": ["SyncPort", "S3FacePort"],
+    "helao.hexagon.ports.transport": ["TransportPort"],
+    "helao.hexagon.ports.status": ["StatusPort"],
+}
+
+
+def test_core_port_modules_import():
+    for modname, names in PORT_MODULES.items():
+        mod = importlib.import_module(modname)
+        for n in names:
+            assert hasattr(mod, n), f"{modname} missing {n}"
