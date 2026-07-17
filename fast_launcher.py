@@ -41,17 +41,18 @@ import colorama
 
 # pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
 # family, which the Windows Proactor loop (the default on Windows) does not
-# provide. Select the WindowsSelectorEventLoopPolicy before uvicorn creates its
-# loop so the co-located ZMQ RPC server works without the RuntimeWarning and the
-# extra tornado selector thread. Safe here: helao uses no asyncio subprocesses.
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# provide. On Windows we force a selector loop via ``loop_factory`` on the
+# ``asyncio.run`` call below (see ``_LOOP_FACTORY``), so the co-located ZMQ RPC
+# server works without the RuntimeWarning and the extra tornado selector thread.
+# This replaces ``asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())``,
+# both of which are deprecated as of Python 3.14. Safe here: helao uses no asyncio
+# subprocesses.
+_LOOP_FACTORY = asyncio.SelectorEventLoop if sys.platform == "win32" else None
 
 
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
-
 
 if __name__ == "__main__":
     log_root = "."
@@ -176,11 +177,11 @@ if __name__ == "__main__":
     # Run uvicorn's server coroutine under asyncio.run() rather than
     # uvicorn.run(). uvicorn.run() -> Server.run() feeds its own loop factory to
     # asyncio (asyncio.ProactorEventLoop on Windows), which is instantiated
-    # directly and therefore ignores the event-loop policy set above. asyncio.run
-    # calls asyncio.new_event_loop(), which honors the policy, so the co-located
-    # zmq.asyncio RPC server gets the add_reader-capable selector loop it needs.
-    # Behavior is unchanged off Windows (new_event_loop yields the same loop type
-    # uvicorn's auto factory would have).
+    # directly and would ignore our selector requirement. asyncio.run() builds the
+    # loop from ``loop_factory`` (``_LOOP_FACTORY``: SelectorEventLoop on Windows,
+    # default elsewhere), so the co-located zmq.asyncio RPC server gets the
+    # add_reader-capable selector loop it needs. Behavior is unchanged off Windows
+    # (loop_factory=None yields uvicorn's usual loop type).
     config = uvicorn.Config(
         app,
         host=server_config["host"],
@@ -189,4 +190,4 @@ if __name__ == "__main__":
         timeout_graceful_shutdown=5,
     )
     server = uvicorn.Server(config)
-    asyncio.run(server.serve())
+    asyncio.run(server.serve(), loop_factory=_LOOP_FACTORY)

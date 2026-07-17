@@ -48,16 +48,19 @@ import colorama
 
 # pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
 # family, which the Windows Proactor loop (the default on Windows) does not
-# provide. Select the WindowsSelectorEventLoopPolicy before Bokeh/tornado creates
-# its loop so any co-located ZMQ RPC socket works without the RuntimeWarning and
-# the extra selector thread. Safe here: helao uses no asyncio subprocesses, and
-# tornado prefers the selector loop on Windows.
+# provide. Install a selector loop as the current event loop before Bokeh/tornado
+# creates its IOLoop (which wraps asyncio.get_event_loop()), so any co-located ZMQ
+# RPC socket works without the RuntimeWarning and the extra selector thread. This
+# replaces asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy()), both
+# deprecated as of Python 3.14; asyncio.set_event_loop / SelectorEventLoop are the
+# non-deprecated equivalents (SelectorEventLoop is exactly the loop that policy
+# built). Safe here: helao uses no asyncio subprocesses, and tornado prefers the
+# selector loop on Windows.
 if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    asyncio.set_event_loop(asyncio.SelectorEventLoop())
 from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
 from helao.helpers.yml_tools import yml_load
-
 
 if __name__ == "__main__":
     log_root = "."
