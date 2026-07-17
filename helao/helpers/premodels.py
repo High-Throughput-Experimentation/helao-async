@@ -139,7 +139,7 @@ class Sequence(SequenceModel):
             year_week,
             sequence_day,
             f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
-        ).replace(r"\\", "/")
+        ).replace(os.sep, "/")
 
 
 class Experiment(Sequence, ExperimentModel):
@@ -191,7 +191,7 @@ class Experiment(Sequence, ExperimentModel):
         return os.path.join(
             str(sequence_dir),
             f"{experiment_time}__{self.experiment_name}",
-        ).replace(r"\\", "/")
+        ).replace(os.sep, "/")
 
     def get_exp(self) -> ExperimentModel:
         """Return a plain ``ExperimentModel`` snapshot with aggregated actions.
