@@ -9,8 +9,10 @@ compares payload CONTENT and the recorder manifest, and asserts the two
 INTENTIONAL on-disk-vs-S3 differences that §5.5 requires the harness to
 check as differences, not sameness:
   1. FileInfo rename rule in the S3 action meta:
-     file_name  x.hlo        -> x.hlo.json
-     file_type  helao__file  -> helao__<ext>_file  (hlo -> helao__hlo_file)
+     file_name  x.hlo        -> x.hlo.json (or x.hlo.json.gz if compressed)
+     file_type  <prefix>helao__file -> <prefix>helao__<ext>_file, where
+                <ext> is the trailing extension of the S3 key ("json", or
+                "gz" when compressed) — never "hlo" itself.
   2. technique_name list -> str split applied ONLY in the S3/prc copies.
 """
 
@@ -39,6 +41,12 @@ def _load_bytes(path: Path) -> bytes:
     return raw
 
 
+def _manifest_entry_key(entry: tuple) -> str:
+    bucket, key, gzip = entry
+    suffix = ":gzip" if gzip else ""
+    return f"s3_manifest.{bucket}/{key}{suffix}"
+
+
 def diff_s3_manifest(
     gpath: Path, cpath: Path, mg: UuidMapper, mc: UuidMapper
 ) -> List[dict]:
@@ -55,11 +63,19 @@ def diff_s3_manifest(
     diffs: List[dict] = []
     for missing in sorted(g - c):
         diffs.append(
-            {"key": f"s3_manifest{missing}", "golden": "present", "candidate": "absent"}
+            {
+                "key": _manifest_entry_key(missing),
+                "golden": "present",
+                "candidate": "absent",
+            }
         )
     for extra in sorted(c - g):
         diffs.append(
-            {"key": f"s3_manifest{extra}", "golden": "absent", "candidate": "present"}
+            {
+                "key": _manifest_entry_key(extra),
+                "golden": "absent",
+                "candidate": "present",
+            }
         )
     return diffs
 
@@ -115,8 +131,22 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> List[dict]:
         if not isinstance(fi, dict):
             continue
         name = fi.get("file_name", "")
-        if name.endswith(".hlo.json"):
-            orig = name[: -len(".json")]
+        if ".hlo.json" in name:
+            # Real legacy rename (sync_driver.py ~1213-1239): the S3 key gets
+            # a trailing extension appended to the uploaded .hlo filename
+            # (".json", plus ".gz" when compressed), and file_type has
+            # "helao__file" replaced with "helao__<last-S3-key-ext>_file",
+            # preserving any server-name prefix (e.g. "wssim_helao__file" ->
+            # "wssim_helao__json_file"). Derive the expected extension from
+            # the S3-side name itself rather than assuming a fixed value.
+            if name.endswith(".gz"):
+                ext = "gz"
+                orig = name[: -len(".gz")]
+            else:
+                ext = name.rsplit(".", 1)[-1]
+                orig = name
+            if orig.endswith(".json"):
+                orig = orig[: -len(".json")]
             if orig not in disk_files:
                 diffs.append(
                     {
@@ -125,11 +155,11 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> List[dict]:
                         "candidate": "no matching on-disk entry",
                     }
                 )
-            elif fi.get("file_type") != "helao__hlo_file":
+            elif not fi.get("file_type", "").endswith(f"helao__{ext}_file"):
                 diffs.append(
                     {
                         "key": f"files[{name}].file_type",
-                        "golden": "helao__hlo_file",
+                        "golden": f"*helao__{ext}_file (rename rule)",
                         "candidate": fi.get("file_type"),
                     }
                 )

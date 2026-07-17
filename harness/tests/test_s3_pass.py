@@ -97,23 +97,51 @@ def test_s3_manifest_jsonl_compares_mapped_key_sets(tmp_path):
 
 
 def test_fileinfo_rename_rule_is_asserted():
+    # Realistic values per sync_driver.py (~1213-1239) and base.py's default
+    # file_type (f"{server_name.lower()}_helao__file"): the on-disk FileInfo
+    # carries a server-name prefix, and the S3-side rename replaces
+    # "helao__file" with "helao__<last-S3-key-extension>_file" (never "hlo").
     disk_act = {
-        "files": [{"file_name": "WsSim-0.0.0.0__0.hlo", "file_type": "helao__file"}],
+        "files": [
+            {"file_name": "WsSim-0.0.0.0__0.hlo", "file_type": "wssim_helao__file"}
+        ],
         "technique_name": ["t1", "t2"],
     }
     good_s3 = {
         "files": [
-            {"file_name": "WsSim-0.0.0.0__0.hlo.json", "file_type": "helao__hlo_file"}
+            {
+                "file_name": "WsSim-0.0.0.0__0.hlo.json",
+                "file_type": "wssim_helao__json_file",
+            }
         ],
         "technique_name": "t1",
     }
     assert assert_s3_meta_rules(disk_act, good_s3) == []
+
+    # Rename MISSING: S3 side still carries the pre-rename generic file_type.
     bad_type = {
         "files": [
-            {"file_name": "WsSim-0.0.0.0__0.hlo.json", "file_type": "helao__file"}
+            {
+                "file_name": "WsSim-0.0.0.0__0.hlo.json",
+                "file_type": "wssim_helao__file",
+            }
         ],
         "technique_name": "t1",
     }
     assert assert_s3_meta_rules(disk_act, bad_type) != []
+
+    # Compressed upload: S3 key gets ".hlo.json.gz", file_type extension is
+    # "gz" (the LAST S3-key extension), not "json".
+    gzip_s3 = {
+        "files": [
+            {
+                "file_name": "WsSim-0.0.0.0__0.hlo.json.gz",
+                "file_type": "wssim_helao__gz_file",
+            }
+        ],
+        "technique_name": "t1",
+    }
+    assert assert_s3_meta_rules(disk_act, gzip_s3) == []
+
     bad_technique = dict(good_s3, technique_name=["t1", "t2"])
     assert assert_s3_meta_rules(disk_act, bad_technique) != []
