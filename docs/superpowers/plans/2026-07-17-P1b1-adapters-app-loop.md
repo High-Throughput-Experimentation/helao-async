@@ -3625,5 +3625,21 @@ Do NOT commit the capture output or the smoke root (both live outside the repo).
 
 ## Gate record
 
-(appended by Task 12 Step 6 when the smoke passes)
+**Date:** 2026-07-17
+**Git SHA:** 66c074b4b6a12a776f67d8b03ce396683ceb2f38 (P1b1 T11, base for this gate; T12's own commit follows)
+**Config:** `goldenhex` (hexagon ORCH+SIM via `deployment: hexagon`, legacy sim DB), root `/home/dan/INST_hlo_hexsmoke`
+
+**Launch:** `python launch.py goldenhex --no-hot-reload` — ORCH/SIM/DB all reached `/docs` 200 within ~40s, zero tracebacks in any of the three `LOGS/<KEY>.log` files.
+
+**Capture:** `python -m harness.capture --scenario GM-1 --root /home/dan/INST_hlo_hexsmoke --out /home/dan/hexsmoke_captures/gm1_p1b1 --config-prefix goldenhex` -> `captured GM-1 -> /home/dan/hexsmoke_captures/gm1_p1b1`, exit 0. Capture's own quiesce (loop stopped, DB `/n_queue`+`/tasks` drained, RUNS_ACTIVE settled) passed inside the rig.
+
+**Assertion:** `assert_smoke_tree.py /home/dan/INST_hlo_hexsmoke` -> **ALL CHECKS PASS** (RUNS_SYNCED zip present; PROCESSES has 4 `-prc.yml`, matching the P0 GM-1 golden's count exactly; S3_SIM recorded uploads present; RUNS_ACTIVE empty; LOGS/{ORCH,SIM,DB}.log all present; hexagon loop-started line present; no fake-adapter banner; no tracebacks).
+
+**Shutdown:** `kill_group.py` terminated all three pids cleanly; ports 8001/8002/8010 confirmed down; `ps aux` shows no stray `fast_launcher`/`goldenhex` processes.
+
+**Regression:** `pytest helao/hexagon/tests -q` -> 170 passed. `pyright helao/hexagon/` -> 10 pre-existing errors (all in `test_adapters_data.py`/`test_adapters_runtime_services.py`, T6/T7 typed-params test fixtures passing bare `Literal` strings where `DataModel`/`Action`/`Experiment`/`Sequence` are expected) confirmed present with T12's two edits stashed out, i.e. NOT introduced by this gate; carried forward as pre-existing debt outside T12 scope.
+
+**Real bug found + fixed (in scope, non-legacy):** `helao/hexagon/app/dispatch_loop.py` and `helao/hexagon/app/orch_effects.py` (T9/T8) bound `LOGGER = logging.getLogger(__name__)` (stdlib) instead of the project's launcher-installed `helao_logging.LOGGER` singleton convention. A stdlib `getLogger(__name__)` call always returns a valid Logger object, so it never raised — it silently dropped every dispatch-loop/effects log record (including the loop's own "started operator orch" line) instead of routing to `<root>/LOGS/ORCH.log`, because `helao_logging.make_logger` attaches the file handler only to the specifically-named per-server logger instance with `propagate = False`. Fixed by introducing a small `_LazyServerLogger` shim (mirrors `LegacyLoggingAdapter._log()`'s call-time resolution) that both modules now share; verified the "--- started operator orch ---" line lands in `ORCH.log` post-fix, all 170 hexagon tests still pass, and the fix is a no-op (does not raise) when `helao_logging.LOGGER` is unset (bare unit-test import path).
+
+**Transport:** real ZMQ RPC + HTTP + WS; no fakes in composition.
 

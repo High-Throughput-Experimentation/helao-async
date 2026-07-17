@@ -11,11 +11,11 @@ ever dispatches an RPC/HTTP request to its own server — every effect is a
 direct method call on the wrapped legacy Orch."""
 
 import asyncio
-import logging
 from dataclasses import dataclass, field, replace
 from typing import Callable, Dict
 
 from helao.hexagon.app.orch_effects import (
+    _LazyServerLogger,
     OrchCommandRunner,
     apply_state_delta,
     derive_state,
@@ -39,7 +39,7 @@ from helao.hexagon.domain.orchestration import (
     step,
 )
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = _LazyServerLogger()  # see orch_effects.py for the call-time-resolution
 _POLICY = DispatchPolicy()
 
 __all__ = ["HexDispatchLoop", "HexRuntime", "HexagonGraft", "graft_hexagon_loop"]
