@@ -80,6 +80,26 @@ def test_history_registered_on_last_action_uuid_match():
     assert hits and hits[0].action_uuid == act.action_uuid  # checklist #1
 
 
+def test_history_not_registered_while_action_still_active():
+    """FIX: ActionServerModel.last_action_uuid is set on every status push,
+    including the first "active" report (base_status.py ~L315), before any
+    sort. Legacy (orch_status_sync.py:200-231) only registers history by
+    scanning the endpoint nonactive_dict buckets for a match, so it can
+    never fire while the action is merely active. An ACTIVE action whose
+    uuid equals last_dispatched_action_uuid must NOT emit
+    RegisterHistoryEntry."""
+    gsm = _gsm()
+    act = _action([HloStatus.active])
+    asm = _asm(act, "acquire", finished=False)
+    _, cmds = fold_status(
+        gsm,
+        asm,
+        loop_started=True,
+        last_dispatched_action_uuid=act.action_uuid,
+    )
+    assert not any(isinstance(c, RegisterHistoryEntry) for c in cmds)
+
+
 def test_newly_nonactive_go_to_live_buffer():
     """Checklist #3 needs two ingests: GlobalStatusModel only records a
     (uuid, status) pair in the "recently transitioned" list when the uuid is
@@ -133,13 +153,20 @@ def test_orch_state_derivation_idle_vs_busy():
 
 def test_estopped_uuid_triggers_estop_only_when_loop_started():
     est = _action([HloStatus.finished, HloStatus.estopped])
-    _, cmds_started = fold_status(
-        _gsm(),
+    gsm_started = _gsm()
+    # FIX: legacy's estop branch (orch_status_sync.py ~274-275) only calls
+    # estop_loop() -- it never assigns orch.globalstatusmodel.orch_state.
+    # Pin a pre-existing orch_state here and confirm fold_status leaves it
+    # unchanged (no forced OrchStatus.estopped) on the estop branch.
+    gsm_started.orch_state = OrchStatus.busy
+    state_started, cmds_started = fold_status(
+        gsm_started,
         _asm(est, "acquire", finished=True),
         loop_started=True,
         last_dispatched_action_uuid=None,
     )
     assert any(isinstance(c, TriggerEstopFromStatus) for c in cmds_started)
+    assert state_started == OrchStatus.busy  # unchanged, matches legacy no-op
     _, cmds_stopped = fold_status(
         _gsm(),
         _asm(est, "acquire", finished=True),

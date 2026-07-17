@@ -37,8 +37,18 @@ of raising. Fixed by keeping ``PushLiveBuffer.items`` flat --
 ``Tuple[Tuple[UUID, str], ...]`` -- matching ``update_global_with_acts``
 verbatim (byte-identical to the ``for act_uuid, act_status in
 recent_nonactive`` loop in orch_status_sync.update_status, which calls
-``put_lbuf`` once per pair, including a possible duplicate uuid across two
-buckets, e.g. ``errored`` then ``finished``).
+``put_lbuf`` once per pair).
+
+Note on the flat-tuple shape: ``GlobalStatusModel._sort_status`` guards each
+bucket scan with ``if uuid in self.active_dict: del ...; append(...)``, so
+once a uuid is consumed out of ``active_dict`` by the first bucket that
+contains it, a later bucket holding the same uuid (e.g. a dual
+``errored``+``finished`` landing from a single ``EndpointModel.sort_status``
+call) is skipped by that same guard and does not append a second entry --
+verified empirically against the real model. The flat
+``Tuple[Tuple[UUID, str], ...]`` shape is chosen purely for byte-identical
+API fidelity with ``update_global_with_acts``, not because a genuine
+duplicate-uuid entry is exercised or even reachable through this guard.
 """
 
 from dataclasses import dataclass
@@ -122,11 +132,24 @@ def fold_status(
         )
 
     # -- checklist #1: history registration on last_action_uuid match ------
+    # ActionServerModel.last_action_uuid is set on EVERY status push (incl.
+    # the first "active" report, before sort_status runs -- base_status.py
+    # ~L315), so a bare uuid-equality check would fire while the action is
+    # still running. Legacy (orch_status_sync.py:200-231) only registers
+    # history by scanning the endpoint nonactive_dict buckets for a match --
+    # it can never fire while merely active. Mirror that: also require the
+    # reported uuid to actually be present in one of the ASM's nonactive
+    # buckets (finished/errored/estopped) after this push's sort.
     reported_uuid = asm.last_action_uuid
     if (
         last_dispatched_action_uuid is not None
         and reported_uuid is not None
         and reported_uuid == last_dispatched_action_uuid
+        and any(
+            reported_uuid in bucket
+            for ep in asm.endpoints.values()
+            for bucket in ep.nonactive_dict.values()
+        )
     ):
         commands.append(RegisterHistoryEntry(action_uuid=reported_uuid))
 
@@ -139,7 +162,12 @@ def fold_status(
                 reason=f"estopped uuids in finished: {sorted(map(str, estopped))}"
             )
         )
-        orch_state = OrchStatus.estopped
+        # legacy's estop branch (orch_status_sync.py ~274-275) only calls
+        # estop_loop() -- which sets loop_state, not orch_state -- and never
+        # assigns orch.globalstatusmodel.orch_state; grep confirms orch_state
+        # is only ever assigned error/idle/busy. Mirror that no-op here by
+        # returning gsm's existing orch_state unchanged.
+        orch_state = gsm.orch_state
     elif errored and loop_started:
         commands.append(SetOrchStateError())
         orch_state = OrchStatus.error
