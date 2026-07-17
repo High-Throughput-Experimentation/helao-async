@@ -12,8 +12,13 @@ Normalization semantics per §5.5:
 - time fields (any *_timestamp, epoch_ns): collapsed to "TS";
 - environment/code identity (codehash/codepath/funcname, hlo_version,
   exec_id, action_etc, dummy/simulation/access, aux_file_paths): DROPPED;
-- host identity (orch_key/orch_host/orch_port, MachineModel.machine_name):
-  collapsed to "HOST" (presence still checked);
+- host identity (orch_key/orch_host/orch_port, and `machine_name` when it
+  belongs to a MachineModel — the `orchestrator`/`action_server` sub-dicts,
+  or a bare top-level key): collapsed to "HOST" (presence still checked).
+  `machine_name` inside a `samples_in`/`samples_out` entry is SampleModel
+  identity (interpolated into `global_label`), not host identity, so it is
+  NOT collapsed there — a differing sample `machine_name` must surface as a
+  real diff;
 - *_output_dir strings: timestamp components normalized via the §5.1 grammar;
 - ordering hazards (samples_in/out, files, dispatched_*_abbr): stable-sorted
   before diffing;
@@ -91,15 +96,31 @@ def canonicalize(d: dict) -> dict:
     return out
 
 
-def normalize_meta(obj: Any, mapper: UuidMapper, key: Optional[str] = None) -> Any:
-    """Apply §5.5 normalization to a loaded YAML/JSON object, recursively."""
+def normalize_meta(
+    obj: Any,
+    mapper: UuidMapper,
+    key: Optional[str] = None,
+    in_samples: bool = False,
+) -> Any:
+    """Apply §5.5 normalization to a loaded YAML/JSON object, recursively.
+
+    `in_samples` threads whether the current subtree is nested inside a
+    `samples_in`/`samples_out` entry. `machine_name` is ambiguous by bare key
+    name alone: on `MachineModel` (the `orchestrator`/`action_server`
+    sub-dicts, or a top-level key) it is host identity and gets collapsed to
+    "HOST"; on `SampleModel` (inside `samples_in`/`samples_out`) it is sample
+    identity and must be left alone so a real difference surfaces.
+    """
     if isinstance(obj, dict):
         out: dict = {}
         for k, v in obj.items():
             ks = str(k)
+            child_in_samples = in_samples or ks in ("samples_in", "samples_out")
             if ks.endswith(DROP_KEY_SUFFIXES) or ks in DROP_EXACT_KEYS:
                 continue
-            if ks in HOST_EXACT_KEYS:
+            if ks in HOST_EXACT_KEYS and not (
+                ks == "machine_name" and child_in_samples
+            ):
                 out[ks] = "HOST"
                 continue
             if ks.endswith(TIMESTAMP_KEY_SUFFIXES) or ks in TIMESTAMP_EXACT_KEYS:
@@ -108,13 +129,13 @@ def normalize_meta(obj: Any, mapper: UuidMapper, key: Optional[str] = None) -> A
             if ks.endswith(UUID_KEY_SUFFIXES) or ks in UUID_EXACT_KEYS:
                 out[ks] = mapper.sub_any(v)
                 continue
-            out[ks] = normalize_meta(v, mapper, key=ks)
+            out[ks] = normalize_meta(v, mapper, key=ks, in_samples=child_in_samples)
         for k in SORT_LIST_KEYS:
             if k in out and isinstance(out[k], list):
                 out[k] = sorted(out[k], key=_stable_key)
         return canonicalize(out)
     if isinstance(obj, list):
-        return [normalize_meta(v, mapper, key=key) for v in obj]
+        return [normalize_meta(v, mapper, key=key, in_samples=in_samples) for v in obj]
     if isinstance(obj, str):
         # embedded uuids (per-sample action_uuid strings, S3 key strings) map;
         # *_output_dir values additionally get the §5.1 grammar treatment.
@@ -138,7 +159,7 @@ def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
             {"key": path, "golden": repr(golden), "candidate": repr(candidate)}
         )
         return diffs
-    if isinstance(golden, dict):
+    if isinstance(golden, dict) and isinstance(candidate, dict):
         for k in sorted(set(golden) | set(candidate)):
             kp = f"{path}.{k}" if path else str(k)
             if k not in golden:
@@ -150,7 +171,7 @@ def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
             else:
                 diffs.extend(diff_meta(golden[k], candidate[k], kp))
         return diffs
-    if isinstance(golden, list):
+    if isinstance(golden, list) and isinstance(candidate, list):
         if len(golden) != len(candidate):
             diffs.append(
                 {
