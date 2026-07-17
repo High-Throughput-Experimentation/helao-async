@@ -1,0 +1,179 @@
+"""YAML/meta content normalization + structural diff (spec §5.3, §5.5).
+
+The volatile lists below are EXACTLY the spec §5.5 contract. Do NOT add
+entries without a master-spec amendment: an over-broad normalizer re-creates
+failure mode F1 by masking real diffs. Per-scenario VALUE masking (random sim
+data) is manifest-driven and handled by hlo_pass/s3_pass, never here.
+
+Normalization semantics per §5.5:
+- identity fields (uuids, run_id, data_request_id): uuid-MAPPED via
+  UuidMapper so parent/child links and the uuid5 process derivation are
+  checked, not ignored;
+- time fields (any *_timestamp, epoch_ns): collapsed to "TS";
+- environment/code identity (codehash/codepath/funcname, hlo_version,
+  exec_id, action_etc, dummy/simulation/access, aux_file_paths): DROPPED;
+- host identity (orch_key/orch_host/orch_port, MachineModel.machine_name):
+  collapsed to "HOST" (presence still checked);
+- *_output_dir strings: timestamp components normalized via the §5.1 grammar;
+- ordering hazards (samples_in/out, files, dispatched_*_abbr): stable-sorted
+  before diffing;
+- absent == empty (clean_dict pruning, §5.3): canonicalize drops
+  None/''/[]/{} recursively on BOTH sides.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+from pathlib import Path
+from typing import Any, List, Optional, Union
+
+from helao.helpers.yml_tools import yml_load
+
+from harness.classify import normalize_relpath
+from harness.uuidmap import UuidMapper
+
+# --- §5.5 volatile lists (exhaustive; keep in lockstep with the spec) ------
+UUID_KEY_SUFFIXES = ("_uuid",)
+UUID_EXACT_KEYS = {"run_id", "data_request_id"}
+TIMESTAMP_KEY_SUFFIXES = ("_timestamp",)
+TIMESTAMP_EXACT_KEYS = {"epoch_ns"}
+DROP_KEY_SUFFIXES = ("_codehash", "_codepath", "_funcname")
+DROP_EXACT_KEYS = {
+    "hlo_version",
+    "exec_id",
+    "action_etc",
+    "dummy",
+    "simulation",
+    "access",
+    "aux_file_paths",
+}
+HOST_EXACT_KEYS = {"orch_key", "orch_host", "orch_port", "machine_name"}
+OUTPUT_DIR_KEY_SUFFIX = "_output_dir"
+# §5.5 ordering hazards: sort by a stable key before diffing.
+SORT_LIST_KEYS = {
+    "dispatched_actions_abbr",
+    "dispatched_experiments_abbr",
+    "files",
+    "samples_in",
+    "samples_out",
+}
+
+
+def to_plain(obj: Any) -> Any:
+    """Convert ruamel round-trip containers to plain dict/list recursively."""
+    if isinstance(obj, dict):
+        return {str(k): to_plain(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [to_plain(v) for v in obj]
+    return obj
+
+
+def load_yml_plain(path: Union[str, Path]) -> Any:
+    """Load a YAML file into plain Python containers."""
+    return to_plain(yml_load(Path(path)))
+
+
+def _stable_key(item: Any) -> str:
+    return json.dumps(item, sort_keys=True, default=str)
+
+
+def canonicalize(d: dict) -> dict:
+    """absent == empty (§5.3): drop None/''/[]/{}; NaN -> None like clean_dict."""
+    out = {}
+    for k, v in d.items():
+        if v is None or v == "" or v == [] or v == {}:
+            continue
+        if isinstance(v, float) and math.isnan(v):
+            out[k] = None
+            continue
+        out[k] = v
+    return out
+
+
+def normalize_meta(obj: Any, mapper: UuidMapper, key: Optional[str] = None) -> Any:
+    """Apply §5.5 normalization to a loaded YAML/JSON object, recursively."""
+    if isinstance(obj, dict):
+        out: dict = {}
+        for k, v in obj.items():
+            ks = str(k)
+            if ks.endswith(DROP_KEY_SUFFIXES) or ks in DROP_EXACT_KEYS:
+                continue
+            if ks in HOST_EXACT_KEYS:
+                out[ks] = "HOST"
+                continue
+            if ks.endswith(TIMESTAMP_KEY_SUFFIXES) or ks in TIMESTAMP_EXACT_KEYS:
+                out[ks] = "TS"
+                continue
+            if ks.endswith(UUID_KEY_SUFFIXES) or ks in UUID_EXACT_KEYS:
+                out[ks] = mapper.sub_any(v)
+                continue
+            out[ks] = normalize_meta(v, mapper, key=ks)
+        for k in SORT_LIST_KEYS:
+            if k in out and isinstance(out[k], list):
+                out[k] = sorted(out[k], key=_stable_key)
+        return canonicalize(out)
+    if isinstance(obj, list):
+        return [normalize_meta(v, mapper, key=key) for v in obj]
+    if isinstance(obj, str):
+        # embedded uuids (per-sample action_uuid strings, S3 key strings) map;
+        # *_output_dir values additionally get the §5.1 grammar treatment.
+        s = mapper.sub(obj)
+        if key is not None and key.endswith(OUTPUT_DIR_KEY_SUFFIX):
+            s = normalize_relpath(s)
+        return s
+    return obj
+
+
+def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
+    """Structural diff of two ALREADY-NORMALIZED objects; [] when identical."""
+    diffs: List[dict] = []
+    if isinstance(golden, bool) != isinstance(candidate, bool) or (
+        type(golden) is not type(candidate)
+        and not (
+            isinstance(golden, (int, float)) and isinstance(candidate, (int, float))
+        )
+    ):
+        diffs.append(
+            {"key": path, "golden": repr(golden), "candidate": repr(candidate)}
+        )
+        return diffs
+    if isinstance(golden, dict):
+        for k in sorted(set(golden) | set(candidate)):
+            kp = f"{path}.{k}" if path else str(k)
+            if k not in golden:
+                diffs.append(
+                    {"key": kp, "golden": "<absent>", "candidate": candidate[k]}
+                )
+            elif k not in candidate:
+                diffs.append({"key": kp, "golden": golden[k], "candidate": "<absent>"})
+            else:
+                diffs.extend(diff_meta(golden[k], candidate[k], kp))
+        return diffs
+    if isinstance(golden, list):
+        if len(golden) != len(candidate):
+            diffs.append(
+                {
+                    "key": f"{path}.len" if path else "len",
+                    "golden": len(golden),
+                    "candidate": len(candidate),
+                }
+            )
+            return diffs
+        for i, (g, c) in enumerate(zip(golden, candidate)):
+            diffs.extend(diff_meta(g, c, f"{path}[{i}]"))
+        return diffs
+    if golden != candidate:
+        diffs.append({"key": path, "golden": golden, "candidate": candidate})
+    return diffs
+
+
+def diff_prg(golden: dict, candidate: dict) -> List[dict]:
+    """.prg sidecars: only the terminal s3/api booleans are contractual (§5.7)."""
+    diffs = []
+    for k in ("s3", "api"):
+        if golden.get(k) != candidate.get(k):
+            diffs.append(
+                {"key": k, "golden": golden.get(k), "candidate": candidate.get(k)}
+            )
+    return diffs
