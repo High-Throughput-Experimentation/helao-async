@@ -330,7 +330,10 @@ async def _drive_run_sequence(reporter: TestReporter) -> None:
             reporter.check(
                 "all experiments nested under one sequence dir",
                 lambda: len(
-                    {c["action_output_dir"].split("/")[2] for c in fake.action_calls}
+                    {
+                        c["action_output_dir"].replace("\\", "/").split("/")[2]
+                        for c in fake.action_calls
+                    }
                 )
                 == 1,
             )
