@@ -11,7 +11,7 @@ success. The Sim DB server (P0) implements S3FacePort with a recording sink.
 """
 
 from pathlib import Path
-from typing import Optional, Protocol, Union, runtime_checkable
+from typing import Protocol, Union, runtime_checkable
 
 __all__ = ["S3FacePort", "SyncPort"]
 
