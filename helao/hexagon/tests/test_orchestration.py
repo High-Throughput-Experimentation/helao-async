@@ -111,6 +111,29 @@ def test_estopped_uuid_when_loop_not_started_is_noop():
     assert s == s0 and cmds == ()
 
 
+def test_estop_requested_when_loop_not_started_is_noop():
+    """Mirrors production /estop_orch (orch_api.py:364-373): only estops when
+    loop_state == started; stopped (and estopped) are no-ops."""
+    s0 = st(loop_state=LoopStatus.stopped)
+    s, cmds = fsm.step(s0, fsm.EstopRequested(reason="ui"))
+    assert s == s0 and cmds == ()
+
+
+def test_estop_requested_when_loop_started_estops():
+    s, cmds = fsm.step(
+        st(loop_state=LoopStatus.started, n_acts=2), fsm.EstopRequested(reason="ui")
+    )
+    assert s.loop_state == LoopStatus.estopped
+    assert s.loop_intent == LoopIntent.none
+    assert kinds(cmds) == [
+        fsm.ClearActiveRunId,
+        fsm.EstopFanout,
+        fsm.FinishActiveEstopped,
+        fsm.SetStopMessage,
+        fsm.AlertOperator,
+    ]
+
+
 # --- T10/T11: clears ---
 
 
@@ -158,6 +181,7 @@ def test_t12_plate_gate_sets_stopped_inline():
         fsm.PlateGateFailed(message="no access"),
     )
     assert s.loop_state == LoopStatus.stopped
+    assert s.loop_intent == LoopIntent.none
     assert kinds(cmds) == [fsm.SetStopMessage]
 
 

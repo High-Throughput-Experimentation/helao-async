@@ -472,6 +472,8 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         return replace(state, loop_intent=LoopIntent.skip), ()
 
     if isinstance(event, EstopRequested):  # T9 (API source)
+        if state.loop_state != LoopStatus.started:
+            return state, ()
         return _estop_transition(state, event.reason)
 
     if isinstance(event, ActionResultErrored):  # T9 (result escalation)
@@ -512,7 +514,7 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         )
 
     if isinstance(event, PlateGateFailed):  # T12 (inline stopped)
-        new = replace(state, loop_state=LoopStatus.stopped, loop_intent=LoopIntent.stop)
+        new = replace(state, loop_state=LoopStatus.stopped, loop_intent=LoopIntent.none)
         return new, (SetStopMessage(message=event.message),)
 
     if isinstance(event, HeartbeatFailed):  # T12
