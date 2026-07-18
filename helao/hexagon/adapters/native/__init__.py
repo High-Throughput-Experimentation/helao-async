@@ -8,10 +8,12 @@ from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
+from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 
 __all__ = [
     "NativeMetaFileWriter",
     "NativeDataFileWriter",
     "NativeDataStreamer",
     "NativeActionFinalizer",
+    "NativeArtifactStoreAdapter",
 ]
