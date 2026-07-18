@@ -114,6 +114,42 @@ ITEMS: Dict[str, Callable[[Path, str, str], int]] = {}
 # Signature: (root, orch_key, prefix) -> rc
 
 
+def item2_nondefault_identity(root: Path, orch_key: str, prefix: str) -> int:
+    """§10.3 item 2: full run under a non-default orch MachineModel
+    (HEXORC). MINOR-8 regression mode = permanent stall (status folds from
+    self-hosted /wait actions carry the wrong orchestrator identity and are
+    never cleared), so completion within the timeout IS the core assert."""
+    epm = ExperimentPlanMaker()
+    for _ in range(2):
+        epm.add("SIM_websocket_data_hexid", {"wait_time": 2.0, "data_duration": 4.0})
+    seq = Sequence(
+        sequence_name="SIM_websocket_data_hexid_seq",
+        sequence_label="p1b2b-item2",
+        sequence_params={"wait_time": 2.0, "data_duration": 4.0},
+        planned_experiments=epm.planned_experiments,
+        sequence_uuid=gen_uuid(),
+        dummy=True,
+        simulation=True,
+    )
+    submit_and_start(orch_key, seq)
+    wait_until(lambda: orch_parked(orch_key), 600, label="item2 full-run drain")
+    hist = get_histories(orch_key)
+    acts = [meta for _u, meta in hist["action"]]
+    waits = [m for m in acts if m.get("action_name") == "wait"]
+    assert len(waits) == 4, f"expected 4 self-hosted waits, got {len(waits)}"
+    # self-hosted /wait finish under the renamed identity (MINOR-8)
+    assert all(m.get("action_finished_timestamp") for m in waits), waits
+    # status folds cleared: nothing lingers active
+    st = get_orch_state(orch_key)
+    assert str(st.get("loop_state")).endswith("stopped"), st.get("loop_state")
+    exps = [meta for _u, meta in hist["experiment"]]
+    assert len(exps) == 2, f"expected 2 experiments in history, got {len(exps)}"
+    return 0
+
+
+ITEMS["item2"] = item2_nondefault_identity
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--item", required=True, choices=sorted(ITEMS) or ["none"])
