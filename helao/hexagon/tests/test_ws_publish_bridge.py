@@ -11,6 +11,7 @@ to ActionModel, data frames to DataPackageModel, live frames to the dict.
 """
 
 import asyncio
+import contextlib
 import socket
 from uuid import uuid4
 
@@ -123,8 +124,18 @@ async def test_bridge_roundtrip_real_publisher_real_subscriber():
     finally:
         for sub in subs.values():
             sub.subscriber_task.cancel()
+        # The WS handlers are blocked inside WsPublisher.broadcast() awaiting
+        # the fan-out queue and never observe the client close, so uvicorn's
+        # graceful shutdown would wait out its close_timeout. force_exit skips
+        # the connection-drain; cancel+suppress guarantees teardown returns.
         server.should_exit = True
-        await asyncio.wait_for(serve_task, timeout=10)
+        server.force_exit = True
+        try:
+            await asyncio.wait_for(serve_task, timeout=5)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            serve_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await serve_task
 
 
 @pytest.mark.asyncio
