@@ -6,7 +6,7 @@ Exit code: 0 PASS, 1 assertion failure, 2 driver error.
 
 Item drivers are registered in ITEMS:
   item2 (non-default identity), item4 (serial >=3 experiments),
-  item6 (history-poll hang exit), item7 (idle drain + non-blank history)."""
+  item6 (dead-peer health exit), item7 (idle drain + non-blank history)."""
 
 import argparse
 import pickle
@@ -194,28 +194,22 @@ def _active_dict_nonempty() -> bool:
     return bool(gs.get("active_dict"))
 
 
-def item6_history_poll_hang_exit(root: Path, orch_key: str, prefix: str) -> int:
-    """§10.3 item 6 (history-poll hang exit) — CHARACTERIZATION of a KNOWN P2
-    DEFERRAL, not a passing behavioral test.
+def item6_dead_peer_health_exit(root: Path, orch_key: str, prefix: str) -> int:
+    """§10.3 item 6 (dead-peer heartbeat exit) — REAL behavioral assertion
+    since P2a (this used to be the P1b2b characterization TRIPWIRE of the
+    known hang; the flip is item 3 of the P2a acceptance gate).
 
-    Killing an action server mid-action SHOULD let the heartbeat monitor stop
-    the orch. A P1b2b investigation showed this behavior exists in NEITHER the
-    hexagon composition NOR legacy: the monitor (ServerMonitor.active_action_
-    monitor, orch_monitor.py) fires and sets loop_intent=stop plus the
-    "endpoints are unavailable" message via orch.stop(), but the single drainer
-    is blocked in a dead-action wait with no health-aware escape (the hexagon
-    dispatch poll waits on action_history, which the killed sim never feeds;
-    and finish_active_experiment -> orch_wait_for_all_actions waits on
-    active_dict, which nothing prunes for a dead peer), so loop_state never
-    reaches stopped. A correct fix (health-aware dead-action exit + active_dict
-    pruning) is native health-event decomposition, deferred to P2.
+    Killing an action server mid-action now makes the hexagon health
+    monitor emit HeartbeatFailed(+dead uuids) -> stop intent + the
+    "... endpoints are unavailable" stop message + PruneDeadActions, so
+    the wrapped-legacy orch_wait_for_all_actions unblocks and the orch
+    PARKS stopped with an empty active_dict.
 
-    This test therefore CHARACTERIZES the current limitation: after the kill
-    the heartbeat monitor is observed to fire (best-effort) but the orch stays
-    un-parked. TRIPWIRE: if a future P2 change makes the orch actually PARK
-    stopped here, the ``assert not _stopped()`` below FAILS — that is the
-    signal to rewrite this into the real behavioral assertion (orch parks
-    stopped with the offline-endpoint message)."""
+    SANCTIONED BEHAVIOR DELTA (improvement over legacy — see the P2a plan's
+    "Sanctioned behavior deltas" and p2-decisions.md Q3): legacy parks
+    FOREVER here (the P1b2b investigation showed the monitor fires but
+    nothing prunes active_dict or releases the history poll). This is a
+    deliberate §9-style delta, not a parity bug."""
     seq = build_ws_sequence(1, wait_time=1.0, data_duration=60.0)
     submit_and_start(orch_key, seq)
     wait_until(_active_dict_nonempty, 120, poll_s=1.0, label="item6 action active")
@@ -224,37 +218,25 @@ def item6_history_poll_hang_exit(root: Path, orch_key: str, prefix: str) -> int:
     def _stopped() -> bool:
         return str(get_orch_state(orch_key).get("loop_state")).endswith("stopped")
 
-    # Best-effort: the heartbeat monitor (interval 3s in goldenhexconc.yml)
-    # should at least SET the offline-endpoint stop message, even though it
-    # cannot park the loop for a dead peer.
-    saw_msg = False
-    for _ in range(15):  # ~30s of 2s polls
-        msg = str(get_orch_state(orch_key).get("current_stop_message"))
-        if "endpoints are unavailable" in msg:
-            saw_msg = True
-            break
-        if _stopped():  # unexpected under the current limitation
-            break
-        time.sleep(2)
-    print(f"[conc] item6 heartbeat monitor set offline message: {saw_msg}")
+    # heartbeat_interval is 3 s in goldenhexconc.yml; probe + prune + drain
+    # must park the orch well inside this window
+    wait_until(_stopped, 120, poll_s=2.0, label="item6 park after dead-peer kill")
 
-    # DOCUMENTED P2 GAP / TRIPWIRE: the orch cannot yet convert the stop intent
-    # into a parked stopped state for a dead peer. Give it a generous window;
-    # it must stay un-parked under the current (legacy-parity) behavior.
-    for _ in range(15):  # ~30s more
-        if _stopped():
-            break
-        time.sleep(2)
-    assert not _stopped(), (
-        "item6: orch PARKED stopped after a dead-peer kill — the P2 dead-peer "
-        "health-aware exit appears to be implemented. Update this test to the "
-        "real behavioral assertion (orch parks stopped with the "
-        "'endpoints are unavailable' message)."
-    )
+    st = get_orch_state(orch_key)
+    msg = str(st.get("current_stop_message"))
+    assert (
+        "endpoints are unavailable" in msg
+    ), f"stop message missing offline text: {msg!r}"
+    gs = requests.post(
+        f"http://{ORCH_HOST}:{ORCH_PORT}/global_status", timeout=10
+    ).json()
+    assert not gs.get(
+        "active_dict"
+    ), f"active_dict not pruned after dead-peer kill: {gs.get('active_dict')}"
     return 0
 
 
-ITEMS["item6"] = item6_history_poll_hang_exit
+ITEMS["item6"] = item6_dead_peer_health_exit
 
 
 def item7_idle_drain_and_history(root: Path, orch_key: str, prefix: str) -> int:
