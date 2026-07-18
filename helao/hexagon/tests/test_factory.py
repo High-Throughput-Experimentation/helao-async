@@ -247,10 +247,15 @@ async def test_action_app_startup_binds_ws_publish_bridge(
 
 
 @pytest.mark.asyncio
-async def test_orch_status_adapter_never_bound_by_orch_app(installed_config):
-    """Controller hardening 3 (Q1/D3 guard): makeOrchApp must never bind the
-    WS publish bridge — an unbound DispatcherStatusAdapter for an ORCH
-    composition still raises UnwiredPortError on publish_status."""
+async def test_status_adapter_unbound_is_fail_loud(installed_config):
+    """Controller hardening 3 (Q1/D3 underpinning): a DispatcherStatusAdapter
+    is unbound by default and stays fail-loud (UnwiredPortError on
+    publish_status). This is what makes "makeOrchApp never binds" SAFE — only
+    makeActionApp's startup hook binds the bridge (see
+    test_action_app_startup_binds_ws_publish_bridge); makeOrchApp adds no bind
+    call, verified by code review, so an orch composition's status adapter
+    keeps this default-unbound fail-loud behavior. (Bare-adapter check; not a
+    makeOrchApp integration test.)"""
     from helao.hexagon.adapters.errors import UnwiredPortError
     from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 
