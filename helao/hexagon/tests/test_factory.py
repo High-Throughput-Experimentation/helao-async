@@ -185,3 +185,18 @@ def test_build_wiring_wires_native_write_adapters(installed_config):
     assert isinstance(w.data_sink, NativeDataSinkAdapter)
     assert "artifact_store" in ACTION_REQUIRED and "data_sink" in ACTION_REQUIRED
     w.require(*ACTION_REQUIRED)  # fail-loud stays satisfiable
+
+
+def test_make_action_app_registers_graft_hooks(installed_config):
+    from helao.hexagon.app.factory import makeActionApp
+
+    app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
+    assert app.hexagon_wiring.artifact_store is not None
+    assert app.hexagon_active_graft is None  # applied at startup, not build
+    startup_names = [h.__name__ for h in app.router.on_startup]
+    shutdown_names = [h.__name__ for h in app.router.on_shutdown]
+    assert "_hexagon_active_graft_startup" in startup_names
+    assert "_hexagon_active_graft_shutdown" in shutdown_names
+    # ours must be registered AFTER the legacy BaseAPI startup that creates
+    # app.base (Starlette preserves registration order)
+    assert startup_names[-1] == "_hexagon_active_graft_startup"
