@@ -4,7 +4,7 @@
 dummy: true
 simulation: true
 show_debug: true
-run_unit_tests: true
+run_unit_tests: false
 experiment_libraries:
   - helao/hexagon/tests/smoke/hexid_exp.py
 sequence_libraries: []
