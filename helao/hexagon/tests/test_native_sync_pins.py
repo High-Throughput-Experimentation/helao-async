@@ -13,7 +13,7 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_verbatim_region,
 )
 
-REGION_END = 1732  # T6; grows to 2057 (T7)
+REGION_END = 2057  # T7: full verbatim region capstone
 
 MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
 
@@ -117,3 +117,20 @@ def test_process_recovery_surface_parity():
     assert_source_parity(
         native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_PROCESS
     )
+
+
+SYNC_DRIVER_TAIL = [
+    "to_s3",
+    "to_api",
+    "list_pending",
+    "list_pending_acts",
+    "list_pending_exps",
+    "finish_pending",
+    "reset_sync",
+    "shutdown",
+    "unsync_dir",
+]
+
+
+def test_sync_driver_tail_parity():
+    assert_source_parity(native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_TAIL)
