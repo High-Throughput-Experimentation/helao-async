@@ -365,7 +365,19 @@ StepResult = Tuple[OrchestrationState, Tuple[Command, ...]]
 
 
 def _estop_transition(state: OrchestrationState, reason: str) -> StepResult:
-    """T9/T13: the estop_loop sequence (core-01 §7), exact command order."""
+    """T9/T13: the estop_loop sequence (core-01 §7), exact command order.
+
+    Idempotent re-entry guard (DD-3): ``ActionResultErrored`` and
+    ``UncaughtLoopException`` escalate to estop unconditionally (no
+    started-only guard, unlike ``EstopRequested``/``EstoppedUuidIngested`` —
+    both must stay reachable so an escalation landing mid-finalization can
+    still be observed). A second escalation racing in while already estopped
+    (e.g. a stale in-flight dispatch effect that crashes against
+    post-finalize state) must therefore no-op here instead of re-running the
+    cascade: ``FinishActiveEstopped`` is the SOLE finalizer and must never
+    fire twice."""
+    if state.loop_state == LoopStatus.estopped:
+        return state, ()
     new = replace(
         state,
         loop_state=LoopStatus.estopped,

@@ -11,7 +11,12 @@ from pathlib import Path
 import pytest
 
 from helao.hexagon.domain.models import LoopStatus
-from helao.hexagon.domain.orchestration import StatusChanged
+from helao.hexagon.domain.orchestration import (
+    ActionResultErrored,
+    CloseOutExperimentCmd,
+    FinishThenDispatchExperimentCmd,
+    StatusChanged,
+)
 from helao.hexagon.tests.live_group import (
     build_ws_sequence,
     live_group,
@@ -129,3 +134,130 @@ async def test_item1_status_burst_no_double_drain(tmp_path):
         )
         assert exp_yml_count == 2, exp_yml_count
         assert orch.globalstatusmodel.loop_state == LoopStatus.stopped
+
+
+# =============================================================================
+# Item 3: estop between decision and effect — three sub-races (DD-3)
+# =============================================================================
+def _assert_estopped_exp_yml(root: Path):
+    """[finished, estopped] terminal status, exactly once each."""
+    import yaml
+
+    exp_ymls = list(Path(root).rglob("*-exp.yml"))
+    assert exp_ymls, "estop finalizer produced no experiment yml"
+    statuses = [
+        yaml.safe_load(p.read_text()).get("experiment_status") for p in exp_ymls
+    ]
+    assert ["finished", "estopped"] in statuses, statuses
+    for st in statuses:
+        assert st.count("finished") == 1, st  # no duplicate finished
+
+
+@pytest.mark.asyncio
+async def test_item3a_estop_while_blocked_on_dispatch(tmp_path):
+    """(a) estop lands while the drainer is BLOCKED inside the dispatch
+    effect (standing for the dispatch lock). Trigger over REAL transport
+    (/estop_orch). After release: the in-effect live re-check bails, no new
+    action registers, the estop finalizer is sole."""
+    async with live_group(str(tmp_path)) as g:
+        orch, runtime = g.orch, g.runtime
+        clean_finishes, estop_finishes = _spy_finishers(orch)
+        gate, entered = asyncio.Event(), asyncio.Event()
+        orig_dispatch = orch.loop_task_dispatch_action
+
+        async def gated_dispatch(*a, **k):
+            entered.set()
+            await gate.wait()
+            return await orig_dispatch(*a, **k)
+
+        orch.loop_task_dispatch_action = gated_dispatch
+        seq = build_ws_sequence(1, wait_time=5.0, data_duration=2.0)
+        await orch_call("append_sequence", body={"sequence": seq.as_dict()})
+        await orch_call("start")
+        await asyncio.wait_for(entered.wait(), timeout=60)
+        n_actions_before = len(orch.action_history)
+
+        await orch_call("estop_orch")  # trigger-site cascade over real HTTP/RPC
+        assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        assert len(estop_finishes) == 1  # finalizer already ran, exactly once
+
+        gate.set()  # release the stalled effect
+        await asyncio.sleep(2.0)
+        # the released dispatch bailed: nothing new registered or dispatched
+        assert len(orch.action_history) == n_actions_before
+        assert len(clean_finishes) == 0  # clean close-out never fired
+        assert len(estop_finishes) == 1  # STILL the sole finalizer
+        assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        _assert_estopped_exp_yml(tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_item3b_estop_between_decision_and_finish_then_dispatch(tmp_path):
+    """(b) estop lands after the reducer decided FinishThenDispatchExperiment
+    but before the runner executes it. The runner's live re-check (re-check
+    #2) must bail; estop_finish_active stays the SOLE finalizer."""
+    async with live_group(str(tmp_path)) as g:
+        orch, runtime = g.orch, g.runtime
+        clean_finishes, estop_finishes = _spy_finishers(orch)
+        window, reached = asyncio.Event(), asyncio.Event()
+        orig_execute = runtime.effects.execute
+
+        async def gated_execute(cmd):
+            if (
+                isinstance(cmd, FinishThenDispatchExperimentCmd)
+                and orch.active_experiment is not None
+                and not reached.is_set()
+            ):
+                reached.set()
+                await window.wait()  # decision made; effect not yet run
+            return await orig_execute(cmd)
+
+        runtime.effects.execute = gated_execute
+        seq = build_ws_sequence(2, wait_time=1.0, data_duration=2.0)
+        await orch_call("append_sequence", body={"sequence": seq.as_dict()})
+        await orch_call("start")
+        await asyncio.wait_for(reached.wait(), timeout=120)
+
+        await orch_call("estop_orch")  # lands INSIDE the decision->effect window
+        assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        window.set()
+        await asyncio.sleep(2.0)
+        assert len(estop_finishes) == 1
+        assert len(clean_finishes) == 0  # re-check bailed; no clean finish ever
+        assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        _assert_estopped_exp_yml(tmp_path)
+
+
+@pytest.mark.asyncio
+async def test_item3c_estop_during_finalization_close_out(tmp_path):
+    """(c) estop escalation (ActionResultErrored — the unguarded ingestion
+    source) lands while the drainer is inside finalization's CloseOut
+    effect window. Live re-check #3: the close-out re-checks LIVE loop_state
+    and bails; single finalizer."""
+    async with live_group(str(tmp_path)) as g:
+        orch, runtime = g.orch, g.runtime
+        clean_finishes, estop_finishes = _spy_finishers(orch)
+        window, reached = asyncio.Event(), asyncio.Event()
+        orig_execute = runtime.effects.execute
+
+        async def gated_execute(cmd):
+            if isinstance(cmd, CloseOutExperimentCmd) and not reached.is_set():
+                reached.set()
+                await window.wait()  # finalization decided; close-out pending
+            return await orig_execute(cmd)
+
+        runtime.effects.execute = gated_execute
+        seq = build_ws_sequence(1, wait_time=1.0, data_duration=2.0)
+        await orch_call("append_sequence", body={"sequence": seq.as_dict()})
+        await orch_call("start")
+        await asyncio.wait_for(reached.wait(), timeout=120)
+
+        # concurrent estop through the reducer at its trigger site (DD-3):
+        await runtime.handle(ActionResultErrored(reason="conc item3c"))
+        assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
+        assert len(estop_finishes) == 1
+        window.set()  # release the pending clean close-out
+        await asyncio.sleep(2.0)
+        assert len(clean_finishes) == 0  # close-out re-checked live and bailed
+        assert len(estop_finishes) == 1  # sole finalizer, still
+        _assert_estopped_exp_yml(tmp_path)
