@@ -1,0 +1,45 @@
+# P1b2b CONCURRENCY config (§10.3 launched-group items 4/6/7).
+# Copy of goldenhex.yml with a fast orch heartbeat (item 6 needs the
+# active_action_monitor to notice a killed SIM quickly) and its own root.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_hexconc
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    deployment: hexagon
+    params:
+      heartbeat_interval: 3
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    deployment: hexagon
+    live_vis: wssim_live_vis
+    params: {}
+    hlo_postprocess_libs:
+      - hlo_to_csv
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sim_db_server
+    params:
+      aws_bucket: helao-sim
+      s3_record: true
