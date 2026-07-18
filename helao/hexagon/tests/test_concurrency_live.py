@@ -18,6 +18,8 @@ from helao.hexagon.domain.orchestration import (
     StatusChanged,
 )
 from helao.hexagon.tests.live_group import (
+    SIM_HOST,
+    SIM_PORT,
     build_ws_sequence,
     live_group,
     orch_call,
@@ -307,3 +309,93 @@ async def test_item3c_estop_during_finalization_close_out(tmp_path):
         # when the re-check is broken, vs. staying flat when it works.
         assert len(raw_finish_calls) == n_raw_finish_at_gate
         _assert_estopped_exp_yml(tmp_path)
+
+
+# =============================================================================
+# Item 5: nonblocking lifecycle (send_nbstatuspackage -> update_nonblocking
+#         -> clear); the flag must survive the endpoint (ac42e9bf/e7534fd3)
+# =============================================================================
+@pytest.mark.asyncio
+async def test_item5_adapter_nonblocking_roundtrip_real_endpoints(tmp_path):
+    """Hexagon status adapter -> REAL /update_nonblocking on the live orch:
+    the bookkeeping tuple must carry the adapter's composed own host/port
+    (the Task 1 carry — never ''/0), and clear_nonblocking must reach the
+    real SIM /stop_executor over the dispatcher."""
+    from helao.helpers.time_utils import gen_uuid
+    from helao.hexagon.tests.live_group import ORCH_HOST, ORCH_PORT
+
+    async with live_group(str(tmp_path)) as g:
+        status = g.sim_app.hexagon_wiring.status
+        exec_id = "SIM p1b2b-item5"
+        act_uuid = gen_uuid()
+        await status.send_nonblocking_status(
+            "ORCH", ORCH_HOST, ORCH_PORT, "SIM", exec_id, act_uuid, "active"
+        )
+        expected = ("SIM", exec_id, SIM_HOST, SIM_PORT)
+        assert expected in g.orch.nonblocking, g.orch.nonblocking
+        # the carry: identity is the REAL composed one, never the defaults
+        assert ("SIM", exec_id, "", 0) not in g.orch.nonblocking
+
+        # clear leg: real /stop_executor POST to the SIM's live host/port
+        resp_tups = await g.orch.clear_nonblocking()
+        assert resp_tups, "clear_nonblocking sent nothing"
+        for resp, _err in resp_tups:
+            assert resp is not None, "stop_executor never reached the SIM"
+
+        # finished status removes the tuple
+        await status.send_nonblocking_status(
+            "ORCH", ORCH_HOST, ORCH_PORT, "SIM", exec_id, act_uuid, "finished"
+        )
+        assert expected not in g.orch.nonblocking
+
+
+@pytest.mark.asyncio
+async def test_item5_nonblocking_wait_full_lifecycle(tmp_path):
+    """Full run: TEST_consecutive_noblocking's nonblocking /wait — the
+    nonblocking flag survives the endpoint (orch.nonblocking becomes
+    non-empty mid-run), every wait finishes, and the registry drains to
+    empty at park."""
+    from helao.deploy.test.sequences.TEST_seq import TEST_consecutive_noblocking
+    from helao.helpers.premodels import Sequence
+    from helao.helpers.time_utils import gen_uuid
+
+    params = {"wait_time": 1.0, "cycles": 1, "plate_sample_no_list": [1]}
+    async with live_group(str(tmp_path)) as g:
+        seq = Sequence(
+            sequence_name="TEST_consecutive_noblocking",
+            sequence_label="p1b2b-item5",
+            sequence_params=params,
+            planned_experiments=TEST_consecutive_noblocking(**params),
+            sequence_uuid=gen_uuid(),
+            dummy=True,
+            simulation=True,
+        )
+        await orch_call("append_sequence", body={"sequence": seq.as_dict()})
+        await orch_call("start")
+
+        saw_nonblocking = False
+        for _ in range(720):  # 3 min budget; nb wait is wait_time*10 = 10 s
+            if g.orch.nonblocking:
+                saw_nonblocking = True
+            gsm = g.orch.globalstatusmodel
+            if (
+                saw_nonblocking
+                and gsm.loop_state == LoopStatus.stopped
+                and not gsm.active_dict
+                and not g.orch.action_dq
+                and not g.orch.experiment_dq
+                and not g.orch.sequence_dq
+            ):
+                break
+            await asyncio.sleep(0.25)
+
+        assert saw_nonblocking, "nonblocking flag never survived the endpoint"
+        assert g.orch.nonblocking == [], "registry did not drain"
+        # every wait action reached finished (the MINOR-8 stall would show here)
+        waits = [
+            meta
+            for meta in g.orch.action_history.values()
+            if meta.get("action_name") == "wait"
+        ]
+        assert waits, "no wait actions registered"
+        assert all(m.get("action_finished_timestamp") for m in waits), waits
