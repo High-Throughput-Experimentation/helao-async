@@ -133,9 +133,12 @@ class PlateGateFailed:
 
 @dataclass(frozen=True)
 class HeartbeatFailed:
-    """active_action_monitor probe failure (T12 + alert)."""
+    """active_action_monitor probe failure (T12 + alert). P2a: carries the
+    dead server's active action uuids (stringified) so the reducer can order
+    a PruneDeadActions — the pure-hexagon dead-peer exit (decision Q3)."""
 
     message: str
+    dead_action_uuids: Tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -332,6 +335,16 @@ class InterruptWake:
     message: str
 
 
+@dataclass(frozen=True)
+class PruneDeadActions:
+    """Dead-peer exit (item-6, P2a): pop the uuids from active_dict (global
+    AND per-endpoint, like /clear_actives), bucket them finished-terminal,
+    register history — makes legacy orch_wait_for_all_actions's
+    actions_idle() true WITHOUT editing it (decision Q3)."""
+
+    action_uuids: Tuple[str, ...]
+
+
 Command = Union[
     CreateDispatchLoopTask,
     RefuseStart,
@@ -354,6 +367,7 @@ Command = Union[
     ClearErroredFromFinished,
     ReleaseServersEstop,
     InterruptWake,
+    PruneDeadActions,
 ]
 
 StepResult = Tuple[OrchestrationState, Tuple[Command, ...]]
@@ -529,14 +543,14 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         new = replace(state, loop_state=LoopStatus.stopped, loop_intent=LoopIntent.none)
         return new, (SetStopMessage(message=event.message),)
 
-    if isinstance(event, HeartbeatFailed):  # T12
-        return (
-            replace(state, loop_intent=LoopIntent.stop),
-            (
-                SetStopMessage(message=event.message),
-                AlertOperator(message=event.message),
-            ),
+    if isinstance(event, HeartbeatFailed):  # T12 (+ P2a dead-peer prune)
+        cmds: Tuple[Command, ...] = (
+            SetStopMessage(message=event.message),
+            AlertOperator(message=event.message),
         )
+        if event.dead_action_uuids:
+            cmds = cmds + (PruneDeadActions(action_uuids=event.dead_action_uuids),)
+        return replace(state, loop_intent=LoopIntent.stop), cmds
 
     if isinstance(event, DriverHealthUnrecovered):  # T12
         msg = f"unknown driver states: {', '.join(event.na_drivers)}"
@@ -598,6 +612,7 @@ __all__ = [
     "ClearErroredFromFinished",
     "ReleaseServersEstop",
     "InterruptWake",
+    "PruneDeadActions",
     "Command",
     "StepResult",
     "step",
