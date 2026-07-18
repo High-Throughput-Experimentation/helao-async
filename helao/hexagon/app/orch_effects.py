@@ -8,7 +8,7 @@ an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Tuple
 from uuid import UUID
 
 from helao.helpers import helao_logging
@@ -80,6 +80,10 @@ class _LazyServerLogger:
 
 
 LOGGER = _LazyServerLogger()
+
+# driver-health retry cadence (verbatim orch_dispatch._exec_driver_health:
+# <=5 x 5 s); module-level so tests can compress it without patching asyncio
+DRIVER_HEALTH_RETRY_DELAY_S: float = 5.0
 
 __all__ = ["OrchCommandRunner", "apply_state_delta", "derive_state"]
 
@@ -208,28 +212,6 @@ class OrchCommandRunner:
             await orch.finish_active_sequence()
             LOGGER.info("!!!dispatching next sequence")
             return await orch.loop_task_dispatch_sequence()
-
-        if isinstance(cmd, RetryDriverHealth):
-            # verbatim orch_dispatch._exec_driver_health (<=5 x 5 s)
-            na_drivers = list(cmd.na_drivers)
-            retries = 0
-            while retries < 5 and na_drivers:
-                LOGGER.info(
-                    f"unknown driver states: {', '.join(na_drivers)}, "
-                    "retrying in 5 seconds"
-                )
-                await asyncio.sleep(5)
-                na_drivers = [
-                    k for k, (_, v) in orch.status_summary.items() if v == "unknown"
-                ]
-                retries += 1
-            if na_drivers:
-                orch.current_stop_message = (
-                    f"unknown driver states: {', '.join(na_drivers)}"
-                )
-                LOGGER.warning(orch.current_stop_message)
-                await orch.stop()
-            return None
 
         if isinstance(cmd, WaitAllActionsIdle):
             # verbatim DrainForStop body — OWNS the stopped write (DD-2 T5)
@@ -372,3 +354,25 @@ class OrchCommandRunner:
             return None
 
         raise AssertionError(f"unhandled reducer command: {cmd!r}")
+
+    async def execute_retry_driver_health(
+        self, cmd: RetryDriverHealth
+    ) -> "Tuple[str, ...]":
+        """Verbatim orch_dispatch._exec_driver_health retry cadence, MINUS
+        the exhaustion stop: the remainder is returned so HexRuntime can
+        feed the DriverHealthUnrecovered event (P2a — the reducer's
+        SetStopMessage wording is identical to the removed direct write)."""
+        orch = self.orch
+        na_drivers = list(cmd.na_drivers)
+        retries = 0
+        while retries < 5 and na_drivers:
+            LOGGER.info(
+                f"unknown driver states: {', '.join(na_drivers)}, "
+                "retrying in 5 seconds"
+            )
+            await asyncio.sleep(DRIVER_HEALTH_RETRY_DELAY_S)
+            na_drivers = [
+                k for k, (_, v) in orch.status_summary.items() if v == "unknown"
+            ]
+            retries += 1
+        return tuple(na_drivers)

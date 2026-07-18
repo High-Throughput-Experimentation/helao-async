@@ -205,3 +205,73 @@ async def test_graft_rebinds_status_ingestion_endpoints():
     )
     assert "update_status" in graft.originals
     await graft.close()
+
+
+@pytest.mark.asyncio
+async def test_graft_swaps_heartbeat_task_when_health_wired():
+    class _FakeHealth:
+        def __init__(self):
+            self.bound = None
+
+        def bind_orch(self, orch):
+            self.bound = orch
+
+        async def endpoints_available(self, urls):
+            return [(u, True) for u in urls]
+
+        async def ping_action_servers(self):
+            return {}
+
+        def status_summary(self):
+            return {}
+
+    async def _forever():
+        await asyncio.sleep(3600)
+
+    orch = _ScriptedOrch()
+    orch.heartbeat_interval = 3600  # type: ignore[attr-defined]
+    orch.ignore_heartbeats = []  # type: ignore[attr-defined]
+    orch.heartbeat_monitor = (  # type: ignore[attr-defined]
+        asyncio.get_running_loop().create_task(_forever())
+    )
+    health = _FakeHealth()
+    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy(), health=health))
+    await asyncio.sleep(0.05)
+    assert health.bound is orch
+    assert (
+        orch.heartbeat_monitor.cancelled()  # type: ignore[attr-defined]
+        or orch.heartbeat_monitor.done()  # type: ignore[attr-defined]
+    )
+    assert graft.health_monitor is not None
+    await graft.close()
+
+
+@pytest.mark.asyncio
+async def test_graft_without_health_skips_monitor():
+    orch = _ScriptedOrch()
+    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy()))
+    assert graft.health_monitor is None
+    await graft.close()
+
+
+@pytest.mark.asyncio
+async def test_driver_health_exhaustion_feeds_unrecovered_event(monkeypatch):
+    """P2a: RetryDriverHealth exhaustion now constructs the
+    DriverHealthUnrecovered event (same stop-message wording via the
+    reducer) instead of the executor calling stop() directly."""
+    import helao.hexagon.app.orch_effects as fx
+
+    monkeypatch.setattr(fx, "DRIVER_HEALTH_RETRY_DELAY_S", 0.01)
+    orch = _ScriptedOrch(n_acts=1, n_exps=0, n_seqs=0)
+    orch.status_summary = {"MOTOR": ("idle", "unknown")}
+    runtime, loop = _make(orch)
+    loop.start()
+    from helao.hexagon.domain.orchestration import StartRequested
+
+    await runtime.handle(StartRequested())
+    for _ in range(300):
+        if orch.current_stop_message:
+            break
+        await asyncio.sleep(0.01)
+    assert orch.current_stop_message == "unknown driver states: MOTOR"
+    await loop.close()
