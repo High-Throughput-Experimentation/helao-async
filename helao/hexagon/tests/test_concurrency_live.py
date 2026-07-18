@@ -58,8 +58,16 @@ def _count_exp_ymls(root: Path) -> int:
     to sit when the assertion runs."""
     total = len(list((root / "RUNS_FINISHED").rglob("*-exp.yml")))
     for zip_path in (root / "RUNS_SYNCED").rglob("*.zip"):
-        with zipfile.ZipFile(zip_path) as zf:
-            total += sum(1 for name in zf.namelist() if name.endswith("-exp.yml"))
+        try:
+            with zipfile.ZipFile(zip_path) as zf:
+                total += sum(1 for name in zf.namelist() if name.endswith("-exp.yml"))
+        except (zipfile.BadZipFile, FileNotFoundError, OSError):
+            # SyncDriver may be mid-write of this zip (or moving it) when the
+            # poll reads it -> treat as not-yet-counted this pass. The bounded
+            # poll in _wait_for_exp_yml_count retries until the zip is complete,
+            # so a transient unreadable zip never fails the count (was a flaky
+            # zipfile.BadZipFile in test_item1 on full-suite runs).
+            continue
     return total
 
 
