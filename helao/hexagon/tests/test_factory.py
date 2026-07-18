@@ -117,3 +117,56 @@ def test_launcher_shims_delegate():
     )
     assert sim_shim.LEGACY_MODULE == "helao.deploy.test.servers.action.ws_simulator"
     assert orch_shim.FACTORY is factory.makeOrchApp
+
+
+def test_build_wiring_status_port_carries_own_identity(installed_config):
+    """P1b1 carry: the status adapter must be composed with the server's own
+    host/port from config (orch_status_sync keys nonblocking bookkeeping on
+    them) — never the ''/0 defaults."""
+    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.app.factory import build_wiring
+    from helao.hexagon.ports.status import StatusPort
+
+    w = build_wiring("SIM")
+    assert isinstance(w.status, DispatcherStatusAdapter)
+    assert isinstance(w.status, StatusPort)
+    assert w.status._own_host == "127.0.0.1"
+    assert w.status._own_port == 8902
+    # the composition's consumed set now includes status (fail-loud stays real)
+    w.require("config", "logging", "clock", "transport", "status")
+
+
+@pytest.mark.asyncio
+async def test_status_wire_send_carries_composed_identity(
+    installed_config, monkeypatch
+):
+    """send_nonblocking_status must put the COMPOSED host/port on the wire
+    (params_dict server_host/server_port), not ''/0."""
+    from helao.core.error import ErrorCodes
+    from helao.hexagon.app.factory import build_wiring
+    import helao.hexagon.adapters.legacy.status as status_mod
+
+    sent = []
+
+    async def _fake_dispatch(
+        server_key,
+        host,
+        port,
+        private_action,
+        params_dict,
+        json_dict,
+        timeout=60,
+        retries=5,
+    ):
+        sent.append((private_action, params_dict))
+        return {}, ErrorCodes.none
+
+    monkeypatch.setattr(status_mod, "async_private_dispatcher", _fake_dispatch)
+    w = build_wiring("SIM")
+    assert w.status is not None
+    await w.status.send_nonblocking_status(
+        "ORCH", "127.0.0.1", 8901, "SIM", "SIM exec_1", None, "active"  # type: ignore[arg-type]
+    )
+    action, params = sent[0]
+    assert action == "update_nonblocking"
+    assert params == {"server_host": "127.0.0.1", "server_port": 8902}

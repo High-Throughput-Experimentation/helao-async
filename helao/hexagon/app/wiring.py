@@ -35,8 +35,15 @@ __all__ = [
 
 # Ports each P1b1 composition genuinely consumes (fail-loud is meaningful,
 # not vacuous). Extended as adapters gain runtime consumers in P1b2/P2.
-ORCH_REQUIRED = ("config", "logging", "clock", "transport", "state_persistence")
-ACTION_REQUIRED = ("config", "logging", "clock", "transport")
+ORCH_REQUIRED = (
+    "config",
+    "logging",
+    "clock",
+    "transport",
+    "state_persistence",
+    "status",
+)
+ACTION_REQUIRED = ("config", "logging", "clock", "transport", "status")
 
 
 @dataclass
