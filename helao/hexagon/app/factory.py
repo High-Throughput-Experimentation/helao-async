@@ -16,6 +16,7 @@ from importlib import import_module
 from helao.hexagon.adapters.errors import HexagonDeferred
 from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
+from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
 from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
 from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
@@ -39,6 +40,7 @@ def build_wiring(server_key: str) -> PortWiring:
         status=DispatcherStatusAdapter(
             server_key, own_host=scfg["host"], own_port=scfg["port"]
         ),
+        health=LegacyHealthAdapter(),
     )
 
 
