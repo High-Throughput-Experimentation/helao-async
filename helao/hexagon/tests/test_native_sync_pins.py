@@ -1,0 +1,66 @@
+"""Source-parity pins for the P2c native sync re-body (D1).
+
+Every pinned member's source must be byte-identical to the LIVE legacy
+module (helao/core/drivers/data/sync_driver.py) — proves the copy is exact
+AND pins against future legacy drift. The verbatim-region test is the
+capstone: the whole contiguous legacy region must appear unmodified inside
+the native module. REGION_END grows per task (T2: 528 ... T7: 2057)."""
+
+import helao.core.drivers.data.sync_driver as legacy_mod
+import helao.hexagon.adapters.native.sync_driver as native_mod
+from helao.hexagon.tests.sync_fixtures import (
+    assert_source_parity,
+    assert_verbatim_region,
+)
+
+REGION_END = 528  # T2; grows to 672 (T3), 1014 (T4), 1394 (T5), 1732 (T6), 2057 (T7)
+
+MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
+
+ASYNC_RW_LOCK = ["__init__", "read_locked", "write_locked"]
+
+HELAO_YML = [
+    "__init__",
+    "parts",
+    "check_paths",
+    "exists",
+    "__repr__",
+    "type",
+    "timestamp",
+    "status",
+    "meta_status",
+    "is_estopped",
+    "rename",
+    "status_idx",
+    "relative_path",
+    "active_path",
+    "finished_path",
+    "synced_path",
+    "cleanup",
+    "list_children",
+    "active_children",
+    "finished_children",
+    "synced_children",
+    "children",
+    "misc_files",
+    "lock_files",
+    "hlo_files",
+    "parent_path",
+    "write_meta",
+]
+
+
+def test_verbatim_region():
+    assert_verbatim_region(REGION_END)
+
+
+def test_module_functions_parity():
+    assert_source_parity(native_mod, legacy_mod, MODULE_FUNCS)
+
+
+def test_async_rw_lock_parity():
+    assert_source_parity(native_mod.AsyncRWLock, legacy_mod.AsyncRWLock, ASYNC_RW_LOCK)
+
+
+def test_helao_yml_parity():
+    assert_source_parity(native_mod.HelaoYml, legacy_mod.HelaoYml, HELAO_YML)
