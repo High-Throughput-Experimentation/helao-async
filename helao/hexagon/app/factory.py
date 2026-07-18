@@ -13,7 +13,7 @@ launcher edits, per-config atomic cut-over/rollback."""
 import os
 from importlib import import_module
 
-from helao.hexagon.adapters.errors import HexagonDeferred
+from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
 from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
 from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
@@ -23,6 +23,7 @@ from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
 from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
+from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED, PortWiring
 
 __all__ = ["build_wiring", "makeActionApp", "makeOrchApp", "makeVisApp"]
@@ -90,6 +91,7 @@ def makeActionApp(server_key: str, legacy_module: str):
     app = import_module(legacy_module).makeApp(server_key)
     app.hexagon_wiring = wiring
     app.hexagon_active_graft = None
+    app.hexagon_ws_bridge = None
 
     # Registered AFTER the legacy BaseAPI's own startup handler (which sets
     # self.base = Base(app=self, ...), base_api.py:646; Starlette preserves
@@ -98,6 +100,17 @@ def makeActionApp(server_key: str, legacy_module: str):
     @app.on_event("startup")
     async def _hexagon_active_graft_startup():
         app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
+        # P2b-2 (D3): the WS publish bridge needs the live Base's fan-out
+        # queues — construct and bind it now, ACTION apps only (orch WS
+        # stays on legacy relays, Q1: makeOrchApp never binds).
+        if not isinstance(wiring.status, DispatcherStatusAdapter):
+            raise UnwiredPortError(
+                "WS publish bridge requires DispatcherStatusAdapter status wiring"
+            )
+        status_adapter = wiring.status
+        bridge = WsPublishBridge(app.base.status_q, app.base.data_q, app.base.live_q)
+        status_adapter.bind_publish_bridge(bridge)
+        app.hexagon_ws_bridge = bridge
 
     @app.on_event("shutdown")
     async def _hexagon_active_graft_shutdown():

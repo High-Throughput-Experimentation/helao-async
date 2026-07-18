@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponse, HelaoDriver
-from helao.hexagon.adapters.errors import HexagonDeferred
+from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.legacy.hardware import LegacyDriverHardwareAdapter
 from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
 from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
@@ -102,13 +102,37 @@ def test_queue_pck_timestamped_export(tmp_path):
     assert p.name != "queues.pck"
 
 
-# --- Status: wire-level push (publish_* deferred loudly) ----------------------
+# --- Status: wire-level push (publish_* fail loud until the bridge binds) -----
 @pytest.mark.asyncio
-async def test_status_conformance_and_deferred_publish():
+async def test_status_conformance_and_unbound_publish():
     a = DispatcherStatusAdapter(server_key="ORCH")
     assert isinstance(a, StatusPort)
-    with pytest.raises(HexagonDeferred):
+    with pytest.raises(UnwiredPortError):
         await a.publish_status({})
+    with pytest.raises(UnwiredPortError):
+        await a.publish_data({})
+    with pytest.raises(UnwiredPortError):
+        await a.publish_live({})
+
+
+@pytest.mark.asyncio
+async def test_status_bound_publish_puts_wire_types():
+    """D1 through the adapter: a bound publish_status restores the
+    channel's wire type (ActionModel) onto the fan-out queue."""
+    from helao.core.models.action import ActionModel
+    from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+
+    status_q = MultisubscriberQueue()
+    data_q = MultisubscriberQueue()
+    live_q = MultisubscriberQueue()
+    sub = status_q.queue()  # direct subscriber queue
+    a = DispatcherStatusAdapter(server_key="SIM")
+    a.bind_publish_bridge(WsPublishBridge(status_q, data_q, live_q))
+    await a.publish_status(ActionModel(action_name="acquire_data").model_dump())
+    item = sub.get_nowait()
+    assert isinstance(item, ActionModel)
+    assert item.action_name == "acquire_data"
 
 
 @pytest.mark.asyncio
