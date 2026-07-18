@@ -28,8 +28,19 @@ and out of scope here): ``StatusPort.send_nonblocking_status`` declares
 ``act_uuid: UUID`` (non-Optional), but a nonblocking transition can be
 reported before an action UUID is known; this adapter widens its own
 parameter to ``Optional[UUID]`` to accept that and passes it through as
-``None`` in the actionmodel body when absent."""
+``None`` in the actionmodel body when absent.
 
+Third drift (P1b2b Task 6, adapter-local fix): the real ``/update_nonblocking``
+endpoint's ``Orch.update_nonblocking`` (orch_status_sync.py) unconditionally
+f-string-formats ``actionmodel.action_timestamp`` with a ``%m-%d %H:%M:%S``
+format spec (``f"{actionmodel.action_timestamp: %m-%d %H:%M:%S}"``), which
+raises on ``None`` (``NoneType.__format__`` rejects a format spec). This
+adapter therefore always sends a real, well-formed ISO timestamp under
+``actionmodel.action_timestamp`` -- pydantic's ``Action.action_timestamp:
+Optional[datetime]`` parses the ISO string back into a ``datetime`` on the
+legacy side, so the format spec always has a real datetime to work with."""
+
+from datetime import datetime
 from typing import List, Optional, Tuple
 from uuid import UUID
 
@@ -99,6 +110,9 @@ class DispatcherStatusAdapter:
                 "exec_id": exec_id,
                 "action_status": [status],
                 "action_server": {"server_name": server_key},
+                # real, well-formed timestamp (third drift, above): a missing
+                # one 500s the legacy endpoint's f-string format spec.
+                "action_timestamp": datetime.now().isoformat(),
             }
         }
         for _ in range(retries):
