@@ -1,8 +1,9 @@
-"""In-memory port fakes for domain-adjacent unit tests (spec §10.2).
+"""In-memory port fakes (spec §10.2): OPT-IN test doubles, never wired by
+default composition.
 
-TEST-ONLY in P1a. Each fake logs a WARNING banner at construction so a
-"green on fakes" run is visible in output; production composition (P1b)
-raises on unwired ports and never defaults to these.
+Each fake logs a WARNING banner at construction so a "green on fakes" run is
+visible in output; production composition (app/wiring.py) raises on unwired
+ports and never defaults to these.
 """
 
 import logging
