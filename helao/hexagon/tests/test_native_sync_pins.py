@@ -13,7 +13,7 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_verbatim_region,
 )
 
-REGION_END = 528  # T2; grows to 672 (T3), 1014 (T4), 1394 (T5), 1732 (T6), 2057 (T7)
+REGION_END = 672  # T3; grows to 1014 (T4), 1394 (T5), 1732 (T6), 2057 (T7)
 
 MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
 
@@ -50,6 +50,18 @@ HELAO_YML = [
 ]
 
 
+PROGRESS = [
+    "__init__",
+    "yml",
+    "list_unfinished_procs",
+    "read_dict",
+    "write_dict",
+    "s3_done",
+    "api_done",
+    "remove_prg",
+]
+
+
 def test_verbatim_region():
     assert_verbatim_region(REGION_END)
 
@@ -64,3 +76,7 @@ def test_async_rw_lock_parity():
 
 def test_helao_yml_parity():
     assert_source_parity(native_mod.HelaoYml, legacy_mod.HelaoYml, HELAO_YML)
+
+
+def test_progress_parity():
+    assert_source_parity(native_mod.Progress, legacy_mod.Progress, PROGRESS)

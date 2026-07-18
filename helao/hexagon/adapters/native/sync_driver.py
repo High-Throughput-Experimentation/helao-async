@@ -26,7 +26,7 @@ import), and the native-only section differ from legacy.
 
 # pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportCallIssue=false, reportOptionalMemberAccess=false, reportOptionalSubscript=false
 
-__all__ = ["AsyncRWLock", "HelaoYml"]
+__all__ = ["AsyncRWLock", "HelaoYml", "Progress"]
 
 import os
 import shutil
@@ -534,5 +534,149 @@ class HelaoYml:
             yml_dumps(meta_dict),
             encoding="utf-8",
         )
+
+
+class Progress:
+    """Sidecar ``.prg`` file tracking sync state for one ``HelaoYml``.
+
+    The first time the progress file is opened it is initialized with default
+    booleans (``api``/``s3`` = False) plus type-specific fields: actions get
+    ``files_pending`` / ``files_s3`` lists, experiments get the per-process
+    bookkeeping dicts (``process_metas``, ``process_groups``, etc.).
+    Subsequent opens read the existing dict from disk.
+
+    Attributes:
+        ymlpath: Path of the parent yml.
+        prg: Path of the ``.prg`` file (under ``RUNS_SYNCED``).
+        dict: In-memory copy of the progress dict.
+    """
+
+    ymlpath: HelaoYml
+    prg: Path
+    dict: Dict
+
+    def __init__(self, path: Union[Path, str]):
+        """Resolve the yml/prg pair and load (or initialize) the progress dict.
+
+        Args:
+            path: Either the yml file under any ``RUNS_*`` tree or its
+                companion ``.prg`` file under ``RUNS_SYNCED``.
+
+        Raises:
+            ValueError: If ``path`` is not a ``.yml`` or ``.prg`` file.
+        """
+
+        if isinstance(path, Path):
+            if path.suffix == ".yml":
+                self.ymlpath = path
+            elif path.suffix == ".prg":
+                self.prg = path
+        else:
+            if path.endswith(".yml"):
+                self.ymlpath = Path(path)
+            elif path.endswith(".prg"):
+                self.prg = Path(path)
+            else:
+                raise ValueError(f"{path} is not a valid Helao .yml or .prg file")
+
+        # if not hasattr(self, "yml"):
+        #     self.read_dict()
+        #     self.yml = HelaoYml(self.dict["yml"])
+
+        if not hasattr(self, "prg"):
+            self.prg = self.yml.synced_path.with_suffix(".prg")
+
+        # self.prglockpath = str(self.prg) + ".lock"
+        # self.prglock = FileLock(self.prglockpath)
+        # if not os.path.exists(self.prglockpath):
+        #     os.makedirs(os.path.dirname(self.prglockpath), exist_ok=True)
+        #     with open(self.prglockpath, "w") as _:
+        #         pass
+
+        # first time, write progress dict
+        if not self.prg.exists():
+            self.prg.parent.mkdir(parents=True, exist_ok=True)
+            self.dict = {
+                "yml": self.yml.target.__str__(),
+                "api": False,
+                "s3": False,
+            }
+            if self.yml.type == "action":
+                act_dict = {
+                    "files_pending": [],
+                    "files_s3": {},
+                }
+                self.dict.update(act_dict)
+            if self.yml.type == "experiment":
+                process_groups = self.yml.meta.get("process_order_groups", {})
+                exp_dict = {
+                    "process_actions_done": {},  # {action submit order: yml.target.name}
+                    "process_groups": process_groups,  # {process_idx: contributor action indices}
+                    "process_metas": {},  # {process_idx: yml_dict}
+                    "process_s3": [],  # list of process_idx with S3 done
+                    "process_api": [],  # list of process_idx with API done
+                    "legacy_finisher_idxs": [],  # end action indicies (submit order)
+                    "legacy_experiment": False if process_groups else True,
+                }
+                self.dict.update(exp_dict)
+            self.write_dict()
+        else:
+            self.read_dict()
+            if not hasattr(self, "yml"):
+                self.ymlpath = Path(self.dict["yml"])
+
+    @property
+    def yml(self) -> HelaoYml:
+        """Freshly-constructed ``HelaoYml`` for ``self.ymlpath``."""
+        return HelaoYml(self.ymlpath)
+
+    def list_unfinished_procs(self) -> tuple:
+        """Return ``(s3_unfinished, api_unfinished)`` process-group indices.
+
+        For experiment ymls, returns the process group keys that have not yet
+        landed in S3 / the API. For other yml types both lists are empty.
+        """
+        if self.yml.type == "experiment":
+            s3_unf = [
+                x
+                for x in self.dict["process_groups"].keys()
+                if x not in self.dict["process_s3"]
+            ]
+            api_unf = [
+                x
+                for x in self.dict["process_groups"].keys()
+                if x not in self.dict["process_api"]
+            ]
+            return s3_unf, api_unf
+        return [], []
+
+    def read_dict(self):
+        """Reload ``self.dict`` from the ``.prg`` file on disk."""
+        self.dict = yml_load(self.prg)
+
+    def write_dict(self, new_dict: Optional[Dict] = None):
+        """Persist the progress dict to the ``.prg`` file as YAML.
+
+        Args:
+            new_dict: Override dict to write. Defaults to ``self.dict``.
+        """
+        out_dict = self.dict if new_dict is None else new_dict
+        # with self.prglock:
+        self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
+
+    @property
+    def s3_done(self) -> bool:
+        """Whether the yml has been pushed to S3."""
+        return self.dict["s3"]
+
+    @property
+    def api_done(self) -> bool:
+        """Whether the yml has been registered with the API."""
+        return self.dict["api"]
+
+    def remove_prg(self):
+        """Delete the ``.prg`` file from disk."""
+        # with self.prglock:
+        self.prg.unlink()
 
 
