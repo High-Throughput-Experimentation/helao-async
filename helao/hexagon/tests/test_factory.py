@@ -200,3 +200,60 @@ def test_make_action_app_registers_graft_hooks(installed_config):
     # ours must be registered AFTER the legacy BaseAPI startup that creates
     # app.base (Starlette preserves registration order)
     assert startup_names[-1] == "_hexagon_active_graft_startup"
+
+
+@pytest.mark.asyncio
+async def test_action_app_startup_binds_ws_publish_bridge(
+    installed_config, monkeypatch
+):
+    """P2b-2 D3: the existing _hexagon_active_graft_startup hook constructs
+    WsPublishBridge over the live base's queues and binds it into the status
+    adapter (ACTION apps only; makeOrchApp is untouched, Q1)."""
+    from types import SimpleNamespace
+
+    from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+    import helao.hexagon.app.active_graft as active_graft_mod
+    from helao.hexagon.app.factory import makeActionApp
+
+    class _StubGraft:
+        def close(self):
+            pass
+
+    # isolate the bind from the P2b-1 write graft (its own tests cover it)
+    monkeypatch.setattr(
+        active_graft_mod,
+        "graft_active_write_path",
+        lambda base, wiring: _StubGraft(),
+    )
+    app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
+    assert app.hexagon_ws_bridge is None  # bound at startup, not at build
+    app.base = SimpleNamespace(
+        status_q=MultisubscriberQueue(),
+        data_q=MultisubscriberQueue(),
+        live_q=MultisubscriberQueue(),
+    )
+    hook = [
+        h
+        for h in app.router.on_startup
+        if h.__name__ == "_hexagon_active_graft_startup"
+    ][0]
+    await hook()
+    assert isinstance(app.hexagon_ws_bridge, WsPublishBridge)
+    assert app.hexagon_wiring.status._publish_bridge is app.hexagon_ws_bridge
+    assert app.hexagon_ws_bridge._status_q is app.base.status_q
+    assert app.hexagon_ws_bridge._data_q is app.base.data_q
+    assert app.hexagon_ws_bridge._live_q is app.base.live_q
+
+
+@pytest.mark.asyncio
+async def test_orch_status_adapter_never_bound_by_orch_app(installed_config):
+    """Controller hardening 3 (Q1/D3 guard): makeOrchApp must never bind the
+    WS publish bridge — an unbound DispatcherStatusAdapter for an ORCH
+    composition still raises UnwiredPortError on publish_status."""
+    from helao.hexagon.adapters.errors import UnwiredPortError
+    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+
+    a = DispatcherStatusAdapter("ORCH")
+    with pytest.raises(UnwiredPortError):
+        await a.publish_status({})
