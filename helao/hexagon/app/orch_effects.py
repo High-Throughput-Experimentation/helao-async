@@ -170,6 +170,33 @@ class OrchCommandRunner:
             # _dispatch_action_locked already carries)
             if gsm.loop_state == LoopStatus.estopped:
                 return ErrorCodes.estop
+            # P2a T8: HexHealthMonitor is active_dict-driven -- it only sees
+            # a server that OWNS an active action, so a peer that dies as a
+            # mere DISPATCH TARGET (before its action registers active, e.g.
+            # a prior ORCH-hosted wait was the active step) is invisible to
+            # it. Pre-probe the head action's own endpoint here, BEFORE
+            # dispatch, so a dead target parks the loop instead of falling
+            # into the legacy dispatcher's ~450s retry ladder. Peek only
+            # (action_dq[0]) -- the dispatch itself still owns the pop.
+            if orch.action_dq:
+                head = orch.action_dq[0]
+                url = getattr(head, "url", None)
+                # non-Action stand-ins (e.g. dispatch-loop-mechanics test
+                # doubles that queue bare placeholders) have no url to probe
+                if url is not None:
+                    end = "/".join(url.strip("/").split("/")[-2:])
+                    if end not in orch.ignore_heartbeats:
+                        self.wiring.require("health")
+                        results = await self.wiring.health.endpoints_available(  # type: ignore[union-attr]
+                            [url]
+                        )
+                        _url, ok = results[0]
+                        if not ok:
+                            msg = f"{end} endpoints are unavailable"
+                            orch.current_stop_message = msg
+                            LOGGER.warning(msg)
+                            await orch.intend_stop()
+                            return ErrorCodes.none
             LOGGER.info("!!!checking conditions for next action")
             rc = await orch.loop_task_dispatch_action()
             # history poll (orch_dispatch.py:621-622) — ingestion registers
