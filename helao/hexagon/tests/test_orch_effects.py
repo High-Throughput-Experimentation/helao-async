@@ -39,6 +39,7 @@ class _GSM:
         self.loop_state = LoopStatus.stopped
         self.loop_intent = LoopIntent.none
         self.orch_state = OrchStatus.idle
+        self.active_dict = {}
         self.cleared = []
 
     def clear_in_finished(self, hlostatus):
@@ -61,6 +62,7 @@ class _StubOrch:
         self.current_stop_message = ""
         self.last_dispatched_action_uuid = "u1"
         self.action_history = {"u1": {}}
+        self.ignore_heartbeats = set()
         self.interrupt_q = asyncio.Queue()
         self.calls = []
         self.dispatch_rc = ErrorCodes.none
@@ -323,3 +325,57 @@ async def test_dispatch_head_action_poll_breaks_on_pruned_uuid():
     runner.pruned_uuids.add("dead-uuid")
     rc = await asyncio.wait_for(runner.execute(DispatchHeadAction()), timeout=3.0)
     assert rc == ErrorCodes.none
+
+
+class _FakeHeadAction:
+    """Stand-in for the real Action model's ``.url`` property (action.py)."""
+
+    def __init__(self, url: str):
+        self.url = url
+
+
+class _FakeHealthDown:
+    """HealthPort double reporting a fixed set of dead urls (item-6 T8)."""
+
+    def __init__(self, down_urls):
+        self.down_urls = set(down_urls)
+        self.calls = []
+
+    async def endpoints_available(self, urls):
+        self.calls.append(list(urls))
+        return [(u, u not in self.down_urls) for u in urls]
+
+    async def ping_action_servers(self):
+        raise AssertionError("unused")
+
+    def status_summary(self):
+        raise AssertionError("unused")
+
+
+@pytest.mark.asyncio
+async def test_dispatch_head_action_dead_target_parks_stopped():
+    """P2a T8 (item-6 dead-peer fix): HexHealthMonitor is active_dict-driven,
+    so a peer that dies as a mere DISPATCH TARGET -- before its action ever
+    registers active (e.g. a prior ORCH-hosted wait was the active step) --
+    is invisible to it. Reproduce that exact hole: loop_state=started, an
+    EMPTY active_dict, and a head action whose endpoint is already down.
+    Without the pre-probe guard this heads straight into
+    loop_task_dispatch_action -- here it must instead park stopped and
+    leave the head action undispatched."""
+    orch = _StubOrch()
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    assert orch.globalstatusmodel.active_dict == {}  # nothing owns an active action
+    dead_url = "http://127.0.0.1:1234/SIM/acquire_data"
+    head = _FakeHeadAction(dead_url)
+    orch.action_dq = [head]
+    health = _FakeHealthDown(down_urls=[dead_url])
+    runner = OrchCommandRunner(orch, PortWiring(logging=_AlertSpy(), health=health))
+
+    rc = await runner.execute(DispatchHeadAction())
+
+    assert rc is ErrorCodes.none
+    assert "loop_task_dispatch_action" not in orch.calls  # never dispatched
+    assert orch.action_dq == [head]  # still queued, not popped
+    assert orch.current_stop_message == "SIM/acquire_data endpoints are unavailable"
+    assert orch.globalstatusmodel.loop_intent == LoopIntent.stop
+    assert "intend_stop" in orch.calls
