@@ -7,7 +7,9 @@ guard sites orch_dispatch.py carries. State deltas follow DD-2. Never issues
 an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
+from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from helao.helpers import helao_logging
 from helao.hexagon.app.wiring import PortWiring
@@ -41,6 +43,7 @@ from helao.hexagon.domain.orchestration import (
     FinishThenDispatchSequenceCmd,
     InterruptWake,
     OrchestrationState,
+    PruneDeadActions,
     RefuseStart,
     ReleaseServersEstop,
     RequeueHeadAction,
@@ -143,6 +146,9 @@ class OrchCommandRunner:
         self.orch = orch
         self.wiring = wiring
         self.policy = DispatchPolicy()
+        # P2a: stringified uuids pruned by PruneDeadActions — the
+        # DispatchHeadAction history poll's health-aware exit (Q3)
+        self.pruned_uuids: set = set()
 
     async def execute(self, cmd: Command) -> Optional[ErrorCodes]:
         orch = self.orch
@@ -163,8 +169,12 @@ class OrchCommandRunner:
             LOGGER.info("!!!checking conditions for next action")
             rc = await orch.loop_task_dispatch_action()
             # history poll (orch_dispatch.py:621-622) — ingestion registers
-            # the uuid; the heartbeat monitor is the only exit on a dead peer
+            # the uuid. P2a health-aware exit (Q3): a dead peer's pruned
+            # uuid breaks the poll (the prune also registers history, so
+            # either condition releases it).
             while orch.last_dispatched_action_uuid not in orch.action_history.keys():
+                if str(orch.last_dispatched_action_uuid) in self.pruned_uuids:
+                    break
                 await asyncio.sleep(0.2)
             pause = self.policy.evaluate_step_thru(derive_state(orch).snapshot())
             if pause is not None:
@@ -315,6 +325,50 @@ class OrchCommandRunner:
 
         if isinstance(cmd, InterruptWake):
             await orch.interrupt_q.put(cmd.message)
+            return None
+
+        if isinstance(cmd, PruneDeadActions):
+            # item-6 dead-peer exit (Q3, pure-hexagon): move the dead
+            # server's uuids out of EVERY active_dict (global + per-endpoint,
+            # like /clear_actives — a global-only pop would be resurrected by
+            # the next fold's _sort_status) into the finished bucket with a
+            # terminal status, and register them in action_history so the
+            # history poll and non-blank-history asserts hold. Runs WITHOUT
+            # aiolock: fully synchronous on the event loop, and taking the
+            # lock here would add a third owner (invariant: ingestion +
+            # dispatch critical section only).
+            from helao.hexagon.app.ingestion import action_history_meta
+
+            now = datetime.now()
+            for uuid_str in cmd.action_uuids:
+                act_uuid = UUID(uuid_str)
+                act = gsm.active_dict.pop(act_uuid, None)
+                for asm in gsm.server_dict.values():
+                    for epm in asm.endpoints.values():
+                        ep_act = epm.active_dict.pop(act_uuid, None)
+                        if act is None and ep_act is not None:
+                            act = ep_act
+                self.pruned_uuids.add(uuid_str)
+                if act is None:
+                    LOGGER.warning(
+                        f"PruneDeadActions: uuid {uuid_str} not in any "
+                        "active_dict; nothing to prune"
+                    )
+                    continue
+                if HloStatus.finished not in act.action_status:
+                    # guarded-status idiom (action.py:172), not a raw append
+                    act.append_action_status(HloStatus.finished)
+                if act.action_finished_timestamp is None:
+                    act.action_finished_timestamp = now
+                if HloStatus.finished not in gsm.nonactive_dict:
+                    gsm.nonactive_dict[HloStatus.finished] = {}
+                gsm.nonactive_dict[HloStatus.finished][act_uuid] = act
+                if act.action_timestamp is not None:
+                    orch.register_action_uuid(act_uuid, action_history_meta(orch, act))
+                LOGGER.warning(
+                    f"pruned dead-peer action {uuid_str} "
+                    f"({act.action_server.server_name}/{act.action_name})"
+                )
             return None
 
         raise AssertionError(f"unhandled reducer command: {cmd!r}")
