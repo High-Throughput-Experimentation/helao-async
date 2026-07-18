@@ -44,7 +44,17 @@ ORCH_REQUIRED = (
     "status",
     "health",  # P2a: HexHealthMonitor + driver-health gate consume it
 )
-ACTION_REQUIRED = ("config", "logging", "clock", "transport", "status")
+ACTION_REQUIRED = (
+    "config",
+    "logging",
+    "clock",
+    "transport",
+    "status",
+    # P2b-1: the native write runtime carries all Active write traffic —
+    # a missing adapter must abort startup, never fall through to legacy
+    "artifact_store",
+    "data_sink",
+)
 
 
 @dataclass
