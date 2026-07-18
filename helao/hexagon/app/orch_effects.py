@@ -7,7 +7,9 @@ guard sites orch_dispatch.py carries. State deltas follow DD-2. Never issues
 an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
-from typing import Optional
+from datetime import datetime
+from typing import Optional, Tuple
+from uuid import UUID
 
 from helao.helpers import helao_logging
 from helao.hexagon.app.wiring import PortWiring
@@ -41,6 +43,7 @@ from helao.hexagon.domain.orchestration import (
     FinishThenDispatchSequenceCmd,
     InterruptWake,
     OrchestrationState,
+    PruneDeadActions,
     RefuseStart,
     ReleaseServersEstop,
     RequeueHeadAction,
@@ -78,6 +81,10 @@ class _LazyServerLogger:
 
 LOGGER = _LazyServerLogger()
 
+# driver-health retry cadence (verbatim orch_dispatch._exec_driver_health:
+# <=5 x 5 s); module-level so tests can compress it without patching asyncio
+DRIVER_HEALTH_RETRY_DELAY_S: float = 5.0
+
 __all__ = ["OrchCommandRunner", "apply_state_delta", "derive_state"]
 
 
@@ -113,7 +120,12 @@ async def apply_state_delta(
     (only a transition whose INPUT state was estopped — T10 — may overwrite a
     live estopped value); T5 exception via skip_loop_state; loop_intent routed
     through the legacy intend_* methods (interrupt_q wake preserved);
-    orch_state deliberately NOT written back (legacy ingester owns it)."""
+    orch_state written back since P2a (the ingestion rebind removed the
+    legacy StatusIngester's inline writers at the same instant — sole-writer
+    property). The orch_state write is deliberately UNGUARDED against a live
+    estopped value: the legacy inline chain always overwrote orch_state with
+    idle/busy on any fold (its estop branch is started-guarded), so the
+    reducer's StatusChanged must keep doing the same."""
     gsm = orch.globalstatusmodel
     if not skip_loop_state and new.loop_state != old.loop_state:
         live = gsm.loop_state
@@ -121,6 +133,8 @@ async def apply_state_delta(
             LOGGER.info("concurrent E-STOP observed; loop_state write suppressed")
         else:
             gsm.loop_state = new.loop_state
+    if new.orch_state != old.orch_state:
+        gsm.orch_state = new.orch_state
     if new.loop_intent != old.loop_intent:
         intender = {
             LoopIntent.stop: orch.intend_stop,
@@ -136,6 +150,9 @@ class OrchCommandRunner:
         self.orch = orch
         self.wiring = wiring
         self.policy = DispatchPolicy()
+        # P2a: stringified uuids pruned by PruneDeadActions — the
+        # DispatchHeadAction history poll's health-aware exit (Q3)
+        self.pruned_uuids: set = set()
 
     async def execute(self, cmd: Command) -> Optional[ErrorCodes]:
         orch = self.orch
@@ -153,11 +170,42 @@ class OrchCommandRunner:
             # _dispatch_action_locked already carries)
             if gsm.loop_state == LoopStatus.estopped:
                 return ErrorCodes.estop
+            # P2a T8: HexHealthMonitor is active_dict-driven -- it only sees
+            # a server that OWNS an active action, so a peer that dies as a
+            # mere DISPATCH TARGET (before its action registers active, e.g.
+            # a prior ORCH-hosted wait was the active step) is invisible to
+            # it. Pre-probe the head action's own endpoint here, BEFORE
+            # dispatch, so a dead target parks the loop instead of falling
+            # into the legacy dispatcher's ~450s retry ladder. Peek only
+            # (action_dq[0]) -- the dispatch itself still owns the pop.
+            if orch.action_dq:
+                head = orch.action_dq[0]
+                url = getattr(head, "url", None)
+                # non-Action stand-ins (e.g. dispatch-loop-mechanics test
+                # doubles that queue bare placeholders) have no url to probe
+                if url is not None:
+                    end = "/".join(url.strip("/").split("/")[-2:])
+                    if end not in orch.ignore_heartbeats:
+                        self.wiring.require("health")
+                        results = await self.wiring.health.endpoints_available(  # type: ignore[union-attr]
+                            [url]
+                        )
+                        _url, ok = results[0]
+                        if not ok:
+                            msg = f"{end} endpoints are unavailable"
+                            orch.current_stop_message = msg
+                            LOGGER.warning(msg)
+                            await orch.intend_stop()
+                            return ErrorCodes.none
             LOGGER.info("!!!checking conditions for next action")
             rc = await orch.loop_task_dispatch_action()
             # history poll (orch_dispatch.py:621-622) — ingestion registers
-            # the uuid; the heartbeat monitor is the only exit on a dead peer
+            # the uuid. P2a health-aware exit (Q3): a dead peer's pruned
+            # uuid breaks the poll (the prune also registers history, so
+            # either condition releases it).
             while orch.last_dispatched_action_uuid not in orch.action_history.keys():
+                if str(orch.last_dispatched_action_uuid) in self.pruned_uuids:
+                    break
                 await asyncio.sleep(0.2)
             pause = self.policy.evaluate_step_thru(derive_state(orch).snapshot())
             if pause is not None:
@@ -191,28 +239,6 @@ class OrchCommandRunner:
             await orch.finish_active_sequence()
             LOGGER.info("!!!dispatching next sequence")
             return await orch.loop_task_dispatch_sequence()
-
-        if isinstance(cmd, RetryDriverHealth):
-            # verbatim orch_dispatch._exec_driver_health (<=5 x 5 s)
-            na_drivers = list(cmd.na_drivers)
-            retries = 0
-            while retries < 5 and na_drivers:
-                LOGGER.info(
-                    f"unknown driver states: {', '.join(na_drivers)}, "
-                    "retrying in 5 seconds"
-                )
-                await asyncio.sleep(5)
-                na_drivers = [
-                    k for k, (_, v) in orch.status_summary.items() if v == "unknown"
-                ]
-                retries += 1
-            if na_drivers:
-                orch.current_stop_message = (
-                    f"unknown driver states: {', '.join(na_drivers)}"
-                )
-                LOGGER.warning(orch.current_stop_message)
-                await orch.stop()
-            return None
 
         if isinstance(cmd, WaitAllActionsIdle):
             # verbatim DrainForStop body — OWNS the stopped write (DD-2 T5)
@@ -310,4 +336,70 @@ class OrchCommandRunner:
             await orch.interrupt_q.put(cmd.message)
             return None
 
+        if isinstance(cmd, PruneDeadActions):
+            # item-6 dead-peer exit (Q3, pure-hexagon): move the dead
+            # server's uuids out of EVERY active_dict (global + per-endpoint,
+            # like /clear_actives — a global-only pop would be resurrected by
+            # the next fold's _sort_status) into the finished bucket with a
+            # terminal status, and register them in action_history so the
+            # history poll and non-blank-history asserts hold. Runs WITHOUT
+            # aiolock: fully synchronous on the event loop, and taking the
+            # lock here would add a third owner (invariant: ingestion +
+            # dispatch critical section only).
+            from helao.hexagon.app.ingestion import action_history_meta
+
+            now = datetime.now()
+            for uuid_str in cmd.action_uuids:
+                act_uuid = UUID(uuid_str)
+                act = gsm.active_dict.pop(act_uuid, None)
+                for asm in gsm.server_dict.values():
+                    for epm in asm.endpoints.values():
+                        ep_act = epm.active_dict.pop(act_uuid, None)
+                        if act is None and ep_act is not None:
+                            act = ep_act
+                self.pruned_uuids.add(uuid_str)
+                if act is None:
+                    LOGGER.warning(
+                        f"PruneDeadActions: uuid {uuid_str} not in any "
+                        "active_dict; nothing to prune"
+                    )
+                    continue
+                if HloStatus.finished not in act.action_status:
+                    # guarded-status idiom (action.py:172), not a raw append
+                    act.append_action_status(HloStatus.finished)
+                if act.action_finished_timestamp is None:
+                    act.action_finished_timestamp = now
+                if HloStatus.finished not in gsm.nonactive_dict:
+                    gsm.nonactive_dict[HloStatus.finished] = {}
+                gsm.nonactive_dict[HloStatus.finished][act_uuid] = act
+                if act.action_timestamp is not None:
+                    orch.register_action_uuid(act_uuid, action_history_meta(orch, act))
+                LOGGER.warning(
+                    f"pruned dead-peer action {uuid_str} "
+                    f"({act.action_server.server_name}/{act.action_name})"
+                )
+            return None
+
         raise AssertionError(f"unhandled reducer command: {cmd!r}")
+
+    async def execute_retry_driver_health(
+        self, cmd: RetryDriverHealth
+    ) -> "Tuple[str, ...]":
+        """Verbatim orch_dispatch._exec_driver_health retry cadence, MINUS
+        the exhaustion stop: the remainder is returned so HexRuntime can
+        feed the DriverHealthUnrecovered event (P2a — the reducer's
+        SetStopMessage wording is identical to the removed direct write)."""
+        orch = self.orch
+        na_drivers = list(cmd.na_drivers)
+        retries = 0
+        while retries < 5 and na_drivers:
+            LOGGER.info(
+                f"unknown driver states: {', '.join(na_drivers)}, "
+                "retrying in 5 seconds"
+            )
+            await asyncio.sleep(DRIVER_HEALTH_RETRY_DELAY_S)
+            na_drivers = [
+                k for k, (_, v) in orch.status_summary.items() if v == "unknown"
+            ]
+            retries += 1
+        return tuple(na_drivers)

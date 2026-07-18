@@ -340,3 +340,27 @@ def test_t4_exit_under_estop_keeps_estopped_and_skips_closeout():
 def test_t4_exit_with_leftover_queues_exports():
     s, cmds = fsm.step(st(loop_state=LoopStatus.stopped, n_seqs=2), fsm.LoopIterate())
     assert fsm.ExportQueuesCmd in kinds(cmds)
+
+
+def test_heartbeat_failed_with_dead_uuids_orders_prune():
+    """P2a item-6: a HeartbeatFailed carrying the dead server's active
+    uuids must order PruneDeadActions AFTER the stop message + alert."""
+    state = fsm.OrchestrationState(loop_state=LoopStatus.started)
+    msg = "SIM/acquire endpoints are unavailable"
+    new, cmds = fsm.step(
+        state, fsm.HeartbeatFailed(message=msg, dead_action_uuids=("u-1", "u-2"))
+    )
+    assert new.loop_intent == LoopIntent.stop
+    assert cmds == (
+        fsm.SetStopMessage(message=msg),
+        fsm.AlertOperator(message=msg),
+        fsm.PruneDeadActions(action_uuids=("u-1", "u-2")),
+    )
+
+
+def test_heartbeat_failed_without_dead_uuids_is_unchanged_t12():
+    """Back-compat: the no-uuid form keeps the exact pre-P2a T12 result."""
+    state = fsm.OrchestrationState(loop_state=LoopStatus.started)
+    new, cmds = fsm.step(state, fsm.HeartbeatFailed(message="m"))
+    assert new.loop_intent == LoopIntent.stop
+    assert cmds == (fsm.SetStopMessage(message="m"), fsm.AlertOperator(message="m"))
