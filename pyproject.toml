@@ -1,0 +1,11 @@
+[tool.black]
+# Native re-body modules under helao/hexagon/adapters/native/ are VERBATIM,
+# byte-identical copies of the legacy CARDS-P6 write collaborators
+# (helao/core/servers/active_data_*.py, base_meta_writer.py), pinned per-method
+# by inspect.getsource source-parity tests for byte-parity. Several legacy
+# collaborator modules are NOT black-formatted at line-length 88, so running
+# black on the copies would reformat them and break the source-parity
+# byte-identity. force-exclude keeps this package exempt from black even when
+# its files are passed explicitly. (No other black config: line length stays
+# the default 88 for the rest of the repo.)
+force-exclude = 'helao/hexagon/adapters/native/'
