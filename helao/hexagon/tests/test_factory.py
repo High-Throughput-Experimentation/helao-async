@@ -287,3 +287,46 @@ async def test_status_adapter_unbound_is_fail_loud(installed_config):
     a = DispatcherStatusAdapter("ORCH")
     with pytest.raises(UnwiredPortError):
         await a.publish_status({})
+
+
+def test_vis_shims_delegate(monkeypatch):
+    """P2d: each vis/operator shim exports the 4-arg makeBokehApp shape
+    bokeh_launcher calls (doc positional; confPrefix/server_key/
+    helao_repo_root as kwargs) and routes through factory.makeVisApp to
+    the right legacy module."""
+    from bokeh.document import Document
+
+    import helao.deploy.hexagon.servers.operator.standalone_operator as op_shim
+    import helao.deploy.hexagon.servers.visualizer.action_visualizer as av_shim
+    import helao.deploy.hexagon.servers.visualizer.live_visualizer as lv_shim
+    from helao.hexagon.app import factory
+
+    expected = {
+        op_shim: "helao.deploy.hte.servers.operator.standalone_operator",
+        lv_shim: "helao.deploy.hte.servers.visualizer.live_visualizer",
+        av_shim: "helao.deploy.hte.servers.visualizer.action_visualizer",
+    }
+    calls = {}
+
+    class FakeLegacy:
+        @staticmethod
+        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+            calls["args"] = (doc, confPrefix, server_key, helao_repo_root)
+            return doc
+
+    def fake_import(name):
+        calls["module"] = name
+        return FakeLegacy
+
+    monkeypatch.setattr(factory, "import_module", fake_import)
+    for shim, legacy_module in expected.items():
+        assert shim.LEGACY_MODULE == legacy_module
+        assert shim.FACTORY is factory.makeVisApp
+        doc = Document()
+        # the EXACT call shape bokeh_launcher.py:185-190 produces
+        out = shim.makeBokehApp(
+            doc, confPrefix="goldenhexvis", server_key="X", helao_repo_root="/repo"
+        )
+        assert out is doc
+        assert calls["module"] == legacy_module
+        assert calls["args"] == (doc, "goldenhexvis", "X", "/repo")
