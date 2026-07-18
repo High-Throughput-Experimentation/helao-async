@@ -473,12 +473,19 @@ async def test_dead_peer_race_real_loop_parks_without_hang():
     )
     gsm = orch.globalstatusmodel
     u = uuid4()
-    ing = HexStatusIngestion(orch, _RuntimeSpy(orch))
+    runtime = mon.runtime  # the REAL HexRuntime built by _monitor_setup
+    # Seed through the REAL runtime (not _RuntimeSpy) so the busy fold
+    # actually runs apply_state_delta and flips orch_state to busy --
+    # otherwise orch_state would sit at its idle default for the whole
+    # test and WaitAllActionsIdle's `if orch_state == idle: break` would
+    # succeed trivially, making the test pass even if the monitor's
+    # prune -> StatusChanged ordering were broken.
+    ing = HexStatusIngestion(orch, runtime)
     await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active])))
     while not orch.interrupt_q.empty():
         orch.interrupt_q.get_nowait()  # drain the fold wakes
+    assert gsm.orch_state == OrchStatus.busy  # genuine precondition for the guard
 
-    runtime = mon.runtime  # the REAL HexRuntime built by _monitor_setup
     loop = HexDispatchLoop(runtime)
     loop.start()
     # pre-seed intent=stop so the first LoopIterate takes T5 (DrainForStop
