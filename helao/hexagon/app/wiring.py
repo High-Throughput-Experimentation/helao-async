@@ -21,7 +21,7 @@ from helao.hexagon.ports.sample_state import SampleStatePort
 from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.sync import SyncPort
 from helao.hexagon.ports.transport import TransportPort
-from helao.hexagon.ports.auxiliary import StatePersistencePort
+from helao.hexagon.ports.auxiliary import HealthPort, StatePersistencePort
 from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
 
 __all__ = [
@@ -42,6 +42,7 @@ ORCH_REQUIRED = (
     "transport",
     "state_persistence",
     "status",
+    "health",  # P2a: HexHealthMonitor + driver-health gate consume it
 )
 ACTION_REQUIRED = ("config", "logging", "clock", "transport", "status")
 
@@ -61,6 +62,7 @@ class PortWiring:
     status: Optional[StatusPort] = None
     hardware: Optional[HardwarePort] = None
     sample_state: Optional[SampleStatePort] = None
+    health: Optional[HealthPort] = None
 
     def require(self, *names: str) -> None:
         known = {f.name for f in fields(self)}
