@@ -4,8 +4,6 @@ level only — full lifecycle is the Task 12 launched smoke."""
 
 import pytest
 
-from helao.hexagon.adapters.errors import HexagonDeferred
-
 
 def _world(tmp_path):
     return {
@@ -99,11 +97,38 @@ def test_make_action_app_wraps_legacy_module(installed_config):
     assert "/SIM/acquire_data" in routes  # real legacy action route survived
 
 
-def test_make_vis_app_defers_loudly():
-    from helao.hexagon.app.factory import makeVisApp
+def test_make_vis_app_delegates_to_legacy_module(monkeypatch):
+    """P2d compat-facade: makeVisApp imports the named legacy module and
+    calls its makeBokehApp with the launcher-shaped args, attaching NOTHING
+    (HelaoBokehAPI self-configures from CONFIG; native vis ports = P3)."""
+    from bokeh.document import Document
 
-    with pytest.raises(HexagonDeferred):
-        makeVisApp("LIVE")
+    from helao.hexagon.app import factory
+
+    calls = {}
+
+    class FakeLegacy:
+        @staticmethod
+        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+            calls["args"] = (doc, confPrefix, server_key, helao_repo_root)
+            return doc
+
+    def fake_import(name):
+        calls["module"] = name
+        return FakeLegacy
+
+    monkeypatch.setattr(factory, "import_module", fake_import)
+    doc = Document()
+    out = factory.makeVisApp(
+        "helao.deploy.hte.servers.operator.standalone_operator",
+        doc,
+        "goldenhexvis",
+        "OPERATOR",
+        "/repo",
+    )
+    assert out is doc
+    assert calls["module"] == "helao.deploy.hte.servers.operator.standalone_operator"
+    assert calls["args"] == (doc, "goldenhexvis", "OPERATOR", "/repo")
 
 
 def test_launcher_shims_delegate():
