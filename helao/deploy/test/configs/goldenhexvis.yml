@@ -1,0 +1,72 @@
+# P2d GATE config: hexagon-hosted bokeh operator/visualizers over the
+# hexagon ORCH+SIM (goldenhex.yml servers verbatim + golden.yml's bokeh
+# entries, each flipped to `deployment: hexagon` so bokeh_launcher resolves
+# the helao/deploy/hexagon shim modules). goldenhex.yml itself stays a pure
+# action/orch parity config. DB stays legacy (cut-over is P2e).
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_hexvis
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    deployment: hexagon
+    params: {}
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
+  OPERATOR:
+    host: 127.0.0.1
+    port: 5001
+    group: operator
+    bokeh: standalone_operator
+    deployment: hexagon
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (hexagon compat-facade)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    deployment: hexagon
+    live_vis: wssim_live_vis
+    params: {}
+    hlo_postprocess_libs:
+      - hlo_to_csv
+  LIVE:
+    host: 127.0.0.1
+    port: 5002
+    group: visualizer
+    bokeh: live_visualizer
+    deployment: hexagon
+    params:
+      doc_name: Websocket Live Visualizer
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: Action Visualizer
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sim_db_server
+    params:
+      aws_bucket: helao-sim
+      s3_record: true
