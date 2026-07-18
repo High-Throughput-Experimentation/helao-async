@@ -83,10 +83,27 @@ def makeOrchApp(server_key: str):
 
 
 def makeActionApp(server_key: str, legacy_module: str):
+    from helao.hexagon.app.active_graft import graft_active_write_path
+
     wiring = build_wiring(server_key)
     wiring.require(*ACTION_REQUIRED)
     app = import_module(legacy_module).makeApp(server_key)
     app.hexagon_wiring = wiring
+    app.hexagon_active_graft = None
+
+    # Registered AFTER the legacy BaseAPI's own startup handler (which sets
+    # self.base = Base(app=self, ...), base_api.py:646; Starlette preserves
+    # registration order): the graft sees the live app.base and rebinds
+    # contain_action + meta_writer before any action can be contained.
+    @app.on_event("startup")
+    async def _hexagon_active_graft_startup():
+        app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
+
+    @app.on_event("shutdown")
+    async def _hexagon_active_graft_shutdown():
+        if app.hexagon_active_graft is not None:
+            app.hexagon_active_graft.close()
+
     return app
 
 
