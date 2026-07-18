@@ -4,7 +4,7 @@ Runs against a LIVE launched group (launch.py <prefix>) — MAIN SESSION only
 (background subagent launches get reaped on idle). Invoked by conc_run.sh.
 Exit code: 0 PASS, 1 assertion failure, 2 driver error.
 
-Item drivers are registered in ITEMS and appended by Tasks 8-11:
+Item drivers are registered in ITEMS:
   item2 (non-default identity), item4 (serial >=3 experiments),
   item6 (history-poll hang exit), item7 (idle drain + non-blank history)."""
 
@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Callable, Dict, Optional
 
 import psutil
+import requests
 
 from helao.core.error import ErrorCodes
 from helao.helpers.dispatcher import private_dispatcher
@@ -110,7 +111,7 @@ def parse_hist_ts(s: str) -> datetime:
 
 
 ITEMS: Dict[str, Callable[[Path, str, str], int]] = {}
-# Tasks 8-11 register: ITEMS["item2"], ITEMS["item4"], ITEMS["item6"], ITEMS["item7"]
+# Registered below: ITEMS["item2"], ITEMS["item4"], ITEMS["item6"], ITEMS["item7"]
 # Signature: (root, orch_key, prefix) -> rc
 
 
@@ -184,6 +185,109 @@ def item4_serial_multi_experiment(root: Path, orch_key: str, prefix: str) -> int
 
 
 ITEMS["item4"] = item4_serial_multi_experiment
+
+
+def _active_dict_nonempty() -> bool:
+    gs = requests.post(
+        f"http://{ORCH_HOST}:{ORCH_PORT}/global_status", timeout=10
+    ).json()
+    return bool(gs.get("active_dict"))
+
+
+def item6_history_poll_hang_exit(root: Path, orch_key: str, prefix: str) -> int:
+    """§10.3 item 6 (history-poll hang exit) — CHARACTERIZATION of a KNOWN P2
+    DEFERRAL, not a passing behavioral test.
+
+    Killing an action server mid-action SHOULD let the heartbeat monitor stop
+    the orch. A P1b2b investigation showed this behavior exists in NEITHER the
+    hexagon composition NOR legacy: the monitor (ServerMonitor.active_action_
+    monitor, orch_monitor.py) fires and sets loop_intent=stop plus the
+    "endpoints are unavailable" message via orch.stop(), but the single drainer
+    is blocked in a dead-action wait with no health-aware escape (the hexagon
+    dispatch poll waits on action_history, which the killed sim never feeds;
+    and finish_active_experiment -> orch_wait_for_all_actions waits on
+    active_dict, which nothing prunes for a dead peer), so loop_state never
+    reaches stopped. A correct fix (health-aware dead-action exit + active_dict
+    pruning) is native health-event decomposition, deferred to P2.
+
+    This test therefore CHARACTERIZES the current limitation: after the kill
+    the heartbeat monitor is observed to fire (best-effort) but the orch stays
+    un-parked. TRIPWIRE: if a future P2 change makes the orch actually PARK
+    stopped here, the ``assert not _stopped()`` below FAILS — that is the
+    signal to rewrite this into the real behavioral assertion (orch parks
+    stopped with the offline-endpoint message)."""
+    seq = build_ws_sequence(1, wait_time=1.0, data_duration=60.0)
+    submit_and_start(orch_key, seq)
+    wait_until(_active_dict_nonempty, 120, poll_s=1.0, label="item6 action active")
+    kill_server(root, prefix, "SIM")
+
+    def _stopped() -> bool:
+        return str(get_orch_state(orch_key).get("loop_state")).endswith("stopped")
+
+    # Best-effort: the heartbeat monitor (interval 3s in goldenhexconc.yml)
+    # should at least SET the offline-endpoint stop message, even though it
+    # cannot park the loop for a dead peer.
+    saw_msg = False
+    for _ in range(15):  # ~30s of 2s polls
+        msg = str(get_orch_state(orch_key).get("current_stop_message"))
+        if "endpoints are unavailable" in msg:
+            saw_msg = True
+            break
+        if _stopped():  # unexpected under the current limitation
+            break
+        time.sleep(2)
+    print(f"[conc] item6 heartbeat monitor set offline message: {saw_msg}")
+
+    # DOCUMENTED P2 GAP / TRIPWIRE: the orch cannot yet convert the stop intent
+    # into a parked stopped state for a dead peer. Give it a generous window;
+    # it must stay un-parked under the current (legacy-parity) behavior.
+    for _ in range(15):  # ~30s more
+        if _stopped():
+            break
+        time.sleep(2)
+    assert not _stopped(), (
+        "item6: orch PARKED stopped after a dead-peer kill — the P2 dead-peer "
+        "health-aware exit appears to be implemented. Update this test to the "
+        "real behavioral assertion (orch parks stopped with the "
+        "'endpoints are unavailable' message)."
+    )
+    return 0
+
+
+ITEMS["item6"] = item6_history_poll_hang_exit
+
+
+def item7_idle_drain_and_history(root: Path, orch_key: str, prefix: str) -> int:
+    """§10.3 item 7: natural drain (NO /stop) parks the loop via the
+    complete-idle path; history entries are non-blank. Plus the launched-
+    path §9.1 asserts: flat per-server log files under <root>/LOGS."""
+    seq = build_ws_sequence(1, wait_time=2.0, data_duration=4.0)
+    submit_and_start(orch_key, seq)
+    # deliberately NO orch_post(..., "stop"): the drain itself must park
+    wait_until(lambda: orch_parked(orch_key), 600, label="item7 natural drain")
+    st = get_orch_state(orch_key)
+    assert str(st.get("loop_state")).endswith("stopped"), st.get("loop_state")
+    assert str(st.get("orch_state")).endswith("idle"), st.get("orch_state")
+
+    hist = get_histories(orch_key)
+    acts = [meta for _u, meta in hist["action"]]
+    assert acts, "action history is empty after a completed run"
+    for meta in acts:  # non-blank entries (2e828981/ac42e9bf/6b8931ce)
+        assert meta.get("action_name"), meta
+        assert meta.get("action_timestamp"), meta
+        assert meta.get("action_finished_timestamp"), meta
+        assert meta.get("experiment_uuid"), meta
+
+    # §9.1 on the launched hexagon path: flat log files at the contract path
+    logs = root / "LOGS"
+    for key in (orch_key, "SIM", "DB"):
+        assert (logs / f"{key}.log").exists(), f"missing {key}.log under LOGS"
+    assert (logs / "ntpLastSync.txt").exists()
+    assert not (root / "LOGS_FW").exists(), "parallel log dir must never exist"
+    return 0
+
+
+ITEMS["item7"] = item7_idle_drain_and_history
 
 
 def main() -> int:
