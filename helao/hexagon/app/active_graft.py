@@ -21,12 +21,13 @@ legacy BaseAPI keeps hosting the routes (Q1).
 
 from copy import copy
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, cast
 
 from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
 from helao.helpers.active_params import ActiveParams
 from helao.hexagon.adapters.errors import UnwiredPortError
+from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
 from helao.hexagon.app.wiring import PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -56,12 +57,16 @@ def graft_active_write_path(base, wiring: PortWiring) -> ActiveWriteGraft:
             "(collaborators_for/meta_writer_for); got "
             f"{type(store).__name__ if store is not None else None}"
         )
+    # The guard above proves `store` is a wired native adapter (it has the
+    # collaborator-factory surface); narrow the abstract ArtifactStorePort to
+    # the concrete type so the extension methods type-check without suppression.
+    store = cast(NativeArtifactStoreAdapter, store)
 
     graft = ActiveWriteGraft(base=base)
     graft.originals["contain_action"] = base.contain_action
     graft.originals["meta_writer"] = base.meta_writer
-    store.bind_base(base)  # type: ignore[reportAttributeAccessIssue]
-    base.meta_writer = store.meta_writer_for(base)  # type: ignore[reportAttributeAccessIssue]
+    store.bind_base(base)
+    base.meta_writer = store.meta_writer_for(base)
 
     async def hex_contain_action(activeparams: ActiveParams):
         # ------------------------------------------------------------------
@@ -80,7 +85,7 @@ def graft_active_write_path(base, wiring: PortWiring) -> ActiveWriteGraft:
         )
         # --- hexagon swap (the reroute) ---
         active = base.actives[activeparams.action.action_uuid]
-        streamer, file_writer, finalizer = store.collaborators_for(active)  # type: ignore[reportAttributeAccessIssue]
+        streamer, file_writer, finalizer = store.collaborators_for(active)
         active.data_stream = streamer
         active.data_file_writer = file_writer
         active.action_finalizer = finalizer
