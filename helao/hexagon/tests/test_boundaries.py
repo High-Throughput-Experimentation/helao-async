@@ -12,6 +12,9 @@ Layer rules:
              helao.hexagon.ports.*, helao.core.drivers.helao_driver
              (declared exception: DriverResponse value objects, spec §4.3.1)
 - adapters/: anything EXCEPT helao.hexagon.app and helao.hexagon.tests
+- adapters/native/ (P2b-1): same as adapters/ PLUS helao.core.servers.* is
+             banned — the native write runtime owns the write logic and
+             never wraps legacy server classes
 - app/     : anything EXCEPT helao.hexagon.tests
 - tests/   : anything (fakes moved to adapters/fakes in P1b1)
 """
@@ -84,6 +87,8 @@ _STDLIB = frozenset(sys.stdlib_module_names)
 
 def _layer_of(pyfile: Path) -> str:
     rel = pyfile.resolve().relative_to(HEXAGON_ROOT)
+    if len(rel.parts) > 2 and rel.parts[0] == "adapters" and rel.parts[1] == "native":
+        return "adapters-native"
     return rel.parts[0] if len(rel.parts) > 1 else "root"
 
 
@@ -123,6 +128,19 @@ def _allowed(module: str, layer: str) -> bool:
         return not (
             module == f"{HEXAGON_PKG}.tests"
             or module.startswith(f"{HEXAGON_PKG}.tests.")
+        )
+    if layer == "adapters-native":
+        # P2b-1: the native write runtime. Same bans as adapters/ (never
+        # app, never tests) PLUS helao.core.servers.* — the native bodies
+        # own the write logic; only the app-layer graft touches legacy
+        # server classes.
+        return not (
+            module == f"{HEXAGON_PKG}.app"
+            or module.startswith(f"{HEXAGON_PKG}.app.")
+            or module == f"{HEXAGON_PKG}.tests"
+            or module.startswith(f"{HEXAGON_PKG}.tests.")
+            or module == "helao.core.servers"
+            or module.startswith("helao.core.servers.")
         )
     if layer == "adapters":
         # ports+domain+vendor+legacy helao.* allowed; never app (inversion)
@@ -272,3 +290,37 @@ def test_checker_flags_app_importing_tests(tmp_path):
 def test_app_layer_clean():
     bad = [v for f in _walk_layer("app") for v in iter_violations(f)]
     assert not bad, f"app boundary violations: {bad}"
+
+
+def test_checker_flags_native_importing_core_servers(tmp_path):
+    """Mutation self-test (P2b-1): adapters/native/ is the hexagon-owned
+    write runtime — unlike adapters/legacy it must NOT wrap legacy server
+    classes. helao.core.servers.* is banned there (models/helpers stay
+    allowed: the native bodies are byte-copies of the collaborator modules,
+    which import helao.core.models + helao.helpers only)."""
+    native_dir = HEXAGON_ROOT / "adapters" / "native"
+    native_dir.mkdir(exist_ok=True)
+    (native_dir / "__init__.py").touch()
+    victim = native_dir / "_boundary_selftest_tmp.py"
+    victim.write_text(
+        "import aiofiles\n"  # vendor allowed
+        "from helao.helpers.yml_tools import yml_dumps\n"  # helpers allowed
+        "from helao.core.models.run_dir import RunDir\n"  # models allowed
+        "from helao.core.servers.base import Base\n"  # BANNED in native
+        "from helao.core.servers.active_finalizer import ActionFinalizer\n"  # BANNED
+    )
+    try:
+        hits = iter_violations(victim)
+        assert {m for _, m, _ in hits} == {
+            "helao.core.servers.base",
+            "helao.core.servers.active_finalizer",
+        }
+    finally:
+        victim.unlink()
+
+
+def test_native_adapters_never_import_core_servers():
+    d = HEXAGON_ROOT / "adapters" / "native"
+    files = sorted(d.rglob("*.py")) if d.is_dir() else []
+    bad = [v for f in files for v in iter_violations(f)]
+    assert not bad, f"native-adapter boundary violations: {bad}"
