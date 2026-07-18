@@ -1,6 +1,5 @@
 """Config (raw-dict identity), Logging (fail-loud), Clock (NTP offset)."""
 
-import logging as std_logging
 from datetime import datetime, timedelta
 
 import pytest

@@ -2,8 +2,6 @@
 delegation onto recording stubs (real-Base/Active integration is exercised
 by the Task 12 smoke through the launched group)."""
 
-import asyncio
-
 import pytest
 
 from helao.hexagon.adapters.errors import UnwiredPortError
