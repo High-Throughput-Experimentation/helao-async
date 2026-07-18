@@ -21,6 +21,8 @@ from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
 from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
+from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
+from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED, PortWiring
 
 __all__ = ["build_wiring", "makeActionApp", "makeOrchApp", "makeVisApp"]
@@ -31,16 +33,20 @@ def build_wiring(server_key: str) -> PortWiring:
     root = config.root()  # KeyError -> loud, like helao_dirs
     log_root = os.path.join(root, "LOGS")
     scfg = config.server_cfg(server_key)  # KeyError -> loud, like the launcher
+    clock = LegacyClockAdapter.from_offset_file(log_root)
     return PortWiring(
         config=config,
         logging=LegacyLoggingAdapter(),
-        clock=LegacyClockAdapter.from_offset_file(log_root),
+        clock=clock,
         transport=LegacyTransportAdapter(config),
         state_persistence=QueuePckStore(root),
         status=DispatcherStatusAdapter(
             server_key, own_host=scfg["host"], own_port=scfg["port"]
         ),
         health=LegacyHealthAdapter(),
+        # P2b-1 native write runtime (base bound later by the active graft)
+        artifact_store=NativeArtifactStoreAdapter(config=config, clock=clock),
+        data_sink=NativeDataSinkAdapter(),
     )
 
 
@@ -77,10 +83,27 @@ def makeOrchApp(server_key: str):
 
 
 def makeActionApp(server_key: str, legacy_module: str):
+    from helao.hexagon.app.active_graft import graft_active_write_path
+
     wiring = build_wiring(server_key)
     wiring.require(*ACTION_REQUIRED)
     app = import_module(legacy_module).makeApp(server_key)
     app.hexagon_wiring = wiring
+    app.hexagon_active_graft = None
+
+    # Registered AFTER the legacy BaseAPI's own startup handler (which sets
+    # self.base = Base(app=self, ...), base_api.py:646; Starlette preserves
+    # registration order): the graft sees the live app.base and rebinds
+    # contain_action + meta_writer before any action can be contained.
+    @app.on_event("startup")
+    async def _hexagon_active_graft_startup():
+        app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
+
+    @app.on_event("shutdown")
+    async def _hexagon_active_graft_shutdown():
+        if app.hexagon_active_graft is not None:
+            app.hexagon_active_graft.close()
+
     return app
 
 
