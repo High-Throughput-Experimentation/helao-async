@@ -1,12 +1,14 @@
 [tool.black]
-# Four native re-body modules under helao/hexagon/adapters/native/ are
-# VERBATIM, byte-identical copies of the legacy CARDS-P6 write collaborators
-# (helao/core/servers/active_data_*.py, base_meta_writer.py), pinned per-method
+# Five native re-body modules under helao/hexagon/adapters/native/ are
+# VERBATIM, byte-identical copies of legacy code: four CARDS-P6 write
+# collaborators (helao/core/servers/active_data_*.py, base_meta_writer.py) and
+# the P2c sync driver (helao/core/drivers/data/sync_driver.py), pinned per-method
 # by inspect.getsource source-parity tests for byte-parity. Several legacy
 # collaborator modules are NOT black-formatted at line-length 88, so running
 # black on the copies would reformat them and break the source-parity
-# byte-identity. force-exclude protects ONLY those four re-bodies; the
+# byte-identity. force-exclude protects ONLY those five re-bodies; the
 # hand-written native adapters (artifact_store, data_sink, ws_publish) are
 # black-enforced like the rest of the repo (P2b-2 D2). (No other black
 # config: line length stays the default 88.)
-force-exclude = 'helao/hexagon/adapters/native/(meta_writer|data_file|data_stream|finalizer)\.py'
+# sync_driver.py is the P2c re-body of helao/core/drivers/data/sync_driver.py (D1); its hand-written NativeSyncAdapter sibling (sync_adapter.py) stays black-enforced.
+force-exclude = 'helao/hexagon/adapters/native/(meta_writer|data_file|data_stream|finalizer|sync_driver)\.py'
