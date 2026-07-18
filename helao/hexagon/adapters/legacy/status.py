@@ -17,13 +17,11 @@ the actionmodel sub-fields the port gives us (exec_id, action_uuid,
 action_status, action_server.server_name) under the correct ``actionmodel``
 body key, and ``server_host``/``server_port`` under the correct query keys.
 
-Known gap (flagged, not silently papered over): ``StatusPort.send_nonblocking_status``
-does not pass the reporting server's own host/port, only the port's
-constructor knows them (``own_host``/``own_port``, defaulting to ``""``/``0``
-when unset) -- a real composition must supply them at construction time or
-downstream ``clear_nonblocking`` bookkeeping (keyed on host/port) will be
-wrong. This is a P1b2-scoped follow-up, not a P1b1 blocker (send/attach/detach
-still function correctly for the push path).
+Own identity (closed P1b1 gap): the composition (factory.build_wiring)
+constructs this adapter with ``own_host``/``own_port`` taken from the
+server's own config entry, so downstream ``clear_nonblocking`` bookkeeping
+(keyed on host/port in orch_status_sync) sees the real reporting identity.
+The ``""``/``0`` defaults remain only for unit construction convenience.
 
 Second drift (flagged, adapter-local fix only -- the port itself is P1a-owned
 and out of scope here): ``StatusPort.send_nonblocking_status`` declares
