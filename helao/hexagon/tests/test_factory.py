@@ -5,7 +5,6 @@ level only — full lifecycle is the Task 12 launched smoke."""
 import pytest
 
 from helao.hexagon.adapters.errors import HexagonDeferred
-from helao.hexagon.app.wiring import UnwiredPortError
 
 
 def _world(tmp_path):
