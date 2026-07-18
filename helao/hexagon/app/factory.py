@@ -18,6 +18,7 @@ from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
 from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
+from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
 from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED, PortWiring
 
@@ -28,12 +29,16 @@ def build_wiring(server_key: str) -> PortWiring:
     config = from_global_config()  # raises when CONFIG is not installed
     root = config.root()  # KeyError -> loud, like helao_dirs
     log_root = os.path.join(root, "LOGS")
+    scfg = config.server_cfg(server_key)  # KeyError -> loud, like the launcher
     return PortWiring(
         config=config,
         logging=LegacyLoggingAdapter(),
         clock=LegacyClockAdapter.from_offset_file(log_root),
         transport=LegacyTransportAdapter(config),
         state_persistence=QueuePckStore(root),
+        status=DispatcherStatusAdapter(
+            server_key, own_host=scfg["host"], own_port=scfg["port"]
+        ),
     )
 
 
