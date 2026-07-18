@@ -22,41 +22,24 @@ echo "[conc_run] launching $PREFIX (log: $LAUNCHLOG)"
 nohup conda run --no-capture-output -n helao python launch.py "$PREFIX" --no-hot-reload > "$LAUNCHLOG" 2>&1 &
 LAUNCH_PID=$!
 
-echo "[conc_run] waiting for ports 8001/8002/8010"
-UP=0
-for i in $(seq 1 90); do
-  if conda run -n helao python - <<'PY' 2>/dev/null
-import socket, sys
-ok = all(socket.socket().connect_ex(("127.0.0.1", p)) == 0 for p in (8001, 8002, 8010))
-sys.exit(0 if ok else 1)
-PY
-  then UP=1; break; fi
-  sleep 2
-done
-if [ "$UP" -ne 1 ]; then
-  echo "[conc_run] FAIL ports never came up; launch tail:"; tail -40 "$LAUNCHLOG"
-  conda run -n helao python helao/hexagon/tests/smoke/kill_group.py "$ROOT" "$PREFIX"
-  kill "$LAUNCH_PID" 2>/dev/null; exit 2
-fi
-# Ports being open (socket bound by the launcher) is NOT the same as the orch
-# app being ready to serve. The co-located ZMQ RPC mirror (18001) comes up
-# early, but the uvicorn HTTP server (8001) does not accept until the orch's
-# startup lifespan finishes — which can spend ~30s in a SIM status-subscribe
-# backoff. The item drivers reach the orch over HTTP (e.g. /append_sequence,
-# which is not RPC-mirrored), so poll the orch's real HTTP endpoint until it
-# answers 200 (or give up after ~120s). RPC readiness alone races the driver.
-echo "[conc_run] waiting for $ORCH_KEY HTTP to be serving (/get_orch_state)"
+# Wait for the orch to actually SERVE over HTTP. Probe ONLY with curl (one
+# tiny process per poll) — do NOT spawn `conda run python` per iteration: each
+# is a full interpreter + conda activation, and hammering it every 2s during
+# the CPU-sensitive multi-server startup starves the group so badly that
+# launch.py tears it down (observed: SIM shut down ~3s in and the orch never
+# finished its SIM status-subscribe, so the driver's HTTP call was refused).
+# We probe only the orch on 8001: action/DB servers launch before the
+# orchestrator (LAUNCH_ORDER), so a serving orch implies they are up. The
+# drivers reach the orch over HTTP (e.g. /append_sequence is not RPC-mirrored),
+# and its uvicorn HTTP does not accept until the startup lifespan finishes
+# (~30s SIM-subscribe backoff), so HTTP-200 is the right readiness signal.
+echo "[conc_run] waiting for $ORCH_KEY HTTP to serve (/get_orch_state)"
 READY=0
-for i in $(seq 1 60); do
-  if conda run -n helao python - <<'PY' 2>/dev/null
-import sys, requests
-try:
-    r = requests.post("http://127.0.0.1:8001/get_orch_state", json={}, timeout=3)
-    sys.exit(0 if r.status_code == 200 else 1)
-except Exception:
-    sys.exit(1)
-PY
-  then READY=1; break; fi
+for i in $(seq 1 120); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+    -H 'Content-Type: application/json' --data '{}' \
+    --max-time 3 "http://127.0.0.1:8001/get_orch_state" 2>/dev/null || echo 000)
+  if [ "$code" = "200" ]; then READY=1; break; fi
   sleep 2
 done
 if [ "$READY" -ne 1 ]; then
@@ -64,7 +47,7 @@ if [ "$READY" -ne 1 ]; then
   conda run -n helao python helao/hexagon/tests/smoke/kill_group.py "$ROOT" "$PREFIX"
   kill "$LAUNCH_PID" 2>/dev/null; exit 2
 fi
-sleep 2  # small settle after readiness
+sleep 3  # small settle after readiness
 
 echo "[conc_run] driving $ITEM"
 conda run -n helao python -m helao.hexagon.tests.smoke.conc_items \
