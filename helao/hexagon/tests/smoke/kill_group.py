@@ -32,4 +32,4 @@ def main(root: str, prefix: str = "goldenhex") -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else "goldenhex"))
