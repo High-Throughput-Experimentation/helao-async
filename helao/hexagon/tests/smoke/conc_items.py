@@ -150,6 +150,42 @@ def item2_nondefault_identity(root: Path, orch_key: str, prefix: str) -> int:
 ITEMS["item2"] = item2_nondefault_identity
 
 
+def item4_serial_multi_experiment(root: Path, orch_key: str, prefix: str) -> int:
+    """§10.3 item 4: 3-experiment sequence; every experiment's actions all
+    FINISH before the next experiment's first action STARTS (5c43a803),
+    and the nonblocking registry is clear at park."""
+    seq = build_ws_sequence(3, wait_time=2.0, data_duration=4.0)
+    submit_and_start(orch_key, seq)
+    wait_until(lambda: orch_parked(orch_key), 900, label="item4 3-exp drain")
+
+    hist = get_histories(orch_key)
+    acts = [meta for _u, meta in hist["action"]]
+    groups: dict = {}
+    for meta in acts:  # dict preserves first-seen (dispatch) order
+        groups.setdefault(str(meta.get("experiment_uuid")), []).append(meta)
+    exp_groups = list(groups.values())
+    assert len(exp_groups) == 3, f"expected 3 experiment groups, got {len(exp_groups)}"
+    for metas in exp_groups:
+        assert all(
+            m.get("action_finished_timestamp") for m in metas
+        ), f"unfinished action in {metas}"
+    for prev, nxt in zip(exp_groups, exp_groups[1:]):
+        prev_finish = max(parse_hist_ts(m["action_finished_timestamp"]) for m in prev)
+        next_start = min(parse_hist_ts(m["action_timestamp"]) for m in nxt)
+        assert next_start >= prev_finish, (
+            f"experiment overlap: next started {next_start} "
+            f"before previous finished {prev_finish}"
+        )
+    nb = orch_post(orch_key, "list_nonblocking")
+    assert nb == [], f"nonblocking registry not cleared: {nb}"
+    exps = [meta for _u, meta in hist["experiment"]]
+    assert len(exps) == 3, f"expected 3 experiments in history, got {len(exps)}"
+    return 0
+
+
+ITEMS["item4"] = item4_serial_multi_experiment
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--item", required=True, choices=sorted(ITEMS) or ["none"])
