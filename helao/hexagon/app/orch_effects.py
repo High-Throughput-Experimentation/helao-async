@@ -113,7 +113,12 @@ async def apply_state_delta(
     (only a transition whose INPUT state was estopped — T10 — may overwrite a
     live estopped value); T5 exception via skip_loop_state; loop_intent routed
     through the legacy intend_* methods (interrupt_q wake preserved);
-    orch_state deliberately NOT written back (legacy ingester owns it)."""
+    orch_state written back since P2a (the ingestion rebind removed the
+    legacy StatusIngester's inline writers at the same instant — sole-writer
+    property). The orch_state write is deliberately UNGUARDED against a live
+    estopped value: the legacy inline chain always overwrote orch_state with
+    idle/busy on any fold (its estop branch is started-guarded), so the
+    reducer's StatusChanged must keep doing the same."""
     gsm = orch.globalstatusmodel
     if not skip_loop_state and new.loop_state != old.loop_state:
         live = gsm.loop_state
@@ -121,6 +126,8 @@ async def apply_state_delta(
             LOGGER.info("concurrent E-STOP observed; loop_state write suppressed")
         else:
             gsm.loop_state = new.loop_state
+    if new.orch_state != old.orch_state:
+        gsm.orch_state = new.orch_state
     if new.loop_intent != old.loop_intent:
         intender = {
             LoopIntent.stop: orch.intend_stop,

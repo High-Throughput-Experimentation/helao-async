@@ -195,6 +195,27 @@ async def test_delta_t5_exception_skips_loop_state():
     assert orch.globalstatusmodel.loop_state == LoopStatus.started  # drain body owns it
 
 
+@pytest.mark.asyncio
+async def test_apply_state_delta_writes_orch_state_back_dd2():
+    """P2a DD-2: the reducer delta is now the SOLE orch_state writer.
+    Unguarded overwrite is deliberate legacy parity: the legacy inline
+    chain always overwrote orch_state with idle/busy on a fold."""
+    orch = _StubOrch()
+    old = OrchestrationState(orch_state=OrchStatus.idle)
+    new = OrchestrationState(orch_state=OrchStatus.busy)
+    await apply_state_delta(orch, old, new)
+    assert orch.globalstatusmodel.orch_state == OrchStatus.busy
+
+
+@pytest.mark.asyncio
+async def test_apply_state_delta_skips_unchanged_orch_state():
+    orch = _StubOrch()
+    orch.globalstatusmodel.orch_state = OrchStatus.busy  # live drifted
+    st = OrchestrationState(orch_state=OrchStatus.idle)
+    await apply_state_delta(orch, st, st)  # no delta -> no write
+    assert orch.globalstatusmodel.orch_state == OrchStatus.busy
+
+
 # --- OrchCommandRunner ----------------------------------------------------------
 @pytest.mark.asyncio
 async def test_dispatch_head_action_happy_path():

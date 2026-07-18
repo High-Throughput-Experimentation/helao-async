@@ -167,6 +167,11 @@ async def test_graft_rebinds_control_methods():
             "estop_loop",
             "clear_estop",
             "clear_error",
+            # P2a DD-2: ingestion rebind set grafted onto the same originals
+            # dict; this stub never defined them, so both capture None
+            # (tolerant getattr(..., None) — see graft_hexagon_loop).
+            "update_status",
+            "update_nonblocking",
         }
         await orch.start()  # type: ignore[attr-defined]  # rebound by the graft
         for _ in range(200):
@@ -181,3 +186,22 @@ async def test_graft_rebinds_control_methods():
         assert orch.action_dq == []
     finally:
         await graft.loop.close()
+
+
+@pytest.mark.asyncio
+async def test_graft_rebinds_status_ingestion_endpoints():
+    """P2a: graft_hexagon_loop extends the instance-rebind set with
+    update_status/update_nonblocking (DD-2 atomic hand-off)."""
+    orch = _ScriptedOrch()
+    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy()))
+    assert graft.ingestion is not None
+    assert (
+        orch.update_status.__func__  # type: ignore[attr-defined]  # rebound by the graft
+        is type(graft.ingestion).update_status
+    )
+    assert (
+        orch.update_nonblocking.__func__  # type: ignore[attr-defined]  # rebound by the graft
+        is type(graft.ingestion).update_nonblocking
+    )
+    assert "update_status" in graft.originals
+    await graft.close()
