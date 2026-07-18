@@ -13,7 +13,7 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_verbatim_region,
 )
 
-REGION_END = 1394  # T5; grows to 1732 (T6), 2057 (T7)
+REGION_END = 1732  # T6; grows to 2057 (T7)
 
 MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
 
@@ -107,3 +107,13 @@ SYNC_DRIVER_YML = ["sync_yml"]
 
 def test_sync_yml_parity():
     assert_source_parity(native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_YML)
+
+
+SYNC_DRIVER_PROCESS = ["update_process", "reconcile_processes", "sync_process"]
+
+
+def test_process_recovery_surface_parity():
+    """The 728a663c fix must be byte-identical (plan MUST-PRESERVE)."""
+    assert_source_parity(
+        native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_PROCESS
+    )
