@@ -11,9 +11,9 @@ Layer rules:
 - ports/   : stdlib (minus I/O denylist), helao.hexagon.domain.*,
              helao.hexagon.ports.*, helao.core.drivers.helao_driver
              (declared exception: DriverResponse value objects, spec §4.3.1)
-- adapters/: anything EXCEPT helao.hexagon.app
-- app/     : anything
-- tests/   : anything (fakes live here in P1a)
+- adapters/: anything EXCEPT helao.hexagon.app and helao.hexagon.tests
+- app/     : anything EXCEPT helao.hexagon.tests
+- tests/   : anything (fakes moved to adapters/fakes in P1b1)
 """
 
 import ast
@@ -115,13 +115,25 @@ def _imported_modules(pyfile: Path) -> List[Tuple[int, str]]:
 
 def _allowed(module: str, layer: str) -> bool:
     top = module.split(".")[0]
-    if layer in ("app", "tests", "root"):
+    if layer in ("tests", "root"):
         return True
-    if layer == "adapters":
+    if layer == "app":
+        # composition root: anything EXCEPT test code (fakes live in
+        # adapters/fakes and are opt-in; tests/ must never leak into prod)
         return not (
-            module == f"{HEXAGON_PKG}.app" or module.startswith(f"{HEXAGON_PKG}.app.")
+            module == f"{HEXAGON_PKG}.tests"
+            or module.startswith(f"{HEXAGON_PKG}.tests.")
         )
-    # domain / ports
+    if layer == "adapters":
+        # ports+domain+vendor+legacy helao.* allowed; never app (inversion)
+        # and never tests
+        return not (
+            module == f"{HEXAGON_PKG}.app"
+            or module.startswith(f"{HEXAGON_PKG}.app.")
+            or module == f"{HEXAGON_PKG}.tests"
+            or module.startswith(f"{HEXAGON_PKG}.tests.")
+        )
+    # domain / ports (LOCKED — do not touch below this line)
     if top in VENDOR_BANNED:
         return False
     if top in _STDLIB:
@@ -219,3 +231,44 @@ def test_checker_allows_domain_allowlist(tmp_path):
         assert iter_violations(victim) == []
     finally:
         victim.unlink()
+
+
+def test_checker_flags_adapters_importing_app_and_tests(tmp_path):
+    """Mutation self-test: adapters/ may import legacy helao.* and vendors,
+    but never the app layer (composition inversion) nor test code."""
+    victim = HEXAGON_ROOT / "adapters" / "_boundary_selftest_tmp.py"
+    victim.write_text(
+        "import httpx\n"  # vendors ARE allowed in adapters
+        "from helao.core.servers.base import Base\n"  # legacy allowed
+        "from helao.hexagon.app import factory\n"  # banned
+        "from helao.hexagon.tests import fakes\n"  # banned
+    )
+    try:
+        hits = iter_violations(victim)
+        assert {m for _, m, _ in hits} == {
+            "helao.hexagon.app",
+            "helao.hexagon.tests",
+        }
+    finally:
+        victim.unlink()
+
+
+def test_checker_flags_app_importing_tests(tmp_path):
+    """Mutation self-test: app/ may import adapters+ports+domain+anything,
+    but never test code (fakes are opt-in via adapters/fakes, spec §10.2)."""
+    victim = HEXAGON_ROOT / "app" / "_boundary_selftest_tmp.py"
+    victim.write_text(
+        "import fastapi\n"
+        "from helao.hexagon.adapters.fakes import FakeClock\n"  # allowed (opt-in)
+        "from helao.hexagon.tests.test_orchestration import x\n"  # banned
+    )
+    try:
+        hits = iter_violations(victim)
+        assert {m for _, m, _ in hits} == {"helao.hexagon.tests.test_orchestration"}
+    finally:
+        victim.unlink()
+
+
+def test_app_layer_clean():
+    bad = [v for f in _walk_layer("app") for v in iter_violations(f)]
+    assert not bad, f"app boundary violations: {bad}"
