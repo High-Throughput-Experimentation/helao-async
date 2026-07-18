@@ -13,7 +13,7 @@ launcher edits, per-config atomic cut-over/rollback."""
 import os
 from importlib import import_module
 
-from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
+from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
 from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
@@ -120,8 +120,15 @@ def makeActionApp(server_key: str, legacy_module: str):
     return app
 
 
-def makeVisApp(*args, **kwargs):
-    raise HexagonDeferred(
-        "visualizer/operator hosting via hexagon vis adapters is P2 "
-        "(master spec §12); keep bokeh entries on their legacy deployment"
+def makeVisApp(legacy_module, doc, confPrefix, server_key, helao_repo_root):
+    """P2d compat-facade (D1/D2): host a legacy Bokeh app UNMODIFIED.
+
+    Delegates completely to the legacy module's makeBokehApp — no wiring is
+    attached because HelaoBokehAPI self-configures from config_loader.CONFIG
+    (server_api.py) and exposes no injection seam. Native vis hosting
+    (ConfigPort/WsSubscriber adapters) is P3; this only makes the bokeh
+    PROCESS launchable under `deployment: hexagon` routing.
+    """
+    return import_module(legacy_module).makeBokehApp(
+        doc, confPrefix, server_key, helao_repo_root
     )
