@@ -1022,3 +1022,383 @@ class SyncDriver:
             await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
 
+    async def sync_yml(
+        self,
+        yml_path: Path,
+        retries: int = 3,
+        rank: int = 5,
+        force_s3: bool = False,
+        force_api: bool = False,
+        compress: bool = False,
+    ):
+        """Run the full sync pipeline for a single yml file.
+
+        Steps: verify the yml is finished and its children are synced, upload
+        action HLO/misc files to S3 (or convert >1GB hlo to parquet first),
+        finalize any pending processes for an experiment, push the patched
+        metadata JSON to S3 and the API, and finally move the yml plus its
+        files to ``RUNS_SYNCED`` (zipping the sequence directory on success).
+
+        Args:
+            yml_path: yml file to sync.
+            retries: Number of times to retry pending process sync. Defaults to 3.
+            rank: Current queue priority for re-enqueue logic.
+            force_s3: Re-push to S3 even if previously done.
+            force_api: Re-push to API even if previously done.
+            compress: Gzip JSON bodies before uploading to S3.
+
+        Returns:
+            On success, the progress dict (minus ``process_metas``) as the
+            shipped state; ``True`` if there was nothing to sync; ``False``
+            when the yml could not be synced this pass.
+        """
+        if not yml_path.exists():
+            LOGGER.debug(
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
+            return True
+        # if yml_path.name in self.task_set:
+        #     async with self.aiolock:
+        #         self.task_set.remove(yml_path.name)
+        prog = self.get_progress(yml_path)
+        if not prog:
+            LOGGER.debug(
+                f"{str(yml_path)} does not exist, assume yml has moved to synced."
+            )
+            return True
+
+        meta = copy(prog.yml.meta)
+
+        if prog.yml.status == "synced":
+            LOGGER.debug(
+                f"Cannot sync {str(prog.yml.target)}, status is already 'synced'."
+            )
+            return True
+
+        LOGGER.debug(
+            f"{str(prog.yml.target)} status is not synced, checking for finished."
+        )
+
+        if prog.yml.status == "active":
+            LOGGER.debug(
+                f"Cannot sync {str(prog.yml.target)}, status is not 'finished'."
+            )
+            return False
+
+        LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
+
+        # first check if child objects are registered with API (non-actions).
+        # Concurrency with descendants is prevented by the hierarchical sync
+        # locks acquired in the syncer worker, so this method only needs to
+        # gate on child *sync status*, not on whether children are running.
+        if prog.yml.type != "action":
+            active_children = prog.yml.active_children
+            # An estopped child left stranded in RUNS_ACTIVE is terminal: it will
+            # never finish or move on its own, so it must not block the parent
+            # forever. Only genuinely-still-running (non-estopped) active children
+            # gate the parent. The estopped ones' process contributions are still
+            # picked up by reconcile_processes (which reads active children too).
+            blocking_active = [c for c in active_children if not c.is_estopped]
+            if blocking_active:
+                LOGGER.debug(
+                    f"Cannot sync {str(prog.yml.target)}, children are still 'active'."
+                )
+                return False
+            if active_children:
+                LOGGER.warning(
+                    f"{str(prog.yml.target)} has {len(active_children)} estopped "
+                    f"child(ren) stranded in RUNS_ACTIVE; treating as terminal and "
+                    f"proceeding with sync."
+                )
+            if prog.yml.finished_children:
+                LOGGER.debug(
+                    f"Cannot sync {str(prog.yml.target)}, children are not 'synced'."
+                )
+                # Re-queue this parent *below* its children, and decrement the
+                # rank on every pass so the rank_limit floor in enqueue_yml
+                # eventually bounds the retries. Re-queuing at a higher rank
+                # (rank + 1) never approaches the floor, so a child that keeps
+                # failing (or can't be synced) would re-queue the parent
+                # forever -- the infinite loop this method must avoid.
+                parent_rank = rank - 1
+                child_rank = parent_rank - 1
+                LOGGER.debug(
+                    f"Adding 'finished' children to sync queue at rank {child_rank} "
+                    f"(higher priority than parent rank {parent_rank})."
+                )
+                # Re-submit every unsynced child. enqueue_yml is the single
+                # dedup point: a child still queued/running is skipped, while a
+                # child whose sync failed (and so left task_set/running_tasks)
+                # is re-queued at strictly higher priority than this parent.
+                for child in prog.yml.finished_children:
+                    await self.enqueue_yml(child.target, child_rank)
+                    LOGGER.info(str(child.target))
+                LOGGER.debug(
+                    f"Re-adding {str(prog.yml.target)} to sync queue at rank {parent_rank}."
+                )
+                if prog.yml.target.name in self.running_tasks:
+                    async with self.aiolock:
+                        self.running_tasks.pop(prog.yml.target.name)
+                self.task_set.discard(prog.yml.target.name)
+                await self.enqueue_yml(prog.yml.target, parent_rank)
+                LOGGER.debug(f"{str(prog.yml.target)} re-queued, exiting.")
+                return False
+
+        LOGGER.debug(f"{str(prog.yml.target)} children are synced, proceeding.")
+
+        # next push files to S3 (actions only)
+        if prog.yml.type == "action":
+            # re-check file lists
+            LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
+            prog.dict["files_pending"] += [
+                str(p)
+                for p in prog.yml.hlo_files + prog.yml.misc_files
+                if str(p) not in prog.dict["files_pending"]
+                and str(p) not in prog.dict["files_s3"]
+            ]
+            # push files to S3
+            while prog.dict.get("files_pending", []):
+                for sp in prog.dict["files_pending"]:
+                    fp = Path(sp)
+                    LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
+                    if fp.suffix == ".hlo":
+                        if fp.stat().st_size < 1024**3:  # 1GB
+                            file_s3_key = (
+                                f"raw_data/{meta['action_uuid']}/{fp.name}.json"
+                            )
+                            if compress:
+                                file_s3_key += ".gz"
+                            LOGGER.debug("Parsing hlo dicts.")
+                            try:
+                                file_meta, file_data = await asyncio.to_thread(
+                                    read_hlo, sp
+                                )
+                            except Exception:
+                                LOGGER.error(
+                                    f"Failed to read hlo file {fp}, skipping upload.",
+                                    exc_info=True,
+                                )
+                                file_meta = {}
+                                file_data = {}
+                            msg = {"meta": file_meta, "data": file_data}
+                        else:
+                            LOGGER.debug(
+                                "hlo file larger than 1GB, converting to parquet."
+                            )
+                            file_s3_key = (
+                                f"raw_data/{meta['action_uuid']}/{fp.stem}.parquet"
+                            )
+                            try:
+                                parquet_path = str(fp).replace(".hlo", ".parquet")
+                                await asyncio.to_thread(
+                                    hlo_to_parquet, fp, parquet_path
+                                )
+                                msg = Path(parquet_path)
+                            except Exception:
+                                LOGGER.error(
+                                    f"Failed to convert hlo file {fp} to parquet, skipping upload.",
+                                    exc_info=True,
+                                )
+                                msg = None
+                    else:
+                        rel_posix_path = str(
+                            fp.relative_to(prog.yml.targetdir)
+                        ).replace("\\", "/")
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{rel_posix_path}"
+                        msg = fp
+                    LOGGER.debug(f"Destination: {file_s3_key}")
+                    file_success = await self.to_s3(
+                        msg=msg,
+                        target=file_s3_key,
+                        compress=compress,
+                    )
+                    if file_success:
+                        LOGGER.debug("Removing file from pending list.")
+                        prog.dict["files_pending"].remove(sp)
+                        LOGGER.info(f"Adding file to S3 dict. {str(fp)}: {file_s3_key}")
+                        prog.dict["files_s3"].update({str(fp): file_s3_key})
+                        LOGGER.debug(f"Updating progress: {prog.dict}")
+                        prog.write_dict()
+
+                        # update files list with uploaded filename
+                        if fp.name != os.path.basename(file_s3_key):
+                            file_idx = [
+                                i
+                                for i, x in enumerate(meta["files"])
+                                if x["file_name"]
+                                == str(fp.relative_to(prog.yml.targetdir))
+                            ][0]
+                            fileinfo = FileInfo.model_validate(
+                                meta["files"].pop(file_idx)
+                            )
+                            fileinfo.file_name = str(
+                                fp.relative_to(prog.yml.targetdir)
+                            ).replace("\\", "/")
+                            if "." in file_s3_key.split("/")[-1]:
+                                fileinfo.file_name = os.path.basename(file_s3_key)
+                            else:
+                                fileinfo.file_name = fileinfo.file_name.replace(
+                                    f"{fp.suffix}", ""
+                                )
+                            if fileinfo.file_type.endswith(
+                                "helao__file"
+                            ):  # generic file
+                                fileinfo.file_type = fileinfo.file_type.replace(
+                                    "helao__file",
+                                    f"helao__{file_s3_key.split('.')[-1]}_file",
+                                )
+                            meta["files"].append(fileinfo.model_dump())
+
+        # if prog.yml is an experiment first check processes before pushing to API
+        if prog.yml.type == "experiment":
+            LOGGER.debug(f"Finishing processes for {prog.yml.target.name}")
+            # Rebuild process metas from the on-disk action ymls before flushing.
+            # A reset/stale/cross-run .prg may have empty or partial
+            # process_metas even though every child action already synced; this
+            # recovers them so the experiment isn't stuck on "process index
+            # ... missing".
+            prog = self.reconcile_processes(prog)
+            retry_count = 0
+            s3_unf, api_unf = prog.list_unfinished_procs()
+            while s3_unf or api_unf:
+                if retry_count == retries:
+                    break
+                await self.sync_process(prog, force=True)
+                s3_unf, api_unf = prog.list_unfinished_procs()
+                retry_count += 1
+            if s3_unf or api_unf:
+                LOGGER.info(
+                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
+                )
+                return False
+            if prog.dict["process_metas"]:
+                meta["process_list"] = [
+                    d["process_uuid"]
+                    for _, d in sorted(prog.dict["process_metas"].items())
+                ]
+
+        LOGGER.debug(f"Patching model for {prog.yml.target.name}")
+        patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
+        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
+
+        # patch technique lists in meta
+        tech_name = meta.get("technique_name", "NA")
+        if isinstance(tech_name, list):
+            split_technique = tech_name[meta.get("action_split", 0)]
+            meta["technique_name"] = split_technique
+
+        # next push prog.yml to S3
+        if not prog.s3_done or force_s3:
+            LOGGER.debug(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
+            uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
+            meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
+            s3_success = await self.to_s3(meta, meta_s3_key)
+            if s3_success:
+                prog.dict["s3"] = True
+                prog.write_dict()
+
+        # next push prog.yml to API
+        if not prog.api_done or force_api:
+            LOGGER.debug(f"Pushing prog.yml to API for {prog.yml.target.name}")
+            api_success = await self.to_api(meta, prog.yml.type)
+            LOGGER.debug(f"API push returned {api_success} for {prog.yml.target.name}")
+            if api_success:
+                prog.dict["api"] = True
+                prog.write_dict()
+
+        # get yml target name for popping later (after seq zip removes yml)
+        yml_target_name = prog.yml.target.name
+        yml_type = prog.yml.type
+
+        # move to synced
+        if prog.s3_done and prog.api_done:
+
+            LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
+            for lock_path in prog.yml.lock_files:
+                lock_path.unlink()
+            for file_path in prog.yml.misc_files + prog.yml.hlo_files:
+                LOGGER.debug(f"Moving {str(file_path)}")
+                move_success = await asyncio.to_thread(move_to_synced, file_path)
+                while not move_success:
+                    LOGGER.debug(f"{file_path} is in use, retrying.")
+                    await asyncio.sleep(1)
+                    move_success = await asyncio.to_thread(move_to_synced, file_path)
+
+            # finally move yaml and update target
+            LOGGER.debug(f"Moving {yml_target_name} to RUNS_SYNCED")
+            # with prog.yml.filelock:
+            yml_success = move_to_synced(yml_path)
+            if yml_success:
+                result = prog.yml.cleanup()
+                LOGGER.debug(f"Cleanup {yml_target_name} {result}.")
+                if result == "success":
+                    LOGGER.debug("yml_success")
+                    prog = self.get_progress(Path(yml_success))
+                    LOGGER.debug("reassigning prog")
+                    prog.dict["yml"] = str(yml_success)
+                    LOGGER.debug("updating progress")
+                    prog.write_dict()
+
+            # pop children from progress dict
+            if yml_type in ["experiment", "sequence"]:
+                children = prog.yml.children
+                LOGGER.debug(f"Removing children from progress: {children}.")
+                for childyml in children:
+                    LOGGER.debug(f"Clearing {childyml.target.name}")
+                    finished_child_path = childyml.finished_path.parent
+                    if finished_child_path.exists():
+                        self.try_remove_empty(str(finished_child_path))
+                self.try_remove_empty(str(prog.yml.finished_path.parent))
+
+            if yml_type == "sequence":
+                sequence_name = prog.yml.meta.get("sequence_name", "NA")
+                LOGGER.debug(f"Zipping {prog.yml.target.parent.name}.")
+                zip_target = prog.yml.target.parent.parent.joinpath(
+                    f"{prog.yml.target.parent.name}.zip"
+                )
+                LOGGER.info(
+                    f"Full sequence has synced, creating zip: {str(zip_target)}"
+                )
+                path_parts = prog.yml.target.parts
+                await asyncio.to_thread(zip_dir, prog.yml.target.parent, zip_target)
+                root_path = Path(
+                    *path_parts[: path_parts.index(RunDir.SYNCED)]
+                ).as_posix()
+                self.cleanup_root(root_path)
+                LOGGER.debug("Removing sequence from progress.")
+                # self.progress.pop(prog.yml.target.name)
+
+                if zip_target.exists() and sequence_name in self.auto_analyses:
+                    ana_config = self.auto_analyses[sequence_name]
+                    LOGGER.info(
+                        f"dispatching auto-analysis {ana_config['endpoint']} for {sequence_name}"
+                    )
+                    await async_action_dispatcher(
+                        world_config_dict={
+                            "servers": {ana_config["server_key"]: ana_config}
+                        },
+                        A=Action(
+                            action_name=ana_config["endpoint"],
+                            action_server=MachineModel(
+                                server_name=ana_config["server_key"],
+                            ),
+                            action_params={
+                                "sequence_zip_path": str(zip_target),
+                                "params": ana_config.get("analysis_params", {}),
+                            },
+                        ),
+                    )
+
+            if yml_target_name in self.running_tasks:
+                LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
+                async with self.aiolock:
+                    self.running_tasks.pop(yml_target_name)
+
+            # if action contributes processes, update processes
+            if yml_type == "action" and meta.get("process_contrib", False):
+                exp_prog = self.update_process(prog.yml, meta)
+                await self.sync_process(exp_prog)
+
+        return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
+        return return_dict
+
