@@ -13,7 +13,7 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_verbatim_region,
 )
 
-REGION_END = 1014  # T4; grows to 1394 (T5), 1732 (T6), 2057 (T7)
+REGION_END = 1394  # T5; grows to 1732 (T6), 2057 (T7)
 
 MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
 
@@ -100,3 +100,10 @@ SYNC_DRIVER_CORE = [
 
 def test_sync_driver_core_parity():
     assert_source_parity(native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_CORE)
+
+
+SYNC_DRIVER_YML = ["sync_yml"]
+
+
+def test_sync_yml_parity():
+    assert_source_parity(native_mod.SyncDriver, legacy_mod.SyncDriver, SYNC_DRIVER_YML)
