@@ -160,7 +160,7 @@ async def test_item3a_estop_while_blocked_on_dispatch(tmp_path):
     (/estop_orch). After release: the in-effect live re-check bails, no new
     action registers, the estop finalizer is sole."""
     async with live_group(str(tmp_path)) as g:
-        orch, runtime = g.orch, g.runtime
+        orch, _ = g.orch, g.runtime
         clean_finishes, estop_finishes = _spy_finishers(orch)
         gate, entered = asyncio.Event(), asyncio.Event()
         orig_dispatch = orch.loop_task_dispatch_action
@@ -217,6 +217,7 @@ async def test_item3b_estop_between_decision_and_finish_then_dispatch(tmp_path):
         await orch_call("append_sequence", body={"sequence": seq.as_dict()})
         await orch_call("start")
         await asyncio.wait_for(reached.wait(), timeout=120)
+        n_exp_dq_at_gate = len(orch.experiment_dq)  # the not-yet-dispatched 2nd exp
 
         await orch_call("estop_orch")  # lands INSIDE the decision->effect window
         assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
@@ -224,6 +225,17 @@ async def test_item3b_estop_between_decision_and_finish_then_dispatch(tmp_path):
         await asyncio.sleep(2.0)
         assert len(estop_finishes) == 1
         assert len(clean_finishes) == 0  # re-check bailed; no clean finish ever
+        # make the bailed re-check OBSERVABLE: if it had NOT bailed, the released
+        # effect would fall through to loop_task_dispatch_experiment(), which
+        # unconditionally pops experiment_dq and re-stages a NEW active_experiment
+        # (dispatch_experiment()/_stage_experiment(), orch_dispatch.py:993-1025) --
+        # regardless of estop_finish_active() having already cleared
+        # active_experiment to None. Confirmed via fault injection (temporarily
+        # neutering re-check #2 in orch_effects.py): experiment_dq goes 1->0 and
+        # active_experiment gets repopulated with a fresh experiment when the
+        # re-check is broken, vs. staying 1->1 / None when it works.
+        assert len(orch.experiment_dq) == n_exp_dq_at_gate  # no extra exp dispatch
+        assert orch.active_experiment is None  # nothing re-staged post-estop
         assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
         _assert_estopped_exp_yml(tmp_path)
 
@@ -237,6 +249,21 @@ async def test_item3c_estop_during_finalization_close_out(tmp_path):
     async with live_group(str(tmp_path)) as g:
         orch, runtime = g.orch, g.runtime
         clean_finishes, estop_finishes = _spy_finishers(orch)
+        # a SECOND, unconditional spy layered on top of _spy_finishers's
+        # active-experiment-gated one: clean_finishes only counts a call that
+        # observed active_experiment is not None, which by design can never be
+        # true once estop_finish_active has already cleared it -- so a bailed
+        # re-check and a broken (never-bails) one look IDENTICAL to
+        # clean_finishes. raw_finish_calls counts every call regardless,
+        # making a spurious extra invocation observable.
+        raw_finish_calls = []
+        orig_finish_raw = orch.finish_active_experiment
+
+        async def raw_spy_finish(*a, **k):
+            raw_finish_calls.append(1)
+            return await orig_finish_raw(*a, **k)
+
+        orch.finish_active_experiment = raw_spy_finish
         window, reached = asyncio.Event(), asyncio.Event()
         orig_execute = runtime.effects.execute
 
@@ -251,6 +278,7 @@ async def test_item3c_estop_during_finalization_close_out(tmp_path):
         await orch_call("append_sequence", body={"sequence": seq.as_dict()})
         await orch_call("start")
         await asyncio.wait_for(reached.wait(), timeout=120)
+        n_raw_finish_at_gate = len(raw_finish_calls)
 
         # concurrent estop through the reducer at its trigger site (DD-3):
         await runtime.handle(ActionResultErrored(reason="conc item3c"))
@@ -260,4 +288,14 @@ async def test_item3c_estop_during_finalization_close_out(tmp_path):
         await asyncio.sleep(2.0)
         assert len(clean_finishes) == 0  # close-out re-checked live and bailed
         assert len(estop_finishes) == 1  # sole finalizer, still
+        # make the bailed re-check OBSERVABLE: should_close_out_experiment()
+        # is only reached inside CloseOutExperimentCmd's handler, guarding the
+        # sole call to finish_active_experiment() in that path -- so a broken
+        # re-check (e.g. dropping the loop_state clause) shows up as one MORE
+        # raw call than at the gate, even though clean_finishes can't see it
+        # (active_experiment is already None by then). Confirmed via fault
+        # injection (temporarily forcing the CloseOutExperimentCmd guard to
+        # True in orch_effects.py): raw_finish_calls grows by 1 post-release
+        # when the re-check is broken, vs. staying flat when it works.
+        assert len(raw_finish_calls) == n_raw_finish_at_gate
         _assert_estopped_exp_yml(tmp_path)
