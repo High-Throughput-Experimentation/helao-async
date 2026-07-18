@@ -1,0 +1,42 @@
+# P1b2b IDENTITY config (§10.3 item 2, MINOR-8): goldenhex with the orch
+# renamed HEXORC (non-default MachineModel identity) and an experiment
+# library that targets the renamed key. Ports unchanged (8001/8002/8010).
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: false
+experiment_libraries:
+  - helao/hexagon/tests/smoke/hexid_exp.py
+sequence_libraries: []
+run_type: simulation
+root: /home/dan/INST_hlo_hexid
+servers:
+  HEXORC:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    deployment: hexagon
+    params: {}
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    deployment: hexagon
+    live_vis: wssim_live_vis
+    params: {}
+    hlo_postprocess_libs:
+      - hlo_to_csv
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sim_db_server
+    params:
+      aws_bucket: helao-sim
+      s3_record: true
