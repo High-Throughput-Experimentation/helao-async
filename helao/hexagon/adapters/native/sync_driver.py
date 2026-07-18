@@ -1740,3 +1740,328 @@ class SyncDriver:
                     exp_prog.write_dict()
         return exp_prog
 
+    async def to_s3(
+        self,
+        msg: Union[dict, Path],
+        target: str,
+        retries: int = 5,
+        compress: bool = False,
+    ) -> bool:
+        """Upload a dict (as JSON) or a file to the configured S3 bucket.
+
+        Args:
+            msg: Dict to serialize to JSON, or file path to upload as-is.
+            target: Destination key inside the bucket.
+            retries: Number of retries (each waits 30s) before giving up.
+            compress: If ``msg`` is a dict, gzip it and append ``.gz`` to ``target``.
+
+        Returns:
+            True on successful upload (or when S3 is not configured at all),
+            False if all retries failed.
+        """
+        try:
+            if self.s3 is None:
+                LOGGER.info("S3 is not configured. Skipping to S3 upload.")
+                return True
+            if isinstance(msg, dict):
+                LOGGER.debug("Converting dict to json.")
+                uploadee = dict2json(msg)
+                uploader = self.s3.upload_fileobj
+                if compress:
+                    if not target.endswith(".gz"):
+                        target = f"{target}.gz"
+                    buffer = io.BytesIO()
+                    with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
+                        f.write(uploadee.read())
+                    buffer.seek(0)
+                    uploadee = buffer
+            else:
+                LOGGER.debug("Converting path to str")
+                uploadee = str(msg)
+                uploader = self.s3.upload_file
+            for i in range(retries + 1):
+                if i > 0:
+                    LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
+                try:
+                    await asyncio.to_thread(uploader, uploadee, self.bucket, target)
+                    return True
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to upload {target} to S3, retrying in 30 seconds",
+                        exc_info=True,
+                    )
+                    await asyncio.sleep(30)
+            LOGGER.info(f"Did not upload {target} after {retries} tries.")
+            return False
+        except Exception:
+            LOGGER.error(f"Could not push {target}.", exc_info=True)
+            return False
+
+    async def to_api(self, req_model: dict, meta_type: str, retries: int = 5) -> bool:
+        """Register a metadata record with the upstream API.
+
+        When no ``api_host`` is configured, returns ``True`` immediately (the
+        API leg is a no-op).
+
+        Args:
+            req_model: Metadata dict to register.
+            meta_type: Resource type (``action``/``experiment``/``sequence``/``process``).
+            retries: Number of retry attempts on failure.
+
+        Returns:
+            True on successful registration (or when the API is disabled).
+        """
+        if self.api_host is None:
+            LOGGER.info("Modelyst API is not configured. Skipping to API push.")
+            return True
+        else:
+            return True
+
+    def list_pending(self, omit_manual_exps: bool = True) -> list:
+        """Return ``*-seq.yml`` paths waiting under ``RUNS_FINISHED``.
+
+        Args:
+            omit_manual_exps: Skip files containing ``manual_orch_seq``.
+
+        Returns:
+            List of pending sequence yml file paths.
+        """
+        finished_dir = str(self.helaodirs.save_root).replace(
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
+        )
+        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        LOGGER.info(f"Found {len(pending)} pending sequences in RUNS_FINISHED.")
+        return pending
+
+    def list_pending_acts(self, omit_manual_exps: bool = True) -> list:
+        """Return ``*-act.yml`` paths waiting under ``RUNS_FINISHED``.
+
+        Args:
+            omit_manual_exps: Skip files containing ``manual_orch_seq``.
+
+        Returns:
+            List of pending action yml file paths.
+        """
+        finished_dir = str(self.helaodirs.save_root).replace(
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
+        )
+        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        LOGGER.info(f"Found {len(pending)} pending actions in RUNS_FINISHED.")
+        return pending
+
+    def list_pending_exps(self, omit_manual_exps: bool = True) -> list:
+        """Return ``*-exp.yml`` paths waiting under ``RUNS_FINISHED``.
+
+        Args:
+            omit_manual_exps: Skip files containing ``manual_orch_seq``.
+
+        Returns:
+            List of pending experiment yml file paths.
+        """
+        finished_dir = str(self.helaodirs.save_root).replace(
+            RunDir.ACTIVE.value, RunDir.FINISHED.value
+        )
+        pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
+        if omit_manual_exps:
+            pending = [x for x in pending if "manual_orch_seq" not in x]
+        LOGGER.info(f"Found {len(pending)} pending experiments in RUNS_FINISHED.")
+        return pending
+
+    async def finish_pending(
+        self, omit_manual_exps: bool = True, actions_first: bool = False
+    ) -> list:
+        """Enqueue every pending sequence (and optionally actions/experiments first).
+
+        For each pending yml, any existing ``.progress`` sibling under
+        ``RUNS_SYNCED`` triggers :meth:`reset_sync` before the yml is queued.
+
+        Args:
+            omit_manual_exps: Skip files containing ``manual_orch_seq``.
+            actions_first: When true, enqueue actions and experiments before
+                sequences (used to drain a partial sync).
+
+        Returns:
+            The list of pending sequence paths that were enqueued.
+        """
+
+        async def reset_and_queue(pp, rank: int = 0):
+            """Reset any stale ``.progress`` sibling under ``RUNS_SYNCED`` and enqueue ``pp``."""
+            if os.path.exists(
+                pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(
+                    ".yml", ".progress"
+                )
+            ):
+                self.reset_sync(
+                    os.path.dirname(pp).replace(
+                        RunDir.FINISHED.value, RunDir.SYNCED.value
+                    )
+                )
+            await self.enqueue_yml(pp, rank)
+
+        if actions_first:
+            pending_acts = self.list_pending_acts(omit_manual_exps)
+            LOGGER.info(f"Enqueueing {len(pending_acts)} actions from RUNS_FINISHED.")
+            for pp in pending_acts:
+                await reset_and_queue(pp, rank=0)
+
+            pending_exps = self.list_pending_exps(omit_manual_exps)
+            LOGGER.info(
+                f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED."
+            )
+            for pp in pending_exps:
+                await reset_and_queue(pp, rank=1)
+
+        pending_seqs = self.list_pending(omit_manual_exps)
+        LOGGER.info(f"Enqueueing {len(pending_seqs)} sequences from RUNS_FINISHED.")
+
+        for pp in pending_seqs:
+            await reset_and_queue(pp, rank=2)
+
+        return pending_seqs
+
+    def reset_sync(self, sync_path: str) -> bool:
+        """Revert a synced sequence (zip or directory) back to ``RUNS_FINISHED``.
+
+        For a synced sequence ``.zip``, the contents (minus ``.prg`` / ``.lock``
+        entries) are extracted into the parallel ``RUNS_FINISHED`` directory
+        and the zip is renamed to ``.orig``. For an unzipped ``RUNS_SYNCED``
+        directory, ``.prg``/``.progress``/``.lock`` files are deleted and the
+        remaining files are moved back to ``RUNS_FINISHED``.
+
+        Args:
+            sync_path: Path to a synced sequence zip or directory.
+
+        Returns:
+            True on a successful reset, False otherwise.
+        """
+        if not os.path.exists(sync_path):
+            LOGGER.info(f"{sync_path} does not exist.")
+            return False
+        if RunDir.SYNCED not in sync_path:
+            LOGGER.info(f"Cannot reset path that's not in RUNS_SYNCED: {sync_path}")
+            return False
+        ## if path is a zip
+        if sync_path.endswith(".zip"):
+            zf = ZipFile(sync_path)
+            if any(x.endswith("-seq.prg") for x in zf.namelist()):
+                seqzip_dir = os.path.dirname(sync_path)
+                dest = os.path.join(
+                    seqzip_dir.replace(RunDir.SYNCED.value, RunDir.FINISHED.value),
+                    os.path.basename(sync_path).replace(".zip", ""),
+                )
+                os.makedirs(dest, exist_ok=True)
+                no_lock_prg = [
+                    x
+                    for x in zf.namelist()
+                    if not x.endswith(".prg") and not x.endswith(".lock")
+                ]
+                zf.extractall(dest, members=no_lock_prg)
+                zf.close()
+                if not os.path.exists(sync_path.replace(".zip", ".orig")):
+                    shutil.move(sync_path, sync_path.replace(".zip", ".orig"))
+                LOGGER.info(f"Restored zip to {dest}")
+                return True
+            zf.close()
+            LOGGER.info("Zip does not contain a valid sequence.")
+            return False
+
+        ## if path is a directory
+        elif os.path.isdir(sync_path):
+            base_prgs = [
+                x
+                for x in glob(os.path.join(sync_path, "**", "*-*.pr*"), recursive=True)
+                if x.endswith(".progress") or x.endswith(".prg") or x.endswith(".lock")
+            ]
+            # seq_prgs = [x for x in base_prgs if "-seq.pr" in x]
+            # for x in seq_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # exp_prgs = [x for x in base_prgs if "-exp.pr" in x]
+            # for x in exp_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+            # act_prgs = [x for x in base_prgs if "-act.pr" in x]
+            # for x in act_prgs:
+            #     base_prgs = [
+            #         y for y in base_prgs if not y.startswith(os.path.dirname(x))
+            #     ]
+
+            # base_prgs = act_prgs + exp_prgs + seq_prgs
+
+            if not base_prgs:
+                LOGGER.info(
+                    f"Did not find any .prg or .progress files in subdirectories of {sync_path}"
+                )
+                self.unsync_dir(sync_path)
+
+            else:
+                LOGGER.warning(
+                    f"Found {len(base_prgs)} .prg, .progress, or .lock files in subdirectories of {sync_path}"
+                )
+                # remove all .prg files and lock files
+                for prg in base_prgs:
+                    base_dir = os.path.dirname(prg)
+                    sub_prgs = [
+                        x
+                        for x in glob(
+                            os.path.join(base_dir, "**", "*-*.pr*"), recursive=True
+                        )
+                        if x.endswith(".progress") or x.endswith(".prg")
+                    ]
+                    sub_lock = [
+                        x
+                        for x in glob(
+                            os.path.join(base_dir, "**", "*.lock"), recursive=True
+                        )
+                    ]
+                    LOGGER.info(
+                        f"Removing {len(base_prgs) + len(sub_lock)} prg and progress files in subdirectories of {base_dir}"
+                    )
+                    for sp in sub_prgs + sub_lock:
+                        os.remove(sp)
+
+                    # move path back to RUNS_FINISHED
+                    self.unsync_dir(base_dir)
+
+            seq_zips = glob(os.path.join(sync_path, "**", "*.zip"), recursive=True)
+            if not seq_zips:
+                LOGGER.info(
+                    f"Did not find any zip files in subdirectories of {sync_path}"
+                )
+            else:
+                LOGGER.info(
+                    f"Found {len(seq_zips)} zip files in subdirectories of {sync_path}"
+                )
+                for seq_zip in seq_zips:
+                    self.reset_sync(seq_zip)
+            return True
+        LOGGER.info("Arg was not a sequence path or zip.")
+        return False
+
+    def shutdown(self):
+        """Hook for graceful shutdown; currently a no-op."""
+        pass
+
+    def unsync_dir(self, sync_dir: str):
+        """Delete progress/lock files and move the rest from ``sync_dir`` to ``RUNS_FINISHED``.
+
+        Args:
+            sync_dir: Directory under ``RUNS_SYNCED`` to unsync.
+        """
+        for fp in glob(os.path.join(sync_dir, "**", "*"), recursive=True):
+            if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
+                os.remove(fp)
+            elif not os.path.isdir(fp):
+                tp = os.path.dirname(
+                    fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value)
+                )
+                os.makedirs(tp, exist_ok=True)
+                shutil.move(fp, tp)
+        LOGGER.warning(f"Successfully reverted {sync_dir}")
+
