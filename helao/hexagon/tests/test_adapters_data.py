@@ -80,8 +80,8 @@ def test_conformance():
 async def test_data_sink_delegates_verbatim():
     active = _StubActive()
     sink = ActiveDataSinkAdapter(active)
-    await sink.enqueue_data("dm")
-    sink.enqueue_data_nowait("dm2")
+    await sink.enqueue_data("dm")  # type: ignore[reportArgumentType]
+    sink.enqueue_data_nowait("dm2")  # type: ignore[reportArgumentType]
     assert sink.get_realtime_nowait() == 123
     await sink.finish_hlo_header(file_conn_keys=None, realtime=9)
     sink.write_file_nowait("s", "t", filename="f.csv")
@@ -114,9 +114,9 @@ async def test_data_sink_lbuf_routes_via_base():
 async def test_artifact_store_meta_and_promotion_delegate():
     base = _AsyncRec()
     store = LegacyArtifactStoreAdapter(base=base)
-    await store.write_act("A")
-    await store.write_exp("E")
-    await store.write_seq("S")
+    await store.write_act("A")  # type: ignore[reportArgumentType]
+    await store.write_exp("E")  # type: ignore[reportArgumentType]
+    await store.write_seq("S")  # type: ignore[reportArgumentType]
     assert [c[0] for c in base.calls] == ["write_act", "write_exp", "write_seq"]
 
 
@@ -124,17 +124,17 @@ async def test_artifact_store_meta_and_promotion_delegate():
 async def test_artifact_store_stream_members_require_bound_active():
     store = LegacyArtifactStoreAdapter(base=_AsyncRec())
     with pytest.raises(UnwiredPortError):
-        await store.write_one_shot("A", "data", "csv__file", "f.csv", None)
+        await store.write_one_shot("A", "data", "csv__file", "f.csv", None)  # type: ignore[reportArgumentType]
     with pytest.raises(UnwiredPortError):
-        await store.finish("A")
+        await store.finish("A")  # type: ignore[reportArgumentType]
 
 
 @pytest.mark.asyncio
 async def test_artifact_store_bound_active_delegates():
     base, active = _AsyncRec(), _StubActive()
     store = LegacyArtifactStoreAdapter(base=base).for_action(active)
-    await store.write_one_shot("A", "data", "csv__file", "f.csv", "h")
-    await store.close_streams("A")  # -> Active.substitute (close-every-hlo)
-    await store.finish("A")  # -> Active.finish (join-drain-close)
+    await store.write_one_shot("A", "data", "csv__file", "f.csv", "h")  # type: ignore[reportArgumentType]
+    await store.close_streams("A")  # type: ignore[reportArgumentType]  # -> Active.substitute (close-every-hlo)
+    await store.finish("A")  # type: ignore[reportArgumentType]  # -> Active.finish (join-drain-close)
     names = [c[0] for c in active.calls]
     assert names == ["write_file", "substitute", "finish"]

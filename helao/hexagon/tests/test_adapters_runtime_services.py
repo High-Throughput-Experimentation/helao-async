@@ -85,7 +85,10 @@ def test_level_methods_delegate():
             rec.append(("alert", m))
 
     a = LegacyLoggingAdapter(logger=_Spy())
-    a.info("i"), a.warning("w"), a.error("e", exc_info=True), a.alert("a")
+    a.info("i")
+    a.warning("w")
+    a.error("e", exc_info=True)
+    a.alert("a")
     assert rec == [
         ("info", "i"),
         ("warning", "w"),
