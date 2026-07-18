@@ -14,7 +14,7 @@ import asyncio
 from dataclasses import dataclass, field, replace
 from typing import Callable, Dict, Optional
 
-from helao.hexagon.app.ingestion import HexStatusIngestion
+from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion
 from helao.hexagon.app.orch_effects import (
     _LazyServerLogger,
     OrchCommandRunner,
@@ -28,6 +28,7 @@ from helao.hexagon.domain.orchestration import (
     ClearErrorRequested,
     ClearEstopRequested,
     CreateDispatchLoopTask,
+    DriverHealthUnrecovered,
     EstopRequested,
     Event,
     LoopIterate,
@@ -67,7 +68,17 @@ class HexRuntime:
                 self.loop_wake.set()  # the long-lived task IS the loop (T1)
                 continue
             if isinstance(cmd, RetryDriverHealth):
-                await self.effects.execute(cmd)
+                remaining = await self.effects.execute_retry_driver_health(cmd)
+                if remaining:
+                    # P2a: exhaustion is now the DriverHealthUnrecovered
+                    # event (reducer T12: stop intent + identical
+                    # "unknown driver states: ..." stop message)
+                    rc3 = await self._apply_and_execute(
+                        derive_state(self.orch),
+                        DriverHealthUnrecovered(na_drivers=remaining),
+                    )
+                    if rc3 is not ErrorCodes.none:
+                        rc = rc3
                 # one-shot ladder fall-through with na_drivers masked —
                 # mirrors orch_dispatch._loop's non-continue driver-health
                 # path (re-asking next_step with them still unknown would
@@ -149,8 +160,11 @@ class HexagonGraft:
     effects: OrchCommandRunner
     originals: Dict[str, Optional[Callable]] = field(default_factory=dict)
     ingestion: Optional[HexStatusIngestion] = None
+    health_monitor: Optional[HexHealthMonitor] = None
 
     async def close(self) -> None:
+        if self.health_monitor is not None:
+            await self.health_monitor.close()
         await self.loop.close()
 
 
@@ -238,5 +252,16 @@ def graft_hexagon_loop(orch, wiring: PortWiring) -> HexagonGraft:
     # legacy (out of P2a scope).
     orch.update_status = ingestion.update_status
     orch.update_nonblocking = ingestion.update_nonblocking
+    if wiring.health is not None:
+        bind = getattr(wiring.health, "bind_orch", None)
+        if bind is not None:
+            bind(orch)
+        # instance-level task swap (not a source edit): the legacy
+        # heartbeat task was created by myinit before this graft runs
+        legacy_hb = getattr(orch, "heartbeat_monitor", None)
+        if legacy_hb is not None:
+            legacy_hb.cancel()
+        graft.health_monitor = HexHealthMonitor(orch, runtime, wiring.health)
+        graft.health_monitor.start()
     loop.start()
     return graft

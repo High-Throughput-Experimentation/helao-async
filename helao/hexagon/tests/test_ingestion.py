@@ -300,3 +300,236 @@ async def test_two_lock_owner_invariant_prune_never_takes_aiolock():
     runner = OrchCommandRunner(orch, PortWiring())
     await runner.execute(PruneDeadActions(action_uuids=(str(u),)))
     assert orch.aiolock.acquisitions == 1  # type: ignore[attr-defined]
+
+
+from helao.core.models.orchstatus import LoopIntent
+from helao.hexagon.app.dispatch_loop import HexDispatchLoop, HexRuntime
+from helao.hexagon.app.ingestion import HexHealthMonitor
+from helao.hexagon.domain.orchestration import StartRequested
+
+
+class _FakeHealth:
+    def __init__(self, bad=()):
+        self.bad = set(bad)
+
+    async def endpoints_available(self, urls):
+        return [(u, u not in self.bad) for u in urls]
+
+    async def ping_action_servers(self):
+        return {}
+
+    def status_summary(self):
+        return {}
+
+
+class _AlertSpy:
+    def __init__(self):
+        self.alerts = []
+
+    def info(self, msg): ...
+    def warning(self, msg): ...
+    def error(self, msg, exc_info=False): ...
+
+    def alert(self, msg):
+        self.alerts.append(msg)
+
+    def file_logger(self, server_key, log_root):
+        raise AssertionError("unused")
+
+
+class _MonitorOrch(_IngestOrch):
+    """Full-enough legacy surface for HexRuntime over a real GSM. The
+    drain/estop members are FAITHFUL ports of the legacy bodies (not
+    conveniences): the two required-fix regression tests below exercise the
+    real WaitAllActionsIdle executor and the real estop cascade against
+    them, and their hang modes only exist if these behave like legacy."""
+
+    def __init__(self):
+        super().__init__()
+        self.heartbeat_interval = 0.05
+        self.ignore_heartbeats = []
+        self.current_stop_message = ""
+        self.active_run_id = "RUN"
+        self.action_dq, self.experiment_dq, self.sequence_dq = [], [], []
+        self.status_summary = {}
+        self.step_thru_actions = False
+        self.step_thru_experiments = False
+        self.step_thru_sequences = False
+
+    # all four intend_* put the intent on interrupt_q, like the real
+    # Orch (orch.py:536-571) — the drain path's intend_none wake matters
+    async def intend_stop(self):
+        self.globalstatusmodel.loop_intent = LoopIntent.stop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def intend_skip(self):
+        self.globalstatusmodel.loop_intent = LoopIntent.skip
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def intend_estop(self):
+        self.globalstatusmodel.loop_intent = LoopIntent.estop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def intend_none(self):
+        self.globalstatusmodel.loop_intent = LoopIntent.none
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def orch_wait_for_all_actions(self):
+        # faithful port of orch.py:443-455: returns IMMEDIATELY (no yield!)
+        # once actions_idle(); otherwise parks on the interrupt queue — the
+        # exact mechanism the dead-peer race can starve (required fix 2)
+        while not self.globalstatusmodel.actions_idle():
+            await self.interrupt_q.get()
+
+    def export_queues(self, timestamp_pck: bool = False):
+        return None  # finalization's ExportQueuesCmd lands here
+
+    async def estop_actions(self, switch: bool):
+        return None  # EstopFanout target; must not need aiolock
+
+    async def estop_finish_active(self):
+        return None  # FinishActiveEstopped target; must not need aiolock
+
+
+def _monitor_setup(bad):
+    orch = _MonitorOrch()
+    wiring = PortWiring(logging=_AlertSpy())
+    effects = OrchCommandRunner(orch, wiring)
+    runtime = HexRuntime(orch, effects)
+    mon = HexHealthMonitor(orch, runtime, _FakeHealth(bad=bad))
+    return orch, wiring, effects, mon
+
+
+@pytest.mark.asyncio
+async def test_monitor_dead_peer_prunes_sets_message_and_goes_idle():
+    """The full item-6 chain in-process: probe -> HeartbeatFailed(+uuids)
+    -> stop intent + stop message + alert + prune -> StatusChanged fold
+    (DD-2 write-back -> orch_state idle) -> interrupt wake."""
+    orch, wiring, effects, mon = _monitor_setup(
+        bad={"http://127.0.0.1:8002/SIM/acquire"}
+    )
+    gsm = orch.globalstatusmodel
+    gsm.loop_state = LoopStatus.started
+    u = uuid4()
+    ing = HexStatusIngestion(orch, _RuntimeSpy(orch))
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active])))
+    while not orch.interrupt_q.empty():
+        orch.interrupt_q.get_nowait()  # drain the fold wakes
+
+    await mon.probe_once()
+
+    assert orch.current_stop_message == "SIM/acquire endpoints are unavailable"
+    assert gsm.loop_intent == LoopIntent.stop
+    assert gsm.actions_idle()
+    assert gsm.orch_state == OrchStatus.idle  # StatusChanged wrote back
+    assert str(u) in effects.pruned_uuids
+    assert wiring.logging.alerts == [  # type: ignore[union-attr]
+        "SIM/acquire endpoints are unavailable"
+    ]
+    assert not orch.interrupt_q.empty()  # the wake that releases the drain
+
+
+@pytest.mark.asyncio
+async def test_monitor_noop_when_loop_not_started_or_all_healthy():
+    orch, _w, effects, mon = _monitor_setup(bad=set())
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    await mon.probe_once()  # no active endpoints -> no-op
+    orch2, _w2, effects2, mon2 = _monitor_setup(
+        bad={"http://127.0.0.1:8002/SIM/acquire"}
+    )
+    await mon2.probe_once()  # loop stopped -> no probe at all
+    assert effects.pruned_uuids == set() and effects2.pruned_uuids == set()
+    assert orch.current_stop_message == "" and orch2.current_stop_message == ""
+
+
+@pytest.mark.asyncio
+async def test_monitor_respects_ignore_heartbeats():
+    orch, _w, effects, mon = _monitor_setup(bad={"http://127.0.0.1:8002/SIM/acquire"})
+    orch.ignore_heartbeats = ["SIM/acquire"]
+    orch.globalstatusmodel.loop_state = LoopStatus.started
+    ing = HexStatusIngestion(orch, _RuntimeSpy(orch))
+    await ing.update_status(actionservermodel=_asm(_act(uuid4(), [HloStatus.active])))
+    await mon.probe_once()
+    assert orch.current_stop_message == ""
+    assert effects.pruned_uuids == set()
+
+
+@pytest.mark.asyncio
+async def test_dead_peer_race_real_loop_parks_without_hang():
+    """REQUIRED-FIX-2 regression: the monitor's prune -> StatusChanged ->
+    interrupt-wake ORDERING is load-bearing. The real WaitAllActionsIdle
+    executor (orch_effects.py:217-227) loops `while loop_state != stopped:
+    await orch_wait_for_all_actions(); if orch_state == idle: break`, and
+    orch_wait_for_all_actions returns IMMEDIATELY without yielding once
+    actions_idle() is true — so a window where active_dict is pruned but
+    orch_state has not landed idle lets the drainer spin without a yield,
+    starving the event loop so the StatusChanged coroutine that would set
+    orch_state=idle can never be scheduled: the failure mode is a HANG,
+    not an assertion failure. This test parks the REAL HexRuntime +
+    HexDispatchLoop in the stop-drain with an active action, fires ONE
+    probe, and requires the park to complete under a hard timeout."""
+    orch, wiring, effects, mon = _monitor_setup(
+        bad={"http://127.0.0.1:8002/SIM/acquire"}
+    )
+    gsm = orch.globalstatusmodel
+    u = uuid4()
+    ing = HexStatusIngestion(orch, _RuntimeSpy(orch))
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active])))
+    while not orch.interrupt_q.empty():
+        orch.interrupt_q.get_nowait()  # drain the fold wakes
+
+    runtime = mon.runtime  # the REAL HexRuntime built by _monitor_setup
+    loop = HexDispatchLoop(runtime)
+    loop.start()
+    # pre-seed intent=stop so the first LoopIterate takes T5 (DrainForStop
+    # -> WaitAllActionsIdle) without ever touching a dispatch effect
+    gsm.loop_intent = LoopIntent.stop
+    orch.action_dq = ["a0"]  # has_work for T1; never dispatched (drain wins)
+    await runtime.handle(StartRequested())
+    await asyncio.sleep(0.1)
+    # drainer is now parked inside orch_wait_for_all_actions on the
+    # interrupt queue with one active action; loop_state is still started
+    assert gsm.loop_state == LoopStatus.started
+
+    await mon.probe_once()
+
+    async def _parked():
+        while not (
+            gsm.loop_state == LoopStatus.stopped and gsm.orch_state == OrchStatus.idle
+        ):
+            await asyncio.sleep(0.02)
+
+    await asyncio.wait_for(_parked(), timeout=5.0)
+    assert orch.current_stop_message == "SIM/acquire endpoints are unavailable"
+    assert gsm.actions_idle()
+    assert str(u) in effects.pruned_uuids
+    await loop.close()
+
+
+@pytest.mark.asyncio
+async def test_estop_cascade_under_aiolock_does_not_deadlock():
+    """REQUIRED-FIX-3 regression: update_status emits EstoppedUuidIngested
+    via `await runtime.handle(...)` while HOLDING orch.aiolock (legacy
+    parity — the inline block called estop_loop under the lock,
+    orch_status_sync.py:274-275). Legacy was safe because its estop path
+    took no lock; the hexagon cascade (ClearActiveRunId, EstopFanout,
+    FinishActiveEstopped, SetStopMessage, AlertOperator + apply_state_delta)
+    is DIFFERENT code and must never re-acquire aiolock — if any of it did,
+    this await chain deadlocks. Runs the REAL HexRuntime (non-spy) through
+    a fold carrying an estopped uuid under a hard timeout."""
+    orch, wiring, effects, mon = _monitor_setup(bad=set())
+    gsm = orch.globalstatusmodel
+    gsm.loop_state = LoopStatus.started
+    ing = HexStatusIngestion(orch, mon.runtime)  # REAL runtime, no spy
+    u = uuid4()
+    est = _act(u, [HloStatus.active, HloStatus.finished, HloStatus.estopped])
+    ok = await asyncio.wait_for(
+        ing.update_status(actionservermodel=_asm(est, active=False)),
+        timeout=5.0,
+    )
+    assert ok is True
+    assert gsm.loop_state == LoopStatus.estopped
+    assert gsm.orch_state == OrchStatus.estopped  # DD-2 write-back
+    assert orch.current_stop_message.startswith("E-STOP due to action uuid(s):")
+    assert orch.active_run_id is None  # ClearActiveRunId ran
+    assert not orch.aiolock.locked()  # lock released cleanly after the fold

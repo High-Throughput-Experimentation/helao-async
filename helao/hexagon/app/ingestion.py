@@ -32,17 +32,20 @@ no shared mutable state — it holds only the ``orch``/``runtime`` refs and
 resolves every attribute at call time (``import_queues`` reassignment of
 ``globalstatusmodel`` is always observed)."""
 
+import asyncio
+
 from helao.hexagon.app.orch_effects import _LazyServerLogger
 from helao.hexagon.domain.models import HloStatus, LoopStatus
 from helao.hexagon.domain.orchestration import (
     ErroredUuidIngested,
     EstoppedUuidIngested,
+    HeartbeatFailed,
     StatusChanged,
 )
 
 LOGGER = _LazyServerLogger()
 
-__all__ = ["HexStatusIngestion", "action_history_meta"]
+__all__ = ["HexStatusIngestion", "HexHealthMonitor", "action_history_meta"]
 
 
 def action_history_meta(orch, act_model) -> dict:
@@ -175,3 +178,83 @@ class HexStatusIngestion:
             await orch.interrupt_q.put(orch.globalstatusmodel)
 
             return True
+
+
+class HexHealthMonitor:
+    """Replaces the legacy heartbeat task (ServerMonitor.active_action_
+    monitor): same probe cadence (orch.heartbeat_interval), same active-url
+    collection, same last-two-path-segment trim + ignore_heartbeats filter,
+    same "<ends> endpoints are unavailable" stop-message wording. The
+    REACTION differs by design (P2a sanctioned delta): instead of a direct
+    orch.stop() + LOGGER.alert, it emits HeartbeatFailed (reducer T12: stop
+    intent + SetStopMessage + AlertOperator) carrying the dead endpoints'
+    active uuids so PruneDeadActions can clear them; then a StatusChanged
+    fold (apply_state_delta writes orch_state=idle, DD-2) and an interrupt
+    wake, in THAT order, so a parked orch_wait_for_all_actions wakes to an
+    already-idle orch_state (no hot-spin in WaitAllActionsIdle). Never
+    acquires aiolock (two-owner invariant): every mutation happens in the
+    synchronous PruneDeadActions executor on this event loop."""
+
+    def __init__(self, orch, runtime, health):
+        self.orch = orch
+        self.runtime = runtime
+        self.health = health
+        self._task = None
+
+    def start(self) -> None:
+        self._task = asyncio.get_running_loop().create_task(
+            self.run_forever(), name="hexagon_health_monitor"
+        )
+
+    async def close(self) -> None:
+        if self._task is not None:
+            self._task.cancel()
+
+    async def run_forever(self) -> None:
+        orch = self.orch
+        while True:
+            try:
+                await self.probe_once()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                LOGGER.error("health monitor probe failed", exc_info=True)
+            await asyncio.sleep(orch.heartbeat_interval)
+
+    async def probe_once(self) -> None:
+        orch = self.orch
+        gsm = orch.globalstatusmodel
+        if gsm.loop_state != LoopStatus.started:
+            return
+        active_items = list(gsm.active_dict.items())
+        active_endpoints = [actmod.url for _uuid, actmod in active_items]
+        if not active_endpoints:
+            return
+        unique_endpoints = list(set(active_endpoints))
+        results = await self.health.endpoints_available(unique_endpoints)
+        bad_urls = [url for url, ok in results if not ok]
+        # legacy trim + ignore filter (orch_monitor.py:117-119)
+        kept_bad_urls = [
+            url
+            for url in bad_urls
+            if "/".join(url.strip("/").split("/")[-2:]) not in orch.ignore_heartbeats
+        ]
+        if not kept_bad_urls:
+            return
+        bad_ends = ["/".join(url.strip("/").split("/")[-2:]) for url in kept_bad_urls]
+        dead_uuids = tuple(
+            str(act_uuid)
+            for act_uuid, actmod in active_items
+            if actmod.url in kept_bad_urls
+        )
+        msg = f"{', '.join(bad_ends)} endpoints are unavailable"
+        LOGGER.warning(msg)
+        await self.runtime.handle(
+            HeartbeatFailed(message=msg, dead_action_uuids=dead_uuids)
+        )
+        if dead_uuids:
+            # post-prune fold BEFORE the wake: apply_state_delta (sole
+            # orch_state writer, DD-2) must land idle before a parked
+            # orch_wait_for_all_actions re-checks it
+            await self.runtime.handle(StatusChanged(any_active=bool(gsm.active_dict)))
+            await orch.interrupt_q.put(orch.globalstatusmodel)
