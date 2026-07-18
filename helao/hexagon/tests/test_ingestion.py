@@ -5,7 +5,7 @@ loop_state, lock-held emission, and the two update_nonblocking wire quirks
 
 import asyncio
 from datetime import datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -19,9 +19,12 @@ from helao.core.models.server import (
 )
 from helao.helpers.premodels import Action
 from helao.hexagon.app.ingestion import HexStatusIngestion, action_history_meta
+from helao.hexagon.app.orch_effects import OrchCommandRunner
+from helao.hexagon.app.wiring import PortWiring
 from helao.hexagon.domain.orchestration import (
     ErroredUuidIngested,
     EstoppedUuidIngested,
+    PruneDeadActions,
     StatusChanged,
 )
 
@@ -233,3 +236,67 @@ def test_action_history_meta_matches_legacy_shape():
     }
     assert meta["action_server"] == "SIM"
     assert meta["action_finished_timestamp"] is None
+
+
+class _CountingLock:
+    """asyncio.Lock wrapper counting acquisitions (two-owner invariant)."""
+
+    def __init__(self):
+        self._lock = asyncio.Lock()
+        self.acquisitions = 0
+
+    def locked(self):
+        return self._lock.locked()
+
+    async def __aenter__(self):
+        self.acquisitions += 1
+        return await self._lock.__aenter__()
+
+    async def __aexit__(self, *exc):
+        return await self._lock.__aexit__(*exc)
+
+
+@pytest.mark.asyncio
+async def test_prune_dead_actions_unblocks_actions_idle_and_registers():
+    orch, spy, ing = _make()
+    u = uuid4()
+    # fold an active action in (populates gsm.active_dict AND server_dict)
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active])))
+    gsm = orch.globalstatusmodel
+    assert not gsm.actions_idle()
+    runner = OrchCommandRunner(orch, PortWiring())
+    await runner.execute(PruneDeadActions(action_uuids=(str(u),)))
+    assert gsm.actions_idle()  # global active_dict pruned
+    # per-endpoint active_dict pruned too (else the next fold resurrects it)
+    for asm in gsm.server_dict.values():
+        for ep in asm.endpoints.values():
+            assert u not in ep.active_dict
+    # terminal status injected + finished-bucketed + history registered
+    pruned = gsm.nonactive_dict[HloStatus.finished][u]
+    assert HloStatus.finished in pruned.action_status
+    assert pruned.action_finished_timestamp is not None
+    assert u in orch.registered
+    assert orch.registered[u]["action_finished_timestamp"] is not None
+    assert str(u) in runner.pruned_uuids
+
+
+@pytest.mark.asyncio
+async def test_prune_unknown_uuid_is_a_noop():
+    orch, _spy, _ing = _make()
+    runner = OrchCommandRunner(orch, PortWiring())
+    await runner.execute(PruneDeadActions(action_uuids=(str(uuid4()),)))
+    assert orch.registered == {}
+
+
+@pytest.mark.asyncio
+async def test_two_lock_owner_invariant_prune_never_takes_aiolock():
+    """aiolock owners are ingestion + dispatch critical section ONLY: one
+    update_status = exactly one acquisition; the prune adds none."""
+    orch, spy, ing = _make()
+    orch.aiolock = _CountingLock()  # type: ignore[assignment]
+    u = uuid4()
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active])))
+    assert orch.aiolock.acquisitions == 1  # type: ignore[attr-defined]
+    runner = OrchCommandRunner(orch, PortWiring())
+    await runner.execute(PruneDeadActions(action_uuids=(str(u),)))
+    assert orch.aiolock.acquisitions == 1  # type: ignore[attr-defined]

@@ -310,3 +310,16 @@ async def test_misc_effects():
     # RequeueHeadAction is unreachable in P1b1 (DD-4): logged, not executed
     await runner.execute(RequeueHeadAction())
     assert orch.action_dq == []
+
+
+@pytest.mark.asyncio
+async def test_dispatch_head_action_poll_breaks_on_pruned_uuid():
+    """P2a health-aware exit (Q3): the history poll must not spin forever
+    when the dispatched uuid was pruned as dead."""
+    orch = _StubOrch()
+    orch.last_dispatched_action_uuid = "dead-uuid"
+    orch.action_history = {}  # never fed — the legacy hang mode
+    runner = OrchCommandRunner(orch, PortWiring(logging=_AlertSpy()))
+    runner.pruned_uuids.add("dead-uuid")
+    rc = await asyncio.wait_for(runner.execute(DispatchHeadAction()), timeout=3.0)
+    assert rc == ErrorCodes.none
