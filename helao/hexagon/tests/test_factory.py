@@ -170,3 +170,18 @@ async def test_status_wire_send_carries_composed_identity(
     action, params = sent[0]
     assert action == "update_nonblocking"
     assert params == {"server_host": "127.0.0.1", "server_port": 8902}
+
+
+def test_build_wiring_wires_native_write_adapters(installed_config):
+    from helao.hexagon.adapters.native.artifact_store import (
+        NativeArtifactStoreAdapter,
+    )
+    from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
+    from helao.hexagon.app.factory import build_wiring
+    from helao.hexagon.app.wiring import ACTION_REQUIRED
+
+    w = build_wiring("SIM")
+    assert isinstance(w.artifact_store, NativeArtifactStoreAdapter)
+    assert isinstance(w.data_sink, NativeDataSinkAdapter)
+    assert "artifact_store" in ACTION_REQUIRED and "data_sink" in ACTION_REQUIRED
+    w.require(*ACTION_REQUIRED)  # fail-loud stays satisfiable

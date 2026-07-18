@@ -32,5 +32,9 @@ def test_require_rejects_unknown_port_name():
 
 
 def test_required_sets_are_frozen_tuples():
-    assert set(ACTION_REQUIRED) <= set(ORCH_REQUIRED) | {"transport"}
+    assert set(ACTION_REQUIRED) <= set(ORCH_REQUIRED) | {
+        "transport",
+        "artifact_store",
+        "data_sink",
+    }
     assert "state_persistence" in ORCH_REQUIRED

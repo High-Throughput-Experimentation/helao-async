@@ -21,6 +21,8 @@ from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
 from helao.hexagon.adapters.legacy.state_persistence import QueuePckStore
 from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
+from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
+from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED, PortWiring
 
 __all__ = ["build_wiring", "makeActionApp", "makeOrchApp", "makeVisApp"]
@@ -31,16 +33,20 @@ def build_wiring(server_key: str) -> PortWiring:
     root = config.root()  # KeyError -> loud, like helao_dirs
     log_root = os.path.join(root, "LOGS")
     scfg = config.server_cfg(server_key)  # KeyError -> loud, like the launcher
+    clock = LegacyClockAdapter.from_offset_file(log_root)
     return PortWiring(
         config=config,
         logging=LegacyLoggingAdapter(),
-        clock=LegacyClockAdapter.from_offset_file(log_root),
+        clock=clock,
         transport=LegacyTransportAdapter(config),
         state_persistence=QueuePckStore(root),
         status=DispatcherStatusAdapter(
             server_key, own_host=scfg["host"], own_port=scfg["port"]
         ),
         health=LegacyHealthAdapter(),
+        # P2b-1 native write runtime (base bound later by the active graft)
+        artifact_store=NativeArtifactStoreAdapter(config=config, clock=clock),
+        data_sink=NativeDataSinkAdapter(),
     )
 
 
