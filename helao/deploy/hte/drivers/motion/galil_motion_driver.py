@@ -56,6 +56,7 @@ from helao.core.drivers.helao_driver import (
 from ...layouts.aligner import Aligner
 from ...drivers.motion.enum import MoveModes, TransformationModes
 from helao.hexagon.domain.motion_transform import TransformXY
+from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
@@ -173,24 +174,29 @@ class Galil(HelaoDriver):
                     f"{gethostname().lower()}_last_plate_calib.json",
                 )
 
-            self.plate_transfermatrix = self.load_transfermatrix(
-                file=self.file_backup_transfermatrix
+            # P3a galil-split slice-2 (hexagon CalibrationStorePort): the
+            # store computes the identical <states_root>/<host>_last_plate_
+            # calib.json and <db_root>/plate_calib/<host>_instrument_calib.json
+            # paths inline above/below; `save_transfermatrix`/
+            # `load_transfermatrix` remain unchanged (still used by the
+            # aligner's out-of-scope named-plate write and by
+            # `update_plate_transfermatrix`).
+            self._calib_store = JsonFileCalibrationStore(
+                states_root=helaodirs.states_root if helaodirs is not None else None,
+                db_root=helaodirs.db_root if helaodirs is not None else None,
+                hostname=gethostname().lower(),
             )
+
+            self.plate_transfermatrix = self._calib_store.load_plate_calibration()
             if self.plate_transfermatrix is None:
                 self.plate_transfermatrix = self.dflt_matrix
 
-            self.save_transfermatrix(file=self.file_backup_transfermatrix)
+            self._calib_store.save_plate_calibration(self.plate_transfermatrix)
             LOGGER.info(f"plate_transfermatrix is: \n{self.plate_transfermatrix}")
 
             self.M_instr = None
             if helaodirs is not None:
-                Mplate = self.load_transfermatrix(
-                    file=os.path.join(
-                        helaodirs.db_root,
-                        "plate_calib",
-                        f"{gethostname().lower()}_instrument_calib.json",
-                    )
-                )
+                Mplate = self._calib_store.load_instrument_calibration()
 
                 if Mplate is not None:
                     self.M_instr = self.convert_Mplate_to_Minstr(Mplate=Mplate.tolist())
