@@ -169,6 +169,14 @@ git commit -m "test(hexagon): P3a-2 sweep — only biologic remains xfail (techn
 
 **Risk controls:** the `global`-loader pattern is gated on "no module/class/default-arg vendor use" (Step 1 of Tasks 2/3); andor future-annotations placement verified; construction-time behavior unchanged (loader called before first use on every live path; deferred constructor-connect untouched).
 
+## Outcome (2026-07-18 — COMPLETE)
+
+Executed on `feat/p3a2-lazy-imports` (commits `f06b7435`…Task4). Hexagon suite **335 passed, 2 xfailed, 0 failed**; sweep 19 passed, 2 xfailed (biologic import + kinesis construct, both deferred), 0 failed.
+- pal: per-method `nidaqmx` import in the trigger method. nidaqmx: `_load_nidaqmx()` globals loader called from `connect()`. andor: `from __future__ import annotations` + `_load_andor()` called in `__init__` before `AndorSDK3()`. All 3 modules now import with NO module-top vendor import (verified col-0 grep clean).
+- **andor is the real hermetic win** — imports on Linux with pyAndorSDK3 absent. nidaqmx/pal already imported here (nidaqmx pip-installed) so their assertion is trivially true in this env; true hermetic needs vendor-less CI.
+- **Downstream unblock:** all 27 hte exp/seq libraries now import on Linux (0 fail) — ADSS/ANEC/CLAD/ECMS import `Spacingmethod`/`PALtools`/`MoveModes` directly from galil_motion/pal drivers, which P3a-1+P3a-2 made importable. This is the P3c foundation.
+- Deferred still: biologic (technique.py module-scope `blp.*` registry restructure); constructor-connect §10.4 cluster (kinesis/gamry/andor) → native splits.
+
 ## Execution Handoff
 
 Recommended: **Subagent-Driven** — fresh subagent per task, review between (live-station driver edits).
