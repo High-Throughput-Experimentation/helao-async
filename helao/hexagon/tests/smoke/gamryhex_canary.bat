@@ -61,8 +61,12 @@ set "WINTITLE=HELAO_CANARY_%PREFIX%"
 
 echo.
 echo [canary] === %PREFIX% ===
-echo [canary] wiping fresh root %ROOT%
-if exist "%ROOT%" rmdir /s /q "%ROOT%"
+REM NEVER wipe %ROOT%. An openapi diff reads the live server's /openapi.json and
+REM produces no output tree, so no "fresh root" is needed. On a station %ROOT%
+REM (e.g. C:\INST_hlo) holds production RUN data, calibration matrices, and may
+REM contain the code repo itself -- deleting it is catastrophic and unrecoverable
+REM (rmdir /s /q bypasses the Recycle Bin). %ROOT% is used read-only here, only
+REM to locate the pid pickle for kill_group.py.
 
 echo [canary] launching %PREFIX% (log: %LAUNCHLOG%)
 start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot-reload > "%LAUNCHLOG%" 2>&1"
