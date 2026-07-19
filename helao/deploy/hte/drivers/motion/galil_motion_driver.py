@@ -58,7 +58,6 @@ from ...drivers.motion.enum import MoveModes, TransformationModes
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
-import gclib
 
 
 class cmd_exception(ValueError):
@@ -161,6 +160,8 @@ class Galil(HelaoDriver):
         Returns:
             `DriverResponse` reporting whether the Galil connection is enabled.
         """
+        import gclib
+
         try:
             helaodirs = getattr(self._base_hook, "helaodirs", None)
 
@@ -191,9 +192,7 @@ class Galil(HelaoDriver):
                 )
 
                 if Mplate is not None:
-                    self.M_instr = self.convert_Mplate_to_Minstr(
-                        Mplate=Mplate.tolist()
-                    )
+                    self.M_instr = self.convert_Mplate_to_Minstr(Mplate=Mplate.tolist())
 
             if self.M_instr is None:
                 LOGGER.info("Did not find refernce plate, loading Minstr from config")
@@ -268,7 +267,11 @@ class Galil(HelaoDriver):
 
             return DriverResponse(
                 response=DriverResponseType.success,
-                status=DriverStatus.ok if self.galil_enabled else DriverStatus.uninitialized,
+                status=(
+                    DriverStatus.ok
+                    if self.galil_enabled
+                    else DriverStatus.uninitialized
+                ),
             )
         except Exception:
             LOGGER.error("connect failed", exc_info=True)
@@ -818,9 +821,7 @@ class Galil(HelaoDriver):
                     speed = self.motor_max_speed_count_sec
                 self._speed = speed
             except Exception:
-                LOGGER.error(
-                    f"motor numerical error for axis '{ax}'", exc_info=True
-                )
+                LOGGER.error(f"motor numerical error for axis '{ax}'", exc_info=True)
                 # something went wrong in the numerical part so we give that as feedback
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
@@ -956,6 +957,8 @@ class Galil(HelaoDriver):
         Returns:
             Dict with a single `connection` field describing the outcome.
         """
+        import gclib
+
         try:
             self.g.GClose()  # don't forget to close connections!
         except gclib.GclibError as e:
@@ -1345,9 +1348,7 @@ class Galil(HelaoDriver):
             plate_id: Plate ID to look up.
         """
         return {
-            "platemap": await unified_db.get_platemap(
-                [SolidSample(plate_id=plate_id)]
-            )
+            "platemap": await unified_db.get_platemap([SolidSample(plate_id=plate_id)])
         }
 
     async def solid_get_samples_xy(
