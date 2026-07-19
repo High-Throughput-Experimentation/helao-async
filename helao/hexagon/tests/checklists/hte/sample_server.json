@@ -1,0 +1,814 @@
+[
+  {
+    "path": "/SAMPLE/archive_custom_add_gas",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_add_gas",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "source_gas_in",
+        "annotation": "GasSample",
+        "default": "Body(GasSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()}), embed=True)"
+      },
+      {
+        "name": "volume_ml",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "combine_gases",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "dilute_gases",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_add_liquid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_add_liquid",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "source_liquid_in",
+        "annotation": "LiquidSample",
+        "default": "Body(LiquidSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()}), embed=True)"
+      },
+      {
+        "name": "volume_ml",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "combine_liquids",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "dilute_liquids",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_load",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_load",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "load_sample_in",
+        "annotation": "Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]",
+        "default": "Body(LiquidSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()}), embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_load_solid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_load_solid",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "sample_no",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "plate_id",
+        "annotation": "int",
+        "default": "1"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_query_sample",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_query_sample",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_unload",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_unload",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "destroy_liquid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "destroy_gas",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "destroy_solid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_liquid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_solid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_gas",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_custom_unloadall",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_custom_unloadall",
+    "params": [
+      {
+        "name": "destroy_liquid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "destroy_gas",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "destroy_solid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_liquid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_solid",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "keep_gas",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_export_csv",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_export_csv",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_export_icpms",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_export_icpms",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "survey_runs",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "main_runs",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "rack",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "dilution_factor",
+        "annotation": "Optional[float]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_export_json",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_export_json",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_load",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_load",
+    "params": [
+      {
+        "name": "load_sample_in",
+        "annotation": "Union[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample], dict]",
+        "default": "Body(LiquidSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()}), embed=True)"
+      },
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_new_position",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_new",
+    "params": [
+      {
+        "name": "req_vol",
+        "annotation": "Optional[float]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_query_sample",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_query_sample",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_unload",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_unload",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/archive_tray_unloadall",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_unloadall",
+    "params": []
+  },
+  {
+    "path": "/SAMPLE/archive_tray_update_position",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "archive_tray_update_position",
+    "params": [
+      {
+        "name": "sample",
+        "annotation": "Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]",
+        "default": "Body(LiquidSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()}), embed=True)"
+      },
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/convert_v1DB",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "convert_v1DB",
+    "params": []
+  },
+  {
+    "path": "/SAMPLE/db_get_samples",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "db_get_samples",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([LiquidSample.model_validate({'sample_no': 1, 'machine_name': gethostname().lower()})], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/db_new_samples",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "db_new_samples",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([LiquidSample.model_validate({'machine_name': gethostname().lower(), 'source': [], 'volume_ml': 0.0, 'action_time': strftime('%y%m%d.%H%M%S'), 'chemical': [], 'partial_molarity': [], 'supplier': [], 'lot_number': []})], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/generate_plate_sample_no_list",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "generate_plate_sample_no_list",
+    "params": [
+      {
+        "name": "plate_id",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "sample_code",
+        "annotation": "int",
+        "default": "Query(0, ge=0, le=2)"
+      },
+      {
+        "name": "skip_n_samples",
+        "annotation": "int",
+        "default": "Query(0, ge=0)"
+      },
+      {
+        "name": "direction",
+        "annotation": "Optional[ScanDirection]",
+        "default": "None"
+      },
+      {
+        "name": "sample_nos",
+        "annotation": "List[int]",
+        "default": "[]"
+      },
+      {
+        "name": "sample_nos_operator",
+        "annotation": "Optional[ScanOperator]",
+        "default": "None"
+      },
+      {
+        "name": "platemap_xys",
+        "annotation": "list",
+        "default": "[]"
+      },
+      {
+        "name": "platemap_xys_operator",
+        "annotation": "Optional[ScanOperator]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SAMPLE/get_loaded_positions",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_positions",
+    "params": []
+  },
+  {
+    "path": "/custom_assembly_allowed",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "custom_assembly_allowed",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/custom_dest_allowed",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "custom_dest_allowed",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/custom_is_destroyed",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "custom_is_destroyed",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/custom_query_sample",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "custom_query_sample",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/custom_update_position",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "custom_update_position",
+    "params": [
+      {
+        "name": "custom",
+        "annotation": "Optional[str]",
+        "default": "None"
+      },
+      {
+        "name": "sample",
+        "annotation": "Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body(None, embed=True)"
+      },
+      {
+        "name": "dilute",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/get_samples",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_samples",
+    "params": [
+      {
+        "name": "samples",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/list_new_samples",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "list_new_samples",
+    "params": [
+      {
+        "name": "num_smps",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "give_only",
+        "annotation": "str",
+        "default": "'false'"
+      }
+    ]
+  },
+  {
+    "path": "/new_ref_samples",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "new_ref_samples",
+    "params": [
+      {
+        "name": "samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "sample_out_type",
+        "annotation": "str",
+        "default": "''"
+      },
+      {
+        "name": "sample_position",
+        "annotation": "str",
+        "default": "''"
+      },
+      {
+        "name": "combine_liquids",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "combine_gases",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "action",
+        "annotation": "Optional[Action]",
+        "default": "Body(None, embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/new_samples",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "new_samples",
+    "params": [
+      {
+        "name": "samples",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/tray_get_next_full",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tray_get_next_full",
+    "params": [
+      {
+        "name": "after_tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "after_slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "after_vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/tray_new_position",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tray_new_position",
+    "params": [
+      {
+        "name": "req_vol",
+        "annotation": "float",
+        "default": "2.0"
+      }
+    ]
+  },
+  {
+    "path": "/tray_query_sample",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tray_query_sample",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/tray_update_position",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tray_update_position",
+    "params": [
+      {
+        "name": "tray",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "slot",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "vial",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "sample",
+        "annotation": "Optional[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body(None, embed=True)"
+      },
+      {
+        "name": "dilute",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/update_samples",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "update_samples",
+    "params": [
+      {
+        "name": "samples",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  }
+]

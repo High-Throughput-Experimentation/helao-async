@@ -1,0 +1,212 @@
+[
+  {
+    "path": "/CALC/calc_uvis_abs",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "calc_uvis_abs",
+    "params": [
+      {
+        "name": "ev_parts",
+        "annotation": "list",
+        "default": "[1.8, 2.2, 2.6, 3.0]"
+      },
+      {
+        "name": "bin_width",
+        "annotation": "int",
+        "default": "3"
+      },
+      {
+        "name": "window_length",
+        "annotation": "int",
+        "default": "45"
+      },
+      {
+        "name": "poly_order",
+        "annotation": "int",
+        "default": "4"
+      },
+      {
+        "name": "lower_wl",
+        "annotation": "float",
+        "default": "370"
+      },
+      {
+        "name": "upper_wl",
+        "annotation": "float",
+        "default": "700"
+      },
+      {
+        "name": "max_mthd_allowed",
+        "annotation": "float",
+        "default": "1.2"
+      },
+      {
+        "name": "max_limit",
+        "annotation": "float",
+        "default": "0.99"
+      },
+      {
+        "name": "min_mthd_allowed",
+        "annotation": "float",
+        "default": "-0.2"
+      },
+      {
+        "name": "min_limit",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "delta",
+        "annotation": "float",
+        "default": "1.0"
+      }
+    ]
+  },
+  {
+    "path": "/CALC/check_CP_Ewe_bounds",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "check_CP_Ewe_bounds",
+    "params": [
+      {
+        "name": "CP_Ewe_V__mean_final",
+        "annotation": "float | bool",
+        "default": "False"
+      },
+      {
+        "name": "limted_Ewe_V__mean_final",
+        "annotation": "float | bool",
+        "default": "False"
+      },
+      {
+        "name": "lower_limit",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "upper_limit",
+        "annotation": "float",
+        "default": "3"
+      }
+    ]
+  },
+  {
+    "path": "/CALC/check_co2_purge",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "check_co2_purge",
+    "params": [
+      {
+        "name": "co2_ppm_thresh",
+        "annotation": "float",
+        "default": "95000"
+      },
+      {
+        "name": "purge_if",
+        "annotation": "Union[str, float]",
+        "default": "'below'"
+      },
+      {
+        "name": "present_syringe_volume_ul",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "repeat_experiment_name",
+        "annotation": "str",
+        "default": "'CCSI_sub_headspace_purge_and_measure'"
+      },
+      {
+        "name": "repeat_experiment_params",
+        "annotation": "dict",
+        "default": "{}"
+      },
+      {
+        "name": "repeat_experiment_kwargs",
+        "annotation": "dict",
+        "default": "{}"
+      }
+    ]
+  },
+  {
+    "path": "/CALC/fill_syringe_volume_check",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "fill_syringe_volume_check",
+    "params": [
+      {
+        "name": "check_volume_ul",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "target_volume_ul",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "present_volume_ul",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "repeat_experiment_name",
+        "annotation": "str",
+        "default": "'CCSI_sub_fill_syringe'"
+      },
+      {
+        "name": "repeat_experiment_params",
+        "annotation": "dict",
+        "default": "{}"
+      },
+      {
+        "name": "repeat_experiment_kwargs",
+        "annotation": "dict",
+        "default": "{}"
+      }
+    ]
+  },
+  {
+    "path": "/CALC/keep_min_ocv",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "keep_min_ocv",
+    "params": [
+      {
+        "name": "min_offset_ocv",
+        "annotation": "float | bool",
+        "default": "False"
+      },
+      {
+        "name": "new_ocv",
+        "annotation": "float | bool",
+        "default": "False"
+      },
+      {
+        "name": "lower_limit",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "upper_limit",
+        "annotation": "float",
+        "default": "1.2"
+      },
+      {
+        "name": "offset_value",
+        "annotation": "float",
+        "default": "-0.2"
+      }
+    ]
+  }
+]

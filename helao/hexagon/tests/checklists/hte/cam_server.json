@@ -1,0 +1,36 @@
+[
+  {
+    "path": "/CAM/acquire_image",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_image",
+    "params": [
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "1"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/CAM/cancel_acquire_image",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_image",
+    "params": []
+  }
+]

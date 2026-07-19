@@ -1,0 +1,73 @@
+[
+  {
+    "path": "/DOSEPUMP/cancel_run_continuous",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_run_continuous",
+    "params": [
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/DOSEPUMP/run_continuous",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_continuous",
+    "params": [
+      {
+        "name": "rate_uL_min",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "duration_sec",
+        "annotation": "float",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/start_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_polling",
+    "params": []
+  },
+  {
+    "path": "/start_pump",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_pump",
+    "params": []
+  },
+  {
+    "path": "/stop_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_polling",
+    "params": []
+  },
+  {
+    "path": "/stop_pump",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_pump",
+    "params": []
+  }
+]

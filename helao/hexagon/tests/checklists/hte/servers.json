@@ -1,0 +1,124 @@
+{
+  "_description": "Manifest of the 23 hte action-server modules (helao/deploy/hte/servers/action/*.py) to their tracked server_key(s), per spec P3 decomposition doc §1 (source: .omc/research/framework-rewrite/deploy-hte-servers.md). Multi-key servers list all keys; representative_key (first listed) is the key substituted for {server_key} when freezing the endpoint checklist in harness/hte_freeze.py.",
+  "servers": [
+    {
+      "module": "HTEdata_server.py",
+      "keys": [],
+      "representative_key": null,
+      "note": "no tracked server_key in configs"
+    },
+    {
+      "module": "analysis_server.py",
+      "keys": ["ANA"],
+      "representative_key": "ANA"
+    },
+    {
+      "module": "andor_server.py",
+      "keys": ["ANDOR"],
+      "representative_key": "ANDOR"
+    },
+    {
+      "module": "biologic_server.py",
+      "keys": ["BIOLOGIC", "PSTAT"],
+      "representative_key": "BIOLOGIC"
+    },
+    {
+      "module": "calc_server.py",
+      "keys": ["CALC"],
+      "representative_key": "CALC"
+    },
+    {
+      "module": "cam_server.py",
+      "keys": ["CAM"],
+      "representative_key": "CAM"
+    },
+    {
+      "module": "co2sensor_server.py",
+      "keys": ["CO2SENSOR"],
+      "representative_key": "CO2SENSOR"
+    },
+    {
+      "module": "dbpack_server.py",
+      "keys": ["DB"],
+      "representative_key": "DB"
+    },
+    {
+      "module": "diapump_server.py",
+      "keys": ["DOSEPUMP"],
+      "representative_key": "DOSEPUMP"
+    },
+    {
+      "module": "galil_io.py",
+      "keys": ["IO"],
+      "representative_key": "IO"
+    },
+    {
+      "module": "galil_motion.py",
+      "keys": ["MOTOR"],
+      "representative_key": "MOTOR"
+    },
+    {
+      "module": "gamry_server2.py",
+      "keys": ["PSTAT"],
+      "representative_key": "PSTAT"
+    },
+    {
+      "module": "kinesis_server.py",
+      "keys": ["KMOTOR"],
+      "representative_key": "KMOTOR"
+    },
+    {
+      "module": "mfc_server.py",
+      "keys": ["MFC", "N2MFC", "CALIBRATIONMFC", "CALIBRATIONMFCSECOND"],
+      "representative_key": "MFC"
+    },
+    {
+      "module": "nidaqmx_server.py",
+      "keys": ["NI"],
+      "representative_key": "NI"
+    },
+    {
+      "module": "o2sensor_server.py",
+      "keys": [],
+      "representative_key": null,
+      "note": "no tracked server_key in configs"
+    },
+    {
+      "module": "pal_server.py",
+      "keys": ["PAL"],
+      "representative_key": "PAL"
+    },
+    {
+      "module": "pdu_server.py",
+      "keys": [],
+      "representative_key": null,
+      "note": "no tracked server_key in configs"
+    },
+    {
+      "module": "power_supply_server.py",
+      "keys": ["POWER_SUPPLY"],
+      "representative_key": "POWER_SUPPLY"
+    },
+    {
+      "module": "sample_server.py",
+      "keys": ["SAMPLE"],
+      "representative_key": "SAMPLE"
+    },
+    {
+      "module": "spec_server.py",
+      "keys": ["SPEC_T", "SPEC_R"],
+      "representative_key": "SPEC_T"
+    },
+    {
+      "module": "syringe_server.py",
+      "keys": ["WORKSYRINGE", "CLEANSYRINGE", "WATERSYRINGE"],
+      "representative_key": "WORKSYRINGE"
+    },
+    {
+      "module": "tec_server.py",
+      "keys": [],
+      "representative_key": null,
+      "note": "no tracked server_key in configs"
+    }
+  ]
+}

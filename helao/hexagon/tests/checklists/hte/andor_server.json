@@ -1,0 +1,94 @@
+[
+  {
+    "path": "/ANDOR/acquire",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire",
+    "params": [
+      {
+        "name": "external_trigger",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "frames_per_poll",
+        "annotation": "int",
+        "default": "100"
+      },
+      {
+        "name": "buffer_count",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "exp_time",
+        "annotation": "float",
+        "default": "0.0098"
+      },
+      {
+        "name": "framerate",
+        "annotation": "float",
+        "default": "98"
+      },
+      {
+        "name": "timeout",
+        "annotation": "float",
+        "default": "5000"
+      }
+    ]
+  },
+  {
+    "path": "/ANDOR/adjust_nd",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "adjust_nd",
+    "params": []
+  },
+  {
+    "path": "/ANDOR/cancel_acquire",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire",
+    "params": []
+  },
+  {
+    "path": "/ANDOR/cooling",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cooling",
+    "params": [
+      {
+        "name": "cooldown",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "timeout",
+        "annotation": "int",
+        "default": "600"
+      }
+    ]
+  },
+  {
+    "path": "/stop_private",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_private",
+    "params": []
+  }
+]
