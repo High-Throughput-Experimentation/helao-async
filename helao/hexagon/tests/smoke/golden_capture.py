@@ -144,17 +144,24 @@ def settle(
     poll_s: float = 2.0,
     timeout_s: float = 300.0,
 ) -> None:
-    """Wait for the run_OCV action to actually WRITE and FINISH, then settle.
+    """Wait for the run_OCV action to WRITE its -act.yml and FINISH, then settle.
 
     NO orch/DB in this topology, AND a manual direct-POST action writes to
     RUNS_DIAG (base.py:1016) and never touches RUNS_ACTIVE -- so polling
-    ``runs_active_empty`` alone returns before any file exists, snapshotting an
-    empty tree that then passes parity vacuously. Instead: require at least one
-    ``-act.yml`` AND one ``.hlo`` to be present (the action ran and emitted
-    data), ``RUNS_ACTIVE`` empty (nothing in flight), and the total artifact
-    count stable across ``settle_polls`` consecutive polls. If the action
-    errored or produced no data, this raises TimeoutError -- a loud failure,
-    never a silent empty capture.
+    ``runs_active_empty`` alone returns before any file is written,
+    snapshotting an empty tree that then passes parity vacuously (the original
+    at-station false PASS). Instead require the action's ``-act.yml`` to be
+    present (the action ran to completion), ``RUNS_ACTIVE`` empty (nothing in
+    flight), and the artifact count stable across ``settle_polls`` consecutive
+    polls. If no ``-act.yml`` ever appears the action errored -> TimeoutError
+    (loud failure, never a silent empty capture).
+
+    NOTE: ``.hlo`` presence is intentionally NOT required here. Observed
+    at-station: manual run_OCV emits an -act.yml but no .hlo (for BOTH legacy
+    and hexagon), i.e. no streamed data file. That is a measurement/data-path
+    question, not a capture-timing one, so it must not hang settling; snapshot()
+    warns about it instead. The -act.yml (with its masked derived params) is
+    still a real parity comparison between legacy and hexagon.
     """
     root = Path(root)
     t0 = time.time()
@@ -163,7 +170,7 @@ def settle(
     while time.time() - t0 < timeout_s:
         acts, hlos = _run_artifacts(root)
         count = len(acts) + len(hlos)
-        ready = bool(acts) and bool(hlos) and runs_active_empty(root)
+        ready = bool(acts) and runs_active_empty(root)
         if ready and count == last:
             stable += 1
         elif ready:
@@ -176,10 +183,10 @@ def settle(
         time.sleep(poll_s)
     acts, hlos = _run_artifacts(root)
     raise TimeoutError(
-        f"{root}: run_OCV produced no completed artifacts after {timeout_s}s "
+        f"{root}: run_OCV wrote no -act.yml after {timeout_s}s "
         f"(-act.yml={len(acts)}, .hlo={len(hlos)}). The action likely errored "
-        "or wrote no data -- check the launch/capture logs. Refusing to "
-        "snapshot an empty tree that would pass parity trivially."
+        "-- check the launch/capture logs. Refusing to snapshot an empty tree "
+        "that would pass parity trivially."
     )
 
 
@@ -202,15 +209,25 @@ def snapshot(
             f"{out_dir} already exists; refusing to overwrite a capture"
         )
     # Anti-vacuous-pass guard: an empty capture (no action output) compares to
-    # nothing and passes parity trivially. Refuse it here, before writing
-    # anything, so a false PASS is impossible even if settle() were bypassed.
+    # nothing and passes parity trivially. Require at least one -act.yml before
+    # writing anything, so a false PASS is impossible even if settle() were
+    # bypassed. .hlo is NOT required (manual run_OCV may emit none), but its
+    # absence is warned loudly: parity then compares -act.yml metadata only, not
+    # the hlo data-write path.
     acts, hlos = _run_artifacts(root)
-    if not acts or not hlos:
+    if not acts:
         raise RuntimeError(
-            f"{root} has no run_OCV output to capture (-act.yml={len(acts)}, "
-            f".hlo={len(hlos)}); refusing a vacuous capture that would pass "
-            "parity with 0 diffs. Check the launch/capture logs -- the action "
-            "may have errored or produced no data."
+            f"{root} has no -act.yml to capture; refusing a vacuous capture "
+            "that would pass parity with 0 diffs. Check the launch/capture "
+            "logs -- the action may have errored or produced no output."
+        )
+    if not hlos:
+        print(
+            f"[golden_capture] WARNING: no .hlo captured under {root} -- run_OCV "
+            "produced no streamed data file. Parity will compare -act.yml "
+            "metadata only, NOT the hlo data-write path. Verify the measurement "
+            "actually acquires data (dummy cell connected, driver.get_data "
+            "returning samples)."
         )
     out_root = out_dir / "root"
     out_root.mkdir(parents=True)

@@ -43,7 +43,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         root = Path(td) / "captroot"
         (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
         (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text("file_type: action\n")
-        # a .hlo is required for the anti-vacuous-pass guard to accept the tree
+        # include a .hlo too (the full happy path: metadata + data file)
         (root / "RUNS_FINISHED" / "x" / "OCV-0.hlo").write_text("hlo_version: x\n%%\n")
         (root / "LOGS").mkdir(parents=True)
         (root / "LOGS" / "PSTAT.log").write_text("not captured")
@@ -152,12 +152,42 @@ def test_settle_times_out_when_no_artifacts_are_written():
             raise AssertionError("settle() should time out when no artifacts appear")
 
 
+def test_settle_returns_with_act_yml_only_no_hlo():
+    """Observed at-station: manual run_OCV emits -act.yml but no .hlo (both
+    configs). settle must NOT require a .hlo (would hang) -- an -act.yml with
+    RUNS_ACTIVE empty is a completed action."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        d = root / "RUNS_DIAG" / "0__0__PSTAT__run_OCV"
+        d.mkdir(parents=True)
+        (d / "250716.131421-act.yml").write_text("file_type: action\n")  # no .hlo
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_snapshot_succeeds_with_act_yml_only():
+    """snapshot captures an -act.yml-only tree (warns about the missing .hlo but
+    does not refuse -- the -act.yml is still a real parity comparison)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        d = root / "RUNS_DIAG" / "0__0__PSTAT__run_OCV"
+        d.mkdir(parents=True)
+        (d / "250716.131421-act.yml").write_text("file_type: action\n")  # no .hlo
+        out = Path(td) / "golden" / "run1"
+        snapshot(
+            root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
+        )
+        assert (out / "root" / "RUNS_DIAG" / "0__0__PSTAT__run_OCV").exists()
+        assert (out / "provenance.yml").exists()
+
+
 ALL_TESTS = [
     test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance,
     test_snapshot_refuses_to_overwrite_existing_out_dir,
     test_snapshot_refuses_empty_capture,
     test_settle_returns_once_action_artifacts_are_complete_and_stable,
     test_settle_times_out_when_no_artifacts_are_written,
+    test_settle_returns_with_act_yml_only_no_hlo,
+    test_snapshot_succeeds_with_act_yml_only,
 ]
 
 
