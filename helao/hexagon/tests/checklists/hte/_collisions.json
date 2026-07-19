@@ -1,0 +1,130 @@
+{
+  "exp": {
+    "CCSI_sub_unload_cell": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_load_solid": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_load_liquid": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_load_gas": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_alloff": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_headspace_purge_and_measure": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_headspace_measure": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_drain": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_n2drain": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_initialization_end_state": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_peripumpoff": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_initialization_firstpart": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_cellfill": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2monitoring": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2monitoring_mfcmasscotwo": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2topup_mfcmassdose": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2constantpressure": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2mass_temp": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2massdose": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_co2maintainconcentration": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_flowflush": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_clean_inject": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_refill_clean": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_debug_co2purge": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_leaktest_co2": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_monitorcell": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_n2flush": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_n2clean": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_n2rinse": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ],
+    "CCSI_sub_n2headspace": [
+      "CCSI_exp.py",
+      "CSIL_exp.py"
+    ]
+  },
+  "seq": {
+    "ECHEUVIS_postseq": [
+      "ECHEUVIS_seq.py",
+      "HISPEC_seq.py"
+    ]
+  }
+}
