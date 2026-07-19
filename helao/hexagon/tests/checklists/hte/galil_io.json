@@ -1,0 +1,194 @@
+[
+  {
+    "path": "/IO/acquire_analog_in",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_analog_in",
+    "params": [
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/IO/cancel_acquire_analog_in",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_analog_in",
+    "params": []
+  },
+  {
+    "path": "/IO/get_analog_in",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_analog_in",
+    "params": [
+      {
+        "name": "ai_item",
+        "annotation": "app.driver.dev_aiitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/IO/get_digital_in",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_digital_in",
+    "params": [
+      {
+        "name": "di_item",
+        "annotation": "app.driver.dev_diitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/IO/get_digital_out",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_digital_out",
+    "params": [
+      {
+        "name": "do_item",
+        "annotation": "app.driver.dev_doitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/IO/reset",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "reset",
+    "params": []
+  },
+  {
+    "path": "/IO/set_analog_out",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_analog_out",
+    "params": [
+      {
+        "name": "ao_item",
+        "annotation": "app.driver.dev_aoitems",
+        "default": "None"
+      },
+      {
+        "name": "value",
+        "annotation": "Optional[float]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/IO/set_digital_cycle",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_digital_cycle",
+    "params": [
+      {
+        "name": "trigger_name",
+        "annotation": "app.driver.dev_diitems",
+        "default": "'gamry_ttl0'"
+      },
+      {
+        "name": "triggertype",
+        "annotation": "TriggerType",
+        "default": "TriggerType.fallingedge"
+      },
+      {
+        "name": "out_name",
+        "annotation": "Optional[Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]]",
+        "default": "'led'"
+      },
+      {
+        "name": "out_name_gamry",
+        "annotation": "app.driver.dev_doitems",
+        "default": "'gamry_aux'"
+      },
+      {
+        "name": "toggle_init_delay",
+        "annotation": "Union[float, List[float]]",
+        "default": "0"
+      },
+      {
+        "name": "toggle_duty",
+        "annotation": "Union[float, List[float]]",
+        "default": "0.5"
+      },
+      {
+        "name": "toggle_period",
+        "annotation": "Union[float, List[float]]",
+        "default": "2.0"
+      },
+      {
+        "name": "toggle_duration",
+        "annotation": "Union[float, List[float]]",
+        "default": "-1"
+      },
+      {
+        "name": "req_out_name",
+        "annotation": "Optional[Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/IO/set_digital_out",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_digital_out",
+    "params": [
+      {
+        "name": "do_item",
+        "annotation": "app.driver.dev_doitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/IO/stop_digital_cycle",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop_digital_cycle",
+    "params": []
+  }
+]

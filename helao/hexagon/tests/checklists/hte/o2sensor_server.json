@@ -1,0 +1,36 @@
+[
+  {
+    "path": "/{server_key}/acquire_o2",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_o2",
+    "params": [
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/cancel_acquire_o2",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_o2",
+    "params": []
+  }
+]

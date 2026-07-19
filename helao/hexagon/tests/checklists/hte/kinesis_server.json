@@ -1,0 +1,110 @@
+[
+  {
+    "path": "/KMOTOR/cancel_kmove",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_kmove",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "app.driver.dev_kinesis",
+        "default": "motors[0]"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/KMOTOR/kmove",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "kmove",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "app.driver.dev_kinesis",
+        "default": "motors[0]"
+      },
+      {
+        "name": "move_mode",
+        "annotation": "MoveModes",
+        "default": "'relative'"
+      },
+      {
+        "name": "value_mm",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "velocity_mm_s",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "acceleration_mm_s2",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "poll_rate_s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/KMOTOR/set_velocity",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_velocity",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "app.driver.dev_kinesis",
+        "default": "motors[0]"
+      },
+      {
+        "name": "velocity_mm_s",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "acceleration_mm_s2",
+        "annotation": "Optional[float]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/start_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_polling",
+    "params": []
+  },
+  {
+    "path": "/stop_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_polling",
+    "params": []
+  }
+]

@@ -1,0 +1,93 @@
+[
+  {
+    "path": "/{server_key}/cancel_record_tec",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_record_tec",
+    "params": []
+  },
+  {
+    "path": "/{server_key}/cancel_wait_till_stable",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_wait_till_stable",
+    "params": []
+  },
+  {
+    "path": "/{server_key}/disable_tec",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "disable_tec",
+    "params": []
+  },
+  {
+    "path": "/{server_key}/enable_tec",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "enable_tec",
+    "params": []
+  },
+  {
+    "path": "/{server_key}/record_tec",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "record_tec",
+    "params": [
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/set_temperature",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_temperature",
+    "params": [
+      {
+        "name": "target_temperature_degc",
+        "annotation": "float",
+        "default": "25.0"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/wait_till_stable",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "wait_till_stable",
+    "params": [
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      }
+    ]
+  }
+]

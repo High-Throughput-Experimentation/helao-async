@@ -1,0 +1,676 @@
+[
+  {
+    "path": "/BIOLOGIC/get_meas_status",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_meas_status",
+    "params": []
+  },
+  {
+    "path": "/BIOLOGIC/run_CA",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CA",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vval__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_CAOCV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CAOCV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "CA_Vval__V_list",
+        "annotation": "List[float]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "CA_Tval__s_list",
+        "annotation": "List[float]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "CA_AcqInterval__s",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "CA_IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "CA_ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "CA_Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "OCV_Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "OCV_AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_CP",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CP",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Ival__A",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshEwe_V",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_CV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vinit__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Vapex1__V",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "Vapex2__V",
+        "annotation": "float",
+        "default": "-1.0"
+      },
+      {
+        "name": "Vfinal__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "ScanRate__V_s",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "Cycles",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_GEIS",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_GEIS",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Iinit__A",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "Iamp__A",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "Finit__Hz",
+        "annotation": "float",
+        "default": "1"
+      },
+      {
+        "name": "Ffinal__Hz",
+        "annotation": "float",
+        "default": "10000"
+      },
+      {
+        "name": "FrequencyNumber",
+        "annotation": "int",
+        "default": "60"
+      },
+      {
+        "name": "Duration__s",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "SweepMode",
+        "annotation": "str",
+        "default": "'log'"
+      },
+      {
+        "name": "Repeats",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "DelayFraction",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_OCV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_OCV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "RSD_threshold",
+        "annotation": "float",
+        "default": "1"
+      },
+      {
+        "name": "simple_threshold",
+        "annotation": "float",
+        "default": "0.3"
+      },
+      {
+        "name": "signal_change_threshold",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "amplitude_threshold",
+        "annotation": "float",
+        "default": "0.05"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/run_PEIS",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_PEIS",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vinit__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Vamp__V",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "Finit__Hz",
+        "annotation": "float",
+        "default": "1000"
+      },
+      {
+        "name": "Ffinal__Hz",
+        "annotation": "float",
+        "default": "1000000"
+      },
+      {
+        "name": "FrequencyNumber",
+        "annotation": "int",
+        "default": "60"
+      },
+      {
+        "name": "Duration__s",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "SweepMode",
+        "annotation": "str",
+        "default": "'log'"
+      },
+      {
+        "name": "Repeats",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "DelayFraction",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "IRange",
+        "annotation": "EC_IRange",
+        "default": "EC_IRange.AUTO"
+      },
+      {
+        "name": "ERange",
+        "annotation": "EC_ERange",
+        "default": "EC_ERange.AUTO"
+      },
+      {
+        "name": "Bandwidth",
+        "annotation": "EC_Bandwidth",
+        "default": "EC_Bandwidth.BW4"
+      },
+      {
+        "name": "channel",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLduration",
+        "annotation": "float",
+        "default": "1.0"
+      }
+    ]
+  },
+  {
+    "path": "/BIOLOGIC/stop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop",
+    "params": [
+      {
+        "name": "channel",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/stop_private",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_private",
+    "params": [
+      {
+        "name": "channel",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  }
+]

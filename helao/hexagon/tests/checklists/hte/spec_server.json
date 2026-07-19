@@ -1,0 +1,186 @@
+[
+  {
+    "path": "/SPEC_T/acquire_spec",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_spec",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "int_time_ms",
+        "annotation": "int",
+        "default": "35"
+      },
+      {
+        "name": "duration_sec",
+        "annotation": "Optional[float]",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/SPEC_T/acquire_spec_adv",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_spec_adv",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "int_time_ms",
+        "annotation": "int",
+        "default": "35"
+      },
+      {
+        "name": "duration_sec",
+        "annotation": "Optional[float]",
+        "default": "-1"
+      },
+      {
+        "name": "n_avg",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "fft",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "peak_lower_wl",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "peak_upper_wl",
+        "annotation": "Optional[float]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/SPEC_T/acquire_spec_extrig",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_spec_extrig",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "edge_mode",
+        "annotation": "TriggerType",
+        "default": "TriggerType.risingedge"
+      },
+      {
+        "name": "int_time",
+        "annotation": "int",
+        "default": "35"
+      },
+      {
+        "name": "n_avg",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "fft",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/SPEC_T/calibrate_intensity",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "calibrate_intensity",
+    "params": [
+      {
+        "name": "int_time_ms",
+        "annotation": "int",
+        "default": "35"
+      },
+      {
+        "name": "n_avg",
+        "annotation": "int",
+        "default": "3"
+      },
+      {
+        "name": "peak_lower_wl",
+        "annotation": "Optional[float]",
+        "default": "400"
+      },
+      {
+        "name": "peak_upper_wl",
+        "annotation": "Optional[float]",
+        "default": "750"
+      },
+      {
+        "name": "target_peak_min",
+        "annotation": "Optional[float]",
+        "default": "30000"
+      },
+      {
+        "name": "target_peak_max",
+        "annotation": "Optional[float]",
+        "default": "32000"
+      },
+      {
+        "name": "max_iters",
+        "annotation": "int",
+        "default": "5"
+      },
+      {
+        "name": "max_integration_time",
+        "annotation": "int",
+        "default": "150"
+      }
+    ]
+  },
+  {
+    "path": "/SPEC_T/stop_extrig_after",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop_extrig_after",
+    "params": [
+      {
+        "name": "delay",
+        "annotation": "int",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/get_wl",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_wl",
+    "params": []
+  }
+]
