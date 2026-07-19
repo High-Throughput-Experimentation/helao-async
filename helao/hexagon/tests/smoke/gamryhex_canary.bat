@@ -55,14 +55,24 @@ call :run_one gamryhex  "%HEX_JSON%"    || goto :fail
 
 echo.
 echo [canary] diffing openapi surfaces
-call conda run -n helao python "%~dp0openapi_diff.py" "%LEGACY_JSON%" "%HEX_JSON%"
+REM Persist diff output to a file too, so the result survives the window closing.
+call conda run -n helao python "%~dp0openapi_diff.py" "%LEGACY_JSON%" "%HEX_JSON%" > "%OUTDIR%\openapi_diff.txt" 2>&1
 set "DIFF_RC=!errorlevel!"
+type "%OUTDIR%\openapi_diff.txt"
 popd
+echo.
 if "%DIFF_RC%"=="0" (
-  echo [canary] PASS -- gamryhex openapi surface matches legacy gamry
+  echo [canary] PASS -- gamryhex openapi surface matches legacy gamry> "%OUTDIR%\canary_result.txt"
 ) else (
-  echo [canary] DIFFS FOUND -- see output above; artifacts in %OUTDIR%
+  echo [canary] DIFFS FOUND rc=%DIFF_RC% -- see openapi_diff.txt> "%OUTDIR%\canary_result.txt"
 )
+type "%OUTDIR%\canary_result.txt"
+echo [canary] artifacts + result saved in: %OUTDIR%
+echo.
+REM Keep the window open so the result is readable when double-clicked. `pause`
+REM is a no-op if stdin is redirected (non-interactive run), which is fine --
+REM the result is also in %OUTDIR%\canary_result.txt regardless.
+pause
 exit /b %DIFF_RC%
 
 REM ---------------------------------------------------------------------------
@@ -90,7 +100,8 @@ set "UP=0"
 for /l %%i in (1,1,90) do (
   call conda run -n helao python -c "import socket,sys; sys.exit(0 if socket.socket().connect_ex(('127.0.0.1',8001))==0 else 1)" 2>nul
   if !errorlevel! equ 0 ( set "UP=1" & goto :got_port )
-  timeout /t 2 /nobreak >nul
+  REM sleep ~2s via ping; `timeout` errors when stdin is not an interactive console
+  ping -n 3 -w 1000 127.0.0.1 >nul
 )
 :got_port
 if not "%UP%"=="1" (
@@ -99,7 +110,8 @@ if not "%UP%"=="1" (
   call :kill_one
   exit /b 2
 )
-timeout /t 3 /nobreak >nul
+REM settle ~3s (ping, not timeout, to survive redirected stdin)
+ping -n 4 -w 1000 127.0.0.1 >nul
 
 echo [canary] fetching /openapi.json -> %OUTJSON%
 call conda run -n helao python -c "import urllib.request,sys; open(sys.argv[2],'wb').write(urllib.request.urlopen('http://127.0.0.1:8001/openapi.json',timeout=30).read())" x "%OUTJSON%"
@@ -124,4 +136,6 @@ REM ---------------------------------------------------------------------------
 :fail
 popd
 echo [canary] ABORTED -- a launch/fetch step failed; see logs in %OUTDIR%
+echo [canary] ABORTED -- see %PREFIX%.launch.log in %OUTDIR%> "%OUTDIR%\canary_result.txt"
+pause
 exit /b 2
