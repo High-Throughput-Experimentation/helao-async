@@ -32,7 +32,11 @@ REM Guard: refuse an unsafe root (drive/fs anchor, or a root that contains the
 REM code repo) BEFORE anything touches it. safe_root.py is the single choke
 REM point; %ROOT% is only ever used read-only in this script, but the check is
 REM defense in depth against a mis-set root: key. See safe_root.py.
-conda run -n helao python "%~dp0safe_root.py" check "%ROOT%"
+REM NOTE: `conda` is conda.bat on Windows -- every conda call in this script's
+REM own flow MUST be prefixed with `call`, else the parent batch terminates when
+REM conda.bat returns (silent exit). Only the conda inside `start ... cmd /c` is
+REM exempt (it runs in a separate child shell).
+call conda run -n helao python "%~dp0safe_root.py" check "%ROOT%"
 if not "%errorlevel%"=="0" (
   echo [canary] ABORT -- root %ROOT% failed the safety guard; see message above
   exit /b 2
@@ -51,7 +55,7 @@ call :run_one gamryhex  "%HEX_JSON%"    || goto :fail
 
 echo.
 echo [canary] diffing openapi surfaces
-conda run -n helao python "%~dp0openapi_diff.py" "%LEGACY_JSON%" "%HEX_JSON%"
+call conda run -n helao python "%~dp0openapi_diff.py" "%LEGACY_JSON%" "%HEX_JSON%"
 set "DIFF_RC=!errorlevel!"
 popd
 if "%DIFF_RC%"=="0" (
@@ -84,7 +88,7 @@ start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot
 echo [canary] waiting for PSTAT port 8001
 set "UP=0"
 for /l %%i in (1,1,90) do (
-  conda run -n helao python -c "import socket,sys; sys.exit(0 if socket.socket().connect_ex(('127.0.0.1',8001))==0 else 1)" 2>nul
+  call conda run -n helao python -c "import socket,sys; sys.exit(0 if socket.socket().connect_ex(('127.0.0.1',8001))==0 else 1)" 2>nul
   if !errorlevel! equ 0 ( set "UP=1" & goto :got_port )
   timeout /t 2 /nobreak >nul
 )
@@ -98,7 +102,7 @@ if not "%UP%"=="1" (
 timeout /t 3 /nobreak >nul
 
 echo [canary] fetching /openapi.json -> %OUTJSON%
-conda run -n helao python -c "import urllib.request,sys; open(sys.argv[2],'wb').write(urllib.request.urlopen('http://127.0.0.1:8001/openapi.json',timeout=30).read())" x "%OUTJSON%"
+call conda run -n helao python -c "import urllib.request,sys; open(sys.argv[2],'wb').write(urllib.request.urlopen('http://127.0.0.1:8001/openapi.json',timeout=30).read())" x "%OUTJSON%"
 set "FETCH_RC=!errorlevel!"
 
 echo [canary] killing %PREFIX%
@@ -112,7 +116,7 @@ exit /b 0
 
 REM ---------------------------------------------------------------------------
 :kill_one
-conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
+call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
 taskkill /FI "WINDOWTITLE eq %WINTITLE%*" /T /F >nul 2>&1
 goto :eof
 
