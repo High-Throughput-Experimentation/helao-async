@@ -28,6 +28,7 @@ from pathlib import Path
 from harness.manifest import ProvenanceManifest
 
 from helao.hexagon.tests.smoke.golden_capture import (
+    OCV_ACT_YML_MASKED_META_KEYS,
     OCV_HLO_COLUMNS,
     OCV_HLO_ROW_COUNT_TOLERANCE,
     OCV_MASKED_HLO_COLUMNS,
@@ -67,11 +68,15 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.masked_hlo_columns == OCV_MASKED_HLO_COLUMNS
         assert manifest.hlo_row_count_tolerance == OCV_HLO_ROW_COUNT_TOLERANCE
         assert set(OCV_HLO_COLUMNS) == set(manifest.masked_hlo_columns["*OCV*.hlo"])
-        # KNOWN GAP (§3 of the coordinator directive) documented in notes so a
-        # human eyeballing a golden set sees the expected-diff keys directly.
-        assert "t_s__mean_final" in manifest.notes
-        assert "Ewe_V__mean_final" in manifest.notes
-        assert "has_bubble" in manifest.notes
+        # The data-derived -act.yml action_params are masked via masked_meta_keys
+        # (manifest-driven meta-value mask) so parity is a clean PASS when only
+        # those values differ; assert the manifest carries the mask + round-trips.
+        assert manifest.masked_meta_keys == OCV_ACT_YML_MASKED_META_KEYS
+        assert manifest.masked_meta_keys_for("run_OCV__0-act.yml") == [
+            "action_params.t_s__mean_final",
+            "action_params.Ewe_V__mean_final",
+            "action_params.has_bubble",
+        ]
 
 
 def test_snapshot_refuses_to_overwrite_existing_out_dir():

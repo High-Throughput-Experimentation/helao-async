@@ -29,6 +29,7 @@ from harness.treepass import (
 )
 from harness.uuidmap import UuidMapper
 from harness.yaml_pass import (
+    apply_meta_key_mask,
     diff_meta,
     diff_prg,
     load_yml_plain,
@@ -72,6 +73,10 @@ def compare_file(row, norm, gpath, cpath, mg, mc, manifest):
     if row in YAML_ROWS:
         g = normalize_meta(load_yml_plain(gpath), mg)
         c = normalize_meta(load_yml_plain(cpath), mc)
+        mkeys = manifest.masked_meta_keys_for(norm)
+        if mkeys:
+            g = apply_meta_key_mask(g, mkeys)
+            c = apply_meta_key_mask(c, mkeys)
         return diff_meta(g, c)
     if row is ArtifactRow.PRG:
         return diff_prg(load_yml_plain(gpath), load_yml_plain(cpath))

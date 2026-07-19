@@ -92,27 +92,29 @@ OCV_HLO_ROW_COUNT_TOLERANCE = {"*OCV*.hlo": 2, "*OCV*.hlo.json*": 2}
 # Any csv postprocess derived from the masked columns above: line-count only.
 OCV_CONTENT_MASKED_FILES = {"*.csv": "line-count"}
 
-# KNOWN GAP -- NOT covered by masked_hlo_columns (.hlo files only).
-# GamryExec._post_exec (gamry_server2.py ~283-330) writes data-derived
-# summary values into the run's -act.yml action_params: t_s__mean_final,
-# Ewe_V__mean_final, and (run_OCV only) has_bubble. These derive from the
-# exact same live/unmasked measurement and are NOT normalized away by
-# harness.yaml_pass.normalize_meta -- they are plain float/bool leaves under
-# action_params, not uuids/timestamps/host-identity/dropped-env-keys (the
-# §5.5 volatile lists there). harness.parity's diff_meta will therefore
-# ALWAYS report a diff on these three keys between two independent captures,
-# even against the identical dummy cell. This is intentionally left as a
-# documented, eyeballed-by-the-operator expected diff (chosen over inventing
-# a harness masking change): golden_diff.bat persists and prints the full
-# parity report so the operator can confirm the ONLY diffs present are these
-# three action_params keys (plus the already-masked hlo columns above). A
-# bare "FAIL" from harness.parity must NOT be read as a regression without
-# checking the report contents for anything beyond this list.
-ACT_YML_KNOWN_EXPECTED_DIFF_KEYS = (
-    "action_params.t_s__mean_final",
-    "action_params.Ewe_V__mean_final",
-    "action_params.has_bubble",
-)
+# GamryExec._post_exec (gamry_server2.py ~283-330) writes data-derived summary
+# values into the run's -act.yml action_params: t_s__mean_final,
+# Ewe_V__mean_final, and (run_OCV only) has_bubble. These derive from the exact
+# same live/unmasked measurement and are NOT covered by masked_hlo_columns
+# (which masks .hlo files only) nor by harness.yaml_pass.normalize_meta's §5.5
+# volatile lists (they are plain float/bool leaves under action_params, not
+# uuids/timestamps/host-identity). Without masking, harness.parity's diff_meta
+# would report a diff on these three keys between any two independent captures,
+# even against the identical dummy cell.
+#
+# They are masked via the manifest's masked_meta_keys (the meta-side analogue
+# of masked_hlo_columns): parity neutralizes their VALUES on both sides before
+# diffing while keeping the keys present, so the runtime diff is a CLEAN PASS
+# when only these values differ, and a real regression in ANY other key/file
+# still surfaces normally. Pattern is "*-act.yml" (any action yml in this
+# GM-OCV capture set); the keys are no-ops on any yml lacking them.
+OCV_ACT_YML_MASKED_META_KEYS = {
+    "*-act.yml": [
+        "action_params.t_s__mean_final",
+        "action_params.Ewe_V__mean_final",
+        "action_params.has_bubble",
+    ],
+}
 
 
 def run_ocv_action(host: str, port: int, tval_s: float, acq_s: float) -> dict:
@@ -180,11 +182,10 @@ def snapshot(
     config_path = CONFIG_DIR / f"{config_prefix}.yml"
     combined_notes = (
         "REAL-HARDWARE run_OCV capture (dummy cell / cal resistor at-station); "
-        "NOT a simulation -- GamryDriver has no sim/dummy data path. "
-        "KNOWN EXPECTED DIFF (not covered by masked_hlo_columns): -act.yml "
-        f"{', '.join(ACT_YML_KNOWN_EXPECTED_DIFF_KEYS)} are data-derived from "
-        "the live measurement and always differ between captures; eyeball "
-        "the parity report to confirm no OTHER diffs are present."
+        "NOT a simulation -- GamryDriver has no sim/dummy data path. -act.yml "
+        "action_params t_s__mean_final, Ewe_V__mean_final, has_bubble are "
+        "data-derived from the live measurement and are masked via "
+        "masked_meta_keys so parity is a clean PASS when only they differ."
     )
     if notes:
         combined_notes = f"{combined_notes} {notes}"
@@ -207,6 +208,7 @@ def snapshot(
         masked_hlo_columns=OCV_MASKED_HLO_COLUMNS,
         hlo_row_count_tolerance=OCV_HLO_ROW_COUNT_TOLERANCE,
         content_masked_files=OCV_CONTENT_MASKED_FILES,
+        masked_meta_keys=OCV_ACT_YML_MASKED_META_KEYS,
         notes=combined_notes,
     ).save(out_dir)
     return out_dir

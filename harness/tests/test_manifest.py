@@ -42,8 +42,44 @@ def test_optional_masking_fields_default_empty(tmp_path):
     m.masked_hlo_columns = {}
     m.hlo_row_count_tolerance = {}
     m.content_masked_files = {}
+    m.masked_meta_keys = {}
     m.save(tmp_path)
     loaded = ProvenanceManifest.load(tmp_path)
     assert loaded.masked_hlo_columns == {}
     assert loaded.hlo_row_count_tolerance == {}
     assert loaded.content_masked_files == {}
+    assert loaded.masked_meta_keys == {}
+
+
+def test_masked_meta_keys_roundtrip_and_lookup(tmp_path):
+    m = make_manifest()
+    m.masked_meta_keys = {
+        "*-act.yml": ["action_params.t_s__mean_final", "action_params.has_bubble"]
+    }
+    m.save(tmp_path)
+    loaded = ProvenanceManifest.load(tmp_path)
+    assert loaded == m
+    assert loaded.masked_meta_keys_for("run_OCV__0-act.yml") == [
+        "action_params.t_s__mean_final",
+        "action_params.has_bubble",
+    ]
+    assert loaded.masked_meta_keys_for("x-seq.yml") == []
+
+
+def test_old_manifest_without_masked_meta_keys_loads_default_empty(tmp_path):
+    """Backward compat: a provenance.yml captured before masked_meta_keys
+    existed must still load, defaulting the new field to {}."""
+    import dataclasses
+
+    from ruamel.yaml import YAML
+    from harness.manifest import MANIFEST_NAME
+
+    data = dataclasses.asdict(make_manifest())
+    data.pop("masked_meta_keys")  # simulate a pre-field manifest on disk
+    y = YAML(typ="safe")
+    y.default_flow_style = False
+    with open(tmp_path / MANIFEST_NAME, "w") as f:
+        y.dump(data, f)
+    loaded = ProvenanceManifest.load(tmp_path)
+    assert loaded.masked_meta_keys == {}
+    assert loaded.masked_meta_keys_for("a-act.yml") == []
