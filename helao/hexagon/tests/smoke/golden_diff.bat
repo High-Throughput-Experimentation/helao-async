@@ -163,6 +163,11 @@ type "%OUTDIR%\%PREFIX%.capture.log"
 
 echo [golden] killing %PREFIX%
 call :kill_one
+REM Let the exclusive GamryCOM device handle release before the next launch
+REM opens dev_id again -- killing the python server does not instantly free the
+REM out-of-process GamryCOM lock ('CGamryPstat - In use by another script').
+REM ~5s margin between our two sequential captures.
+ping -n 6 -w 1000 127.0.0.1 >nul
 
 if not "%CAPTURE_RC%"=="0" (
   echo [golden] FAIL %PREFIX% capture rc=%CAPTURE_RC%

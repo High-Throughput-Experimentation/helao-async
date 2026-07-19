@@ -126,6 +126,31 @@ OCV_ACT_YML_MASKED_META_KEYS = {
 }
 
 
+def verify_device_open(host: str, port: int) -> None:
+    """Fail fast if the potentiostat COM device did not connect at startup.
+
+    GamryDriver.connect() opens an exclusive COM handle; if another gamry
+    process holds dev_id the open raises ``CGamryPstat - In use by another
+    script`` and the server comes up with a closed pstat. Running run_OCV then
+    just errors with no data (an errored -act.yml, no .hlo). Checking
+    ``/PSTAT/gamry_is_open`` (pstat.TestIsOpen) up front surfaces the real cause
+    instead.
+    """
+    try:
+        r = requests.post(f"http://{host}:{port}/PSTAT/gamry_is_open", timeout=10)
+        is_open = r.status_code == 200 and bool(r.json())
+    except (requests.RequestException, ValueError):
+        is_open = False
+    if not is_open:
+        raise RuntimeError(
+            "PSTAT gamry device is NOT open -- connect() failed at server "
+            "startup (commonly 'CGamryPstat - In use by another script'). "
+            "Another process holds the potentiostat: close the production gamry "
+            "group, the openapi canary, and any leftover python / GamryCOM.exe, "
+            "then re-run. See the PSTAT launch log for the connect traceback."
+        )
+
+
 def run_ocv_action(host: str, port: int, tval_s: float, acq_s: float) -> dict:
     """POST /PSTAT/run_OCV and return the dispatch response (does not block)."""
     r = requests.post(
@@ -341,6 +366,7 @@ def main(argv=None) -> int:
 
     assert_fresh(args.root)
     wait_for_server(PSTAT_HOST, PSTAT_PORT)
+    verify_device_open(PSTAT_HOST, PSTAT_PORT)
     run_ocv_action(PSTAT_HOST, PSTAT_PORT, args.tval, args.acq)
     settle(args.root, settle_polls=args.settle_polls)
     out = snapshot(
