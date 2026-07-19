@@ -50,6 +50,40 @@ def test_content_diff_fails_gate(tmp_path):
     assert report["n_diffs"] >= 1
 
 
+def test_masked_meta_key_neutralizes_act_yml_value(tmp_path):
+    """masked_meta_keys masks a data-derived -act.yml value (the meta-side
+    analogue of masked_hlo_columns): the same diff that fails the gate above
+    passes once the manifest masks that dotted key."""
+    a = make_golden(tmp_path, "runA", seed=0)
+    b = make_golden(tmp_path, "runB", seed=100)
+    act = next((b / "root").rglob("*-act.yml"))
+    act.write_text(act.read_text().replace("duration: 2.0", "duration: 9.0"))
+    # control: unmasked, the differing action_params value fails the gate
+    assert run_parity(a, b)["status"] == "fail"
+    # re-attach the golden manifest WITH the meta mask -> value neutralized on
+    # both sides, gate passes; a real diff in any OTHER key would still fail.
+    attach_manifest(a, meta_masked={"*-act.yml": ["action_params.duration"]})
+    report = run_parity(a, b)
+    assert report["status"] == "pass", report["file_diffs"]
+
+
+def test_masked_meta_key_still_catches_other_diffs(tmp_path):
+    """Masking one action_params key must NOT hide a diff in a different key."""
+    a = make_golden(tmp_path, "runA", seed=0)
+    b = make_golden(tmp_path, "runB", seed=100)
+    act = next((b / "root").rglob("*-act.yml"))
+    # change action_name (not masked) in addition to the masked duration
+    txt = (
+        act.read_text()
+        .replace("duration: 2.0", "duration: 9.0")
+        .replace("action_name: acquire_data", "action_name: something_else")
+    )
+    act.write_text(txt)
+    attach_manifest(a, meta_masked={"*-act.yml": ["action_params.duration"]})
+    report = run_parity(a, b)
+    assert report["status"] == "fail"  # the unmasked action_name diff surfaces
+
+
 def test_report_file_is_written(tmp_path):
     a = make_golden(tmp_path, "runA", seed=0)
     b = make_golden(tmp_path, "runB", seed=100)

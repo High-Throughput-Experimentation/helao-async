@@ -73,34 +73,26 @@ type "%OUTDIR%\parity-report.json"
 
 popd
 echo.
-REM harness.parity reports FAIL/n_diffs^>0 whenever ANY diff exists, and the
-REM run_OCV -act.yml action_params keys below are a KNOWN, ALWAYS-PRESENT diff
-REM (data-derived from the live dummy-cell measurement, not covered by
-REM masked_hlo_columns which only masks .hlo files -- see golden_capture.py's
-REM ACT_YML_KNOWN_EXPECTED_DIFF_KEYS comment for why). This script therefore
-REM does NOT relabel a nonzero parity rc as a blanket PASS/FAIL for the
-REM operator -- it persists the full report and requires a manual eyeball
-REM that file_diffs contains ONLY the three known keys before calling this a
-REM pass. Do not automate that check away without an operator looking at it.
-(
-  echo [golden] parity rc=%PARITY_RC% ^(0=zero diffs; 1=diffs present -- EXPECTED, read below^)
-  echo [golden]
-  echo [golden] KNOWN EXPECTED DIFF -- NOT a regression by itself:
-  echo [golden]   run_OCV -act.yml action_params.t_s__mean_final
-  echo [golden]   run_OCV -act.yml action_params.Ewe_V__mean_final
-  echo [golden]   run_OCV -act.yml action_params.has_bubble
-  echo [golden]   These are data-derived from the live measurement and are NOT
-  echo [golden]   covered by masked_hlo_columns ^(.hlo files only^), so they
-  echo [golden]   ALWAYS differ between two independent real-hardware captures.
-  echo [golden]
-  echo [golden] ACTION REQUIRED: open %OUTDIR%\parity-report.json and confirm
-  echo [golden]   file_diffs contains ONLY the three keys above ^(plus the
-  echo [golden]   already-masked OCV hlo columns, which should show no diff at
-  echo [golden]   all^). ANY OTHER diff -- a different file, a different key, a
-  echo [golden]   tree_diffs entry -- is a REAL hexagon-vs-legacy regression.
-  echo [golden]
-  echo [golden] artifacts: %OUTDIR%\gamry, %OUTDIR%\gamryhex, %OUTDIR%\parity-report.json
-) > "%OUTDIR%\golden_result.txt"
+REM The data-derived run_OCV -act.yml action_params (t_s__mean_final,
+REM Ewe_V__mean_final, has_bubble) are masked via the capture manifest's
+REM masked_meta_keys (see golden_capture.py), so parity rc=0 is a genuine PASS
+REM and rc!=0 means a REAL hexagon-vs-legacy diff. The full report is printed
+REM and persisted above either way for inspection.
+if "%PARITY_RC%"=="0" (
+  (
+    echo [golden] PASS -- gamryhex RUNS-tree matches legacy gamry ^(run_OCV, masked^)
+    echo [golden] artifacts: %OUTDIR%\gamry, %OUTDIR%\gamryhex, %OUTDIR%\parity-report.json
+  ) > "%OUTDIR%\golden_result.txt"
+) else (
+  (
+    echo [golden] DIFFS FOUND rc=%PARITY_RC% -- REAL regression, inspect the report
+    echo [golden] open %OUTDIR%\parity-report.json: tree_diffs / file_diffs list
+    echo [golden]   every differing member and key. The three data-derived
+    echo [golden]   run_OCV action_params keys are masked, so anything shown
+    echo [golden]   here is a genuine hexagon-vs-legacy difference.
+    echo [golden] artifacts: %OUTDIR%\gamry, %OUTDIR%\gamryhex, %OUTDIR%\parity-report.json
+  ) > "%OUTDIR%\golden_result.txt"
+)
 type "%OUTDIR%\golden_result.txt"
 echo.
 REM Keep the window open so the result is readable when double-clicked. `pause`
