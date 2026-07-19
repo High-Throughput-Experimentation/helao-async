@@ -27,10 +27,17 @@ A sub-project may legitimately hold at **"Linux-green, awaiting station"** (spec
 
 ## Sub-project decomposition & dependency order
 
+**Architecture pin (verified against the P2 graft, 2026-07-18):** the hexagon `makeActionApp` graft reroutes only the **write/status path** (`base.contain_action`, `base.meta_writer`, `active.data_stream`/`data_file_writer`/`action_finalizer`) via instance-rebind. It does **NOT** touch `app.driver` — the legacy driver instance stays live (`HardwarePort` in `wiring.py:73` is an unused `Optional=None` stub as of P2). Therefore:
+
+- **hte cut-over parity is reached by graft-wrapping the legacy servers (P3b) with their legacy drivers intact** — exactly as P2 did for the SIM server. The per-station golden-diff gate certifies this.
+- **Native Hardware adapters (P3a) are a parallel native-replacement track, NOT a P3b prerequisite.** Spec still wants them landed (shared Gamry/NI/motion + `TransformXY` are reused by P4/P5, and native replacement is the end state), but they do not block hte parity. P3a and P3b proceed independently; P3a's shared adapters gate P4/P5, not P3.
+- **Runtime caveat:** hte legacy drivers are Windows-only and won't import/run on Linux, so P3b's *runtime* graft is exercised at-station. P3b's Linux-green portion is limited to shim compile/import + the static endpoint checklist (P3-pre). P3a native adapters, by contrast, ARE Linux construct/import-sweep testable (lazy vendor imports, §11.1) — making P3a the more Linux-productive track.
+
 ```
-P3-pre ──► P3a ──► P3b ──► P3e (config shims + preflight)
-              └──► P3c ──┘
-              └──► P3d ──┘
+P3-pre ─┬─► P3b (graft-wrap 23 servers; parity critical path) ─► P3e (config cut-over + station gate)
+        ├─► P3c (libraries — import-only, no driver dep) ───────┘
+        ├─► P3d (vis + operator) ───────────────────────────────┘
+        └─► P3a (native Hardware adapters; parallel track, gates P4/P5, Linux-testable)
 ```
 
 ### P3-pre — Dependent-surface inventory + endpoint-extraction checklist  *(MANDATORY FIRST — Linux-complete)*
@@ -38,7 +45,7 @@ P3-pre ──► P3a ──► P3b ──► P3e (config shims + preflight)
 **Scope:** (1) AST endpoint-extraction harness run over all 23 legacy `makeApp` modules → frozen per-server checklist artifacts (route path/method/tags/param names+types+defaults, incl. config-shaped dynamic enums extracted with a target config so `drv.dev_*` signatures materialize); (2) member-surface audit (§8.2 — grep-derived `app.*`/`base.*`/`active.*`/`dyn_endpoints`/`poller_class`/`server_params` usage per server); (3) dependent-surface inventory (§8.3(3) — exp/seq library imports, `active.*`/`base.*` member usage, config references to shared modules, `bokeh_port` claims); (4) flat-namespace collision scan (CCSI/CSIL, ECHEUVIS_postseq). No production code changes — tooling + committed audit artifacts under `helao/hexagon/tests/checklists/hte/`.
 **Gate:** artifacts committed; collision scan enumerates the two known hazards + any others; extraction reproducible via a committed script.
 
-### P3a — Shared Hardware adapter substrate + driver conformance  *(dependency root — Linux-complete for construct/import; hardware exercise deferred)*
+### P3a — Shared Hardware adapter substrate + driver conformance  *(parallel native track; gates P4/P5, not P3; Linux-complete for construct/import; hardware exercise deferred)*
 **Scope:** bind the ~18 hte drivers to `HardwarePort` (`helao/hexagon/adapters/legacy/hardware.py` `LegacyDriverHardwareAdapter` for clean serial/HTTP/compute; net-new adapters for the special cases). **P2 wired NO real hardware** (`wiring.py:73` stub) — this is net-new. Includes: lazy adapter-scoped vendor imports (§11.1) + Linux import-sweep CI test; per-driver `_METHOD_MAP` refinement; `ExclusiveAccess` port for poller-mutex drivers (AliCat/legato/sensors); empty-`DriverResponse()`=skip-sample sentinel formalized; the two Galil `{err_code:ErrorCodes}` command surfaces mapped once. **4 special-case splits:**
   - **PAL** — 4-way (§4.4 #1): transport / trigger / sample-reconciliation policy / job-context(DataSink) port. **Wrap-then-split**: port PAL as a single adapter behind the job-context port to parity first, split internals after (largest single item; may sub-phase P3a-PAL).
   - **galil_motion** — 3-way + aligner (D6, §4.4 #2): gclib motion adapter / pure `TransformXY` domain service + calibration storage port / Bokeh Aligner→visualizer adapter. `TransformXY` lifted whole (Base-free ~370 LOC); shared with P4 ThorlabsMotor.
@@ -78,4 +85,8 @@ P3-pre ──► P3a ──► P3b ──► P3e (config shims + preflight)
 
 ## Execution note
 
-P3-pre and P3a are the immediate work. P3-pre is Linux-complete and mandatory-first. P3a is the dependency root for P3b/P3c/P3d and for P4/P5. P3c/P3d can proceed in parallel with P3b once P3a lands the aligner extraction (P3d dependency). The terminal per-station hardware gate (P3e) is a hard stop requiring station access — it will be surfaced explicitly, not guessed through.
+P3-pre is Linux-complete and mandatory-first — **DONE** (branch `feat/p3-pre-hte-inventory`, 92 harness tests green; frozen checklists + member/dependent-surface audits + collision scan committed).
+
+Given the architecture pin above, the two Linux-productive next tracks are **P3a** (native Hardware adapters — construct/import-sweep testable on Linux, gates P4/P5) and **P3c** (libraries — import + collision-check, no driver dependency). **P3b** and **P3d** are shim-scaffold on Linux but runtime-exercised at-station. The terminal per-station hardware gate (P3e) is a hard stop requiring station access — surfaced explicitly, not guessed through.
+
+Note: P3d's aligner-panel wiring depends on P3a's galil_motion aligner extraction (D6); schedule that split early in P3a if P3d is pulled forward.
