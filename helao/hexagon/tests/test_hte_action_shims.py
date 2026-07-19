@@ -1,4 +1,4 @@
-"""P3b slice-1: import-only checks for the hexagon hte action-server shims.
+"""P3b: import-only checks for the hexagon hte action-server shims.
 
 Each shim under helao.deploy.hexagon.servers.action must import cleanly,
 expose a callable makeApp, and declare a LEGACY_MODULE string pointing at
@@ -32,6 +32,10 @@ HTE_ACTION_SHIM_MODULES = [
     "spec_server",
     "syringe_server",
     "tec_server",
+    # P3b-2: dbpack (HelaoSyncer; legacy syncer kept — native-sync cut-over is a
+    # separate P2e-style step) + analysis (config-driven analyze_ endpoints).
+    "dbpack_server",
+    "analysis_server",
 ]
 
 
