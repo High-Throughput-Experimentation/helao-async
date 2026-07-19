@@ -1,0 +1,33 @@
+# HEXAGON CANARY for the gamry station (P3e). Copy of gamry.yml with
+# `deployment: hexagon` flipping PSTAT (gamry_server2) and ACTVIS
+# (action_visualizer) onto the hexagon factory — the first hte cut-over
+# target, run AT-STATION (Windows/COM). gamry.yml stays legacy for rollback;
+# the cut-over is ONLY the two `deployment: hexagon` keys. Ports/root/params
+# match gamry.yml so an on-station golden diff (§6.6) compares like-for-like.
+dummy: true
+simulation: true
+run_type: gamry
+root: C:\INST_hlo
+alert_config_path: C:\INST_hlo\USER_CONFIG\alert_gamry.yml
+servers:
+  PSTAT:
+    host: 127.0.0.1
+    port: 8001
+    group: action
+    fast: gamry_server2
+    deployment: hexagon
+    action_vis: gamry_vis
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'PSTAT Visualizer'
+      launch_browser: true
