@@ -12,7 +12,6 @@ completion.
 import time
 import asyncio
 import numpy as np
-import comtypes.client as client
 
 from .signal import ControlMode
 from helao.core.drivers.helao_driver import (
@@ -25,7 +24,9 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-async def measure_ocv(pstat, gamrycom, duration: float = 2.0, acquisition_period: float = 0.1) -> tuple:
+async def measure_ocv(
+    pstat, gamrycom, duration: float = 2.0, acquisition_period: float = 0.1
+) -> tuple:
     """Measure open-circuit voltage by polling ``pstat.MeasureV`` while the cell is off.
 
     Args:
@@ -47,6 +48,7 @@ async def measure_ocv(pstat, gamrycom, duration: float = 2.0, acquisition_period
         await asyncio.sleep(acquisition_period)
     ts, vs = list(zip(*data))
     return list(ts), list(vs)
+
 
 class ReadZ:
     """Helper around a GamryCOM ``ReadZ`` dtaq for single-frequency EIS.
@@ -119,6 +121,8 @@ class ReadZ:
         Returns:
             ``DriverResponse`` reporting initialization status.
         """
+        import comtypes.client as client
+
         try:
             self.events = client.GetEvents(self.dtaq, self.dtaqsink)
             self.pstat.SetAchSelect(self.GamryCOM.GND)
@@ -278,6 +282,8 @@ class ReadZ:
             (``busy``/``retry``/``error``/``ok``) and whose ``data`` contains
             the impedance result dict only once the sink is done.
         """
+        import comtypes.client as client
+
         try:
             client.PumpEvents(pump_rate)
             time.sleep(0.1)

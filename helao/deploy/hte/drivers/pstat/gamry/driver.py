@@ -17,8 +17,6 @@ sys.coinit_flags = 0x0
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-import comtypes
-import comtypes.client as client
 import psutil
 import time
 from enum import Enum
@@ -101,6 +99,8 @@ class GamryDriver(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
+        import comtypes.client as client
+
         try:
             self.connection_raised = True
             LOGGER.info(f"using device_id {self.device_id} from config")
@@ -194,6 +194,9 @@ class GamryDriver(HelaoDriver):
             KeyError: If the resolved signal parameters are missing keys
                 required by the technique.
         """
+        import comtypes
+        import comtypes.client as client
+
         try:
             # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
@@ -357,6 +360,9 @@ class GamryDriver(HelaoDriver):
             ``DriverResponse`` with ``status=busy`` and the wall-clock
             ``start_time`` in ``data`` on success.
         """
+        import comtypes
+        import comtypes.client as client
+
         try:
             # emit TTL output
             ttl_send = ttl_params.get("TTLsend", -1)
@@ -403,6 +409,8 @@ class GamryDriver(HelaoDriver):
             active dtaq to a list of new samples since the previous call, and
             whose ``status`` is ``busy`` while points are still arriving.
         """
+        import comtypes.client as client
+
         try:
             client.PumpEvents(pump_rate)
             total_points = len(self.dtaqsink.acquired_points)
@@ -642,6 +650,8 @@ class GamryDriver(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting EIS setup status.
         """
+        import comtypes.client as client
+
         try:
             # check for ongoing measurement via dtaqsink
             if not isinstance(self.dtaqsink, DummySink):
