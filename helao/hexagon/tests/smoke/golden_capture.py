@@ -129,27 +129,58 @@ def run_ocv_action(host: str, port: int, tval_s: float, acq_s: float) -> dict:
     return r.json()
 
 
+def _run_artifacts(root: Path) -> tuple:
+    """(-act.yml paths, .hlo paths) anywhere under root's captured run trees."""
+    root = Path(root)
+    return (
+        sorted(str(p) for p in root.rglob("*-act.yml")),
+        sorted(str(p) for p in root.rglob("*.hlo")),
+    )
+
+
 def settle(
     root: Path,
     settle_polls: int = 3,
     poll_s: float = 2.0,
     timeout_s: float = 300.0,
 ) -> None:
-    """Settle with NO orch/DB in this topology: RUNS_ACTIVE emptying only.
+    """Wait for the run_OCV action to actually WRITE and FINISH, then settle.
 
-    Mirrors ``harness.capture.run_gm3``'s manual-action settle (that scenario
-    is also orch-less), generalized into consecutive-clean-poll form like
-    ``harness.capture.quiesce``.
+    NO orch/DB in this topology, AND a manual direct-POST action writes to
+    RUNS_DIAG (base.py:1016) and never touches RUNS_ACTIVE -- so polling
+    ``runs_active_empty`` alone returns before any file exists, snapshotting an
+    empty tree that then passes parity vacuously. Instead: require at least one
+    ``-act.yml`` AND one ``.hlo`` to be present (the action ran and emitted
+    data), ``RUNS_ACTIVE`` empty (nothing in flight), and the total artifact
+    count stable across ``settle_polls`` consecutive polls. If the action
+    errored or produced no data, this raises TimeoutError -- a loud failure,
+    never a silent empty capture.
     """
     root = Path(root)
     t0 = time.time()
-    settled = 0
+    stable = 0
+    last = None
     while time.time() - t0 < timeout_s:
-        settled = settled + 1 if runs_active_empty(root) else 0
-        if settled >= settle_polls:
+        acts, hlos = _run_artifacts(root)
+        count = len(acts) + len(hlos)
+        ready = bool(acts) and bool(hlos) and runs_active_empty(root)
+        if ready and count == last:
+            stable += 1
+        elif ready:
+            stable = 1
+        else:
+            stable = 0
+        if stable >= settle_polls:
             return
+        last = count
         time.sleep(poll_s)
-    raise TimeoutError(f"{root} RUNS_ACTIVE did not settle after {timeout_s}s")
+    acts, hlos = _run_artifacts(root)
+    raise TimeoutError(
+        f"{root}: run_OCV produced no completed artifacts after {timeout_s}s "
+        f"(-act.yml={len(acts)}, .hlo={len(hlos)}). The action likely errored "
+        "or wrote no data -- check the launch/capture logs. Refusing to "
+        "snapshot an empty tree that would pass parity trivially."
+    )
 
 
 def snapshot(
@@ -169,6 +200,17 @@ def snapshot(
     if out_dir.exists():
         raise FileExistsError(
             f"{out_dir} already exists; refusing to overwrite a capture"
+        )
+    # Anti-vacuous-pass guard: an empty capture (no action output) compares to
+    # nothing and passes parity trivially. Refuse it here, before writing
+    # anything, so a false PASS is impossible even if settle() were bypassed.
+    acts, hlos = _run_artifacts(root)
+    if not acts or not hlos:
+        raise RuntimeError(
+            f"{root} has no run_OCV output to capture (-act.yml={len(acts)}, "
+            f".hlo={len(hlos)}); refusing a vacuous capture that would pass "
+            "parity with 0 diffs. Check the launch/capture logs -- the action "
+            "may have errored or produced no data."
         )
     out_root = out_dir / "root"
     out_root.mkdir(parents=True)

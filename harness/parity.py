@@ -128,6 +128,20 @@ def run_parity(
             if fdiffs:
                 file_diffs[norm] = fdiffs
         consistency = internal_s3_checks(g_ex) + internal_s3_checks(c_ex)
+        # F1 guard: an empty golden set has nothing to compare and would PASS
+        # with 0 diffs vacuously (e.g. a capture that snapshotted before the run
+        # wrote any output). A golden master with no comparable files is never
+        # legitimate -- fail loudly instead.
+        if not g_snap.files:
+            consistency.append(
+                {
+                    "check": "empty_golden",
+                    "detail": (
+                        "golden set has 0 comparable files; refusing a vacuous "
+                        "0-diff pass (capture likely produced no run output)"
+                    ),
+                }
+            )
     n_diffs = (
         len(tree_diffs) + sum(len(v) for v in file_diffs.values()) + len(consistency)
     )
