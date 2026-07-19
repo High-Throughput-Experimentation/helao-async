@@ -1,4 +1,4 @@
-# P1b1 SMOKE config (hexagon-composed ORCH + SIM; legacy sim DB).
+# SMOKE config (hexagon-composed ORCH + SIM + DB; P2e sync cut-over).
 # Copy of golden.yml minus the bokeh servers (vis/operator hosting is P2),
 # with `deployment: hexagon` flipping ORCH and SIM onto the hexagon factory.
 # Ports match golden.yml so harness/capture.py works unmodified.
@@ -40,6 +40,7 @@ servers:
     port: 8010
     group: action
     fast: sim_db_server
+    deployment: hexagon
     params:
       aws_bucket: helao-sim
       s3_record: true
