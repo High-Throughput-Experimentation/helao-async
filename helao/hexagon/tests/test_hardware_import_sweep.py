@@ -17,11 +17,11 @@ SLICE1_MODULES = [
     "motion.kinesis_driver",
     "pump.simdos_driver",
     "robot.pal_driver",
+    "io.nidaqmx_driver",
 ]
 SLICE2_MODULES = [
     "spec.andor.driver",
     "pstat.biologic.driver",
-    "io.nidaqmx_driver",
 ]
 
 
