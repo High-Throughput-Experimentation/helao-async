@@ -16,12 +16,12 @@ SLICE1_MODULES = [
     "io.synaccess.driver",
     "motion.kinesis_driver",
     "pump.simdos_driver",
+    "robot.pal_driver",
 ]
 SLICE2_MODULES = [
     "spec.andor.driver",
     "pstat.biologic.driver",
     "io.nidaqmx_driver",
-    "robot.pal_driver",
 ]
 
 
