@@ -81,12 +81,21 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         ]
 
 
-def _write_completed_run(root: Path) -> None:
-    """A RUNS_DIAG tree with one completed manual action: -act.yml + .hlo."""
+def _write_action(root: Path, status: str = "finished", with_hlo: bool = True) -> Path:
+    """A RUNS_DIAG tree with one manual action -act.yml at ``status`` (+ .hlo)."""
     d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__PSTAT__run_OCV"
     d.mkdir(parents=True)
-    (d / "250716.131421-act.yml").write_text("file_type: action\n")
-    (d / "PSTAT-OCV-0.hlo").write_text("hlo_version: x\n%%\n")
+    (d / "250716.131421-act.yml").write_text(
+        f"file_type: action\naction_status:\n  - {status}\n"
+    )
+    if with_hlo:
+        (d / "PSTAT-OCV-0.hlo").write_text("hlo_version: x\n%%\n")
+    return d
+
+
+def _write_completed_run(root: Path) -> None:
+    """A RUNS_DIAG tree with one completed (finished) manual action: -act.yml + .hlo."""
+    _write_action(root, status="finished", with_hlo=True)
 
 
 def test_snapshot_refuses_to_overwrite_existing_out_dir():
@@ -152,31 +161,48 @@ def test_settle_times_out_when_no_artifacts_are_written():
             raise AssertionError("settle() should time out when no artifacts appear")
 
 
-def test_settle_returns_with_act_yml_only_no_hlo():
-    """Observed at-station: manual run_OCV emits -act.yml but no .hlo (both
-    configs). settle must NOT require a .hlo (would hang) -- an -act.yml with
-    RUNS_ACTIVE empty is a completed action."""
+def test_settle_returns_with_terminal_status_no_hlo():
+    """A finished action with no .hlo (run_OCV emitted none) still settles --
+    settle gates on terminal action_status, not on a .hlo."""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
-        d = root / "RUNS_DIAG" / "0__0__PSTAT__run_OCV"
-        d.mkdir(parents=True)
-        (d / "250716.131421-act.yml").write_text("file_type: action\n")  # no .hlo
+        _write_action(root, status="finished", with_hlo=False)
         settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
 
 
-def test_snapshot_succeeds_with_act_yml_only():
-    """snapshot captures an -act.yml-only tree (warns about the missing .hlo but
-    does not refuse -- the -act.yml is still a real parity comparison)."""
+def test_settle_does_not_return_while_action_active():
+    """THE core fix: -act.yml exists at init with status 'active' (base.py:1029).
+    settle must NOT return on file existence -- else it snapshots + kills the
+    server mid-measurement (observed: a captured -act.yml frozen at 'active')."""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
-        d = root / "RUNS_DIAG" / "0__0__PSTAT__run_OCV"
-        d.mkdir(parents=True)
-        (d / "250716.131421-act.yml").write_text("file_type: action\n")  # no .hlo
+        _write_action(root, status="active", with_hlo=False)  # still running
+        try:
+            settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
+        except TimeoutError:
+            pass
+        else:
+            raise AssertionError("settle() must not return while status is 'active'")
+
+
+def test_settle_returns_on_errored_status():
+    """An errored action IS terminal -- settle returns (snapshot then WARNS)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="errored", with_hlo=False)
+        settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
+
+
+def test_snapshot_succeeds_with_terminal_act_yml_only():
+    """snapshot captures a finished -act.yml-only tree (warns about the missing
+    .hlo but does not refuse -- the -act.yml is still a real parity comparison)."""
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_action(root, status="finished", with_hlo=False)
         out = Path(td) / "golden" / "run1"
         snapshot(
             root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
         )
-        assert (out / "root" / "RUNS_DIAG" / "0__0__PSTAT__run_OCV").exists()
         assert (out / "provenance.yml").exists()
 
 
@@ -186,8 +212,10 @@ ALL_TESTS = [
     test_snapshot_refuses_empty_capture,
     test_settle_returns_once_action_artifacts_are_complete_and_stable,
     test_settle_times_out_when_no_artifacts_are_written,
-    test_settle_returns_with_act_yml_only_no_hlo,
-    test_snapshot_succeeds_with_act_yml_only,
+    test_settle_returns_with_terminal_status_no_hlo,
+    test_settle_does_not_return_while_action_active,
+    test_settle_returns_on_errored_status,
+    test_snapshot_succeeds_with_terminal_act_yml_only,
 ]
 
 

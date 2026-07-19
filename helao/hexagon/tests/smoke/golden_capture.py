@@ -22,9 +22,11 @@ orch-less, db-less gamry/gamryhex 2-server topology (PSTAT@8001 + ACTVIS@5001
 only -- no ORCH, no DB). ``harness.capture``'s ``quiesce``/``orch_stopped``/
 ``db_drained`` assume an orchestrator + DB server and do not apply here (see
 the rationale already recorded in ``gamryhex_canary.bat``, which hit the same
-topology gap for the openapi-diff canary). Settling is done by polling
-``harness.capture.runs_active_empty`` alone, the same primitive
-``harness.capture.run_gm3`` uses for its own orch-less manual action.
+topology gap for the openapi-diff canary). Settling gates on the action's -act.yml reaching a
+TERMINAL ``action_status`` (finished/errored) -- NOT on the file existing,
+because a manual action writes its -act.yml at init with status "active"
+(base.py:1029) and only rewrites it terminal at finish; settling on existence
+would snapshot + kill the server mid-measurement.
 
 Usage (AT-STATION, Windows, conda env ``helao``) -- ATTACH THE DUMMY CELL /
 CAL RESISTOR FIRST:
@@ -57,6 +59,13 @@ from harness import HARNESS_VERSION
 from harness.capture import assert_fresh, runs_active_empty, wait_for_server
 from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
+from harness.yaml_pass import load_yml_plain
+
+# HloStatus terminal states. A manual action's -act.yml is written at init with
+# status "active" (base.py:1029 update_act_file) and only REWRITTEN with a
+# terminal status at finish (write_act). Settling on the file's mere existence
+# therefore snapshots + kills mid-measurement; settle on a terminal status.
+TERMINAL_STATUSES = ("finished", "errored")
 
 PSTAT_HOST, PSTAT_PORT = "127.0.0.1", 8001
 
@@ -138,6 +147,34 @@ def _run_artifacts(root: Path) -> tuple:
     )
 
 
+def _act_status_map(root: Path) -> dict:
+    """{-act.yml path: action_status list}. A file that is missing/partial/
+    unreadable (mid-write) yields [] -> treated as not-yet-terminal."""
+    out: dict = {}
+    for a in Path(root).rglob("*-act.yml"):
+        try:
+            data = load_yml_plain(a)
+            st = data.get("action_status") or []
+        except Exception:
+            st = []
+        if isinstance(st, str):
+            st = [st]
+        out[str(a)] = list(st)
+    return out
+
+
+def _actions_complete(root: Path) -> bool:
+    """True iff >=1 -act.yml exists and EVERY -act.yml has a terminal status.
+
+    The -act.yml is written at action init with status "active" and only
+    rewritten terminal at finish, so file existence alone is NOT completion.
+    """
+    m = _act_status_map(root)
+    if not m:
+        return False
+    return all(any(s in TERMINAL_STATUSES for s in sts) for sts in m.values())
+
+
 def settle(
     root: Path,
     settle_polls: int = 3,
@@ -156,12 +193,16 @@ def settle(
     polls. If no ``-act.yml`` ever appears the action errored -> TimeoutError
     (loud failure, never a silent empty capture).
 
-    NOTE: ``.hlo`` presence is intentionally NOT required here. Observed
-    at-station: manual run_OCV emits an -act.yml but no .hlo (for BOTH legacy
-    and hexagon), i.e. no streamed data file. That is a measurement/data-path
-    question, not a capture-timing one, so it must not hang settling; snapshot()
-    warns about it instead. The -act.yml (with its masked derived params) is
-    still a real parity comparison between legacy and hexagon.
+    Completion is gated on the -act.yml's action_status reaching a TERMINAL
+    state (finished/errored), NOT on the file merely existing -- the file is
+    written at init with status "active" (base.py:1029), so existence-based
+    settling snapshots + kills the server MID-MEASUREMENT (observed: a captured
+    -act.yml frozen at "active"). Also require RUNS_ACTIVE empty and the
+    artifact count stable across ``settle_polls`` consecutive polls.
+
+    NOTE: ``.hlo`` presence is intentionally NOT required here (a run that
+    errors emits none); snapshot() warns about a missing/errored result
+    instead, so settling never hangs on it.
     """
     root = Path(root)
     t0 = time.time()
@@ -170,7 +211,7 @@ def settle(
     while time.time() - t0 < timeout_s:
         acts, hlos = _run_artifacts(root)
         count = len(acts) + len(hlos)
-        ready = bool(acts) and runs_active_empty(root)
+        ready = _actions_complete(root) and runs_active_empty(root)
         if ready and count == last:
             stable += 1
         elif ready:
@@ -181,12 +222,12 @@ def settle(
             return
         last = count
         time.sleep(poll_s)
-    acts, hlos = _run_artifacts(root)
+    statuses = _act_status_map(root)
     raise TimeoutError(
-        f"{root}: run_OCV wrote no -act.yml after {timeout_s}s "
-        f"(-act.yml={len(acts)}, .hlo={len(hlos)}). The action likely errored "
-        "-- check the launch/capture logs. Refusing to snapshot an empty tree "
-        "that would pass parity trivially."
+        f"{root}: run_OCV did not reach a terminal action_status after "
+        f"{timeout_s}s (statuses={statuses}). The action is stuck active or "
+        "never wrote -- check the launch/capture logs. Refusing to snapshot a "
+        "mid-flight tree."
     )
 
 
@@ -220,6 +261,14 @@ def snapshot(
             f"{root} has no -act.yml to capture; refusing a vacuous capture "
             "that would pass parity with 0 diffs. Check the launch/capture "
             "logs -- the action may have errored or produced no output."
+        )
+    errored = [p for p, st in _act_status_map(root).items() if "errored" in st]
+    if errored:
+        print(
+            f"[golden_capture] WARNING: {len(errored)} action(s) ERRORED and were "
+            f"still captured: {errored}. An errored run is NOT a valid parity "
+            "baseline (it likely produced no data / partial output). Check the "
+            "-act.yml error fields and the PSTAT log before trusting a PASS."
         )
     if not hlos:
         print(
