@@ -63,3 +63,27 @@ def test_kinesis_constructs_without_connecting(monkeypatch):
     )
     assert calls == [], "KinesisMotor.__init__ must not connect to hardware"
     assert isinstance(LegacyDriverHardwareAdapter(drv), HardwarePort)
+
+
+DISCONNECTED_CONSTRUCT = [
+    ("io.galil_io_driver", "Galil"),
+    ("motion.galil_motion_driver", "Galil"),
+    ("sensor.cm0134_driver", "CM0134"),
+    ("sensor.sprintir_driver", "SprintIR"),
+    ("io.synaccess.driver", "NetbooterDriver"),
+    ("pump.simdos_driver", "SIMDOS"),
+    # NOT disconnected-construct (excluded, not weakened - recorded as findings):
+    # - pstat.gamry.driver.GamryDriver: __init__ calls self.connect()
+    #   unconditionally (same §10.4 constructor-connect pattern as
+    #   KinesisMotor); out of scope for this plan.
+    # - temperature_control.mecom_driver.MeerstetterTEC: __init__ requires
+    #   config["channel"]/config["port"] with no default, raising a plain
+    #   KeyError on config={}; unrelated to vendor imports.
+]
+
+
+@pytest.mark.parametrize("mod,cls", DISCONNECTED_CONSTRUCT)
+def test_adapter_is_hardware_port(mod, cls):
+    klass = getattr(importlib.import_module(BASE + mod), cls)
+    drv = klass(config={})
+    assert isinstance(LegacyDriverHardwareAdapter(drv), HardwarePort)
