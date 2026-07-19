@@ -11,7 +11,6 @@ __all__ = ["CM0134", "CM0134Poller", "O2MonExec"]
 import time
 import asyncio
 import serial
-import minimalmodbus
 
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
@@ -66,6 +65,8 @@ class CM0134(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
+        import minimalmodbus
+
         try:
             self.inst = minimalmodbus.Instrument(
                 self.config_dict.get("device", "COM7"),
@@ -131,6 +132,8 @@ class CM0134(HelaoDriver):
 
     def read_o2_ppm(self):
         """Read one O2 ppm value from the sensor, or ``None`` on a transient error."""
+        import minimalmodbus
+
         try:
             o2_level = self.inst.read_register(1, functioncode=4) * 10
         except minimalmodbus.NoResponseError as err:
