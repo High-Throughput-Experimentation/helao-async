@@ -32,7 +32,13 @@ def test_slice1_driver_imports_on_linux(mod):
 
 @pytest.mark.parametrize("mod", SLICE2_MODULES)
 @pytest.mark.xfail(
-    reason="P3a-2: deeper lazy-import/constructor refactor pending", strict=False
+    reason="P3a-2: biologic/technique.py references blp.OCV/CA/CV/PEIS/GEIS/CP "
+    "at module scope (technique registry built at import) plus an "
+    "`easy_class: BiologicProgram` class annotation — lazy-import requires a "
+    "registry restructure (store technique names/factories, resolve "
+    "getattr(blp, ...) at use), not an import move. Deferred to the biologic "
+    "native-adapter work.",
+    strict=False,
 )
 def test_slice2_driver_imports_on_linux(mod):
     importlib.import_module(BASE + mod)
