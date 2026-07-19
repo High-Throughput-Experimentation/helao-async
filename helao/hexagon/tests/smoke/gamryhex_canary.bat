@@ -128,8 +128,14 @@ exit /b 0
 
 REM ---------------------------------------------------------------------------
 :kill_one
+REM 1) kill the action/vis servers via their pid pickle.
 call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
-taskkill /FI "WINDOWTITLE eq %WINTITLE%*" /T /F >nul 2>&1
+REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
+REM matching its command line -- precise, so it can never hit the canary console.
+REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
+REM through a shared conhost.exe and close the main canary window.
+REM The match includes " --no-hot-reload" so prefix "gamry" cannot match "gamryhex".
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 goto :eof
 
 REM ---------------------------------------------------------------------------
