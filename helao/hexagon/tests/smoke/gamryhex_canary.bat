@@ -28,6 +28,16 @@ if "%ROOT%"=="" set "ROOT=C:\INST_hlo"
 set "OUTDIR=%~2"
 if "%OUTDIR%"=="" set "OUTDIR=%TEMP%\gamryhex_canary"
 
+REM Guard: refuse an unsafe root (drive/fs anchor, or a root that contains the
+REM code repo) BEFORE anything touches it. safe_root.py is the single choke
+REM point; %ROOT% is only ever used read-only in this script, but the check is
+REM defense in depth against a mis-set root: key. See safe_root.py.
+conda run -n helao python "%~dp0safe_root.py" check "%ROOT%"
+if not "%errorlevel%"=="0" (
+  echo [canary] ABORT -- root %ROOT% failed the safety guard; see message above
+  exit /b 2
+)
+
 REM repo root = four levels up from this script (helao\hexagon\tests\smoke\)
 pushd "%~dp0..\..\..\.." || exit /b 2
 set "REPO=%CD%"
