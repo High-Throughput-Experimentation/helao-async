@@ -5,12 +5,12 @@ spectrograph control library so the action server can capture spectra,
 manage cooling and select grating/filter/slit settings.
 """
 
-from pyAndorSDK3 import AndorSDK3, CameraException
+from __future__ import annotations
+
 import numpy as np
 import time as time
 import pandas as pd
 from typing import Optional
-from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
@@ -23,6 +23,15 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
     DriverResponseType,
 )
+
+
+# Andor SDKs (pyAndorSDK3 / pyAndorSpectrograph) are vendor runtimes; import
+# them lazily so the module imports on a vendor-less Linux box (§11.1).
+# Called before the camera/spectrograph is first touched.
+def _load_andor():
+    global AndorSDK3, CameraException, ATSpectrograph
+    from pyAndorSDK3 import AndorSDK3, CameraException
+    from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 
 class AndorDriver(HelaoDriver):
@@ -74,6 +83,7 @@ class AndorDriver(HelaoDriver):
 
         self.timeout = 5000
 
+        _load_andor()
         self.sdk3 = AndorSDK3()
         self.device_id = self.config.get("dev_id", 0)
         LOGGER.info(f"using device_id {self.device_id} from config")
@@ -331,6 +341,7 @@ class AndorDriver(HelaoDriver):
             LOGGER.info("Slit width is too low")
             return
         # Load libraries
+        _load_andor()
         spc = ATSpectrograph()
 
         # Initialize libraries
@@ -364,7 +375,7 @@ class AndorDriver(HelaoDriver):
                     )
                 )
 
-                (shm, grat) = spc.GetGrating(0)
+                shm, grat = spc.GetGrating(0)
                 LOGGER.info("Function GetGrating returned: {} Grat".format(grat))
 
                 shm = spc.SetWavelength(0, centralWL)
@@ -374,14 +385,14 @@ class AndorDriver(HelaoDriver):
                     )
                 )
 
-                (shm, wave) = spc.GetWavelength(0)
+                shm, wave = spc.GetWavelength(0)
                 LOGGER.info(
                     "Function GetWavelength returned: {} Wavelength: {}".format(
                         spc.GetFunctionReturnDescription(shm, 64)[1], wave
                     )
                 )
 
-                (shm, min, max) = spc.GetWavelengthLimits(0, grat)
+                shm, min, max = spc.GetWavelengthLimits(0, grat)
                 LOGGER.info(
                     "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
                         spc.GetFunctionReturnDescription(shm, 64)[1], min, max
@@ -432,6 +443,7 @@ class AndorDriver(HelaoDriver):
         adjust_success = False
         try:
             # Load libraries
+            _load_andor()
             spc = ATSpectrograph()
 
             # Initialize libraries
@@ -464,7 +476,7 @@ class AndorDriver(HelaoDriver):
                     )
                 )
 
-                (shm, grat) = spc.GetGrating(0)
+                shm, grat = spc.GetGrating(0)
                 LOGGER.info("Function GetGrating returned: {} Grat".format(grat))
 
                 shm = spc.SetWavelength(0, 672.26)
@@ -474,21 +486,21 @@ class AndorDriver(HelaoDriver):
                     )
                 )
 
-                (shm, wave) = spc.GetWavelength(0)
+                shm, wave = spc.GetWavelength(0)
                 LOGGER.info(
                     "Function GetWavelength returned: {} Wavelength: {}".format(
                         spc.GetFunctionReturnDescription(shm, 64)[1], wave
                     )
                 )
 
-                (shm, min, max) = spc.GetWavelengthLimits(0, grat)
+                shm, min, max = spc.GetWavelengthLimits(0, grat)
                 LOGGER.info(
                     "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
                         spc.GetFunctionReturnDescription(shm, 64)[1], min, max
                     )
                 )
 
-                (shm, c0, c1, c2, c3) = spc.GetPixelCalibrationCoefficients(
+                shm, c0, c1, c2, c3 = spc.GetPixelCalibrationCoefficients(
                     0
                 )  # these dont seem to be usefull for me
                 coeff = [c0, c1, c2, c3]

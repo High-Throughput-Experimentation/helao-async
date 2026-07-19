@@ -18,9 +18,9 @@ SLICE1_MODULES = [
     "pump.simdos_driver",
     "robot.pal_driver",
     "io.nidaqmx_driver",
+    "spec.andor.driver",
 ]
 SLICE2_MODULES = [
-    "spec.andor.driver",
     "pstat.biologic.driver",
 ]
 
