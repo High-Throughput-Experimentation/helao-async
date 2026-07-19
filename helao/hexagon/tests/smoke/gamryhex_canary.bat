@@ -16,7 +16,16 @@ REM The openapi diff is the topology-appropriate parity check.
 REM
 REM Both configs share root C:\INST_hlo and ports 8001/5001, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
-REM gamryhex is simulation:true, so no live potentiostat is required.
+REM CORRECTION: gamryhex's simulation:true is cosmetic (banner color) here --
+REM GamryDriver has no sim/dummy data path (see golden_capture.py's docstring
+REM for the full investigation). GamryDriver.__init__ opens a real GamryCOM
+REM connection unconditionally, so even just STARTING either server (as this
+REM script does, to read /openapi.json) already needs a live-or-vendor-
+REM emulated device enumerable in GamryCOM's device list at dev_id -- this
+REM canary passing at-station means the station has one, not that the code
+REM tolerates having none. A data-producing action (see golden_diff.bat's
+REM run_OCV capture) additionally requires a dummy cell / cal resistor
+REM attached so a real measurement is safe to run.
 REM
 REM Usage: gamryhex_canary.bat [root] [outdir]
 REM   root   default C:\INST_hlo   (must match the configs' root: key)

@@ -1,0 +1,39 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of gamryhex.yml
+# (keeps `deployment: hexagon` on PSTAT + ACTVIS -- the hexagon side of the
+# runtime golden diff) used solely by
+# helao.hexagon.tests.smoke.golden_capture / golden_diff.bat to capture a
+# runtime golden-master run_OCV tree. The ONLY change from gamryhex.yml is
+# `root:`, pointed at a dedicated throwaway path so the capture rig's
+# assert_fresh() has a clean tree to start from and production C:\INST_hlo
+# (real run data, DATABASE, USER_CONFIG calibration) is never touched. Ports
+# and params match gamrygold.yml so the capture-vs-capture parity diff
+# compares like-for-like. This is a REAL-HARDWARE capture (see
+# golden_capture.py docstring) -- attach a dummy cell / calibration resistor
+# before launching.
+dummy: true
+simulation: true
+run_type: gamry
+root: C:\INST_hlo_golden
+alert_config_path: C:\INST_hlo_golden\USER_CONFIG\alert_gamry.yml
+servers:
+  PSTAT:
+    host: 127.0.0.1
+    port: 8001
+    group: action
+    fast: gamry_server2
+    deployment: hexagon
+    action_vis: gamry_vis
+    params:
+      allow_no_sample: true
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'PSTAT Visualizer'
+      launch_browser: true
