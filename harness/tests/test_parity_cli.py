@@ -84,6 +84,17 @@ def test_masked_meta_key_still_catches_other_diffs(tmp_path):
     assert report["status"] == "fail"  # the unmasked action_name diff surfaces
 
 
+def test_empty_golden_set_fails_not_vacuous_pass(tmp_path):
+    """A golden with no comparable files must FAIL, not pass with 0 diffs."""
+    a = tmp_path / "runA"
+    (a / "root").mkdir(parents=True)  # empty root, no run output
+    attach_manifest(a)
+    b = make_golden(tmp_path, "runB", seed=100)
+    report = run_parity(a, b)
+    assert report["status"] == "fail"
+    assert any(c.get("check") == "empty_golden" for c in report["consistency_diffs"])
+
+
 def test_report_file_is_written(tmp_path):
     a = make_golden(tmp_path, "runA", seed=0)
     b = make_golden(tmp_path, "runB", seed=100)

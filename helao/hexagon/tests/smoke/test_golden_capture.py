@@ -43,6 +43,8 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         root = Path(td) / "captroot"
         (root / "RUNS_FINISHED" / "x").mkdir(parents=True)
         (root / "RUNS_FINISHED" / "x" / "a-act.yml").write_text("file_type: action\n")
+        # a .hlo is required for the anti-vacuous-pass guard to accept the tree
+        (root / "RUNS_FINISHED" / "x" / "OCV-0.hlo").write_text("hlo_version: x\n%%\n")
         (root / "LOGS").mkdir(parents=True)
         (root / "LOGS" / "PSTAT.log").write_text("not captured")
 
@@ -79,10 +81,18 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         ]
 
 
+def _write_completed_run(root: Path) -> None:
+    """A RUNS_DIAG tree with one completed manual action: -act.yml + .hlo."""
+    d = root / "RUNS_DIAG" / "25.28" / "0716" / "0__0__PSTAT__run_OCV"
+    d.mkdir(parents=True)
+    (d / "250716.131421-act.yml").write_text("file_type: action\n")
+    (d / "PSTAT-OCV-0.hlo").write_text("hlo_version: x\n%%\n")
+
+
 def test_snapshot_refuses_to_overwrite_existing_out_dir():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
-        root.mkdir()
+        _write_completed_run(root)
         out = Path(td) / "golden" / "run1"
         snapshot(
             root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
@@ -103,36 +113,51 @@ def test_snapshot_refuses_to_overwrite_existing_out_dir():
             )
 
 
-def test_settle_returns_once_runs_active_is_empty_for_settle_polls():
+def test_snapshot_refuses_empty_capture():
+    """The false-PASS guard: a root with no -act.yml/.hlo must NOT be captured
+    (an empty golden set compares to nothing and passes parity vacuously)."""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
-        root.mkdir()
-        # RUNS_ACTIVE absent entirely -> runs_active_empty() is True immediately.
+        (root / "RUNS_DIAG").mkdir(parents=True)  # present but empty (no data)
+        out = Path(td) / "golden" / "run1"
+        try:
+            snapshot(
+                root=root, out_dir=out, config_prefix="gamrygold", tval_s=3.0, acq_s=0.1
+            )
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError("snapshot() must refuse an empty (no-output) capture")
+        assert not out.exists()  # nothing written on refusal
+
+
+def test_settle_returns_once_action_artifacts_are_complete_and_stable():
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td) / "captroot"
+        _write_completed_run(root)  # -act.yml + .hlo present, RUNS_ACTIVE absent
         settle(root, settle_polls=2, poll_s=0.01, timeout_s=5.0)
 
 
-def test_settle_times_out_when_runs_active_never_empties():
+def test_settle_times_out_when_no_artifacts_are_written():
+    """The action never wrote output (errored / no data): settle must raise,
+    not silently return -- this is what prevents the empty-capture false PASS."""
     with tempfile.TemporaryDirectory() as td:
         root = Path(td) / "captroot"
-        (root / "RUNS_ACTIVE" / "x").mkdir(parents=True)
-        (root / "RUNS_ACTIVE" / "x" / "still-running-act.yml").write_text(
-            "file_type: action\n"
-        )
+        root.mkdir()  # empty root, nothing ever written
         try:
             settle(root, settle_polls=2, poll_s=0.01, timeout_s=0.05)
         except TimeoutError:
             pass
         else:
-            raise AssertionError(
-                "settle() should time out while RUNS_ACTIVE stays non-empty"
-            )
+            raise AssertionError("settle() should time out when no artifacts appear")
 
 
 ALL_TESTS = [
     test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance,
     test_snapshot_refuses_to_overwrite_existing_out_dir,
-    test_settle_returns_once_runs_active_is_empty_for_settle_polls,
-    test_settle_times_out_when_runs_active_never_empties,
+    test_snapshot_refuses_empty_capture,
+    test_settle_returns_once_action_artifacts_are_complete_and_stable,
+    test_settle_times_out_when_no_artifacts_are_written,
 ]
 
 
