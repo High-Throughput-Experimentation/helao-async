@@ -300,6 +300,21 @@ Expected: each import appears inside methods (indented), none at column 0. Cross
 
 **Deferred-by-design:** andor (`__future__` annotations + constructor-connect), biologic, nidaqmx, pal (slice-2 `P3a-2`); all hardware runtime exercise (station gate); the 4 special-case splits (PAL 4-way, galil 3-way+aligner, Gamry COM STA-thread, Archive→SampleState — separate P3a sub-plans).
 
+## Slice-1 outcome (2026-07-18 — COMPLETE)
+
+Executed on `feat/p3a1-hardware-import-sweep` (commits `aeeeab77`…`fa46bf07`). Full hexagon suite **332 passed, 3 xfailed, 2 xpassed, 0 failed**; sweep green.
+
+- Lazy per-method imports landed: `galil_io` (`connect`), `cm0134` (`connect`,`read_o2_ppm`), `galil_motion` (`connect`,`motor_disconnect` — the plan's `run_aligner_precheck`/`shutdown` guess was stale; live grep found the real 2nd `except gclib.GclibError` site is `motor_disconnect`), `gamry driver` (`connect`,`setup`,`measure`,`get_data`,`setup_eis`; `comtypes` added to `setup`/`measure` for `COMError`) + `readz` (`init_pstat`,`get_data`). All behavior-preserving (import relocation only), verified by diff review.
+- `xpassed` = nidaqmx + pal import in THIS env only because `nidaqmx` is pip-installed here; the true §11.1 hermetic guarantee needs a vendor-less CI env (or slice-2 lazy imports) — noted, not yet a real gate.
+
+### P3a-2 backlog (deferred, do NOT force into import-relocation scope)
+
+1. **Constructor-connect (§10.4) cluster** — drivers whose `__init__` performs connection/instantiation, so they can't disconnected-construct: `KinesisMotor` (`self.connect()`; and `kinesis_server.py` never calls connect() externally → the fix must RELOCATE connect() into the server's `makeApp`/startup, matching `galil_io.py:52`/`galil_motion.py:91`/`spec_server.py:148`/`nidaqmx_server.py:65` — a server-side behavior change, not a driver import move), `GamryDriver` (`self.connect()` in `__init__`), `AndorDriver` (`AndorSDK3()` in `__init__`). `MeerstetterTEC` is a milder case (requires `config["channel"]`/`["port"]`, no `config={}` default — not a connect, just no-default). Batch these as one P3a-2 disconnected-construct task with per-server connect-relocation.
+2. **andor** lazy import — also needs `from __future__ import annotations` (class annotation `cam: AndorSDK3` evaluates at import) in addition to per-method imports + the constructor fix above.
+3. **biologic** — `easy_biologic` raises Windows-only `OSError` at its own import; needs per-method lazy import in `driver.py` + `technique.py`.
+4. **nidaqmx** — 11 `nidaqmx.constants` symbols across ~a dozen method sites; per-method local imports (verify each site).
+5. **pal** — `nidaqmx` around the trigger block (~L546); likely 1-2 methods, fast follow.
+
 ## Execution Handoff
 
 Plan saved. Recommended: **Subagent-Driven** — fresh subagent per task, review between (these edit live-station driver code; between-task review is the behavior-preservation checkpoint). Each task is grep-verify → edit → sweep-green → commit.
