@@ -36,3 +36,30 @@ def test_slice1_driver_imports_on_linux(mod):
 )
 def test_slice2_driver_imports_on_linux(mod):
     importlib.import_module(BASE + mod)
+
+
+def test_kinesis_constructs_without_connecting(monkeypatch):
+    """§10.4: KinesisMotor(config) must not open devices in __init__."""
+    import pylablib.devices.Thorlabs as Thorlabs
+    from helao.deploy.hte.drivers.motion import kinesis_driver
+
+    calls = []
+    monkeypatch.setattr(
+        Thorlabs,
+        "KinesisMotor",
+        lambda *a, **k: calls.append((a, k)) or object(),
+    )
+    drv = kinesis_driver.KinesisMotor(
+        config={
+            "axes": {
+                "x": {
+                    "serial_no": "0",
+                    "pos_scale": 1,
+                    "vel_scale": 1,
+                    "acc_scale": 1,
+                }
+            }
+        }
+    )
+    assert calls == [], "KinesisMotor.__init__ must not connect to hardware"
+    assert isinstance(LegacyDriverHardwareAdapter(drv), HardwarePort)
