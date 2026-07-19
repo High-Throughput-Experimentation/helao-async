@@ -41,9 +41,22 @@ _NON_RUN_GENERATED = (
     "PROCESSES",
 )
 
+#: Names that must NEVER be deleted, even if one is passed explicitly or gets
+#: added to the generated allowlist by mistake. A station commonly keeps its
+#: helao code checkout under the data root at ``<root>\CODE``; protect it by name
+#: so a reset can never touch it (belt-and-suspenders on top of GENERATED_DIRS,
+#: which already excludes it). This is separate from validate_root(), which
+#: refuses a root that contains *this running* repo -- a station's ``CODE`` copy
+#: may be a different checkout, so it is guarded here by name too.
+PROTECTED_DIRS: Set[str] = {"CODE"}
+
 #: Every subdirectory name HELAO generates under ``root``. Only these may ever
 #: be considered for deletion; anything else is out of scope by construction.
-GENERATED_DIRS: Set[str] = {d.value for d in ALL_RUN_DIRS} | set(_NON_RUN_GENERATED)
+#: PROTECTED_DIRS is subtracted so a protected name can never leak into the
+#: deletable set even if _NON_RUN_GENERATED is later edited.
+GENERATED_DIRS: Set[str] = (
+    {d.value for d in ALL_RUN_DIRS} | set(_NON_RUN_GENERATED)
+) - PROTECTED_DIRS
 
 #: The only subdirs safe to delete without special intent: transient launch
 #: state and in-flight (not-yet-finished) run output. Everything else
@@ -98,6 +111,14 @@ def reset_generated(
     rp = validate_root(root)
     requested = set(names) if names is not None else set(EPHEMERAL_DIRS)
 
+    # explicit protection first: a protected name (e.g. CODE) is never deletable,
+    # even ahead of the generated-allowlist check, so the error is unambiguous.
+    protected_hit = requested & PROTECTED_DIRS
+    if protected_hit:
+        raise ValueError(
+            f"refusing to delete protected path(s): {sorted(protected_hit)}"
+        )
+
     illegal = requested - GENERATED_DIRS
     if illegal:
         raise ValueError(
@@ -107,6 +128,9 @@ def reset_generated(
 
     removed: List[str] = []
     for name in sorted(requested):
+        # last-ditch guard: never delete a protected dir under any code path
+        if name in PROTECTED_DIRS:
+            raise ValueError(f"refusing to delete protected path {name!r}")
         target = (rp / name).resolve()
         # defense in depth: must be a direct child of root, never root
         if target == rp or target.parent != rp:
