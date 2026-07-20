@@ -65,10 +65,18 @@ async def _exercise_rpc(reporter: TestReporter) -> None:
     def boom() -> None:
         raise RuntimeError("boom")
 
+    def echo_timeout(timeout: int = 0, message: str = "") -> dict:
+        # A remote method whose parameter name shadows RPCClient.call's own
+        # `timeout` control kwarg. It must be forwarded via `args=` without a
+        # "got multiple values for keyword argument 'timeout'" collision
+        # (regression: ANDOR/acquire has a `timeout` param).
+        return {"timeout": timeout, "message": message}
+
     dispatcher.register("echo", echo)
     dispatcher.register("aecho", aecho)
     dispatcher.register("needs_machine", needs_machine)
     dispatcher.register("boom", boom)
+    dispatcher.register("echo_timeout", echo_timeout)
 
     await dispatcher.serve("127.0.0.1", port)
     try:
@@ -94,15 +102,27 @@ async def _exercise_rpc(reporter: TestReporter) -> None:
                 lambda: disp == "S@M",
             )
 
+            # A forwarded param named `timeout` must not collide with the
+            # control `timeout` kwarg: the control timeout (2.0s) governs the
+            # wait, while args={"timeout": 999} is forwarded to the remote fn.
+            shadow = await client.call(
+                "echo_timeout",
+                timeout=2.0,
+                args={"timeout": 999, "message": "z"},
+            )
+            reporter.check(
+                "RPCClient forwards a param named 'timeout' via args= "
+                "without colliding with the control timeout",
+                lambda: shadow == {"timeout": 999, "message": "z"},
+            )
+
             # Expect RPCError when the handler raises
             try:
                 await client.call("boom")
                 raised = False
             except RPCError:
                 raised = True
-            reporter.check(
-                "RPCError raised when remote handler errors", lambda: raised
-            )
+            reporter.check("RPCError raised when remote handler errors", lambda: raised)
 
             # Unknown method should also raise RPCError
             try:
@@ -123,15 +143,24 @@ async def _exercise_rpc(reporter: TestReporter) -> None:
         def _drive_sync():
             sync = RPCSyncClient(endpoint=endpoint, default_timeout=5.0)
             try:
-                return sync.call("echo", message="sync", count=3)
+                echoed = sync.call("echo", message="sync", count=3)
+                shadowed = sync.call(
+                    "echo_timeout", timeout=5.0, args={"timeout": 42, "message": "s"}
+                )
+                return echoed, shadowed
             finally:
                 sync.close()
 
         loop = asyncio.get_running_loop()
-        sync_result = await loop.run_in_executor(None, _drive_sync)
+        sync_result, sync_shadow = await loop.run_in_executor(None, _drive_sync)
         reporter.check(
             "RPCSyncClient round-trip preserves args",
             lambda: sync_result == {"message": "sync", "count": 3},
+        )
+        reporter.check(
+            "RPCSyncClient forwards a param named 'timeout' via args= "
+            "without colliding with the control timeout",
+            lambda: sync_shadow == {"timeout": 42, "message": "s"},
         )
     finally:
         await dispatcher.close()

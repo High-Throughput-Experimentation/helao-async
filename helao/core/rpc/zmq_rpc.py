@@ -438,6 +438,7 @@ class RPCClient:
         self,
         method: str,
         timeout: Optional[float] = None,
+        args: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Any:
         """Invoke ``method`` on the remote dispatcher and return its result.
@@ -445,7 +446,13 @@ class RPCClient:
         Args:
             method: Remote method name.
             timeout: Override for the per-call wait, in seconds.
-            **kwargs: Forwarded to the remote method.
+            args: Payload dict forwarded to the remote method. Use this rather
+                than ``**kwargs`` when a forwarded parameter name could shadow
+                one of this method's own parameters (``method``/``timeout``/
+                ``args``) -- e.g. an action whose params include a key literally
+                named ``timeout``. Keys here are collision-proof; ``**kwargs``
+                are merged on top for convenience.
+            **kwargs: Forwarded to the remote method (merged over ``args``).
 
         Returns:
             The server's ``result`` payload.
@@ -461,7 +468,9 @@ class RPCClient:
         fut: asyncio.Future = asyncio.get_running_loop().create_future()
         self._pending[req_id] = fut
         try:
-            req = RPCRequest(id=req_id, method=method, args=kwargs)
+            payload = dict(args or {})
+            payload.update(kwargs)
+            req = RPCRequest(id=req_id, method=method, args=payload)
             await self._socket.send(_REQ_ENCODER.encode(req))
             wait = timeout if timeout is not None else self.default_timeout
             resp: RPCResponse = await asyncio.wait_for(fut, timeout=wait)
@@ -541,6 +550,7 @@ class RPCSyncClient:
         self,
         method: str,
         timeout: Optional[float] = None,
+        args: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Any:
         """Send a single request and block for the reply.
@@ -548,7 +558,13 @@ class RPCSyncClient:
         Args:
             method: Remote method name.
             timeout: Override for the per-call wait, in seconds.
-            **kwargs: Forwarded to the remote method.
+            args: Payload dict forwarded to the remote method. Use this rather
+                than ``**kwargs`` when a forwarded parameter name could shadow
+                one of this method's own parameters (``method``/``timeout``/
+                ``args``) -- e.g. an action whose params include a key literally
+                named ``timeout``. Keys here are collision-proof; ``**kwargs``
+                are merged on top for convenience.
+            **kwargs: Forwarded to the remote method (merged over ``args``).
 
         Returns:
             The server's ``result`` payload.
@@ -558,7 +574,9 @@ class RPCSyncClient:
             TimeoutError: If no reply arrives within ``timeout``.
         """
         sock = self._ensure_socket()
-        req = RPCRequest(id=next(self._ids), method=method, args=kwargs)
+        payload = dict(args or {})
+        payload.update(kwargs)
+        req = RPCRequest(id=next(self._ids), method=method, args=payload)
         try:
             sock.send(_REQ_ENCODER.encode(req))
         except zmq.ZMQError:

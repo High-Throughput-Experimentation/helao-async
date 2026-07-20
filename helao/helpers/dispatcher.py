@@ -136,10 +136,13 @@ async def async_action_dispatcher(
     rpc_args["action"] = A.as_dict()
     try:
         client = await _get_rpc_client(act_addr, act_port)
+        # Pass params via `args=` (not `**rpc_args`) so an action param named
+        # `timeout` (e.g. ANDOR/acquire) cannot collide with call()'s own
+        # `timeout` kwarg ("got multiple values for keyword argument 'timeout'").
         result = await client.call(
             rpc_method,
             timeout=min(timeout, _RPC_PROBE_TIMEOUT),
-            **rpc_args,
+            args=rpc_args,
         )
         return result, ErrorCodes.none
     except (RPCError, asyncio.TimeoutError, zmq.ZMQError, OSError) as e:
@@ -243,10 +246,12 @@ async def async_private_dispatcher(
     rpc_args.update(json_dict or {})
     try:
         client = await _get_rpc_client(host, port)
+        # `args=` (not `**rpc_args`) so a merged param/body key named `timeout`
+        # cannot collide with call()'s own `timeout` kwarg.
         result = await client.call(
             private_action,
             timeout=min(timeout, _RPC_PROBE_TIMEOUT),
-            **rpc_args,
+            args=rpc_args,
         )
         return result, ErrorCodes.none
     except (RPCError, asyncio.TimeoutError, zmq.ZMQError, OSError) as e:
@@ -374,10 +379,12 @@ def private_dispatcher(
     rpc_args.update(json_dict or {})
     try:
         client = _get_sync_rpc_client(server_host, server_port)
+        # `args=` (not `**rpc_args`) so a merged param/body key named `timeout`
+        # cannot collide with call()'s own `timeout` kwarg.
         result = client.call(
             private_action,
             timeout=min(timeout, _RPC_PROBE_TIMEOUT),
-            **rpc_args,
+            args=rpc_args,
         )
         return result, ErrorCodes.none
     except (RPCError, TimeoutError, zmq.ZMQError, OSError) as e:
