@@ -177,7 +177,14 @@ exit /b 0
 
 REM ---------------------------------------------------------------------------
 :kill_one
-REM 1) kill the action/vis servers via their pid pickle.
+REM 0) GRACEFUL shutdown FIRST so the gamry driver's shutdown() runs:
+REM disconnect() closes the pstat (releases the exclusive GamryCOM device) and
+REM kill_gamrycom() terminates GamryCOM.exe. A hard kill skips this and LEAKS
+REM the device lock -> the next launch fails 'CGamryPstat - In use by another
+REM script'. Best-effort (server dies mid-response); then wait for release.
+call conda run -n helao python "%~dp0graceful_shutdown.py" 8001
+ping -n 5 -w 1000 127.0.0.1 >nul
+REM 1) kill the action/vis servers via their pid pickle (any that didn't exit).
 call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%CAPROOT%" "%PREFIX%"
 REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit this console.
