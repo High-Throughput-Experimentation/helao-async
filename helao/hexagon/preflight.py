@@ -84,6 +84,26 @@ def _checklist_module(server: dict) -> Optional[str]:
     return module
 
 
+def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
+    """Where a deployment's frozen endpoint checklists live.
+
+    A PRIVATE nested deployment keeps its checklists INSIDE its own repo
+    (helao/deploy/<dep>/tests/checklists/) — the public parent cannot host a
+    directory named after a private deployment. The public deployments (hte,
+    test) keep theirs centrally under helao/hexagon/tests/checklists/<dep>/.
+    Prefer the in-repo location when it exists, else the central one; the path
+    is BUILT from the resolved deployment at runtime, so this parent source
+    names nothing private.
+    """
+    if not deployment:
+        return None
+    in_repo = REPO_ROOT / "helao" / "deploy" / deployment / "tests" / "checklists"
+    if in_repo.exists():
+        return in_repo
+    central = CHECKLIST_ROOT / deployment
+    return central if central.exists() else None
+
+
 def _config_sanity(servers: dict) -> list[str]:
     issues: list[str] = []
     hostports: dict[tuple, str] = {}
@@ -184,7 +204,7 @@ def preflight_config(config: str) -> list[str]:
     cfg = read_config(config)
     servers = cfg.get("servers", {})
     deployment = _config_deployment(config)
-    checklist_dir = (CHECKLIST_ROOT / deployment) if deployment else None
+    checklist_dir = _checklist_dir(deployment)
     issues: list[str] = []
     issues += _config_sanity(servers)
     issues += _shim_completeness(servers)
