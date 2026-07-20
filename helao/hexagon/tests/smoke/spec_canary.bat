@@ -101,6 +101,18 @@ REM (rmdir /s /q bypasses the Recycle Bin). %ROOT% is used read-only here, only
 REM to locate the pid pickle for kill_group.py.
 
 echo [canary] launching %PREFIX% (log: %LAUNCHLOG%)
+REM Pre-launch guard: refuse to launch onto a still-bound HTTP/RPC port. A
+REM stale binder from a previous leg or a prior *_canary/_diff run can still
+REM own 127.0.0.1:8011 (or its co-located ZMQ RPC sibling 18011); the new
+REM server then fails to bind and falls back to the 0.0.0.0 wildcard while the
+REM stale binder keeps the loopback port, so the RPC-first action dispatch
+REM reaches the STALE binder (ACK'd but never executed) -> a silent capture
+REM hang. Wait for both ports to release before launching (mirrors :kill_one).
+call conda run -n helao python "%~dp0wait_ports_free.py" 8011
+if not "%errorlevel%"=="0" (
+  echo [canary] ABORT %PREFIX% -- ports 8011/18011 still bound before launch; kill the stale holder and retry
+  exit /b 2
+)
 start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot-reload > "%LAUNCHLOG%" 2>&1"
 
 echo [canary] waiting for SPEC port 8011
