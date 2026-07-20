@@ -1,0 +1,43 @@
+# HEXAGON CANARY for the kinesis_server station (P3a special-split). Copy of
+# kmotor.yml with `deployment: hexagon` flipping KMOTOR (kinesis_server) and
+# ACTVIS (action_visualizer) onto the hexagon factory (makeActionApp shim at
+# helao/deploy/hexagon/servers/action/kinesis_server.py) -- run AT-STATION
+# (Windows / Thorlabs Kinesis). kmotor.yml stays legacy for rollback; the
+# cut-over is ONLY the two `deployment: hexagon` keys. Ports/root/params
+# match kmotor.yml so an on-station openapi diff compares like-for-like.
+#
+# OPENAPI-ONLY (see kmotor.yml's header): every action route registered
+# under the verbatim `axes.z` block (kmove / cancel_kmove / set_velocity)
+# either drives the stage or writes live velocity/acceleration parameters to
+# the device; there is no position/status QUERY action to dispatch safely.
+# There is therefore no runtime golden-diff config pair for KMOTOR -- only
+# this openapi-surface canary (mirrors ni_canary.bat's rationale). The RPC
+# port is HTTP+10000 = 18015.
+dummy: true
+simulation: true
+run_type: kinesis_server
+root: C:\INST_hlo
+servers:
+  KMOTOR:
+    host: 127.0.0.1
+    port: 8015
+    group: action
+    fast: kinesis_server
+    deployment: hexagon
+    params:
+      axes:
+        z:
+          serial_no: "49437454"
+          pos_scale: 1228800.0 # device to mm
+          vel_scale: 65970697.6 # device to mm/s
+          acc_scale: 13518.2 # device to mm/s2
+          move_limit_mm: 5.0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'KMOTOR Visualizer'
+      launch_browser: true

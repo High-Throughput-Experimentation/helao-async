@@ -1,47 +1,41 @@
 @echo off
 setlocal enabledelayedexpansion
 REM ---------------------------------------------------------------------------
-REM Windows canary for the galiliohex hexagon cut-over: runtime /openapi.json diff.
+REM Windows canary for the diapumphex hexagon cut-over: runtime /openapi.json diff.
 REM
-REM Launches the LEGACY galilio group and the HEXAGON galiliohex group in turn,
-REM dumps each IO server's live /openapi.json, and diffs them. An identical
+REM Launches the LEGACY diapump group and the HEXAGON diapumphex group in turn,
+REM dumps each DOSEPUMP server's live /openapi.json, and diffs them. An identical
 REM route/schema surface proves the hexagon makeActionApp factory produces a
-REM byte-parity action server for the galil_io cut-over target (the third
-REM Windows/gclib driver, after gamry and galil_motion).
+REM byte-parity action server for the diapump_server (diaphragm dosing pump)
+REM cut-over target.
+REM
+REM OPENAPI-ONLY (single tier -- NO runtime golden-diff tier). Every diapump
+REM action (run_continuous, dispense_byvolume, dispense_byrate) actively DRIVES
+REM fluid; none is a safe non-perturbing read, so there is no valid runtime golden
+REM scenario the way cam's acquire_image is. The /openapi.json surface diff done
+REM here is the whole harness -- same openapi-only precedent as dbpack_canary.sh
+REM and analysis_canary.sh.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. galiliohex is a 2-server group (IO@8005 +
-REM ACTVIS@5001) with NO orchestrator, so the GM-* scenarios cannot drive it.
-REM The openapi diff is the topology-appropriate parity check (mirrors
-REM galil_canary.bat / gamryhex_canary.bat exactly).
+REM sequences to an orchestrator. diapumphex is a 2-server group (DOSEPUMP@8016 +
+REM ACTVIS@5001) with NO orchestrator (mirrors cam_canary.bat exactly).
 REM
-REM Both configs share root C:\INST_hlo and ports 8005/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and ports 8016/5001, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
-REM NOTE: galilio.yml's simulation:true is cosmetic (banner color) here --
-REM Galil.connect() has no sim/dummy data path (see golden_capture_galil_io.py's
-REM docstring for the full investigation). Galil.connect() opens a real gclib
-REM TCP connection unconditionally, but (like galil_motion) a failed/unreachable
-REM connection is CAUGHT internally and just sets galil_enabled=False --
-REM HOWEVER, UNLIKE galil_motion, galil_io.py's endpoint set (including
-REM get_digital_in) is entirely gated on galil_enabled, so a disconnected
-REM controller means openapi surface DIFFERS (fewer routes) between a run with
-REM the controller reachable and one without -- this canary (openapi surface
-REM only) therefore still does NOT require a reachable galil controller to PASS
-REM as long as BOTH legacy and hexagon see the SAME (dis)connected state, but a
-REM data-producing action (see galilio_diff.bat's get_digital_in capture)
-REM additionally requires the controller powered on and reachable at
-REM galil_ip_str for get_digital_in to exist and produce data at all.
+REM NOTE: this openapi canary only boots each server and reads /openapi.json; it
+REM never dispatches an action, so no pump ever moves fluid and no COM device
+REM needs to be present (the sim/dummy driver serves the route surface).
 REM
-REM Usage: galilio_canary.bat [root] [outdir]
+REM Usage: diapump_canary.bat [root] [outdir]
 REM   root   default C:\INST_hlo   (must match the configs' root: key)
-REM   outdir default %TEMP%\galilio_canary
+REM   outdir default %TEMP%\diapump_canary
 REM ---------------------------------------------------------------------------
 
 set "ROOT=%~1"
 if "%ROOT%"=="" set "ROOT=C:\INST_hlo"
 set "OUTDIR=%~2"
-if "%OUTDIR%"=="" set "OUTDIR=%TEMP%\galilio_canary"
+if "%OUTDIR%"=="" set "OUTDIR=%TEMP%\diapump_canary"
 
 REM Guard: refuse an unsafe root (drive/fs anchor, or a root that contains the
 REM code repo) BEFORE anything touches it. safe_root.py is the single choke
@@ -62,11 +56,11 @@ pushd "%~dp0..\..\..\.." || exit /b 2
 set "REPO=%CD%"
 
 if not exist "%OUTDIR%" mkdir "%OUTDIR%"
-set "LEGACY_JSON=%OUTDIR%\galilio_openapi.json"
-set "HEX_JSON=%OUTDIR%\galiliohex_openapi.json"
+set "LEGACY_JSON=%OUTDIR%\diapump_openapi.json"
+set "HEX_JSON=%OUTDIR%\diapumphex_openapi.json"
 
-call :run_one galilio     "%LEGACY_JSON%" || goto :fail
-call :run_one galiliohex  "%HEX_JSON%"    || goto :fail
+call :run_one diapump     "%LEGACY_JSON%" || goto :fail
+call :run_one diapumphex  "%HEX_JSON%"    || goto :fail
 
 echo.
 echo [canary] diffing openapi surfaces
@@ -77,7 +71,7 @@ type "%OUTDIR%\openapi_diff.txt"
 popd
 echo.
 if "%DIFF_RC%"=="0" (
-  echo [canary] PASS -- galiliohex openapi surface matches legacy galilio> "%OUTDIR%\canary_result.txt"
+  echo [canary] PASS -- diapumphex openapi surface matches legacy diapump> "%OUTDIR%\canary_result.txt"
 ) else (
   echo [canary] DIFFS FOUND rc=%DIFF_RC% -- see openapi_diff.txt> "%OUTDIR%\canary_result.txt"
 )
@@ -110,29 +104,29 @@ REM to locate the pid pickle for kill_group.py.
 echo [canary] launching %PREFIX% (log: %LAUNCHLOG%)
 REM Pre-launch guard: refuse to launch onto a still-bound HTTP/RPC port. A
 REM stale binder from a previous leg or a prior *_canary/_diff run can still
-REM own 127.0.0.1:8005 (or its co-located ZMQ RPC sibling 18005); the new
+REM own 127.0.0.1:8016 (or its co-located ZMQ RPC sibling 18016); the new
 REM server then fails to bind and falls back to the 0.0.0.0 wildcard while the
 REM stale binder keeps the loopback port, so the RPC-first action dispatch
 REM reaches the STALE binder (ACK'd but never executed) -> a silent capture
 REM hang. Wait for both ports to release before launching (mirrors :kill_one).
-call conda run -n helao python "%~dp0wait_ports_free.py" 8005
+call conda run -n helao python "%~dp0wait_ports_free.py" 8016
 if not "%errorlevel%"=="0" (
-  echo [canary] ABORT %PREFIX% -- ports 8005/18005 still bound before launch; kill the stale holder and retry
+  echo [canary] ABORT %PREFIX% -- ports 8016/18016 still bound before launch; kill the stale holder and retry
   exit /b 2
 )
 start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot-reload > "%LAUNCHLOG%" 2>&1"
 
-echo [canary] waiting for IO port 8005
+echo [canary] waiting for DOSEPUMP port 8016
 set "UP=0"
 for /l %%i in (1,1,90) do (
-  call conda run -n helao python -c "import socket,sys; sys.exit(0 if socket.socket().connect_ex(('127.0.0.1',8005))==0 else 1)" 2>nul
+  call conda run -n helao python -c "import socket,sys; sys.exit(0 if socket.socket().connect_ex(('127.0.0.1',8016))==0 else 1)" 2>nul
   if !errorlevel! equ 0 ( set "UP=1" & goto :got_port )
   REM sleep ~2s via ping; `timeout` errors when stdin is not an interactive console
   ping -n 3 -w 1000 127.0.0.1 >nul
 )
 :got_port
 if not "%UP%"=="1" (
-  echo [canary] FAIL %PREFIX% port 8005 never came up; launch tail:
+  echo [canary] FAIL %PREFIX% port 8016 never came up; launch tail:
   powershell -NoProfile -Command "if (Test-Path '%LAUNCHLOG%') { Get-Content -Tail 40 '%LAUNCHLOG%' }"
   call :kill_one
   exit /b 2
@@ -141,7 +135,7 @@ REM settle ~3s (ping, not timeout, to survive redirected stdin)
 ping -n 4 -w 1000 127.0.0.1 >nul
 
 echo [canary] fetching /openapi.json -> %OUTJSON%
-call conda run -n helao python -c "import urllib.request,sys; open(sys.argv[2],'wb').write(urllib.request.urlopen('http://127.0.0.1:8005/openapi.json',timeout=30).read())" x "%OUTJSON%"
+call conda run -n helao python -c "import urllib.request,sys; open(sys.argv[2],'wb').write(urllib.request.urlopen('http://127.0.0.1:8016/openapi.json',timeout=30).read())" x "%OUTJSON%"
 set "FETCH_RC=!errorlevel!"
 
 echo [canary] killing %PREFIX%
@@ -155,12 +149,11 @@ exit /b 0
 
 REM ---------------------------------------------------------------------------
 :kill_one
-REM 0) GRACEFUL shutdown FIRST so the galil driver's shutdown() runs:
-REM Galil.shutdown() calls self.g.GClose() (releases the gclib TCP connection
-REM to the controller). A hard kill skips this and may leave the controller
-REM holding a stale connection slot -- best-effort (server dies mid-response);
-REM then wait.
-call conda run -n helao python "%~dp0graceful_shutdown.py" 8005
+REM 0) GRACEFUL shutdown FIRST so the diapump driver's shutdown() runs cleanly.
+REM The dosing pump holds a serial COM handle in a real deployment; graceful
+REM shutdown lets the driver release it. Best-effort (server may die
+REM mid-response); then wait.
+call conda run -n helao python "%~dp0graceful_shutdown.py" 8016
 ping -n 5 -w 1000 127.0.0.1 >nul
 REM 1) kill the action/vis servers via their pid pickle (any that didn't exit).
 call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
@@ -168,8 +161,23 @@ REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit the canary console.
 REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
 REM through a shared conhost.exe and close the main canary window.
-REM The match includes " --no-hot-reload" so prefix "galilio" cannot match "galiliohex".
+REM The match includes " --no-hot-reload" so prefix "diapump" cannot match "diapumphex".
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+REM 3) WAIT for the DOSEPUMP server's HTTP + co-located ZMQ RPC ports (RPC =
+REM HTTP+10000 = 18016) to actually RELEASE before returning. The RPC listener
+REM is a thread inside the server process and lives as long as the process does;
+REM if the next sequential launch (diapump vs diapumphex) starts while a stale
+REM listener still owns 127.0.0.1:18016, the next launch's "Address in use"
+REM fallback fires and a dispatch_action RPC-first call would reach the STALE
+REM binder -- yielding a broken surface. Poll both ports until free (~30s cap).
+set "RELEASED=0"
+for /l %%i in (1,1,30) do (
+  call conda run -n helao python -c "import socket,sys; c=lambda p: socket.socket().connect_ex(('127.0.0.1',p))==0; sys.exit(1 if (c(8016) or c(18016)) else 0)" 2>nul
+  if !errorlevel! equ 0 ( set "RELEASED=1" & goto :diapump_ports_free )
+  ping -n 2 -w 1000 127.0.0.1 >nul
+)
+:diapump_ports_free
+if not "!RELEASED!"=="1" echo [canary] WARNING %PREFIX% ports 8016/18016 still bound after wait -- next launch may hit a stale RPC binder
 goto :eof
 
 REM ---------------------------------------------------------------------------

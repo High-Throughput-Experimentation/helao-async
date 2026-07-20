@@ -69,6 +69,16 @@ from helao.helpers.config_loader import read_config
 from helao.helpers.dispatcher import async_action_dispatcher
 from helao.helpers.premodels import Action
 
+# async_action_dispatcher's RPC-first path opens a zmq.asyncio socket, which
+# requires the add_reader event-loop family the Windows Proactor loop (the
+# default on Windows) does not provide. This standalone capture client runs in
+# its OWN process -- separate from fast_launcher/bokeh_launcher, which already
+# force a selector loop -- so it must apply the same fix here or it emits the
+# "Proactor event loop does not implement add_reader" RuntimeWarning (and spins
+# up an extra tornado selector thread). Mirrors fast_launcher.py's _LOOP_FACTORY:
+# SelectorEventLoop on Windows, default loop elsewhere (loop_factory=None).
+_LOOP_FACTORY = asyncio.SelectorEventLoop if sys.platform == "win32" else None
+
 # HloStatus terminal states. A manual action's -act.yml is written at init with
 # status "active" (base.py:1029 update_act_file) and only REWRITTEN with a
 # terminal status at finish (write_act). Settling on the file's mere existence
@@ -247,7 +257,8 @@ def dispatch_action(
     resp, err = asyncio.run(
         async_action_dispatcher(
             world_cfg, action, params=action_params, timeout=timeout
-        )
+        ),
+        loop_factory=_LOOP_FACTORY,
     )
     if err != ErrorCodes.none:
         raise RuntimeError(

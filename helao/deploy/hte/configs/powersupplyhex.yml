@@ -1,0 +1,40 @@
+# HEXAGON CANARY for the power_supply_server station (P3a special-split).
+# Copy of powersupply.yml with `deployment: hexagon` flipping POWER_SUPPLY
+# (power_supply_server, via the hexagon shim at
+# helao/deploy/hexagon/servers/action/power_supply_server.py) and ACTVIS
+# (action_visualizer) onto the hexagon factory -- run AT-STATION (Windows /
+# pyvisa serial). powersupply.yml stays legacy for rollback; the cut-over is
+# ONLY the two `deployment: hexagon` keys. Ports/root/params match
+# powersupply.yml so an on-station openapi diff compares like-for-like.
+#
+# OPENAPI-ONLY (see powersupply.yml's header): every action route
+# (apply_voltage / square_wave / constant_current_square_wave) energizes the
+# supply output via `driver.connect()` + `driver.set_output(True)` in its
+# executor's `_pre_exec`; there is no position/status QUERY action to
+# dispatch safely. There is therefore no runtime golden-diff config pair for
+# POWER_SUPPLY -- only this openapi-surface canary (mirrors
+# kmotorhex.yml/nihex's rationale). The RPC port is HTTP+10000 = 18002.
+dummy: true
+simulation: true
+run_type: power_supply
+root: C:\INST_hlo
+servers:
+  POWER_SUPPLY:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: power_supply_server
+    deployment: hexagon
+    action_vis: power_supply_vis
+    params:
+      resource_name: 'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
+      timeout_ms: 10000
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'POWER_SUPPLY Visualizer'
+      launch_browser: true

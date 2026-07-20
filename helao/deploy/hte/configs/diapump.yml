@@ -1,0 +1,35 @@
+# STANDALONE diapump_server canary config (P3a special-split, DIAPUMP). Mirrors
+# cam.yml's 2-server shape (one action server + one action_visualizer) so an
+# at-station openapi surface diff can compare legacy vs hexagon like-for-like
+# without pulling in the full ccsi2 station. The DOSEPUMP params (port/address)
+# are copied VERBATIM from ccsi2.yml's DOSEPUMP block. This is the diaphragm
+# dosing pump (serial COM, no vendor DLL, no COM/gclib).
+#
+# OPENAPI-CANARY ONLY (single tier, NO runtime golden-diff tier). Every diapump
+# action -- run_continuous, dispense_byvolume, dispense_byrate -- actively DRIVES
+# fluid; none is a safe non-perturbing read, so there is no valid runtime golden
+# scenario the way cam's acquire_image is. The /openapi.json surface diff
+# (diapump_canary.bat: this config + diapumphex.yml) fully proves the hexagon
+# makeActionApp route/schema factory parity. Same openapi-only precedent as the
+# dbpack and analysis canaries.
+dummy: true
+simulation: true
+run_type: diapump_server
+root: C:\INST_hlo
+servers:
+  DOSEPUMP:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    fast: diapump_server
+    params:
+      port: COM7
+      address: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'DIAPUMP Visualizer'
+      launch_browser: true

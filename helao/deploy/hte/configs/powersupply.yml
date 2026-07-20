@@ -1,0 +1,45 @@
+# STANDALONE power_supply_server canary config (P3a special-split,
+# POWER_SUPPLY). Mirrors galil.yml / kmotor.yml's 2-server shape (one action
+# server + one action_visualizer) so an at-station openapi golden diff can
+# compare legacy vs hexagon like-for-like without pulling in a full station.
+# `resource_name`/`timeout_ms` are copied verbatim from power_supply_test.yml
+# (the only reference for this server) so PowerSupplyDriver.connect() can
+# open the real pyvisa VISA resource -- a wrong/absent resource_name makes
+# connect() fail inside every executor's `_pre_exec` (ApplyVoltageExecutor /
+# SquareWaveExecutor / ConstantCurrentSquareWaveExecutor all call
+# `self.driver.connect()` there), though the openapi route surface itself
+# still registers regardless (route registration does not call connect()).
+#
+# OPENAPI-ONLY canary (no runtime golden-diff counterpart). Every action
+# route power_supply_server.py registers -- `apply_voltage`, `square_wave`,
+# `constant_current_square_wave` -- runs an executor whose `_pre_exec` calls
+# `driver.connect()` followed by `driver.set_output(True)`: EVERY action
+# energizes the supply output before doing anything else. `get_voltage_async`
+# / `get_current_async` are driver-level polling helpers used internally by
+# these executors (see power_supply_driver.py) -- they are NOT exposed as
+# standalone action endpoints, so there is no safe, non-perturbing read
+# action to dispatch for a runtime diff (mirrors ni_canary.bat /
+# kmotor_canary.bat's rationale exactly). The openapi diff (see
+# powersupply_canary.bat) is therefore the safety-appropriate parity check.
+dummy: true
+simulation: true
+run_type: power_supply
+root: C:\INST_hlo
+servers:
+  POWER_SUPPLY:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: power_supply_server
+    action_vis: power_supply_vis
+    params:
+      resource_name: 'ASRL/dev/cu.usbmodem0031012B04581::INSTR'
+      timeout_ms: 10000
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'POWER_SUPPLY Visualizer'
+      launch_browser: true
