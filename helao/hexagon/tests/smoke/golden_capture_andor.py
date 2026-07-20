@@ -323,14 +323,35 @@ def main(argv=None) -> int:
             "(duration <= 0 runs until cancelled and would hang the capture)"
         )
 
+    # Flushed stage breadcrumbs: this capture can block for minutes on real
+    # hardware, and stdout is block-buffered when the bat redirects it to a
+    # file, so a plain print would not surface until the process exits. With
+    # flush=True each stage lands in the capture log immediately, so a hang is
+    # attributable to the exact stage reached (server-wait vs dispatch vs
+    # settle) rather than an opaque empty log.
     assert_fresh(args.root)
+    print(
+        f"[golden_capture_andor] waiting for ANDOR at {ANDOR_HOST}:{ANDOR_PORT} ...",
+        flush=True,
+    )
     wait_for_server(ANDOR_HOST, ANDOR_PORT)
+    print(
+        f"[golden_capture_andor] server up; dispatching acquire "
+        f"(duration={args.duration}, external_trigger={args.external_trigger}) ...",
+        flush=True,
+    )
     acquire_action(
         args.config_prefix,
         duration=args.duration,
         external_trigger=args.external_trigger,
     )
+    print(
+        "[golden_capture_andor] acquire dispatch returned; settling on -act.yml "
+        "terminal status ...",
+        flush=True,
+    )
     settle(args.root, settle_polls=args.settle_polls)
+    print("[golden_capture_andor] settled; snapshotting RUNS tree ...", flush=True)
     out = snapshot(
         root=args.root,
         out_dir=args.out,
