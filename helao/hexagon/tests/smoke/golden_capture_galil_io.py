@@ -79,12 +79,10 @@ from harness.capture import assert_fresh, wait_for_server
 from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
 
-from helao.core.error import ErrorCodes
-from helao.helpers.dispatcher import private_dispatcher
-
 from helao.hexagon.tests.smoke.golden_capture import (
     _act_status_map,
     _run_artifacts,
+    dispatch_action,
     settle,
 )
 
@@ -162,39 +160,18 @@ def verify_device_open(host: str, port: int) -> None:
         )
 
 
-def get_digital_in_action(host: str, port: int) -> dict:
-    """Run /IO/get_digital_in via the HELAO dispatcher and return its dict.
+def get_digital_in_action(config_prefix: str) -> dict:
+    """Run /IO/get_digital_in via ``async_action_dispatcher`` (the production
+    action-dispatch path -- RPC then HTTP, full action envelope).
 
-    Uses ``private_dispatcher`` -- the canonical way HELAO servers call each
-    other's endpoints (and how the orchestrator dispatches actions in
-    production) -- rather than a hand-rolled ``requests.post``. It tries the
-    co-located ZMQ RPC first (which bypasses the HTTP layer) and falls back to
-    HTTP with a correctly-formed JSON body. This matters: a bare
-    ``requests.post(url)`` sends no body, and BaseAPI's ``app_entry`` middleware
-    runs ``json.loads(await request.body())`` on every ``/{server_key}/*`` POST
-    (base_api.py), so a bodyless action POST raises ``JSONDecodeError`` -> 500
-    BEFORE the endpoint ever runs. The dispatcher forms the request correctly.
-
-    ``di_item`` is passed as a query param (``params_dict``); the JSON body
-    is empty (``json_dict={}``) purely to satisfy the middleware's
-    ``json.loads`` call -- ``get_digital_in`` takes no body fields. Pinned to
+    ``di_item`` MUST travel in the action envelope's ``action_params``: the
+    endpoint reads ``action.action_params["di_item"]``, so a bare
+    ``private_dispatcher`` (empty envelope, param only in the query string)
+    left ``action_params`` without ``di_item`` -> KeyError/500. Pinned to
     ``di_item="gamry_ttl0"`` -- a digital INPUT read, never a ``dev_do``
     output -- so this never actuates a pump/valve/LED.
     """
-    resp, err = private_dispatcher(
-        "IO",
-        host,
-        port,
-        "IO/get_digital_in",
-        params_dict={"di_item": DI_ITEM},
-        json_dict={},
-        timeout=30,
-    )
-    if err != ErrorCodes.none:
-        raise RuntimeError(
-            f"get_digital_in dispatch failed: err={err}, response={resp}"
-        )
-    return resp
+    return dispatch_action(config_prefix, "IO", "get_digital_in", {"di_item": DI_ITEM})
 
 
 def snapshot(
@@ -299,7 +276,7 @@ def main(argv=None) -> int:
     assert_fresh(args.root)
     wait_for_server(IO_HOST, IO_PORT)
     verify_device_open(IO_HOST, IO_PORT)
-    get_digital_in_action(IO_HOST, IO_PORT)
+    get_digital_in_action(args.config_prefix)
     settle(args.root, settle_polls=args.settle_polls)
     out = snapshot(
         root=args.root,
