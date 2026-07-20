@@ -156,6 +156,23 @@ REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
 REM through a shared conhost.exe and close the main canary window.
 REM The match includes " --no-hot-reload" so prefix "cam" cannot match "camhex".
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+REM 3) WAIT for the CAM server's HTTP + co-located ZMQ RPC ports (RPC =
+REM HTTP+10000 = 18013) to actually RELEASE before returning. The RPC listener
+REM is a thread inside the server process and lives as long as the process does;
+REM if the next sequential launch (cam vs camhex) starts while a stale listener
+REM still owns 127.0.0.1:18013, the next launch's "Address in use" fallback
+REM fires and a dispatch_action RPC-first call would reach the STALE binder.
+REM (cam is openapi-only so it never dispatches an action, but the wait keeps
+REM the kill path uniform and prevents a stale binder leaking into any later
+REM run on these ports.) Poll both ports until free (~30s cap).
+set "RELEASED=0"
+for /l %%i in (1,1,30) do (
+  call conda run -n helao python -c "import socket,sys; c=lambda p: socket.socket().connect_ex(('127.0.0.1',p))==0; sys.exit(1 if (c(8013) or c(18013)) else 0)" 2>nul
+  if !errorlevel! equ 0 ( set "RELEASED=1" & goto :cam_ports_free )
+  ping -n 2 -w 1000 127.0.0.1 >nul
+)
+:cam_ports_free
+if not "!RELEASED!"=="1" echo [canary] WARNING %PREFIX% ports 8013/18013 still bound after wait -- next launch may hit a stale RPC binder
 goto :eof
 
 REM ---------------------------------------------------------------------------
