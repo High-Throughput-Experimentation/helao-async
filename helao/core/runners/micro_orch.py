@@ -442,7 +442,9 @@ class MicroOrch:
         rpc_args["action"] = action.as_dict()
         method = f"{server_name}/{action_name}"
         try:
-            result = await client.call(method, timeout=timeout, **rpc_args)
+            # `args=` (not `**rpc_args`) so an action param named `timeout`
+            # cannot collide with call()'s own `timeout` kwarg.
+            result = await client.call(method, timeout=timeout, args=rpc_args)
         except Exception:
             async with self._cond:
                 self._pending_meta.pop(action_uuid, None)

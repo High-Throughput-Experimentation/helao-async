@@ -1,0 +1,30 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of co2.yml used solely
+# by helao.hexagon.tests.smoke.golden_capture_co2 / co2_diff.bat to capture a
+# runtime golden-master acquire_co2 tree. The ONLY change from co2.yml is
+# `root:`, pointed at a dedicated throwaway path so the capture rig's
+# assert_fresh() has a clean tree to start from and production C:\INST_hlo
+# (real run data, DATABASE, USER_CONFIG) is never touched. This is a
+# REAL-HARDWARE capture (see golden_capture_co2.py docstring) -- acquire_co2
+# reads live CO2 ppm (non-perturbing) but the SprintIR sensor must be attached
+# on COM12 for connect() to succeed and the capture to produce data.
+dummy: true
+simulation: true
+run_type: co2sensor_server
+root: C:\INST_hlo_golden
+servers:
+  CO2SENSOR:
+    host: 127.0.0.1
+    port: 8012
+    group: action
+    fast: co2sensor_server
+    params:
+      port: COM12
+      start_margin: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'CO2 Visualizer'
+      launch_browser: true

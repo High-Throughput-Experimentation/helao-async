@@ -1,0 +1,39 @@
+# STANDALONE andor_server canary config (P3a special-split, ANDOR). Mirrors
+# spec.yml/cam.yml's 2-server shape (one action server + one action_visualizer)
+# so an at-station openapi/runtime golden diff can compare legacy vs hexagon
+# like-for-like without pulling in the full hispec station (ORCH, VIS, DB, CALC,
+# CAM...). The ANDOR params: (dev_id) is copied VERBATIM from hispec.yml's ANDOR
+# block so `acquire` registers identically. This is the Andor Zyla camera +
+# ATSpectrograph (vendor pyAndorSDK3 / pyAndorSpectrograph runtimes) --
+# WINDOWS-ONLY hardware; the runtime golden diff requires the camera +
+# spectrograph attached (see golden_capture_andor.py's docstring). The openapi
+# canary only needs the server to boot and serve /openapi.json.
+#
+# TWO TIERS: andor_canary.bat does the /openapi.json surface diff (this config +
+# andorhex.yml); andor_diff.bat does the runtime `acquire` golden diff
+# (andorgold.yml/andorgoldhex.yml). `acquire` streams a .hlo of live per-pixel
+# intensities (ch_0000..ch_NNNN) + tick timestamps with a config-deterministic
+# `wl` (pixel->wavelength) header -- like spec_server's acquire_spec, NOT cam's
+# timestamped JPEG sidecars: the driver writes NO image files, so no new
+# filename grammar is involved (see golden_capture_andor.py for the masking
+# rationale).
+dummy: true
+simulation: true
+run_type: andor_server
+root: C:\INST_hlo
+servers:
+  ANDOR:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: andor_server
+    params:
+      dev_id: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'ANDOR Visualizer'
+      launch_browser: true

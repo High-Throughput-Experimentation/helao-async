@@ -1,0 +1,33 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of biologic.yml used
+# solely by helao.hexagon.tests.smoke.golden_capture_biologic / biologic_diff.bat
+# to capture a runtime golden-master run_OCV tree. The ONLY change from
+# biologic.yml is `root:`, pointed at a dedicated throwaway path so the capture
+# rig's assert_fresh() has a clean tree to start from and production C:\INST_hlo
+# (real run data, DATABASE, USER_CONFIG calibration) is never touched. This is a
+# REAL-HARDWARE capture (see golden_capture_biologic.py docstring) -- run_OCV
+# reads open-circuit voltage (non-perturbing, drives nothing) but the Biologic
+# instrument must be attached with a dummy cell / calibration resistor for
+# connect() to succeed and the capture to produce data.
+dummy: true
+simulation: true
+run_type: biologic_server
+root: C:\INST_hlo_golden
+servers:
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    fast: biologic_server
+    params:
+      allow_no_sample: true
+      address: 192.168.200.100
+      num_channels: 1
+      grounded: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'BIOLOGIC Visualizer'
+      launch_browser: true

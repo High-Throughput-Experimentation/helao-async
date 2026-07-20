@@ -1,0 +1,32 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of tec.yml used solely
+# by helao.hexagon.tests.smoke.golden_capture_tec / tec_diff.bat to capture a
+# runtime golden-master record_tec tree. The ONLY change from tec.yml is
+# `root:`, pointed at a dedicated throwaway path so the capture rig's
+# assert_fresh() has a clean tree to start from and production C:\INST_hlo
+# (real run data, DATABASE, USER_CONFIG calibration) is never touched. This
+# is a REAL-HARDWARE capture (see golden_capture_tec.py docstring) --
+# record_tec only reads TEC telemetry (no setpoint/enable change), but the
+# Meerstetter controller must be reachable at `port` (COM5) for the poller to
+# connect and the capture to produce data.
+dummy: true
+simulation: true
+run_type: tec_server
+root: C:\INST_hlo_golden
+servers:
+  TEC:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: tec_server
+    action_vis: tec_vis
+    params:
+      channel: 1
+      port: COM5
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'TEC Visualizer'
+      launch_browser: true
