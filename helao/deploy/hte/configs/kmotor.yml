@@ -1,0 +1,58 @@
+# STANDALONE kinesis_server canary config (P3a special-split, KMOTOR). Mirrors
+# galil.yml / spec.yml's 2-server shape (one action server + one
+# action_visualizer) so an at-station openapi golden diff can compare legacy
+# vs hexagon like-for-like without pulling in the full hispec station (ORCH,
+# MOTOR, PSTAT, IO, SAMPLE, SPEC_T, DB, CAM). The `axes.z` block (serial_no /
+# pos_scale / vel_scale / acc_scale / move_limit_mm) is copied VERBATIM from
+# hispec.yml's KMOTOR block so kinesis_dyn_endpoints registers the identical
+# kmove/cancel_kmove/set_velocity route surface AND so KinesisMotor.connect()
+# can actually open the real Thorlabs device at station -- a wrong/absent
+# serial_no makes connect() raise mid-loop, which leaves `self.dev_kinesis`
+# unset on the driver; kinesis_dyn_endpoints's endpoint signatures type-hint
+# their `axis` param as `app.driver.dev_kinesis`, so a missing attribute
+# raises AttributeError at endpoint-registration time and the app never
+# boots (no /openapi.json at all) -- this exact failure mode is what bit the
+# biologic canary. Real params are therefore load-bearing here even for the
+# openapi-only canary, not just for a runtime capture.
+#
+# OPENAPI-ONLY canary (no runtime golden-diff counterpart): every action
+# route kinesis_server.py registers under a configured axis --
+# `kmove` (commands motion, even a 0.0mm relative move still issues a real
+# move command to the stage), `cancel_kmove` (stops/cancels a move
+# executor), and `set_velocity` (writes velocity/acceleration parameters to
+# the live device) -- either drives the stage or mutates its hardware state.
+# There is no position/status QUERY action analogous to galil_motion's
+# `query_positions` (the poller samples position internally via
+# `get_lbuf`/live_dict, but that is not exposed as a callable action route).
+# So there is no SAFE, non-perturbing read action to dispatch for a runtime
+# golden diff -- the openapi-surface diff (see kmotor_canary.bat) is the
+# safety-appropriate parity check (mirrors ni_canary.bat's rationale exactly).
+# KinesisMotor.connect() opens a real pylablib Thorlabs.KinesisMotor handle
+# per axis -- WINDOWS-ONLY hardware; simulation:true is cosmetic (banner
+# color only), there is no Kinesis sim/dummy data path.
+dummy: true
+simulation: true
+run_type: kinesis_server
+root: C:\INST_hlo
+servers:
+  KMOTOR:
+    host: 127.0.0.1
+    port: 8015
+    group: action
+    fast: kinesis_server
+    params:
+      axes:
+        z:
+          serial_no: "49437454"
+          pos_scale: 1228800.0 # device to mm
+          vel_scale: 65970697.6 # device to mm/s
+          acc_scale: 13518.2 # device to mm/s2
+          move_limit_mm: 5.0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'KMOTOR Visualizer'
+      launch_browser: true
