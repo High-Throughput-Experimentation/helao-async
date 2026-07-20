@@ -56,6 +56,33 @@ _SYNC_RPC_CLIENTS: Dict[Tuple[str, int], RPCSyncClient] = {}
 _RPC_PROBE_TIMEOUT = 3.0
 
 
+def _query_safe(params: dict) -> dict:
+    """Coerce a params dict into values aiohttp/yarl accept as query values.
+
+    aiohttp's query-string encoder (yarl) accepts only ``str``/``int``/``float``
+    and raises ``TypeError: Invalid variable type`` on anything else -- notably
+    a ``bool`` action param such as ``external_trigger`` (``ANDOR/acquire``),
+    which otherwise crashes the HTTP-fallback POST and gets swallowed by the
+    retry loop as an escalating-sleep "hang". Map ``bool`` -> ``"true"``/
+    ``"false"`` (FastAPI parses these back to ``bool`` on the server, and the
+    action envelope's ``action_params`` -- which carries the real typed value
+    and wins in ``_build_action_from_kwargs`` -- is unaffected), drop ``None``
+    (yarl rejects it too; the endpoint default / envelope supplies it), and pass
+    ``str``/``int``/``float`` through unchanged. Non-scalar values (list/dict)
+    are left as-is: those belong in the action envelope body, not the query
+    string, so they are out of scope for this coercion.
+    """
+    safe: dict = {}
+    for key, val in (params or {}).items():
+        if isinstance(val, bool):
+            safe[key] = "true" if val else "false"
+        elif val is None:
+            continue
+        else:
+            safe[key] = val
+    return safe
+
+
 async def _get_rpc_client(host: str, port: int) -> RPCClient:
     """Return (or lazily create) the cached async RPC client for one peer.
 
@@ -170,7 +197,7 @@ async def async_action_dispatcher(
             ) as session:
                 async with session.post(
                     url,
-                    params=params,
+                    params=_query_safe(params),
                     json={"action": A.as_dict()},
                 ) as resp:
                     response = await resp.json()
@@ -279,7 +306,7 @@ async def async_private_dispatcher(
             ) as session:
                 async with session.post(
                     url,
-                    params=params_dict,
+                    params=_query_safe(params_dict),
                     json=json_dict,
                 ) as resp:
                     response = await resp.json()
@@ -399,7 +426,7 @@ def private_dispatcher(
     with requests.Session() as session:
         with session.post(
             url,
-            params=params_dict,
+            params=_query_safe(params_dict),
             json=json_dict,
             timeout=timeout,
         ) as resp:

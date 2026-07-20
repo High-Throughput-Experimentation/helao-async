@@ -29,6 +29,7 @@ from helao.core.rpc import (
     derive_rpc_port,
 )
 from helao.helpers.dispatcher import (
+    _query_safe,
     aclose_all_rpc_clients,
     async_private_dispatcher,
     close_all_sync_rpc_clients,
@@ -223,6 +224,38 @@ def dispatcher_unit_test() -> bool:
         reporter.check(
             "ErrorCodes.http is the dispatcher's failure flag",
             lambda: ErrorCodes.http.value == "http",
+        )
+
+        reporter.section("_query_safe coerces HTTP query params (yarl-safe)")
+        # yarl rejects bool query values ("Invalid variable type") -- an action
+        # param named external_trigger=False crashed the HTTP fallback POST and
+        # got swallowed as an escalating-sleep hang. bool -> "true"/"false"
+        # (FastAPI parses back to bool), None dropped, scalars passed through.
+        safe = _query_safe(
+            {
+                "external_trigger": False,
+                "flag": True,
+                "n": 3,
+                "x": 1.5,
+                "s": "a",
+                "z": None,
+            }
+        )
+        reporter.check(
+            "_query_safe maps bool -> 'true'/'false'",
+            lambda: safe.get("external_trigger") == "false"
+            and safe.get("flag") == "true",
+        )
+        reporter.check(
+            "_query_safe drops None and passes str/int/float through",
+            lambda: safe
+            == {
+                "external_trigger": "false",
+                "flag": "true",
+                "n": 3,
+                "x": 1.5,
+                "s": "a",
+            },
         )
 
         reporter.section("RPCDispatcher <-> RPCClient round-trip")
