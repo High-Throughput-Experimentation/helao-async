@@ -31,7 +31,7 @@ sequence_params:
   gamrychannelwait: -1
   gamrychannelsend: 0
 run_type: echeuvis
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: hte-eche-10.htejcap.caltech.edu
