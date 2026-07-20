@@ -133,11 +133,16 @@ def verify_device_open(host: str, port: int) -> None:
     process holds dev_id the open raises ``CGamryPstat - In use by another
     script`` and the server comes up with a closed pstat. Running run_OCV then
     just errors with no data (an errored -act.yml, no .hlo). Checking
-    ``/PSTAT/gamry_is_open`` (pstat.TestIsOpen) up front surfaces the real cause
+    ``gamry_is_open`` (pstat.TestIsOpen) up front surfaces the real cause
     instead.
+
+    NOTE: ``gamry_is_open`` is a PRIVATE endpoint -- bare ``/gamry_is_open``,
+    NOT ``/PSTAT/gamry_is_open``. On this server only ACTION endpoints carry the
+    ``/{server_key}/`` prefix (e.g. ``/PSTAT/run_OCV``); private/system routes
+    (gamry_is_open, gamry_state, shutdown, get_status) are unprefixed.
     """
     try:
-        r = requests.post(f"http://{host}:{port}/PSTAT/gamry_is_open", timeout=10)
+        r = requests.post(f"http://{host}:{port}/gamry_is_open", timeout=10)
         is_open = r.status_code == 200 and bool(r.json())
     except (requests.RequestException, ValueError):
         is_open = False
