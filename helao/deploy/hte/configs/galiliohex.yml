@@ -1,0 +1,40 @@
+# HEXAGON CANARY for the galil_io station (P3a special-split). Copy of
+# galilio.yml with `deployment: hexagon` flipping IO (galil_io) and ACTVIS
+# (action_visualizer) onto the hexagon factory -- the third hte cut-over
+# target (after gamry and galil_motion), run AT-STATION (Windows/gclib).
+# galilio.yml stays legacy for rollback; the cut-over is ONLY the two
+# `deployment: hexagon` keys. Ports/root/params match galilio.yml so an
+# on-station golden diff compares like-for-like.
+dummy: true
+simulation: true
+run_type: galil_io
+root: C:\INST_hlo
+servers:
+  IO:
+    host: 127.0.0.1
+    port: 8005
+    group: action
+    fast: galil_io
+    deployment: hexagon
+    params:
+      galil_ip_str: 192.168.200.234
+      dev_di:
+        gamry_ttl0: 1
+      dev_do:
+        spec_trig: 5
+        ir_emitter: 8
+        doric_wled: 1
+        we_flow: 2
+        we_pump: 7
+        we_vent: 3
+        ce_pump: 6
+        ce_vent: 4
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'IO Visualizer'
+      launch_browser: true

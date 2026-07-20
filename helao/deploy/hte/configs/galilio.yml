@@ -1,0 +1,41 @@
+# STANDALONE galil_io canary config (P3a special-split, IO). Mirrors
+# galil.yml's 2-server shape (one action server + one action_visualizer) so
+# an at-station openapi/runtime golden diff can compare legacy vs hexagon
+# like-for-like without pulling in the full eche10 station (ORCH, PSTAT,
+# MOTOR, SAMPLE, SPEC_T, DB, CAM, KMOTOR). IO params (galil_ip_str, dev_di,
+# dev_do) are copied verbatim from eche10.yml's IO block so get_digital_in
+# registers identically (it is gated on `dev_di`, not on any of the dropped
+# station servers). dev_do is KEPT (faithful openapi surface) even though
+# this canary never calls any set_* action -- see golden_capture_galil_io.py
+# for why.
+dummy: true
+simulation: true
+run_type: galil_io
+root: C:\INST_hlo
+servers:
+  IO:
+    host: 127.0.0.1
+    port: 8005
+    group: action
+    fast: galil_io
+    params:
+      galil_ip_str: 192.168.200.234
+      dev_di:
+        gamry_ttl0: 1
+      dev_do:
+        spec_trig: 5
+        ir_emitter: 8
+        doric_wled: 1
+        we_flow: 2
+        we_pump: 7
+        we_vent: 3
+        ce_pump: 6
+        ce_vent: 4
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'IO Visualizer'
+      launch_browser: true
