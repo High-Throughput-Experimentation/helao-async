@@ -151,6 +151,13 @@ def query_positions_action(host: str, port: int) -> dict:
     issues no motion command.
     """
     r = requests.post(f"http://{host}:{port}/MOTOR/query_positions", timeout=30)
+    if r.status_code != 200:
+        # The uvicorn traceback is routed away from the console + helao MOTOR
+        # log, so surface whatever the server returned in the response body.
+        print(
+            f"[golden_capture_galil] query_positions HTTP {r.status_code}; "
+            f"response body:\n{r.text[:3000]}"
+        )
     r.raise_for_status()
     return r.json()
 
