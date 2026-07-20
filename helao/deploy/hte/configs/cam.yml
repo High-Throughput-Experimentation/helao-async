@@ -1,23 +1,20 @@
 # STANDALONE cam_server canary config (P3a special-split, CAM). Mirrors
 # galil.yml/sample.yml's 2-server shape (one action server + one
-# action_visualizer) so an at-station openapi diff can compare legacy vs
-# hexagon like-for-like without pulling in the full eche10 station. CAM param
-# (axis_ip) is copied verbatim from eche10.yml's CAM block. This is the Axis IP
-# webcam (AxisCam, HTTP JPEG fetch -- NO vendor DLL, NO COM/gclib).
+# action_visualizer) so an at-station openapi/runtime golden diff can compare
+# legacy vs hexagon like-for-like without pulling in the full eche10 station.
+# CAM param (axis_ip) is copied verbatim from eche10.yml's CAM block. This is
+# the Axis IP webcam (AxisCam, HTTP JPEG fetch -- NO vendor DLL, NO COM/gclib).
 #
-# OPENAPI-CANARY ONLY: there is no runtime golden-diff tier for cam. Its
-# acquire_image action writes per-frame timestamped JPEG files
-# (cam_NNNNNN_<%y%m%d.%H%M%S>.jpg) whose filenames and binary content both vary
-# run-to-run; the parity harness has no manifest-only lever to normalize a
-# per-frame-timestamped filename in the tree member set (normalize_name only
-# collapses the §5.1 dir/meta timestamp grammar, not arbitrary aux filenames),
-# so a byte-parity runtime diff would need harness code changes. The openapi
-# surface diff fully proves the makeActionApp route/schema factory parity,
-# which is the cut-over gate; this matches the dbpack/analysis openapi-only
-# precedent. AxisCam.connect() opens no network connection (returns success
-# unconditionally), so this canary boots and serves /openapi.json even without
-# the camera reachable -- a reachable camera is only needed to actually acquire
-# an image, which this canary never does.
+# TWO TIERS (as of the RE_CAM_IMG harness rule): cam_canary.bat does the
+# /openapi.json surface diff (this config + camhex.yml); cam_diff.bat does the
+# runtime acquire_image golden diff (camgold.yml/camgoldhex.yml).
+# AxisCam.connect() opens no network connection (returns success
+# unconditionally), so the openapi canary boots and serves /openapi.json even
+# without the camera reachable; the runtime diff DOES need the camera reachable
+# at axis_ip (it fetches one frame). The runtime diff is possible because
+# harness.classify.normalize_name collapses the volatile
+# cam_NNNNNN_<%y%m%d.%H%M%S>.jpg frame timestamp to cam_NNNNNN_TS.jpg on both
+# sides; see golden_capture_cam.py for the full masking rationale.
 dummy: true
 simulation: true
 run_type: cam_server

@@ -211,3 +211,32 @@ def test_apply_meta_key_mask_absent_is_noop_presence_still_diffs():
     g2 = {"other": 1}
     apply_meta_key_mask(g2, ["action_params.has_bubble"])
     assert g2 == {"other": 1}
+
+
+def test_file_name_values_get_the_name_grammar_treatment():
+    # A FileInfo.file_name inside an -act.yml `files` entry is a bare basename
+    # (os.path.basename). A timestamped cam frame normalizes identically on both
+    # sides so the -act.yml diff is clean; the volatile ymdhms is collapsed but
+    # the deterministic frame counter is kept.
+    m = UuidMapper()
+    out = normalize_meta(
+        {
+            "files": [
+                {"file_name": "cam_000000_260719.220107.jpg", "file_type": "webcam"}
+            ]
+        },
+        m,
+    )
+    assert out == {"files": [{"file_name": "cam_000000_TS.jpg", "file_type": "webcam"}]}
+    # two independent captures (different wall clock) normalize to the SAME thing
+    a = normalize_meta({"file_name": "cam_000000_260719.220107.jpg"}, UuidMapper())
+    b = normalize_meta({"file_name": "cam_000000_991231.010203.jpg"}, UuidMapper())
+    assert a == b == {"file_name": "cam_000000_TS.jpg"}
+
+
+def test_deterministic_file_names_pass_through_unchanged():
+    # No-regression guard: an ordinary <label>-<idx>.hlo file_name matches no
+    # §5.1 grammar rule, so it is untouched (only the cam-frame grammar is new).
+    m = UuidMapper()
+    out = normalize_meta({"file_name": "WsSim-0.0.0.0__0.hlo"}, m)
+    assert out == {"file_name": "WsSim-0.0.0.0__0.hlo"}

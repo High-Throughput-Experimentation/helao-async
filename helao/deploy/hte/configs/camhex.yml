@@ -3,8 +3,8 @@
 # (action_visualizer) onto the hexagon factory. cam.yml stays legacy for
 # rollback; the cut-over is ONLY the two `deployment: hexagon` keys. Ports/root/
 # params match cam.yml so the openapi surface diff compares like-for-like.
-# OPENAPI-CANARY ONLY (no runtime golden-diff tier for cam -- see cam.yml's
-# header for the full rationale).
+# TWO TIERS -- see cam.yml's header (openapi via cam_canary.bat, runtime
+# acquire_image golden diff via cam_diff.bat + camgold/camgoldhex).
 dummy: true
 simulation: true
 run_type: cam_server
