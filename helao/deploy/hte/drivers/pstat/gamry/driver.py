@@ -90,6 +90,25 @@ class GamryDriver(HelaoDriver):
         self.connect()
         LOGGER.debug(f"connected to {self.device_name} on device_id {self.device_id}")
 
+    def _create_and_open_pstat(self, client) -> None:
+        """Load the type library, enumerate the device, create + Open the pstat.
+
+        Split out of ``connect`` so the open can be retried after clearing a
+        stale GamryCOM (see the self-heal in ``connect``). Populates
+        ``GamryCOM``/``device_name``/``model``/``pstat``.
+        """
+        self.GamryCOM = client.GetModule(
+            ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
+        )
+        devices = client.CreateObject("GamryCOM.GamryDeviceList")
+        self.device_name = devices.EnumSections()[self.device_id]
+        self.model = GAMRY_DEVICES.get(
+            self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"]
+        )
+        self.pstat = client.CreateObject(self.model.device)
+        self.pstat.Init(self.device_name)
+        self.pstat.Open()
+
     def connect(self) -> DriverResponse:
         """Load the GamryCOM type library, open the device, and turn the cell off.
 
@@ -104,17 +123,31 @@ class GamryDriver(HelaoDriver):
         try:
             self.connection_raised = True
             LOGGER.info(f"using device_id {self.device_id} from config")
-            self.GamryCOM = client.GetModule(
-                ["{BD962F0D-A990-4823-9CF5-284D1CDD9C6D}", 1, 0]
-            )
-            devices = client.CreateObject("GamryCOM.GamryDeviceList")
-            self.device_name = devices.EnumSections()[self.device_id]
-            self.model = GAMRY_DEVICES.get(
-                self.device_name.split("-")[0], GAMRY_DEVICES["DEFAULT"]
-            )
-            self.pstat = client.CreateObject(self.model.device)
-            self.pstat.Init(self.device_name)
-            self.pstat.Open()
+            try:
+                self._create_and_open_pstat(client)
+            except Exception as open_exc:
+                # DRAFT self-heal (OPT-IN, default OFF via `recover_stale_gamrycom`):
+                # an abnormally-terminated prior run (crash / hard-kill / power
+                # loss) can leave a stale GamryCOM.exe holding the exclusive
+                # device, so pstat.Open() raises
+                # `CGamryPstat - In use by another script`. When enabled, kill the
+                # stale GamryCOM and retry the open ONCE.
+                # RISK: kill_gamrycom() terminates EVERY GamryCOM process on the
+                # host -- do NOT enable where another live instance may legitimately
+                # hold the device. Off by default so behavior is unchanged.
+                if not (
+                    self.config.get("recover_stale_gamrycom", False)
+                    and "in use by another script" in str(open_exc).lower()
+                ):
+                    raise
+                LOGGER.warning(
+                    "pstat.Open() reports device in use; recover_stale_gamrycom "
+                    "is ON -> killing stale GamryCOM and retrying open once",
+                    exc_info=True,
+                )
+                self.kill_gamrycom()
+                time.sleep(1.0)
+                self._create_and_open_pstat(client)
             self.pstat.SetCell(self.GamryCOM.CellOff)
             self.state = self.pstat.State()
             response = DriverResponse(

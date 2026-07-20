@@ -53,6 +53,13 @@ from helao.helpers.time_utils import get_ntp_time
 from logging import Logger
 from helao.helpers import helao_logging as logging
 
+# Upper bound (seconds) for a blocking POST /shutdown. The server's shutdown
+# hook runs its driver shutdown (e.g. gamry disconnect + kill GamryCOM) before
+# responding; this bounds the wait so a hung driver shutdown can't stall
+# teardown. On timeout the server-side handler keeps running and kill_server
+# reaps the process afterward.
+SHUTDOWN_POST_TIMEOUT = 30
+
 LAUNCH_LOGGER: Logger = None
 
 
@@ -384,9 +391,7 @@ class Pidd:
                 f"Retaining '{self.pidFilePath}' for recovery."
             )
         else:
-            LAUNCH_LOGGER.info(
-                f"All servers terminated. Removing '{self.pidFilePath}'"
-            )
+            LAUNCH_LOGGER.info(f"All servers terminated. Removing '{self.pidFilePath}'")
             if os.path.exists(self.pidFilePath):
                 os.remove(self.pidFilePath)
 
@@ -984,7 +989,13 @@ def main():
         """
         LAUNCH_LOGGER.info(f"Unsubscribing {servername} websockets.")
         S = pidd.servers[groupname][servername]
-        requests.post(f"http://{S['host']}:{S['port']}/shutdown")
+        # /shutdown blocks until the server's shutdown_event (incl. the driver's
+        # shutdown hook, e.g. gamry disconnect + kill GamryCOM) completes. Bound
+        # the wait so a hung driver shutdown can't stall teardown forever; the
+        # server-side handler keeps running and kill_server reaps afterward.
+        requests.post(
+            f"http://{S['host']}:{S['port']}/shutdown", timeout=SHUTDOWN_POST_TIMEOUT
+        )
         return S
 
     # Serializes all pidd mutation across the keypress thread (CTRL-r/CTRL-x) and
@@ -1086,7 +1097,9 @@ def main():
         """
         repos = discover_git_repos(helao_repo_root)
         if not repos:
-            LAUNCH_LOGGER.warning("Hot-reload: no git repos found to watch; watcher exiting.")
+            LAUNCH_LOGGER.warning(
+                "Hot-reload: no git repos found to watch; watcher exiting."
+            )
             return
         root = config.get("root", None)
         # Seed only repos whose HEAD is currently readable; a repo that fails to
@@ -1152,7 +1165,9 @@ def main():
                     if entry is None:
                         continue  # server no longer known; drop
                     if server_is_idle(group, entry):
-                        LAUNCH_LOGGER.info(f"Hot-reload: restarting idle {group}/{name}.")
+                        LAUNCH_LOGGER.info(
+                            f"Hot-reload: restarting idle {group}/{name}."
+                        )
                         if not restart_server(
                             group, name, restore=(group == "orchestrator")
                         ):
@@ -1246,8 +1261,13 @@ def main():
                         try:
                             LAUNCH_LOGGER.info(f"Shutting down {server}.")
                             S = G[server]
-                            # will produce a 404 if not found
-                            requests.post(f"http://{S['host']}:{S['port']}/shutdown")
+                            # will produce a 404 if not found. Bounded wait: the
+                            # handler runs the driver shutdown (gamry disconnect +
+                            # kill GamryCOM) before responding.
+                            requests.post(
+                                f"http://{S['host']}:{S['port']}/shutdown",
+                                timeout=SHUTDOWN_POST_TIMEOUT,
+                            )
                         except Exception:
                             LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
             # hold pidd_lock so a concurrent hot-reload restart can't interleave
