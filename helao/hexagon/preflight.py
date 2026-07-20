@@ -68,6 +68,22 @@ def _server_module(server: dict) -> Optional[str]:
     return server.get("fast") or server.get("bokeh")
 
 
+def _checklist_module(server: dict) -> Optional[str]:
+    """The module a server's endpoint checklist is keyed by.
+
+    Normally the `fast`/`bokeh` module basename, but a `fast: graft` server
+    (the generic config-driven hexagon graft, helao/deploy/hexagon/servers/
+    action/graft.py) wraps the module named by its top-level `legacy_module:`
+    key, so its checklist is keyed by that legacy module's basename, not by the
+    generic shim name "graft".
+    """
+    module = _server_module(server)
+    if module == "graft":
+        legacy = server.get("legacy_module")
+        return legacy.rsplit(".", 1)[-1] if legacy else None
+    return module
+
+
 def _config_sanity(servers: dict) -> list[str]:
     issues: list[str] = []
     hostports: dict[tuple, str] = {}
@@ -112,7 +128,7 @@ def _checklist_presence(servers: dict, checklist_dir: Optional[Path]) -> list[st
     for key, s in servers.items():
         if s.get("deployment") != HEXAGON or s.get("group") != "action":
             continue
-        module = _server_module(s)
+        module = _checklist_module(s)
         if module and not (checklist_dir / f"{module}.json").exists():
             issues.append(
                 f"{key}: frozen endpoint checklist missing for '{module}' "
