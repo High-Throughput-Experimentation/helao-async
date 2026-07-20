@@ -1,0 +1,32 @@
+# HEXAGON CANARY for the spec_server station (P3a special-split). Copy of
+# spec.yml with `deployment: hexagon` flipping SPEC (spec_server) and ACTVIS
+# (action_visualizer) onto the hexagon factory -- run AT-STATION
+# (Windows/SPdbUSBm.dll). spec.yml stays legacy for rollback; the cut-over is
+# ONLY the two `deployment: hexagon` keys. Ports/root/params match spec.yml so
+# an on-station openapi/golden diff compares like-for-like.
+dummy: true
+simulation: true
+run_type: spec_server
+root: C:\INST_hlo
+servers:
+  SPEC:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: spec_server
+    deployment: hexagon
+    params:
+      dev_num: 0
+      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
+      n_pixels: 1024
+      start_margin: 5
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'SPEC Visualizer'
+      launch_browser: true
