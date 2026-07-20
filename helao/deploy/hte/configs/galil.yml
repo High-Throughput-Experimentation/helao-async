@@ -1,0 +1,61 @@
+# STANDALONE galil_motion canary config (P3a special-split, MOTOR). Mirrors
+# gamry.yml's 2-server shape (one action server + one action_visualizer) so
+# an at-station openapi/runtime golden diff can compare legacy vs hexagon
+# like-for-like without pulling in the full eche10 station (ORCH, PSTAT, IO,
+# SAMPLE, SPEC_T, DB, CAM, KMOTOR). Axis params (galil_ip_str/ipstr,
+# axis_id, count_to_mm, axis_zero, speeds, timeout) are copied verbatim from
+# eche10.yml's MOTOR block so query_positions registers identically (it is
+# gated on `axis_id`/`dev_axis`, not on any of the dropped station servers).
+# `enable_aligner: false` skips the aligner Bokeh-in-driver startup (out of
+# scope for this canary; see galil_motion_driver.py Galil.connect()).
+dummy: true
+simulation: true
+run_type: galil_motion
+root: C:\INST_hlo
+servers:
+  MOTOR:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: galil_motion
+    params:
+      enable_aligner: false
+      M_instr:
+        -   - 1
+            - 0
+            - 0
+            - 0
+        -   - 0
+            - 1
+            - 0
+            - 0
+        -   - 0
+            - 0
+            - 1
+            - 0
+        -   - 0
+            - 0
+            - 0
+            - 1
+      count_to_mm:
+        A: 0.00015625
+        B: 0.00015625
+      galil_ip_str: 192.168.200.234
+      def_speed_count_sec: 10000
+      max_speed_count_sec: 25000
+      ipstr: 192.168.200.234
+      axis_id:
+        x: B
+        y: A
+      axis_zero:
+        A: 127.8
+        B: 76.7
+      timeout: 600
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'MOTOR Visualizer'
+      launch_browser: true
