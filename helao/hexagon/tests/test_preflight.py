@@ -92,3 +92,18 @@ def test_checklist_module_resolves_graft_from_legacy_module():
     assert preflight._checklist_module({"fast": "graft"}) is None
     # ordinary servers still key by their fast/bokeh module
     assert preflight._checklist_module({"fast": "gamry_server2"}) == "gamry_server2"
+
+
+def test_checklist_dir_prefers_private_in_repo_then_central():
+    """A private deployment's checklists live in its own repo
+    (helao/deploy/<dep>/tests/checklists); hte/test use the central
+    helao/hexagon/tests/checklists/<dep>. Unknown/None -> None."""
+    hte = preflight._checklist_dir("hte")
+    assert hte is not None and hte.parts[-3:] == ("tests", "checklists", "hte")
+    assert "hexagon" in hte.parts  # central location
+    priv = preflight._checklist_dir("priv")
+    if priv is not None:  # present when the priv nested repo is checked out
+        assert priv.parts[-3:] == ("priv", "tests", "checklists")
+        assert "deploy" in priv.parts and "hexagon" not in priv.parts  # in-repo
+    assert preflight._checklist_dir(None) is None
+    assert preflight._checklist_dir("no_such_deployment") is None
