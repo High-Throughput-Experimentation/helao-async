@@ -1,0 +1,35 @@
+# STANDALONE spec_server canary config (P3a special-split, SPEC). Mirrors
+# galil.yml/gamry.yml's 2-server shape (one action server + one
+# action_visualizer) so an at-station openapi/runtime golden diff can compare
+# legacy vs hexagon like-for-like without pulling in the full eche10 station
+# (ORCH, MOTOR, PSTAT, IO, SAMPLE, DB, CAM, KMOTOR). SPEC params (dev_num,
+# lib_path, n_pixels, start_margin, allow_no_sample) are copied verbatim from
+# eche10.yml's SPEC_T block so acquire_spec registers identically. This is the
+# SM303 spectrometer (vendor SPdbUSBm.dll via ctypes) -- WINDOWS-ONLY hardware;
+# the runtime golden diff requires the spectrometer attached (see
+# golden_capture_spec.py's docstring). The openapi canary only needs the
+# server to boot and serve /openapi.json.
+dummy: true
+simulation: true
+run_type: spec_server
+root: C:\INST_hlo
+servers:
+  SPEC:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: spec_server
+    params:
+      dev_num: 0
+      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
+      n_pixels: 1024
+      start_margin: 5
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'SPEC Visualizer'
+      launch_browser: true

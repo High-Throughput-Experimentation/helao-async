@@ -1,0 +1,38 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of spechex.yml (keeps
+# `deployment: hexagon` on SPEC + ACTVIS -- the hexagon side of the runtime
+# golden diff) used solely by helao.hexagon.tests.smoke.golden_capture_spec /
+# spec_diff.bat to capture a runtime golden-master acquire_spec tree. The ONLY
+# change from spechex.yml is `root:`, pointed at a dedicated throwaway path so
+# the capture rig's assert_fresh() has a clean tree to start from and
+# production C:\INST_hlo (real run data, DATABASE, USER_CONFIG calibration) is
+# never touched. Ports and params match specgold.yml so the capture-vs-capture
+# parity diff compares like-for-like. This is a REAL-HARDWARE capture (see
+# golden_capture_spec.py docstring) -- acquire_spec reads a single spectrum
+# (non-perturbing) but the SM303 spectrometer must be attached for connect() to
+# succeed and the capture to produce data.
+dummy: true
+simulation: true
+run_type: spec_server
+root: C:\INST_hlo_golden
+servers:
+  SPEC:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: spec_server
+    deployment: hexagon
+    params:
+      dev_num: 0
+      lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
+      n_pixels: 1024
+      start_margin: 5
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'SPEC Visualizer'
+      launch_browser: true
