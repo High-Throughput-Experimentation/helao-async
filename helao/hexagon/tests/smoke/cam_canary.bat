@@ -9,16 +9,13 @@ REM route/schema surface proves the hexagon makeActionApp factory produces a
 REM byte-parity action server for the cam_server (Axis IP webcam) cut-over
 REM target.
 REM
-REM OPENAPI-CANARY ONLY: there is no spec_diff.bat-style runtime golden diff for
-REM cam. Its acquire_image action writes per-frame timestamped JPEG files
-REM (cam_NNNNNN_<%%y%%m%%d.%%H%%M%%S>.jpg) whose filenames AND binary content
-REM both vary run-to-run; the parity harness has no manifest-only lever to
-REM normalize a per-frame-timestamped filename in the tree member set
-REM (normalize_name collapses only the §5.1 dir/meta timestamp grammar, not
-REM arbitrary aux filenames), so a byte-parity runtime diff would need harness
-REM code changes. The openapi surface diff fully proves the makeActionApp
-REM route/schema factory parity, which is the cut-over gate -- matching the
-REM dbpack/analysis openapi-only precedent.
+REM TWO TIERS: this script does the /openapi.json surface diff; cam_diff.bat does
+REM the runtime acquire_image golden diff (camgold/camgoldhex). The runtime tier
+REM became possible with harness.classify.normalize_name's cam-frame grammar rule
+REM (RE_CAM_IMG): it collapses the volatile cam_NNNNNN_<%%y%%m%%d.%%H%%M%%S>.jpg
+REM frame timestamp to cam_NNNNNN_TS.jpg so two captures' JPEGs land at the same
+REM normalized tree member; the .jpg bytes are content-masked and the .hlo
+REM epoch_s/filename columns value-masked (see golden_capture_cam.py).
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
@@ -30,7 +27,8 @@ REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: AxisCam.connect() opens no network connection (returns success
 REM unconditionally), so this canary boots and serves /openapi.json even without
 REM the camera reachable at axis_ip -- a reachable camera is only needed to
-REM actually acquire an image, which this canary never does.
+REM actually acquire an image, which this openapi canary never does (cam_diff.bat
+REM does, and needs the camera).
 REM
 REM Usage: cam_canary.bat [root] [outdir]
 REM   root   default C:\INST_hlo   (must match the configs' root: key)
@@ -159,12 +157,11 @@ powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $
 REM 3) WAIT for the CAM server's HTTP + co-located ZMQ RPC ports (RPC =
 REM HTTP+10000 = 18013) to actually RELEASE before returning. The RPC listener
 REM is a thread inside the server process and lives as long as the process does;
-REM if the next sequential launch (cam vs camhex) starts while a stale listener
-REM still owns 127.0.0.1:18013, the next launch's "Address in use" fallback
-REM fires and a dispatch_action RPC-first call would reach the STALE binder.
-REM (cam is openapi-only so it never dispatches an action, but the wait keeps
-REM the kill path uniform and prevents a stale binder leaking into any later
-REM run on these ports.) Poll both ports until free (~30s cap).
+REM if the next sequential launch (cam vs camhex, or a following cam_diff.bat run
+REM on the same ports) starts while a stale listener still owns 127.0.0.1:18013,
+REM the next launch's "Address in use" fallback fires and a dispatch_action
+REM RPC-first call would reach the STALE binder -- yielding an empty capture
+REM (the at-station spec failure mode). Poll both ports until free (~30s cap).
 set "RELEASED=0"
 for /l %%i in (1,1,30) do (
   call conda run -n helao python -c "import socket,sys; c=lambda p: socket.socket().connect_ex(('127.0.0.1',p))==0; sys.exit(1 if (c(8013) or c(18013)) else 0)" 2>nul

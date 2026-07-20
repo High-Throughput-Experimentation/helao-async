@@ -63,3 +63,24 @@ def test_classify_rows():
     assert classify_file("RUNS_FINISHED/a/extra_output.csv") is ArtifactRow.AUX_FILE
     assert classify_file("LOGS/ORCH.log") is ArtifactRow.IGNORE
     assert classify_file("STATES/pids_golden_.pck") is ArtifactRow.IGNORE
+
+
+def test_normalize_cam_image_strips_only_the_wall_clock_suffix():
+    # AxisCamExec frame: cam_{counter:06}_{%y%m%d.%H%M%S}.jpg. The counter is
+    # kept (real frame identity, deterministic across captures); only the
+    # volatile ymdhms suffix collapses to TS.
+    assert normalize_name("cam_000000_260719.220107.jpg") == "cam_000000_TS.jpg"
+    assert normalize_name("cam_000005_251231.000000.jpg") == "cam_000005_TS.jpg"
+    # a longer counter (>=1e6 frames) still normalizes (the {:06} pad is a floor)
+    assert normalize_name("cam_1000000_260719.220107.jpg") == "cam_1000000_TS.jpg"
+    # a .jpg that is NOT the cam-frame grammar is left untouched (AUX_FILE stays
+    # compared by name) -- the rule is anchored, not a blanket "*.jpg" strip.
+    assert normalize_name("snapshot.jpg") == "snapshot.jpg"
+    assert normalize_name("cam_result.jpg") == "cam_result.jpg"
+    # it participates in the full relpath walk like any other element
+    assert (
+        normalize_relpath(
+            "RUNS_DIAG/25.28/0716/0__0__CAM__acquire_image/cam_000000_260719.220107.jpg"
+        )
+        == "RUNS_DIAG/YY.WW/MMDD/0__0__CAM__acquire_image/cam_000000_TS.jpg"
+    )
