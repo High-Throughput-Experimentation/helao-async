@@ -193,6 +193,22 @@ REM cascade through a shared conhost.exe and close the main window.
 REM The match includes " --no-hot-reload" so "specgold" cannot match
 REM "specgoldhex" (no space follows "specgold" in that cmdline).
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+REM 3) WAIT for the SPEC server's HTTP + co-located ZMQ RPC ports (RPC =
+REM HTTP+10000 = 18011) to actually RELEASE before returning. The RPC listener
+REM is a thread inside the server process and lives as long as the process does;
+REM if the next sequential launch (specgold vs specgoldhex) -- or a preceding
+REM spec_canary run on the same ports -- leaves a stale listener owning
+REM 127.0.0.1:18011, a dispatch_action RPC-first call reaches the STALE binder:
+REM the action is ACK'd but never runs on the live server, yielding an empty
+REM capture (statuses={}). Poll both ports until free (~30s cap).
+set "RELEASED=0"
+for /l %%i in (1,1,30) do (
+  call conda run -n helao python -c "import socket,sys; c=lambda p: socket.socket().connect_ex(('127.0.0.1',p))==0; sys.exit(1 if (c(8011) or c(18011)) else 0)" 2>nul
+  if !errorlevel! equ 0 ( set "RELEASED=1" & goto :spec_ports_free )
+  ping -n 2 -w 1000 127.0.0.1 >nul
+)
+:spec_ports_free
+if not "!RELEASED!"=="1" echo [golden] WARNING %PREFIX% ports 8011/18011 still bound after wait -- next launch may hit a stale RPC binder
 goto :eof
 
 REM ---------------------------------------------------------------------------

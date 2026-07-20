@@ -262,7 +262,12 @@ def settle(
     poll_s: float = 2.0,
     timeout_s: float = 300.0,
 ) -> None:
-    """Wait for the run_OCV action to WRITE its -act.yml and FINISH, then settle.
+    """Wait for the dispatched action to WRITE its -act.yml and FINISH, then settle.
+
+    Shared by every golden_capture module (gamry run_OCV, galil query_positions,
+    sample get_loaded_positions, spec acquire_spec, ...) -- it is action-agnostic
+    (gates purely on -act.yml terminal status under ``root``), so messages here
+    name "the action" generically, not any one scenario's endpoint.
 
     NO orch/DB in this topology, AND a manual direct-POST action writes to
     RUNS_DIAG (base.py:1016) and never touches RUNS_ACTIVE -- so polling
@@ -305,9 +310,9 @@ def settle(
         time.sleep(poll_s)
     statuses = _act_status_map(root)
     raise TimeoutError(
-        f"{root}: run_OCV did not reach a terminal action_status after "
-        f"{timeout_s}s (statuses={statuses}). The action is stuck active or "
-        "never wrote -- check the launch/capture logs. Refusing to snapshot a "
+        f"{root}: the dispatched action did not reach a terminal action_status "
+        f"after {timeout_s}s (statuses={statuses}). The action is stuck active "
+        "or never wrote -- check the launch/capture logs. Refusing to snapshot a "
         "mid-flight tree."
     )
 
