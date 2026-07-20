@@ -1,0 +1,32 @@
+# VALIDATION config for the generic config-driven hexagon graft (decision A):
+# same as samplehex.yml but SAMPLE routes through the GENERIC `fast: graft`
+# shim + a top-level `legacy_module:` key, instead of the hardcoded
+# helao/deploy/hexagon/servers/action/sample_server.py shim. Proves the generic
+# graft yields a byte-identical action surface to the hardcoded shim (and thus
+# to legacy sample.yml). Linux-runnable (Archive driver, no hardware). Not a
+# production config — a mechanism proof for the private-deployment graft.
+dummy: true
+simulation: true
+run_type: sample_server
+root: /tmp/INST_hlo_sample
+servers:
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: graft
+    deployment: hexagon
+    legacy_module: helao.deploy.hte.servers.action.sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'SAMPLE Visualizer'
+      launch_browser: true

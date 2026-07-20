@@ -72,3 +72,23 @@ def test_library_collision_overridable():
         "allow_shadow": True,
     }
     assert preflight._library_collisions(cfg) == []
+
+
+def test_samplegraft_generic_graft_passes():
+    """The generic config-driven graft (fast: graft + legacy_module) passes
+    every offline gate — its checklist resolves from the legacy module."""
+    assert preflight.preflight_config("samplegraft") == []
+
+
+def test_checklist_module_resolves_graft_from_legacy_module():
+    """fast: graft keys its checklist by the legacy_module basename, not by the
+    generic shim name 'graft'."""
+    graft_srv = {
+        "fast": "graft",
+        "legacy_module": "helao.deploy.hte.servers.action.sample_server",
+    }
+    assert preflight._checklist_module(graft_srv) == "sample_server"
+    # a graft server missing legacy_module resolves to None (no checklist name)
+    assert preflight._checklist_module({"fast": "graft"}) is None
+    # ordinary servers still key by their fast/bokeh module
+    assert preflight._checklist_module({"fast": "gamry_server2"}) == "gamry_server2"
