@@ -1,0 +1,39 @@
+# STANDALONE tec_server canary config (P3a special-split, TEC). Mirrors
+# galil.yml / gamry.yml's 2-server shape (one action server + one
+# action_visualizer) so an at-station openapi/runtime golden diff can compare
+# legacy vs hexagon like-for-like without pulling in the full anec station
+# (ORCH, other action servers, LIVE visualizer). `channel`/`port` are copied
+# verbatim from anec.yml's commented TEC block (the only station reference)
+# so MeerstetterTEC opens a real MeCom serial session and
+# MeerstetterTECPoller's background poll loop produces live telemetry (see
+# mecom_driver.py) -- the poller lazily connects on its first `get_data()`
+# call, there is no explicit `connect()` call in tec_server.py.
+#
+# `record_tec` (streams TEC telemetry via a TECMonExec) is NON-PERTURBING --
+# it does not change the setpoint or enable/disable the controller -- so it
+# is the safe read used for the runtime golden diff (see tec_diff.bat /
+# golden_capture_tec.py). `set_temperature`/`enable_tec`/`disable_tec`/
+# `wait_till_stable` all drive the controller and must never be dispatched by
+# a canary.
+dummy: true
+simulation: true
+run_type: tec_server
+root: C:\INST_hlo
+servers:
+  TEC:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: tec_server
+    action_vis: tec_vis
+    params:
+      channel: 1
+      port: COM5
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'TEC Visualizer'
+      launch_browser: true
