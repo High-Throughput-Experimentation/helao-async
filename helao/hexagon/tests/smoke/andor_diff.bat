@@ -176,7 +176,13 @@ REM settle ~3s (ping, not timeout, to survive redirected stdin)
 ping -n 4 -w 1000 127.0.0.1 >nul
 
 echo [golden] capturing acquire -^> %CAPOUT%
-call conda run -n helao python -m helao.hexagon.tests.smoke.golden_capture_andor --config-prefix %PREFIX% --root "%CAPROOT%" --out "%CAPOUT%" > "%OUTDIR%\%PREFIX%.capture.log" 2>&1
+REM --no-capture-output + python -u: `conda run` otherwise CAPTURES the child's
+REM stdout/stderr and only releases it when the child exits, so a HUNG capture
+REM leaves an empty .capture.log (even flushed prints never surface) and the
+REM stall is unattributable. With both flags the flushed stage breadcrumbs in
+REM golden_capture_andor land in the log LIVE, so the last line pinpoints where
+REM a hang occurred. Tail it from another window: powershell Get-Content -Wait.
+call conda run --no-capture-output -n helao python -u -m helao.hexagon.tests.smoke.golden_capture_andor --config-prefix %PREFIX% --root "%CAPROOT%" --out "%CAPOUT%" > "%OUTDIR%\%PREFIX%.capture.log" 2>&1
 set "CAPTURE_RC=!errorlevel!"
 type "%OUTDIR%\%PREFIX%.capture.log"
 
