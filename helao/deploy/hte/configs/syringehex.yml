@@ -1,0 +1,33 @@
+# HEXAGON CANARY for the syringe_server station (P3a special-split). Copy of
+# syringe.yml with `deployment: hexagon` flipping WORKSYRINGE (syringe_server)
+# and ACTVIS (action_visualizer) onto the hexagon factory -- the hte cut-over
+# target, run AT-STATION (Windows/pyserial COM5). syringe.yml stays legacy for
+# rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# Ports/root/params match syringe.yml so an on-station openapi diff compares
+# like-for-like.
+dummy: true
+simulation: true
+run_type: syringe_server
+root: C:\INST_hlo
+servers:
+  WORKSYRINGE:
+    host: 127.0.0.1
+    port: 8013
+    group: action
+    fast: syringe_server
+    deployment: hexagon
+    params:
+      port: COM5
+      pumps:
+        zero:
+          address: 0
+          diameter: 26.7
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'WORKSYRINGE Visualizer'
+      launch_browser: true

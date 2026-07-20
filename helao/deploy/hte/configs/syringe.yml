@@ -1,0 +1,42 @@
+# STANDALONE syringe_server canary config (P3a special-split, SYRINGE pump).
+# Mirrors galil.yml/spec.yml's 2-server shape (one action server + one
+# action_visualizer) so an at-station openapi/runtime golden diff can compare
+# legacy vs hexagon like-for-like without pulling in the full ccsi1 station
+# (ORCH, the other syringe pumps, MFCs, sensors, DB, ...). The WORKSYRINGE
+# params (port, pumps: zero: {address, diameter}) are copied VERBATIM from
+# ccsi1.yml's WORKSYRINGE block so get_present_volume registers identically
+# (it is gated on nothing beyond the driver being constructed). This is the KD
+# Scientific Legato 100 syringe pump (KDS100 driver, pyserial over COM5) --
+# WINDOWS-ONLY hardware for the full driver lifecycle; the openapi canary only
+# needs the server to boot and serve /openapi.json.
+#
+# NOTE (unlike galil/gamry/spec): get_present_volume reads the driver's
+# software-tracked `present_volume_ul` attribute (initialized to 0.0 in
+# KDS100.__init__ and mutated only by infuse/withdraw/set_present_volume) --
+# it does NOT query the pump over the wire. On a fresh launch that value is
+# deterministically 0.0, so the runtime golden diff is hardware-INDEPENDENT
+# and fully deterministic (no masking needed); see golden_capture_syringe.py.
+dummy: true
+simulation: true
+run_type: syringe_server
+root: C:\INST_hlo
+servers:
+  WORKSYRINGE:
+    host: 127.0.0.1
+    port: 8013
+    group: action
+    fast: syringe_server
+    params:
+      port: COM5
+      pumps:
+        zero:
+          address: 0
+          diameter: 26.7
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'WORKSYRINGE Visualizer'
+      launch_browser: true

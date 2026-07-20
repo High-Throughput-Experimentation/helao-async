@@ -1,0 +1,37 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of syringe.yml used
+# solely by helao.hexagon.tests.smoke.golden_capture_syringe / syringe_diff.bat
+# to capture a runtime golden-master get_present_volume tree. The ONLY change
+# from syringe.yml is `root:`, pointed at a dedicated throwaway path so the
+# capture rig's assert_fresh() has a clean tree to start from and production
+# C:\INST_hlo (real run data, DATABASE, USER_CONFIG) is never touched.
+#
+# get_present_volume reads the driver's software-tracked `present_volume_ul`
+# (0.0 on a fresh launch, KDS100.__init__) -- it does NOT query the pump over
+# the wire, so this capture is deterministic and hardware-INDEPENDENT: it does
+# NOT require the Legato pump attached to produce a valid, non-vacuous, exactly
+# reproducible tree (contrast galilgold/gamrygold/specgold, whose reads need
+# the live device). See golden_capture_syringe.py's docstring.
+dummy: true
+simulation: true
+run_type: syringe_server
+root: C:\INST_hlo_golden
+servers:
+  WORKSYRINGE:
+    host: 127.0.0.1
+    port: 8013
+    group: action
+    fast: syringe_server
+    params:
+      port: COM5
+      pumps:
+        zero:
+          address: 0
+          diameter: 26.7
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'WORKSYRINGE Visualizer'
+      launch_browser: true

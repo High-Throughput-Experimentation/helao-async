@@ -1,0 +1,35 @@
+# HEXAGON CANARY for the diapump_server station (P3a special-split). Copy of
+# diapump.yml with `deployment: hexagon` flipping DOSEPUMP (diapump_server) and
+# ACTVIS (action_visualizer) onto the hexagon factory. diapump.yml stays legacy
+# for rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# Ports/root/params match diapump.yml so the openapi surface diff compares
+# like-for-like.
+#
+# OPENAPI-CANARY ONLY (single tier, NO runtime golden-diff tier) -- see
+# diapump.yml's header: every diapump action drives fluid, so there is no safe
+# non-perturbing read and thus no runtime golden scenario. The /openapi.json
+# surface diff via diapump_canary.bat is the whole harness (dbpack/analysis
+# precedent).
+dummy: true
+simulation: true
+run_type: diapump_server
+root: C:\INST_hlo
+servers:
+  DOSEPUMP:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    fast: diapump_server
+    deployment: hexagon
+    params:
+      port: COM7
+      address: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'DIAPUMP Visualizer'
+      launch_browser: true
