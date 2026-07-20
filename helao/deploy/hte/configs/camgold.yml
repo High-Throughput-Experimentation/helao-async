@@ -1,0 +1,28 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of cam.yml used solely by
+# helao.hexagon.tests.smoke.golden_capture_cam / cam_diff.bat to capture a
+# runtime golden-master acquire_image tree. The ONLY change from cam.yml is
+# `root:`, pointed at a dedicated throwaway path so the capture rig's
+# assert_fresh() has a clean tree to start from and production C:\INST_hlo (real
+# run data, DATABASE, USER_CONFIG calibration) is never touched. This is a
+# REAL-HARDWARE capture (see golden_capture_cam.py docstring) -- acquire_image
+# fetches one live JPEG frame, so the Axis webcam must be reachable at axis_ip.
+dummy: true
+simulation: true
+run_type: cam_server
+root: C:\INST_hlo_golden
+servers:
+  CAM:
+    host: 127.0.0.1
+    port: 8013
+    group: action
+    fast: cam_server
+    params:
+      axis_ip: 192.168.200.210
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'CAM Visualizer'
+      launch_browser: true

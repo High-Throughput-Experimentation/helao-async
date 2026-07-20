@@ -46,6 +46,14 @@ RE_SEQ_ZIPDIR = re.compile(r"^\d{6}(__.+)\.zipdir$")  # explode_zips target
 # treatment as the ``.zip``/``.zipdir`` pair above.
 RE_SEQ_ORIG = re.compile(r"^\d{6}(__.+)\.orig$")
 RE_SEQ_ORIGDIR = re.compile(r"^\d{6}(__.+)\.origdir$")  # explode_zips target
+# AxisCamExec.write_image (helao/deploy/hte/drivers/sensor/axiscam_driver.py)
+# names each frame ``cam_{counter:06}_{%y%m%d.%H%M%S}.jpg`` — the counter is
+# deterministic (0 for a one-shot) but the wall-clock ymdhms suffix is volatile
+# (§5.5), so two independent captures of the same acquire_image scenario would
+# otherwise land the JPEG at different tree paths (a spurious member-set diff
+# that content-masking cannot fix). Collapse ONLY the timestamp, keeping the
+# counter, so the frame identity is still compared: cam_000000_TS.jpg.
+RE_CAM_IMG = re.compile(r"^(cam_\d{6,})_\d{6}\.\d{6}\.jpg$")  # cam_N_%y%m%d.%H%M%S.jpg
 
 TOP_IGNORED = {"LOGS", "STATES", "DATABASE", "USER_CONFIG"}
 
@@ -79,6 +87,9 @@ def normalize_name(part: str) -> str:
     m = RE_SEQ_ORIGDIR.match(part)
     if m:
         return f"TS{m.group(1)}.origdir"
+    m = RE_CAM_IMG.match(part)
+    if m:
+        return f"{m.group(1)}_TS.jpg"
     m = RE_EXP_DIR.match(part)
     if m:
         return f"TS{m.group(1)}"
