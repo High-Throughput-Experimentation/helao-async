@@ -177,7 +177,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return active_dict
 
         @app.post(f"/{server_key}/stop_aligner", tags=["action"])
-        async def stop_aligner():
+        async def stop_aligner(
+        ):
             """Abort an in-progress plate-alignment routine."""
             active = await app.base.setup_and_contain_action()
             active.action.error_code = await app.driver.stop_aligner()
@@ -321,7 +322,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
         @app.post(f"/{server_key}/disconnect", tags=["action"])
-        async def disconnect():
+        async def disconnect(
+        ):
             """Disconnect from the Galil motion controller."""
             active = await app.base.setup_and_contain_action(action_abbr="disconnect")
             await active.enqueue_data_dflt(datadict=await app.driver.motor_disconnect())
@@ -331,22 +333,19 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if dev_axis:
 
             @app.post(f"/{server_key}/query_positions", tags=["action"])
-            async def query_positions():
+            async def query_positions(
+            ):
                 """Return the current position of every configured axis."""
-                try:  # TEMP DEBUG: surface the uncaught 500 traceback in MOTOR.log
-                    active = await app.base.setup_and_contain_action(
-                        action_abbr="query_position"
+                active = await app.base.setup_and_contain_action(
+                    action_abbr="query_position"
+                )
+                await active.enqueue_data_dflt(
+                    datadict=await app.driver.query_axis_position(
+                        axis=app.driver.get_all_axis()
                     )
-                    await active.enqueue_data_dflt(
-                        datadict=await app.driver.query_axis_position(
-                            axis=app.driver.get_all_axis()
-                        )
-                    )
-                    finished_action = await active.finish()
-                    return finished_action.as_dict()
-                except Exception:
-                    LOGGER.exception("TEMP DEBUG query_positions failed")
-                    raise
+                )
+                finished_action = await active.finish()
+                return finished_action.as_dict()
 
         if dev_axis:
 
@@ -521,7 +520,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/stop", tags=["action"])
-        async def stop():
+        async def stop(
+        ):
             """De-energise every configured motor axis."""
             active = await app.base.setup_and_contain_action(action_abbr="stop")
             datadict = await app.driver.motor_off(axis=app.driver.get_all_axis())
@@ -533,7 +533,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/reset", tags=["action"])
-        async def reset():
+        async def reset(
+        ):
             """Reset the Galil controller. Emergency use only.
 
             Calls :meth:`Galil.reset_controller` -- the pre-migration
