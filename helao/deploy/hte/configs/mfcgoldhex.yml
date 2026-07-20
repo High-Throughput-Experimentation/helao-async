@@ -1,0 +1,39 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of mfchex.yml (keeps
+# `deployment: hexagon` on MFC + ACTVIS -- the hexagon side of the runtime
+# golden diff) used solely by helao.hexagon.tests.smoke.golden_capture_mfc /
+# mfc_diff.bat to capture a runtime golden-master acquire_flowrate tree. The
+# ONLY change from mfchex.yml is `root:`, pointed at a dedicated throwaway path
+# so the capture rig's assert_fresh() has a clean tree to start from and
+# production C:\INST_hlo (real run data, DATABASE, USER_CONFIG) is never
+# touched. Ports and params match mfcgold.yml so the capture-vs-capture parity
+# diff compares like-for-like. This is a REAL-HARDWARE capture (see
+# golden_capture_mfc.py docstring) -- acquire_flowrate with flowrate_sccm=None
+# only READS live telemetry (never opens the valve or commands flow; ends by
+# holding the valve CLOSED), but the Alicat MFC must be attached on COM9 for
+# the poller to buffer data and the capture to produce a .hlo.
+dummy: true
+simulation: true
+run_type: mfc_server
+root: C:\INST_hlo_golden
+servers:
+  MFC:
+    host: 127.0.0.1
+    port: 8009
+    group: action
+    fast: mfc_server
+    deployment: hexagon
+    params:
+      devices:
+        CO2:
+          port: COM9
+          unit_id: A
+      co2_server_name: CO2SENSOR
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'MFC Visualizer'
+      launch_browser: true

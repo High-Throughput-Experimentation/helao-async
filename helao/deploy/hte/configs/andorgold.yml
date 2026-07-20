@@ -1,0 +1,30 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of andor.yml used solely
+# by helao.hexagon.tests.smoke.golden_capture_andor / andor_diff.bat to capture
+# a runtime golden-master `acquire` tree. The ONLY change from andor.yml is
+# `root:`, pointed at a dedicated throwaway path so the capture rig's
+# assert_fresh() has a clean tree to start from and production C:\INST_hlo (real
+# run data, DATABASE, USER_CONFIG) is never touched. This is a REAL-HARDWARE
+# capture (see golden_capture_andor.py docstring) -- `acquire` streams live
+# spectra (non-perturbing, software-triggered) but the Andor Zyla camera +
+# ATSpectrograph must be attached for connect() to succeed and the capture to
+# produce data.
+dummy: true
+simulation: true
+run_type: andor_server
+root: C:\INST_hlo_golden
+servers:
+  ANDOR:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: andor_server
+    params:
+      dev_id: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'ANDOR Visualizer'
+      launch_browser: true

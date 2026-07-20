@@ -1,0 +1,28 @@
+# HEXAGON CANARY for the biologic_server station (P3a special-split). Copy of
+# biologic.yml with `deployment: hexagon` flipping BIOLOGIC (biologic_server)
+# and ACTVIS (action_visualizer) onto the hexagon factory -- run AT-STATION
+# (Windows/easy_biologic). biologic.yml stays legacy for rollback; the cut-over
+# is ONLY the two `deployment: hexagon` keys. Ports/root/params match
+# biologic.yml so an on-station openapi/golden diff compares like-for-like.
+dummy: true
+simulation: true
+run_type: biologic_server
+root: C:\INST_hlo
+servers:
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    fast: biologic_server
+    deployment: hexagon
+    params:
+      max_channels: 12
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'BIOLOGIC Visualizer'
+      launch_browser: true

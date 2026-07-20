@@ -1,0 +1,31 @@
+# HEXAGON CANARY for the andor_server station (P3a special-split). Copy of
+# andor.yml with `deployment: hexagon` flipping ANDOR (andor_server) and ACTVIS
+# (action_visualizer) onto the hexagon factory -- run AT-STATION
+# (Windows/pyAndorSDK3 + pyAndorSpectrograph). andor.yml stays legacy for
+# rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# Ports/root/params match andor.yml so an on-station openapi/golden diff
+# compares like-for-like. TWO TIERS -- see andor.yml's header (openapi via
+# andor_canary.bat, runtime `acquire` golden diff via andor_diff.bat +
+# andorgold/andorgoldhex).
+dummy: true
+simulation: true
+run_type: andor_server
+root: C:\INST_hlo
+servers:
+  ANDOR:
+    host: 127.0.0.1
+    port: 8011
+    group: action
+    fast: andor_server
+    deployment: hexagon
+    params:
+      dev_id: 0
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'ANDOR Visualizer'
+      launch_browser: true

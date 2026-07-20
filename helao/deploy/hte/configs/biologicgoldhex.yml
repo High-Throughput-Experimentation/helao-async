@@ -1,0 +1,35 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of biologichex.yml (keeps
+# `deployment: hexagon` on BIOLOGIC + ACTVIS -- the hexagon side of the runtime
+# golden diff) used solely by helao.hexagon.tests.smoke.golden_capture_biologic /
+# biologic_diff.bat to capture a runtime golden-master run_OCV tree. The ONLY
+# change from biologichex.yml is `root:`, pointed at a dedicated throwaway path
+# so the capture rig's assert_fresh() has a clean tree to start from and
+# production C:\INST_hlo (real run data, DATABASE, USER_CONFIG calibration) is
+# never touched. Ports and params match biologicgold.yml so the capture-vs-capture
+# parity diff compares like-for-like. This is a REAL-HARDWARE capture (see
+# golden_capture_biologic.py docstring) -- run_OCV reads open-circuit voltage
+# (non-perturbing, drives nothing) but the Biologic instrument must be attached
+# with a dummy cell / calibration resistor for connect() to succeed and the
+# capture to produce data.
+dummy: true
+simulation: true
+run_type: biologic_server
+root: C:\INST_hlo_golden
+servers:
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    fast: biologic_server
+    deployment: hexagon
+    params:
+      max_channels: 12
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'BIOLOGIC Visualizer'
+      launch_browser: true
