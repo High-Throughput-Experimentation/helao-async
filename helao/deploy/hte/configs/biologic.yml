@@ -2,14 +2,20 @@
 # Mirrors spec.yml/galil.yml/gamry.yml's 2-server shape (one action server + one
 # action_visualizer) so an at-station openapi/runtime golden diff can compare
 # legacy vs hexagon like-for-like without pulling in the full eche4 station
-# (ORCH, OPERATOR, and the rest). The BIOLOGIC params block (max_channels) is
-# copied VERBATIM from eche4.yml's BIOLOGIC block, and the server key is kept
-# exactly `BIOLOGIC`, so run_OCV (and the other technique endpoints) register
-# identically. This is the Biologic potentiostat (easy_biologic / EC-lib over
-# TCP) -- WINDOWS-ONLY hardware; the runtime golden diff requires the
-# instrument attached with a dummy cell / calibration resistor (see
-# golden_capture_biologic.py's docstring). The openapi canary only needs the
-# server to boot and serve /openapi.json.
+# (ORCH, OPERATOR, and the rest). The BIOLOGIC params block MUST carry the
+# REAL hardware params of the station under test (device `address`,
+# `num_channels`, ...), ported from that station's legacy config -- here the
+# hispec station's PSTAT block (address 192.168.200.100, num_channels 1).
+# BiologicDriver.connect() reads only `address` (default 192.168.200.240) and
+# `num_channels` (default 12); a wrong/absent address fails connect() at
+# startup (_driver_status='error'). The OPENAPI canary passes regardless (the
+# route table builds without a live device), so ONLY the runtime golden diff
+# exercises connect() -- a runtime canary is inherently station-specific in its
+# hardware params. The server key is kept exactly `BIOLOGIC`, so run_OCV (and
+# the other technique endpoints) register identically. Biologic potentiostat
+# (easy_biologic / EC-lib over TCP) -- WINDOWS-ONLY hardware; the runtime golden
+# diff requires the instrument attached with a dummy cell / calibration
+# resistor (see golden_capture_biologic.py's docstring).
 dummy: true
 simulation: true
 run_type: biologic_server
@@ -21,7 +27,10 @@ servers:
     group: action
     fast: biologic_server
     params:
-      max_channels: 12
+      allow_no_sample: true
+      address: 192.168.200.100
+      num_channels: 1
+      grounded: true
   ACTVIS:
     host: 127.0.0.1
     port: 5001

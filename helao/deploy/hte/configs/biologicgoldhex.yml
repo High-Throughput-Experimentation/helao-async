@@ -23,7 +23,10 @@ servers:
     fast: biologic_server
     deployment: hexagon
     params:
-      max_channels: 12
+      allow_no_sample: true
+      address: 192.168.200.100
+      num_channels: 1
+      grounded: true
   ACTVIS:
     host: 127.0.0.1
     port: 5001
