@@ -74,7 +74,7 @@ dependencies:
   - s3fs
   - scikit-learn
   - scipy
-  - setuptools
+  - setuptools<82
   - shortuuid
   - sqlalchemy
   - sqlmodel
