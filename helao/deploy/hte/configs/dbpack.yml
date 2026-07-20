@@ -1,0 +1,45 @@
+# STANDALONE dbpack_server canary config (P3a special-split, DB). Software-only
+# openapi-surface canary: dbpack_server wraps driver_classes=[HelaoSyncer]
+# (helao/core/drivers/data/sync_driver.py:2059) and exposes ONLY private/bare
+# endpoints (/finish_yml, /list_pending, /n_queue, /current_progress, ...) --
+# there is no `/{server_key}/{action}` action endpoint and no data-producing
+# action, so a runtime RUNS-tree golden diff is N/A for this server (unlike
+# galil/sample/gamry). The openapi surface diff (legacy vs hexagon route +
+# schema parity) is the appropriate check here -- see dbpack_canary.sh.
+#
+# Step-0 finding: HelaoSyncer.__init__ (sync_driver.py:690) only opens a real
+# AWS session when the `AWS_CONFIG_PATH` env var is set (it is not, on this
+# Linux canary host), so `aws_profile`/`testing` below are inert on Linux --
+# but `self.bucket = self.config_dict["aws_bucket"]` (sync_driver.py:728) is a
+# REQUIRED key with no fallback and KeyErrors the FastAPI startup event
+# (uncaught in BaseAPI.driver_classes wiring) if absent. `aws_bucket` below is
+# a placeholder string; no real S3 call happens since /finish_yml is never
+# exercised by this canary.
+#
+# Mirrors sample.yml's 2-server shape (one action server + one
+# action_visualizer) so an openapi diff can compare legacy vs hexagon
+# like-for-like. Port 8010 copied from eche10.yml's DB block; vis 5001
+# matches the repo-wide ACTVIS convention (galil/gamry/sample all reuse 5001
+# since these standalone configs are never run concurrently).
+dummy: true
+simulation: true
+run_type: dbpack_server
+root: /tmp/INST_hlo_dbpack
+servers:
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: dbpack_server
+    params:
+      aws_profile: default
+      testing: true
+      aws_bucket: helao-canary-dummy
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'DB Visualizer'
+      launch_browser: true
