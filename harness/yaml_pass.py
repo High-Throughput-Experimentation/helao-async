@@ -35,7 +35,7 @@ from typing import Any, List, Optional, Union
 
 from helao.helpers.yml_tools import yml_load
 
-from harness.classify import normalize_relpath
+from harness.classify import normalize_name, normalize_relpath
 from harness.uuidmap import UuidMapper
 
 # --- §5.5 volatile lists (exhaustive; keep in lockstep with the spec) ------
@@ -55,6 +55,14 @@ DROP_EXACT_KEYS = {
 }
 HOST_EXACT_KEYS = {"orch_key", "orch_host", "orch_port", "machine_name"}
 OUTPUT_DIR_KEY_SUFFIX = "_output_dir"
+# §5.5: FileInfo.file_name (in an -act.yml `files` entry) is
+# os.path.basename(file_path) — a single path element that may carry a volatile
+# wall-clock component (e.g. AxisCamExec's cam_NNNNNN_<%y%m%d.%H%M%S>.jpg).
+# Route it through the §5.1 name grammar (normalize_name) so timestamped frame
+# filenames normalize identically on both sides; deterministic basenames (the
+# common case: <label>-<idx>.hlo) match no grammar rule and pass through
+# unchanged, so this is a no-op for every existing scenario.
+FILENAME_KEYS = {"file_name"}
 # §5.5 ordering hazards: sort by a stable key before diffing.
 SORT_LIST_KEYS = {
     "dispatched_actions_abbr",
@@ -146,6 +154,8 @@ def normalize_meta(
         s = mapper.sub(obj)
         if key is not None and key.endswith(OUTPUT_DIR_KEY_SUFFIX):
             s = normalize_relpath(s)
+        elif key in FILENAME_KEYS:
+            s = normalize_name(s)
         return s
     return obj
 
