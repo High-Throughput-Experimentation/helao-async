@@ -1,0 +1,30 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of sample.yml used
+# solely by helao.hexagon.tests.smoke.golden_capture_sample / sample_diff.sh
+# to capture a runtime golden-master get_loaded_positions tree. The ONLY
+# change from sample.yml is `root:`, pointed at a dedicated throwaway path so
+# the capture rig's assert_fresh() has a clean tree to start from. This
+# canary is fully Linux-runnable and needs NO real/simulated hardware --
+# Archive (helao/deploy/hte/drivers/data/archive_driver.py) is pure software;
+# see golden_capture_sample.py's docstring for the full Step-0 investigation.
+dummy: true
+simulation: true
+run_type: sample_server
+root: /tmp/INST_hlo_sample_golden
+servers:
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'SAMPLE Visualizer'
+      launch_browser: true
