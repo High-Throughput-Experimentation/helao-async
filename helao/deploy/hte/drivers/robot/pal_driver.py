@@ -64,9 +64,6 @@ from ...drivers.robot.enum import (
     GCsampletype,
 )
 
-import nidaqmx
-from nidaqmx.constants import LineGrouping
-
 
 class _palcmd(BaseModel):
     """Single ``/loadmethod`` entry forwarded to the PAL program.
@@ -544,6 +541,9 @@ class PAL(HelaoDriver):
             return
         job = self._job
         try:
+            import nidaqmx
+            from nidaqmx.constants import LineGrouping
+
             with nidaqmx.Task() as task:
                 LOGGER.info(
                     f"using trigger port '{self.triggerport_start}' for 'start' trigger"

@@ -1,0 +1,92 @@
+[
+  {
+    "path": "/current_progress",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "current_progress",
+    "params": []
+  },
+  {
+    "path": "/finish_pending",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "finish_pending",
+    "params": [
+      {
+        "name": "actions_first",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/finish_yml",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "finish_yml",
+    "params": [
+      {
+        "name": "yml_path",
+        "annotation": "str",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/list_exceptions",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "list_exceptions",
+    "params": []
+  },
+  {
+    "path": "/list_pending",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "list_pending",
+    "params": []
+  },
+  {
+    "path": "/n_queue",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "n_queue",
+    "params": []
+  },
+  {
+    "path": "/reset_sync",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "reset_sync",
+    "params": [
+      {
+        "name": "sync_path",
+        "annotation": "str",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/tasks",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "running",
+    "params": []
+  }
+]

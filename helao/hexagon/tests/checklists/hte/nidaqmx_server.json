@@ -1,0 +1,341 @@
+[
+  {
+    "path": "/NI/acquire_monitors",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_monitors",
+    "params": [
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      }
+    ]
+  },
+  {
+    "path": "/NI/activecell",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "activecell",
+    "params": [
+      {
+        "name": "cell",
+        "annotation": "dev_activecellitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/cancel_acquire_monitors",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_monitors",
+    "params": []
+  },
+  {
+    "path": "/NI/cellIV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cellIV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Tval",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "SampleRate",
+        "annotation": "int",
+        "default": "Query(1.0, ge=1)"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/NI/fsw",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "fsw",
+    "params": [
+      {
+        "name": "fsw",
+        "annotation": "dev_fswitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/NI/fswbcd",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "fswbcd",
+    "params": [
+      {
+        "name": "fswbcd",
+        "annotation": "dev_fswbcditems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/gasvalve",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "gasvalve",
+    "params": [
+      {
+        "name": "gasvalve",
+        "annotation": "dev_gasvalveitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/heater",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "heater",
+    "params": [
+      {
+        "name": "heater",
+        "annotation": "dev_heatitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/heatloop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "heatloop",
+    "params": [
+      {
+        "name": "duration_hrs",
+        "annotation": "float",
+        "default": "2"
+      },
+      {
+        "name": "celltemp_min_C",
+        "annotation": "float",
+        "default": "74.5"
+      },
+      {
+        "name": "celltemp_max_C",
+        "annotation": "float",
+        "default": "75.5"
+      },
+      {
+        "name": "reservoir2_min_C",
+        "annotation": "float",
+        "default": "84.5"
+      },
+      {
+        "name": "reservoir2_max_C",
+        "annotation": "float",
+        "default": "85.5"
+      }
+    ]
+  },
+  {
+    "path": "/NI/led",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "led",
+    "params": [
+      {
+        "name": "led",
+        "annotation": "dev_leditems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/liquidvalve",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "liquidvalve",
+    "params": [
+      {
+        "name": "liquidvalve",
+        "annotation": "dev_liquidvalveitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/mastercell",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "mastercell",
+    "params": [
+      {
+        "name": "cell",
+        "annotation": "dev_mastercellitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/multivalve",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "multivalve",
+    "params": [
+      {
+        "name": "multivalve",
+        "annotation": "dev_multivalveitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/pump",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "pump",
+    "params": [
+      {
+        "name": "pump",
+        "annotation": "dev_pumpitems",
+        "default": "None"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/NI/stop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop",
+    "params": []
+  },
+  {
+    "path": "/monloop",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "monloop",
+    "params": []
+  },
+  {
+    "path": "/readtemp",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "readtemp",
+    "params": []
+  },
+  {
+    "path": "/stopheatloop",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "heatloopstop",
+    "params": []
+  },
+  {
+    "path": "/stopmonloop",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "monloopstop",
+    "params": []
+  }
+]

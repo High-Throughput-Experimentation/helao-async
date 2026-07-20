@@ -1,0 +1,47 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of galiliohex.yml
+# (keeps `deployment: hexagon` on IO + ACTVIS -- the hexagon side of the
+# runtime golden diff) used solely by
+# helao.hexagon.tests.smoke.golden_capture_galil_io / galilio_diff.bat to
+# capture a runtime golden-master get_digital_in tree. The ONLY change from
+# galiliohex.yml is `root:`, pointed at a dedicated throwaway path so the
+# capture rig's assert_fresh() has a clean tree to start from and production
+# C:\INST_hlo (real run data, DATABASE, USER_CONFIG calibration) is never
+# touched. Ports and params match galiliogold.yml so the capture-vs-capture
+# parity diff compares like-for-like. This is a REAL-HARDWARE capture (see
+# golden_capture_galil_io.py docstring) -- get_digital_in only reads a
+# digital input (no actuation of any dev_do output), but the galil
+# controller must be reachable at galil_ip_str for connect() to succeed and
+# the capture to produce data.
+dummy: true
+simulation: true
+run_type: galil_io
+root: C:\INST_hlo_golden
+servers:
+  IO:
+    host: 127.0.0.1
+    port: 8005
+    group: action
+    fast: galil_io
+    deployment: hexagon
+    params:
+      galil_ip_str: 192.168.200.234
+      dev_di:
+        gamry_ttl0: 1
+      dev_do:
+        spec_trig: 5
+        ir_emitter: 8
+        doric_wled: 1
+        we_flow: 2
+        we_pump: 7
+        we_vent: 3
+        ce_pump: 6
+        ce_vent: 4
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'IO Visualizer'
+      launch_browser: true

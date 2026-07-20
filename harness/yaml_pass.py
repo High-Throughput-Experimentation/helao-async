@@ -150,6 +150,34 @@ def normalize_meta(
     return obj
 
 
+def apply_meta_key_mask(
+    meta: Any, dotted_keys: List[str], sentinel: str = "MASKED"
+) -> Any:
+    """Neutralize the VALUE at each dotted key path, in place, if present.
+
+    The manifest-driven meta-side analogue of masked_hlo_columns (§6.4): a
+    driver may write data-derived summary values back into -act.yml
+    ``action_params`` (e.g. ``t_s__mean_final``) that vary run-to-run and are
+    not covered by the §5.5 volatile lists in ``normalize_meta``. Masking sets
+    the leaf to ``sentinel`` on BOTH sides so the value stops diffing, while
+    leaving the key present so a one-sided presence difference still surfaces.
+    A dotted path whose intermediate or leaf key is absent is left untouched
+    (nothing is created), so structural absence is still diffed normally.
+    """
+    for dotted in dotted_keys:
+        parts = dotted.split(".")
+        node = meta
+        for p in parts[:-1]:
+            if isinstance(node, dict) and p in node:
+                node = node[p]
+            else:
+                node = None
+                break
+        if isinstance(node, dict) and parts[-1] in node:
+            node[parts[-1]] = sentinel
+    return meta
+
+
 def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
     """Structural diff of two ALREADY-NORMALIZED objects; [] when identical."""
     diffs: List[dict] = []

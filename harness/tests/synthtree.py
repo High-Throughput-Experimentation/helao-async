@@ -85,6 +85,7 @@ def attach_manifest(
     masked: dict | None = None,
     tolerance: dict | None = None,
     content_masked: dict | None = None,
+    meta_masked: dict | None = None,
 ) -> None:
     ProvenanceManifest(
         scenario="SYNTH",
@@ -99,5 +100,6 @@ def attach_manifest(
         masked_hlo_columns=masked or {},
         hlo_row_count_tolerance=tolerance or {},
         content_masked_files=content_masked or {},
+        masked_meta_keys=meta_masked or {},
         notes="synthetic tree for normalizer unit tests ONLY — never a parity golden",
     ).save(golden_dir)

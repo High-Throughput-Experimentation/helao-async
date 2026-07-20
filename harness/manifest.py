@@ -41,6 +41,14 @@ class ProvenanceManifest:
     - content_masked_files: fnmatch pattern -> "line-count" (compare number
       of lines only; for files derived from masked random data, e.g. the
       hlo_to_csv output) or "skip" (presence only).
+    - masked_meta_keys: fnmatch pattern on the normalized YAML meta path
+      (-act/-exp/-seq/-prc.yml, analysis) -> dotted key paths whose VALUES are
+      masked in BOTH golden and candidate before diffing (e.g.
+      "action_params.t_s__mean_final"). Presence is still compared (a key
+      present on only one side still surfaces); only the leaf value is
+      neutralized. This is the meta-side analogue of masked_hlo_columns, for
+      data-derived summary values a driver writes back into -act.yml
+      action_params (which normalize_meta's §5.5 volatile lists do not cover).
     """
 
     scenario: str
@@ -55,6 +63,7 @@ class ProvenanceManifest:
     masked_hlo_columns: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
     hlo_row_count_tolerance: Dict[str, int] = dataclasses.field(default_factory=dict)
     content_masked_files: Dict[str, str] = dataclasses.field(default_factory=dict)
+    masked_meta_keys: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
     notes: str = ""
 
     def save(self, golden_dir: Path) -> Path:
@@ -75,6 +84,14 @@ class ProvenanceManifest:
         with open(path) as f:
             data = _yaml.load(f)
         return cls(**{k: v for k, v in dict(data).items()})
+
+    def masked_meta_keys_for(self, norm: str) -> List[str]:
+        """Dotted meta keys to mask for a normalized YAML path (fnmatch)."""
+        out: List[str] = []
+        for pattern, keys in (self.masked_meta_keys or {}).items():
+            if fnmatch.fnmatch(norm, pattern):
+                out.extend(keys)
+        return out
 
 
 def content_mask_mode(norm: str, manifest: "ProvenanceManifest") -> Optional[str]:

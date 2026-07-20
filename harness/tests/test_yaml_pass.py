@@ -1,7 +1,13 @@
 """§5.5 volatile normalization: exactly the spec list, nothing more."""
 
 from harness.uuidmap import UuidMapper
-from harness.yaml_pass import canonicalize, diff_meta, diff_prg, normalize_meta
+from harness.yaml_pass import (
+    apply_meta_key_mask,
+    canonicalize,
+    diff_meta,
+    diff_prg,
+    normalize_meta,
+)
 
 U1 = "00000000-0000-0000-0000-000000000001"
 U2 = "00000000-0000-0000-0000-000000000002"
@@ -179,3 +185,29 @@ def test_prg_compares_only_terminal_booleans():
     assert diff_prg(g, c) == []
     c2 = dict(c, s3=False)
     assert diff_prg(g, c2) == [{"key": "s3", "golden": True, "candidate": False}]
+
+
+def test_apply_meta_key_mask_neutralizes_present_leaf_both_sides():
+    g = {"action_params": {"t_s__mean_final": 1.23, "keep": 5}, "x": 1}
+    c = {"action_params": {"t_s__mean_final": 9.99, "keep": 5}, "x": 1}
+    keys = ["action_params.t_s__mean_final"]
+    apply_meta_key_mask(g, keys)
+    apply_meta_key_mask(c, keys)
+    assert g["action_params"]["t_s__mean_final"] == "MASKED"
+    assert diff_meta(g, c) == []  # only the masked value differed
+    assert g["action_params"]["keep"] == 5 and g["x"] == 1  # others untouched
+
+
+def test_apply_meta_key_mask_absent_is_noop_presence_still_diffs():
+    # masking never CREATES a key -> a one-sided presence difference still shows
+    g = {"action_params": {"has_bubble": True}}
+    c = {"action_params": {}}
+    apply_meta_key_mask(g, ["action_params.has_bubble"])
+    apply_meta_key_mask(c, ["action_params.has_bubble"])
+    assert diff_meta(g, c) == [
+        {"key": "action_params.has_bubble", "golden": "MASKED", "candidate": "<absent>"}
+    ]
+    # a missing intermediate path is left entirely untouched (nothing created)
+    g2 = {"other": 1}
+    apply_meta_key_mask(g2, ["action_params.has_bubble"])
+    assert g2 == {"other": 1}

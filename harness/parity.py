@@ -29,6 +29,7 @@ from harness.treepass import (
 )
 from harness.uuidmap import UuidMapper
 from harness.yaml_pass import (
+    apply_meta_key_mask,
     diff_meta,
     diff_prg,
     load_yml_plain,
@@ -72,6 +73,10 @@ def compare_file(row, norm, gpath, cpath, mg, mc, manifest):
     if row in YAML_ROWS:
         g = normalize_meta(load_yml_plain(gpath), mg)
         c = normalize_meta(load_yml_plain(cpath), mc)
+        mkeys = manifest.masked_meta_keys_for(norm)
+        if mkeys:
+            g = apply_meta_key_mask(g, mkeys)
+            c = apply_meta_key_mask(c, mkeys)
         return diff_meta(g, c)
     if row is ArtifactRow.PRG:
         return diff_prg(load_yml_plain(gpath), load_yml_plain(cpath))
@@ -123,6 +128,20 @@ def run_parity(
             if fdiffs:
                 file_diffs[norm] = fdiffs
         consistency = internal_s3_checks(g_ex) + internal_s3_checks(c_ex)
+        # F1 guard: an empty golden set has nothing to compare and would PASS
+        # with 0 diffs vacuously (e.g. a capture that snapshotted before the run
+        # wrote any output). A golden master with no comparable files is never
+        # legitimate -- fail loudly instead.
+        if not g_snap.files:
+            consistency.append(
+                {
+                    "check": "empty_golden",
+                    "detail": (
+                        "golden set has 0 comparable files; refusing a vacuous "
+                        "0-diff pass (capture likely produced no run output)"
+                    ),
+                }
+            )
     n_diffs = (
         len(tree_diffs) + sum(len(v) for v in file_diffs.values()) + len(consistency)
     )

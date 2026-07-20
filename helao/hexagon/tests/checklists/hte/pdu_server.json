@@ -1,0 +1,37 @@
+[
+  {
+    "path": "/{server_key}/switch_all",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "switch_all",
+    "params": [
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/switch_outlet",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "switch_outlet",
+    "params": [
+      {
+        "name": "outlet_number",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  }
+]
