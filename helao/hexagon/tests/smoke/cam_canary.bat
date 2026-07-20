@@ -156,10 +156,14 @@ REM 0) GRACEFUL shutdown FIRST so the cam driver's shutdown() runs cleanly.
 REM AxisCam holds no persistent hardware handle (HTTP-per-frame), but this
 REM matches every other canary's kill sequence -- best-effort (server dies
 REM mid-response); then wait.
+REM Snapshot the group's PIDs (servers + launch.py monitor) BEFORE the
+REM graceful /shutdown, so teardown / a removed pickle can't defeat the
+REM kill and the launch.py console window is closed by PID (see kill_group.py).
+call conda run -n helao python "%~dp0kill_group.py" "%ROOT%" "%PREFIX%" --snapshot "%TEMP%\helao_pids_%PREFIX%.json"
 call conda run -n helao python "%~dp0graceful_shutdown.py" 8013
 ping -n 5 -w 1000 127.0.0.1 >nul
 REM 1) kill the action/vis servers via their pid pickle (any that didn't exit).
-call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
+call conda run -n helao python "%~dp0kill_group.py" --from-snapshot "%TEMP%\helao_pids_%PREFIX%.json"
 REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit the canary console.
 REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
