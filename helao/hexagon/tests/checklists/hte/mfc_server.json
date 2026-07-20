@@ -1,0 +1,644 @@
+[
+  {
+    "path": "/MFC/acquire_flowrate",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_flowrate",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "flowrate_sccm",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_sccm_sec",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "stay_open",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/acquire_pressure",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "acquire_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "pressure_psia",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_psi_sec",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "stay_open",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "acquisition_rate",
+        "annotation": "float",
+        "default": "0.2"
+      },
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/cancel_acquire_flowrate",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_flowrate",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "Optional[str]",
+        "default": "None"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/cancel_acquire_pressure",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_acquire_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "Optional[str]",
+        "default": "None"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/cancel_hold_valve_action",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_hold_valve_action",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/cancel_maintain_concentration",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_maintain_concentration",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "Optional[str]",
+        "default": "None"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/cancel_maintain_pressure",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "cancel_maintain_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "Optional[str]",
+        "default": "None"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/hold_valve_action",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "hold_valve_action",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/hold_valve_closed_action",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "hold_valve_closed_action",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/maintain_concentration",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "maintain_concentration",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "target_co2_ppm",
+        "annotation": "float",
+        "default": "100000.0"
+      },
+      {
+        "name": "headspace_scc",
+        "annotation": "float",
+        "default": "7.5"
+      },
+      {
+        "name": "refill_freq_sec",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "flowrate_sccm",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_sccm_sec",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "stay_open",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/maintain_pressure",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "maintain_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "target_pressure",
+        "annotation": "float",
+        "default": "14.7"
+      },
+      {
+        "name": "total_gas_scc",
+        "annotation": "float",
+        "default": "7.0"
+      },
+      {
+        "name": "refill_freq_sec",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "flowrate_sccm",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_sccm_sec",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "stay_open",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "duration",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "exec_id",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/set_flowrate",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_flowrate",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "flowrate_sccm",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_sccm_sec",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/MFC/set_pressure",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "set_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "pressure_psia",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "ramp_psi_sec",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/hold_cancel",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "hold_cancel",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/hold_valve",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "hold_valve",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/hold_valve_closed",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "hold_valve_closed",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/list_devices",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "list_devices",
+    "params": []
+  },
+  {
+    "path": "/list_gases",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "list_gases",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/lock_display",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "lock_display",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/manual_query_state",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "manual_query_state",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/read_valve_register",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "read_valve_register",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/send_command",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "send_command",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "command",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/set_gas",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_gas",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "gas",
+        "annotation": "Union[int, str]",
+        "default": "'N2'"
+      }
+    ]
+  },
+  {
+    "path": "/set_gas_mixture",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_gas_mixture",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "gas_dict",
+        "annotation": "dict",
+        "default": "{'N2': 100}"
+      }
+    ]
+  },
+  {
+    "path": "/start_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_polling",
+    "params": []
+  },
+  {
+    "path": "/stop_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_polling",
+    "params": []
+  },
+  {
+    "path": "/tare_pressure",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tare_pressure",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/tare_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "tare_volume",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/unlock_display",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "unlock_display",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      }
+    ]
+  },
+  {
+    "path": "/write_valve_register",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "write_valve_register",
+    "params": [
+      {
+        "name": "device_name",
+        "annotation": "app.driver.dev_mfcs",
+        "default": "devices[0]"
+      },
+      {
+        "name": "value",
+        "annotation": "int",
+        "default": "20000"
+      }
+    ]
+  }
+]

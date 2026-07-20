@@ -1,0 +1,33 @@
+# CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of samplehex.yml (keeps
+# `deployment: hexagon` on SAMPLE + ACTVIS -- the hexagon side of the runtime
+# golden diff) used solely by helao.hexagon.tests.smoke.golden_capture_sample
+# / sample_diff.sh to capture a runtime golden-master get_loaded_positions
+# tree. The ONLY change from samplehex.yml is `root:`, pointed at a dedicated
+# throwaway path so the capture rig's assert_fresh() has a clean tree to
+# start from. Ports and params match samplegold.yml so the capture-vs-capture
+# parity diff compares like-for-like. Fully Linux-runnable, no hardware --
+# see golden_capture_sample.py's docstring for the full Step-0 investigation.
+dummy: true
+simulation: true
+run_type: sample_server
+root: /tmp/INST_hlo_sample_golden
+servers:
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: sample_server
+    deployment: hexagon
+    params:
+      positions:
+        custom:
+          cell1_we: cell
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'SAMPLE Visualizer'
+      launch_browser: true

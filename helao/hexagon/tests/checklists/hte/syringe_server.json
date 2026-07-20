@@ -1,0 +1,203 @@
+[
+  {
+    "path": "/WORKSYRINGE/get_present_volume",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_present_volume",
+    "params": []
+  },
+  {
+    "path": "/WORKSYRINGE/infuse",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "infuse",
+    "params": [
+      {
+        "name": "rate_uL_sec",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "volume_uL",
+        "annotation": "int",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/WORKSYRINGE/withdraw",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "withdraw",
+    "params": [
+      {
+        "name": "rate_uL_sec",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "volume_uL",
+        "annotation": "int",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/clear_target_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "clear_target_volume",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/clear_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "clear_volume",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/get_present_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_present_volume_priv",
+    "params": []
+  },
+  {
+    "path": "/set_present_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_present_volume",
+    "params": [
+      {
+        "name": "volume_uL",
+        "annotation": "float",
+        "default": "0"
+      }
+    ]
+  },
+  {
+    "path": "/set_rate",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_rate",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      },
+      {
+        "name": "rate_uL_sec",
+        "annotation": "int",
+        "default": null
+      },
+      {
+        "name": "direction",
+        "annotation": "int",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/set_target_volume",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_target_volume",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      },
+      {
+        "name": "volume_uL",
+        "annotation": "int",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/start_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_polling",
+    "params": []
+  },
+  {
+    "path": "/start_pump",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "start_pump",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      },
+      {
+        "name": "direction",
+        "annotation": "int",
+        "default": null
+      }
+    ]
+  },
+  {
+    "path": "/stop_polling",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_polling",
+    "params": []
+  },
+  {
+    "path": "/stop_pump",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_pump",
+    "params": [
+      {
+        "name": "pump_name",
+        "annotation": "str",
+        "default": null
+      }
+    ]
+  }
+]

@@ -9,6 +9,7 @@ servers:
     port: 8001
     group: action
     fast: gamry_server2
+    deployment: hexagon
     action_vis: gamry_vis
     params:
       allow_no_sample: true
@@ -20,6 +21,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
+    deployment: hexagon
     params:
       doc_name: 'PSTAT Visualizer'
       launch_browser: true

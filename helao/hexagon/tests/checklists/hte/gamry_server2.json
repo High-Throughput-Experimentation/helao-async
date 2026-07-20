@@ -1,0 +1,834 @@
+[
+  {
+    "path": "/PSTAT/get_meas_status",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_meas_status",
+    "params": []
+  },
+  {
+    "path": "/PSTAT/run_CA",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CA",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vval__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "SetStopXMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopXMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayXMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayXMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_CP",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CP",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Ival__A",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "SetStopXMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopXMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayXMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayXMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshEwe_V",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_CV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_CV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vinit__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Vapex1__V",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "Vapex2__V",
+        "annotation": "float",
+        "default": "-1.0"
+      },
+      {
+        "name": "Vfinal__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "ScanRate__V_s",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "Cycles",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "SetStopIMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopIMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayIMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayIMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_GEIS",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_GEIS",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Ioffset__A",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "Iamp__A",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "Finit__Hz",
+        "annotation": "float",
+        "default": "1000000.0"
+      },
+      {
+        "name": "Ffinal__Hz",
+        "annotation": "float",
+        "default": "10"
+      },
+      {
+        "name": "FrequenciesPerDecade",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "Zinit_expected_Ohm",
+        "annotation": "float",
+        "default": "100.0"
+      },
+      {
+        "name": "ReadFast",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "MaxRetries",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "IErange_fromAC",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_LSV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_LSV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vinit__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Vfinal__V",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "ScanRate__V_s",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "SetStopIMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopIMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopDIMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopDIMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopADIMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopADIMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayIMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayIMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayDIMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayDIMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayADIMin",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopAtDelayADIMax",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_OCV",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_OCV",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Tval__s",
+        "annotation": "float",
+        "default": "10.0"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "RSD_threshold",
+        "annotation": "float",
+        "default": "1"
+      },
+      {
+        "name": "simple_threshold",
+        "annotation": "float",
+        "default": "0.3"
+      },
+      {
+        "name": "signal_change_threshold",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "amplitude_threshold",
+        "annotation": "float",
+        "default": "0.05"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "SetStopADVMin",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "SetStopADVMax",
+        "annotation": "Optional[float]",
+        "default": "None"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshEwe_V",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_PEIS",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_PEIS",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "versus_OCV",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "OCV_duration__s",
+        "annotation": "float",
+        "default": "2.0"
+      },
+      {
+        "name": "OCV_acquisition_period__s",
+        "annotation": "float",
+        "default": "0.1"
+      },
+      {
+        "name": "Voffset__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Vamp__V",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "Finit__Hz",
+        "annotation": "float",
+        "default": "1000000.0"
+      },
+      {
+        "name": "Ffinal__Hz",
+        "annotation": "float",
+        "default": "10"
+      },
+      {
+        "name": "FrequenciesPerDecade",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "Zinit_expected_Ohm",
+        "annotation": "float",
+        "default": "100.0"
+      },
+      {
+        "name": "ReadFast",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "MaxRetries",
+        "annotation": "int",
+        "default": "10"
+      },
+      {
+        "name": "IErange_fromAC",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "-1"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "-1"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/run_RCA",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_RCA",
+    "params": [
+      {
+        "name": "fast_samples_in",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "default": "Body([], embed=True)"
+      },
+      {
+        "name": "Vinit__V",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "Tinit__s",
+        "annotation": "float",
+        "default": "0.5"
+      },
+      {
+        "name": "Vstep__V",
+        "annotation": "float",
+        "default": "0.5"
+      },
+      {
+        "name": "Tstep__s",
+        "annotation": "float",
+        "default": "0.5"
+      },
+      {
+        "name": "Cycles",
+        "annotation": "int",
+        "default": "5"
+      },
+      {
+        "name": "AcqInterval__s",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "TTLwait",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "TTLsend",
+        "annotation": "int",
+        "default": "Query(-1, ge=-1, le=3)"
+      },
+      {
+        "name": "IErange",
+        "annotation": "model_ierange",
+        "default": "'auto'"
+      },
+      {
+        "name": "alert_duration__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alert_above",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "alert_sleep__s",
+        "annotation": "float",
+        "default": "-1"
+      },
+      {
+        "name": "alertThreshI_A",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "comment",
+        "annotation": "str",
+        "default": "''"
+      }
+    ]
+  },
+  {
+    "path": "/PSTAT/stop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop",
+    "params": []
+  },
+  {
+    "path": "/gamry_is_open",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "gamry_is_open",
+    "params": []
+  },
+  {
+    "path": "/gamry_state",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "gamry_state",
+    "params": []
+  },
+  {
+    "path": "/measure_a",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "measure_a",
+    "params": []
+  },
+  {
+    "path": "/measure_i",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "measure_i",
+    "params": []
+  },
+  {
+    "path": "/measure_v",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "measure_v",
+    "params": []
+  },
+  {
+    "path": "/stop_private",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_private",
+    "params": []
+  }
+]

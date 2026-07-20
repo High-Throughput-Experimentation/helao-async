@@ -1,0 +1,36 @@
+# STANDALONE sample_server canary config (P3a special-split, SAMPLE). The
+# FOURTH hardware canary but the FIRST fully-Linux-runnable one: sample_server
+# wraps driver_classes=[Archive] (helao/deploy/hte/drivers/data/
+# archive_driver.py), a pure SOFTWARE sample-DB / tray-position manager with
+# NO hardware dependency whatsoever -- no gclib, no COM, no external DB
+# server. Archive.__init__ only needs the `positions` config block (falls
+# back to an empty dict if absent) plus a root dir for its
+# helaodirs.states_root/db_root state files, both of which a plain Linux path
+# satisfies -- see golden_capture_sample.py's docstring for the full Step-0
+# investigation. Mirrors galil.yml's 2-server shape (one action server + one
+# action_visualizer) so an openapi/runtime golden diff can compare legacy vs
+# hexagon like-for-like without pulling in the full eche10 station (ORCH,
+# MOTOR, PSTAT, IO, SPEC_T, DB, CAM, KMOTOR). `positions` is copied verbatim
+# from eche10.yml's SAMPLE block.
+dummy: true
+simulation: true
+run_type: sample_server
+root: /tmp/INST_hlo_sample
+servers:
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8008
+    group: action
+    fast: sample_server
+    params:
+      positions:
+        custom:
+          cell1_we: cell
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'SAMPLE Visualizer'
+      launch_browser: true

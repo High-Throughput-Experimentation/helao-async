@@ -1,0 +1,32 @@
+# HEXAGON CANARY for the dbpack_server station (P3a special-split). Copy of
+# dbpack.yml with `deployment: hexagon` flipping DB (dbpack_server) and
+# ACTVIS (action_visualizer) onto the hexagon factory. dbpack.yml stays
+# legacy for rollback; the cut-over is ONLY the two `deployment: hexagon`
+# keys. Ports/root/params match dbpack.yml so an openapi diff compares
+# like-for-like. See dbpack.yml for the aws_bucket/AWS_CONFIG_PATH gate
+# investigation and the why-openapi-only (no action endpoints -> no runtime
+# RUNS-tree diff) rationale.
+dummy: true
+simulation: true
+run_type: dbpack_server
+root: /tmp/INST_hlo_dbpack
+servers:
+  DB:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: dbpack_server
+    deployment: hexagon
+    params:
+      aws_profile: default
+      testing: true
+      aws_bucket: helao-canary-dummy
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'DB Visualizer'
+      launch_browser: true

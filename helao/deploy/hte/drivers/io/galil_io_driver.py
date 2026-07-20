@@ -50,7 +50,6 @@ driver_path = os.path.dirname(os.path.realpath(__file__))
 
 # install galil driver first
 # (helao) c:\Program Files (x86)\Galil\gclib\source\wrappers\python>python setup.py install
-import gclib
 
 # pathlib.Path(os.path.join(helao_repo_root, 'visualizer\styles.css')).read_text()
 
@@ -128,6 +127,8 @@ class Galil(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
+        import gclib
+
         try:
             self.g = gclib.py()
             LOGGER.info(f"gclib version: {self.g.GVersion()}")
@@ -276,7 +277,9 @@ class Galil(HelaoDriver):
         """
         return self._read_analog_in(ai_name)
 
-    async def get_digital_in(self, di_name: str = "digital_in", *args, **kwargs) -> dict:
+    async def get_digital_in(
+        self, di_name: str = "digital_in", *args, **kwargs
+    ) -> dict:
         """Read a configured digital input by name.
 
         Args:
@@ -305,7 +308,9 @@ class Galil(HelaoDriver):
             "value": ret,
         }
 
-    async def get_digital_out(self, do_name: str = "digital_out", *args, **kwargs) -> dict:
+    async def get_digital_out(
+        self, do_name: str = "digital_out", *args, **kwargs
+    ) -> dict:
         """Read the current state of a configured digital output by name.
 
         Args:
@@ -365,7 +370,9 @@ class Galil(HelaoDriver):
             "value": None,
         }
 
-    async def set_digital_out(self, on: bool, do_name: str = "", *args, **kwargs) -> dict:
+    async def set_digital_out(
+        self, on: bool, do_name: str = "", *args, **kwargs
+    ) -> dict:
         """Set a configured digital output high or low.
 
         Args:

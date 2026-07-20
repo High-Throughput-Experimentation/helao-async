@@ -1,0 +1,950 @@
+[
+  {
+    "path": "/PAL/PAL_ANEC_GC",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_ANEC_GC",
+    "params": [
+      {
+        "name": "toolGC",
+        "annotation": "PALtools",
+        "default": "PALtools.HS2"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "'cell1_we'"
+      },
+      {
+        "name": "volume_ul_GC",
+        "annotation": "int",
+        "default": "300"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_ANEC_aliquot",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_ANEC_aliquot",
+    "params": [
+      {
+        "name": "toolGC",
+        "annotation": "PALtools",
+        "default": "PALtools.HS2"
+      },
+      {
+        "name": "toolarchive",
+        "annotation": "PALtools",
+        "default": "PALtools.LS3"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "'cell1_we'"
+      },
+      {
+        "name": "volume_ul_GC",
+        "annotation": "int",
+        "default": "300"
+      },
+      {
+        "name": "volume_ul_archive",
+        "annotation": "int",
+        "default": "500"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_archive",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_archive",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "200"
+      },
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "False"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_autodilute",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_autodilute",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "200"
+      },
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_deepclean",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_deepclean",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "Optional[int]",
+        "default": "200"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_dilute",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_dilute",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "200"
+      },
+      {
+        "name": "dest_tray",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "dest_slot",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "dest_vial",
+        "annotation": "int",
+        "default": "0"
+      },
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "True"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_injection_custom_GC",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_injection_custom_GC",
+    "params": [
+      {
+        "name": "startGC",
+        "annotation": "Optional[bool]",
+        "default": "None"
+      },
+      {
+        "name": "sampletype",
+        "annotation": "Optional[GCsampletype]",
+        "default": "None"
+      },
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_injection_custom_HPLC",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_injection_custom_HPLC",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_injection_tray_GC",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_injection_tray_GC",
+    "params": [
+      {
+        "name": "startGC",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "sampletype",
+        "annotation": "GCsampletype",
+        "default": "'liquid'"
+      },
+      {
+        "name": "tool",
+        "annotation": "PALtools",
+        "default": "PALtools.LS1"
+      },
+      {
+        "name": "source_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_injection_tray_HPLC",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_injection_tray_HPLC",
+    "params": [
+      {
+        "name": "tool",
+        "annotation": "PALtools",
+        "default": "PALtools.LS1"
+      },
+      {
+        "name": "source_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "25"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_run_method",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_run_method",
+    "params": [
+      {
+        "name": "micropal",
+        "annotation": "list",
+        "default": "[PalMicroCam.model_validate({'method': 'fillfixed', 'tool': 'LS3', 'volume_ul': 500, 'requested_source': PALposition.model_validate({'position': 'elec_res1', 'tray': None, 'slot': None, 'vial': None}), 'requested_dest': PALposition.model_validate({'position': 'lcfc_res', 'tray': None, 'slot': None, 'vial': None}), 'wash1': 0, 'wash2': 0, 'wash3': 0, 'wash4': 0}), PalMicroCam.model_validate({'method': 'fillfixed', 'tool': 'LS3', 'volume_ul': 500, 'requested_source': PALposition.model_validate({'position': 'elec_res1', 'tray': None, 'slot': None, 'vial': None}), 'requested_dest': PALposition.model_validate({'position': 'lcfc_res', 'tray': None, 'slot': None, 'vial': None}), 'wash1': 0, 'wash2': 0, 'wash3': 0, 'wash4': 0})]"
+      },
+      {
+        "name": "totalruns",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "[0.0]"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_transfer_custom_custom",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_transfer_custom_custom",
+    "params": [
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_transfer_custom_tray",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_transfer_custom_tray",
+    "params": [
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "source",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "dest_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_transfer_tray_custom",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_transfer_tray_custom",
+    "params": [
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "source_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest",
+        "annotation": "dev_customitems",
+        "default": "None"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/PAL_transfer_tray_tray",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "PAL_transfer_tray_tray",
+    "params": [
+      {
+        "name": "sampleperiod",
+        "annotation": "List[float]",
+        "default": "Body([0.0], embed=True)"
+      },
+      {
+        "name": "spacingmethod",
+        "annotation": "Spacingmethod",
+        "default": "Spacingmethod.linear"
+      },
+      {
+        "name": "spacingfactor",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "timeoffset",
+        "annotation": "float",
+        "default": "0.0"
+      },
+      {
+        "name": "tool",
+        "annotation": "Optional[PALtools]",
+        "default": "None"
+      },
+      {
+        "name": "volume_ul",
+        "annotation": "int",
+        "default": "2"
+      },
+      {
+        "name": "source_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "source_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest_tray",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest_slot",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "dest_vial",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "wash1",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash2",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash3",
+        "annotation": "bool",
+        "default": "True"
+      },
+      {
+        "name": "wash4",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
+  },
+  {
+    "path": "/PAL/kill_PAL",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "kill_PAL",
+    "params": []
+  },
+  {
+    "path": "/PAL/stop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop",
+    "params": []
+  }
+]

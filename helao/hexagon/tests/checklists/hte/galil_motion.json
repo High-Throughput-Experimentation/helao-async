@@ -1,0 +1,390 @@
+[
+  {
+    "path": "/MOTOR/MxytoMPlate",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "MxytoMPlate",
+    "params": [
+      {
+        "name": "Mxy",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/axis_off",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "axis_off",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "dev_axisitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/axis_on",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "axis_on",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "dev_axisitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/disconnect",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "disconnect",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/easymove",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "easymove",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "dev_axisitems",
+        "default": "None"
+      },
+      {
+        "name": "d_mm",
+        "annotation": "float",
+        "default": "0"
+      },
+      {
+        "name": "speed",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "mode",
+        "annotation": "MoveModes",
+        "default": "MoveModes.relative"
+      },
+      {
+        "name": "transformation",
+        "annotation": "TransformationModes",
+        "default": "TransformationModes.motorxy"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/easymove_to_solid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "easymove_to_solid",
+    "params": [
+      {
+        "name": "plate_id",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "sample_no",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "speed",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/load_plate_alignment",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "load_plate_alignment",
+    "params": [
+      {
+        "name": "matrix",
+        "annotation": "List",
+        "default": "[[1, 0, 0], [0, 1, 0], [0, 0, 1]]"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/move",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "move",
+    "params": [
+      {
+        "name": "d_mm",
+        "annotation": "List[float]",
+        "default": "[0, 0]"
+      },
+      {
+        "name": "axis",
+        "annotation": "List[str]",
+        "default": "['x', 'y']"
+      },
+      {
+        "name": "speed",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "mode",
+        "annotation": "MoveModes",
+        "default": "MoveModes.relative"
+      },
+      {
+        "name": "transformation",
+        "annotation": "TransformationModes",
+        "default": "TransformationModes.motorxy"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/query_moving",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "query_moving",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "Union[List[str], str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/query_position",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "query_position",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "dev_axisitems",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/query_positions",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "query_positions",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/reset",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "reset",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/reset_plate_alignment",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "reset_plate_alignment",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/run_aligner",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "run_aligner",
+    "params": [
+      {
+        "name": "plateid_or_pmpath",
+        "annotation": "int | str",
+        "default": "6353"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/setmotionref",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "setmotionref",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/solid_get_builtin_specref",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "solid_get_builtin_specref",
+    "params": [
+      {
+        "name": "specref_code",
+        "annotation": "int",
+        "default": "1"
+      },
+      {
+        "name": "ref_position_name",
+        "annotation": "str",
+        "default": "'builtin_ref_motorxy'"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/solid_get_nearest_specref",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "solid_get_nearest_specref",
+    "params": [
+      {
+        "name": "plate_id",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "sample_no",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "specref_code",
+        "annotation": "int",
+        "default": "1"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/solid_get_platemap",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "solid_get_platemap",
+    "params": [
+      {
+        "name": "plate_id",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/solid_get_samples_xy",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "solid_get_samples_xy",
+    "params": [
+      {
+        "name": "plate_id",
+        "annotation": "Optional[int]",
+        "default": "None"
+      },
+      {
+        "name": "sample_no",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/stop",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/stop_aligner",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "stop_aligner",
+    "params": []
+  },
+  {
+    "path": "/MOTOR/toMotorXY",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "toMotorXY",
+    "params": [
+      {
+        "name": "platexy",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/toPlateXY",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "toPlateXY",
+    "params": [
+      {
+        "name": "motorxy",
+        "annotation": "Optional[str]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/MOTOR/z_move",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "z_move",
+    "params": [
+      {
+        "name": "z_position",
+        "annotation": "Zpos",
+        "default": "'NA'"
+      }
+    ]
+  }
+]

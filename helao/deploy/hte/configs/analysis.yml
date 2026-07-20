@@ -1,0 +1,50 @@
+# STANDALONE analysis_server canary config (P3a special-split, ANA). Software-
+# only openapi-surface canary: analysis_server wraps
+# helao/core/drivers/data/analysis_driver.py:486's make_analysis_app, which
+# registers one `/{server_key}/analyze_<name>` endpoint per entry in
+# `params.analyses`. Those endpoints, when actually invoked, need a seeded
+# process/sequence-zip record to run against (AnalysisExecutor.start_executor
+# reads a real process); a runtime golden diff therefore needs seeded input
+# data and is DEFERRED, not N/A -- the openapi surface diff (this config +
+# analysis_canary.sh) is the deliverable for now.
+#
+# Step-0 finding: AnalysisSyncer.__init__ (analysis_driver.py:173) builds a
+# pgs3.EcheUvisLoader (helao/core/drivers/data/loaders/pgs3.py) whose
+# HelaoCredentials (helao/core/models/credentials.py) fields ALL default to
+# empty SecretStr/str values when no env_file is set/found -- boto3.Session
+# and sqlalchemy's create_engine() are both lazy (no connection attempt until
+# a call is made), so the ANA driver launches on Linux with NO real AWS/DB
+# creds and NO params at all required. `analyses: []` is used here (rather
+# than icpm1/xrfs1's `analyses: [icpms_local, xrfs_local]`) because those
+# modules live under a private nested deployment's
+# drivers/data/analyses/ and do not exist in this repo's
+# helao/deploy/hte/drivers/data/analyses/ (only echeuvis_stability.py and
+# uvis_bkgsubnorm.py) -- load_analysis_classes() would only log-and-skip a
+# missing module (not crash), but an empty list keeps the launched surface
+# deterministic and identical between legacy/hexagon.
+#
+# Mirrors sample.yml/dbpack.yml's 2-server shape (one action server + one
+# action_visualizer). Port 8014 matches every live ANA config (icpm1, xrfs1,
+# adss, adss3, ccsi1/2, clad); vis 5001 matches the repo-wide ACTVIS
+# convention (these standalone configs are never run concurrently).
+dummy: true
+simulation: true
+run_type: analysis_server
+root: /tmp/INST_hlo_analysis
+servers:
+  ANA:
+    host: 127.0.0.1
+    port: 8014
+    group: action
+    fast: analysis_server
+    params:
+      local_only: true
+      analyses: []
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'ANA Visualizer'
+      launch_browser: true

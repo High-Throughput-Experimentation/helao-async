@@ -1,0 +1,137 @@
+[
+  {
+    "path": "/{server_key}/check_annealrecord_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "check_annealrecord_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/check_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "check_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/check_printrecord_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "check_printrecord_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/get_elements_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_elements_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/get_info_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_info_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/get_platemap_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_platemap_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/get_platexycalibration",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_platexycalibration",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/get_rcp_plateid",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "get_rcp_plateid",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/{server_key}/save_platexycalibration",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "save_platexycalibration",
+    "params": [
+      {
+        "name": "plateid",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  }
+]

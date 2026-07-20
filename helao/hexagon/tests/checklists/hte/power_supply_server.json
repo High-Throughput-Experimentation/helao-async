@@ -1,0 +1,81 @@
+[
+  {
+    "path": "/POWER_SUPPLY/apply_voltage",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "apply_voltage",
+    "params": [
+      {
+        "name": "voltage",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "sleep_time",
+        "annotation": "float",
+        "default": "0.05"
+      }
+    ]
+  },
+  {
+    "path": "/POWER_SUPPLY/constant_current_square_wave",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "constant_current_square_wave",
+    "params": [
+      {
+        "name": "current",
+        "annotation": "float",
+        "default": "0.01"
+      },
+      {
+        "name": "sleep_time",
+        "annotation": "float",
+        "default": "0.05"
+      },
+      {
+        "name": "sleep_time1",
+        "annotation": "float",
+        "default": "1"
+      },
+      {
+        "name": "sleep_time2",
+        "annotation": "float",
+        "default": "1"
+      }
+    ]
+  },
+  {
+    "path": "/POWER_SUPPLY/square_wave",
+    "method": "post",
+    "tags": [
+      "action"
+    ],
+    "handler": "square_wave",
+    "params": [
+      {
+        "name": "voltage",
+        "annotation": "float",
+        "default": "1.0"
+      },
+      {
+        "name": "sleep_time",
+        "annotation": "float",
+        "default": "0.05"
+      }
+    ]
+  },
+  {
+    "path": "/stop_private",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_private",
+    "params": []
+  }
+]

@@ -24,18 +24,6 @@ import asyncio
 import traceback
 from typing import Optional, Callable, List
 
-import nidaqmx
-from nidaqmx.constants import LineGrouping
-from nidaqmx.constants import Edge
-from nidaqmx.constants import AcquisitionType
-from nidaqmx.constants import TerminalConfiguration
-from nidaqmx.constants import VoltageUnits
-from nidaqmx.constants import TemperatureUnits
-from nidaqmx.constants import ThermocoupleType
-from nidaqmx.constants import CurrentShuntResistorLocation
-from nidaqmx.constants import UnitsPreScaled
-from nidaqmx.constants import TriggerType
-
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
 from helao.helpers.make_str_enum import make_str_enum
@@ -54,6 +42,29 @@ from helao.core.drivers.helao_driver import (
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+# NI-DAQmx is a Windows-only runtime; import it lazily so the module imports on
+# a vendor-less Linux box (§11.1). connect() calls this before any device use.
+def _load_nidaqmx():
+    global nidaqmx, LineGrouping, Edge, AcquisitionType, TerminalConfiguration
+    global VoltageUnits, TemperatureUnits, ThermocoupleType
+    global CurrentShuntResistorLocation, UnitsPreScaled, TriggerType
+    import nidaqmx as _nidaqmx
+    from nidaqmx.constants import (
+        LineGrouping,
+        Edge,
+        AcquisitionType,
+        TerminalConfiguration,
+        VoltageUnits,
+        TemperatureUnits,
+        ThermocoupleType,
+        CurrentShuntResistorLocation,
+        UnitsPreScaled,
+        TriggerType,
+    )
+
+    nidaqmx = _nidaqmx
 
 
 class cNIMAX(HelaoDriver):
@@ -189,6 +200,7 @@ class cNIMAX(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
+        _load_nidaqmx()
         try:
             # seems to work by just defining the scale and then only using its name
             self.Iscale = nidaqmx.scale.Scale.create_lin_scale(
@@ -232,7 +244,9 @@ class cNIMAX(HelaoDriver):
         """
         if self.IO_measuring:
             self.IO_do_meas = False
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """Force-close and reopen the monitor connection."""
@@ -542,7 +556,9 @@ class cNIMAX(HelaoDriver):
         self.task_6284cellvoltage.start()
         self.task_6289cellcurrent.start()
 
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.busy)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.busy
+        )
 
     def stop_cell_iv(self) -> DriverResponse:
         """Stop an in-progress multi-cell IV measurement and close its NI tasks."""
