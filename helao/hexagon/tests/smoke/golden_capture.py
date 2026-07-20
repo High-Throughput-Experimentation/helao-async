@@ -46,12 +46,14 @@ this sequence.
 from __future__ import annotations
 
 import argparse
+import asyncio
 import datetime
 import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
+from socket import gethostname
 
 import requests
 
@@ -60,6 +62,12 @@ from harness.capture import assert_fresh, runs_active_empty, wait_for_server
 from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
 from harness.yaml_pass import load_yml_plain
+
+from helao.core.error import ErrorCodes
+from helao.core.models.machine import MachineModel
+from helao.helpers.config_loader import read_config
+from helao.helpers.dispatcher import async_action_dispatcher
+from helao.helpers.premodels import Action
 
 # HloStatus terminal states. A manual action's -act.yml is written at init with
 # status "active" (base.py:1029 update_act_file) and only REWRITTEN with a
@@ -203,6 +211,49 @@ def _actions_complete(root: Path) -> bool:
     if not m:
         return False
     return all(any(s in TERMINAL_STATUSES for s in sts) for sts in m.values())
+
+
+def dispatch_action(
+    config_prefix: str,
+    server_key: str,
+    action_name: str,
+    action_params: dict | None = None,
+    timeout: int = 30,
+) -> dict:
+    """Dispatch ONE action via ``async_action_dispatcher`` and return its dict.
+
+    This is the production action-dispatch path (what the orchestrator uses):
+    RPC fast-path then HTTP fallback, sending the full ``{"action": A.as_dict()}``
+    envelope so ``action_params`` (e.g. ``di_item``) actually reach the endpoint.
+
+    Do NOT use ``private_dispatcher`` for action endpoints: it is for bare
+    private endpoints, and it sends only ``json_dict`` with no action envelope,
+    so endpoint params never populate ``action.action_params`` -> the endpoint
+    raises KeyError/500 (get_digital_in) -- or silently loses params. It also
+    prepends nothing, so callers wrongly pass ``"KEY/action"`` as the path.
+
+    The destination host/port is resolved by ``async_action_dispatcher`` from
+    ``read_config(config_prefix)['servers'][server_key]``.
+    """
+    action_params = dict(action_params or {})
+    world_cfg = read_config(config_prefix)
+    action = Action(
+        action_name=action_name,
+        action_server=MachineModel(
+            server_name=server_key, machine_name=gethostname().lower()
+        ),
+        action_params=action_params,
+    )
+    resp, err = asyncio.run(
+        async_action_dispatcher(
+            world_cfg, action, params=action_params, timeout=timeout
+        )
+    )
+    if err != ErrorCodes.none:
+        raise RuntimeError(
+            f"{server_key}/{action_name} dispatch failed: err={err}, response={resp}"
+        )
+    return resp
 
 
 def settle(

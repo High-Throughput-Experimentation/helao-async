@@ -69,12 +69,10 @@ from harness.capture import assert_fresh, wait_for_server
 from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
 
-from helao.core.error import ErrorCodes
-from helao.helpers.dispatcher import private_dispatcher
-
 from helao.hexagon.tests.smoke.golden_capture import (
     _act_status_map,
     _run_artifacts,
+    dispatch_action,
     settle,
 )
 
@@ -146,31 +144,15 @@ def verify_device_open(host: str, port: int) -> None:
         )
 
 
-def query_positions_action(host: str, port: int) -> dict:
-    """Run /MOTOR/query_positions via the HELAO dispatcher and return its dict.
-
-    Uses ``private_dispatcher`` -- the canonical way HELAO servers call each
-    other's endpoints (and how the orchestrator dispatches actions in
-    production) -- rather than a hand-rolled ``requests.post``. It tries the
-    co-located ZMQ RPC first (which bypasses the HTTP layer) and falls back to
-    HTTP with a correctly-formed JSON body. This matters: a bare
-    ``requests.post(url)`` sends no body, and BaseAPI's ``app_entry`` middleware
-    runs ``json.loads(await request.body())`` on every ``/{server_key}/*`` POST
-    (base_api.py), so a bodyless action POST raises ``JSONDecodeError`` -> 500
-    BEFORE the endpoint ever runs. The dispatcher forms the request correctly.
+def query_positions_action(config_prefix: str) -> dict:
+    """Run /MOTOR/query_positions via ``async_action_dispatcher`` (the production
+    action-dispatch path -- RPC then HTTP, full action envelope).
 
     No params: ``query_positions`` always queries every configured axis
     (``Galil.get_all_axis()``). Non-perturbing -- reads encoder counts only,
     issues no motion command.
     """
-    resp, err = private_dispatcher(
-        "MOTOR", host, port, "MOTOR/query_positions", json_dict={}, timeout=30
-    )
-    if err != ErrorCodes.none:
-        raise RuntimeError(
-            f"query_positions dispatch failed: err={err}, response={resp}"
-        )
-    return resp
+    return dispatch_action(config_prefix, "MOTOR", "query_positions")
 
 
 def snapshot(
@@ -272,7 +254,7 @@ def main(argv=None) -> int:
     assert_fresh(args.root)
     wait_for_server(MOTOR_HOST, MOTOR_PORT)
     verify_device_open(MOTOR_HOST, MOTOR_PORT)
-    query_positions_action(MOTOR_HOST, MOTOR_PORT)
+    query_positions_action(args.config_prefix)
     settle(args.root, settle_polls=args.settle_polls)
     out = snapshot(
         root=args.root,
