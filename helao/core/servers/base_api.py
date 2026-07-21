@@ -810,6 +810,14 @@ class BaseAPI(HelaoFastAPI):
             LOGGER.info("action shutdown")
             await self.base.shutdown()
 
+            # Stop the poll loop BEFORE disconnecting the driver. The poller runs
+            # while True and is not otherwise cancelled, so if it keeps polling
+            # after driver.shutdown()/disconnect() closes the device it calls
+            # get_data() on a dead handle and spams errors until process exit.
+            if isinstance(self.poller, DriverPoller):
+                LOGGER.info("stopping driver poller before disconnect")
+                await self.poller.stop()
+
             shutdown = getattr(self.driver, "shutdown", None)
             async_shutdown = getattr(self.driver, "async_shutdown", None)
 

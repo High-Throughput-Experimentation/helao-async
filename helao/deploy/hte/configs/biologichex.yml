@@ -7,7 +7,7 @@
 dummy: true
 simulation: true
 run_type: biologic_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   BIOLOGIC:
     host: 127.0.0.1
@@ -15,6 +15,7 @@ servers:
     group: action
     fast: biologic_server
     deployment: hexagon
+    action_vis: biologic_vis
     params:
       allow_no_sample: true
       address: 192.168.200.100

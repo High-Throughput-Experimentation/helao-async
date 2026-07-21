@@ -7,7 +7,7 @@
 # REAL-HARDWARE capture (see golden_capture_mfc.py docstring) -- acquire_flowrate
 # with flowrate_sccm=None only READS live telemetry (it never opens the valve
 # or commands flow; it ends by holding the valve CLOSED), but the Alicat MFC
-# must be attached on COM9 for the poller to buffer data and the capture to
+# must be attached on COM6 for the poller to buffer data and the capture to
 # produce a .hlo.
 dummy: true
 simulation: true
@@ -19,17 +19,18 @@ servers:
     port: 8009
     group: action
     fast: mfc_server
+    live_vis: mfc_vis
     params:
       devices:
         CO2:
-          port: COM9
+          port: COM6
           unit_id: A
       co2_server_name: CO2SENSOR
   ACTVIS:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: 'MFC Visualizer'
       launch_browser: true

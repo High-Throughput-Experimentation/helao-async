@@ -18,6 +18,7 @@ servers:
     port: 8016
     group: action
     fast: biologic_server
+    action_vis: biologic_vis
     params:
       allow_no_sample: true
       address: 192.168.200.100

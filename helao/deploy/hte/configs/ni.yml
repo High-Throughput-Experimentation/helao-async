@@ -24,13 +24,14 @@
 dummy: true
 simulation: true
 run_type: nidaqmx_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   NI:
     host: 127.0.0.1
     port: 8006
     group: action
     fast: nidaqmx_server
+    action_vis: nidaqmx_vis
     params:
       dev_gasvalve:
         1A: cDAQ1Mod1/port0/line0

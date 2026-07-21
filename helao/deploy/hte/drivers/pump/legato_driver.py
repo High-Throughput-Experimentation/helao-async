@@ -29,7 +29,6 @@ from helao.core.drivers.helao_driver import (
     DriverPoller,
 )
 
-
 """ Notes:
 
 Setup serial connection with pyserial module:
@@ -91,6 +90,14 @@ ulmap = {
     "ul": 1.0,
     "ml": 1000.0,
 }
+
+
+# Upper bound on the "\x11" end-of-response re-read loop in send()/_send_sync().
+# A non-responding or disconnected pump must not loop there forever holding
+# com_lock (which would deadlock every other command, including safe_state on
+# shutdown). Normal responses complete in milliseconds; this only caps the
+# pathological case.
+_POLL_READ_TIMEOUT_S = 5.0
 
 
 class KDS100(HelaoDriver):
@@ -228,16 +235,24 @@ class KDS100(HelaoDriver):
         while self.com_lock:
             await asyncio.sleep(0.1)
         self.com_lock = True
-        self.sio.write(command_str)
-        self.sio.flush()
-        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
-        # look for "\x11" end of response character when POLL is on
-        if resp:
-            while not resp[-1].endswith("\x11"):
-                time.sleep(0.1)  # wait 100 msec and re-read, response
-                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
-                resp += newlines
-        self.com_lock = False
+        try:
+            self.sio.write(command_str)
+            self.sio.flush()
+            resp = [x.strip() for x in self.sio.readlines() if x.strip()]
+            # Re-read until the "\x11" end-of-response marker (POLL mode), but
+            # BOUND it: a non-responding/disconnected pump would otherwise loop
+            # here forever while holding com_lock. `await` (not time.sleep) so
+            # the event loop keeps running during the wait.
+            if resp:
+                deadline = time.time() + _POLL_READ_TIMEOUT_S
+                while not resp[-1].endswith("\x11") and time.time() < deadline:
+                    await asyncio.sleep(0.1)
+                    newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
+                    resp += newlines
+        finally:
+            # ALWAYS release the lock -- a leak here would deadlock every
+            # subsequent command (and safe_state on shutdown).
+            self.com_lock = False
         return resp
 
     def _send_sync(self, pump_name: str, cmd: str) -> list:
@@ -262,15 +277,21 @@ class KDS100(HelaoDriver):
         while self.com_lock:
             time.sleep(0.1)
         self.com_lock = True
-        self.sio.write(command_str)
-        self.sio.flush()
-        resp = [x.strip() for x in self.sio.readlines() if x.strip()]
-        if resp:
-            while not resp[-1].endswith("\x11"):
-                time.sleep(0.1)
-                newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
-                resp += newlines
-        self.com_lock = False
+        try:
+            self.sio.write(command_str)
+            self.sio.flush()
+            resp = [x.strip() for x in self.sio.readlines() if x.strip()]
+            # BOUND the "\x11" re-read (see send()): a non-responding pump must
+            # not loop forever holding com_lock. Sync sleep -- the poller calls
+            # this synchronously via get_data().
+            if resp:
+                deadline = time.time() + _POLL_READ_TIMEOUT_S
+                while not resp[-1].endswith("\x11") and time.time() < deadline:
+                    time.sleep(0.1)
+                    newlines = [x.strip() for x in self.sio.readlines() if x.strip()]
+                    resp += newlines
+        finally:
+            self.com_lock = False
         return resp
 
     def update_status_from_response(self, response):

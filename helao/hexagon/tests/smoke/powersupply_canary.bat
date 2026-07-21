@@ -40,7 +40,7 @@ REM   outdir default %TEMP%\powersupply_canary
 REM ---------------------------------------------------------------------------
 
 set "ROOT=%~1"
-if "%ROOT%"=="" set "ROOT=C:\INST_hlo"
+if "%ROOT%"=="" set "ROOT=C:\INST_hlo_golden"
 set "OUTDIR=%~2"
 if "%OUTDIR%"=="" set "OUTDIR=%TEMP%\powersupply_canary"
 
@@ -161,10 +161,14 @@ REM the `/stop_private` handler (power_supply_server.py) calls
 REM app.driver.disconnect(), which closes the pyvisa instrument + resource
 REM manager. A hard kill skips this and may leave the VISA resource claimed
 REM for the next launch -- best-effort (server dies mid-response); then wait.
+REM Snapshot the group's PIDs (servers + launch.py monitor) BEFORE the
+REM graceful /shutdown, so teardown / a removed pickle can't defeat the
+REM kill and the launch.py console window is closed by PID (see kill_group.py).
+call conda run -n helao python "%~dp0kill_group.py" "%ROOT%" "%PREFIX%" --snapshot "%TEMP%\helao_pids_%PREFIX%.json"
 call conda run -n helao python "%~dp0graceful_shutdown.py" 8002
 ping -n 5 -w 1000 127.0.0.1 >nul
 REM 1) kill the action/vis servers via their pid pickle (any that didn't exit).
-call conda run -n helao python helao\hexagon\tests\smoke\kill_group.py "%ROOT%" "%PREFIX%"
+call conda run -n helao python "%~dp0kill_group.py" --from-snapshot "%TEMP%\helao_pids_%PREFIX%.json"
 REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit the canary console.
 REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
