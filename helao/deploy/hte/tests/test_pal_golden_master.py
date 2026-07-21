@@ -75,6 +75,8 @@ from helao.helpers.active_params import ActiveParams
 from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
 from helao.deploy.hte.drivers.robot.pal_driver import PAL
 from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
+from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.legacy.pal_trigger import NullPalTrigger
 from helao.hexagon.domain.pal_reconciliation import PalReconciliation
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -581,17 +583,16 @@ def _make_pal(shim: RecordingShim) -> PAL:
     pal.reconciliation = PalReconciliation(pal.sample_state, pal.cams)
     pal.cam_config = None
     pal.cam_file_path = None
-    pal.sshuser = ""
-    pal.sshkey = ""
     pal.sshhost = "localhost"
     pal.timeout = 5.0
-    pal.PAL_pid = None
-    pal.triggers = False
-    pal.IO_trigger_task = None
-    pal.dev_trigger = None
-    pal.triggerport_start = None
-    pal.triggerport_continue = None
-    pal.triggerport_done = None
+    # P3a-PAL slice 4/6: PAL.__init__ now also builds self.transport
+    # (LegacyPalTransport) and self.trigger (NidaqmxPalTrigger/
+    # NullPalTrigger); this harness bypasses __init__, so set them by
+    # hand too. No real triggers are configured for this harness (mirrors
+    # the old pal.triggers = False / pal.dev_trigger = None), so
+    # NullPalTrigger is the exact behavioral match.
+    pal.transport = LegacyPalTransport(host=pal.sshhost)
+    pal.trigger = NullPalTrigger()
     pal._job = None
     pal._worker_task = None
     pal.IO_measuring = False
@@ -630,9 +631,6 @@ def _make_pal(shim: RecordingShim) -> PAL:
     ]
     pal.IOloop_run = False
     pal.IO_signalq = asyncio.Queue(1)
-    pal.IO_trigger_startq = asyncio.Queue()
-    pal.IO_trigger_continueq = asyncio.Queue()
-    pal.IO_trigger_doneq = asyncio.Queue()
 
     async def _submitjoblist_stub(palcam):
         job = pal._job

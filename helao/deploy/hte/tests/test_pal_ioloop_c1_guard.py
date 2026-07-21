@@ -46,6 +46,8 @@ import asyncio
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.drivers.robot.enum import Spacingmethod
 from helao.deploy.hte.drivers.robot.pal_driver import PAL, PALJob
+from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.legacy.pal_trigger import NullPalTrigger
 
 
 class _FakeAction:
@@ -102,9 +104,12 @@ def _make_pal():
     pal.IO_measuring = True
     pal.IO_continue = False
     pal.IO_error = ErrorCodes.none
-    pal.IO_trigger_task = None
     pal.IO_action_run_counter = 0
-    pal.PAL_pid = None
+    # P3a-PAL slice 4/5/6: _PAL_IOloop_meas_end_helper's finally-block now
+    # calls self.transport.reap_local_process()/self.trigger.stop_polling()
+    # (this harness bypasses __init__, so it must set these by hand).
+    pal.transport = LegacyPalTransport(host=None)
+    pal.trigger = NullPalTrigger()
     return pal
 
 
