@@ -78,6 +78,16 @@ class AliCatMFC(HelaoDriver):
 
         self.polling = True
         self.last_state = "unknown"
+        # Open the Alicat serial connections at construction. BaseAPI builds the
+        # AliCatMFCPoller immediately after the driver and the poller AUTO-STARTS
+        # its poll loop in __init__ -- but BaseAPI never calls connect(), so
+        # deferring the serial open left self.fcs empty: the poller produced no
+        # data, the live buffer key never appeared, and acquire_flowrate's
+        # MfcExec._poll (get_lbuf) never advanced -> the capture hung. Connect
+        # here (like the biologic/andor/SprintIR drivers) so the controllers are
+        # open before the first poll; a bad/absent port logs a clear
+        # "connect failed" instead. get_data() already no-ops on empty fcs.
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open every configured Alicat and query its gas/identity registers.
@@ -230,13 +240,12 @@ class AliCatMFC(HelaoDriver):
         except Exception as e:
             LOGGER.info(f"Exception occured on get_status() {e}. Resetting MFC.")
             self.make_fc_instance(device_name, self.config_dict["devices"][device_name])
-            self.fcs[device_name]._set_control_point(
-                self.fcs_last_mode[device_name], 5
-            )
+            self.fcs[device_name]._set_control_point(self.fcs_last_mode[device_name], 5)
             LOGGER.info("MFC connection restored")
             return None
         if all(
-            x in resp_dict for x in ("mass_flow", "pressure", "setpoint", "control_point")
+            x in resp_dict
+            for x in ("mass_flow", "pressure", "setpoint", "control_point")
         ):
             self.fcs_last_mode[device_name] = resp_dict["control_point"]
             return resp_dict
@@ -1092,12 +1101,8 @@ class FlowMeter(object):
             IOError: When `self.open` is False.
         """
         if not self.open:
-            raise IOError(
-                "The FlowController with address {} and \
-                          port {} is not open".format(
-                    self.address, self.port
-                )
-            )
+            raise IOError("The FlowController with address {} and \
+                          port {} is not open".format(self.address, self.port))
 
     def get_status(self, retries=5) -> dict:
         """Read the current device state.
