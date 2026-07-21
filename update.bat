@@ -10,11 +10,13 @@ for /d %%d in (*) do (
     rem Check if the directory name is not "test" and not "hte"
     if /i not "%%d"=="test" (
         if /i not "%%d"=="hte" (
-            if /i not "%%d"=="__pycache__" (
-            echo --- updating "%%d" ---
-            cd "%%d"
-            git fetch --prune --all && git reset --hard && git pull
-            cd ..
+            if /i not "%%d"=="hexagon" (
+                if /i not "%%d"=="__pycache__" (
+                echo --- updating "%%d" ---
+                cd "%%d"
+                git fetch --prune --all && git reset --hard && git pull
+                cd ..
+                )
             )
         )
     )
