@@ -13,7 +13,7 @@ builtin_ref_motorxy:
   - 100
   - 6
 run_type: uvis
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: 127.0.0.1

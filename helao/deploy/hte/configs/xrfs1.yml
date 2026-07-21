@@ -8,7 +8,7 @@ sequence_libraries:
   - XRFS_seq
   - helao\deploy\test\sequences\TEST_seq.py
 run_type: xrfs
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: hte-xrfs-01.htejcap.caltech.edu
