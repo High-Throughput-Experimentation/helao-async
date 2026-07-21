@@ -62,9 +62,7 @@ def _make_pal() -> PAL:
     pal.IO_measuring = False
     pal.IO_continue = False
     pal.IO_error = ErrorCodes.none
-    pal.IO_trigger_task = None
     pal.IO_action_run_counter = 0
-    pal.PAL_pid = None
     return pal
 
 
@@ -168,9 +166,9 @@ async def _scenario_b4_busy_guard_direct():
     action2 = _FakeAction()
     rejected2 = _pal_reject_busy(pal, action2)
     assert rejected2 is not None, "busy PAL must reject the call"
-    assert rejected2["error_code"] == ErrorCodes.in_progress, (
-        f"busy rejection must carry in_progress, got {rejected2['error_code']!r}"
-    )
+    assert (
+        rejected2["error_code"] == ErrorCodes.in_progress
+    ), f"busy rejection must carry in_progress, got {rejected2['error_code']!r}"
     assert action2.error_code == ErrorCodes.in_progress
 
     print("PASS: B4 busy guard (idle passes, real job in flight rejects in_progress)")

@@ -1,14 +1,35 @@
 """PAL liquid-handler robot driver.
 
-Implements the :class:`PAL` driver that builds joblists from one or more
-``microcam`` definitions, dispatches them to the PAL program (locally or via
-SSH/Cygwin to a remote host), monitors NI-DAQ trigger lines for start/
-continue/done events, and reconciles the resulting sample movements against
-the archive's sample database.
+Implements the :class:`PAL` driver: the job-loop engine (composition root)
+that builds joblists from one or more ``microcam`` definitions and
+orchestrates a full job's lifecycle. Since the P3a-PAL 4-way internal split
+(slices 0-6), the driver itself no longer owns the device-I/O/algorithm
+concerns directly -- it composes four collaborators and stays the engine
+that sequences them:
 
-Also defines the Pydantic models used to describe positions, micro-cams and
-full cam jobs (:class:`PALposition`, :class:`PalAction`, :class:`PalMicroCam`,
-:class:`PalCam`).
+- ``self.sample_state`` (:class:`~helao.hexagon.ports.sample_state.
+  SampleStatePort`) -- the archive/sample-DB boundary.
+- ``self.reconciliation`` (:class:`~helao.hexagon.domain.pal_reconciliation.
+  PalReconciliation`) -- Base-free source/dest resolution, cam-table
+  assembly, and after-trigger sample-state reconciliation.
+- ``self.transport`` (:class:`~helao.hexagon.ports.pal_transport.
+  PalTransportPort`) -- joblist submission (local subprocess or SSH/Cygwin)
+  and PAL process kill.
+- ``self.trigger`` (:class:`~helao.hexagon.ports.pal_trigger.
+  PalTriggerPort`) -- the NI-DAQmx start/continue/done DIO handshake.
+
+What stays engine-owned: the job-loop (``_PAL_IOloop``) and its scheduling,
+the split/reset bookkeeping before each trigger wait, the HLO data-file
+write (step 8, sandwiched between reconciliation's steps 7 and 9), and
+``active.append_sample`` (step 9) -- all of these need the framework's
+``Active``/``DataSinkPort`` handle the collaborators above are never
+handed (Decision 2).
+
+The Pydantic models used to describe positions, micro-cams and full cam jobs
+(:class:`PALposition`, :class:`PalAction`, :class:`PalMicroCam`,
+:class:`PalCam`) are defined in ``helao.hexagon.domain.models`` (P3a-PAL
+slice 3, so the Base-free ``PalReconciliation`` domain service can use them)
+and re-exported here unchanged.
 """
 
 # TODO: for NH3 synthesis experiment, add option run PAL commands locally instead of ssh
@@ -20,21 +41,31 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import asyncio
 import os
-import paramiko
 import time
-import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field as dc_field
-from typing import List, Optional, Union, Tuple
-from pydantic import BaseModel, Field
-import aiofiles
-import subprocess
-import psutil
+from typing import Any, Optional, Protocol
+from pydantic import BaseModel
 
 from helao.helpers import config_loader
-from helao.core.servers.base import Active
+from helao.hexagon.ports.data_sink import DataSinkPort
+from helao.hexagon.ports.sample_state import SampleStatePort
+from helao.hexagon.ports.pal_transport import PalTransportPort
+from helao.hexagon.ports.pal_trigger import PalTriggerPort
+from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
+from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.legacy.pal_trigger import (
+    NidaqmxPalTrigger,
+    NullPalTrigger,
+)
+from helao.hexagon.domain.models import (
+    PALposition,
+    PalAction,
+    PalMicroCam,
+    PalCam,
+)
+from helao.hexagon.domain.pal_reconciliation import PalReconciliation
 from helao.core.error import ErrorCodes
-from helao.core.helaodict import HelaoDict
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
@@ -42,17 +73,6 @@ from helao.core.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from helao.core.models.sample import (
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleStatus,
-    SampleInheritance,
-    SampleType,
-)
-from helao.helpers.sample_api import update_vol
 from helao.core.models.data import DataModel
 from .sample_shim import SampleArchiveShim
 from ...drivers.robot.enum import (
@@ -77,166 +97,51 @@ class _palcmd(BaseModel):
     params: str = ""
 
 
-class PALposition(BaseModel, HelaoDict):
-    """Source or destination position resolved against the archive.
+# PALposition, PalAction, PalMicroCam, PalCam moved to
+# helao.hexagon.domain.models (P3a-PAL slice 3) and imported above --
+# re-exported here unchanged so pal_server.py's import surface is unaffected.
 
-    Attributes:
-        position: Position kind (custom name or ``tray``).
-        samples_initial: Samples present in the position before the action.
-        samples_final: Samples present in the position after the action.
-        tray: Tray index when ``position`` is a tray.
-        slot: Slot index within the tray.
-        vial: Vial index within the slot.
-        error: Result of position checks.
+
+class _PALActiveContext(DataSinkPort, Protocol):
+    """``DataSinkPort`` plus the residual ``Active`` surface PAL's job-loop
+    still reaches directly: the mutable ``.action`` context object, the
+    non-``_nowait`` ``get_realtime()``, and ``finish_hlo_header`` called
+    without an ``await`` (the real ``Active.finish_hlo_header`` is
+    synchronous despite the port's async declaration -- a pre-existing
+    port/adapter signature gap, not something this slice changes).
+
+    PAL's `_sendcommand_main` still reads/mutates ``.action`` directly for
+    job-lifecycle bookkeeping that is permanently engine-owned, not
+    reconciliation: the split/reset block before each trigger wait
+    (samples_in/samples_out/action_sub_name), the C1 error stamp on a
+    triggerwait timeout, step 8's HLO write (save_data/file_conn_keys), and
+    step 9's `append_sample` calls. `_PAL_IOloop_meas_*_helper` similarly
+    stamps the terminal `error_code`/reads `action_uuid` for logging/
+    `finish_hlo_header`. All of the reconciliation ALGORITHM's `.action`
+    reads (samples_in/samples_out resolution, position updates, dest
+    ref-sample resolution -- legacy steps (1)-(7),(9)'s computation) moved
+    into `PalReconciliation` across P3a-PAL slices 3a-3d, receiving
+    `action`/`action_uuid` as plain parameters instead (Decision 2); what
+    remains here is the framework/job-lifecycle boundary the domain service
+    was never meant to cross. PALJob.active stays typed against this
+    composite so the P3a-PAL slice 1 retype to ``DataSinkPort`` (dropping
+    the ``helao.core.servers.base.Active`` import) does not regress
+    pyright. The runtime object is unchanged: still the framework's grafted
+    native ``Active``; only the static type widens.
     """
 
-    position: Optional[str] = None  # dest can be cust. or tray
-    samples_initial: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-    samples_final: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-    # sample: List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]] = Field(default=[])  # holds dest/source position
-    # will be also added to
-    # sample in/out
-    # depending on cam
-    tray: Optional[int] = None
-    slot: Optional[int] = None
-    vial: Optional[int] = None
-    error: Optional[ErrorCodes] = ErrorCodes.none
+    action: Any
 
+    async def get_realtime(self) -> int: ...
 
-class PalAction(BaseModel, HelaoDict):
-    """One concrete execution of a microcam, capturing samples and trigger times.
-
-    Attributes:
-        samples_in: Resolved input samples for this run.
-        samples_out: Output samples (initially references; resolved when stored).
-        dest: Final destination position descriptor.
-        source: Final source position descriptor.
-        dilute: Per-input flag indicating whether the sample is being diluted.
-        dilute_type: Sample type associated with each dilution entry.
-        samples_in_delta_vol_ml: Volume change in mL applied to each input sample.
-        start_time: PAL ``start`` trigger timestamp.
-        continue_time: PAL ``continue`` trigger timestamp.
-        done_time: PAL ``done`` trigger timestamp.
-    """
-
-    samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-    # this initially always holds
-    # references which need to be
-    # converted to
-    # to a real sample later
-    samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-
-    # this holds the runtime list for excution of the PAL cam
-    # a microcam could run 'repeat' times
-    dest: Optional[PALposition] = None
-    source: Optional[PALposition] = None
-
-    dilute: List[bool] = Field(default=[])
-    dilute_type: List[Union[str, None]] = Field(default=[])
-    samples_in_delta_vol_ml: List[float] = Field(default=[])  # contains a list of
-    # delta volumes
-    # for samples_in
-    # for each repeat
-
-    # I probably don't need them as lists but can keep it for now
-    start_time: Optional[int] = None
-    continue_time: Optional[int] = None
-    done_time: Optional[int] = None
-
-
-class PalMicroCam(BaseModel, HelaoDict):
-    """A single PAL method invocation, optionally repeated.
-
-    Attributes:
-        method: Name of the ``CAMS`` member to invoke.
-        tool: PAL tool string (e.g. ``"LS 1"``).
-        volume_ul: Aspirate/dispense volume in microliters.
-        requested_dest: Caller-supplied destination position.
-        requested_source: Caller-supplied source position.
-        wash1: Whether to perform wash stage 1 after the action.
-        wash2: Whether to perform wash stage 2.
-        wash3: Whether to perform wash stage 3.
-        wash4: Whether to perform wash stage 4.
-        path_methodfile: Resolved absolute path to the method ``.cam`` file.
-        rshs_pal_logfile: Path of the PAL auxiliary log file.
-        cam: Resolved :class:`_cam` descriptor for the method.
-        repeat: Number of additional repeats beyond the first run.
-        run: Per-repeat list of :class:`PalAction` results.
-    """
-
-    # scalar values which are the same for each repetition of the PAL method
-    method: Optional[str] = None  # name of methods
-    tool: Optional[str] = None
-    volume_ul: int = 0  # uL
-    # this holds a single resuested source and destination
-    requested_dest: PALposition = PALposition()
-    requested_source: PALposition = PALposition()
-
-    wash1: bool = False
-    wash2: bool = False
-    wash3: bool = False
-    wash4: bool = False
-
-    path_methodfile: str = ""  # all shoukld be in the same folder
-    rshs_pal_logfile: str = ""  # one PAL action logs into one logfile
-    cam: _cam = _cam()
-    repeat: int = 0
-
-    # for each microcam repetition we save a list of results
-    run: List[PalAction] = Field(default=[])
-
-
-class PalCam(BaseModel, HelaoDict):
-    """Composite PAL job: a list of microcams executed ``totalruns`` times.
-
-    Attributes:
-        samples_in: Input samples carried at the job level.
-        samples_out: Output samples accumulated from microcams.
-        microcams: Ordered list of :class:`PalMicroCam` invocations.
-        totalruns: Number of full repetitions of the microcam list.
-        sampleperiod: Per-run scheduling offsets in seconds.
-        spacingmethod: Spacing strategy across runs.
-        spacingfactor: Factor for geometric spacing.
-        timeoffset: Offset (s) subtracted from the requested per-run delay.
-        cur_run: Current run index during execution.
-        joblist: Internal list of ``/loadmethod`` PAL commands.
-        joblist_time: Timestamp when the joblist was submitted.
-        aux_output_filepath: Path used for the PAL auxiliary log.
-    """
-
-    samples_in: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-    samples_out: List[
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-    ] = Field(default=[])
-
-    microcams: List[PalMicroCam] = Field(default=[])
-
-    totalruns: int = 1
-    sampleperiod: List[float] = Field(default=[])
-    spacingmethod: Spacingmethod = "linear"
-    spacingfactor: float = 1.0
-    timeoffset: float = 0.0  # sec
-    cur_run: int = 0
-
-    joblist: list = Field(default=[])
-    joblist_time: Optional[int] = None
-    aux_output_filepath: Optional[str] = None
+    def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None: ...
 
 
 @dataclass
 class PALJob:
     """One submitted PAL job: the resolved ``PalCam`` plus the framework-owned
-    ``Active`` this job's samples/HLO rows are recorded against.
+    ``Active`` action context (typed as :class:`_PALActiveContext`) this
+    job's samples/HLO rows are recorded against.
 
     Replaces the old ``IO_signalq(1)`` bool handshake + the
     ``IO_palcam``/``self.active``/``self.action`` slots (CARDS P4 Design 1,
@@ -248,7 +153,12 @@ class PALJob:
 
     Attributes:
         palcam: Job descriptor with resolved microcams.
-        active: Injected ``Active`` action context (opaque to the driver).
+        active: Injected action context (opaque to the driver), typed as
+            :class:`_PALActiveContext` (``DataSinkPort`` + the residual
+            ``.action``/``get_realtime`` surface -- see that class). The
+            runtime object is still the framework's ``Active``, grafted in
+            by the endpoint; only the type annotation changed (P3a-PAL
+            slice 1: drops the ``helao.core.servers.base`` import).
         done: Set by the job-loop worker when this job's run is over
             (success, error, or stop); polled by ``PALJobExec._poll``.
         error: Terminal ``ErrorCodes`` for this job, stamped by the job-loop
@@ -256,7 +166,7 @@ class PALJob:
     """
 
     palcam: PalCam
-    active: "Active"
+    active: _PALActiveContext
     done: asyncio.Event = dc_field(default_factory=asyncio.Event)
     error: ErrorCodes = ErrorCodes.none
 
@@ -264,13 +174,14 @@ class PALJob:
 class PAL(HelaoDriver):
     """Driver for the PAL liquid-handler robot.
 
-    Owns only the job-loop engine and device I/O (SSH/subprocess submission,
-    NI-DAQ trigger polling, the ordered sample-pipeline mutations against the
-    archive shim). The ``Active`` action context for each job is created by
-    the calling endpoint and handed in via :meth:`submit_job` (CARDS P4
-    Design 1); the driver never reaches a server/base object. The job-loop
-    worker (``_PAL_IOloop``) is started lazily on the first :meth:`submit_job`
-    or :meth:`connect` call (K8: no tasks spawned at construction).
+    The composition root and job-loop engine (P3a-PAL 4-way split, slices
+    0-6): composes ``sample_state``/``reconciliation``/``transport``/
+    ``trigger`` (see module docstring) and sequences them through one job's
+    lifecycle. The ``Active`` action context for each job is created by the
+    calling endpoint and handed in via :meth:`submit_job` (CARDS P4 Design
+    1); the driver never reaches a server/base object. The job-loop worker
+    (``_PAL_IOloop``) is started lazily on the first :meth:`submit_job` or
+    :meth:`connect` call (K8: no tasks spawned at construction).
     """
 
     def __init__(self, config: dict = {}):
@@ -286,31 +197,46 @@ class PAL(HelaoDriver):
         )
 
         self.archive = SampleArchiveShim(self.world_config)
+        # SampleStatePort adoption (P3a-PAL slice 2): the adapter is a
+        # pass-through facade over self.archive (flattening its nested
+        # .unified_db sub-client) -- self.archive is kept as the underlying
+        # shim the adapter wraps, behavior is unchanged 1:1.
+        self.sample_state: SampleStatePort = SampleShimAdapter(self.archive)
 
-        self.sshuser = self.config_dict.get("user", "")
-        self.sshkey = self.config_dict.get("key", "")
+        sshuser = self.config_dict.get("user", "")
+        sshkey = self.config_dict.get("key", "")
         self.sshhost = self.config_dict.get("host", None)
         self.cam_file_path = self.config_dict.get("cam_file_path", "")
         self.timeout = self.config_dict.get("timeout", 30 * 60)
-        self.PAL_pid = None
 
-        self.triggers = False
-        self.IO_trigger_task = None
-        self.dev_trigger = self.config_dict.get("dev_trigger", None)
-        self.triggerport_start = None
-        self.triggerport_continue = None
-        self.triggerport_done = None
+        # PalTransportPort (P3a-PAL slice 4/6): owns SSH/subprocess/psutil.
+        # self.sshhost stays a plain attribute (unchanged) since
+        # pal_server.py's `_pal_reject_busy` reads `app.driver.sshhost`
+        # directly and `connect()` below also reads it.
+        self.transport: PalTransportPort = LegacyPalTransport(
+            host=self.sshhost, user=sshuser, key=sshkey
+        )
 
-        if self.dev_trigger == "NImax":
-            self.triggerport_start = self.config_dict["trigger"].get("start", None)
-            self.triggerport_continue = self.config_dict["trigger"].get(
-                "continue", None
+        # PalTriggerPort (P3a-PAL slice 5/6): owns the NI-DAQmx DIO
+        # handshake. NullPalTrigger reproduces the exact legacy no-op
+        # behavior when dev_trigger != "NImax".
+        dev_trigger = self.config_dict.get("dev_trigger", None)
+        self.trigger: PalTriggerPort
+        if dev_trigger == "NImax":
+            triggerport_start = self.config_dict["trigger"].get("start", None)
+            triggerport_continue = self.config_dict["trigger"].get("continue", None)
+            triggerport_done = self.config_dict["trigger"].get("done", None)
+            LOGGER.info(f"PAL start trigger port: {triggerport_start}")
+            LOGGER.info(f"PAL continue trigger port: {triggerport_continue}")
+            LOGGER.info(f"PAL done trigger port: {triggerport_done}")
+            self.trigger = NidaqmxPalTrigger(
+                triggerport_start,
+                triggerport_continue,
+                triggerport_done,
+                timeout=self.timeout,
             )
-            self.triggerport_done = self.config_dict["trigger"].get("done", None)
-            LOGGER.info(f"PAL start trigger port: {self.triggerport_start}")
-            LOGGER.info(f"PAL continue trigger port: {self.triggerport_continue}")
-            LOGGER.info(f"PAL done trigger port: {self.triggerport_done}")
-            self.triggers = True
+        else:
+            self.trigger = NullPalTrigger()
 
         # for global IOloop: the in-flight PALJob (None when idle), replacing
         # the old self.action/self.active/IO_palcam slots (Design 1, K7b).
@@ -358,6 +284,12 @@ class PAL(HelaoDriver):
         else:
             self.cams = None
 
+        # PalReconciliation domain service (P3a-PAL slice 3b): Base-free
+        # source/dest resolution + cam-table assembly, constructed with the
+        # port + the same cams table (Decision 2 -- port injected, not a
+        # DataSink/Active handle).
+        self.reconciliation = PalReconciliation(self.sample_state, self.cams)
+
         self.palauxheader = [
             "Date",
             "Method",
@@ -370,9 +302,6 @@ class PAL(HelaoDriver):
         ]
         self.IOloop_run = False
         self.IO_signalq = asyncio.Queue(1)
-        self.IO_trigger_startq = asyncio.Queue()
-        self.IO_trigger_continueq = asyncio.Queue()
-        self.IO_trigger_doneq = asyncio.Queue()
 
     def check_tool(self, req_tool=None) -> Optional[str]:
         """Resolve a tool name or value to its canonical :class:`PALtools` value.
@@ -434,7 +363,7 @@ class PAL(HelaoDriver):
             loop = asyncio.get_event_loop()
             self._worker_task = loop.create_task(self._PAL_IOloop())
 
-    async def submit_job(self, palcam: PalCam, active: "Active") -> PALJob:
+    async def submit_job(self, palcam: PalCam, active: _PALActiveContext) -> PALJob:
         """Validate tool names and enqueue ``palcam`` for the IO-loop worker.
 
         Ported body of legacy ``_init_PAL_IOloop`` minus the busy/estop/
@@ -520,96 +449,21 @@ class PAL(HelaoDriver):
             response=DriverResponseType.success, status=DriverStatus.uninitialized
         )
 
-    async def _clear_trigger_qs(self):
-        """Drain the start/continue/done trigger queues, logging any stale entries."""
-        while not self.IO_trigger_startq.empty():
-            timecode = await self.IO_trigger_startq.get()
-            LOGGER.error(f"startq was not empty: '{timecode}'")
-        while not self.IO_trigger_continueq.empty():
-            timecode = await self.IO_trigger_continueq.get()
-            LOGGER.error(f"continyeq was not empty: '{timecode}'")
-        while not self.IO_trigger_doneq.empty():
-            timecode = await self.IO_trigger_doneq.get()
-            LOGGER.error(f"doneq was not empty: '{timecode}'")
-
-    async def _poll_trigger_task(self):
-        """Poll NI-DAQ trigger lines while measuring and post rising edges to the queues."""
-        prev_start = False
-        prev_continue = False
-        prev_done = False
-        if not self.triggers:
-            return
-        job = self._job
-        try:
-            import nidaqmx
-            from nidaqmx.constants import LineGrouping
-
-            with nidaqmx.Task() as task:
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_start}' for 'start' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_continue}' for 'continue' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_done}' for 'done' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                while self.IO_measuring:
-                    data = task.read(number_of_samples_per_channel=1)
-                    new_start = data[0][0]
-                    new_continue = data[1][0]
-                    new_done = data[2][0]
-                    if (new_start ^ prev_start) and new_start:
-                        self.IO_trigger_startq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_start = deepcopy(new_start)
-                        LOGGER.info("IOq: got PAL 'start' trigger poll")
-                    if (new_start ^ prev_start) and not new_start:
-                        prev_start = deepcopy(new_start)
-
-                    if (new_continue ^ prev_continue) and new_continue:
-                        self.IO_trigger_continueq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_continue = deepcopy(new_continue)
-                        LOGGER.info("IOq: got PAL 'continue' trigger poll")
-
-                    if (new_continue ^ prev_continue) and not new_continue:
-                        prev_continue = deepcopy(new_continue)
-
-                    if (new_done ^ prev_done) and new_done:
-                        self.IO_trigger_doneq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_done = deepcopy(new_done)
-                        LOGGER.info("IOq: got PAL 'done' trigger poll")
-
-                    if (new_done ^ prev_done) and not new_done:
-                        prev_done = deepcopy(new_done)
-
-                    await asyncio.sleep(0.01)
-
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"_poll_trigger_task excited with error: {repr(e), tb,}")
-
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
         """Run a full PAL job: pre-checks, joblist submission, and per-microcam updates.
 
         For every microcam and each of its runs this method waits for the
-        three PAL triggers, refreshes input/output samples from the archive
-        database, writes the corresponding HLO row, and updates archive
-        position state.
+        three PAL triggers, then delegates sample-state reconciliation
+        (refresh input samples, materialize output samples, update volumes,
+        persist to the DB, write back archive positions -- legacy steps
+        (1)-(7),(9)) to :meth:`PalReconciliation.reconcile_after_trigger`
+        (P3a-PAL slice 3c). This method retains only what stays
+        engine-owned: the split/reset bookkeeping before each trigger wait,
+        step 8 (the HLO data-file write, which sits between reconciliation's
+        steps 7 and 9 and needs ``file_conn_keys`` mutated by
+        ``active.split()``), and step 9's actual ``active.append_sample``
+        calls (needs the ``DataSinkPort`` handle the domain service never
+        holds).
 
         Args:
             palcam: Job descriptor with resolved microcams.
@@ -681,162 +535,26 @@ class PAL(HelaoDriver):
                     LOGGER.error(f"Got error after triggerwait: '{error}'")
                     return ErrorCodes.critical_error
 
-                # after each pal trigger:
-                # as a pal action can contain many actions which modify
-                # samples in a complex manner
-                # (0) split action if its not the first one
-                # (1) we need to update all input samples from the db to get
-                #     most up-to-date information
-                # (2) then update the new samples (sample_out)
-                #     with up-to-date information
-                #     - creation timecode
-                #     - refresh parts for assemblies
-                # (3) convert samples_out references to real sample
-                #     and add them to the db
-                # (4) add all to the action samples_in/out
-                #     samples_in: initial state
-                #     sample_out: always new samples (final state)
-                # (5) then update samples_in parameters to reflect
-                #     the final states (samples_in_initial --> samples_in_final)
-                #     and update all sample_out info (for assemblies again)
-                # (6) save this back to the db (only samples_in)
-                # (7) update all positions in the archive
-                #     with new final samples
-                # (8) write all output files
-                # (9) add samples_in/out to active.action
-
-                # -- (1) -- get most recent information for all samples_in
-                # palaction.samples_in should always be non ref samples
-                palaction.samples_in = await self.archive.unified_db.get_samples(
-                    samples=palaction.samples_in
+                # after each pal trigger, reconcile sample state (legacy
+                # steps (1)-(7),(9)): refresh/materialize/persist samples,
+                # update volumes, write back archive positions. Step 8 (HLO
+                # write) stays engine-owned below, sandwiched between
+                # reconciliation's steps 7 and 9 exactly like the legacy
+                # code -- see PalReconciliation.reconcile_after_trigger's
+                # docstring for the full step-by-step mapping.
+                (
+                    error,
+                    should_abort,
+                    samples_in_for_job,
+                    samples_out_for_job,
+                ) = await self.reconciliation.reconcile_after_trigger(
+                    palaction, action_uuid=job.active.action.action_uuid
                 )
-                # update the action_uuid
-                for sample in palaction.samples_in:
-                    sample.action_uuid = [job.active.action.action_uuid]
-                # as palaction.samples_in contains both source and dest samples
-                # we had them saved separately (this is for the hlo file)
+                if should_abort:
+                    return error
 
-                # palaction.source should also always contain non ref samples
-                palaction.source.samples_initial = (
-                    await self.archive.unified_db.get_samples(
-                        samples=palaction.source.samples_initial
-                    )
-                )
-                # update the action_uuid
-                for sample in palaction.source.samples_initial:
-                    sample.action_uuid = [job.active.action.action_uuid]
-
-                # dest can also contain ref samples, and these are not yet in the db
-                for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
-                    if dest_sample.global_label is not None:
-                        dest_tmp = await self.archive.unified_db.get_samples(
-                            samples=[dest_sample]
-                        )
-                        if dest_tmp:
-                            palaction.dest.samples_initial[dest_i] = deepcopy(
-                                dest_tmp[0]
-                            )
-                        else:
-                            LOGGER.error("Sample does not exist in db")
-                            return ErrorCodes.critical_error
-                    else:
-                        LOGGER.error(
-                            "palaction.dest.samples_initial should not contain ref samples"
-                        )
-                        return ErrorCodes.bug
-                # update the action_uuid
-                for sample in palaction.dest.samples_initial:
-                    sample.action_uuid = [job.active.action.action_uuid]
-
-                # -- (2) -- update sample_out
-                # only samples in sample_out should be new ones (ref samples)
-                # convert these to real samples by adding them to the db
-                # update sample creation time
-                for sample_out in palaction.samples_out:
-                    LOGGER.info(f" converting ref sample {sample_out} to real sample")
-                    sample_out.sample_creation_timecode = palaction.continue_time
-
-                    # if the sample was destroyed during this run set its
-                    # volume to zero
-                    # destroyed: destination was waste or injector
-                    # for newly created samples
-                    if SampleStatus.destroyed in sample_out.status:
-                        sample_out.destroy_sample()
-
-                    # if sample_out is an assembly we need to update its parts
-                    if sample_out.sample_type == SampleType.assembly:
-                        # could also check if it has parts attribute?
-                        # reset source
-                        sample_out.source = []
-                        for part_i, part in enumerate(sample_out.parts):
-                            if part.global_label is not None:
-                                tmp_part = await self.archive.unified_db.get_samples(
-                                    samples=[part]
-                                )
-                                for sample in tmp_part:
-                                    sample.action_uuid = [job.active.action.action_uuid]
-                                sample_out.parts[part_i] = deepcopy(tmp_part[0])
-                            else:
-                                # the assembly contains a ref sample which
-                                # first need to be updated and converted
-                                part.sample_creation_timecode = palaction.continue_time
-                                part.action_uuid = [job.active.action.action_uuid]
-                                tmp_part = await self.archive.unified_db.new_samples(
-                                    samples=[part]
-                                )
-                                sample_out.parts[part_i] = deepcopy(tmp_part[0])
-                            # now add the real samples back to the source list
-                            sample_out.source.append(part.get_global_label())
-                        # update the action_uuid
-                        for sample in sample_out.parts:
-                            sample.action_uuid = [job.active.action.action_uuid]
-
-                # update the action_uuid
-                for sample in palaction.samples_out:
-                    sample.action_uuid = [job.active.action.action_uuid]
-
-                # -- (3) -- convert samples_out references to real sample
-                #           by adding them to the to db
-                palaction.samples_out = await self.archive.unified_db.new_samples(
-                    samples=palaction.samples_out
-                )
-
-                # -- (4) -- add palaction samples to action object
-                # add palaction samples_in out to main palcam
-                # these should be initial samples
-                # properties are updated later and saved back to db
-                # need a deep copy, else the next modifications would also
-                # modify these samples
-                for sample_in in palaction.samples_in:
-                    job.palcam.samples_in.append(deepcopy(sample_in))
-                # add palaction sample_out to main palcam
-                for sample in palaction.samples_out:
-                    job.palcam.samples_out.append(deepcopy(sample))
-
-                # -- (5) -- convert pal action samples_in
-                # from initial to final
-                # update the sample volumes
-                # (needed only for input samples, samples_out are always
-                # new samples)
-                await self._sendcommand_update_sample_volume(palaction)
-
-                # -- (6) --
-                # update all samples also in the local sample sqlite db
-                await self.archive.unified_db.update_samples(palaction.samples_in)
-
-                for sample_out in palaction.samples_out:
-                    # if sample_out is an assembly we need to update its parts
-                    if sample_out.sample_type == SampleType.assembly:
-                        sample_out.parts = await self.archive.unified_db.get_samples(
-                            samples=sample_out.parts
-                        )
-                    # update the action_uuid
-                    sample_out.action_uuid = [job.active.action.action_uuid]
-                    # save it back to the db
-                    await self.archive.unified_db.update_samples([sample_out])
-
-                # -- (7) -- update the sample position db
-                error = await self._sendcommand_update_archive_helper(palaction)
+                job.palcam.samples_in = samples_in_for_job
+                job.palcam.samples_out = samples_out_for_job
 
                 # -- (8) -- write data (hlo file)
                 if job.active:
@@ -901,926 +619,20 @@ class PAL(HelaoDriver):
         LOGGER.info(f"waiting {tmp_time}sec for PAL to close")
         await asyncio.sleep(tmp_time)
         LOGGER.info(f"done waiting {tmp_time}sec for PAL to close")
-        if self.PAL_pid is not None:
-            LOGGER.info("waiting for PAL pid to finish")
-            self.PAL_pid.communicate()
-            self.PAL_pid = None
+        await self.transport.reap_local_process()
 
         return error
-
-    async def _sendcommand_next_full_vial(
-        self,
-        after_tray: int,
-        after_slot: int,
-        after_vial: int,
-    ) -> Tuple[
-        ErrorCodes,
-        int,
-        int,
-        int,
-        Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
-    ]:
-        """Locate the next full vial after a given tray/slot/vial.
-
-        Args:
-            after_tray: Tray index to search after.
-            after_slot: Slot index to search after.
-            after_vial: Vial index to search after.
-
-        Returns:
-            Tuple ``(error, tray, slot, vial, sample)``. Position fields are
-            ``None`` and ``sample`` is a :class:`NoneSample` if no vial is
-            available.
-        """
-        error = ErrorCodes.none
-        tray_pos = None
-        slot_pos = None
-        vial_pos = None
-        sample = NoneSample()
-
-        if after_tray is None or after_slot is None or after_vial is None:
-            error = ErrorCodes.not_available
-            return error, tray_pos, slot_pos, vial_pos, sample
-
-        # if tray is None, find the global first full vial,
-        # else find the next full after that one
-        # this will add the sample to global sample_in
-        newvialpos = await self.archive.tray_get_next_full(
-            after_tray=after_tray, after_slot=after_slot, after_vial=after_vial
-        )
-
-        if newvialpos["tray"] is not None:
-            tray_pos = newvialpos["tray"]
-            slot_pos = newvialpos["slot"]
-            vial_pos = newvialpos["vial"]
-
-            LOGGER.info(
-                f"diluting liquid sample in tray {tray_pos}, slot {slot_pos}, vial {vial_pos}"
-            )
-
-            # need to get the sample which is currently in this vial
-            # and also add it to global samples_in
-            error, sample = await self.archive.tray_query_sample(
-                tray=tray_pos, slot=slot_pos, vial=vial_pos
-            )
-            if error != ErrorCodes.none:
-                if sample != NoneSample():
-                    sample.inheritance = SampleInheritance.allow_both
-                    sample.reset_sample_status(SampleStatus.preserved)
-                else:
-                    error = ErrorCodes.not_available
-                    LOGGER.error("error converting old liquid_sample to basemodel.")
-
-        else:
-            LOGGER.error("no full vial slots")
-            error = ErrorCodes.not_available
-
-        return error, tray_pos, slot_pos, vial_pos, sample
-
-    async def _sendcommand_check_source_tray(
-        self, microcam: PalMicroCam
-    ) -> PALposition:
-        """Return the tray-source :class:`PALposition`, with an error if no sample.
-
-        Args:
-            microcam: Microcam carrying the requested tray/slot/vial.
-
-        Returns:
-            Resolved :class:`PALposition` whose ``error`` indicates whether
-            a sample was found.
-        """
-        source = (
-            _positiontype.tray
-        )  # should be the same as microcam.requested_source.position
-        error, sample_in = await self.archive.tray_query_sample(
-            microcam.requested_source.tray,
-            microcam.requested_source.slot,
-            microcam.requested_source.vial,
-        )
-
-        if error != ErrorCodes.none:
-            LOGGER.error("PAL_source: Requested tray position does not exist.")
-            error = ErrorCodes.critical_error
-
-        elif sample_in == NoneSample():
-            LOGGER.error(
-                f"PAL_source: No sample in tray {microcam.requested_source.tray}, slot {microcam.requested_source.slot}, vial {microcam.requested_source.vial}"
-            )
-            error = ErrorCodes.not_available
-
-        return PALposition(
-            position=source,
-            samples_initial=[sample_in],
-            tray=microcam.requested_source.tray,
-            slot=microcam.requested_source.slot,
-            vial=microcam.requested_source.vial,
-            error=error,
-        )
-
-    async def _sendcommand_check_source_custom(
-        self, microcam: PalMicroCam
-    ) -> PALposition:
-        """Return the custom-source :class:`PALposition`, with an error if no sample.
-
-        Args:
-            microcam: Microcam carrying the requested custom position name.
-        """
-        source = microcam.requested_source.position  # custom position name
-
-        if source is None:
-            LOGGER.error(
-                "PAL_source: Invalid PAL source 'NONE' for 'custom' position method."
-            )
-            return PALposition(error=ErrorCodes.not_available)
-
-        error, sample_in = await self.archive.custom_query_sample(
-            microcam.requested_source.position
-        )
-
-        if error != ErrorCodes.none:
-            LOGGER.error("PAL_source: Requested custom position does not exist.")
-            error = ErrorCodes.critical_error
-        elif sample_in == NoneSample():
-            LOGGER.error(f"PAL_source: No sample in custom position '{source}'")
-            error = ErrorCodes.not_available
-
-        return PALposition(position=source, samples_initial=[sample_in], error=error)
-
-    async def _sendcommand_check_source_next_empty(
-        self, microcam: PalMicroCam
-    ) -> PALposition:
-        """Reject ``next_empty_vial`` as a PAL source position.
-
-        Args:
-            microcam: Unused; included for signature parity with siblings.
-        """
-        LOGGER.error("PAL_source: PAL source cannot be 'next_empty_vial'")
-        return PALposition(error=ErrorCodes.not_available)
-
-    async def _sendcommand_check_source_next_full(
-        self, microcam: PalMicroCam
-    ) -> PALposition:
-        """Find the next full vial after the requested tray/slot/vial source.
-
-        Args:
-            microcam: Microcam carrying the requested tray-relative cursor.
-        """
-
-        source = _positiontype.tray
-        (
-            error,
-            source_tray,
-            source_slot,
-            source_vial,
-            sample_in,
-        ) = await self._sendcommand_next_full_vial(
-            after_tray=microcam.requested_source.tray,
-            after_slot=microcam.requested_source.slot,
-            after_vial=microcam.requested_source.vial,
-        )
-        if error != ErrorCodes.none:
-            LOGGER.error("PAL_source: No next full vial")
-            return PALposition(error=ErrorCodes.not_available)
-
-        elif sample_in == NoneSample():
-            LOGGER.error(
-                "PAL_source: More then one sample in source position. This is not allowed."
-            )
-            return PALposition(error=ErrorCodes.critical_error)
-
-        return PALposition(
-            position=source,
-            samples_initial=[sample_in],
-            tray=source_tray,
-            slot=source_slot,
-            vial=source_vial,
-            error=error,
-        )
-
-    async def _sendcommand_check_source(self, microcam: PalMicroCam) -> ErrorCodes:
-        """Resolve the source position and append a :class:`PalAction` run entry.
-
-        Dispatches to the position-specific source checker based on
-        ``microcam.cam.source``, sets the resolved tray/slot/vial back on
-        ``microcam.requested_source``, and records the source sample on the
-        microcam's runs list.
-
-        Args:
-            microcam: Microcam whose source is being validated.
-
-        Returns:
-            ``ErrorCodes.none`` on success, otherwise the relevant error.
-        """
-
-        palposition = PALposition()
-
-        # check against desired source type
-        if microcam.cam.source == _positiontype.tray:
-            palposition = await self._sendcommand_check_source_tray(microcam=microcam)
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.source == _positiontype.custom:
-            palposition = await self._sendcommand_check_source_custom(microcam=microcam)
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.source == _positiontype.next_empty_vial:
-            palposition = await self._sendcommand_check_source_next_empty(
-                microcam=microcam
-            )
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.source == _positiontype.next_full_vial:
-            palposition = await self._sendcommand_check_source_next_empty(
-                microcam=microcam
-            )
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        # # Set requested position to new position.
-        # # The new position will be the requested positin for the
-        # # e.g. next full vial search as the new start position
-        microcam.requested_source.tray = palposition.tray
-        microcam.requested_source.slot = palposition.slot
-        microcam.requested_source.vial = palposition.vial
-
-        # if sample_in != NoneSample():
-        # should never be the case as this will already throw an error before
-        # but better check agin
-        if (
-            palposition.samples_initial
-            and len(palposition.samples_initial) == 1
-            and palposition.samples_initial[0] != NoneSample()
-        ):
-
-            LOGGER.info(
-                f"PAL_source: Got sample '{palposition.samples_initial[0].global_label}' in position '{palposition.position}'"
-            )
-            # done with checking source type
-            # setting inheritance and status to None for all samples
-            # in sample_in (will be updated when dest is decided)
-            # they all should actually be give only
-            # but might not be preserved depending on target
-            # sample_in.inheritance =  SampleInheritance.give_only
-            # sample_in.status = [SampleStatus.preserved]
-            palposition.samples_initial[0].inheritance = None
-            palposition.samples_initial[0].reset_sample_status()
-            palposition.samples_initial[0].sample_position = palposition.position
-
-        else:
-            # this should never happen
-            # else we have a bug in the source checks
-            if palposition.position is not None:
-                LOGGER.error(
-                    f"BUG check PAL_source: Got sample no sample in position '{palposition.position}'"
-                )
-
-        microcam.run.append(
-            PalAction(
-                samples_in=deepcopy(palposition.samples_initial),
-                source=deepcopy(palposition),
-                dilute=[False]
-                * len(palposition.samples_initial),  # initial source is not diluted
-                dilute_type=[microcam.cam.sample_out_type]
-                * len(palposition.samples_initial),
-                samples_in_delta_vol_ml=[-1.0 * microcam.volume_ul / 1000.0],
-            )
-        )
-
-        return ErrorCodes.none
-
-    async def _sendcommand_check_dest_tray(self, microcam: PalMicroCam) -> Tuple[
-        PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    ]:
-        """Resolve a tray destination, creating a new sample ref if the vial is empty.
-
-        Args:
-            microcam: Microcam carrying the requested tray/slot/vial dest.
-
-        Returns:
-            Tuple ``(palposition, samples_out_list)`` where ``samples_out_list``
-            contains the newly created reference sample (or is empty if the
-            vial already held a sample and is being diluted).
-        """
-        job = self._job
-        samples_out_list: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_initial: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_final: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-
-        dest = _positiontype.tray
-        error, sample_in = await self.archive.tray_query_sample(
-            microcam.requested_dest.tray,
-            microcam.requested_dest.slot,
-            microcam.requested_dest.vial,
-        )
-
-        if error != ErrorCodes.none:
-            LOGGER.error("PAL_dest: Requested tray position does not exist.")
-            return PALposition(error=ErrorCodes.critical_error), samples_out_list
-
-        # check if a sample is present in destination
-        if sample_in == NoneSample():
-            # no sample in dest, create a new sample reference
-            LOGGER.info(
-                f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}"
-            )
-            if len(microcam.run[-1].samples_in) > 1:
-                LOGGER.error(
-                    f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
-                )
-                return PALposition(error=ErrorCodes.bug), samples_out_list
-
-            error, samples_out_list = await self.archive.new_ref_samples(
-                samples_in=microcam.run[
-                    -1
-                ].samples_in,  # this should hold a sample already from "check source call"
-                sample_out_type=microcam.cam.sample_out_type,
-                sample_position=dest,
-                action=job.active.action,
-            )
-
-            if error != ErrorCodes.none:
-                return PALposition(error=error), samples_out_list
-
-            # this will be a single sample anyway
-            samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
-            samples_out_list[0].sample_position = dest
-            samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].reset_sample_status(SampleStatus.created)
-            dest_samples_initial = []  # no sample here in the beginning
-            dest_samples_final = deepcopy(samples_out_list)
-
-        else:
-            # a sample is already present in the tray position
-            # we add more sample to it, e.g. dilute it
-            LOGGER.info(
-                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
-            )
-            # we can only add liquid to vials (diluite them, no assembly here)
-            sample_in.inheritance = SampleInheritance.receive_only
-            sample_in.reset_sample_status(SampleStatus.preserved)
-
-            dest_samples_initial = [deepcopy(sample_in)]
-            dest_samples_final = [deepcopy(sample_in)]
-
-            # add that sample to the current sample_in list
-            microcam.run[-1].samples_in.append(deepcopy(sample_in))
-            microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
-            microcam.run[-1].dilute.append(True)
-            microcam.run[-1].dilute_type.append(sample_in.sample_type)
-
-        return (
-            PALposition(
-                position=dest,
-                samples_initial=dest_samples_initial,
-                samples_final=dest_samples_final,
-                tray=microcam.requested_dest.tray,
-                slot=microcam.requested_dest.slot,
-                vial=microcam.requested_dest.vial,
-                error=error,
-            ),
-            samples_out_list,
-        )
-
-    async def _sendcommand_check_dest_custom(self, microcam: PalMicroCam) -> Tuple[
-        PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    ]:
-        """Resolve a custom destination, creating a new sample, diluting, or assembling.
-
-        Handles the cases where the destination is empty, holds an assembly,
-        holds the same sample type (dilute), or holds a different type
-        (create an assembly when allowed).
-
-        Args:
-            microcam: Microcam carrying the requested custom destination name.
-
-        Returns:
-            Tuple of the resolved :class:`PALposition` and the new output samples.
-        """
-        job = self._job
-        samples_out_list: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_initial: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_final: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-
-        dest = microcam.requested_dest.position
-        if dest is None:
-            LOGGER.error(
-                "PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method."
-            )
-            return PALposition(error=ErrorCodes.critical_error), samples_out_list
-
-        if not await self.archive.custom_dest_allowed(dest):
-            LOGGER.error(f"PAL_dest: custom position '{dest}' cannot be dest.")
-            return PALposition(error=ErrorCodes.critical_error), samples_out_list
-
-        error, sample_in = await self.archive.custom_query_sample(dest)
-        if error != ErrorCodes.none:
-            LOGGER.error(
-                f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method."
-            )
-            return PALposition(error=error), samples_out_list
-
-        # check if a sample is already present in the custom position
-        if sample_in == NoneSample():
-            # no sample in custom position, create a new sample reference
-            LOGGER.info(
-                f"PAL_dest: No sample in custom position '{dest}', creating new sample reference."
-            )
-
-            # cannot create an assembly
-            if len(microcam.run[-1].samples_in) > 1:
-                LOGGER.error(
-                    "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
-                )
-                return PALposition(error=ErrorCodes.bug), samples_out_list
-
-            # this should actually never create an assembly
-            error, samples_out_list = await self.archive.new_ref_samples(
-                samples_in=microcam.run[-1].samples_in,
-                sample_out_type=microcam.cam.sample_out_type,
-                sample_position=dest,
-                action=job.active.action,
-            )
-
-            if error != ErrorCodes.none:
-                return PALposition(error=error), samples_out_list
-
-            samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
-            samples_out_list[0].sample_position = dest
-            samples_out_list[0].inheritance = SampleInheritance.receive_only
-            samples_out_list[0].reset_sample_status(SampleStatus.created)
-            dest_samples_initial = []  # no sample here in the beginning
-            dest_samples_final = deepcopy(samples_out_list)
-
-        else:
-            # sample is already present
-            # either create an assembly or dilute it
-            # first check what type is present
-            LOGGER.info(
-                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
-            )
-
-            if sample_in.sample_type == SampleType.assembly:
-                # need to check if we already go the same type in
-                # the assembly and then would dilute too
-                # else we add a new sample to that assembly
-
-                # source input should only hold a single sample
-                # but better check for sure
-                if len(microcam.run[-1].samples_in) > 1:
-                    LOGGER.error(
-                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
-                    )
-                    return PALposition(error=ErrorCodes.bug), samples_out_list
-
-                test = False
-                if microcam.run[-1].samples_in[-1].sample_type == SampleType.liquid:
-                    test = await self._sendcommand_check_for_assemblytypes(
-                        sample_type=SampleType.liquid, assembly=sample_in
-                    )
-                elif microcam.run[-1].samples_in[-1].sample_type == SampleType.solid:
-                    test = False  # always add it as a new part
-                elif microcam.run[-1].samples_in[-1].sample_type == SampleType.gas:
-                    test = await self._sendcommand_check_for_assemblytypes(
-                        sample_type=SampleType.gas, assembly=sample_in
-                    )
-                else:
-                    LOGGER.error("PAL_dest: Found a BUG: unsupported sample type.")
-                    return PALposition(error=ErrorCodes.bug), samples_out_list
-
-                if test is True:
-                    # we dilute the assembly sample
-                    dest_samples_initial = deepcopy(samples_out_list)
-                    dest_samples_final = deepcopy(samples_out_list)
-
-                    # we can only add liquid to vials
-                    # (diluite them, no assembly here)
-                    sample_in.inheritance = SampleInheritance.receive_only
-                    sample_in.reset_sample_status(SampleStatus.preserved)
-
-                    # first add the dilute type
-                    microcam.run[-1].dilute_type.append(
-                        microcam.run[-1].samples_in[-1].sample_type
-                    )
-                    microcam.run[-1].samples_in_delta_vol_ml.append(
-                        microcam.volume_ul / 1000.0
-                    )
-                    microcam.run[-1].dilute.append(True)
-                    # then add the new sample_in
-                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
-                else:
-                    # add a new part to assembly
-                    LOGGER.info("PAL_dest: Adding new part to assembly")
-                    if len(microcam.run[-1].samples_in) > 1:
-                        # sample_in should only hold one sample at that point
-                        LOGGER.error(
-                            f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
-                        )
-                        return PALposition(error=ErrorCodes.bug), samples_out_list
-
-                    # first create a new sample from the source sample
-                    # which is then incoporarted into the assembly
-                    error, samples_out_list = await self.archive.new_ref_samples(
-                        samples_in=microcam.run[
-                            -1
-                        ].samples_in,  # this should hold a sample already from "check source call"
-                        sample_out_type=microcam.cam.sample_out_type,
-                        sample_position=dest,
-                        action=job.active.action,
-                    )
-
-                    if error != ErrorCodes.none:
-                        return PALposition(error=error), samples_out_list
-
-                    samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
-                    samples_out_list[0].sample_position = dest
-                    samples_out_list[0].inheritance = SampleInheritance.allow_both
-                    samples_out_list[0].reset_sample_status(
-                        SampleStatus.created, SampleStatus.incorporated
-                    )
-
-                    # add new sample to assembly
-                    sample_in.parts.append(samples_out_list[0])
-                    # we can only add liquid to vials
-                    # (diluite them, no assembly here)
-                    sample_in.inheritance = SampleInheritance.allow_both
-                    sample_in.reset_sample_status(SampleStatus.preserved)
-
-                    dest_samples_initial = [deepcopy(sample_in)]
-                    dest_samples_final = [deepcopy(sample_in)]
-                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
-
-            elif sample_in.sample_type == microcam.run[-1].samples_in[-1].sample_type:
-                # we dilute it if its the same sample type
-                # (and not an assembly),
-                # we can only add liquid to vials
-                # (diluite them, no assembly here)
-                sample_in.inheritance = SampleInheritance.receive_only
-                sample_in.reset_sample_status(SampleStatus.preserved)
-
-                dest_samples_initial = [deepcopy(sample_in)]
-                dest_samples_final = [deepcopy(sample_in)]
-
-                microcam.run[-1].dilute_type.append(sample_in.sample_type)
-                microcam.run[-1].samples_in.append(deepcopy(sample_in))
-                microcam.run[-1].samples_in_delta_vol_ml.append(
-                    microcam.volume_ul / 1000.0
-                )
-                microcam.run[-1].dilute.append(True)
-
-            else:
-                # neither same sample type nor an assembly present.
-                # we now create an assembly if allowed
-                if not await self.archive.custom_assembly_allowed(dest):
-                    # no assembly allowed
-                    LOGGER.error(
-                        f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method."
-                    )
-                    return PALposition(error=ErrorCodes.not_allowed), samples_out_list
-
-                # cannot create an assembly from an assembly
-                if len(microcam.run[-1].samples_in) > 1:
-                    LOGGER.error(
-                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
-                    )
-                    return PALposition(error=ErrorCodes.bug), samples_out_list
-
-                # dest_sample = sample_in
-                # first create a new sample from the source sample
-                # which is then incoporarted into the assembly
-                error, samples_out_list = await self.archive.new_ref_samples(
-                    samples_in=microcam.run[-1].samples_in,
-                    sample_out_type=microcam.cam.sample_out_type,
-                    sample_position=dest,
-                    action=job.active.action,
-                )
-
-                if error != ErrorCodes.none:
-                    return PALposition(error=error), samples_out_list
-
-                samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
-                samples_out_list[0].sample_position = dest
-                samples_out_list[0].inheritance = SampleInheritance.allow_both
-                samples_out_list[0].reset_sample_status(
-                    SampleStatus.created, SampleStatus.incorporated
-                )
-
-                # only now add the sample which was found in the position
-                # to the sample_in list for the exp/prg
-                sample_in.inheritance = SampleInheritance.allow_both
-                sample_in.reset_sample_status(SampleStatus.incorporated)
-
-                microcam.run[-1].samples_in.append(deepcopy(sample_in))
-                # we only add the sample to assembly so delta_vol is 0
-                microcam.run[-1].samples_in_delta_vol_ml.append(0.0)
-                microcam.run[-1].dilute.append(False)
-                microcam.run[-1].dilute_type.append(None)
-
-                # create now an assembly of both
-                tmp_samples_in = [sample_in]
-                # and also add the newly created sample ref to it
-                tmp_samples_in.append(samples_out_list[0])
-                LOGGER.info(
-                    f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'"
-                )
-                error, samples_out2_list = await self.archive.new_ref_samples(
-                    samples_in=tmp_samples_in,
-                    sample_out_type=SampleType.assembly,
-                    sample_position=dest,
-                    action=job.active.action,
-                )
-
-                if error != ErrorCodes.none:
-                    return PALposition(error=error), samples_out_list
-
-                samples_out2_list[0].sample_position = dest
-                samples_out2_list[0].inheritance = SampleInheritance.allow_both
-                samples_out2_list[0].reset_sample_status(SampleStatus.created)
-                # add second sample out to samples_out
-                samples_out_list.append(samples_out2_list[0])
-
-                # intial is the sample initial in the position
-                dest_samples_initial = [deepcopy(sample_in)]
-                # this will be the new assembly
-                dest_samples_final = deepcopy(samples_out2_list)
-
-        return (
-            PALposition(
-                position=dest,
-                samples_initial=dest_samples_initial,
-                samples_final=dest_samples_final,
-                tray=microcam.requested_dest.tray,
-                slot=microcam.requested_dest.slot,
-                vial=microcam.requested_dest.vial,
-                error=error,
-            ),
-            samples_out_list,
-        )
-
-    async def _sendcommand_check_dest_next_empty(self, microcam: PalMicroCam) -> Tuple[
-        PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    ]:
-        """Find the next empty vial with enough volume capacity and create a sample ref.
-
-        Args:
-            microcam: Microcam supplying the volume requirement.
-        """
-        job = self._job
-        samples_out_list: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_initial: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_final: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-
-        dest_tray = None
-        dest_slot = None
-        dest_vial = None
-
-        dest = _positiontype.tray
-        newvialpos = await self.archive.tray_new_position(
-            req_vol=microcam.volume_ul / 1000.0
-        )
-
-        if newvialpos["tray"] is None:
-            LOGGER.error("PAL_dest: empty vial slot is not available")
-            return PALposition(error=ErrorCodes.not_available), samples_out_list
-
-        # dest = _positiontype.tray
-        dest_tray = newvialpos["tray"]
-        dest_slot = newvialpos["slot"]
-        dest_vial = newvialpos["vial"]
-        LOGGER.info(
-            f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}"
-        )
-
-        error, samples_out_list = await self.archive.new_ref_samples(
-            samples_in=microcam.run[
-                -1
-            ].samples_in,  # this should hold a sample already from "check source call"
-            sample_out_type=microcam.cam.sample_out_type,
-            sample_position=dest,
-            action=job.active.action,
-        )
-
-        LOGGER.info(f"new reference sample for empty vial: {samples_out_list}")
-
-        if error != ErrorCodes.none:
-            return PALposition(error=error), samples_out_list
-
-        samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
-        samples_out_list[0].sample_position = dest
-        samples_out_list[0].inheritance = SampleInheritance.receive_only
-        samples_out_list[0].reset_sample_status(SampleStatus.created)
-        dest_samples_initial = []  # no sample here in the beginning
-        dest_samples_final = deepcopy(samples_out_list)
-
-        return (
-            PALposition(
-                position=dest,
-                samples_initial=dest_samples_initial,
-                samples_final=dest_samples_final,
-                tray=dest_tray,
-                slot=dest_slot,
-                vial=dest_vial,
-                error=error,
-            ),
-            samples_out_list,
-        )
-
-    async def _sendcommand_check_dest_next_full(self, microcam: PalMicroCam) -> Tuple[
-        PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    ]:
-        """Find the next full vial after the requested tray cursor as the destination.
-
-        Args:
-            microcam: Microcam carrying the requested tray-relative cursor.
-        """
-        job = self._job
-        samples_out_list: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_initial: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        dest_samples_final: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-
-        dest = None
-        dest_tray = None
-        dest_slot = None
-        dest_vial = None
-
-        dest = _positiontype.tray
-        (
-            error,
-            dest_tray,
-            dest_slot,
-            dest_vial,
-            sample_in,
-        ) = await self._sendcommand_next_full_vial(
-            after_tray=microcam.requested_dest.tray,
-            after_slot=microcam.requested_dest.slot,
-            after_vial=microcam.requested_dest.vial,
-        )
-        if error != ErrorCodes.none:
-            LOGGER.error("PAL_dest: No next full vial")
-            return PALposition(error=ErrorCodes.not_available), samples_out_list
-        if sample_in == NoneSample():
-            LOGGER.error(
-                "PAL_dest: More then one sample in source position. This is not allowed."
-            )
-            return PALposition(error=ErrorCodes.critical_error), samples_out_list
-
-        # a sample is already present in the tray position
-        # we add more sample to it, e.g. dilute it
-        LOGGER.info(
-            f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
-        )
-        sample_in.inheritance = SampleInheritance.receive_only
-        sample_in.reset_sample_status(SampleStatus.preserved)
-
-        microcam.run[-1].samples_in.append(sample_in)
-        microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
-        microcam.run[-1].dilute.append(True)
-        microcam.run[-1].dilute_type.append(sample_in.sample_type)
-
-        dest_samples_initial = [deepcopy(sample_in)]
-        dest_samples_final = [deepcopy(sample_in)]
-
-        return (
-            PALposition(
-                position=dest,
-                samples_initial=dest_samples_initial,
-                samples_final=dest_samples_final,
-                tray=dest_tray,
-                slot=dest_slot,
-                vial=dest_vial,
-                error=error,
-            ),
-            samples_out_list,
-        )
-
-    async def _sendcommand_check_dest(self, microcam: PalMicroCam) -> ErrorCodes:
-        """Resolve the destination position and update the microcam's run entry.
-
-        Dispatches to the destination-specific checker based on
-        ``microcam.cam.dest``, marks samples as destroyed when the
-        destination is configured as destructive, and accumulates input
-        inheritance/status for samples not already assigned.
-
-        Args:
-            microcam: Microcam whose destination is being validated.
-
-        Returns:
-            ``ErrorCodes.none`` on success.
-        """
-
-        samples_out_list: List[
-            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
-        ] = []
-        palposition = PALposition()
-
-        if microcam.cam.dest == _positiontype.tray:
-            palposition, samples_out_list = await self._sendcommand_check_dest_tray(
-                microcam=microcam
-            )
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.dest == _positiontype.custom:
-            palposition, samples_out_list = await self._sendcommand_check_dest_custom(
-                microcam=microcam
-            )
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.dest == _positiontype.next_empty_vial:
-            (
-                palposition,
-                samples_out_list,
-            ) = await self._sendcommand_check_dest_next_empty(microcam=microcam)
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        elif microcam.cam.dest == _positiontype.next_full_vial:
-            (
-                palposition,
-                samples_out_list,
-            ) = await self._sendcommand_check_dest_next_full(microcam=microcam)
-            if palposition.error != ErrorCodes.none:
-                return palposition.error
-
-        # done with destination checks
-
-        # Set requested position to new position.
-        # The new position will be the requested position for the
-        # next full vial search as the new start position
-        microcam.requested_dest.tray = palposition.tray
-        microcam.requested_dest.slot = palposition.slot
-        microcam.requested_dest.vial = palposition.vial
-
-        # check if final samples would be destroyed directly after they
-        # were created
-        if await self.archive.custom_is_destroyed(custom=palposition.position):
-            for sample in samples_out_list:
-                sample.append_sample_status(SampleStatus.destroyed)
-            for sample in palposition.samples_final:
-                sample.append_sample_status(SampleStatus.destroyed)
-
-        # add validated destination to run
-        microcam.run[-1].dest = deepcopy(palposition)
-
-        # update the rest of sample_in for the run
-        for sample in microcam.run[-1].samples_in:
-            if sample.inheritance is None:
-                sample.inheritance = SampleInheritance.give_only
-                sample.reset_sample_status(SampleStatus.preserved)
-
-        # add the samples_out to the run
-        for sample in samples_out_list:
-            microcam.run[-1].samples_out.append(sample)
-
-        # a quick message if samples will be diluted or not
-        for i, sample in enumerate(microcam.run[-1].samples_in):
-            if i >= len(microcam.run[-1].dilute):
-                LOGGER.info(
-                    f"PAL: Not diluting sample_in '{sample.global_label}' because dilute bool not specified."
-                )
-            elif microcam.run[-1].dilute[i]:
-                LOGGER.info(f"PAL: Diluting sample_in '{sample.global_label}'.")
-            else:
-                LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}'.")
-
-        return ErrorCodes.none
 
     async def _sendcommand_prechecks(self, palcam: PalCam) -> ErrorCodes:
         """Build the PAL joblist by validating source/dest of every microcam.
 
-        Also creates the PAL auxiliary log file via the active action and
-        records resolved cam descriptors on each microcam.
+        Also creates the PAL auxiliary log file via the active action.
+        Source/dest resolution and cam-table assembly are delegated to
+        :meth:`PalReconciliation.plan` (P3a-PAL slice 3b/3d cutover) --
+        this method retains only what stays engine-owned (Decision 1):
+        the aux-log-file write and building the ``_palcmd`` joblist
+        strings from the positions ``plan()`` leaves resolved on each
+        microcam's ``run`` entries.
 
         Args:
             palcam: Job descriptor being prepared.
@@ -1829,7 +641,6 @@ class PAL(HelaoDriver):
             ``ErrorCodes.none`` on success or the first failure encountered.
         """
         job = self._job
-        error = ErrorCodes.none
         palcam.joblist = []
 
         # Set the aux log file for the exteral pal program
@@ -1846,36 +657,20 @@ class PAL(HelaoDriver):
             sample_str=None,
         )
 
-        # loop over the list of microcams (joblist)
+        error = await self.reconciliation.plan(
+            palcam,
+            action_uuid=job.active.action.action_uuid,
+            action=job.active.action,
+        )
+        if error != ErrorCodes.none:
+            return error
+
+        # joblist assembly stays engine-owned (Decision 1): one _palcmd per
+        # resolved run, using the source/dest positions plan() left behind
+        # on microcam.run (in the same per-microcam/per-repeat order plan()
+        # appended them).
         for microcam in palcam.microcams:
-            # get the correct cam definition which contains all params
-            # for the correct submission of the job to the PAL
-            if microcam.method in [e.name for e in self.cams]:
-                if self.cams[microcam.method].value.file_name is not None:
-                    microcam.cam = self.cams[microcam.method].value
-                else:
-                    LOGGER.error(f"cam method '{microcam.method}' is not available")
-                    return ErrorCodes.not_available
-            else:
-                LOGGER.error(f"cam method '{microcam.method}' is not available")
-                return ErrorCodes.not_available
-
-            # set runs to empty list
-            # shouldn't actually need it but better be sure its an empty list
-            # at this point
-            microcam.run = []
-
-            for repeat in range(microcam.repeat + 1):
-
-                # check source position
-                error = await self._sendcommand_check_source(microcam)
-                if error != ErrorCodes.none:
-                    return error
-                # check target position
-                error = await self._sendcommand_check_dest(microcam)
-                if error != ErrorCodes.none:
-                    return error
-
+            for run in microcam.run:
                 # add cam to cammand list
                 camfile = os.path.join(microcam.cam.file_path, microcam.cam.file_name)
                 LOGGER.info(f"adding cam '{camfile}'")
@@ -1896,15 +691,15 @@ class PAL(HelaoDriver):
 
                 # A --> B
                 # A
-                source = microcam.run[-1].source.position
-                source_tray = microcam.run[-1].source.tray
-                source_slot = microcam.run[-1].source.slot
-                source_vial = microcam.run[-1].source.vial
+                source = run.source.position
+                source_tray = run.source.tray
+                source_slot = run.source.slot
+                source_vial = run.source.vial
                 # B
-                dest = microcam.run[-1].dest.position
-                dest_tray = microcam.run[-1].dest.tray
-                dest_slot = microcam.run[-1].dest.slot
-                dest_vial = microcam.run[-1].dest.vial
+                dest = run.dest.position
+                dest_tray = run.dest.tray
+                dest_slot = run.dest.slot
+                dest_vial = run.dest.vial
 
                 palcam.joblist.append(
                     _palcmd(
@@ -1918,8 +713,12 @@ class PAL(HelaoDriver):
     async def _sendcommand_triggerwait(self, palaction: PalAction) -> ErrorCodes:
         """Wait for PAL ``start``, ``continue``, and ``done`` triggers in sequence.
 
-        Each wait is bounded by ``self.timeout``. ``start_time``,
-        ``continue_time`` and ``done_time`` are populated on ``palaction``.
+        ``start_time``, ``continue_time`` and ``done_time`` are populated on
+        ``palaction`` from whichever timestamps :meth:`PalTriggerPort.
+        wait_for_triggers` resolved before any failure (P3a-PAL slice 5/6:
+        the actual NI-DAQmx DIO wait moved into ``self.trigger``, which is
+        side-effect-free -- this thin wrapper reproduces the exact legacy
+        per-branch semantics for ``self.IO_error``/``self.IO_continue``).
 
         Args:
             palaction: Current execution to annotate with trigger timestamps.
@@ -1928,67 +727,38 @@ class PAL(HelaoDriver):
             ``ErrorCodes.none``, or one of the ``*_timeout`` codes if a
             trigger does not arrive in time.
         """
-        error = ErrorCodes.none
-        # only wait if triggers are configured
-        if not self.triggers:
-            LOGGER.error("No triggers configured")
-            return error
+        error, start, cont, done = await self.trigger.wait_for_triggers()
 
-        LOGGER.info("waiting for PAL start trigger")
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_startq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL start trigger timeout with error: {repr(e), tb,}")
-            # also need to set IO_continue and IO_error
-            # so active can return
-            # else it will return after real first continue trigger
+        if start is not None:
+            palaction.start_time = start
+        if cont is not None:
+            # also need to set IO_continue here (mirrors the legacy
+            # continue-success branch) so active can return, else it will
+            # return after the real first continue trigger.
+            self.IO_continue = True
+            palaction.continue_time = cont
+        if done is not None:
+            palaction.done_time = done
+
+        if error is ErrorCodes.start_timeout:
             self.IO_error = ErrorCodes.start_timeout
             self.IO_continue = True
-            return ErrorCodes.start_timeout
-
-        palaction.start_time = val
-        LOGGER.info("got PAL start trigger, waiting for PAL continue trigger")
-
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_continueq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL continue trigger timeout with error: {repr(e), tb,}")
-            return ErrorCodes.continue_timeout
-
-        self.IO_continue = True
-        palaction.continue_time = val
-        LOGGER.info("got PAL continue trigger, waiting for PAL done trigger")
-
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_doneq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL done trigger timeout with error: {repr(e), tb,}")
-            return ErrorCodes.done_timeout
-
-        palaction.done_time = val
-        LOGGER.info("got PAL done trigger")
 
         return error
-
-    async def _sendcommand_write_local_rshs_aux_header(self, auxheader, output_file):
-        """Asynchronously create or overwrite the auxiliary log with the column header.
-
-        Args:
-            auxheader: Header string to write.
-            output_file: Path of the auxiliary log file.
-        """
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(auxheader)
 
     async def _sendcommand_submitjoblist_helper(self, palcam: PalCam) -> ErrorCodes:
         """Kill any running PAL instance and submit the joblist locally or via SSH.
 
-        Selects the local or Cygwin/SSH submission path based on
-        ``self.sshhost`` and starts ``_poll_trigger_task`` to monitor the
-        hardware triggers.
+        Delegates SSH/subprocess transport to :attr:`transport` and the
+        trigger poller to :attr:`trigger` (P3a-PAL slice 4/5/6). The two
+        cross-concern lines that used to live inline here -- starting the
+        trigger poller, and stamping ``palcam.joblist_time`` -- stay
+        engine-owned (Decision 1): the poller is started via
+        ``self.trigger.start_polling`` right after clearing the queues
+        (before the aux-log/joblist dispatch, matching the legacy call
+        order), and ``joblist_time`` is stamped right before
+        ``submit_joblist`` (the legacy code stamped it immediately before
+        actually dispatching, on both the local and SSH paths).
 
         Args:
             palcam: Job descriptor whose ``joblist`` will be dispatched.
@@ -1998,268 +768,28 @@ class PAL(HelaoDriver):
         """
 
         job = self._job
-        error = ErrorCodes.none
         # kill PAL if program is open
-        error = await self.kill_PAL()
+        error = await self.transport.kill()
         if error is not ErrorCodes.none:
             LOGGER.error("Could not close PAL")
             return error
 
-        await self._clear_trigger_qs()
-        self.IO_trigger_task = asyncio.create_task(self._poll_trigger_task())
-        if self.sshhost == "localhost":
-
-            FIFO_rshs_dir, rshs_logfile = os.path.split(palcam.aux_output_filepath)
-            LOGGER.info(f"RSHS saving to: {FIFO_rshs_dir}")
-
-            if not os.path.exists(FIFO_rshs_dir):
-                os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
-
-            await self._sendcommand_write_local_rshs_aux_header(
-                auxheader="\t".join(self.palauxheader) + "\r\n",
-                output_file=palcam.aux_output_filepath,
-            )
-            tmpjob = " ".join(
-                [f'/loadmethod "{job.method}" "{job.params}"' for job in palcam.joblist]
-            )
-            cmd_to_execute = f"PAL {tmpjob} /start /quit"
-            LOGGER.info(f"PAL command: '{cmd_to_execute}'")
-            try:
-                # result = os.system(cmd_to_execute)
-                palcam.joblist_time = job.active.get_realtime_nowait()
-                self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
-                LOGGER.info(f"PAL command send: {self.PAL_pid}")
-            except Exception:
-                LOGGER.error("CMD error. Could not send commands.")
-                error = ErrorCodes.cmd_error
-        elif self.sshhost is not None:
-            ssh_connected = False
-            while not ssh_connected:
-                try:
-                    # open SSH to PAL
-                    k = paramiko.RSAKey.from_private_key_file(self.sshkey)
-                    mysshclient = paramiko.SSHClient()
-                    mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    mysshclient.connect(
-                        hostname=self.sshhost, username=self.sshuser, pkey=k
-                    )
-                    ssh_connected = True
-                except Exception:
-                    ssh_connected = False
-                    LOGGER.error(
-                        f"SSH connection error. Retrying in 1 seconds.", exc_info=True
-                    )
-                    await asyncio.sleep(1)
-
-            try:
-
-                FIFO_rshs_dir, rshs_logfile = os.path.split(palcam.aux_output_filepath)
-                FIFO_rshs_dir = FIFO_rshs_dir.replace("C:\\", "")
-                FIFO_rshs_dir = FIFO_rshs_dir.replace("\\", "/")
-
-                LOGGER.info(f"RSHS saving to: /cygdrive/c/{FIFO_rshs_dir}")
-
-                # creating remote folder and logfile on RSHS
-                rshs_path = "/cygdrive/c"
-                for path in FIFO_rshs_dir.split("/"):
-
-                    rshs_path += "/" + path
-                    if path != "":
-                        sshcmd = f"mkdir {rshs_path}"
-                        (
-                            mysshclient_stdin,
-                            mysshclient_stdout,
-                            mysshclient_stderr,
-                        ) = mysshclient.exec_command(sshcmd)
-                if not rshs_path.endswith("/"):
-                    rshs_path += "/"
-                LOGGER.info(f"final RSHS path: {rshs_path}")
-
-                rshs_logfilefull = rshs_path + rshs_logfile
-                sshcmd = f"touch {rshs_logfilefull}"
-                (
-                    mysshclient_stdin,
-                    mysshclient_stdout,
-                    mysshclient_stderr,
-                ) = mysshclient.exec_command(sshcmd)
-
-                auxheader = "\t".join(self.palauxheader) + "\r\n"
-                sshcmd = f"echo -e '{auxheader}' > {rshs_logfilefull}"
-                (
-                    mysshclient_stdin,
-                    mysshclient_stdout,
-                    mysshclient_stderr,
-                ) = mysshclient.exec_command(sshcmd)
-                LOGGER.info(f"final RSHS logfile: {rshs_logfilefull}")
-
-                tmpjob = " ".join(
-                    [
-                        f"/loadmethod '{job.method}' '{job.params}'"
-                        for job in palcam.joblist
-                    ]
-                )
-                cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
-
-                LOGGER.info(f"PAL command: '{cmd_to_execute}'")
-
-            except Exception:
-                LOGGER.error(
-                    "SSH connection error 1. Could not send commands.", exc_info=True
-                )
-
-                error = ErrorCodes.ssh_error
-
-            try:
-                if error is ErrorCodes.none:
-                    palcam.joblist_time = job.active.get_realtime_nowait()
-                    (
-                        mysshclient_stdin,
-                        mysshclient_stdout,
-                        mysshclient_stderr,
-                    ) = mysshclient.exec_command(cmd_to_execute)
-                    mysshclient.close()
-
-            except Exception:
-                LOGGER.error(
-                    "SSH connection error 2. Could not send commands.", exc_info=True
-                )
-                error = ErrorCodes.ssh_error
-
-        return error
-
-    async def _sendcommand_check_for_assemblytypes(
-        self, sample_type: str, assembly: AssemblySample
-    ) -> bool:
-        """Return whether ``assembly`` already contains a part of ``sample_type``.
-
-        Args:
-            sample_type: Sample type to search for.
-            assembly: Assembly whose ``parts`` are inspected.
-        """
-        for part in assembly.parts:
-            if part.sample_type == sample_type:
-                return True
-        return False
-
-    async def _sendcommand_update_archive_helper(
-        self, palaction: PalAction
-    ) -> ErrorCodes:
-        """Push final source/dest samples for ``palaction`` back into the archive.
-
-        Resolves ``samples_final`` against the unified sample DB (or the
-        last sample in ``samples_out`` for unassigned reference samples) and
-        updates tray or custom position entries accordingly.
-
-        Args:
-            palaction: Finished execution to write back.
-
-        Returns:
-            ``ErrorCodes.none`` on success or ``ErrorCodes.not_available``
-            if an archive update fails.
-        """
-
-        job = self._job
-        # update source and dest final samples
-        palaction.source.samples_final = await self.archive.unified_db.get_samples(
-            samples=palaction.source.samples_initial
+        await self.trigger.clear_queues()
+        self.trigger.start_polling(
+            job.active.get_realtime_nowait, lambda: self.IO_measuring
         )
-        # update the action_uuid
-        for sample in palaction.source.samples_final:
-            sample.action_uuid = [job.active.action.action_uuid]
 
-        if palaction.dest.samples_final:
-            # should always only contain one sample
-            if palaction.dest.samples_final[0].global_label is None:
-                # dest_final contains a ref sample
-                # the correct new sample should be always found
-                # in the last position of palaction.samples_out
-                # which should already be uptodate
-                palaction.dest.samples_final = [palaction.samples_out[-1]]
-            else:
-                palaction.dest.samples_final = (
-                    await self.archive.unified_db.get_samples(
-                        samples=palaction.dest.samples_final
-                    )
-                )
-
-        # update the action_uuid
-        for sample in palaction.dest.samples_final:
-            sample.action_uuid = [job.active.action.action_uuid]
-
-        error = ErrorCodes.none
-        retval = False
-        if palaction.source.samples_final:
-            if palaction.source.position == "tray":
-                retval = await self.archive.tray_update_position(
-                    tray=palaction.source.tray,
-                    slot=palaction.source.slot,
-                    vial=palaction.source.vial,
-                    sample=palaction.source.samples_final[0],
-                )
-            else:  # custom postion
-                retval, sample = await self.archive.custom_update_position(
-                    custom=palaction.source.position,
-                    sample=palaction.source.samples_final[0],
-                )
-        else:
-            LOGGER.info("No sample in PAL source.")
-
-        if palaction.dest.samples_final:
-            if palaction.dest.position == "tray":
-                retval = await self.archive.tray_update_position(
-                    tray=palaction.dest.tray,
-                    slot=palaction.dest.slot,
-                    vial=palaction.dest.vial,
-                    sample=palaction.dest.samples_final[0],
-                )
-            else:  # custom postion
-                retval, sample = await self.archive.custom_update_position(
-                    custom=palaction.dest.position,
-                    sample=palaction.dest.samples_final[0],
-                )
-        else:
-            LOGGER.info("No sample in PAL dest.")
-
-        if not retval:
-            error = ErrorCodes.not_available
+        auxheader = "\t".join(self.palauxheader) + "\r\n"
+        error = await self.transport.ensure_aux_logfile(
+            palcam.aux_output_filepath, auxheader
+        )
+        if error is ErrorCodes.none:
+            palcam.joblist_time = job.active.get_realtime_nowait()
+            error = await self.transport.submit_joblist(
+                [(j.method, j.params) for j in palcam.joblist]
+            )
 
         return error
-
-    async def _sendcommand_update_sample_volume(self, palaction: PalAction) -> None:
-        """Apply per-input dilution volumes to input samples (or assembly parts).
-
-        Output samples are skipped because they are always created fresh by
-        the PAL action.
-
-        Args:
-            palaction: Execution carrying ``samples_in`` and the parallel
-                ``dilute``, ``dilute_type`` and ``samples_in_delta_vol_ml``
-                lists.
-        """
-        if len(palaction.samples_in_delta_vol_ml) != len(palaction.samples_in):
-            LOGGER.error("len(samples_in) != len(delta_vol)")
-            return
-        if len(palaction.dilute) != len(palaction.samples_in):
-            LOGGER.error("len(samples_in) != len(dilute)")
-            return
-        if len(palaction.dilute_type) != len(palaction.samples_in):
-            LOGGER.error("len(samples_in) != len(sample_type)")
-            return
-
-        for i, sample in enumerate(palaction.samples_in):
-            if sample.sample_type == SampleType.assembly:
-                # if sample.sample_type == SampleType.assembly:
-                for part in sample.parts:
-                    if part.sample_type == palaction.dilute_type[i]:
-                        update_vol(
-                            part,
-                            palaction.samples_in_delta_vol_ml[i],
-                            palaction.dilute[i],
-                        )
-            else:
-                update_vol(
-                    sample, palaction.samples_in_delta_vol_ml[i], palaction.dilute[i]
-                )
 
     async def _PAL_IOloop(self) -> None:
         """Long-running task that schedules ``totalruns`` of the current job's ``palcam``.
@@ -2390,9 +920,7 @@ class PAL(HelaoDriver):
                             self.IO_error = await self._sendcommand_main(run_palcam)
                             LOGGER.info("PAL sendcommand def end")
 
-                            if self.IO_trigger_task is not None:
-                                self.IO_trigger_task.cancel()
-                                self.IO_trigger_task = None
+                            self.trigger.stop_polling()
 
                     except Exception:
                         LOGGER.error("_PAL_IOloop measurement failed", exc_info=True)
@@ -2425,7 +953,7 @@ class PAL(HelaoDriver):
         LOGGER.info(f"PAL_samples_in: {job.palcam.samples_in}")
         # update sample list with correct information from db if possible
         LOGGER.info("getting current sample information for all sample_in from db")
-        job.palcam.samples_in = await self.archive.unified_db.get_samples(
+        job.palcam.samples_in = await self.sample_state.get_samples(
             samples=job.palcam.samples_in
         )
 
@@ -2440,14 +968,8 @@ class PAL(HelaoDriver):
         terminal status (Design 1, K7b).
         """
 
-        if self.PAL_pid is not None:
-            LOGGER.info("waiting for PAL pid to finish")
-            self.PAL_pid.communicate()
-            self.PAL_pid = None
-
-        if self.IO_trigger_task is not None:
-            self.IO_trigger_task.cancel()
-            self.IO_trigger_task = None
+        await self.transport.reap_local_process()
+        self.trigger.stop_polling()
 
         self.IO_continue = True
         # done sending all PAL commands
@@ -3146,91 +1668,9 @@ class PAL(HelaoDriver):
         return switch
 
     async def kill_PAL(self) -> ErrorCodes:
-        """Terminate any running PAL software process (locally or on the SSH host)."""
-        error_code = ErrorCodes.none
-        LOGGER.info("killing PAL")
-
-        if self.sshhost == "localhost":
-
-            # kill PAL if program is open
-            error_code = await self.kill_PAL_local()
-        elif self.sshhost is not None:
-            error_code = await self.kill_PAL_cygwin()
-
-        if error_code is not ErrorCodes.none:
-            LOGGER.error("Could not close PAL")
-
-        return error_code
-
-    async def kill_PAL_cygwin(self) -> bool:
-        """Kill the PAL Windows process via SSH/Cygwin ``taskkill``.
-
-        Returns:
-            ``ErrorCodes.none`` on success, ``ErrorCodes.ssh_error`` if SSH
-            command execution fails.
-        """
-        ssh_connected = False
-        while not ssh_connected:
-            try:
-                # open SSH to PAL
-                k = paramiko.RSAKey.from_private_key_file(self.sshkey)
-                mysshclient = paramiko.SSHClient()
-                mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                mysshclient.connect(
-                    hostname=self.sshhost, username=self.sshuser, pkey=k
-                )
-                ssh_connected = True
-            except Exception:
-                ssh_connected = False
-                LOGGER.error(
-                    "SSH connection error. Retrying in 1 seconds.", exc_info=True
-                )
-                await asyncio.sleep(1)
-
-        try:
-            sshcmd = "tmux new-window taskkill /F /FI 'WINDOWTITLE eq PAL*'"
-            (
-                mysshclient_stdin,
-                mysshclient_stdout,
-                mysshclient_stderr,
-            ) = mysshclient.exec_command(sshcmd)
-            mysshclient.close()
-
-        except Exception:
-            LOGGER.error(
-                "SSH connection error 1. Could not send commands.", exc_info=True
-            )
-
-            return ErrorCodes.ssh_error
-
-        return ErrorCodes.none
-
-    async def kill_PAL_local(self) -> bool:
-        """Terminate any local ``PAL*`` processes found via ``psutil``.
-
-        Returns:
-            ``ErrorCodes.none`` on success or ``ErrorCodes.critical_error``
-            if a process could not be terminated after three attempts.
-        """
-        pyPids = {
-            p.pid: p
-            for p in psutil.process_iter(["name"])
-            if p.info["name"].startswith("PAL")
-        }
-
-        for pid in pyPids:
-            LOGGER.info(f"killing PAL on PID: {pid}")
-            p = psutil.Process(pid)
-            for _ in range(3):
-                # os.kill(p.pid, signal.SIGTERM)
-                p.terminate()
-                time.sleep(0.5)
-                if not psutil.pid_exists(p.pid):
-                    LOGGER.info("Successfully terminated PAL.")
-                    break
-            if psutil.pid_exists(p.pid):
-                LOGGER.error("Failed to terminate server PAL after 3 retries.")
-                return ErrorCodes.critical_error
-
-        # if none is found return True
-        return ErrorCodes.none
+        """Terminate any running PAL software process (locally or on the SSH
+        host). Thin delegator (P3a-PAL slice 4/6): pal_server.py's
+        `/kill_PAL` endpoint calls this directly, so it stays a PAL method
+        even though the actual SSH/subprocess/psutil work now lives in
+        `self.transport`."""
+        return await self.transport.kill()
