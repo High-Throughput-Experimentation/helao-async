@@ -1,10 +1,29 @@
 """PAL liquid-handler robot driver.
 
-Implements the :class:`PAL` driver that builds joblists from one or more
-``microcam`` definitions, dispatches them to the PAL program (locally or via
-SSH/Cygwin to a remote host), monitors NI-DAQ trigger lines for start/
-continue/done events, and reconciles the resulting sample movements against
-the archive's sample database.
+Implements the :class:`PAL` driver: the job-loop engine (composition root)
+that builds joblists from one or more ``microcam`` definitions and
+orchestrates a full job's lifecycle. Since the P3a-PAL 4-way internal split
+(slices 0-6), the driver itself no longer owns the device-I/O/algorithm
+concerns directly -- it composes four collaborators and stays the engine
+that sequences them:
+
+- ``self.sample_state`` (:class:`~helao.hexagon.ports.sample_state.
+  SampleStatePort`) -- the archive/sample-DB boundary.
+- ``self.reconciliation`` (:class:`~helao.hexagon.domain.pal_reconciliation.
+  PalReconciliation`) -- Base-free source/dest resolution, cam-table
+  assembly, and after-trigger sample-state reconciliation.
+- ``self.transport`` (:class:`~helao.hexagon.ports.pal_transport.
+  PalTransportPort`) -- joblist submission (local subprocess or SSH/Cygwin)
+  and PAL process kill.
+- ``self.trigger`` (:class:`~helao.hexagon.ports.pal_trigger.
+  PalTriggerPort`) -- the NI-DAQmx start/continue/done DIO handshake.
+
+What stays engine-owned: the job-loop (``_PAL_IOloop``) and its scheduling,
+the split/reset bookkeeping before each trigger wait, the HLO data-file
+write (step 8, sandwiched between reconciliation's steps 7 and 9), and
+``active.append_sample`` (step 9) -- all of these need the framework's
+``Active``/``DataSinkPort`` handle the collaborators above are never
+handed (Decision 2).
 
 The Pydantic models used to describe positions, micro-cams and full cam jobs
 (:class:`PALposition`, :class:`PalAction`, :class:`PalMicroCam`,
@@ -22,21 +41,23 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import asyncio
 import os
-import paramiko
 import time
-import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field as dc_field
 from typing import Any, Optional, Protocol
 from pydantic import BaseModel
-import aiofiles
-import subprocess
-import psutil
 
 from helao.helpers import config_loader
 from helao.hexagon.ports.data_sink import DataSinkPort
 from helao.hexagon.ports.sample_state import SampleStatePort
+from helao.hexagon.ports.pal_transport import PalTransportPort
+from helao.hexagon.ports.pal_trigger import PalTriggerPort
 from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
+from helao.hexagon.adapters.legacy.pal_transport import LegacyPalTransport
+from helao.hexagon.adapters.legacy.pal_trigger import (
+    NidaqmxPalTrigger,
+    NullPalTrigger,
+)
 from helao.hexagon.domain.models import (
     PALposition,
     PalAction,
@@ -153,13 +174,14 @@ class PALJob:
 class PAL(HelaoDriver):
     """Driver for the PAL liquid-handler robot.
 
-    Owns only the job-loop engine and device I/O (SSH/subprocess submission,
-    NI-DAQ trigger polling, the ordered sample-pipeline mutations against the
-    archive shim). The ``Active`` action context for each job is created by
-    the calling endpoint and handed in via :meth:`submit_job` (CARDS P4
-    Design 1); the driver never reaches a server/base object. The job-loop
-    worker (``_PAL_IOloop``) is started lazily on the first :meth:`submit_job`
-    or :meth:`connect` call (K8: no tasks spawned at construction).
+    The composition root and job-loop engine (P3a-PAL 4-way split, slices
+    0-6): composes ``sample_state``/``reconciliation``/``transport``/
+    ``trigger`` (see module docstring) and sequences them through one job's
+    lifecycle. The ``Active`` action context for each job is created by the
+    calling endpoint and handed in via :meth:`submit_job` (CARDS P4 Design
+    1); the driver never reaches a server/base object. The job-loop worker
+    (``_PAL_IOloop``) is started lazily on the first :meth:`submit_job` or
+    :meth:`connect` call (K8: no tasks spawned at construction).
     """
 
     def __init__(self, config: dict = {}):
@@ -181,30 +203,40 @@ class PAL(HelaoDriver):
         # shim the adapter wraps, behavior is unchanged 1:1.
         self.sample_state: SampleStatePort = SampleShimAdapter(self.archive)
 
-        self.sshuser = self.config_dict.get("user", "")
-        self.sshkey = self.config_dict.get("key", "")
+        sshuser = self.config_dict.get("user", "")
+        sshkey = self.config_dict.get("key", "")
         self.sshhost = self.config_dict.get("host", None)
         self.cam_file_path = self.config_dict.get("cam_file_path", "")
         self.timeout = self.config_dict.get("timeout", 30 * 60)
-        self.PAL_pid = None
 
-        self.triggers = False
-        self.IO_trigger_task = None
-        self.dev_trigger = self.config_dict.get("dev_trigger", None)
-        self.triggerport_start = None
-        self.triggerport_continue = None
-        self.triggerport_done = None
+        # PalTransportPort (P3a-PAL slice 4/6): owns SSH/subprocess/psutil.
+        # self.sshhost stays a plain attribute (unchanged) since
+        # pal_server.py's `_pal_reject_busy` reads `app.driver.sshhost`
+        # directly and `connect()` below also reads it.
+        self.transport: PalTransportPort = LegacyPalTransport(
+            host=self.sshhost, user=sshuser, key=sshkey
+        )
 
-        if self.dev_trigger == "NImax":
-            self.triggerport_start = self.config_dict["trigger"].get("start", None)
-            self.triggerport_continue = self.config_dict["trigger"].get(
-                "continue", None
+        # PalTriggerPort (P3a-PAL slice 5/6): owns the NI-DAQmx DIO
+        # handshake. NullPalTrigger reproduces the exact legacy no-op
+        # behavior when dev_trigger != "NImax".
+        dev_trigger = self.config_dict.get("dev_trigger", None)
+        self.trigger: PalTriggerPort
+        if dev_trigger == "NImax":
+            triggerport_start = self.config_dict["trigger"].get("start", None)
+            triggerport_continue = self.config_dict["trigger"].get("continue", None)
+            triggerport_done = self.config_dict["trigger"].get("done", None)
+            LOGGER.info(f"PAL start trigger port: {triggerport_start}")
+            LOGGER.info(f"PAL continue trigger port: {triggerport_continue}")
+            LOGGER.info(f"PAL done trigger port: {triggerport_done}")
+            self.trigger = NidaqmxPalTrigger(
+                triggerport_start,
+                triggerport_continue,
+                triggerport_done,
+                timeout=self.timeout,
             )
-            self.triggerport_done = self.config_dict["trigger"].get("done", None)
-            LOGGER.info(f"PAL start trigger port: {self.triggerport_start}")
-            LOGGER.info(f"PAL continue trigger port: {self.triggerport_continue}")
-            LOGGER.info(f"PAL done trigger port: {self.triggerport_done}")
-            self.triggers = True
+        else:
+            self.trigger = NullPalTrigger()
 
         # for global IOloop: the in-flight PALJob (None when idle), replacing
         # the old self.action/self.active/IO_palcam slots (Design 1, K7b).
@@ -270,9 +302,6 @@ class PAL(HelaoDriver):
         ]
         self.IOloop_run = False
         self.IO_signalq = asyncio.Queue(1)
-        self.IO_trigger_startq = asyncio.Queue()
-        self.IO_trigger_continueq = asyncio.Queue()
-        self.IO_trigger_doneq = asyncio.Queue()
 
     def check_tool(self, req_tool=None) -> Optional[str]:
         """Resolve a tool name or value to its canonical :class:`PALtools` value.
@@ -419,89 +448,6 @@ class PAL(HelaoDriver):
         return DriverResponse(
             response=DriverResponseType.success, status=DriverStatus.uninitialized
         )
-
-    async def _clear_trigger_qs(self):
-        """Drain the start/continue/done trigger queues, logging any stale entries."""
-        while not self.IO_trigger_startq.empty():
-            timecode = await self.IO_trigger_startq.get()
-            LOGGER.error(f"startq was not empty: '{timecode}'")
-        while not self.IO_trigger_continueq.empty():
-            timecode = await self.IO_trigger_continueq.get()
-            LOGGER.error(f"continyeq was not empty: '{timecode}'")
-        while not self.IO_trigger_doneq.empty():
-            timecode = await self.IO_trigger_doneq.get()
-            LOGGER.error(f"doneq was not empty: '{timecode}'")
-
-    async def _poll_trigger_task(self):
-        """Poll NI-DAQ trigger lines while measuring and post rising edges to the queues."""
-        prev_start = False
-        prev_continue = False
-        prev_done = False
-        if not self.triggers:
-            return
-        job = self._job
-        try:
-            import nidaqmx
-            from nidaqmx.constants import LineGrouping
-
-            with nidaqmx.Task() as task:
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_start}' for 'start' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_start, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_continue}' for 'continue' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_continue, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                LOGGER.info(
-                    f"using trigger port '{self.triggerport_done}' for 'done' trigger"
-                )
-                task.di_channels.add_di_chan(
-                    self.triggerport_done, line_grouping=LineGrouping.CHAN_PER_LINE
-                )
-                while self.IO_measuring:
-                    data = task.read(number_of_samples_per_channel=1)
-                    new_start = data[0][0]
-                    new_continue = data[1][0]
-                    new_done = data[2][0]
-                    if (new_start ^ prev_start) and new_start:
-                        self.IO_trigger_startq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_start = deepcopy(new_start)
-                        LOGGER.info("IOq: got PAL 'start' trigger poll")
-                    if (new_start ^ prev_start) and not new_start:
-                        prev_start = deepcopy(new_start)
-
-                    if (new_continue ^ prev_continue) and new_continue:
-                        self.IO_trigger_continueq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_continue = deepcopy(new_continue)
-                        LOGGER.info("IOq: got PAL 'continue' trigger poll")
-
-                    if (new_continue ^ prev_continue) and not new_continue:
-                        prev_continue = deepcopy(new_continue)
-
-                    if (new_done ^ prev_done) and new_done:
-                        self.IO_trigger_doneq.put_nowait(
-                            job.active.get_realtime_nowait()
-                        )
-                        prev_done = deepcopy(new_done)
-                        LOGGER.info("IOq: got PAL 'done' trigger poll")
-
-                    if (new_done ^ prev_done) and not new_done:
-                        prev_done = deepcopy(new_done)
-
-                    await asyncio.sleep(0.01)
-
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"_poll_trigger_task excited with error: {repr(e), tb,}")
 
     async def _sendcommand_main(self, palcam: PalCam) -> ErrorCodes:
         """Run a full PAL job: pre-checks, joblist submission, and per-microcam updates.
@@ -673,10 +619,7 @@ class PAL(HelaoDriver):
         LOGGER.info(f"waiting {tmp_time}sec for PAL to close")
         await asyncio.sleep(tmp_time)
         LOGGER.info(f"done waiting {tmp_time}sec for PAL to close")
-        if self.PAL_pid is not None:
-            LOGGER.info("waiting for PAL pid to finish")
-            self.PAL_pid.communicate()
-            self.PAL_pid = None
+        await self.transport.reap_local_process()
 
         return error
 
@@ -770,8 +713,12 @@ class PAL(HelaoDriver):
     async def _sendcommand_triggerwait(self, palaction: PalAction) -> ErrorCodes:
         """Wait for PAL ``start``, ``continue``, and ``done`` triggers in sequence.
 
-        Each wait is bounded by ``self.timeout``. ``start_time``,
-        ``continue_time`` and ``done_time`` are populated on ``palaction``.
+        ``start_time``, ``continue_time`` and ``done_time`` are populated on
+        ``palaction`` from whichever timestamps :meth:`PalTriggerPort.
+        wait_for_triggers` resolved before any failure (P3a-PAL slice 5/6:
+        the actual NI-DAQmx DIO wait moved into ``self.trigger``, which is
+        side-effect-free -- this thin wrapper reproduces the exact legacy
+        per-branch semantics for ``self.IO_error``/``self.IO_continue``).
 
         Args:
             palaction: Current execution to annotate with trigger timestamps.
@@ -780,67 +727,38 @@ class PAL(HelaoDriver):
             ``ErrorCodes.none``, or one of the ``*_timeout`` codes if a
             trigger does not arrive in time.
         """
-        error = ErrorCodes.none
-        # only wait if triggers are configured
-        if not self.triggers:
-            LOGGER.error("No triggers configured")
-            return error
+        error, start, cont, done = await self.trigger.wait_for_triggers()
 
-        LOGGER.info("waiting for PAL start trigger")
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_startq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL start trigger timeout with error: {repr(e), tb,}")
-            # also need to set IO_continue and IO_error
-            # so active can return
-            # else it will return after real first continue trigger
+        if start is not None:
+            palaction.start_time = start
+        if cont is not None:
+            # also need to set IO_continue here (mirrors the legacy
+            # continue-success branch) so active can return, else it will
+            # return after the real first continue trigger.
+            self.IO_continue = True
+            palaction.continue_time = cont
+        if done is not None:
+            palaction.done_time = done
+
+        if error is ErrorCodes.start_timeout:
             self.IO_error = ErrorCodes.start_timeout
             self.IO_continue = True
-            return ErrorCodes.start_timeout
-
-        palaction.start_time = val
-        LOGGER.info("got PAL start trigger, waiting for PAL continue trigger")
-
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_continueq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL continue trigger timeout with error: {repr(e), tb,}")
-            return ErrorCodes.continue_timeout
-
-        self.IO_continue = True
-        palaction.continue_time = val
-        LOGGER.info("got PAL continue trigger, waiting for PAL done trigger")
-
-        try:
-            val = await asyncio.wait_for(self.IO_trigger_doneq.get(), self.timeout)
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.error(f"PAL done trigger timeout with error: {repr(e), tb,}")
-            return ErrorCodes.done_timeout
-
-        palaction.done_time = val
-        LOGGER.info("got PAL done trigger")
 
         return error
-
-    async def _sendcommand_write_local_rshs_aux_header(self, auxheader, output_file):
-        """Asynchronously create or overwrite the auxiliary log with the column header.
-
-        Args:
-            auxheader: Header string to write.
-            output_file: Path of the auxiliary log file.
-        """
-        async with aiofiles.open(output_file, mode="w+") as f:
-            await f.write(auxheader)
 
     async def _sendcommand_submitjoblist_helper(self, palcam: PalCam) -> ErrorCodes:
         """Kill any running PAL instance and submit the joblist locally or via SSH.
 
-        Selects the local or Cygwin/SSH submission path based on
-        ``self.sshhost`` and starts ``_poll_trigger_task`` to monitor the
-        hardware triggers.
+        Delegates SSH/subprocess transport to :attr:`transport` and the
+        trigger poller to :attr:`trigger` (P3a-PAL slice 4/5/6). The two
+        cross-concern lines that used to live inline here -- starting the
+        trigger poller, and stamping ``palcam.joblist_time`` -- stay
+        engine-owned (Decision 1): the poller is started via
+        ``self.trigger.start_polling`` right after clearing the queues
+        (before the aux-log/joblist dispatch, matching the legacy call
+        order), and ``joblist_time`` is stamped right before
+        ``submit_joblist`` (the legacy code stamped it immediately before
+        actually dispatching, on both the local and SSH paths).
 
         Args:
             palcam: Job descriptor whose ``joblist`` will be dispatched.
@@ -850,132 +768,26 @@ class PAL(HelaoDriver):
         """
 
         job = self._job
-        error = ErrorCodes.none
         # kill PAL if program is open
-        error = await self.kill_PAL()
+        error = await self.transport.kill()
         if error is not ErrorCodes.none:
             LOGGER.error("Could not close PAL")
             return error
 
-        await self._clear_trigger_qs()
-        self.IO_trigger_task = asyncio.create_task(self._poll_trigger_task())
-        if self.sshhost == "localhost":
+        await self.trigger.clear_queues()
+        self.trigger.start_polling(
+            job.active.get_realtime_nowait, lambda: self.IO_measuring
+        )
 
-            FIFO_rshs_dir, rshs_logfile = os.path.split(palcam.aux_output_filepath)
-            LOGGER.info(f"RSHS saving to: {FIFO_rshs_dir}")
-
-            if not os.path.exists(FIFO_rshs_dir):
-                os.makedirs(FIFO_rshs_dir, exist_ok=True, cwd=FIFO_rshs_dir)
-
-            await self._sendcommand_write_local_rshs_aux_header(
-                auxheader="\t".join(self.palauxheader) + "\r\n",
-                output_file=palcam.aux_output_filepath,
+        auxheader = "\t".join(self.palauxheader) + "\r\n"
+        error = await self.transport.ensure_aux_logfile(
+            palcam.aux_output_filepath, auxheader
+        )
+        if error is ErrorCodes.none:
+            palcam.joblist_time = job.active.get_realtime_nowait()
+            error = await self.transport.submit_joblist(
+                [(j.method, j.params) for j in palcam.joblist]
             )
-            tmpjob = " ".join(
-                [f'/loadmethod "{job.method}" "{job.params}"' for job in palcam.joblist]
-            )
-            cmd_to_execute = f"PAL {tmpjob} /start /quit"
-            LOGGER.info(f"PAL command: '{cmd_to_execute}'")
-            try:
-                # result = os.system(cmd_to_execute)
-                palcam.joblist_time = job.active.get_realtime_nowait()
-                self.PAL_pid = subprocess.Popen(cmd_to_execute, shell=True)
-                LOGGER.info(f"PAL command send: {self.PAL_pid}")
-            except Exception:
-                LOGGER.error("CMD error. Could not send commands.")
-                error = ErrorCodes.cmd_error
-        elif self.sshhost is not None:
-            ssh_connected = False
-            while not ssh_connected:
-                try:
-                    # open SSH to PAL
-                    k = paramiko.RSAKey.from_private_key_file(self.sshkey)
-                    mysshclient = paramiko.SSHClient()
-                    mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                    mysshclient.connect(
-                        hostname=self.sshhost, username=self.sshuser, pkey=k
-                    )
-                    ssh_connected = True
-                except Exception:
-                    ssh_connected = False
-                    LOGGER.error(
-                        f"SSH connection error. Retrying in 1 seconds.", exc_info=True
-                    )
-                    await asyncio.sleep(1)
-
-            try:
-
-                FIFO_rshs_dir, rshs_logfile = os.path.split(palcam.aux_output_filepath)
-                FIFO_rshs_dir = FIFO_rshs_dir.replace("C:\\", "")
-                FIFO_rshs_dir = FIFO_rshs_dir.replace("\\", "/")
-
-                LOGGER.info(f"RSHS saving to: /cygdrive/c/{FIFO_rshs_dir}")
-
-                # creating remote folder and logfile on RSHS
-                rshs_path = "/cygdrive/c"
-                for path in FIFO_rshs_dir.split("/"):
-
-                    rshs_path += "/" + path
-                    if path != "":
-                        sshcmd = f"mkdir {rshs_path}"
-                        (
-                            mysshclient_stdin,
-                            mysshclient_stdout,
-                            mysshclient_stderr,
-                        ) = mysshclient.exec_command(sshcmd)
-                if not rshs_path.endswith("/"):
-                    rshs_path += "/"
-                LOGGER.info(f"final RSHS path: {rshs_path}")
-
-                rshs_logfilefull = rshs_path + rshs_logfile
-                sshcmd = f"touch {rshs_logfilefull}"
-                (
-                    mysshclient_stdin,
-                    mysshclient_stdout,
-                    mysshclient_stderr,
-                ) = mysshclient.exec_command(sshcmd)
-
-                auxheader = "\t".join(self.palauxheader) + "\r\n"
-                sshcmd = f"echo -e '{auxheader}' > {rshs_logfilefull}"
-                (
-                    mysshclient_stdin,
-                    mysshclient_stdout,
-                    mysshclient_stderr,
-                ) = mysshclient.exec_command(sshcmd)
-                LOGGER.info(f"final RSHS logfile: {rshs_logfilefull}")
-
-                tmpjob = " ".join(
-                    [
-                        f"/loadmethod '{job.method}' '{job.params}'"
-                        for job in palcam.joblist
-                    ]
-                )
-                cmd_to_execute = f"tmux new-window PAL {tmpjob} /start /quit"
-
-                LOGGER.info(f"PAL command: '{cmd_to_execute}'")
-
-            except Exception:
-                LOGGER.error(
-                    "SSH connection error 1. Could not send commands.", exc_info=True
-                )
-
-                error = ErrorCodes.ssh_error
-
-            try:
-                if error is ErrorCodes.none:
-                    palcam.joblist_time = job.active.get_realtime_nowait()
-                    (
-                        mysshclient_stdin,
-                        mysshclient_stdout,
-                        mysshclient_stderr,
-                    ) = mysshclient.exec_command(cmd_to_execute)
-                    mysshclient.close()
-
-            except Exception:
-                LOGGER.error(
-                    "SSH connection error 2. Could not send commands.", exc_info=True
-                )
-                error = ErrorCodes.ssh_error
 
         return error
 
@@ -1108,9 +920,7 @@ class PAL(HelaoDriver):
                             self.IO_error = await self._sendcommand_main(run_palcam)
                             LOGGER.info("PAL sendcommand def end")
 
-                            if self.IO_trigger_task is not None:
-                                self.IO_trigger_task.cancel()
-                                self.IO_trigger_task = None
+                            self.trigger.stop_polling()
 
                     except Exception:
                         LOGGER.error("_PAL_IOloop measurement failed", exc_info=True)
@@ -1158,14 +968,8 @@ class PAL(HelaoDriver):
         terminal status (Design 1, K7b).
         """
 
-        if self.PAL_pid is not None:
-            LOGGER.info("waiting for PAL pid to finish")
-            self.PAL_pid.communicate()
-            self.PAL_pid = None
-
-        if self.IO_trigger_task is not None:
-            self.IO_trigger_task.cancel()
-            self.IO_trigger_task = None
+        await self.transport.reap_local_process()
+        self.trigger.stop_polling()
 
         self.IO_continue = True
         # done sending all PAL commands
@@ -1864,91 +1668,9 @@ class PAL(HelaoDriver):
         return switch
 
     async def kill_PAL(self) -> ErrorCodes:
-        """Terminate any running PAL software process (locally or on the SSH host)."""
-        error_code = ErrorCodes.none
-        LOGGER.info("killing PAL")
-
-        if self.sshhost == "localhost":
-
-            # kill PAL if program is open
-            error_code = await self.kill_PAL_local()
-        elif self.sshhost is not None:
-            error_code = await self.kill_PAL_cygwin()
-
-        if error_code is not ErrorCodes.none:
-            LOGGER.error("Could not close PAL")
-
-        return error_code
-
-    async def kill_PAL_cygwin(self) -> bool:
-        """Kill the PAL Windows process via SSH/Cygwin ``taskkill``.
-
-        Returns:
-            ``ErrorCodes.none`` on success, ``ErrorCodes.ssh_error`` if SSH
-            command execution fails.
-        """
-        ssh_connected = False
-        while not ssh_connected:
-            try:
-                # open SSH to PAL
-                k = paramiko.RSAKey.from_private_key_file(self.sshkey)
-                mysshclient = paramiko.SSHClient()
-                mysshclient.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                mysshclient.connect(
-                    hostname=self.sshhost, username=self.sshuser, pkey=k
-                )
-                ssh_connected = True
-            except Exception:
-                ssh_connected = False
-                LOGGER.error(
-                    "SSH connection error. Retrying in 1 seconds.", exc_info=True
-                )
-                await asyncio.sleep(1)
-
-        try:
-            sshcmd = "tmux new-window taskkill /F /FI 'WINDOWTITLE eq PAL*'"
-            (
-                mysshclient_stdin,
-                mysshclient_stdout,
-                mysshclient_stderr,
-            ) = mysshclient.exec_command(sshcmd)
-            mysshclient.close()
-
-        except Exception:
-            LOGGER.error(
-                "SSH connection error 1. Could not send commands.", exc_info=True
-            )
-
-            return ErrorCodes.ssh_error
-
-        return ErrorCodes.none
-
-    async def kill_PAL_local(self) -> bool:
-        """Terminate any local ``PAL*`` processes found via ``psutil``.
-
-        Returns:
-            ``ErrorCodes.none`` on success or ``ErrorCodes.critical_error``
-            if a process could not be terminated after three attempts.
-        """
-        pyPids = {
-            p.pid: p
-            for p in psutil.process_iter(["name"])
-            if p.info["name"].startswith("PAL")
-        }
-
-        for pid in pyPids:
-            LOGGER.info(f"killing PAL on PID: {pid}")
-            p = psutil.Process(pid)
-            for _ in range(3):
-                # os.kill(p.pid, signal.SIGTERM)
-                p.terminate()
-                time.sleep(0.5)
-                if not psutil.pid_exists(p.pid):
-                    LOGGER.info("Successfully terminated PAL.")
-                    break
-            if psutil.pid_exists(p.pid):
-                LOGGER.error("Failed to terminate server PAL after 3 retries.")
-                return ErrorCodes.critical_error
-
-        # if none is found return True
-        return ErrorCodes.none
+        """Terminate any running PAL software process (locally or on the SSH
+        host). Thin delegator (P3a-PAL slice 4/6): pal_server.py's
+        `/kill_PAL` endpoint calls this directly, so it stays a PAL method
+        even though the actual SSH/subprocess/psutil work now lives in
+        `self.transport`."""
+        return await self.transport.kill()
