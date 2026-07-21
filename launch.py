@@ -210,21 +210,55 @@ class Pidd:
                   information about a process, such as its PID, port, and host.
         """
         helaoPids = self.list_pids()
-        # print_message(LAUNCH_LOGGER, "launcher", helaoPids)
-        running = [tup for tup in helaoPids if psutil.pid_exists(tup[3])]
-        # active = []
-        # for tup in running:
-        #     pid = tup[3]
-        #     port = tup[2]
-        #     host = tup[1]
-        #     proc = psutil.Process(pid)
-        #     if proc.name() in self.PROC_NAMES:
-        #         connections = [
-        #             c for c in proc.connections("tcp4") if c.status == "LISTEN"
-        #         ]
-        #         if (host, port) in [(c.laddr.ip, c.laddr.port) for c in connections]:
-        #             active.append(tup)
-        return running
+        # Only count a PID as active if it is a LIVE process that is actually
+        # the launched helao server for that key. A stale pids_*.pck can hold a
+        # PID that the OS has since reused for an unrelated process;
+        # psutil.pid_exists() alone would then report it "running" and the
+        # launcher would refuse to (re)start a server that is in fact NOT
+        # running. _pid_is_server verifies process identity via cmdline.
+        return [tup for tup in helaoPids if self._pid_is_server(tup[3], tup[0])]
+
+    def _pid_is_server(self, pid, server_key):
+        """Return True only if ``pid`` is a live, non-zombie process that is the
+        launched helao server for ``server_key``.
+
+        Guards against a stale ``pids_*.pck`` whose recorded PID has since been
+        reused by an unrelated process: ``psutil.pid_exists`` returns True for
+        the reused PID, which would make the launcher skip a server that is not
+        actually running. Servers are spawned as
+        ``python {fast,bokeh}_launcher.py <config> <server_key>`` (see
+        :func:`launcher`), so requiring both the launcher script and the exact
+        ``server_key`` argv token in the process cmdline confirms identity
+        cross-platform, without needing socket/port permissions.
+
+        Args:
+            pid (int): PID recorded in the pids pickle.
+            server_key (str): Server key the PID is expected to belong to.
+
+        Returns:
+            bool: True if the PID is the live launched server, else False
+            (dead, a zombie, another user's reused PID, or an unrelated
+            process).
+        """
+        if not psutil.pid_exists(pid):
+            return False
+        try:
+            proc = psutil.Process(pid)
+            if proc.status() == psutil.STATUS_ZOMBIE:
+                return False
+            cmdline = proc.cmdline()
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            # gone, a zombie, or owned by another user (a reused PID) -> not ours
+            return False
+        launched_by = any(
+            launcher in arg
+            for arg in cmdline
+            for launcher in ("fast_launcher.py", "bokeh_launcher.py")
+        )
+        # server_key is passed as its own argv element, so list membership is an
+        # exact-token match (won't false-match a key that is a substring of a
+        # longer server key or of a path).
+        return launched_by and server_key in cmdline
 
     def _reap_child(self, k):
         """Reap the OS child for server ``k`` so a terminated process does not
