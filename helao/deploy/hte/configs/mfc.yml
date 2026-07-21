@@ -1,41 +1,47 @@
 # STANDALONE mfc_server canary config (P3a special-split, MFC). Mirrors
 # galil.yml/gamry.yml/spec.yml's 2-server shape (one action server + one
 # action_visualizer) so an at-station openapi/runtime golden diff can compare
-# legacy vs hexagon like-for-like without pulling in the full ccsi1 station
+# legacy vs hexagon like-for-like without pulling in the full ccsi station
 # (ORCH, IO, NI, SAMPLE, DB, syringes, CO2SENSOR, N2MFC, ...). The MFC params
-# (devices CO2 -> COM9/unit_id A, co2_server_name) are copied VERBATIM from
-# ccsi1.yml's MFC block so acquire_flowrate registers identically. This is an
-# Alicat mass flow controller (pyserial over COM9) -- WINDOWS-ONLY hardware.
+# (devices CO2 -> unit_id A, co2_server_name) mirror the station's real MFC
+# block so acquire_flowrate registers identically. IMPORTANT: the device COM
+# port is STATION-SPECIFIC (ccsi1 = COM9, ccsi2 = COM6); this config is set to
+# COM6 for the ccsi2 station -- point it at the real MFC COM port of whatever
+# station you validate at, or the runtime acquire_flowrate poller opens a dead
+# port and the capture hangs (openapi canary passes regardless). This is an
+# Alicat mass flow controller (pyserial over that COM port) -- WINDOWS-ONLY.
 # NOTE: co2_server_name points at CO2SENSOR, which is NOT in this 2-server
 # canary, so the maintain_concentration endpoints are (deterministically, on
 # BOTH legacy and hexagon) not registered -- acquire_flowrate/acquire_pressure/
-# set_*/hold_* still register whenever a device is declared. Unlike gamry,
-# AliCatMFC.__init__ does NO device I/O (dev_mfcs is built from config alone)
-# and connect() failures are caught, so the server BOOTS and serves
-# /openapi.json even with no Alicat attached; a data-producing action
-# (acquire_flowrate) additionally requires the real MFC on COM9 (see
+# set_*/hold_* still register whenever a device is declared. AliCatMFC.__init__
+# opens the Alicat serial via connect(), but connect() failures are caught, so
+# the server still BOOTS and serves /openapi.json even with no Alicat attached
+# (the openapi canary passes regardless); a data-producing action
+# (acquire_flowrate) additionally requires the real MFC on COM6 -- a wrong COM
+# now fails the action fast (MfcExec fail-fast guard) instead of hanging (see
 # mfc_diff.bat / golden_capture_mfc.py).
 dummy: true
 simulation: true
 run_type: mfc_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   MFC:
     host: 127.0.0.1
     port: 8009
     group: action
     fast: mfc_server
+    live_vis: mfc_vis
     params:
       devices:
         CO2:
-          port: COM9
+          port: COM6
           unit_id: A
       co2_server_name: CO2SENSOR
   ACTVIS:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: 'MFC Visualizer'
       launch_browser: true

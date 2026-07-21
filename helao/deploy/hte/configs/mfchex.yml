@@ -1,13 +1,13 @@
 # HEXAGON CANARY for the mfc_server station (P3a special-split). Copy of
 # mfc.yml with `deployment: hexagon` flipping MFC (mfc_server) and ACTVIS
 # (action_visualizer) onto the hexagon factory -- run AT-STATION (Windows,
-# Alicat MFC on COM9). mfc.yml stays legacy for rollback; the cut-over is ONLY
+# Alicat MFC on COM6). mfc.yml stays legacy for rollback; the cut-over is ONLY
 # the two `deployment: hexagon` keys. Ports/root/params match mfc.yml so an
 # on-station openapi/golden diff compares like-for-like.
 dummy: true
 simulation: true
 run_type: mfc_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   MFC:
     host: 127.0.0.1
@@ -15,17 +15,18 @@ servers:
     group: action
     fast: mfc_server
     deployment: hexagon
+    live_vis: mfc_vis
     params:
       devices:
         CO2:
-          port: COM9
+          port: COM6
           unit_id: A
       co2_server_name: CO2SENSOR
   ACTVIS:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     deployment: hexagon
     params:
       doc_name: 'MFC Visualizer'

@@ -22,6 +22,7 @@ servers:
     group: action
     fast: biologic_server
     deployment: hexagon
+    action_vis: biologic_vis
     params:
       allow_no_sample: true
       address: 192.168.200.100

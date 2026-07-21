@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from enum import StrEnum
 from datetime import datetime
 from dataclasses import dataclass, field
+from typing import Any
 
 from helao.helpers import helao_logging as logging
 
@@ -160,6 +161,11 @@ class DriverPoller:
     last_update: datetime
     live_dict: dict
     polling: bool
+    poll_signal_task: "asyncio.Task[None]"
+    polling_task: "asyncio.Task[None]"
+    # the owning Base (set by BaseAPI after construction); Any avoids a
+    # core->servers import cycle and keeps `await _base_hook.put_lbuf(...)` typed
+    _base_hook: Any
 
     def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:
         """Bind to ``driver`` and start the signal and polling background tasks.
@@ -195,13 +201,46 @@ class DriverPoller:
             LOGGER.info("waiting for polling loop to stop")
             await asyncio.sleep(0.1)
 
-    async def _poll_signal_loop(self):
+    async def stop(self) -> None:
+        """Cancel the background poll loops and await their teardown.
+
+        MUST be called BEFORE disconnecting the driver on shutdown. The poll
+        loop runs ``while True`` and is never otherwise cancelled, so once the
+        driver's ``disconnect()`` closes its serial/handle the loop would keep
+        calling ``get_data`` on a dead device -- spamming errors until the event
+        loop is torn down at process exit. ``_stop_polling`` only pauses the
+        loop (``polling=False``); this fully cancels the tasks. Idempotent.
+        """
+        self.polling = False
+        pending = [
+            t for t in (self.polling_task, self.poll_signal_task) if not t.done()
+        ]
+        for task in pending:
+            task.cancel()
+        if pending:
+            # gather(return_exceptions=True) swallows the CancelledError raised
+            # in each task. Bound the await: a task stuck in a BLOCKING sync
+            # get_data() (e.g. a driver serial read with no timeout) cannot
+            # process the cancellation until it next hits an await, so without a
+            # timeout this would hang shutdown. If they don't unwind in time,
+            # proceed -- the tasks die when the loop tears down at process exit.
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*pending, return_exceptions=True), timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                LOGGER.warning(
+                    "poller task(s) did not stop within 5s (likely blocked in a "
+                    "synchronous get_data); proceeding with shutdown"
+                )
+
+    async def _poll_signal_loop(self) -> None:
         """Background loop that updates ``self.polling`` from the signal queue."""
         while True:
             self.polling = await self.poll_signalq.get()
             LOGGER.info("polling signal received")
 
-    async def _poll_sensor_loop(self):
+    async def _poll_sensor_loop(self) -> None:
         """Background loop that calls :meth:`get_data` and updates ``live_dict``.
 
         While ``polling`` is true, the driver is polled every ``wait_time``

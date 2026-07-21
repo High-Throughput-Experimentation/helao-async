@@ -20,7 +20,7 @@
 dummy: true
 simulation: true
 run_type: andor_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   ANDOR:
     host: 127.0.0.1

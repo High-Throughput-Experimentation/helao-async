@@ -17,6 +17,7 @@ servers:
     port: 8012
     group: action
     fast: co2sensor_server
+    live_vis: co2_vis
     params:
       port: COM12
       start_margin: 0
@@ -24,7 +25,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: 'CO2 Visualizer'
       launch_browser: true

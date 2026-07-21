@@ -67,6 +67,14 @@ class SprintIR(HelaoDriver):
         self.last_rec_time = 0
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
+        # Open the serial port at construction. BaseAPI builds the DriverPoller
+        # (SprintIRPoller) immediately after the driver and the poller AUTO-STARTS
+        # its poll loop in __init__ -- but BaseAPI never calls connect(), so
+        # deferring the serial open left self.com=None and the poller spammed
+        # "'NoneType' object has no attribute 'flush'" every cycle. Connecting
+        # here (like the biologic/andor drivers) opens the port before the first
+        # poll; a bad/absent port logs a clear "connect failed" instead.
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial port, set polling mode, and read firmware scaling.
@@ -195,6 +203,8 @@ class SprintIR(HelaoDriver):
             Tuple ``(cmd_resp, aux_resp)`` of lines beginning with the command
             character versus everything else.
         """
+        if self.com is None:
+            raise RuntimeError("SprintIR serial port is not connected")
         if not command_str.endswith("\r\n"):
             command_str = command_str + "\r\n"
         self.com.write(command_str.encode("utf8"))
@@ -224,6 +234,8 @@ class SprintIR(HelaoDriver):
             The latest filtered CO2 value as a string, or ``False`` if no
             valid reading was found.
         """
+        if self.com is None:
+            raise RuntimeError("SprintIR serial port is not connected")
         self.com.flush()
         lines, _ = self.send("Z")
         for line in lines[::-1]:
@@ -236,6 +248,8 @@ class SprintIR(HelaoDriver):
 
     def reset_polling_mode(self) -> None:
         """Re-issue the polling-mode command (used after consecutive blank reads)."""
+        if self.com is None:
+            return
         self.com.write(b"K 2\r\n")
 
 
