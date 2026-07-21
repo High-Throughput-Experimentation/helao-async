@@ -74,6 +74,7 @@ from helao.helpers.premodels import Action
 from helao.helpers.active_params import ActiveParams
 from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
 from helao.deploy.hte.drivers.robot.pal_driver import PAL
+from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 BASELINE_DIR = REPO_ROOT / ".omc" / "artifacts" / "p4pal" / "baseline"
@@ -223,9 +224,7 @@ class _UnifiedDBShim:
                 s.global_label = f"canned__{_enum_val(s.sample_type)}__{n}"
             self._parent.db[s.global_label] = deepcopy(s)
             out.append(s)
-        self._parent._log(
-            "unified_db.new_samples", result=_samples_snapshot(out)
-        )
+        self._parent._log("unified_db.new_samples", result=_samples_snapshot(out))
         return out
 
     async def update_samples(self, samples=None, *args, **kwargs):
@@ -569,6 +568,11 @@ def _make_pal(shim: RecordingShim) -> PAL:
     _ensure_cam_paths()
     pal = PAL.__new__(PAL)
     pal.archive = shim
+    # P3a-PAL slice 2: PAL.__init__ now also builds self.sample_state (a
+    # SampleStatePort-typed SampleShimAdapter wrapping self.archive); this
+    # harness bypasses __init__ via __new__, so it must set the same
+    # attribute by hand -- exactly like it already does for `pal.archive`.
+    pal.sample_state = SampleShimAdapter(shim)
     pal.cams = CAMS
     pal.cam_config = None
     pal.cam_file_path = None
@@ -779,7 +783,9 @@ async def _scenario_a():
     """(a) single microcam, 1 run -- simple custom->custom transfer."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("src_a", _liquid("src_a__liquid", "a1", volume_ml=5.0, position="src_a"))
+    shim.seed_custom(
+        "src_a", _liquid("src_a__liquid", "a1", volume_ml=5.0, position="src_a")
+    )
     shim.allow_dest("dst_a")
     pal = _make_pal(shim)
     base = _make_base(trace)
@@ -808,7 +814,10 @@ async def _scenario_b():
     """(b) 3 microcams incl. an archive dest (next-empty-vial) -> 2 splits."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("anec_src", _liquid("anec_src__liquid", "b1", volume_ml=10.0, position="anec_src"))
+    shim.seed_custom(
+        "anec_src",
+        _liquid("anec_src__liquid", "b1", volume_ml=10.0, position="anec_src"),
+    )
     shim.allow_dest("Injector 2")
     shim.allow_dest("Injector 1")
     pal = _make_pal(shim)
@@ -835,7 +844,9 @@ async def _scenario_c():
     """(c) microcam repeat=2 (B2 samples-reset quirk): built via method_arbitrary."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("src_c", _liquid("src_c__liquid", "c1", volume_ml=8.0, position="src_c"))
+    shim.seed_custom(
+        "src_c", _liquid("src_c__liquid", "c1", volume_ml=8.0, position="src_c")
+    )
     shim.allow_dest("dst_c")
     pal = _make_pal(shim)
     base = _make_base(trace)
@@ -877,7 +888,10 @@ async def _scenario_d():
         trace = []
         shim = RecordingShim(trace)
         src, dst = f"src_d_{spacing_name}", f"dst_d_{spacing_name}"
-        shim.seed_custom(src, _liquid(f"{src}__liquid", f"d_{spacing_name}", volume_ml=8.0, position=src))
+        shim.seed_custom(
+            src,
+            _liquid(f"{src}__liquid", f"d_{spacing_name}", volume_ml=8.0, position=src),
+        )
         shim.allow_dest(dst)
         pal = _make_pal(shim)
         base = _make_base(trace)
@@ -909,7 +923,9 @@ async def _scenario_e():
     """(e) assembly creation/update (pipeline steps 2/6 part handling)."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("src_e", _liquid("src_e__liquid", "e1", volume_ml=6.0, position="src_e"))
+    shim.seed_custom(
+        "src_e", _liquid("src_e__liquid", "e1", volume_ml=6.0, position="src_e")
+    )
     # a different sample TYPE already at dest -> assembly-creation branch
     shim.seed_custom("dst_e", _gas("dst_e__gas", "e2", volume_ml=2.0, position="dst_e"))
     shim.allow_dest("dst_e")
@@ -941,7 +957,9 @@ async def _scenario_f():
     """(f) destroyed-dest (GC/HPLC inject)."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("src_f", _liquid("src_f__liquid", "f1", volume_ml=4.0, position="src_f"))
+    shim.seed_custom(
+        "src_f", _liquid("src_f__liquid", "f1", volume_ml=4.0, position="src_f")
+    )
     shim.allow_dest("hplc_injector")
     shim.mark_destroyed("hplc_injector")
     pal = _make_pal(shim)
@@ -967,7 +985,9 @@ async def _scenario_g():
     """(g) shim raises mid-pipeline (B6 error funneling)."""
     trace = []
     shim = RecordingShim(trace, raise_on=("unified_db.update_samples", 1))
-    shim.seed_custom("src_g", _liquid("src_g__liquid", "g1", volume_ml=5.0, position="src_g"))
+    shim.seed_custom(
+        "src_g", _liquid("src_g__liquid", "g1", volume_ml=5.0, position="src_g")
+    )
     shim.allow_dest("dst_g")
     pal = _make_pal(shim)
     base = _make_base(trace)
@@ -996,7 +1016,9 @@ async def _scenario_h():
     """(h) stop signal between palactions (repeat=1, same microcam, i=0)."""
     trace = []
     shim = RecordingShim(trace)
-    shim.seed_custom("src_h", _liquid("src_h__liquid", "h1", volume_ml=9.0, position="src_h"))
+    shim.seed_custom(
+        "src_h", _liquid("src_h__liquid", "h1", volume_ml=9.0, position="src_h")
+    )
     shim.allow_dest("dst_h")
     pal = _make_pal(shim)
     base = _make_base(trace)
@@ -1092,10 +1114,14 @@ async def run_all_scenarios(base_dir: Path) -> dict:
     results = {}
     for name, coro_fn in SCENARIOS.items():
         data = await coro_fn()
-        payload = {"scenario": name, **data} if "trace" in data else {
-            "scenario": name,
-            **data,
-        }
+        payload = (
+            {"scenario": name, **data}
+            if "trace" in data
+            else {
+                "scenario": name,
+                **data,
+            }
+        )
         text = json.dumps(payload, indent=2, sort_keys=True, default=str)
         (base_dir / f"{name}.json").write_text(text)
         results[name] = text
@@ -1129,9 +1155,15 @@ async def _run_and_check() -> list:
     _check(c["final"]["finished"], "c: action did not finish", failures)
     _check(c["final"]["split_count"] == 0, "c: repeat must not split", failures)
     append_calls = [
-        e for e in c["trace"] if e.get("domain") == "active" and e["call"] == "append_sample"
+        e
+        for e in c["trace"]
+        if e.get("domain") == "active" and e["call"] == "append_sample"
     ]
-    _check(len(append_calls) == 6, "c: expected 3 repeats x (in,out) = 6 append_sample calls", failures)
+    _check(
+        len(append_calls) == 6,
+        "c: expected 3 repeats x (in,out) = 6 append_sample calls",
+        failures,
+    )
 
     d = await _scenario_d()
     for spacing_name in ("linear", "geometric"):
@@ -1146,9 +1178,15 @@ async def _run_and_check() -> list:
     e = await _scenario_e()
     _check(e["final"]["finished"], "e: action did not finish", failures)
     new_ref_calls = [
-        ev for ev in e["trace"] if ev.get("domain") == "shim" and ev["call"] == "new_ref_samples"
+        ev
+        for ev in e["trace"]
+        if ev.get("domain") == "shim" and ev["call"] == "new_ref_samples"
     ]
-    _check(len(new_ref_calls) >= 2, "e: assembly creation should call new_ref_samples >=2x", failures)
+    _check(
+        len(new_ref_calls) >= 2,
+        "e: assembly creation should call new_ref_samples >=2x",
+        failures,
+    )
 
     f = await _scenario_f()
     _check(f["final"]["finished"], "f: action did not finish", failures)
@@ -1170,7 +1208,9 @@ async def _run_and_check() -> list:
     h = await _scenario_h()
     _check(h["final"]["finished"], "h: action did not finish", failures)
     triggerwait_calls = [
-        ev for ev in h["trace"] if ev.get("domain") == "driver" and ev["call"] == "_sendcommand_triggerwait"
+        ev
+        for ev in h["trace"]
+        if ev.get("domain") == "driver" and ev["call"] == "_sendcommand_triggerwait"
     ]
     _check(
         len(triggerwait_calls) == 1,
@@ -1184,7 +1224,11 @@ async def _run_and_check() -> list:
         "i: busy call must reject with in_progress",
         failures,
     )
-    _check(not i["final"]["active_created"], "i: busy rejection must not create an Active", failures)
+    _check(
+        not i["final"]["active_created"],
+        "i: busy rejection must not create an Active",
+        failures,
+    )
     _check(
         i["final"]["n_shim_or_active_calls"] == 0,
         "i: busy rejection must produce zero shim/active calls (no artifact)",
@@ -1220,7 +1264,9 @@ def main():
         if det_failures:
             print(f"DETERMINISM CHECK FAILED for: {det_failures}")
         else:
-            print("DETERMINISM CHECK PASSED: two capture runs byte-identical for all 9 scenarios")
+            print(
+                "DETERMINISM CHECK PASSED: two capture runs byte-identical for all 9 scenarios"
+            )
 
     # also cross-check the first baseline capture against a fresh run
     # (belt-and-suspenders against ordering bugs introduced by the checked
