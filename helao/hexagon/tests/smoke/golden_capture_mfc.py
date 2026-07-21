@@ -12,9 +12,9 @@ only. (One difference from gamry: ``AliCatMFC.__init__`` does NO device I/O and
 ``connect()`` exceptions are caught, so the server still BOOTS + serves
 /openapi.json with no MFC attached -- that is what the openapi mfc_canary.bat
 relies on. This RUNTIME capture, however, needs the live device: with no Alicat
-on COM4 the poller buffers nothing and ``MfcExec._poll`` errors reading an empty
+on COM6 the poller buffers nothing and ``MfcExec._poll`` errors reading an empty
 live buffer.) So this capture rig is an AT-STATION, REAL-HARDWARE gate: the
-Alicat MFC must be attached on COM4 for ``acquire_flowrate`` to produce data.
+Alicat MFC must be attached on COM6 for ``acquire_flowrate`` to produce data.
 
 SAFETY -- why acquire_flowrate is the non-perturbing choice
 -----------------------------------------------------------
@@ -113,7 +113,7 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
 
 # The single MFC device declared in the mfc*.yml MFC block (ccsi1.yml verbatim:
-# devices: {CO2: {port: COM4, unit_id: A}}). devices[0] == "CO2" is the endpoint
+# devices: {CO2: {port: COM6, unit_id: A}}). devices[0] == "CO2" is the endpoint
 # default for device_name; passed explicitly here so both captures target the
 # same controller deterministically.
 DEVICE_NAME = "CO2"
@@ -220,14 +220,14 @@ def snapshot(
             f"[golden_capture_mfc] WARNING: {len(errored)} action(s) ERRORED "
             f"and were still captured: {errored}. An errored run is NOT a valid "
             "parity baseline. Check the -act.yml error fields and the MFC log "
-            "before trusting a PASS (e.g. no Alicat on COM4 -> empty live buffer)."
+            "before trusting a PASS (e.g. no Alicat on COM6 -> empty live buffer)."
         )
     if not hlos:
         print(
             f"[golden_capture_mfc] WARNING: no .hlo captured under {root} -- "
             "acquire_flowrate produced no telemetry data file. Parity will "
             "compare -act.yml metadata only, NOT the hlo data-write path. Verify "
-            "the Alicat MFC is attached on COM4 and the poller is buffering data."
+            "the Alicat MFC is attached on COM6 and the poller is buffering data."
         )
     out_root = out_dir / "root"
     out_root.mkdir(parents=True)
@@ -240,7 +240,7 @@ def snapshot(
     ).stdout.strip()
     config_path = CONFIG_DIR / f"{config_prefix}.yml"
     combined_notes = (
-        "REAL-HARDWARE acquire_flowrate capture (Alicat MFC attached on COM4); "
+        "REAL-HARDWARE acquire_flowrate capture (Alicat MFC attached on COM6); "
         "NOT a simulation -- AliCatMFC has no sim/dummy data path. Dispatched "
         "with flowrate_sccm=None so the MFC valve is NEVER opened and NO flow is "
         "commanded (pure telemetry read; ends valve-closed). The .hlo body "
