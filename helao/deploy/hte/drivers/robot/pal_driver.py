@@ -27,7 +27,7 @@ import time
 import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field as dc_field
-from typing import Any, List, Optional, Protocol, Union, Tuple
+from typing import Any, Optional, Protocol
 from pydantic import BaseModel
 import aiofiles
 import subprocess
@@ -45,7 +45,6 @@ from helao.hexagon.domain.models import (
 )
 from helao.hexagon.domain.pal_reconciliation import PalReconciliation
 from helao.core.error import ErrorCodes
-from helao.core.helaodict import HelaoDict
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
     DriverResponse,
@@ -53,17 +52,6 @@ from helao.core.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from helao.core.models.sample import (
-    AssemblySample,
-    LiquidSample,
-    GasSample,
-    SolidSample,
-    NoneSample,
-    SampleStatus,
-    SampleInheritance,
-    SampleType,
-)
-from helao.helpers.sample_api import update_vol
 from helao.core.models.data import DataModel
 from .sample_shim import SampleArchiveShim
 from ...drivers.robot.enum import (
@@ -101,17 +89,24 @@ class _PALActiveContext(DataSinkPort, Protocol):
     synchronous despite the port's async declaration -- a pre-existing
     port/adapter signature gap, not something this slice changes).
 
-    PAL's `_sendcommand_main`/`_PAL_IOloop_meas_*_helper` still read/mutate
-    ``.action`` directly (samples_in/samples_out/action_sub_name/error_code/
-    action_uuid/file_conn_keys/save_data) -- the after-trigger reconciliation
-    slice 3c lifts next. (`_sendcommand_check_dest_*` no longer reaches
-    `.action` this way: P3a-PAL slice 3b moved dest resolution into
-    `PalReconciliation`, which receives `action` as a plain parameter
-    instead, per Decision 2.) Until slice 3c/3d finish the lift, PALJob.active
-    is typed against this composite so retyping to ``DataSinkPort`` (P3a-PAL
-    slice 1, dropping the ``helao.core.servers.base.Active`` import) does not
-    regress pyright. The runtime object is unchanged: still the framework's
-    grafted native ``Active``; only the static type widens.
+    PAL's `_sendcommand_main` still reads/mutates ``.action`` directly for
+    job-lifecycle bookkeeping that is permanently engine-owned, not
+    reconciliation: the split/reset block before each trigger wait
+    (samples_in/samples_out/action_sub_name), the C1 error stamp on a
+    triggerwait timeout, step 8's HLO write (save_data/file_conn_keys), and
+    step 9's `append_sample` calls. `_PAL_IOloop_meas_*_helper` similarly
+    stamps the terminal `error_code`/reads `action_uuid` for logging/
+    `finish_hlo_header`. All of the reconciliation ALGORITHM's `.action`
+    reads (samples_in/samples_out resolution, position updates, dest
+    ref-sample resolution -- legacy steps (1)-(7),(9)'s computation) moved
+    into `PalReconciliation` across P3a-PAL slices 3a-3d, receiving
+    `action`/`action_uuid` as plain parameters instead (Decision 2); what
+    remains here is the framework/job-lifecycle boundary the domain service
+    was never meant to cross. PALJob.active stays typed against this
+    composite so the P3a-PAL slice 1 retype to ``DataSinkPort`` (dropping
+    the ``helao.core.servers.base.Active`` import) does not regress
+    pyright. The runtime object is unchanged: still the framework's grafted
+    native ``Active``; only the static type widens.
     """
 
     action: Any
