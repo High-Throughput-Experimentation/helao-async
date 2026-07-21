@@ -52,6 +52,13 @@ MODEL_EXPORTS = [
     "ShortAnalysisModel",
     "ErrorCodes",
     "HelaoDict",
+    # PAL algorithm models (P3a-PAL slice 3) -- see models.py module docstring
+    # "Exception" note.
+    "PALposition",
+    "PalAction",
+    "PalMicroCam",
+    "PalCam",
+    "Spacingmethod",
 ]
 
 
