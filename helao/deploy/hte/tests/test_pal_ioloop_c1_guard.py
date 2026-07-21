@@ -42,7 +42,6 @@ stays ``none``); with C1 it PASSES.
 """
 
 import asyncio
-from types import SimpleNamespace
 
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.drivers.robot.enum import Spacingmethod
@@ -140,21 +139,21 @@ async def _drive_one_measurement(pal, job, timeout=5.0):
 
 
 def _assert_terminal(pal, job, scenario):
-    assert isinstance(pal.IO_error, ErrorCodes), (
-        f"[{scenario}] IO_error not ErrorCodes: {type(pal.IO_error)}"
-    )
-    assert pal.IO_error is not ErrorCodes.none, (
-        f"[{scenario}] IO_error must be non-none terminal code, got {pal.IO_error!r}"
-    )
-    assert job.done.is_set(), (
-        f"[{scenario}] meas_end_helper did NOT mark the job done (hang bug)"
-    )
-    assert job.error is not ErrorCodes.none, (
-        f"[{scenario}] job never stamped with a terminal error"
-    )
-    assert job.active.action.error_code is not None, (
-        f"[{scenario}] action never finalized"
-    )
+    assert isinstance(
+        pal.IO_error, ErrorCodes
+    ), f"[{scenario}] IO_error not ErrorCodes: {type(pal.IO_error)}"
+    assert (
+        pal.IO_error is not ErrorCodes.none
+    ), f"[{scenario}] IO_error must be non-none terminal code, got {pal.IO_error!r}"
+    assert (
+        job.done.is_set()
+    ), f"[{scenario}] meas_end_helper did NOT mark the job done (hang bug)"
+    assert (
+        job.error is not ErrorCodes.none
+    ), f"[{scenario}] job never stamped with a terminal error"
+    assert (
+        job.active.action.error_code is not None
+    ), f"[{scenario}] action never finalized"
     assert job.active.action.error_code is not ErrorCodes.none, (
         f"[{scenario}] finalized error_code is none -> SILENT SUCCESS on outage; "
         f"got {job.active.action.error_code!r}"
@@ -162,16 +161,22 @@ def _assert_terminal(pal, job, scenario):
 
 
 async def _scenario_meas_start_raise():
-    """:2354 path -- unified_db.get_samples raises inside meas_start_helper."""
+    """:2354 path -- sample_state.get_samples raises inside meas_start_helper."""
     pal = _make_pal()
     active = _FakeActive()
     job = PALJob(palcam=_PalCamStub(), active=active)
 
-    class _RaisingUnifiedDB:
+    class _RaisingSampleState:
         async def get_samples(self, *a, **k):
             raise RuntimeError("SAMPLE get_samples failed: simulated outage")
 
-    pal.archive = SimpleNamespace(unified_db=_RaisingUnifiedDB())
+    # P3a-PAL slice 2: _PAL_IOloop_meas_start_helper calls self.sample_state.
+    # get_samples(...), not self.archive.unified_db.get_samples(...) anymore --
+    # the raising stub must live on sample_state or it's never reached (the
+    # loop would instead hit an unrelated AttributeError for a missing
+    # sample_state attribute, which happens to also satisfy this test's
+    # terminal-error assertions for the WRONG reason).
+    pal.sample_state = _RaisingSampleState()
     # _sendcommand_main should never be reached in this scenario.
     reached = {"sendcommand": False}
 
@@ -182,9 +187,9 @@ async def _scenario_meas_start_raise():
     pal._sendcommand_main = _sc
 
     await _drive_one_measurement(pal, job)
-    assert not reached["sendcommand"], (
-        "meas_start raise should short-circuit before _sendcommand_main"
-    )
+    assert not reached[
+        "sendcommand"
+    ], "meas_start raise should short-circuit before _sendcommand_main"
     _assert_terminal(pal, job, "meas_start")
     print("PASS: meas_start (:2354) raise -> terminal error_code, meas_end ran")
 
@@ -195,11 +200,11 @@ async def _scenario_sendcommand_raise():
     active = _FakeActive()
     job = PALJob(palcam=_PalCamStub(), active=active)
 
-    class _OkUnifiedDB:
+    class _OkSampleState:
         async def get_samples(self, samples=None, *a, **k):
             return samples or []
 
-    pal.archive = SimpleNamespace(unified_db=_OkUnifiedDB())
+    pal.sample_state = _OkSampleState()
 
     async def _sc(_):
         raise RuntimeError("SAMPLE tray_query_sample failed: simulated outage")
