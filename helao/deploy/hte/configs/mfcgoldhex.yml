@@ -9,7 +9,7 @@
 # diff compares like-for-like. This is a REAL-HARDWARE capture (see
 # golden_capture_mfc.py docstring) -- acquire_flowrate with flowrate_sccm=None
 # only READS live telemetry (never opens the valve or commands flow; ends by
-# holding the valve CLOSED), but the Alicat MFC must be attached on COM4 for
+# holding the valve CLOSED), but the Alicat MFC must be attached on COM6 for
 # the poller to buffer data and the capture to produce a .hlo.
 dummy: true
 simulation: true
@@ -25,7 +25,7 @@ servers:
     params:
       devices:
         CO2:
-          port: COM4
+          port: COM6
           unit_id: A
       co2_server_name: CO2SENSOR
   ACTVIS:

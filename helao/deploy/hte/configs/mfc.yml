@@ -5,8 +5,8 @@
 # (ORCH, IO, NI, SAMPLE, DB, syringes, CO2SENSOR, N2MFC, ...). The MFC params
 # (devices CO2 -> unit_id A, co2_server_name) mirror the station's real MFC
 # block so acquire_flowrate registers identically. IMPORTANT: the device COM
-# port is STATION-SPECIFIC (ccsi1 = COM9, ccsi2 = COM4); this config is set to
-# COM4 for the ccsi2 station -- point it at the real MFC COM port of whatever
+# port is STATION-SPECIFIC (ccsi1 = COM9, ccsi2 = COM6); this config is set to
+# COM6 for the ccsi2 station -- point it at the real MFC COM port of whatever
 # station you validate at, or the runtime acquire_flowrate poller opens a dead
 # port and the capture hangs (openapi canary passes regardless). This is an
 # Alicat mass flow controller (pyserial over that COM port) -- WINDOWS-ONLY.
@@ -17,7 +17,7 @@
 # opens the Alicat serial via connect(), but connect() failures are caught, so
 # the server still BOOTS and serves /openapi.json even with no Alicat attached
 # (the openapi canary passes regardless); a data-producing action
-# (acquire_flowrate) additionally requires the real MFC on COM4 -- a wrong COM
+# (acquire_flowrate) additionally requires the real MFC on COM6 -- a wrong COM
 # now fails the action fast (MfcExec fail-fast guard) instead of hanging (see
 # mfc_diff.bat / golden_capture_mfc.py).
 dummy: true
@@ -33,7 +33,7 @@ servers:
     params:
       devices:
         CO2:
-          port: COM4
+          port: COM6
           unit_id: A
       co2_server_name: CO2SENSOR
   ACTVIS:
