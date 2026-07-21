@@ -8,7 +8,7 @@ sequence_libraries:
   - ICPMS_seq
   - helao\deploy\test\sequences\TEST_seq.py
 run_type: icpm
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: hte-icpm-01.htejcap.caltech.edu
@@ -17,7 +17,7 @@ servers:
     fast: async_orch2
     params:
       seqspec_parser_path: helao\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS_SYNCED
   OPERATOR:
     group: operator
     bokeh: standalone_operator

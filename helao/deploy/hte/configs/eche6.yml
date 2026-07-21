@@ -29,7 +29,7 @@ sequence_params:
   gamrychannelwait: -1
   gamrychannelsend: 0
 run_type: eche
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: hte-eche-06.htejcap.caltech.edu
@@ -38,7 +38,7 @@ servers:
     fast: async_orch2
     params:
       seqspec_parser_path: helao\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS_SYNCED
     verbose: true
   OPERATOR:
     group: operator
