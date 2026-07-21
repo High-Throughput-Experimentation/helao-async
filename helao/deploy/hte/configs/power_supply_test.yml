@@ -32,7 +32,7 @@ sequence_libraries:
 #   gamrychannelwait: -1
 #   gamrychannelsend: 0
 run_type: power_supply
-root: C:\INST_hlo
+root: C:\INST_hlo\DATA
 servers:
   ORCH:
     host: 127.0.0.1
@@ -41,7 +41,7 @@ servers:
     fast: async_orch2
     params:
       # seqspec_parser_path: helao\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS_SYNCED
       ignore_heartbeats:
         - ANDOR/acquire
     verbose: true

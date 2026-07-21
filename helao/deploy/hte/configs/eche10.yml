@@ -40,7 +40,7 @@ servers:
     fast: async_orch2
     params:
       seqspec_parser_path: helao\deploy\hte\specifications\last3months.py
-      seqspec_folder_path: C:\INST_hlo\RUNS_SYNCED
+      seqspec_folder_path: C:\INST_hlo\DATA\RUNS_SYNCED
   OPERATOR:
     group: operator
     bokeh: standalone_operator
