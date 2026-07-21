@@ -1,53 +1,27 @@
 """Enumerations and model classes describing PAL robot methods (``CAM`` files).
 
-Defines the position kinds, GC sample categories, the per-method ``_cam`` model
-holding the source/destination policy and TTL flags, the enumeration of all
-supported PAL ``CAM`` files, sample-spacing methods, and the tool labels
-recognized by the PAL software.
+Defines the GC sample categories, the enumeration of all supported PAL
+``CAM`` files, and the tool labels recognized by the PAL software.
+
+``_cam``, ``_positiontype``, and ``Spacingmethod`` are re-exported here from
+``helao.hexagon.domain.models`` (P3a-PAL slice 3: they moved there so the
+Base-free ``PalReconciliation`` domain service can use them without
+importing this deploy-tree module) -- CAMS's construction below is
+unaffected, it just references the imported names instead of local ones.
 """
 
 from enum import Enum
-from pydantic import BaseModel
-from typing import Optional
 from helao.core.models.sample import SampleType
+from helao.hexagon.domain.models import _cam, _positiontype, Spacingmethod
 
-
-class _cam(BaseModel):
-    """Describes a single PAL ``CAM`` method.
-
-    Attributes:
-        name: Method name as referenced by the orchestrator.
-        file_name: Vendor ``.cam`` file name; filled in at runtime from config.
-        file_path: Directory containing the ``.cam`` file.
-        sample_out_type: Output sample type produced by the method.
-        ttl_start: Whether the method emits the start TTL trigger.
-        ttl_continue: Whether the method emits the continue TTL trigger.
-        ttl_done: Whether the method emits the done TTL trigger.
-        source: Source position kind (see :class:`_positiontype`).
-        dest: Destination position kind (see :class:`_positiontype`).
-    """
-
-    name: Optional[str] = None
-    file_name: Optional[str] = None
-    file_path: Optional[str] = None
-    sample_out_type: Optional[str] = (
-        None  # should not be assembly, only liquid, solid...
-    )
-    ttl_start: bool = False
-    ttl_continue: bool = False
-    ttl_done: bool = False
-
-    source: Optional[str] = None
-    dest: Optional[str] = None
-
-
-class _positiontype(str, Enum):
-    """Categories of source/destination positions understood by the PAL driver."""
-
-    tray = "tray"
-    custom = "custom"
-    next_empty_vial = "next_empty_vial"
-    next_full_vial = "next_full_vial"
+__all__ = [
+    "_cam",
+    "_positiontype",
+    "Spacingmethod",
+    "GCsampletype",
+    "CAMS",
+    "PALtools",
+]
 
 
 class GCsampletype(str, Enum):
@@ -66,7 +40,6 @@ class CAMS(Enum):
     Each member's value is a :class:`_cam` template; ``file_name`` and
     ``file_path`` are populated by the driver from server configuration.
     """
-
 
     transfer_tray_tray = _cam(
         name="transfer_tray_tray",
@@ -236,20 +209,6 @@ class CAMS(Enum):
     #               source = _positiontype.custom,
     #               dest = _positiontype.tray,
     #              )
-
-
-class Spacingmethod(str, Enum):
-    """Scheduling spacing options for repeated PAL runs.
-
-    Attributes:
-        linear: Equal intervals between runs.
-        geometric: Intervals scaled by a geometric factor.
-        custom: Caller-supplied list of absolute timestamps.
-    """
-
-    linear = "linear"  # 1, 2, 3, 4, 5, ...
-    geometric = "gemoetric"  # 1, 2, 4, 8, 16
-    custom = "custom"  # list of absolute times for each run
 
 
 #    power = "power"
