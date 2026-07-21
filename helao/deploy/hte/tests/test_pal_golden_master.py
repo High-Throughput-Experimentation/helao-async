@@ -75,6 +75,7 @@ from helao.helpers.active_params import ActiveParams
 from helao.deploy.hte.drivers.robot.enum import CAMS, Spacingmethod
 from helao.deploy.hte.drivers.robot.pal_driver import PAL
 from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
+from helao.hexagon.domain.pal_reconciliation import PalReconciliation
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 BASELINE_DIR = REPO_ROOT / ".omc" / "artifacts" / "p4pal" / "baseline"
@@ -574,6 +575,10 @@ def _make_pal(shim: RecordingShim) -> PAL:
     # attribute by hand -- exactly like it already does for `pal.archive`.
     pal.sample_state = SampleShimAdapter(shim)
     pal.cams = CAMS
+    # P3a-PAL slice 3b: PAL.__init__ now also builds self.reconciliation
+    # (PalReconciliation, constructed with the same sample_state + cams);
+    # this harness bypasses __init__, so set it by hand too.
+    pal.reconciliation = PalReconciliation(pal.sample_state, pal.cams)
     pal.cam_config = None
     pal.cam_file_path = None
     pal.sshuser = ""
