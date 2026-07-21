@@ -33,6 +33,8 @@ import psutil
 
 from helao.helpers import config_loader
 from helao.hexagon.ports.data_sink import DataSinkPort
+from helao.hexagon.ports.sample_state import SampleStatePort
+from helao.hexagon.adapters.legacy.sample_state import SampleShimAdapter
 from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 from helao.core.drivers.helao_driver import (
@@ -319,6 +321,11 @@ class PAL(HelaoDriver):
         )
 
         self.archive = SampleArchiveShim(self.world_config)
+        # SampleStatePort adoption (P3a-PAL slice 2): the adapter is a
+        # pass-through facade over self.archive (flattening its nested
+        # .unified_db sub-client) -- self.archive is kept as the underlying
+        # shim the adapter wraps, behavior is unchanged 1:1.
+        self.sample_state: SampleStatePort = SampleShimAdapter(self.archive)
 
         self.sshuser = self.config_dict.get("user", "")
         self.sshkey = self.config_dict.get("key", "")
@@ -740,7 +747,7 @@ class PAL(HelaoDriver):
 
                 # -- (1) -- get most recent information for all samples_in
                 # palaction.samples_in should always be non ref samples
-                palaction.samples_in = await self.archive.unified_db.get_samples(
+                palaction.samples_in = await self.sample_state.get_samples(
                     samples=palaction.samples_in
                 )
                 # update the action_uuid
@@ -750,10 +757,8 @@ class PAL(HelaoDriver):
                 # we had them saved separately (this is for the hlo file)
 
                 # palaction.source should also always contain non ref samples
-                palaction.source.samples_initial = (
-                    await self.archive.unified_db.get_samples(
-                        samples=palaction.source.samples_initial
-                    )
+                palaction.source.samples_initial = await self.sample_state.get_samples(
+                    samples=palaction.source.samples_initial
                 )
                 # update the action_uuid
                 for sample in palaction.source.samples_initial:
@@ -762,7 +767,7 @@ class PAL(HelaoDriver):
                 # dest can also contain ref samples, and these are not yet in the db
                 for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
                     if dest_sample.global_label is not None:
-                        dest_tmp = await self.archive.unified_db.get_samples(
+                        dest_tmp = await self.sample_state.get_samples(
                             samples=[dest_sample]
                         )
                         if dest_tmp:
@@ -803,7 +808,7 @@ class PAL(HelaoDriver):
                         sample_out.source = []
                         for part_i, part in enumerate(sample_out.parts):
                             if part.global_label is not None:
-                                tmp_part = await self.archive.unified_db.get_samples(
+                                tmp_part = await self.sample_state.get_samples(
                                     samples=[part]
                                 )
                                 for sample in tmp_part:
@@ -814,7 +819,7 @@ class PAL(HelaoDriver):
                                 # first need to be updated and converted
                                 part.sample_creation_timecode = palaction.continue_time
                                 part.action_uuid = [job.active.action.action_uuid]
-                                tmp_part = await self.archive.unified_db.new_samples(
+                                tmp_part = await self.sample_state.new_samples(
                                     samples=[part]
                                 )
                                 sample_out.parts[part_i] = deepcopy(tmp_part[0])
@@ -830,7 +835,7 @@ class PAL(HelaoDriver):
 
                 # -- (3) -- convert samples_out references to real sample
                 #           by adding them to the to db
-                palaction.samples_out = await self.archive.unified_db.new_samples(
+                palaction.samples_out = await self.sample_state.new_samples(
                     samples=palaction.samples_out
                 )
 
@@ -855,18 +860,18 @@ class PAL(HelaoDriver):
 
                 # -- (6) --
                 # update all samples also in the local sample sqlite db
-                await self.archive.unified_db.update_samples(palaction.samples_in)
+                await self.sample_state.update_samples(palaction.samples_in)
 
                 for sample_out in palaction.samples_out:
                     # if sample_out is an assembly we need to update its parts
                     if sample_out.sample_type == SampleType.assembly:
-                        sample_out.parts = await self.archive.unified_db.get_samples(
+                        sample_out.parts = await self.sample_state.get_samples(
                             samples=sample_out.parts
                         )
                     # update the action_uuid
                     sample_out.action_uuid = [job.active.action.action_uuid]
                     # save it back to the db
-                    await self.archive.unified_db.update_samples([sample_out])
+                    await self.sample_state.update_samples([sample_out])
 
                 # -- (7) -- update the sample position db
                 error = await self._sendcommand_update_archive_helper(palaction)
@@ -978,7 +983,7 @@ class PAL(HelaoDriver):
         # if tray is None, find the global first full vial,
         # else find the next full after that one
         # this will add the sample to global sample_in
-        newvialpos = await self.archive.tray_get_next_full(
+        newvialpos = await self.sample_state.tray_get_next_full(
             after_tray=after_tray, after_slot=after_slot, after_vial=after_vial
         )
 
@@ -993,7 +998,7 @@ class PAL(HelaoDriver):
 
             # need to get the sample which is currently in this vial
             # and also add it to global samples_in
-            error, sample = await self.archive.tray_query_sample(
+            error, sample = await self.sample_state.tray_query_sample(
                 tray=tray_pos, slot=slot_pos, vial=vial_pos
             )
             if error != ErrorCodes.none:
@@ -1025,7 +1030,7 @@ class PAL(HelaoDriver):
         source = (
             _positiontype.tray
         )  # should be the same as microcam.requested_source.position
-        error, sample_in = await self.archive.tray_query_sample(
+        error, sample_in = await self.sample_state.tray_query_sample(
             microcam.requested_source.tray,
             microcam.requested_source.slot,
             microcam.requested_source.vial,
@@ -1066,7 +1071,7 @@ class PAL(HelaoDriver):
             )
             return PALposition(error=ErrorCodes.not_available)
 
-        error, sample_in = await self.archive.custom_query_sample(
+        error, sample_in = await self.sample_state.custom_query_sample(
             microcam.requested_source.position
         )
 
@@ -1250,7 +1255,7 @@ class PAL(HelaoDriver):
         ] = []
 
         dest = _positiontype.tray
-        error, sample_in = await self.archive.tray_query_sample(
+        error, sample_in = await self.sample_state.tray_query_sample(
             microcam.requested_dest.tray,
             microcam.requested_dest.slot,
             microcam.requested_dest.vial,
@@ -1272,7 +1277,7 @@ class PAL(HelaoDriver):
                 )
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
-            error, samples_out_list = await self.archive.new_ref_samples(
+            error, samples_out_list = await self.sample_state.new_ref_samples(
                 samples_in=microcam.run[
                     -1
                 ].samples_in,  # this should hold a sample already from "check source call"
@@ -1358,11 +1363,11 @@ class PAL(HelaoDriver):
             )
             return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
-        if not await self.archive.custom_dest_allowed(dest):
+        if not await self.sample_state.custom_dest_allowed(dest):
             LOGGER.error(f"PAL_dest: custom position '{dest}' cannot be dest.")
             return PALposition(error=ErrorCodes.critical_error), samples_out_list
 
-        error, sample_in = await self.archive.custom_query_sample(dest)
+        error, sample_in = await self.sample_state.custom_query_sample(dest)
         if error != ErrorCodes.none:
             LOGGER.error(
                 f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method."
@@ -1384,7 +1389,7 @@ class PAL(HelaoDriver):
                 return PALposition(error=ErrorCodes.bug), samples_out_list
 
             # this should actually never create an assembly
-            error, samples_out_list = await self.archive.new_ref_samples(
+            error, samples_out_list = await self.sample_state.new_ref_samples(
                 samples_in=microcam.run[-1].samples_in,
                 sample_out_type=microcam.cam.sample_out_type,
                 sample_position=dest,
@@ -1469,7 +1474,7 @@ class PAL(HelaoDriver):
 
                     # first create a new sample from the source sample
                     # which is then incoporarted into the assembly
-                    error, samples_out_list = await self.archive.new_ref_samples(
+                    error, samples_out_list = await self.sample_state.new_ref_samples(
                         samples_in=microcam.run[
                             -1
                         ].samples_in,  # this should hold a sample already from "check source call"
@@ -1520,7 +1525,7 @@ class PAL(HelaoDriver):
             else:
                 # neither same sample type nor an assembly present.
                 # we now create an assembly if allowed
-                if not await self.archive.custom_assembly_allowed(dest):
+                if not await self.sample_state.custom_assembly_allowed(dest):
                     # no assembly allowed
                     LOGGER.error(
                         f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method."
@@ -1537,7 +1542,7 @@ class PAL(HelaoDriver):
                 # dest_sample = sample_in
                 # first create a new sample from the source sample
                 # which is then incoporarted into the assembly
-                error, samples_out_list = await self.archive.new_ref_samples(
+                error, samples_out_list = await self.sample_state.new_ref_samples(
                     samples_in=microcam.run[-1].samples_in,
                     sample_out_type=microcam.cam.sample_out_type,
                     sample_position=dest,
@@ -1572,7 +1577,7 @@ class PAL(HelaoDriver):
                 LOGGER.info(
                     f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'"
                 )
-                error, samples_out2_list = await self.archive.new_ref_samples(
+                error, samples_out2_list = await self.sample_state.new_ref_samples(
                     samples_in=tmp_samples_in,
                     sample_out_type=SampleType.assembly,
                     sample_position=dest,
@@ -1631,7 +1636,7 @@ class PAL(HelaoDriver):
         dest_vial = None
 
         dest = _positiontype.tray
-        newvialpos = await self.archive.tray_new_position(
+        newvialpos = await self.sample_state.tray_new_position(
             req_vol=microcam.volume_ul / 1000.0
         )
 
@@ -1647,7 +1652,7 @@ class PAL(HelaoDriver):
             f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}"
         )
 
-        error, samples_out_list = await self.archive.new_ref_samples(
+        error, samples_out_list = await self.sample_state.new_ref_samples(
             samples_in=microcam.run[
                 -1
             ].samples_in,  # this should hold a sample already from "check source call"
@@ -1817,7 +1822,7 @@ class PAL(HelaoDriver):
 
         # check if final samples would be destroyed directly after they
         # were created
-        if await self.archive.custom_is_destroyed(custom=palposition.position):
+        if await self.sample_state.custom_is_destroyed(custom=palposition.position):
             for sample in samples_out_list:
                 sample.append_sample_status(SampleStatus.destroyed)
             for sample in palposition.samples_final:
@@ -2193,7 +2198,7 @@ class PAL(HelaoDriver):
 
         job = self._job
         # update source and dest final samples
-        palaction.source.samples_final = await self.archive.unified_db.get_samples(
+        palaction.source.samples_final = await self.sample_state.get_samples(
             samples=palaction.source.samples_initial
         )
         # update the action_uuid
@@ -2209,10 +2214,8 @@ class PAL(HelaoDriver):
                 # which should already be uptodate
                 palaction.dest.samples_final = [palaction.samples_out[-1]]
             else:
-                palaction.dest.samples_final = (
-                    await self.archive.unified_db.get_samples(
-                        samples=palaction.dest.samples_final
-                    )
+                palaction.dest.samples_final = await self.sample_state.get_samples(
+                    samples=palaction.dest.samples_final
                 )
 
         # update the action_uuid
@@ -2223,14 +2226,14 @@ class PAL(HelaoDriver):
         retval = False
         if palaction.source.samples_final:
             if palaction.source.position == "tray":
-                retval = await self.archive.tray_update_position(
+                retval = await self.sample_state.tray_update_position(
                     tray=palaction.source.tray,
                     slot=palaction.source.slot,
                     vial=palaction.source.vial,
                     sample=palaction.source.samples_final[0],
                 )
             else:  # custom postion
-                retval, sample = await self.archive.custom_update_position(
+                retval, sample = await self.sample_state.custom_update_position(
                     custom=palaction.source.position,
                     sample=palaction.source.samples_final[0],
                 )
@@ -2239,14 +2242,14 @@ class PAL(HelaoDriver):
 
         if palaction.dest.samples_final:
             if palaction.dest.position == "tray":
-                retval = await self.archive.tray_update_position(
+                retval = await self.sample_state.tray_update_position(
                     tray=palaction.dest.tray,
                     slot=palaction.dest.slot,
                     vial=palaction.dest.vial,
                     sample=palaction.dest.samples_final[0],
                 )
             else:  # custom postion
-                retval, sample = await self.archive.custom_update_position(
+                retval, sample = await self.sample_state.custom_update_position(
                     custom=palaction.dest.position,
                     sample=palaction.dest.samples_final[0],
                 )
@@ -2458,7 +2461,7 @@ class PAL(HelaoDriver):
         LOGGER.info(f"PAL_samples_in: {job.palcam.samples_in}")
         # update sample list with correct information from db if possible
         LOGGER.info("getting current sample information for all sample_in from db")
-        job.palcam.samples_in = await self.archive.unified_db.get_samples(
+        job.palcam.samples_in = await self.sample_state.get_samples(
             samples=job.palcam.samples_in
         )
 
