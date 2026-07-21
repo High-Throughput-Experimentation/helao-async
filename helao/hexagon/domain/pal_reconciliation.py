@@ -32,19 +32,22 @@ to the shipped driver.
 
 import logging
 from copy import deepcopy
-from typing import Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 from helao.hexagon.domain.models import (
+    Action,
     ErrorCodes,
     AssemblySample,
     GasSample,
     LiquidSample,
     NoneSample,
+    PalCam,
     PALposition,
     PalAction,
     PalMicroCam,
     SampleInheritance,
     SampleStatus,
+    SampleType,
     SolidSample,
     _positiontype,
 )
@@ -344,5 +347,714 @@ class PalReconciliation:
                 samples_in_delta_vol_ml=[-1.0 * microcam.volume_ul / 1000.0],
             )
         )
+
+        return ErrorCodes.none
+
+    async def _check_dest_tray(
+        self, microcam: PalMicroCam, action: Optional[Action] = None
+    ) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Resolve a tray destination, creating a new sample ref if the vial is empty.
+
+        Args:
+            microcam: Microcam carrying the requested tray/slot/vial dest.
+            action: Job-context ``Action`` forwarded to
+                ``sample_state.new_ref_samples`` (Decision 2: plain param,
+                not a DataSink/Active handle).
+
+        Returns:
+            Tuple ``(palposition, samples_out_list)`` where ``samples_out_list``
+            contains the newly created reference sample (or is empty if the
+            vial already held a sample and is being diluted).
+        """
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+
+        dest = _positiontype.tray
+        error, sample_in = await self.sample_state.tray_query_sample(
+            microcam.requested_dest.tray,
+            microcam.requested_dest.slot,
+            microcam.requested_dest.vial,
+        )
+
+        if error != ErrorCodes.none:
+            LOGGER.error("PAL_dest: Requested tray position does not exist.")
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
+
+        # check if a sample is present in destination
+        if sample_in == NoneSample():
+            # no sample in dest, create a new sample reference
+            LOGGER.info(
+                f"PAL_dest: No sample in tray {microcam.requested_dest.tray}, slot {microcam.requested_dest.slot}, vial {microcam.requested_dest.vial}"
+            )
+            if len(microcam.run[-1].samples_in) > 1:
+                LOGGER.error(
+                    f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
+                )
+                return PALposition(error=ErrorCodes.bug), samples_out_list
+
+            error, samples_out_list = await self.sample_state.new_ref_samples(
+                samples_in=microcam.run[
+                    -1
+                ].samples_in,  # this should hold a sample already from "check source call"
+                sample_out_type=microcam.cam.sample_out_type,
+                sample_position=dest,
+                action=action,
+            )
+
+            if error != ErrorCodes.none:
+                return PALposition(error=error), samples_out_list
+
+            # this will be a single sample anyway
+            samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
+            samples_out_list[0].sample_position = dest
+            samples_out_list[0].inheritance = SampleInheritance.receive_only
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
+            dest_samples_initial = []  # no sample here in the beginning
+            dest_samples_final = deepcopy(samples_out_list)
+
+        else:
+            # a sample is already present in the tray position
+            # we add more sample to it, e.g. dilute it
+            LOGGER.info(
+                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+            )
+            # we can only add liquid to vials (diluite them, no assembly here)
+            sample_in.inheritance = SampleInheritance.receive_only
+            sample_in.reset_sample_status(SampleStatus.preserved)
+
+            dest_samples_initial = [deepcopy(sample_in)]
+            dest_samples_final = [deepcopy(sample_in)]
+
+            # add that sample to the current sample_in list
+            microcam.run[-1].samples_in.append(deepcopy(sample_in))
+            microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
+            microcam.run[-1].dilute.append(True)
+            microcam.run[-1].dilute_type.append(sample_in.sample_type)
+
+        return (
+            PALposition(
+                position=dest,
+                samples_initial=dest_samples_initial,
+                samples_final=dest_samples_final,
+                tray=microcam.requested_dest.tray,
+                slot=microcam.requested_dest.slot,
+                vial=microcam.requested_dest.vial,
+                error=error,
+            ),
+            samples_out_list,
+        )
+
+    async def _check_dest_custom(
+        self, microcam: PalMicroCam, action: Optional[Action] = None
+    ) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Resolve a custom destination, creating a new sample, diluting, or assembling.
+
+        Handles the cases where the destination is empty, holds an assembly,
+        holds the same sample type (dilute), or holds a different type
+        (create an assembly when allowed).
+
+        Args:
+            microcam: Microcam carrying the requested custom destination name.
+            action: Job-context ``Action`` forwarded to
+                ``sample_state.new_ref_samples`` (Decision 2).
+
+        Returns:
+            Tuple of the resolved :class:`PALposition` and the new output samples.
+        """
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+
+        dest = microcam.requested_dest.position
+        if dest is None:
+            LOGGER.error(
+                "PAL_dest: Invalid PAL dest 'NONE' for 'custom' position method."
+            )
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
+
+        if not await self.sample_state.custom_dest_allowed(dest):
+            LOGGER.error(f"PAL_dest: custom position '{dest}' cannot be dest.")
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
+
+        error, sample_in = await self.sample_state.custom_query_sample(dest)
+        if error != ErrorCodes.none:
+            LOGGER.error(
+                f"PAL_dest: Invalid PAL dest '{dest}' for 'custom' position method."
+            )
+            return PALposition(error=error), samples_out_list
+
+        # check if a sample is already present in the custom position
+        if sample_in == NoneSample():
+            # no sample in custom position, create a new sample reference
+            LOGGER.info(
+                f"PAL_dest: No sample in custom position '{dest}', creating new sample reference."
+            )
+
+            # cannot create an assembly
+            if len(microcam.run[-1].samples_in) > 1:
+                LOGGER.error(
+                    "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                )
+                return PALposition(error=ErrorCodes.bug), samples_out_list
+
+            # this should actually never create an assembly
+            error, samples_out_list = await self.sample_state.new_ref_samples(
+                samples_in=microcam.run[-1].samples_in,
+                sample_out_type=microcam.cam.sample_out_type,
+                sample_position=dest,
+                action=action,
+            )
+
+            if error != ErrorCodes.none:
+                return PALposition(error=error), samples_out_list
+
+            samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
+            samples_out_list[0].sample_position = dest
+            samples_out_list[0].inheritance = SampleInheritance.receive_only
+            samples_out_list[0].reset_sample_status(SampleStatus.created)
+            dest_samples_initial = []  # no sample here in the beginning
+            dest_samples_final = deepcopy(samples_out_list)
+
+        else:
+            # sample is already present
+            # either create an assembly or dilute it
+            # first check what type is present
+            LOGGER.info(
+                f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+            )
+
+            if sample_in.sample_type == SampleType.assembly:
+                # need to check if we already go the same type in
+                # the assembly and then would dilute too
+                # else we add a new sample to that assembly
+
+                # source input should only hold a single sample
+                # but better check for sure
+                if len(microcam.run[-1].samples_in) > 1:
+                    LOGGER.error(
+                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                    )
+                    return PALposition(error=ErrorCodes.bug), samples_out_list
+
+                test = False
+                if microcam.run[-1].samples_in[-1].sample_type == SampleType.liquid:
+                    test = await self._check_for_assemblytypes(
+                        sample_type=SampleType.liquid, assembly=sample_in
+                    )
+                elif microcam.run[-1].samples_in[-1].sample_type == SampleType.solid:
+                    test = False  # always add it as a new part
+                elif microcam.run[-1].samples_in[-1].sample_type == SampleType.gas:
+                    test = await self._check_for_assemblytypes(
+                        sample_type=SampleType.gas, assembly=sample_in
+                    )
+                else:
+                    LOGGER.error("PAL_dest: Found a BUG: unsupported sample type.")
+                    return PALposition(error=ErrorCodes.bug), samples_out_list
+
+                if test is True:
+                    # we dilute the assembly sample
+                    dest_samples_initial = deepcopy(samples_out_list)
+                    dest_samples_final = deepcopy(samples_out_list)
+
+                    # we can only add liquid to vials
+                    # (diluite them, no assembly here)
+                    sample_in.inheritance = SampleInheritance.receive_only
+                    sample_in.reset_sample_status(SampleStatus.preserved)
+
+                    # first add the dilute type
+                    microcam.run[-1].dilute_type.append(
+                        microcam.run[-1].samples_in[-1].sample_type
+                    )
+                    microcam.run[-1].samples_in_delta_vol_ml.append(
+                        microcam.volume_ul / 1000.0
+                    )
+                    microcam.run[-1].dilute.append(True)
+                    # then add the new sample_in
+                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
+                else:
+                    # add a new part to assembly
+                    LOGGER.info("PAL_dest: Adding new part to assembly")
+                    if len(microcam.run[-1].samples_in) > 1:
+                        # sample_in should only hold one sample at that point
+                        LOGGER.error(
+                            f"PAL_dest: Found a BUG: Assembly not allowed for PAL dest '{dest}' for 'tray' position method."
+                        )
+                        return PALposition(error=ErrorCodes.bug), samples_out_list
+
+                    # first create a new sample from the source sample
+                    # which is then incoporarted into the assembly
+                    error, samples_out_list = await self.sample_state.new_ref_samples(
+                        samples_in=microcam.run[
+                            -1
+                        ].samples_in,  # this should hold a sample already from "check source call"
+                        sample_out_type=microcam.cam.sample_out_type,
+                        sample_position=dest,
+                        action=action,
+                    )
+
+                    if error != ErrorCodes.none:
+                        return PALposition(error=error), samples_out_list
+
+                    samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
+                    samples_out_list[0].sample_position = dest
+                    samples_out_list[0].inheritance = SampleInheritance.allow_both
+                    samples_out_list[0].reset_sample_status(
+                        SampleStatus.created, SampleStatus.incorporated
+                    )
+
+                    # add new sample to assembly
+                    sample_in.parts.append(samples_out_list[0])
+                    # we can only add liquid to vials
+                    # (diluite them, no assembly here)
+                    sample_in.inheritance = SampleInheritance.allow_both
+                    sample_in.reset_sample_status(SampleStatus.preserved)
+
+                    dest_samples_initial = [deepcopy(sample_in)]
+                    dest_samples_final = [deepcopy(sample_in)]
+                    microcam.run[-1].samples_in.append(deepcopy(sample_in))
+
+            elif sample_in.sample_type == microcam.run[-1].samples_in[-1].sample_type:
+                # we dilute it if its the same sample type
+                # (and not an assembly),
+                # we can only add liquid to vials
+                # (diluite them, no assembly here)
+                sample_in.inheritance = SampleInheritance.receive_only
+                sample_in.reset_sample_status(SampleStatus.preserved)
+
+                dest_samples_initial = [deepcopy(sample_in)]
+                dest_samples_final = [deepcopy(sample_in)]
+
+                microcam.run[-1].dilute_type.append(sample_in.sample_type)
+                microcam.run[-1].samples_in.append(deepcopy(sample_in))
+                microcam.run[-1].samples_in_delta_vol_ml.append(
+                    microcam.volume_ul / 1000.0
+                )
+                microcam.run[-1].dilute.append(True)
+
+            else:
+                # neither same sample type nor an assembly present.
+                # we now create an assembly if allowed
+                if not await self.sample_state.custom_assembly_allowed(dest):
+                    # no assembly allowed
+                    LOGGER.error(
+                        f"PAL_dest: Assembly not allowed for PAL dest '{dest}' for 'custom' position method."
+                    )
+                    return PALposition(error=ErrorCodes.not_allowed), samples_out_list
+
+                # cannot create an assembly from an assembly
+                if len(microcam.run[-1].samples_in) > 1:
+                    LOGGER.error(
+                        "PAL_dest: Found a BUG: Too many input samples. Cannot create an assembly here."
+                    )
+                    return PALposition(error=ErrorCodes.bug), samples_out_list
+
+                # dest_sample = sample_in
+                # first create a new sample from the source sample
+                # which is then incoporarted into the assembly
+                error, samples_out_list = await self.sample_state.new_ref_samples(
+                    samples_in=microcam.run[-1].samples_in,
+                    sample_out_type=microcam.cam.sample_out_type,
+                    sample_position=dest,
+                    action=action,
+                )
+
+                if error != ErrorCodes.none:
+                    return PALposition(error=error), samples_out_list
+
+                samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
+                samples_out_list[0].sample_position = dest
+                samples_out_list[0].inheritance = SampleInheritance.allow_both
+                samples_out_list[0].reset_sample_status(
+                    SampleStatus.created, SampleStatus.incorporated
+                )
+
+                # only now add the sample which was found in the position
+                # to the sample_in list for the exp/prg
+                sample_in.inheritance = SampleInheritance.allow_both
+                sample_in.reset_sample_status(SampleStatus.incorporated)
+
+                microcam.run[-1].samples_in.append(deepcopy(sample_in))
+                # we only add the sample to assembly so delta_vol is 0
+                microcam.run[-1].samples_in_delta_vol_ml.append(0.0)
+                microcam.run[-1].dilute.append(False)
+                microcam.run[-1].dilute_type.append(None)
+
+                # create now an assembly of both
+                tmp_samples_in = [sample_in]
+                # and also add the newly created sample ref to it
+                tmp_samples_in.append(samples_out_list[0])
+                LOGGER.info(
+                    f"PAL_dest: Creating assembly from '{[sample.global_label for sample in tmp_samples_in]}' in position '{dest}'"
+                )
+                error, samples_out2_list = await self.sample_state.new_ref_samples(
+                    samples_in=tmp_samples_in,
+                    sample_out_type=SampleType.assembly,
+                    sample_position=dest,
+                    action=action,
+                )
+
+                if error != ErrorCodes.none:
+                    return PALposition(error=error), samples_out_list
+
+                samples_out2_list[0].sample_position = dest
+                samples_out2_list[0].inheritance = SampleInheritance.allow_both
+                samples_out2_list[0].reset_sample_status(SampleStatus.created)
+                # add second sample out to samples_out
+                samples_out_list.append(samples_out2_list[0])
+
+                # intial is the sample initial in the position
+                dest_samples_initial = [deepcopy(sample_in)]
+                # this will be the new assembly
+                dest_samples_final = deepcopy(samples_out2_list)
+
+        return (
+            PALposition(
+                position=dest,
+                samples_initial=dest_samples_initial,
+                samples_final=dest_samples_final,
+                tray=microcam.requested_dest.tray,
+                slot=microcam.requested_dest.slot,
+                vial=microcam.requested_dest.vial,
+                error=error,
+            ),
+            samples_out_list,
+        )
+
+    async def _check_dest_next_empty(
+        self, microcam: PalMicroCam, action: Optional[Action] = None
+    ) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Find the next empty vial with enough volume capacity and create a sample ref.
+
+        Args:
+            microcam: Microcam supplying the volume requirement.
+            action: Job-context ``Action`` forwarded to
+                ``sample_state.new_ref_samples`` (Decision 2).
+        """
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+
+        dest_tray = None
+        dest_slot = None
+        dest_vial = None
+
+        dest = _positiontype.tray
+        newvialpos = await self.sample_state.tray_new_position(
+            req_vol=microcam.volume_ul / 1000.0
+        )
+
+        if newvialpos["tray"] is None:
+            LOGGER.error("PAL_dest: empty vial slot is not available")
+            return PALposition(error=ErrorCodes.not_available), samples_out_list
+
+        # dest = _positiontype.tray
+        dest_tray = newvialpos["tray"]
+        dest_slot = newvialpos["slot"]
+        dest_vial = newvialpos["vial"]
+        LOGGER.info(
+            f"PAL_dest: archiving liquid sample to tray {dest_tray}, slot {dest_slot}, vial {dest_vial}"
+        )
+
+        error, samples_out_list = await self.sample_state.new_ref_samples(
+            samples_in=microcam.run[
+                -1
+            ].samples_in,  # this should hold a sample already from "check source call"
+            sample_out_type=microcam.cam.sample_out_type,
+            sample_position=dest,
+            action=action,
+        )
+
+        LOGGER.info(f"new reference sample for empty vial: {samples_out_list}")
+
+        if error != ErrorCodes.none:
+            return PALposition(error=error), samples_out_list
+
+        samples_out_list[0].volume_ml = microcam.volume_ul / 1000.0
+        samples_out_list[0].sample_position = dest
+        samples_out_list[0].inheritance = SampleInheritance.receive_only
+        samples_out_list[0].reset_sample_status(SampleStatus.created)
+        dest_samples_initial = []  # no sample here in the beginning
+        dest_samples_final = deepcopy(samples_out_list)
+
+        return (
+            PALposition(
+                position=dest,
+                samples_initial=dest_samples_initial,
+                samples_final=dest_samples_final,
+                tray=dest_tray,
+                slot=dest_slot,
+                vial=dest_vial,
+                error=error,
+            ),
+            samples_out_list,
+        )
+
+    async def _check_dest_next_full(self, microcam: PalMicroCam) -> Tuple[
+        PALposition,
+        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    ]:
+        """Find the next full vial after the requested tray cursor as the destination.
+
+        Args:
+            microcam: Microcam carrying the requested tray-relative cursor.
+        """
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_initial: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        dest_samples_final: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+
+        dest = _positiontype.tray
+        (
+            error,
+            dest_tray,
+            dest_slot,
+            dest_vial,
+            sample_in,
+        ) = await self._next_full_vial(
+            after_tray=microcam.requested_dest.tray,
+            after_slot=microcam.requested_dest.slot,
+            after_vial=microcam.requested_dest.vial,
+        )
+        if error != ErrorCodes.none:
+            LOGGER.error("PAL_dest: No next full vial")
+            return PALposition(error=ErrorCodes.not_available), samples_out_list
+        if sample_in == NoneSample():
+            LOGGER.error(
+                "PAL_dest: More then one sample in source position. This is not allowed."
+            )
+            return PALposition(error=ErrorCodes.critical_error), samples_out_list
+
+        # a sample is already present in the tray position
+        # we add more sample to it, e.g. dilute it
+        LOGGER.info(
+            f"PAL_dest: Got sample '{sample_in.global_label}' in position '{dest}'"
+        )
+        sample_in.inheritance = SampleInheritance.receive_only
+        sample_in.reset_sample_status(SampleStatus.preserved)
+
+        microcam.run[-1].samples_in.append(sample_in)
+        microcam.run[-1].samples_in_delta_vol_ml.append(microcam.volume_ul / 1000.0)
+        microcam.run[-1].dilute.append(True)
+        microcam.run[-1].dilute_type.append(sample_in.sample_type)
+
+        dest_samples_initial = [deepcopy(sample_in)]
+        dest_samples_final = [deepcopy(sample_in)]
+
+        return (
+            PALposition(
+                position=dest,
+                samples_initial=dest_samples_initial,
+                samples_final=dest_samples_final,
+                tray=dest_tray,
+                slot=dest_slot,
+                vial=dest_vial,
+                error=error,
+            ),
+            samples_out_list,
+        )
+
+    async def _check_dest(
+        self, microcam: PalMicroCam, action: Optional[Action] = None
+    ) -> ErrorCodes:
+        """Resolve the destination position and update the microcam's run entry.
+
+        Dispatches to the destination-specific checker based on
+        ``microcam.cam.dest``, marks samples as destroyed when the
+        destination is configured as destructive, and accumulates input
+        inheritance/status for samples not already assigned. Mutates
+        ``microcam`` in place (matches the legacy driver's contract).
+
+        Args:
+            microcam: Microcam whose destination is being validated.
+            action: Job-context ``Action`` forwarded to the tray/custom/
+                next_empty checkers (Decision 2).
+
+        Returns:
+            ``ErrorCodes.none`` on success.
+        """
+
+        samples_out_list: List[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = []
+        palposition = PALposition()
+
+        if microcam.cam.dest == _positiontype.tray:
+            palposition, samples_out_list = await self._check_dest_tray(
+                microcam=microcam, action=action
+            )
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
+
+        elif microcam.cam.dest == _positiontype.custom:
+            palposition, samples_out_list = await self._check_dest_custom(
+                microcam=microcam, action=action
+            )
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
+
+        elif microcam.cam.dest == _positiontype.next_empty_vial:
+            (
+                palposition,
+                samples_out_list,
+            ) = await self._check_dest_next_empty(microcam=microcam, action=action)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
+
+        elif microcam.cam.dest == _positiontype.next_full_vial:
+            (
+                palposition,
+                samples_out_list,
+            ) = await self._check_dest_next_full(microcam=microcam)
+            if palposition.error != ErrorCodes.none:
+                return palposition.error
+
+        # done with destination checks
+
+        # Set requested position to new position.
+        # The new position will be the requested position for the
+        # next full vial search as the new start position
+        microcam.requested_dest.tray = palposition.tray
+        microcam.requested_dest.slot = palposition.slot
+        microcam.requested_dest.vial = palposition.vial
+
+        # check if final samples would be destroyed directly after they
+        # were created
+        if await self.sample_state.custom_is_destroyed(custom=palposition.position):
+            for sample in samples_out_list:
+                sample.append_sample_status(SampleStatus.destroyed)
+            for sample in palposition.samples_final:
+                sample.append_sample_status(SampleStatus.destroyed)
+
+        # add validated destination to run
+        microcam.run[-1].dest = deepcopy(palposition)
+
+        # update the rest of sample_in for the run
+        for sample in microcam.run[-1].samples_in:
+            if sample.inheritance is None:
+                sample.inheritance = SampleInheritance.give_only
+                sample.reset_sample_status(SampleStatus.preserved)
+
+        # add the samples_out to the run
+        for sample in samples_out_list:
+            microcam.run[-1].samples_out.append(sample)
+
+        # a quick message if samples will be diluted or not
+        for i, sample in enumerate(microcam.run[-1].samples_in):
+            if i >= len(microcam.run[-1].dilute):
+                LOGGER.info(
+                    f"PAL: Not diluting sample_in '{sample.global_label}' because dilute bool not specified."
+                )
+            elif microcam.run[-1].dilute[i]:
+                LOGGER.info(f"PAL: Diluting sample_in '{sample.global_label}'.")
+            else:
+                LOGGER.info(f"PAL: Not diluting sample_in '{sample.global_label}'.")
+
+        return ErrorCodes.none
+
+    async def _check_for_assemblytypes(
+        self, sample_type: str, assembly: AssemblySample
+    ) -> bool:
+        """Return whether ``assembly`` already contains a part of ``sample_type``.
+
+        Args:
+            sample_type: Sample type to search for.
+            assembly: Assembly whose ``parts`` are inspected.
+        """
+        for part in assembly.parts:
+            if part.sample_type == sample_type:
+                return True
+        return False
+
+    async def plan(
+        self,
+        palcam: PalCam,
+        action_uuid=None,
+        action: Optional[Action] = None,
+    ) -> ErrorCodes:
+        """Resolve the cam template, source, and destination for every
+        microcam/repeat in ``palcam``, mutating ``palcam.microcams`` in
+        place (cam-table assembly + source/dest resolution folded together,
+        P3a-PAL slice 3b).
+
+        Mirrors the first half of the legacy driver's
+        ``_sendcommand_prechecks`` loop (cam lookup + ``_check_source`` +
+        ``_check_dest``) verbatim. Per Decision 1, this method does NOT
+        build the ``_palcmd`` joblist strings or write the aux log file --
+        the engine still owns joblist assembly and reads the resolved
+        ``microcam.run[-1].source``/``.dest`` positions this method leaves
+        behind.
+
+        Args:
+            palcam: Job descriptor whose ``microcams`` will be resolved.
+            action_uuid: Accepted for signature symmetry with
+                :meth:`reconcile_after_trigger` (Decision 2's job-context
+                pair); not read by ``plan()`` itself -- no call in this
+                method's lifted body stamps ``action_uuid`` directly.
+            action: Job-context ``Action`` forwarded to
+                ``sample_state.new_ref_samples`` via ``_check_dest*``.
+
+        Returns:
+            ``ErrorCodes.none`` on success or the first failure encountered.
+        """
+        for microcam in palcam.microcams:
+            # get the correct cam definition which contains all params
+            # for the correct submission of the job to the PAL
+            if microcam.method in [e.name for e in self.cams]:
+                if self.cams[microcam.method].value.file_name is not None:
+                    microcam.cam = self.cams[microcam.method].value
+                else:
+                    LOGGER.error(f"cam method '{microcam.method}' is not available")
+                    return ErrorCodes.not_available
+            else:
+                LOGGER.error(f"cam method '{microcam.method}' is not available")
+                return ErrorCodes.not_available
+
+            # set runs to empty list
+            # shouldn't actually need it but better be sure its an empty list
+            # at this point
+            microcam.run = []
+
+            for repeat in range(microcam.repeat + 1):
+                # check source position
+                error = await self._check_source(microcam)
+                if error != ErrorCodes.none:
+                    return error
+                # check target position
+                error = await self._check_dest(microcam, action=action)
+                if error != ErrorCodes.none:
+                    return error
 
         return ErrorCodes.none
