@@ -13,7 +13,7 @@ here), so async bodies are driven via `asyncio.run(...)` from plain
 
 import asyncio
 import itertools
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from helao.hexagon.domain.models import (
     AssemblySample,
@@ -21,6 +21,7 @@ from helao.hexagon.domain.models import (
     LiquidSample,
     GasSample,
     NoneSample,
+    PalAction,
     PalCam,
     PalMicroCam,
     PALposition,
@@ -35,7 +36,8 @@ from helao.hexagon.ports.sample_state import SampleStatePort
 
 class FakeSampleState:
     """In-memory `SampleStatePort` fake covering the full surface
-    `_check_source*`/`_check_dest*`/`_next_full_vial`/`plan()` call."""
+    `_check_source*`/`_check_dest*`/`_next_full_vial`/`plan()`/
+    `reconcile_after_trigger`/`_update_archive_helper` call."""
 
     def __init__(self):
         self.tray_db = {}
@@ -43,6 +45,14 @@ class FakeSampleState:
         self.tray_query_calls = []
         self.custom_query_calls = []
         self.new_ref_samples_calls = []
+        self.tray_update_calls = []
+        self.custom_update_calls = []
+        self.update_samples_calls = []
+        # keyed by global_label -- backs get_samples/new_samples/update_samples
+        self.sample_db = {}
+        # labels that get_samples should silently DROP (simulates "does not
+        # exist in db", vs. the default echo-back-unchanged behavior)
+        self.missing_labels = set()
         # (tray, slot, vial) / custom-position keys whose query should
         # report a lookup error (simulates "requested position does not
         # exist")
@@ -53,6 +63,8 @@ class FakeSampleState:
         self.custom_destroyed_set = set()
         self._ref_counter = itertools.count(1)
         self._tray_pos_counter = itertools.count(1)
+        self._new_sample_counter = itertools.count(1)
+        self.fail_update_position = False
 
     def seed_tray(self, tray, slot, vial, sample):
         self.tray_db[(tray, slot, vial)] = sample
@@ -93,7 +105,11 @@ class FakeSampleState:
     async def tray_update_position(
         self, tray=None, slot=None, vial=None, sample=None, dilute=False
     ):
-        raise NotImplementedError("not exercised until slice 3c/3d")
+        self.tray_update_calls.append((tray, slot, vial))
+        if self.fail_update_position:
+            return False
+        self.tray_db[(tray, slot, vial)] = sample
+        return True
 
     async def custom_query_sample(self, custom=None):
         self.custom_query_calls.append(custom)
@@ -105,7 +121,9 @@ class FakeSampleState:
         return ErrorCodes.none, sample
 
     async def custom_update_position(self, custom=None, sample=None, dilute=False):
-        raise NotImplementedError("not exercised until slice 3c/3d")
+        self.custom_update_calls.append(custom)
+        self.custom_db[custom] = sample
+        return True, sample
 
     async def custom_dest_allowed(self, custom=None):
         return custom in self.custom_dest_allowed_set
@@ -137,13 +155,32 @@ class FakeSampleState:
         return ErrorCodes.none, [ref]
 
     async def get_samples(self, samples=None):
-        raise NotImplementedError("not exercised until slice 3c")
+        out = []
+        for s in samples or []:
+            label = getattr(s, "global_label", None)
+            if label and label in self.missing_labels:
+                continue  # simulates "does not exist in db"
+            if label and label in self.sample_db:
+                out.append(self.sample_db[label])
+            else:
+                out.append(s)
+        return out
 
     async def new_samples(self, samples=None):
-        raise NotImplementedError("not exercised until slice 3c")
+        out = []
+        for s in samples or []:
+            if getattr(s, "global_label", None) is None:
+                s.global_label = f"new__{next(self._new_sample_counter)}"
+            self.sample_db[s.global_label] = s
+            out.append(s)
+        return out
 
     async def update_samples(self, samples=None):
-        raise NotImplementedError("not exercised until slice 3c")
+        self.update_samples_calls.append(list(samples or []))
+        for s in samples or []:
+            if getattr(s, "global_label", None):
+                self.sample_db[s.global_label] = s
+        return None
 
 
 def _liquid(label, volume_ml=1.0):
@@ -719,5 +756,283 @@ def test_plan_unknown_method_is_not_available():
         err = await recon.plan(palcam, action_uuid=None, action=None)
 
         assert err is ErrorCodes.not_available
+
+    asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# slice 3c: after-trigger reconciliation
+# ---------------------------------------------------------------------------
+
+
+def _palaction(
+    samples_in=None,
+    samples_out=None,
+    source_position="src",
+    source_samples_initial=None,
+    dest_position: Optional[str] = "dst",
+    dest_samples_initial=None,
+    dest_samples_final=None,
+    dilute=None,
+    dilute_type=None,
+    samples_in_delta_vol_ml=None,
+    continue_time=999,
+):
+    # dest.samples_final mirrors what _check_dest (slice 3b) leaves resolved
+    # BEFORE the trigger fires; _update_archive_helper only acts on the dest
+    # side when this is already populated (an empty dest.samples_final
+    # legitimately means "no dest sample resolved"). Defaults to mirroring
+    # dest_samples_initial, matching the common case in these fixtures.
+    if dest_samples_final is None:
+        dest_samples_final = dest_samples_initial or []
+    return PalAction(
+        samples_in=samples_in or [],
+        samples_out=samples_out or [],
+        source=PALposition(
+            position=source_position,
+            samples_initial=source_samples_initial or [],
+        ),
+        dest=PALposition(
+            position=dest_position,
+            samples_initial=dest_samples_initial or [],
+            samples_final=dest_samples_final,
+        ),
+        dilute=dilute if dilute is not None else [],
+        dilute_type=dilute_type if dilute_type is not None else [],
+        samples_in_delta_vol_ml=(
+            samples_in_delta_vol_ml if samples_in_delta_vol_ml is not None else []
+        ),
+        continue_time=continue_time,
+    )
+
+
+def test_update_sample_volume_applies_delta_non_assembly():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+        sample = _liquid("s1", volume_ml=5.0)
+        palaction = _palaction(
+            samples_in=[sample],
+            dilute=[True],
+            dilute_type=[SampleType.liquid],
+            samples_in_delta_vol_ml=[2.0],
+        )
+
+        await recon._update_sample_volume(palaction)
+
+        assert sample.volume_ml == 7.0
+
+    asyncio.run(_run())
+
+
+def test_update_sample_volume_length_mismatch_is_noop():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+        sample = _liquid("s1", volume_ml=5.0)
+        palaction = _palaction(
+            samples_in=[sample],
+            dilute=[],  # mismatched length vs samples_in
+            dilute_type=[SampleType.liquid],
+            samples_in_delta_vol_ml=[2.0],
+        )
+
+        await recon._update_sample_volume(palaction)
+
+        assert sample.volume_ml == 5.0  # untouched
+
+    asyncio.run(_run())
+
+
+def test_update_archive_helper_tray_positions():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+        src_sample = _liquid("src_final")
+        dst_sample = _liquid("dst_final")
+        palaction = _palaction(
+            source_position="tray",
+            source_samples_initial=[src_sample],
+            dest_position="tray",
+            dest_samples_initial=[dst_sample],
+        )
+        assert palaction.source is not None and palaction.dest is not None
+        palaction.source.tray, palaction.source.slot, palaction.source.vial = 1, 1, 1
+        palaction.dest.tray, palaction.dest.slot, palaction.dest.vial = 1, 1, 2
+
+        error = await recon._update_archive_helper(palaction, action_uuid="u1")
+
+        assert error is ErrorCodes.none
+        assert state.tray_update_calls == [(1, 1, 1), (1, 1, 2)]
+        assert palaction.source.samples_final[0].action_uuid == ["u1"]
+
+    asyncio.run(_run())
+
+
+def test_update_archive_helper_custom_positions():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+        src_sample = _liquid("src_final")
+        dst_sample = _liquid("dst_final")
+        palaction = _palaction(
+            source_position="src_custom",
+            source_samples_initial=[src_sample],
+            dest_position="dst_custom",
+            dest_samples_initial=[dst_sample],
+        )
+
+        error = await recon._update_archive_helper(palaction, action_uuid="u1")
+
+        assert error is ErrorCodes.none
+        assert state.custom_update_calls == ["src_custom", "dst_custom"]
+
+    asyncio.run(_run())
+
+
+def test_update_archive_helper_dest_ref_sample_uses_last_samples_out():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+        new_sample = _liquid("brand_new")
+        # dest.samples_final[0].global_label is None -> falls back to
+        # palaction.samples_out[-1] rather than querying the db.
+        unresolved_ref = LiquidSample(sample_no="ref")
+        palaction = _palaction(
+            samples_out=[new_sample],
+            source_position="src_custom",
+            source_samples_initial=[_liquid("src_final")],
+            dest_position="dst_custom",
+            dest_samples_initial=[unresolved_ref],
+        )
+
+        error = await recon._update_archive_helper(palaction, action_uuid="u1")
+
+        assert error is ErrorCodes.none
+        assert palaction.dest is not None
+        assert palaction.dest.samples_final == [new_sample]
+
+    asyncio.run(_run())
+
+
+def test_update_archive_helper_returns_not_available_on_failed_update():
+    async def _run():
+        state = FakeSampleState()
+        state.fail_update_position = True
+        recon = PalReconciliation(sample_state=state, cams=None)
+        palaction = _palaction(
+            source_position="tray",
+            source_samples_initial=[_liquid("src_final")],
+            dest_position=None,
+            dest_samples_initial=[],
+        )
+        assert palaction.source is not None
+        palaction.source.tray, palaction.source.slot, palaction.source.vial = 1, 1, 1
+
+        error = await recon._update_archive_helper(palaction, action_uuid="u1")
+
+        assert error is ErrorCodes.not_available
+
+    asyncio.run(_run())
+
+
+def test_reconcile_after_trigger_happy_path():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+
+        sample_in = _liquid("carried_in", volume_ml=5.0)
+        state.sample_db["carried_in"] = sample_in
+        new_out = _liquid("dummy_out_ref")  # no global_label yet -> ref sample
+        new_out.global_label = None
+
+        palaction = _palaction(
+            samples_in=[sample_in],
+            samples_out=[new_out],
+            source_position="src_custom",
+            source_samples_initial=[sample_in],
+            dest_position="dst_custom",
+            dest_samples_initial=[],
+            dilute=[True],
+            dilute_type=[SampleType.liquid],
+            samples_in_delta_vol_ml=[3.0],
+        )
+
+        (
+            error,
+            should_abort,
+            samples_in_for_job,
+            samples_out_for_job,
+        ) = await recon.reconcile_after_trigger(palaction, action_uuid="u1")
+
+        assert should_abort is False
+        assert error is ErrorCodes.none
+        # snapshot captured BEFORE the volume update -- pre-dilution value
+        assert samples_in_for_job[0].volume_ml == 5.0
+        # but the palaction's own samples_in reflects the POST-dilution value
+        assert palaction.samples_in[0].volume_ml == 8.0
+        assert len(samples_out_for_job) == 1
+        assert samples_out_for_job[0].global_label is not None
+        # samples_out was materialized (global_label assigned) and persisted
+        assert palaction.samples_out[0].global_label in state.sample_db
+        # action_uuid stamped throughout
+        assert palaction.samples_in[0].action_uuid == ["u1"]
+
+    asyncio.run(_run())
+
+
+def test_reconcile_after_trigger_aborts_on_unresolvable_dest_ref():
+    async def _run():
+        state = FakeSampleState()
+        state.missing_labels.add("missing_from_db")
+        recon = PalReconciliation(sample_state=state, cams=None)
+
+        # a dest ref sample (global_label set) that the db doesn't know about
+        unresolvable = _liquid("missing_from_db")
+
+        palaction = _palaction(
+            dest_position="dst_custom",
+            dest_samples_initial=[unresolvable],
+        )
+
+        (
+            error,
+            should_abort,
+            samples_in_for_job,
+            samples_out_for_job,
+        ) = await recon.reconcile_after_trigger(palaction, action_uuid="u1")
+
+        assert should_abort is True
+        assert error is ErrorCodes.critical_error
+        assert samples_in_for_job == []
+        assert samples_out_for_job == []
+
+    asyncio.run(_run())
+
+
+def test_reconcile_after_trigger_aborts_on_ref_sample_bug():
+    async def _run():
+        state = FakeSampleState()
+        recon = PalReconciliation(sample_state=state, cams=None)
+
+        # dest.samples_initial entry with NO global_label at all is a bug
+        # (source/dest checks should always resolve refs before this point)
+        never_resolved = LiquidSample(sample_no="oops")
+        never_resolved.global_label = None
+
+        palaction = _palaction(
+            dest_position="dst_custom",
+            dest_samples_initial=[never_resolved],
+        )
+
+        (
+            error,
+            should_abort,
+            samples_in_for_job,
+            samples_out_for_job,
+        ) = await recon.reconcile_after_trigger(palaction, action_uuid="u1")
+
+        assert should_abort is True
+        assert error is ErrorCodes.bug
 
     asyncio.run(_run())

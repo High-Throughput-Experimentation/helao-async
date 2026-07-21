@@ -34,6 +34,7 @@ import logging
 from copy import deepcopy
 from typing import List, Optional, Tuple, Union
 
+from helao.helpers.sample_api import update_vol
 from helao.hexagon.domain.models import (
     Action,
     ErrorCodes,
@@ -1058,3 +1059,280 @@ class PalReconciliation:
                     return error
 
         return ErrorCodes.none
+
+    async def _update_archive_helper(
+        self, palaction: PalAction, action_uuid=None
+    ) -> ErrorCodes:
+        """Push final source/dest samples for ``palaction`` back into the archive.
+
+        Resolves ``samples_final`` against the unified sample DB (or the
+        last sample in ``samples_out`` for unassigned reference samples) and
+        updates tray or custom position entries accordingly.
+
+        Args:
+            palaction: Finished execution to write back.
+            action_uuid: Job-context action UUID stamped onto resolved
+                samples (Decision 2: plain param, not a DataSink/Active
+                handle).
+
+        Returns:
+            ``ErrorCodes.none`` on success or ``ErrorCodes.not_available``
+            if an archive update fails.
+        """
+
+        # update source and dest final samples
+        palaction.source.samples_final = await self.sample_state.get_samples(
+            samples=palaction.source.samples_initial
+        )
+        # update the action_uuid
+        for sample in palaction.source.samples_final:
+            sample.action_uuid = [action_uuid]
+
+        if palaction.dest.samples_final:
+            # should always only contain one sample
+            if palaction.dest.samples_final[0].global_label is None:
+                # dest_final contains a ref sample
+                # the correct new sample should be always found
+                # in the last position of palaction.samples_out
+                # which should already be uptodate
+                palaction.dest.samples_final = [palaction.samples_out[-1]]
+            else:
+                palaction.dest.samples_final = await self.sample_state.get_samples(
+                    samples=palaction.dest.samples_final
+                )
+
+        # update the action_uuid
+        for sample in palaction.dest.samples_final:
+            sample.action_uuid = [action_uuid]
+
+        error = ErrorCodes.none
+        retval = False
+        if palaction.source.samples_final:
+            if palaction.source.position == "tray":
+                retval = await self.sample_state.tray_update_position(
+                    tray=palaction.source.tray,
+                    slot=palaction.source.slot,
+                    vial=palaction.source.vial,
+                    sample=palaction.source.samples_final[0],
+                )
+            else:  # custom postion
+                retval, sample = await self.sample_state.custom_update_position(
+                    custom=palaction.source.position,
+                    sample=palaction.source.samples_final[0],
+                )
+        else:
+            LOGGER.info("No sample in PAL source.")
+
+        if palaction.dest.samples_final:
+            if palaction.dest.position == "tray":
+                retval = await self.sample_state.tray_update_position(
+                    tray=palaction.dest.tray,
+                    slot=palaction.dest.slot,
+                    vial=palaction.dest.vial,
+                    sample=palaction.dest.samples_final[0],
+                )
+            else:  # custom postion
+                retval, sample = await self.sample_state.custom_update_position(
+                    custom=palaction.dest.position,
+                    sample=palaction.dest.samples_final[0],
+                )
+        else:
+            LOGGER.info("No sample in PAL dest.")
+
+        if not retval:
+            error = ErrorCodes.not_available
+
+        return error
+
+    async def _update_sample_volume(self, palaction: PalAction) -> None:
+        """Apply per-input dilution volumes to input samples (or assembly parts).
+
+        Output samples are skipped because they are always created fresh by
+        the PAL action.
+
+        Args:
+            palaction: Execution carrying ``samples_in`` and the parallel
+                ``dilute``, ``dilute_type`` and ``samples_in_delta_vol_ml``
+                lists.
+        """
+        if len(palaction.samples_in_delta_vol_ml) != len(palaction.samples_in):
+            LOGGER.error("len(samples_in) != len(delta_vol)")
+            return
+        if len(palaction.dilute) != len(palaction.samples_in):
+            LOGGER.error("len(samples_in) != len(dilute)")
+            return
+        if len(palaction.dilute_type) != len(palaction.samples_in):
+            LOGGER.error("len(samples_in) != len(sample_type)")
+            return
+
+        for i, sample in enumerate(palaction.samples_in):
+            if sample.sample_type == SampleType.assembly:
+                # if sample.sample_type == SampleType.assembly:
+                for part in sample.parts:
+                    if part.sample_type == palaction.dilute_type[i]:
+                        update_vol(
+                            part,
+                            palaction.samples_in_delta_vol_ml[i],
+                            palaction.dilute[i],
+                        )
+            else:
+                update_vol(
+                    sample, palaction.samples_in_delta_vol_ml[i], palaction.dilute[i]
+                )
+
+    async def reconcile_after_trigger(
+        self,
+        palaction: PalAction,
+        action_uuid=None,
+    ) -> Tuple[ErrorCodes, bool, list, list]:
+        """Reconcile sample state for one ``palaction`` after its PAL triggers
+        fire: refresh input samples, materialize output samples, update
+        volumes, persist to the sample DB, and write back archive positions
+        (legacy steps (1)-(7),(9) -- P3a-PAL slice 3c).
+
+        Step 8 (the HLO data-file write) stays engine-owned: it sits between
+        steps 7 and 9 and uses ``file_conn_keys`` mutated by ``active.split()``,
+        which this Base-free service never touches. Step 9 itself
+        (``active.append_sample``) also stays engine-owned since it needs the
+        ``DataSinkPort``/``Active`` handle (Decision 2) -- this method instead
+        returns the exact deepcopy snapshot legacy step 4 accumulated into
+        ``job.palcam.samples_in``/``samples_out`` (captured at the SAME point
+        in the sequence, before step 5's volume mutation, so the recorded
+        snapshot reflects pre-dilution volumes exactly like the legacy code)
+        for the engine to hand to ``append_sample``.
+
+        Args:
+            palaction: Current execution; mutated in place (matches the
+                legacy driver's contract).
+            action_uuid: Job-context action UUID stamped onto resolved
+                samples (Decision 2).
+
+        Returns:
+            Tuple ``(error, should_abort, samples_in_for_job,
+            samples_out_for_job)``. ``should_abort=True`` mirrors the
+            legacy code's early ``return ErrorCodes.critical_error``/
+            ``return ErrorCodes.bug`` (an unresolvable dest ref sample) --
+            the engine must abort ``_sendcommand_main`` entirely, not just
+            this palaction. When ``False``, ``error`` is simply step 7's
+            (``_update_archive_helper``) outcome, matching the legacy
+            code's non-aborting step-7 failure path.
+        """
+        # -- (1) -- get most recent information for all samples_in
+        # palaction.samples_in should always be non ref samples
+        palaction.samples_in = await self.sample_state.get_samples(
+            samples=palaction.samples_in
+        )
+        # update the action_uuid
+        for sample in palaction.samples_in:
+            sample.action_uuid = [action_uuid]
+        # as palaction.samples_in contains both source and dest samples
+        # we had them saved separately (this is for the hlo file)
+
+        # palaction.source should also always contain non ref samples
+        palaction.source.samples_initial = await self.sample_state.get_samples(
+            samples=palaction.source.samples_initial
+        )
+        # update the action_uuid
+        for sample in palaction.source.samples_initial:
+            sample.action_uuid = [action_uuid]
+
+        # dest can also contain ref samples, and these are not yet in the db
+        for dest_i, dest_sample in enumerate(palaction.dest.samples_initial):
+            if dest_sample.global_label is not None:
+                dest_tmp = await self.sample_state.get_samples(samples=[dest_sample])
+                if dest_tmp:
+                    palaction.dest.samples_initial[dest_i] = deepcopy(dest_tmp[0])
+                else:
+                    LOGGER.error("Sample does not exist in db")
+                    return ErrorCodes.critical_error, True, [], []
+            else:
+                LOGGER.error(
+                    "palaction.dest.samples_initial should not contain ref samples"
+                )
+                return ErrorCodes.bug, True, [], []
+        # update the action_uuid
+        for sample in palaction.dest.samples_initial:
+            sample.action_uuid = [action_uuid]
+
+        # -- (2) -- update sample_out
+        # only samples in sample_out should be new ones (ref samples)
+        # convert these to real samples by adding them to the db
+        # update sample creation time
+        for sample_out in palaction.samples_out:
+            LOGGER.info(f" converting ref sample {sample_out} to real sample")
+            sample_out.sample_creation_timecode = palaction.continue_time
+
+            # if the sample was destroyed during this run set its
+            # volume to zero
+            # destroyed: destination was waste or injector
+            # for newly created samples
+            if SampleStatus.destroyed in sample_out.status:
+                sample_out.destroy_sample()
+
+            # if sample_out is an assembly we need to update its parts
+            if sample_out.sample_type == SampleType.assembly:
+                # could also check if it has parts attribute?
+                # reset source
+                sample_out.source = []
+                for part_i, part in enumerate(sample_out.parts):
+                    if part.global_label is not None:
+                        tmp_part = await self.sample_state.get_samples(samples=[part])
+                        for sample in tmp_part:
+                            sample.action_uuid = [action_uuid]
+                        sample_out.parts[part_i] = deepcopy(tmp_part[0])
+                    else:
+                        # the assembly contains a ref sample which
+                        # first need to be updated and converted
+                        part.sample_creation_timecode = palaction.continue_time
+                        part.action_uuid = [action_uuid]
+                        tmp_part = await self.sample_state.new_samples(samples=[part])
+                        sample_out.parts[part_i] = deepcopy(tmp_part[0])
+                    # now add the real samples back to the source list
+                    sample_out.source.append(part.get_global_label())
+                # update the action_uuid
+                for sample in sample_out.parts:
+                    sample.action_uuid = [action_uuid]
+
+        # update the action_uuid
+        for sample in palaction.samples_out:
+            sample.action_uuid = [action_uuid]
+
+        # -- (3) -- convert samples_out references to real sample
+        #           by adding them to the to db
+        palaction.samples_out = await self.sample_state.new_samples(
+            samples=palaction.samples_out
+        )
+
+        # -- (4) -- snapshot for the engine's job.palcam accumulation.
+        # Legacy step 4 appended deepcopies of samples_in/samples_out into
+        # job.palcam at EXACTLY this point (before step 5's volume mutation)
+        # -- captured here so the engine gets the same pre-dilution values.
+        samples_in_for_job = [deepcopy(s) for s in palaction.samples_in]
+        samples_out_for_job = [deepcopy(s) for s in palaction.samples_out]
+
+        # -- (5) -- convert pal action samples_in
+        # from initial to final
+        # update the sample volumes
+        # (needed only for input samples, samples_out are always
+        # new samples)
+        await self._update_sample_volume(palaction)
+
+        # -- (6) --
+        # update all samples also in the local sample sqlite db
+        await self.sample_state.update_samples(palaction.samples_in)
+
+        for sample_out in palaction.samples_out:
+            # if sample_out is an assembly we need to update its parts
+            if sample_out.sample_type == SampleType.assembly:
+                sample_out.parts = await self.sample_state.get_samples(
+                    samples=sample_out.parts
+                )
+            # update the action_uuid
+            sample_out.action_uuid = [action_uuid]
+            # save it back to the db
+            await self.sample_state.update_samples([sample_out])
+
+        # -- (7) -- update the sample position db
+        error = await self._update_archive_helper(palaction, action_uuid=action_uuid)
+
+        return error, False, samples_in_for_job, samples_out_for_job
