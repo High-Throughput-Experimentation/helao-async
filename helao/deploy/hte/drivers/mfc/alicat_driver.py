@@ -509,8 +509,34 @@ class MfcExec(Executor):
         LOGGER.info("MfcExec initialized.")
         self.duration = self.active.action.action_params.get("duration", -1)
 
+    def _device_not_connected_error(self) -> Optional[dict]:
+        """Fail-fast terminal error when this exec's MFC device isn't connected.
+
+        A failed ``AliCatMFC.connect()`` (e.g. a wrong/absent COM port) leaves
+        the driver's ``fcs`` empty, so the poller never populates the live
+        buffer and ``_poll``'s ``get_lbuf(device_name)`` would ``KeyError``
+        mid-loop -- and because that escaped before the action was finalized,
+        the ``-act.yml`` never reached a terminal status and a golden capture /
+        caller hung waiting out its timeout. Returning a non-``none`` error from
+        ``_pre_exec`` makes ``action_loop_task`` ``finish()`` the action
+        ``errored`` immediately, with a clear reason, instead. Returns ``None``
+        when the device is connected.
+        """
+        fcs = getattr(self.active.driver, "fcs", {}) or {}
+        if self.device_name not in fcs:
+            LOGGER.error(
+                f"MFC device {self.device_name!r} is not connected "
+                f"(driver.fcs={list(fcs)}); check the device COM port and power. "
+                "Aborting action (fail-fast)."
+            )
+            return {"error": ErrorCodes.critical_error}
+        return None
+
     async def _pre_exec(self) -> dict:
         """Set the flow rate (and ramp) for the configured device."""
+        guard = self._device_not_connected_error()
+        if guard is not None:
+            return guard
         LOGGER.info("MfcExec running setup methods.")
         self.flowrate_sccm = self.active.action.action_params.get("flowrate_sccm", None)
         self.ramp_sccm_sec = self.active.action.action_params.get("ramp_sccm_sec", 0)
@@ -586,6 +612,9 @@ class PfcExec(MfcExec):
 
     async def _pre_exec(self) -> dict:
         """Set the target pressure (and ramp) on the configured device."""
+        guard = self._device_not_connected_error()
+        if guard is not None:
+            return guard
         LOGGER.info("PfcExec running setup methods.")
         self.pressure_psia = self.active.action.action_params.get("pressure_psia", None)
         self.ramp_psi_sec = self.active.action.action_params.get("ramp_psi_sec", 0)
@@ -653,6 +682,9 @@ class MfcConstPresExec(MfcExec):
 
     async def _pre_exec(self) -> dict:
         """Set the refill flow rate on the device before the loop starts."""
+        guard = self._device_not_connected_error()
+        if guard is not None:
+            return guard
         LOGGER.info("MfcConstPresExec running setup methods.")
         rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
@@ -806,6 +838,9 @@ class MfcConstConcExec(MfcExec):
 
     async def _pre_exec(self) -> dict:
         """Set the refill flow rate on the device before the loop starts."""
+        guard = self._device_not_connected_error()
+        if guard is not None:
+            return guard
         LOGGER.info("MfcConstConcExec running setup methods.")
         rate_resp = await self.active.driver.set_flowrate(
             device_name=self.device_name,
