@@ -226,8 +226,15 @@ class KDS100(HelaoDriver):
             cmd: Pump command string; a trailing carriage return is added if missing.
 
         Returns:
-            List of non-empty response lines stripped of whitespace.
+            List of non-empty response lines stripped of whitespace. Empty when
+            the serial connection is not open (``self.sio is None``).
         """
+        if self.sio is None:
+            LOGGER.warning(
+                f"cannot send '{cmd.strip()}' to '{pump_name}': "
+                "syringe pump not connected (sio is None)"
+            )
+            return []
         if not cmd.endswith("\r"):
             cmd = cmd + "\r"
         addr = self.config_dict["pumps"][pump_name]["address"]
@@ -268,8 +275,17 @@ class KDS100(HelaoDriver):
             cmd: Pump command string; a trailing carriage return is added if missing.
 
         Returns:
-            List of non-empty response lines stripped of whitespace.
+            List of non-empty response lines stripped of whitespace. Empty when
+            the serial connection is not open (``self.sio is None``) -- keeps
+            the background poller from crashing every cycle on an unconnected
+            pump.
         """
+        if self.sio is None:
+            LOGGER.warning(
+                f"cannot send '{cmd.strip()}' to '{pump_name}': "
+                "syringe pump not connected (sio is None)"
+            )
+            return []
         if not cmd.endswith("\r"):
             cmd = cmd + "\r"
         addr = self.config_dict["pumps"][pump_name]["address"]
@@ -494,7 +510,19 @@ class KDS100(HelaoDriver):
         Enables POLL mode, disables NVRAM writes, stops the pump, clears time
         and target volume counters, and applies the syringe diameter from
         configuration.
+
+        No-op when the serial connection was never opened (``self.sio is
+        None`` -- e.g. ``connect()`` failed because the pump's COM port is
+        absent at this station). Attempting the POLL/stop commands against a
+        closed port raised ``AttributeError: 'NoneType' object has no attribute
+        'write'`` on shutdown; skip cleanly so ``async_shutdown`` can still
+        reach ``disconnect()``.
         """
+        if self.sio is None:
+            LOGGER.warning(
+                "syringe pump not connected (sio is None); skipping safe_state"
+            )
+            return
         for plab, pdict in self.config_dict.get("pumps", {}).items():
             addr = pdict["address"]
             idle_resp = f"{addr:02}:\x11"
