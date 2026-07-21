@@ -1,0 +1,52 @@
+# HEXAGON CANARY for the pal_server station (P3a special-split, PAL wrap step).
+# Copy of pal.yml with `deployment: hexagon` flipping PAL (pal_server) and
+# ACTVIS (action_visualizer) onto the hexagon factory (makeActionApp shim,
+# helao/deploy/hexagon/servers/action/pal_server.py) -- run AT-STATION
+# (Windows, PAL autosampler reachable over SSH). pal.yml stays legacy for
+# rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# Ports/root/params match pal.yml so an on-station openapi diff compares
+# like-for-like. The RPC port is HTTP+10000 = 18007.
+#
+# OPENAPI-ONLY (see pal.yml's header): every PAL action drives the physical
+# autosampler/robot; there is no safe non-perturbing read, so there is no
+# runtime golden-diff config pair for PAL -- only this openapi-surface canary.
+# This is the WRAP half of the PAL 4-way "wrap-then-split": prove the hexagon
+# shim yields a byte-identical route surface first; decompose PAL internals
+# (transport / trigger / sample-reconciliation / job-context ports) after.
+dummy: true
+simulation: true
+run_type: pal_server
+root: C:\INST_hlo_golden
+servers:
+  PAL:
+    host: 127.0.0.1
+    port: 8007
+    group: action
+    fast: pal_server
+    deployment: hexagon
+    params:
+      user: RSHS
+      key: c:\helao\sshkeys\adss_private_newff.pem
+      host: 10.231.100.128
+      timeout: 1800
+      dev_trigger: NImax
+      trigger:
+        start: PXI-6284/port2/line5
+        continue: PXI-6284/port2/line7
+        done: PXI-6284/port2/line3
+      cam_file_path: C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO
+      cams:
+        transfer_tray_tray: tray_to_tray_220214.cam
+        transfer_custom_tray: custom_to_tray_220214.cam
+        archive: custom_to_tray_220214.cam
+        transfer_tray_custom: tray_to_custom_220214.cam
+        deepclean: deep_clean_220214.cam
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    deployment: hexagon
+    params:
+      doc_name: 'PAL Visualizer'
+      launch_browser: true

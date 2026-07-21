@@ -1,0 +1,58 @@
+# STANDALONE pal_server canary config (P3a special-split, PAL -- the 4-way
+# "wrap-then-split" WRAP step: port PAL behind the hexagon shim to openapi
+# parity first; the transport/trigger/sample-reconciliation/job-context split
+# is a later sub-phase). Mirrors ni.yml/kmotor.yml's 2-server shape (one action
+# server + one action_visualizer) so an at-station openapi golden diff can
+# compare legacy vs hexagon like-for-like without pulling in a full PAL station
+# (ORCH, SAMPLE, DB, NI, gamry, ...). The PAL `params:` (SSH user/key/host,
+# NI trigger lines, cam_file_path + cams map) are copied VERBATIM from adss3.yml
+# (the live PAL station) so pal_dyn_endpoints registers exactly the same route
+# surface -- the `cams:` entries GATE which PAL_transfer_*/PAL_archive endpoints
+# exist, so an incomplete params block would change the registered routes and
+# break the openapi diff.
+#
+# OPENAPI-ONLY canary (no runtime golden-diff counterpart): every PAL action
+# (PAL_run_method / PAL_ANEC_* / PAL_injection_* / PAL_transfer_* / PAL_archive)
+# drives the physical autosampler/robot (SSH-dispatched cam methods + NI trigger
+# handshake) and must never be dispatched as a canary -- there is no safe,
+# non-perturbing read action. So the openapi-surface diff (see pal_canary.bat)
+# is the topology- and safety-appropriate parity check (mirrors ni/kmotor).
+# PAL is an SSH-connected Cytron/PAL autosampler -- WINDOWS-ONLY at station;
+# simulation:true is cosmetic (banner color). The openapi canary only needs the
+# server to boot and serve /openapi.json (connect failures are caught). PAL has
+# no visualizer, so ACTVIS shows an empty panel (as for cam/kmotor).
+dummy: true
+simulation: true
+run_type: pal_server
+root: C:\INST_hlo_golden
+servers:
+  PAL:
+    host: 127.0.0.1
+    port: 8007
+    group: action
+    fast: pal_server
+    params:
+      user: RSHS
+      key: c:\helao\sshkeys\adss_private_newff.pem
+      host: 10.231.100.128
+      timeout: 1800
+      dev_trigger: NImax
+      trigger:
+        start: PXI-6284/port2/line5
+        continue: PXI-6284/port2/line7
+        done: PXI-6284/port2/line3
+      cam_file_path: C:\Users\rshs\Desktop\ADSS\adss_psc_methods\HELAO
+      cams:
+        transfer_tray_tray: tray_to_tray_220214.cam
+        transfer_custom_tray: custom_to_tray_220214.cam
+        archive: custom_to_tray_220214.cam
+        transfer_tray_custom: tray_to_custom_220214.cam
+        deepclean: deep_clean_220214.cam
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: 'PAL Visualizer'
+      launch_browser: true
