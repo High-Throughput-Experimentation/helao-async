@@ -219,8 +219,20 @@ class DriverPoller:
             task.cancel()
         if pending:
             # gather(return_exceptions=True) swallows the CancelledError raised
-            # in each task and waits for all of them to finish unwinding.
-            await asyncio.gather(*pending, return_exceptions=True)
+            # in each task. Bound the await: a task stuck in a BLOCKING sync
+            # get_data() (e.g. a driver serial read with no timeout) cannot
+            # process the cancellation until it next hits an await, so without a
+            # timeout this would hang shutdown. If they don't unwind in time,
+            # proceed -- the tasks die when the loop tears down at process exit.
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*pending, return_exceptions=True), timeout=5.0
+                )
+            except asyncio.TimeoutError:
+                LOGGER.warning(
+                    "poller task(s) did not stop within 5s (likely blocked in a "
+                    "synchronous get_data); proceeding with shutdown"
+                )
 
     async def _poll_signal_loop(self) -> None:
         """Background loop that updates ``self.polling`` from the signal queue."""
