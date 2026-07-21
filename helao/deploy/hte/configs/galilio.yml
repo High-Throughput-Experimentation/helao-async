@@ -11,13 +11,14 @@
 dummy: true
 simulation: true
 run_type: galil_io
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   IO:
     host: 127.0.0.1
     port: 8005
     group: action
     fast: galil_io
+    live_vis: pressure_vis
     params:
       galil_ip_str: 192.168.200.234
       dev_di:
@@ -35,7 +36,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: 'IO Visualizer'
       launch_browser: true

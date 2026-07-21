@@ -8,7 +8,7 @@
 dummy: true
 simulation: true
 run_type: cam_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   CAM:
     host: 127.0.0.1

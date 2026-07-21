@@ -22,6 +22,7 @@ servers:
     group: action
     fast: co2sensor_server
     deployment: hexagon
+    live_vis: co2_vis
     params:
       port: COM12
       start_margin: 0
@@ -29,7 +30,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     deployment: hexagon
     params:
       doc_name: 'CO2 Visualizer'
