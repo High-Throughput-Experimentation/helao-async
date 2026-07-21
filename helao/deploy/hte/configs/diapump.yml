@@ -15,7 +15,7 @@
 dummy: true
 simulation: true
 run_type: diapump_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   DOSEPUMP:
     host: 127.0.0.1

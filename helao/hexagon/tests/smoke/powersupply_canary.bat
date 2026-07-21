@@ -40,7 +40,7 @@ REM   outdir default %TEMP%\powersupply_canary
 REM ---------------------------------------------------------------------------
 
 set "ROOT=%~1"
-if "%ROOT%"=="" set "ROOT=C:\INST_hlo"
+if "%ROOT%"=="" set "ROOT=C:\INST_hlo_golden"
 set "OUTDIR=%~2"
 if "%OUTDIR%"=="" set "OUTDIR=%TEMP%\powersupply_canary"
 

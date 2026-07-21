@@ -24,7 +24,7 @@
 dummy: true
 simulation: true
 run_type: power_supply
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   POWER_SUPPLY:
     host: 127.0.0.1

@@ -23,13 +23,14 @@
 dummy: true
 simulation: true
 run_type: mfc_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   MFC:
     host: 127.0.0.1
     port: 8009
     group: action
     fast: mfc_server
+    live_vis: mfc_vis
     params:
       devices:
         CO2:
@@ -40,7 +41,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
-    bokeh: action_visualizer
+    bokeh: live_visualizer
     params:
       doc_name: 'MFC Visualizer'
       launch_browser: true

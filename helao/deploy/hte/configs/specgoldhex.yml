@@ -21,6 +21,7 @@ servers:
     group: action
     fast: spec_server
     deployment: hexagon
+    action_vis: spec_vis
     params:
       dev_num: 0
       lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll

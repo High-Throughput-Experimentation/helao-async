@@ -7,7 +7,7 @@
 dummy: true
 simulation: true
 run_type: spec_server
-root: C:\INST_hlo
+root: C:\INST_hlo_golden
 servers:
   SPEC:
     host: 127.0.0.1
@@ -15,6 +15,7 @@ servers:
     group: action
     fast: spec_server
     deployment: hexagon
+    action_vis: spec_vis
     params:
       dev_num: 0
       lib_path: C:\Spectral Products\SM32ProForUSB\SDK Examples\DLL\x64\stdcall\SPdbUSBm.dll
