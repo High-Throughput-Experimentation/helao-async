@@ -25,14 +25,14 @@ import time
 import traceback
 from copy import deepcopy
 from dataclasses import dataclass, field as dc_field
-from typing import List, Optional, Union, Tuple
+from typing import Any, List, Optional, Protocol, Union, Tuple
 from pydantic import BaseModel, Field
 import aiofiles
 import subprocess
 import psutil
 
 from helao.helpers import config_loader
-from helao.core.servers.base import Active
+from helao.hexagon.ports.data_sink import DataSinkPort
 from helao.core.error import ErrorCodes
 from helao.core.helaodict import HelaoDict
 from helao.core.drivers.helao_driver import (
@@ -233,10 +233,38 @@ class PalCam(BaseModel, HelaoDict):
     aux_output_filepath: Optional[str] = None
 
 
+class _PALActiveContext(DataSinkPort, Protocol):
+    """``DataSinkPort`` plus the residual ``Active`` surface PAL's job-loop
+    still reaches directly: the mutable ``.action`` context object, the
+    non-``_nowait`` ``get_realtime()``, and ``finish_hlo_header`` called
+    without an ``await`` (the real ``Active.finish_hlo_header`` is
+    synchronous despite the port's async declaration -- a pre-existing
+    port/adapter signature gap, not something this slice changes).
+
+    PAL's `_sendcommand_main`/`_sendcommand_check_dest_*`/
+    `_PAL_IOloop_meas_*_helper` read/mutate ``.action`` directly (samples_in/
+    samples_out/action_sub_name/error_code/action_uuid/file_conn_keys/
+    save_data) and pass it to `SampleStatePort.new_ref_samples(action=...)`.
+    P3a-PAL slice 3 (PalReconciliation) injects ``action``/``action_uuid`` as
+    plain parameters instead and retires this surface; until then PALJob.active
+    is typed against this composite so retyping to ``DataSinkPort`` (P3a-PAL
+    slice 1, dropping the ``helao.core.servers.base.Active`` import) does not
+    regress pyright. The runtime object is unchanged: still the framework's
+    grafted native ``Active``; only the static type widens.
+    """
+
+    action: Any
+
+    async def get_realtime(self) -> int: ...
+
+    def finish_hlo_header(self, file_conn_keys=None, realtime=None) -> None: ...
+
+
 @dataclass
 class PALJob:
     """One submitted PAL job: the resolved ``PalCam`` plus the framework-owned
-    ``Active`` this job's samples/HLO rows are recorded against.
+    ``Active`` action context (typed as :class:`_PALActiveContext`) this
+    job's samples/HLO rows are recorded against.
 
     Replaces the old ``IO_signalq(1)`` bool handshake + the
     ``IO_palcam``/``self.active``/``self.action`` slots (CARDS P4 Design 1,
@@ -248,7 +276,12 @@ class PALJob:
 
     Attributes:
         palcam: Job descriptor with resolved microcams.
-        active: Injected ``Active`` action context (opaque to the driver).
+        active: Injected action context (opaque to the driver), typed as
+            :class:`_PALActiveContext` (``DataSinkPort`` + the residual
+            ``.action``/``get_realtime`` surface -- see that class). The
+            runtime object is still the framework's ``Active``, grafted in
+            by the endpoint; only the type annotation changed (P3a-PAL
+            slice 1: drops the ``helao.core.servers.base`` import).
         done: Set by the job-loop worker when this job's run is over
             (success, error, or stop); polled by ``PALJobExec._poll``.
         error: Terminal ``ErrorCodes`` for this job, stamped by the job-loop
@@ -256,7 +289,7 @@ class PALJob:
     """
 
     palcam: PalCam
-    active: "Active"
+    active: _PALActiveContext
     done: asyncio.Event = dc_field(default_factory=asyncio.Event)
     error: ErrorCodes = ErrorCodes.none
 
@@ -434,7 +467,7 @@ class PAL(HelaoDriver):
             loop = asyncio.get_event_loop()
             self._worker_task = loop.create_task(self._PAL_IOloop())
 
-    async def submit_job(self, palcam: PalCam, active: "Active") -> PALJob:
+    async def submit_job(self, palcam: PalCam, active: _PALActiveContext) -> PALJob:
         """Validate tool names and enqueue ``palcam`` for the IO-loop worker.
 
         Ported body of legacy ``_init_PAL_IOloop`` minus the busy/estop/
