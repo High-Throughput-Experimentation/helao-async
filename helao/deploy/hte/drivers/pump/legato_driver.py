@@ -128,6 +128,14 @@ class KDS100(HelaoDriver):
         self.present_volume_ul = 0.0
         self.last_state = "unknown"
 
+        # Open the serial connection now. BaseAPI never calls connect(), and
+        # KDS100Poller begins polling as soon as it is constructed, so a present
+        # pump must be connected here to be readable on the first poll. An
+        # absent COM port leaves self.sio = None (connect() logs the failure);
+        # the poll and shutdown paths tolerate that (get_data short-circuits,
+        # safe_state no-ops).
+        self.connect()
+
     def connect(self) -> DriverResponse:
         """Open the serial connection to the daisy-chained pump(s).
 
@@ -230,7 +238,11 @@ class KDS100(HelaoDriver):
             the serial connection is not open (``self.sio is None``).
         """
         if self.sio is None:
-            LOGGER.warning(
+            # DEBUG, not WARNING: an unconnected pump is an expected quiet state
+            # (the poller short-circuits before reaching here), so this must not
+            # spam the log every cycle. Actions still get [] and fail visibly
+            # downstream.
+            LOGGER.debug(
                 f"cannot send '{cmd.strip()}' to '{pump_name}': "
                 "syringe pump not connected (sio is None)"
             )
@@ -281,7 +293,11 @@ class KDS100(HelaoDriver):
             pump.
         """
         if self.sio is None:
-            LOGGER.warning(
+            # DEBUG, not WARNING: an unconnected pump is an expected quiet state
+            # (the poller short-circuits before reaching here), so this must not
+            # spam the log every cycle. Actions still get [] and fail visibly
+            # downstream.
+            LOGGER.debug(
                 f"cannot send '{cmd.strip()}' to '{pump_name}': "
                 "syringe pump not connected (sio is None)"
             )
@@ -574,6 +590,11 @@ class KDS100Poller(DriverPoller):
             `DriverResponse` when polling is paused or no pump responded.
         """
         if not self.driver.polling:
+            return DriverResponse()
+        if self.driver.sio is None:
+            # Pump not connected (COM port absent / connect() failed): skip the
+            # poll quietly. Calling _send_sync per pump here would just return
+            # [] and spam a per-cycle log until a connection exists.
             return DriverResponse()
         status_dict = {}
         for plab, pdict in self.driver.config_dict.get("pumps", {}).items():
