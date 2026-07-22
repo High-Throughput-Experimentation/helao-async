@@ -30,7 +30,6 @@ __all__ = ["Galil", "MoveModes", "TransformationModes"]
 import numpy as np
 import time
 import asyncio
-from functools import partial
 import json
 import os
 from socket import gethostname
@@ -38,13 +37,10 @@ from copy import deepcopy
 import traceback
 
 
-from bokeh.server.server import Server
-
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
-from helao.core.servers.vis import HelaoVis
 from helao.core.models.sample import SolidSample
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
@@ -53,7 +49,10 @@ from helao.core.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from ...layouts.aligner import Aligner
+# P3a galil-split slice-4: the Bokeh `Server`/`HelaoVis` construction and the
+# `Aligner` import moved to the vis-layer host
+# (`helao/hexagon/adapters/vis/galil_aligner_host.py`); the driver no longer
+# hosts a Bokeh server, holds an Active, or exposes a `base` property (D6 fix).
 from ...drivers.motion.enum import MoveModes, TransformationModes
 from helao.hexagon.domain.motion_transform import TransformXY
 from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
@@ -122,29 +121,30 @@ class Galil(HelaoDriver):
         self.galilcmd = None
         self.galil_enabled = None
 
-        # block gamry
+        # block gamry -- also the shared mutual-exclusion lock between
+        # `_motor_move` and a running plate alignment (driver-owned; the
+        # vis-layer aligner host reads/clears it through AlignerMotorContext).
         self.blocked = False
         # is motor move busy?
         self.motor_busy = False
-        self.bokehapp = None
-        self.aligner = None
-        self.aligning_enabled = False
-        self.aligner_plateid = None
-        self.aligner_active = None
-        # identical to the pre-migration `self.base.server_params.get(...)`
-        # read: `server_api.py:74` makes `config` and `server_params` the
-        # same dict object (K1).
-        self.aligner_enabled = self.config_dict.get("enable_aligner", False)
 
-    @property
-    def base(self):
-        """Backward-compatible alias for `_base_hook`.
+        # P3a galil-split slice-4: the Bokeh aligner + its Active are no longer
+        # owned by the driver. The driver keeps only an optional position-notify
+        # sink (the aligner's asyncio queue) that `update_aligner` feeds; the
+        # vis-layer `GalilAlignerHost` sets it via `set_position_sink`. The old
+        # `bokehapp`/`aligner`/`aligning_enabled`/`aligner_plateid`/
+        # `aligner_active`/`aligner_enabled` attrs and the `base` property moved
+        # to the host / AlignerMotorContext (D6 fix).
+        self._position_sink = None
 
-        `layouts/aligner.py` (out of this migration's scope) reads
-        `motor.base.helaodirs` / `motor.base.get_main_error` directly; this
-        keeps that working without touching the Bokeh aligner module.
+    def set_position_sink(self, sink) -> None:
+        """Register (or clear with ``None``) the aligner position-notify queue.
+
+        Called by the vis-layer ``GalilAlignerHost`` when it constructs the
+        Bokeh ``Aligner``; ``update_aligner`` pushes motor position/status
+        dicts here so the aligner's Bokeh widgets stay live.
         """
-        return self._base_hook
+        self._position_sink = sink
 
     def connect(self) -> DriverResponse:
         """Load plate calibration, build the axis transform, open the gclib
@@ -269,8 +269,9 @@ class Galil(HelaoDriver):
                 LOGGER.error("Galil connection error", exc_info=True)
                 self.galil_enabled = False
 
-            if self.aligner_enabled and self.galil_enabled and self.bokehapp is None:
-                self.start_aligner()
+            # P3a galil-split slice-4: the Bokeh aligner is no longer started
+            # here. The action server constructs `GalilAlignerHost` after
+            # connect() when `enable_aligner` is set (D6 fix).
 
             return DriverResponse(
                 response=DriverResponseType.success,
@@ -356,46 +357,6 @@ class Galil(HelaoDriver):
         Minstr[1][3] = Mplate[1][2]
         return Minstr
 
-    def start_aligner(self):
-        """Launch the embedded Bokeh aligner server on `bokeh_port`.
-
-        `host`/`port` (and the `bokeh_port` fallback) live on the server's
-        top-level `server_cfg` entry, not inside `self.config` (only
-        `server_cfg["params"]` is handed to a migrated driver), so these
-        are read via `self._base_hook.server_cfg` (K2/K8) -- safe here
-        because `connect` (the only caller) runs after the hosting server
-        assigns `_base_hook`.
-        """
-        server_cfg = getattr(self._base_hook, "server_cfg", None)
-        if server_cfg is None:
-            LOGGER.warning(
-                "start_aligner: _base_hook/server_cfg not set; aligner not started"
-            )
-            return
-        servHost = server_cfg["host"]
-        servPort = self.config_dict.get("bokeh_port", server_cfg["port"] + 1000)
-        servPy = "Aligner"
-
-        self.bokehapp = Server(
-            {f"/{servPy}": partial(self.makeBokehApp, motor=self)},
-            port=servPort,
-            address=servHost,
-            allow_websocket_origin=[f"{servHost}:{servPort}"],
-        )
-        LOGGER.info(f"started bokeh server {self.bokehapp}")
-        self.bokehapp.start()
-        # self.bokehapp.io_loop.add_callback(self.bokehapp.show, f"/{servPy}")
-
-    def makeBokehApp(self, doc, motor):
-        """Bokeh document factory that attaches an `Aligner` to `doc`."""
-        app = HelaoVis(
-            server_key=self._base_hook.server.server_name,
-            doc=doc,
-        )
-
-        doc.aligner = Aligner(app.vis, motor)
-        return doc
-
     async def setaxisref(self):
         """Home every linear axis, refine the home position, then zero absolute coords.
 
@@ -478,65 +439,11 @@ class Galil(HelaoDriver):
         else:
             return "error"
 
-    async def stop_aligner(self) -> ErrorCodes:
-        """Ask the Bokeh aligner to terminate its current alignment session."""
-        if self.aligner_enabled and self.aligner:
-            self.aligner.stop_align()
-            return ErrorCodes.none
-        else:
-            return ErrorCodes.not_available
-
-    def run_aligner_precheck(self):
-        """Whether a new aligner run may start, and the code to report if not.
-
-        Exact port of the nested gate from the pre-migration `run_aligner`:
-        the outer check (motor not blocked and Galil enabled) reports
-        `ErrorCodes.in_progress` on failure; only if that passes does the
-        inner check (aligner enabled and constructed) run, reporting
-        `ErrorCodes.not_available` on failure. Kept as one driver-owned
-        decision (K7: the driver decides, the endpoint acts on the verdict)
-        so the two rejection reasons can never be attributed backwards.
-
-        Returns:
-            `(True, ErrorCodes.none)` if a run may start, else
-            `(False, <ErrorCodes>)`.
-        """
-        if self.blocked or not self.galil_enabled:
-            return False, ErrorCodes.in_progress
-        if not self.aligner_enabled or not self.aligner:
-            return False, ErrorCodes.not_available
-        return True, ErrorCodes.none
-
-    async def start_aligner_run(self, active) -> dict:
-        """Attach a server-contained `Active` to the aligner and begin tracking motion.
-
-        K7b: creating the `Active` (`contain_action`) is no longer done by
-        this driver -- the `/run_aligner` endpoint now calls
-        `app.base.contain_action(...)` itself (after checking
-        `run_aligner_precheck`) and passes the result in as `active`. This
-        method does exactly what the tail of the pre-migration
-        `run_aligner` did once the `Active` existed: stores the plate id,
-        stores `active` as `self.aligner_active` (consumed directly by
-        `layouts/aligner.py`, out of this migration's scope), flips the
-        busy/aligning flags, and kicks off a motion-status query.
-
-        Args:
-            active: An `Active` already returned by `contain_action` for
-                this run_aligner request; its `action.action_params` must
-                carry `plateid_or_pmpath`.
-
-        Returns:
-            The active action dict.
-        """
-        self.blocked = True
-        self.aligner_plateid = active.action.action_params["plateid_or_pmpath"]
-        self.aligner_active = active
-        self.aligning_enabled = True
-        activeDict = self.aligner_active.action.as_dict()
-
-        _ = await self.query_axis_moving(axis=self.get_all_axis())
-
-        return activeDict
+    # P3a galil-split slice-4: `stop_aligner`, `run_aligner_precheck`, and
+    # `start_aligner_run` moved to the vis-layer `GalilAlignerHost` (they own
+    # the aligner session + its Active, which no longer live on the driver).
+    # `blocked` (read/set by those verbs and by `_motor_move`) stays here as the
+    # driver-owned shared lock; the host reaches it through AlignerMotorContext.
 
     async def motor_move(self, active) -> dict:
         """Public motor-move entry point that extracts params from `active.action`.
@@ -1254,7 +1161,11 @@ class Galil(HelaoDriver):
         return [ax for ax in self.axis_id]
 
     def shutdown(self) -> set:
-        """Close the gclib connection and cancel the aligner IO task on server shutdown.
+        """Close the gclib connection on server shutdown.
+
+        The aligner IO-task cancellation moved to `GalilAlignerHost.shutdown`
+        (P3a slice-4); the action server invokes it alongside this on the
+        FastAPI shutdown path.
 
         Returns:
             A single-element set containing "shutdown".
@@ -1268,14 +1179,17 @@ class Galil(HelaoDriver):
         except Exception as e:
             tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
             LOGGER.error(f"could not close galil connection: {repr(e), tb,}")
-        if self.aligner_enabled and self.aligner:
-            self.aligner.IOtask.cancel()
         return {"shutdown"}
 
     async def update_aligner(self, msg):
-        """Forward `msg` to the aligner's motor-position queue, if running."""
-        if self.aligner_enabled and self.aligner:
-            await self.aligner.motorpos_q.put(msg)
+        """Forward `msg` to the aligner's motor-position queue, if one is wired.
+
+        The sink is the Bokeh aligner's `motorpos_q`, registered by
+        `GalilAlignerHost` via `set_position_sink` (P3a slice-4). `None` when
+        no aligner is hosted, so this is a no-op then.
+        """
+        if self._position_sink is not None:
+            await self._position_sink.put(msg)
 
     def save_transfermatrix(self, file):
         """Write `self.plate_transfermatrix` to `file` as JSON.
