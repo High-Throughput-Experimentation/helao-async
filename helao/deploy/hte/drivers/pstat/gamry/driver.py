@@ -11,8 +11,6 @@ sense/range/filter settings during setup, drives data acquisition via a
 
 import sys
 
-sys.coinit_flags = 0x0
-
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
 
@@ -118,6 +116,16 @@ class GamryDriver(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
+        # comtypes reads ``sys.coinit_flags`` when it first initializes COM;
+        # set it here (0x0 == COINIT_MULTITHREADED, comtypes' own default too)
+        # right before the first ``import comtypes.client`` rather than at
+        # module import, so merely importing this driver never mutates a
+        # process-global. Matters because ``GamryDriver`` is shared across
+        # deployments (hte + private potentiostat servers) and is imported on
+        # Linux by the hexagon import-sweep, where a COM apartment flag is
+        # meaningless. connect() is the driver's first comtypes user, so the
+        # apartment model is unchanged on Windows (P3a Gamry COM track).
+        sys.coinit_flags = 0x0
         import comtypes.client as client
 
         try:
