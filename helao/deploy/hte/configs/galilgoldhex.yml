@@ -1,6 +1,6 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of galilhex.yml
-# (keeps `deployment: hexagon` on MOTOR + ACTVIS -- the hexagon side of the
-# runtime golden diff) used solely by
+# (keeps `deployment: hexagon` on MOTOR -- the hexagon side of the runtime
+# golden diff) used solely by
 # helao.hexagon.tests.smoke.golden_capture_galil / galil_diff.bat to capture
 # a runtime golden-master query_positions tree. The ONLY change from
 # galilhex.yml is `root:`, pointed at a dedicated throwaway path so the
@@ -55,12 +55,3 @@ servers:
         A: 127.8
         B: 76.7
       timeout: 600
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'MOTOR Visualizer'
-      launch_browser: true

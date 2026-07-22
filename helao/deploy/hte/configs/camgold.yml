@@ -18,11 +18,3 @@ servers:
     fast: cam_server
     params:
       axis_ip: 192.168.200.210
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'CAM Visualizer'
-      launch_browser: true
