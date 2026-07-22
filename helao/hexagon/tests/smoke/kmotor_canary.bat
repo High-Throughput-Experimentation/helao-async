@@ -24,10 +24,10 @@ REM and safety-appropriate parity check (mirrors ni_canary.bat exactly).
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. kmotorhex is a 2-server group (KMOTOR@8015 +
-REM ACTVIS@5001) with NO orchestrator, so the GM-* scenarios cannot drive it.
+REM sequences to an orchestrator. kmotorhex is a 1-server group (KMOTOR@8015)
+REM with NO orchestrator, so the GM-* scenarios cannot drive it.
 REM
-REM Both configs share root C:\INST_hlo and ports 8015/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8015, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: kmotor.yml's simulation:true is cosmetic (banner color) -- Kinesis
 REM has no sim/dummy data path. KinesisMotor.connect() opens a real pylablib

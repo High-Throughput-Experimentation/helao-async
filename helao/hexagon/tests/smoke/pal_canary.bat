@@ -24,10 +24,10 @@ REM so both legs register the same surface.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. palhex is a 2-server group (PAL@8007 +
-REM ACTVIS@5001) with NO orchestrator, so the GM-* scenarios cannot drive it.
+REM sequences to an orchestrator. palhex is a 1-server group (PAL@8007) with
+REM NO orchestrator, so the GM-* scenarios cannot drive it.
 REM
-REM Both configs share root C:\INST_hlo_golden and ports 8007/5001, so they MUST
+REM Both configs share root C:\INST_hlo_golden and port 8007, so they MUST
 REM run sequentially (this script does that) -- never launch both at once.
 REM NOTE: simulation:true is cosmetic (banner color) -- PAL has no sim/dummy data
 REM path. The PAL driver opens an SSH session to the autosampler host at startup;

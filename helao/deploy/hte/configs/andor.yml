@@ -1,7 +1,8 @@
-# STANDALONE andor_server canary config (P3a special-split, ANDOR). Mirrors
-# spec.yml/cam.yml's 2-server shape (one action server + one action_visualizer)
-# so an at-station openapi/runtime golden diff can compare legacy vs hexagon
-# like-for-like without pulling in the full hispec station (ORCH, VIS, DB, CALC,
+# STANDALONE andor_server canary config (P3a special-split, ANDOR). This config
+# is action-only: hispec.yml declares no action_vis/live_vis for ANDOR, so a
+# visualizer panel here would only ever be blank. It exists so an at-station
+# openapi/runtime golden diff can compare legacy vs hexagon like-for-like
+# without pulling in the full hispec station (ORCH, VIS, DB, CALC,
 # CAM...). The ANDOR params: (dev_id) is copied VERBATIM from hispec.yml's ANDOR
 # block so `acquire` registers identically. This is the Andor Zyla camera +
 # ATSpectrograph (vendor pyAndorSDK3 / pyAndorSpectrograph runtimes) --
@@ -29,11 +30,3 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'ANDOR Visualizer'
-      launch_browser: true

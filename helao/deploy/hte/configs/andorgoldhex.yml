@@ -1,6 +1,6 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of andorhex.yml (keeps
-# `deployment: hexagon` on ANDOR + ACTVIS -- the hexagon side of the runtime
-# golden diff) used solely by helao.hexagon.tests.smoke.golden_capture_andor /
+# `deployment: hexagon` on ANDOR -- the hexagon side of the runtime golden
+# diff) used solely by helao.hexagon.tests.smoke.golden_capture_andor /
 # andor_diff.bat to capture a runtime golden-master `acquire` tree. The ONLY
 # change from andorhex.yml is `root:`, pointed at a dedicated throwaway path so
 # the capture rig's assert_fresh() has a clean tree to start from and production
@@ -23,12 +23,3 @@ servers:
     deployment: hexagon
     params:
       dev_id: 0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'ANDOR Visualizer'
-      launch_browser: true

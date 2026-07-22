@@ -1,6 +1,6 @@
 # CAPTURE-ONLY THROWAWAY ROOT, NEVER PRODUCTION. Copy of syringehex.yml
-# (keeps `deployment: hexagon` on WORKSYRINGE + ACTVIS -- the hexagon side of
-# the runtime golden diff) used solely by
+# (keeps `deployment: hexagon` on WORKSYRINGE -- the hexagon side of the
+# runtime golden diff) used solely by
 # helao.hexagon.tests.smoke.golden_capture_syringe / syringe_diff.bat to
 # capture a runtime golden-master get_present_volume tree. The ONLY change from
 # syringehex.yml is `root:`, pointed at a dedicated throwaway path so the
@@ -28,12 +28,3 @@ servers:
         zero:
           address: 0
           diameter: 26.7
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'WORKSYRINGE Visualizer'
-      launch_browser: true
