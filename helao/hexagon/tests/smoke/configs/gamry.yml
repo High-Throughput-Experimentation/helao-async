@@ -1,3 +1,9 @@
+# LEGACY baseline gamry canary (PSTAT = gamry_server2). deployment: hte on both
+# servers so this launches the legacy hte Gamry app; gamryhex.yml flips both to
+# deployment: hexagon. gamry_canary.bat diffs the two -> a genuine
+# legacy-vs-hexagon /openapi.json parity check. (Previously this file carried
+# deployment: hexagon on both servers, making the canary a vacuous hex-vs-hex
+# comparison.)
 dummy: true
 simulation: true
 run_type: gamry
@@ -9,7 +15,7 @@ servers:
     port: 8001
     group: action
     fast: gamry_server2
-    deployment: hexagon
+    deployment: hte
     action_vis: gamry_vis
     params:
       allow_no_sample: true
@@ -21,7 +27,7 @@ servers:
     port: 5001
     group: visualizer
     bokeh: action_visualizer
-    deployment: hexagon
+    deployment: hte
     params:
       doc_name: 'PSTAT Visualizer'
       launch_browser: true
