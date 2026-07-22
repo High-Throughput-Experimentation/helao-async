@@ -17,6 +17,7 @@ servers:
     host: 127.0.0.1
     port: 8016
     group: action
+    deployment: hte
     fast: biologic_server
     action_vis: biologic_vis
     params:
@@ -28,6 +29,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: action_visualizer
     params:
       doc_name: 'BIOLOGIC Visualizer'

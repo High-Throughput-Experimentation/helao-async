@@ -18,6 +18,7 @@ servers:
     host: 127.0.0.1
     port: 8009
     group: action
+    deployment: hte
     fast: mfc_server
     live_vis: mfc_vis
     params:
@@ -30,6 +31,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: live_visualizer
     params:
       doc_name: 'MFC Visualizer'

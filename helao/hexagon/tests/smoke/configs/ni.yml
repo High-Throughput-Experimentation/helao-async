@@ -30,6 +30,7 @@ servers:
     host: 127.0.0.1
     port: 8006
     group: action
+    deployment: hte
     fast: nidaqmx_server
     action_vis: nidaqmx_vis
     params:
@@ -61,6 +62,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: action_visualizer
     params:
       doc_name: 'NI Visualizer'

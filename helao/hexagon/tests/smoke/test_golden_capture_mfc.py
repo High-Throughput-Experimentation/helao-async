@@ -98,7 +98,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.scenario == SCENARIO
         assert manifest.config_prefix == "mfcgold"
         assert manifest.config_path.replace("\\", "/").endswith(
-            "helao/deploy/hte/configs/mfcgold.yml"
+            "helao/hexagon/tests/smoke/configs/mfcgold.yml"
         )
         assert manifest.masked_hlo_columns == MFC_MASKED_HLO_COLUMNS
         # the one data-derived summary that acquire_flowrate lands in -act.yml
