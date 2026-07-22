@@ -20,11 +20,3 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'SAMPLE Visualizer'
-      launch_browser: true

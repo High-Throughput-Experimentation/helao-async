@@ -23,10 +23,10 @@
 # missing module (not crash), but an empty list keeps the launched surface
 # deterministic and identical between legacy/hexagon.
 #
-# Mirrors sample.yml/dbpack.yml's 2-server shape (one action server + one
-# action_visualizer). Port 8014 matches every live ANA config (icpm1, xrfs1,
-# adss, adss3, ccsi1/2, clad); vis 5001 matches the repo-wide ACTVIS
-# convention (these standalone configs are never run concurrently).
+# This config is action-only: none of the live ANA configs (icpm1, xrfs1,
+# adss, adss3, ccsi1/2, clad) declare action_vis/live_vis for ANA, so a
+# visualizer panel here would only ever be blank. Port 8014 matches every
+# live ANA config.
 dummy: true
 simulation: true
 run_type: analysis_server
@@ -40,11 +40,3 @@ servers:
     params:
       local_only: true
       analyses: []
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'ANA Visualizer'
-      launch_browser: true

@@ -16,8 +16,8 @@
 # route/schema surface proves the hexagon makeActionApp factory produces a
 # byte-parity action server for this cut-over target.
 #
-# Both configs share root /tmp/INST_hlo_dbpack and ports 8010/5001, so they
-# MUST run sequentially (this script does that) -- never launch both at once.
+# Both configs share root /tmp/INST_hlo_dbpack and port 8010, so they MUST
+# run sequentially (this script does that) -- never launch both at once.
 #
 # Usage: dbpack_canary.sh [root] [outdir]
 #   root   default /tmp/INST_hlo_dbpack    (must match the configs' root: key)

@@ -7,8 +7,9 @@
 # back to an empty dict if absent) plus a root dir for its
 # helaodirs.states_root/db_root state files, both of which a plain Linux path
 # satisfies -- see golden_capture_sample.py's docstring for the full Step-0
-# investigation. Mirrors galil.yml's 2-server shape (one action server + one
-# action_visualizer) so an openapi/runtime golden diff can compare legacy vs
+# investigation. This config is action-only: eche10.yml declares no
+# action_vis/live_vis for SAMPLE, so a visualizer panel here would only ever
+# be blank. It exists so an openapi/runtime golden diff can compare legacy vs
 # hexagon like-for-like without pulling in the full eche10 station (ORCH,
 # MOTOR, PSTAT, IO, SPEC_T, DB, CAM, KMOTOR). `positions` is copied verbatim
 # from eche10.yml's SAMPLE block.
@@ -26,11 +27,3 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'SAMPLE Visualizer'
-      launch_browser: true
