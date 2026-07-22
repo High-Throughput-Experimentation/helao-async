@@ -16,11 +16,11 @@
 # a placeholder string; no real S3 call happens since /finish_yml is never
 # exercised by this canary.
 #
-# Mirrors sample.yml's 2-server shape (one action server + one
-# action_visualizer) so an openapi diff can compare legacy vs hexagon
-# like-for-like. Port 8010 copied from eche10.yml's DB block; vis 5001
-# matches the repo-wide ACTVIS convention (galil/gamry/sample all reuse 5001
-# since these standalone configs are never run concurrently).
+# This config is action-only: dbpack_server exposes only private/bare
+# endpoints, and no visualizer is declared anywhere DB is used, so a
+# visualizer panel here would only ever be blank. It exists so an openapi
+# diff can compare legacy vs hexagon like-for-like. Port 8010 copied from
+# eche10.yml's DB block.
 dummy: true
 simulation: true
 run_type: dbpack_server
@@ -35,11 +35,3 @@ servers:
       aws_profile: default
       testing: true
       aws_bucket: helao-canary-dummy
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'DB Visualizer'
-      launch_browser: true

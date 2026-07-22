@@ -1,10 +1,10 @@
 # HEXAGON CANARY for the galil_motion station (P3a special-split). Copy of
-# galil.yml with `deployment: hexagon` flipping MOTOR (galil_motion) and
-# ACTVIS (action_visualizer) onto the hexagon factory -- the next hte
-# cut-over target after gamry, run AT-STATION (Windows/gclib). galil.yml
-# stays legacy for rollback; the cut-over is ONLY the two `deployment:
-# hexagon` keys. Ports/root/params match galil.yml so an on-station golden
-# diff compares like-for-like.
+# galil.yml with `deployment: hexagon` flipping MOTOR (galil_motion) onto
+# the hexagon factory -- the next hte cut-over target after gamry, run
+# AT-STATION (Windows/gclib). galil.yml stays legacy for rollback; the
+# cut-over is ONLY the `deployment: hexagon` key. Action-only (see galil.yml's
+# header -- eche10.yml declares no visualizer for MOTOR). Ports/root/params
+# match galil.yml so an on-station golden diff compares like-for-like.
 dummy: true
 simulation: true
 run_type: galil_motion
@@ -49,12 +49,3 @@ servers:
         A: 127.8
         B: 76.7
       timeout: 600
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'MOTOR Visualizer'
-      launch_browser: true

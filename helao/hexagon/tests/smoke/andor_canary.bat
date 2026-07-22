@@ -11,13 +11,13 @@ REM ATSpectrograph) cut-over target.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. andorhex is a 2-server group (ANDOR@8011 +
-REM ACTVIS@5001) with NO orchestrator, so the GM-* scenarios cannot drive it.
+REM sequences to an orchestrator. andorhex is a 1-server group (ANDOR@8011)
+REM with NO orchestrator, so the GM-* scenarios cannot drive it.
 REM The openapi diff is the topology-appropriate parity check (mirrors
 REM spec_canary.bat / cam_canary.bat exactly). See andor_diff.bat for the
 REM runtime `acquire` golden diff, the topology-appropriate DATA check.
 REM
-REM Both configs share root C:\INST_hlo and ports 8011/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8011, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: andor.yml's simulation:true is cosmetic (banner color) -- AndorDriver
 REM has no sim/dummy data path (see golden_capture_andor.py). AndorDriver.connect

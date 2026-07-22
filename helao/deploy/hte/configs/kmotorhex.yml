@@ -1,9 +1,10 @@
 # HEXAGON CANARY for the kinesis_server station (P3a special-split). Copy of
-# kmotor.yml with `deployment: hexagon` flipping KMOTOR (kinesis_server) and
-# ACTVIS (action_visualizer) onto the hexagon factory (makeActionApp shim at
+# kmotor.yml with `deployment: hexagon` flipping KMOTOR (kinesis_server) onto
+# the hexagon factory (makeActionApp shim at
 # helao/deploy/hexagon/servers/action/kinesis_server.py) -- run AT-STATION
 # (Windows / Thorlabs Kinesis). kmotor.yml stays legacy for rollback; the
-# cut-over is ONLY the two `deployment: hexagon` keys. Ports/root/params
+# cut-over is ONLY the `deployment: hexagon` key. Action-only (see kmotor.yml's
+# header -- hispec.yml declares no visualizer for KMOTOR). Ports/root/params
 # match kmotor.yml so an on-station openapi diff compares like-for-like.
 #
 # OPENAPI-ONLY (see kmotor.yml's header): every action route registered
@@ -32,12 +33,3 @@ servers:
           vel_scale: 65970697.6 # device to mm/s
           acc_scale: 13518.2 # device to mm/s2
           move_limit_mm: 5.0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'KMOTOR Visualizer'
-      launch_browser: true

@@ -1,7 +1,8 @@
-# STANDALONE cam_server canary config (P3a special-split, CAM). Mirrors
-# galil.yml/sample.yml's 2-server shape (one action server + one
-# action_visualizer) so an at-station openapi/runtime golden diff can compare
-# legacy vs hexagon like-for-like without pulling in the full eche10 station.
+# STANDALONE cam_server canary config (P3a special-split, CAM). This config is
+# action-only: eche10.yml declares no action_vis/live_vis for CAM, so a
+# visualizer panel here would only ever be blank. It exists so an at-station
+# openapi/runtime golden diff can compare legacy vs hexagon like-for-like
+# without pulling in the full eche10 station.
 # CAM param (axis_ip) is copied verbatim from eche10.yml's CAM block. This is
 # the Axis IP webcam (AxisCam, HTTP JPEG fetch -- NO vendor DLL, NO COM/gclib).
 #
@@ -27,11 +28,3 @@ servers:
     fast: cam_server
     params:
       axis_ip: 192.168.200.210
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'CAM Visualizer'
-      launch_browser: true

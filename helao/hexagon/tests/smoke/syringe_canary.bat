@@ -12,14 +12,14 @@ REM Legato syringe pump) cut-over target.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. syringehex is a 2-server group
-REM (WORKSYRINGE@8013 + ACTVIS@5001) with NO orchestrator, so the GM-* scenarios
-REM cannot drive it. The openapi diff is the topology-appropriate parity check
+REM sequences to an orchestrator. syringehex is a 1-server group
+REM (WORKSYRINGE@8013) with NO orchestrator, so the GM-* scenarios cannot
+REM drive it. The openapi diff is the topology-appropriate parity check
 REM (mirrors spec_canary.bat / galil_canary.bat / gamryhex_canary.bat exactly).
 REM See syringe_diff.bat for the runtime get_present_volume golden diff, the
 REM topology-appropriate DATA check.
 REM
-REM Both configs share root C:\INST_hlo and ports 8013/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8013, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: syringe.yml's simulation:true is cosmetic (banner color) -- KDS100 has
 REM no sim/dummy driver swap. KDS100.connect() opens the pyserial COM5 port at

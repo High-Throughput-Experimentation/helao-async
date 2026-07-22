@@ -1,11 +1,11 @@
 # HEXAGON CANARY for the analysis_server station (P3a special-split). Copy of
-# analysis.yml with `deployment: hexagon` flipping ANA (analysis_server) and
-# ACTVIS (action_visualizer) onto the hexagon factory. analysis.yml stays
-# legacy for rollback; the cut-over is ONLY the two `deployment: hexagon`
-# keys. Ports/root/params match analysis.yml so an openapi diff compares
-# like-for-like. See analysis.yml for the Step-0 credentials/analyses-list
-# investigation and the why-deferred (needs seeded process data) runtime-diff
-# rationale.
+# analysis.yml with `deployment: hexagon` flipping ANA (analysis_server) onto
+# the hexagon factory. analysis.yml stays legacy for rollback; the cut-over
+# is ONLY the `deployment: hexagon` key. Action-only (see analysis.yml's
+# header -- no live ANA config declares a visualizer). Ports/root/params
+# match analysis.yml so an openapi diff compares like-for-like. See
+# analysis.yml for the Step-0 credentials/analyses-list investigation and the
+# why-deferred (needs seeded process data) runtime-diff rationale.
 dummy: true
 simulation: true
 run_type: analysis_server
@@ -20,12 +20,3 @@ servers:
     params:
       local_only: true
       analyses: []
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'ANA Visualizer'
-      launch_browser: true

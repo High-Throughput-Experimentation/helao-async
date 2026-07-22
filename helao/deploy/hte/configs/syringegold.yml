@@ -27,11 +27,3 @@ servers:
         zero:
           address: 0
           diameter: 26.7
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'WORKSYRINGE Visualizer'
-      launch_browser: true

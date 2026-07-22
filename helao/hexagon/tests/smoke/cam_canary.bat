@@ -19,10 +19,10 @@ REM epoch_s/filename columns value-masked (see golden_capture_cam.py).
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. camhex is a 2-server group (CAM@8013 +
-REM ACTVIS@5001) with NO orchestrator (mirrors galil_canary.bat exactly).
+REM sequences to an orchestrator. camhex is a 1-server group (CAM@8013) with
+REM NO orchestrator (mirrors galil_canary.bat exactly).
 REM
-REM Both configs share root C:\INST_hlo and ports 8013/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8013, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: AxisCam.connect() opens no network connection (returns success
 REM unconditionally), so this canary boots and serves /openapi.json even without
