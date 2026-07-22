@@ -14,14 +14,14 @@
 #
 # Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 # golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-# sequences to an orchestrator. sample/samplehex is a 2-server group
-# (SAMPLE@8008 + ACTVIS@5001) with NO orchestrator, so the GM-* scenarios
-# cannot drive it via that harness -- the openapi diff is the
-# topology-appropriate parity check (see sample_diff.sh for the runtime
-# get_loaded_positions golden diff, the topology-appropriate DATA check).
+# sequences to an orchestrator. sample/samplehex is a 1-server group
+# (SAMPLE@8008) with NO orchestrator, so the GM-* scenarios cannot drive it
+# via that harness -- the openapi diff is the topology-appropriate parity
+# check (see sample_diff.sh for the runtime get_loaded_positions golden diff,
+# the topology-appropriate DATA check).
 #
-# Both configs share root /tmp/INST_hlo_sample and ports 8008/5001, so they
-# MUST run sequentially (this script does that) -- never launch both at once.
+# Both configs share root /tmp/INST_hlo_sample and port 8008, so they MUST
+# run sequentially (this script does that) -- never launch both at once.
 #
 # Usage: sample_canary.sh [root] [outdir]
 #   root   default /tmp/INST_hlo_sample   (must match the configs' root: key)
