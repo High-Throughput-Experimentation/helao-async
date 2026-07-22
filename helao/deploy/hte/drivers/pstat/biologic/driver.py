@@ -19,7 +19,10 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import numpy as np
 import pandas as pd
-import easy_biologic as ebl
+
+# easy_biologic (the vendor SDK) is imported lazily in connect() / via
+# technique.resolve_easy_class so the driver imports and constructs without the
+# SDK present (P3a-2 hermetic disconnected-construct).
 
 from helao.core.drivers.helao_driver import (
     HelaoDriver,
@@ -28,7 +31,7 @@ from helao.core.drivers.helao_driver import (
     DriverResponseType,
 )
 
-from .technique import BiologicTechnique
+from .technique import BiologicTechnique, resolve_easy_class
 
 
 # ctypes struct to dict (won't work with arrays, nested structs)
@@ -84,7 +87,9 @@ class BiologicDriver(HelaoDriver):
         self.channels = {i: None for i in range(self.num_channels)}
         self.channel_params = {i: {} for i in range(self.num_channels)}
         self.channel_technique = {i: None for i in range(self.num_channels)}
-        self.connect()
+        # P3a-2 constructor-connect fix: no device I/O here. The action server
+        # (biologic_server.biologic_dyn_endpoints) calls connect() at startup;
+        # this keeps the driver constructible without the instrument/SDK.
         self.stopping = False
         self.connection_ctx = None
 
@@ -101,6 +106,8 @@ class BiologicDriver(HelaoDriver):
                     "Connection already raised. In use by another script."
                 )
             self.connection_raised = True
+            import easy_biologic as ebl
+
             self.pstat = ebl.BiologicDevice(str(self.address))
             self.connection_ctx = self.pstat.connect()
             self.ready = True
@@ -146,7 +153,7 @@ class BiologicDriver(HelaoDriver):
                     if any([x > 0 for x in states])
                     else DriverStatus.ok
                 )
-                
+
                 data = {i: x for i, x in enumerate(states)}
             elif channel not in self.channels:
                 status = DriverStatus.uninitialized
@@ -204,7 +211,7 @@ class BiologicDriver(HelaoDriver):
             listed_params = {
                 k: [v] if k in listed else v for k, v in mapped_params.items()
             }
-            self.channels[channel] = technique.easy_class(
+            self.channels[channel] = resolve_easy_class(technique.easy_class_name)(
                 device=self.pstat, params=listed_params, channels=[channel]
             )
             self.channel_params[channel] = listed_params

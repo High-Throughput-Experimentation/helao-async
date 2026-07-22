@@ -9,11 +9,30 @@ technique name.
 
 from dataclasses import dataclass
 from typing import Optional, Dict
-import easy_biologic.base_programs as blp
-from easy_biologic import BiologicProgram
-
 
 from enum import StrEnum
+
+# P3a-2: the easy-biologic vendor runtime is imported lazily (see
+# `resolve_easy_class`) rather than at module import, so this registry — and
+# the BiologicDriver that imports it — load without the SDK present (hermetic
+# disconnected-construct; the SDK is only needed when a technique is actually
+# instantiated in `BiologicDriver.setup`).
+
+
+def resolve_easy_class(easy_class_name: str):
+    """Lazily import ``easy_biologic.base_programs`` and return a program class.
+
+    Args:
+        easy_class_name: Attribute name of the ``BiologicProgram`` subclass in
+            ``easy_biologic.base_programs`` (e.g. ``"OCV"``, ``"CA"``).
+
+    Returns:
+        The requested easy-biologic ``BiologicProgram`` subclass.
+    """
+    import easy_biologic.base_programs as blp
+
+    return getattr(blp, easy_class_name)
+
 
 # class IRange(StrEnum):
 #     p100 = "p100"
@@ -57,7 +76,9 @@ class BiologicTechnique:
 
     Attributes:
         technique_name: Short name used as the lookup key in ``BIOTECHS``.
-        easy_class: easy-biologic ``BiologicProgram`` subclass to instantiate.
+        easy_class_name: Attribute name of the easy-biologic ``BiologicProgram``
+            subclass in ``easy_biologic.base_programs`` (resolved lazily via
+            :func:`resolve_easy_class` so this module imports without the SDK).
         parameter_map: Mapping from action-server parameter keys to the
             easy-biologic program parameter names.
         field_map: Mapping from easy-biologic data field names to the HELAO
@@ -65,14 +86,14 @@ class BiologicTechnique:
     """
 
     technique_name: str
-    easy_class: BiologicProgram
+    easy_class_name: str
     parameter_map: Optional[Dict[str, str]] = None
     field_map: Optional[Dict[str, str]] = None
 
 
 TECH_OCV = BiologicTechnique(
     technique_name="OCV",
-    easy_class=blp.OCV,
+    easy_class_name="OCV",
     parameter_map={
         "Tval__s": "time",
         "AcqInterval__s": "time_interval",
@@ -85,7 +106,7 @@ TECH_OCV = BiologicTechnique(
 )
 TECH_CA = BiologicTechnique(
     technique_name="CA",
-    easy_class=blp.CA,
+    easy_class_name="CA",
     parameter_map={
         "Vval__V": "voltages",
         "Tval__s": "durations",
@@ -105,7 +126,7 @@ TECH_CA = BiologicTechnique(
 )
 TECH_CP = BiologicTechnique(
     technique_name="CP",
-    easy_class=blp.CP,
+    easy_class_name="CP",
     parameter_map={
         "Ival__A": "currents",
         "Tval__s": "durations",
@@ -125,7 +146,7 @@ TECH_CP = BiologicTechnique(
 )
 TECH_CV = BiologicTechnique(
     technique_name="CV",
-    easy_class=blp.CV,
+    easy_class_name="CV",
     parameter_map={
         "Vinit__V": "start",
         "Vapex1__V": "end",
@@ -149,7 +170,7 @@ TECH_CV = BiologicTechnique(
 
 TECH_PEIS = BiologicTechnique(
     technique_name="PEIS",
-    easy_class=blp.PEIS,
+    easy_class_name="PEIS",
     parameter_map={
         "Vinit__V": "voltage",
         "Vamp__V": "amplitude_voltage",
@@ -188,7 +209,7 @@ TECH_PEIS = BiologicTechnique(
 
 TECH_GEIS = BiologicTechnique(
     technique_name="GEIS",
-    easy_class=blp.GEIS,
+    easy_class_name="GEIS",
     parameter_map={
         "Iinit__A": "current",
         "Iamp__A": "amplitude_current",
@@ -226,7 +247,7 @@ TECH_GEIS = BiologicTechnique(
 )
 TECH_CAOCV = BiologicTechnique(
     technique_name="CAOCV",
-    easy_class=blp.CAOCV,
+    easy_class_name="CAOCV",
     parameter_map={
         "CA_Vval__V_list": "ca_voltages",
         "CA_Tval__s_list": "ca_durations",

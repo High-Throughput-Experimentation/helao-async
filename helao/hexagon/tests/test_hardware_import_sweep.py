@@ -31,29 +31,31 @@ def test_slice1_driver_imports_on_linux(mod):
 
 
 @pytest.mark.parametrize("mod", SLICE2_MODULES)
-@pytest.mark.xfail(
-    reason="P3a-2: biologic/technique.py references blp.OCV/CA/CV/PEIS/GEIS/CP "
-    "at module scope (technique registry built at import) plus an "
-    "`easy_class: BiologicProgram` class annotation — lazy-import requires a "
-    "registry restructure (store technique names/factories, resolve "
-    "getattr(blp, ...) at use), not an import move. Deferred to the biologic "
-    "native-adapter work.",
-    strict=False,
-)
 def test_slice2_driver_imports_on_linux(mod):
+    # P3a-2 DONE (2026-07-22): biologic/technique.py no longer references
+    # blp.OCV/... at module scope. The registry stores technique-name strings
+    # (`easy_class_name`) and resolves the vendor class lazily via
+    # `resolve_easy_class` at setup() time, so the driver now imports on Linux
+    # without the Windows-only easy_biologic runtime.
     importlib.import_module(BASE + mod)
 
 
 @pytest.mark.xfail(
-    reason="P3a-2 constructor-connect backlog: KinesisMotor.__init__ calls "
-    "self.connect() and kinesis_server.py never calls connect() externally, so "
-    "the fix must relocate connect() to the server startup (behavior change beyond "
-    "import relocation). Same §10.4 violation class as GamryDriver/AndorDriver/"
-    "MeerstetterTEC — batched into P3a-2.",
+    reason="P3a-2 status (2026-07-22): KinesisMotor.__init__ still calls "
+    "self.connect(). Unlike the other §10.4 offenders it is CONTESTED, not a "
+    "clean TODO: kinesis_server.py wires poller_class=KinesisPoller, and a "
+    "DriverPoller auto-starts in __init__ needing an open device (see the "
+    "poller-connect-in-__init__ rule), so relocating connect() is not a plain "
+    "behavior-preserving move. The sibling offenders are resolved otherwise: "
+    "AndorDriver fixed (disconnected-construct), GamryDriver deferred (shared "
+    "across private deployments), MeerstetterTEC dropped (no hte driver).",
     strict=False,
 )
 def test_kinesis_constructs_without_connecting(monkeypatch):
-    """§10.4: KinesisMotor(config) must not open devices in __init__."""
+    """§10.4: KinesisMotor(config) must not open devices in __init__.
+
+    Currently xfails by design — kinesis is poller-backed, so connect-in-
+    __init__ may be correct rather than a violation (contested; see reason)."""
     import pylablib.devices.Thorlabs as Thorlabs
     from helao.deploy.hte.drivers.motion import kinesis_driver
 
