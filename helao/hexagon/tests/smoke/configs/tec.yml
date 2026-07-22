@@ -24,6 +24,7 @@ servers:
     host: 127.0.0.1
     port: 8008
     group: action
+    deployment: hte
     fast: tec_server
     action_vis: tec_vis
     params:
@@ -33,6 +34,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: action_visualizer
     params:
       doc_name: 'TEC Visualizer'

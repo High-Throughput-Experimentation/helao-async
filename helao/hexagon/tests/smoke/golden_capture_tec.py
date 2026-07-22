@@ -75,10 +75,9 @@ TEC_HOST, TEC_PORT = "127.0.0.1", 8008
 
 SCENARIO = "GM-TEC"
 
-# helao/hexagon/tests/smoke/golden_capture_tec.py -> repo root is 4 parents
-# up (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # TECMonExec._poll (mecom_driver.py) reads the poller's live buffer
 # (`tec_vals` + `epoch_s`) and returns it verbatim as the polled `data` dict,
@@ -222,7 +221,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_record_tec",
         sequence_params={
             "manual": True,

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from helao.hexagon import preflight
 
+# hte canary configs (P3a/P3e) were relocated out of helao/deploy/hte/configs/
+# into this centralized, hte-only directory; bare-prefix resolution (which
+# globs helao/deploy/*/configs/) no longer finds them, so they must be passed
+# by full path.
+SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
+
 
 def test_gamryhex_canary_passes():
     """The hte hexagon canary config passes every offline gate."""
-    assert preflight.preflight_config("gamryhex") == []
+    assert preflight.preflight_config(str(SMOKE_CONFIGS / "gamryhex.yml")) == []
 
 
 def test_goldenhex_configs_pass():
@@ -77,7 +83,7 @@ def test_library_collision_overridable():
 def test_samplegraft_generic_graft_passes():
     """The generic config-driven graft (fast: graft + legacy_module) passes
     every offline gate — its checklist resolves from the legacy module."""
-    assert preflight.preflight_config("samplegraft") == []
+    assert preflight.preflight_config(str(SMOKE_CONFIGS / "samplegraft.yml")) == []
 
 
 def test_checklist_module_resolves_graft_from_legacy_module():

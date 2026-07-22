@@ -30,6 +30,7 @@ servers:
     host: 127.0.0.1
     port: 8010
     group: action
+    deployment: hte
     fast: dbpack_server
     params:
       aws_profile: default

@@ -83,7 +83,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.scenario == SCENARIO
         assert manifest.config_prefix == "specgold"
         assert manifest.config_path.replace("\\", "/").endswith(
-            "helao/deploy/hte/configs/specgold.yml"
+            "helao/hexagon/tests/smoke/configs/specgold.yml"
         )
         assert manifest.masked_hlo_columns == SPEC_MASKED_HLO_COLUMNS
         # no data-derived summary lands in -act.yml for acquire_spec -> no

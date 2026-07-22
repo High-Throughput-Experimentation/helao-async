@@ -152,7 +152,7 @@ if not "%errorlevel%"=="0" (
   echo [golden] ABORT %PREFIX% -- ports 8005/18005 still bound before launch; kill the stale holder and retry
   exit /b 2
 )
-start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot-reload > "%LAUNCHLOG%" 2>&1"
+start "%WINTITLE%" cmd /c "conda run -n helao python launch.py "%~dp0configs\%PREFIX%.yml" --no-hot-reload > "%LAUNCHLOG%" 2>&1"
 
 echo [golden] waiting for IO port 8005
 set "UP=0"
@@ -208,9 +208,9 @@ REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit this console.
 REM `taskkill /T /F` by window title is NEVER used: /T tree-kills and can
 REM cascade through a shared conhost.exe and close the main window.
-REM The match includes " --no-hot-reload" so "galiliogold" cannot match
-REM "galiliogoldhex" (no space follows "galiliogold" in that cmdline).
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+REM The match includes ".yml" so "galiliogold" cannot match
+REM "galiliogoldhex" ("galiliogold.yml" is a distinct filename, so no collision).
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py*%PREFIX%.yml*--no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 goto :eof
 
 REM ---------------------------------------------------------------------------

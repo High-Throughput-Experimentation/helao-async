@@ -22,6 +22,7 @@ servers:
     host: 127.0.0.1
     port: 8008
     group: action
+    deployment: hte
     fast: sample_server
     params:
       positions:

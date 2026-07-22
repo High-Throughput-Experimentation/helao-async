@@ -96,10 +96,9 @@ SYRINGE_HOST, SYRINGE_PORT = "127.0.0.1", 8013
 
 SCENARIO = "GM-SYRVOL"
 
-# helao/hexagon/tests/smoke/golden_capture_syringe.py -> repo root is 4 parents
-# up (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # MASKING = NONE (deliberate -- see module docstring). get_present_volume
 # writes the driver's software-tracked present_volume_ul (0.0 on a fresh idle
@@ -246,7 +245,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_get_present_volume",
         sequence_params={
             "manual": True,
