@@ -1,10 +1,11 @@
 # HEXAGON CANARY for the cam_server station (P3a special-split). Copy of
-# cam.yml with `deployment: hexagon` flipping CAM (cam_server) and ACTVIS
-# (action_visualizer) onto the hexagon factory. cam.yml stays legacy for
-# rollback; the cut-over is ONLY the two `deployment: hexagon` keys. Ports/root/
-# params match cam.yml so the openapi surface diff compares like-for-like.
-# TWO TIERS -- see cam.yml's header (openapi via cam_canary.bat, runtime
-# acquire_image golden diff via cam_diff.bat + camgold/camgoldhex).
+# cam.yml with `deployment: hexagon` flipping CAM (cam_server) onto the
+# hexagon factory. cam.yml stays legacy for rollback; the cut-over is ONLY the
+# `deployment: hexagon` key. Action-only (see cam.yml's header -- eche10.yml
+# declares no visualizer for CAM). Ports/root/params match cam.yml so the
+# openapi surface diff compares like-for-like. TWO TIERS -- see cam.yml's
+# header (openapi via cam_canary.bat, runtime acquire_image golden diff via
+# cam_diff.bat + camgold/camgoldhex).
 dummy: true
 simulation: true
 run_type: cam_server
@@ -18,12 +19,3 @@ servers:
     deployment: hexagon
     params:
       axis_ip: 192.168.200.210
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'CAM Visualizer'
-      launch_browser: true

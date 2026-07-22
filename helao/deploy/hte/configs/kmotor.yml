@@ -1,8 +1,9 @@
-# STANDALONE kinesis_server canary config (P3a special-split, KMOTOR). Mirrors
-# galil.yml / spec.yml's 2-server shape (one action server + one
-# action_visualizer) so an at-station openapi golden diff can compare legacy
-# vs hexagon like-for-like without pulling in the full hispec station (ORCH,
-# MOTOR, PSTAT, IO, SAMPLE, SPEC_T, DB, CAM). The `axes.z` block (serial_no /
+# STANDALONE kinesis_server canary config (P3a special-split, KMOTOR). This
+# config is action-only: hispec.yml declares no action_vis/live_vis for
+# KMOTOR, so a visualizer panel here would only ever be blank. It exists so
+# an at-station openapi golden diff can compare legacy vs hexagon
+# like-for-like without pulling in the full hispec station (ORCH, MOTOR,
+# PSTAT, IO, SAMPLE, SPEC_T, DB, CAM). The `axes.z` block (serial_no /
 # pos_scale / vel_scale / acc_scale / move_limit_mm) is copied VERBATIM from
 # hispec.yml's KMOTOR block so kinesis_dyn_endpoints registers the identical
 # kmove/cancel_kmove/set_velocity route surface AND so KinesisMotor.connect()
@@ -48,11 +49,3 @@ servers:
           vel_scale: 65970697.6 # device to mm/s
           acc_scale: 13518.2 # device to mm/s2
           move_limit_mm: 5.0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'KMOTOR Visualizer'
-      launch_browser: true

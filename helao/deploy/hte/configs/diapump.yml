@@ -1,7 +1,9 @@
-# STANDALONE diapump_server canary config (P3a special-split, DIAPUMP). Mirrors
-# cam.yml's 2-server shape (one action server + one action_visualizer) so an
-# at-station openapi surface diff can compare legacy vs hexagon like-for-like
-# without pulling in the full ccsi2 station. The DOSEPUMP params (port/address)
+# STANDALONE diapump_server canary config (P3a special-split, DIAPUMP). This
+# config is action-only: ccsi2.yml declares no action_vis/live_vis for
+# DOSEPUMP, so a visualizer panel here would only ever be blank. It exists so
+# an at-station openapi surface diff can compare legacy vs hexagon
+# like-for-like without pulling in the full ccsi2 station. The DOSEPUMP
+# params (port/address)
 # are copied VERBATIM from ccsi2.yml's DOSEPUMP block. This is the diaphragm
 # dosing pump (serial COM, no vendor DLL, no COM/gclib).
 #
@@ -25,11 +27,3 @@ servers:
     params:
       port: COM7
       address: 0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'DIAPUMP Visualizer'
-      launch_browser: true

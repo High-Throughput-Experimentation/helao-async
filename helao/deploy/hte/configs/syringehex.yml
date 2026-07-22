@@ -1,8 +1,9 @@
 # HEXAGON CANARY for the syringe_server station (P3a special-split). Copy of
 # syringe.yml with `deployment: hexagon` flipping WORKSYRINGE (syringe_server)
-# and ACTVIS (action_visualizer) onto the hexagon factory -- the hte cut-over
-# target, run AT-STATION (Windows/pyserial COM5). syringe.yml stays legacy for
-# rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# onto the hexagon factory -- the hte cut-over target, run AT-STATION
+# (Windows/pyserial COM5). syringe.yml stays legacy for rollback; the
+# cut-over is ONLY the `deployment: hexagon` key. Action-only (see
+# syringe.yml's header -- ccsi1.yml declares no visualizer for WORKSYRINGE).
 # Ports/root/params match syringe.yml so an on-station openapi diff compares
 # like-for-like.
 dummy: true
@@ -22,12 +23,3 @@ servers:
         zero:
           address: 0
           diameter: 26.7
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'WORKSYRINGE Visualizer'
-      launch_browser: true

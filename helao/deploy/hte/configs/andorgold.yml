@@ -20,11 +20,3 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'ANDOR Visualizer'
-      launch_browser: true

@@ -18,10 +18,10 @@ REM and analysis_canary.sh.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. diapumphex is a 2-server group (DOSEPUMP@8016 +
-REM ACTVIS@5001) with NO orchestrator (mirrors cam_canary.bat exactly).
+REM sequences to an orchestrator. diapumphex is a 1-server group (DOSEPUMP@8016)
+REM with NO orchestrator (mirrors cam_canary.bat exactly).
 REM
-REM Both configs share root C:\INST_hlo and ports 8016/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8016, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: this openapi canary only boots each server and reads /openapi.json; it
 REM never dispatches an action, so no pump ever moves fluid and no COM device

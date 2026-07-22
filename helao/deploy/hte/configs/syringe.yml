@@ -1,8 +1,9 @@
 # STANDALONE syringe_server canary config (P3a special-split, SYRINGE pump).
-# Mirrors galil.yml/spec.yml's 2-server shape (one action server + one
-# action_visualizer) so an at-station openapi/runtime golden diff can compare
-# legacy vs hexagon like-for-like without pulling in the full ccsi1 station
-# (ORCH, the other syringe pumps, MFCs, sensors, DB, ...). The WORKSYRINGE
+# This config is action-only: ccsi1.yml declares no action_vis/live_vis for
+# WORKSYRINGE, so a visualizer panel here would only ever be blank. It exists
+# so an at-station openapi/runtime golden diff can compare legacy vs hexagon
+# like-for-like without pulling in the full ccsi1 station (ORCH, the other
+# syringe pumps, MFCs, sensors, DB, ...). The WORKSYRINGE
 # params (port, pumps: zero: {address, diameter}) are copied VERBATIM from
 # ccsi1.yml's WORKSYRINGE block so get_present_volume registers identically
 # (it is gated on nothing beyond the driver being constructed). This is the KD
@@ -32,11 +33,3 @@ servers:
         zero:
           address: 0
           diameter: 26.7
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'WORKSYRINGE Visualizer'
-      launch_browser: true

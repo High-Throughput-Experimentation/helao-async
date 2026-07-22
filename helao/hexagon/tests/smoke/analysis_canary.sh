@@ -15,8 +15,8 @@
 # identical route/schema surface proves the hexagon makeActionApp factory
 # produces a byte-parity action server for this cut-over target.
 #
-# Both configs share root /tmp/INST_hlo_analysis and ports 8014/5001, so they
-# MUST run sequentially (this script does that) -- never launch both at once.
+# Both configs share root /tmp/INST_hlo_analysis and port 8014, so they MUST
+# run sequentially (this script does that) -- never launch both at once.
 #
 # Usage: analysis_canary.sh [root] [outdir]
 #   root   default /tmp/INST_hlo_analysis   (must match the configs' root: key)

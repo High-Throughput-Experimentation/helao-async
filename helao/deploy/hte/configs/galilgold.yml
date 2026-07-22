@@ -51,11 +51,3 @@ servers:
         A: 127.8
         B: 76.7
       timeout: 600
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    params:
-      doc_name: 'MOTOR Visualizer'
-      launch_browser: true

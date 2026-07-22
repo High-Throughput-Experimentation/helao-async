@@ -1,9 +1,10 @@
 # HEXAGON CANARY for the pal_server station (P3a special-split, PAL wrap step).
-# Copy of pal.yml with `deployment: hexagon` flipping PAL (pal_server) and
-# ACTVIS (action_visualizer) onto the hexagon factory (makeActionApp shim,
+# Copy of pal.yml with `deployment: hexagon` flipping PAL (pal_server) onto
+# the hexagon factory (makeActionApp shim,
 # helao/deploy/hexagon/servers/action/pal_server.py) -- run AT-STATION
 # (Windows, PAL autosampler reachable over SSH). pal.yml stays legacy for
-# rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# rollback; the cut-over is ONLY the `deployment: hexagon` key. Action-only
+# (see pal.yml's header -- adss3.yml declares no visualizer for PAL).
 # Ports/root/params match pal.yml so an on-station openapi diff compares
 # like-for-like. The RPC port is HTTP+10000 = 18007.
 #
@@ -41,12 +42,3 @@ servers:
         archive: custom_to_tray_220214.cam
         transfer_tray_custom: tray_to_custom_220214.cam
         deepclean: deep_clean_220214.cam
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'PAL Visualizer'
-      launch_browser: true

@@ -1,10 +1,11 @@
 # HEXAGON CANARY for the sample_server station (P3a special-split). Copy of
-# sample.yml with `deployment: hexagon` flipping SAMPLE (sample_server) and
-# ACTVIS (action_visualizer) onto the hexagon factory. sample.yml stays
-# legacy for rollback; the cut-over is ONLY the two `deployment: hexagon`
-# keys. Ports/root/params match sample.yml so a golden diff compares
-# like-for-like. Unlike galil/gamry this canary is fully Linux-runnable (no
-# hardware, no COM/gclib) -- see golden_capture_sample.py's docstring.
+# sample.yml with `deployment: hexagon` flipping SAMPLE (sample_server) onto
+# the hexagon factory. sample.yml stays legacy for rollback; the cut-over is
+# ONLY the `deployment: hexagon` key. Action-only (see sample.yml's header --
+# eche10.yml declares no visualizer for SAMPLE). Ports/root/params match
+# sample.yml so a golden diff compares like-for-like. Unlike galil/gamry this
+# canary is fully Linux-runnable (no hardware, no COM/gclib) -- see
+# golden_capture_sample.py's docstring.
 dummy: true
 simulation: true
 run_type: sample_server
@@ -20,12 +21,3 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'SAMPLE Visualizer'
-      launch_browser: true

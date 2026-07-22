@@ -1,7 +1,8 @@
 # HEXAGON CANARY for the diapump_server station (P3a special-split). Copy of
-# diapump.yml with `deployment: hexagon` flipping DOSEPUMP (diapump_server) and
-# ACTVIS (action_visualizer) onto the hexagon factory. diapump.yml stays legacy
-# for rollback; the cut-over is ONLY the two `deployment: hexagon` keys.
+# diapump.yml with `deployment: hexagon` flipping DOSEPUMP (diapump_server)
+# onto the hexagon factory. diapump.yml stays legacy for rollback; the
+# cut-over is ONLY the `deployment: hexagon` key. Action-only (see
+# diapump.yml's header -- ccsi2.yml declares no visualizer for DOSEPUMP).
 # Ports/root/params match diapump.yml so the openapi surface diff compares
 # like-for-like.
 #
@@ -24,12 +25,3 @@ servers:
     params:
       port: COM7
       address: 0
-  ACTVIS:
-    host: 127.0.0.1
-    port: 5001
-    group: visualizer
-    bokeh: action_visualizer
-    deployment: hexagon
-    params:
-      doc_name: 'DIAPUMP Visualizer'
-      launch_browser: true

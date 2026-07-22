@@ -11,12 +11,12 @@ REM major Windows/gclib driver, after gamry).
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the
 REM golden SIM group topology (orch@8001, sim@8002, db@8010) and dispatches
-REM sequences to an orchestrator. galilhex is a 2-server group (MOTOR@8003 +
-REM ACTVIS@5001) with NO orchestrator, so the GM-* scenarios cannot drive it.
+REM sequences to an orchestrator. galilhex is a 1-server group (MOTOR@8003)
+REM with NO orchestrator, so the GM-* scenarios cannot drive it.
 REM The openapi diff is the topology-appropriate parity check (mirrors
 REM gamryhex_canary.bat exactly).
 REM
-REM Both configs share root C:\INST_hlo and ports 8003/5001, so they MUST run
+REM Both configs share root C:\INST_hlo and port 8003, so they MUST run
 REM sequentially (this script does that) -- never launch both at once.
 REM NOTE: galil.yml's simulation:true is cosmetic (banner color) here --
 REM Galil.connect() has no sim/dummy data path (see golden_capture_galil.py's
