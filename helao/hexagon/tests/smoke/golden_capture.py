@@ -242,14 +242,24 @@ def dispatch_action(
     prepends nothing, so callers wrongly pass ``"KEY/action"`` as the path.
 
     The destination host/port is resolved by ``async_action_dispatcher`` from
-    ``read_config(config_prefix)['servers'][server_key]``. ``config_prefix`` is
-    resolved via ``CONFIG_DIR`` (this module's ``configs/`` sibling), NOT
-    ``read_config``'s bare-prefix glob -- the relocated hte canary configs no
-    longer live under ``helao/deploy/*/configs/``, so a bare prefix would raise
-    ``FileNotFoundError``.
+    the config's ``['servers'][server_key]``. ``config_prefix`` may be EITHER a
+    bare prefix -- resolved against ``CONFIG_DIR`` (this module's ``configs/``
+    sibling, the hte canary configs) -- OR a full path to a config file, used
+    as-is. Private deployments (mea/lila) pass their own
+    ``tests/smoke/configs/<prefix>.yml`` full path, since their relocated
+    canary configs are NOT under this parent module's ``CONFIG_DIR``. A bare
+    prefix is NOT sent through ``read_config``'s bare-prefix glob -- the
+    relocated configs no longer live under ``helao/deploy/*/configs/``, so that
+    would raise ``FileNotFoundError``.
     """
     action_params = dict(action_params or {})
-    world_cfg = read_config(str(CONFIG_DIR / f"{config_prefix}.yml"))
+    # Path-or-prefix: a value ending in .yml/.py is a full config path (used
+    # as-is); anything else is a bare prefix resolved against CONFIG_DIR.
+    if config_prefix.endswith((".yml", ".py")):
+        cfg_arg = config_prefix
+    else:
+        cfg_arg = str(CONFIG_DIR / f"{config_prefix}.yml")
+    world_cfg = read_config(cfg_arg)
     action = Action(
         action_name=action_name,
         action_server=MachineModel(
