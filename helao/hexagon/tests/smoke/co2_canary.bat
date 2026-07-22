@@ -113,7 +113,7 @@ if not "%errorlevel%"=="0" (
   echo [canary] ABORT %PREFIX% -- ports 8012/18012 still bound before launch; kill the stale holder and retry
   exit /b 2
 )
-start "%WINTITLE%" cmd /c "conda run -n helao python launch.py %PREFIX% --no-hot-reload > "%LAUNCHLOG%" 2>&1"
+start "%WINTITLE%" cmd /c "conda run -n helao python launch.py "%~dp0configs\%PREFIX%.yml" --no-hot-reload > "%LAUNCHLOG%" 2>&1"
 
 echo [canary] waiting for CO2SENSOR port 8012
 set "UP=0"
@@ -164,8 +164,8 @@ REM 2) kill the launch.py monitor (+ its conda/cmd wrapper) for THIS prefix by
 REM matching its command line -- precise, so it can never hit the canary console.
 REM `taskkill /T /F` by window title was removed: /T tree-kills and can cascade
 REM through a shared conhost.exe and close the main canary window.
-REM The match includes " --no-hot-reload" so prefix "co2" cannot match "co2hex".
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %PREFIX% --no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+REM The match includes ".yml" so prefix "co2" cannot match "co2hex".
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py*%PREFIX%.yml*--no-hot-reload*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 REM 3) WAIT for the CO2SENSOR server's HTTP + co-located ZMQ RPC ports (RPC =
 REM HTTP+10000 = 18012) to actually RELEASE before returning. The RPC listener
 REM is a thread inside the server process and lives as long as the process does;

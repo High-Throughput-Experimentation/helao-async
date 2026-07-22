@@ -64,7 +64,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.scenario == SCENARIO
         assert manifest.config_prefix == "syringegold"
         assert manifest.config_path.replace("\\", "/").endswith(
-            "helao/deploy/hte/configs/syringegold.yml"
+            "helao/hexagon/tests/smoke/configs/syringegold.yml"
         )
         # MASKING = NONE is the load-bearing decision for this scenario: the
         # present_volume_ul value is config-deterministic on a fresh idle pump

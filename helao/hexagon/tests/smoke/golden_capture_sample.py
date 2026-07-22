@@ -100,10 +100,9 @@ SAMPLE_HOST, SAMPLE_PORT = "127.0.0.1", 8008
 
 SCENARIO = "GM-POS"
 
-# helao/hexagon/tests/smoke/golden_capture_sample.py -> repo root is 4
-# parents up (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # get_loaded_positions writes no .hlo data file at all (see module docstring)
 # -- there is therefore nothing to mask in a data column, and no data-derived
@@ -194,7 +193,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_get_loaded_positions",
         sequence_params={
             "manual": True,

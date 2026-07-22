@@ -36,6 +36,7 @@ servers:
     host: 127.0.0.1
     port: 8014
     group: action
+    deployment: hte
     fast: analysis_server
     params:
       local_only: true

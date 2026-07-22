@@ -23,6 +23,7 @@ servers:
     host: 127.0.0.1
     port: 8016
     group: action
+    deployment: hte
     fast: diapump_server
     params:
       port: COM7

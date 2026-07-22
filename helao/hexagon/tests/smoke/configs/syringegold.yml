@@ -20,6 +20,7 @@ servers:
     host: 127.0.0.1
     port: 8013
     group: action
+    deployment: hte
     fast: syringe_server
     params:
       port: COM5

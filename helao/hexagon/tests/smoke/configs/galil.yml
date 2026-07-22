@@ -18,6 +18,7 @@ servers:
     host: 127.0.0.1
     port: 8003
     group: action
+    deployment: hte
     fast: galil_motion
     params:
       enable_aligner: false

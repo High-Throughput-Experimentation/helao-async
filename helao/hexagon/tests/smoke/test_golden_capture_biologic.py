@@ -70,7 +70,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.scenario == SCENARIO
         assert manifest.config_prefix == "biologicgold"
         assert manifest.config_path.replace("\\", "/").endswith(
-            "helao/deploy/hte/configs/biologicgold.yml"
+            "helao/hexagon/tests/smoke/configs/biologicgold.yml"
         )
         assert manifest.masked_hlo_columns == OCV_MASKED_HLO_COLUMNS
         assert manifest.hlo_row_count_tolerance == OCV_HLO_ROW_COUNT_TOLERANCE
