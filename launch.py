@@ -592,7 +592,12 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     Returns:
         Pidd: An instance of the Pidd class containing the process IDs of the launched servers.
     """
-    confPrefix = os.path.basename(confArg).replace(".py", "")
+    # Strip ANY config extension (.py/.yml/.yaml), not just .py, so launching by
+    # a full path to a .yml config (read_config accepts either a bare prefix or a
+    # full path) yields a clean prefix -- the pid pickle is named
+    # pids_<confPrefix>_<extraopt>.pck and kill_group globs it, so a stray ".yml"
+    # here would change the pickle name. splitext drops only the final extension.
+    confPrefix = os.path.splitext(os.path.basename(confArg))[0]
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
 
