@@ -30,6 +30,7 @@ servers:
     host: 127.0.0.1
     port: 8002
     group: action
+    deployment: hte
     fast: power_supply_server
     action_vis: power_supply_vis
     params:
@@ -39,6 +40,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: action_visualizer
     params:
       doc_name: 'POWER_SUPPLY Visualizer'

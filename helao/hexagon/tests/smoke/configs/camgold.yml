@@ -15,6 +15,7 @@ servers:
     host: 127.0.0.1
     port: 8013
     group: action
+    deployment: hte
     fast: cam_server
     params:
       axis_ip: 192.168.200.210

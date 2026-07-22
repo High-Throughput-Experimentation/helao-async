@@ -80,10 +80,9 @@ MOTOR_HOST, MOTOR_PORT = "127.0.0.1", 8003
 
 SCENARIO = "GM-QPOS"
 
-# helao/hexagon/tests/smoke/golden_capture_galil.py -> repo root is 4 parents
-# up (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # galil_motion.py's query_positions endpoint calls
 # `Galil.query_axis_position(axis=Galil.get_all_axis())` and enqueues its
@@ -223,7 +222,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_query_positions",
         sequence_params={
             "manual": True,

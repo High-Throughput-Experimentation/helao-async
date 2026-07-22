@@ -17,6 +17,7 @@ servers:
     host: 127.0.0.1
     port: 8005
     group: action
+    deployment: hte
     fast: galil_io
     live_vis: pressure_vis
     params:
@@ -36,6 +37,7 @@ servers:
     host: 127.0.0.1
     port: 5001
     group: visualizer
+    deployment: hte
     bokeh: live_visualizer
     params:
       doc_name: 'IO Visualizer'

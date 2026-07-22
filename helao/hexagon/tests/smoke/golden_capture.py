@@ -89,10 +89,9 @@ PSTAT_HOST, PSTAT_PORT = "127.0.0.1", 8001
 
 SCENARIO = "GM-OCV"
 
-# helao/hexagon/tests/smoke/golden_capture.py -> repo root is 4 parents up
-# (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # helao/deploy/hte/drivers/pstat/gamry/dtaq.py: DTAQ_OCV.output_keys. These
 # are raw ADC/COM samples pulled straight off the live potentiostat -- no
@@ -243,10 +242,14 @@ def dispatch_action(
     prepends nothing, so callers wrongly pass ``"KEY/action"`` as the path.
 
     The destination host/port is resolved by ``async_action_dispatcher`` from
-    ``read_config(config_prefix)['servers'][server_key]``.
+    ``read_config(config_prefix)['servers'][server_key]``. ``config_prefix`` is
+    resolved via ``CONFIG_DIR`` (this module's ``configs/`` sibling), NOT
+    ``read_config``'s bare-prefix glob -- the relocated hte canary configs no
+    longer live under ``helao/deploy/*/configs/``, so a bare prefix would raise
+    ``FileNotFoundError``.
     """
     action_params = dict(action_params or {})
-    world_cfg = read_config(config_prefix)
+    world_cfg = read_config(str(CONFIG_DIR / f"{config_prefix}.yml"))
     action = Action(
         action_name=action_name,
         action_server=MachineModel(
@@ -399,7 +402,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_run_OCV",
         sequence_params={
             "manual": True,

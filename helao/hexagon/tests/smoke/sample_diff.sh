@@ -86,9 +86,8 @@ kill_one() {
   conda run -n helao python "$SCRIPT_DIR/kill_group.py" "$CAPROOT" "$prefix"
   # 2) kill the launch.py monitor for THIS prefix by matching its command
   # line -- precise, so it can never hit this shell. The trailing
-  # " --no-hot-reload" ensures "samplegold" cannot match "samplegoldhex" (no
-  # space follows "samplegold" in that cmdline).
-  pkill -f "launch\\.py ${prefix} --no-hot-reload" 2>/dev/null || true
+  # ".yml" ensures "samplegold" cannot match "samplegoldhex" ("samplegold.yml" is a distinct filename, so no collision).
+  pkill -f "launch\\.py .*${prefix}\\.yml --no-hot-reload" 2>/dev/null || true
 }
 
 # ---------------------------------------------------------------------------
@@ -101,7 +100,7 @@ run_one() {
   echo
   echo "[golden] === $prefix ==="
   echo "[golden] launching $prefix (log: $launchlog)"
-  nohup conda run -n helao python launch.py "$prefix" --no-hot-reload > "$launchlog" 2>&1 &
+  nohup conda run -n helao python launch.py "$SCRIPT_DIR/configs/${prefix}.yml" --no-hot-reload > "$launchlog" 2>&1 &
   local launch_pid=$!
 
   echo "[golden] waiting for SAMPLE port 8008"

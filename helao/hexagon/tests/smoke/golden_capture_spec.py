@@ -81,10 +81,9 @@ SPEC_HOST, SPEC_PORT = "127.0.0.1", 8011
 
 SCENARIO = "GM-SPEC"
 
-# helao/hexagon/tests/smoke/golden_capture_spec.py -> repo root is 4 parents up
-# (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # n_pixels from the SPEC config block (eche10.yml / spec*.yml). SM303.
 # acquire_spec_adv builds the data dict as {"epoch_s": ..., "ch_0000": ...,
@@ -204,7 +203,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_acquire_spec",
         sequence_params={
             "manual": True,

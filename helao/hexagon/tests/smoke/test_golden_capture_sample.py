@@ -79,7 +79,7 @@ def test_snapshot_copies_parity_tops_and_writes_roundtrippable_provenance():
         assert manifest.scenario == SCENARIO
         assert manifest.config_prefix == "samplegold"
         assert manifest.config_path.replace("\\", "/").endswith(
-            "helao/deploy/hte/configs/samplegold.yml"
+            "helao/hexagon/tests/smoke/configs/samplegold.yml"
         )
         # No volatile action_params fields for this scenario (Step 0):
         # _positions/_tray_pos/_custom_pos are fully config-derived on a

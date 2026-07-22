@@ -17,6 +17,7 @@ servers:
     host: 127.0.0.1
     port: 8011
     group: action
+    deployment: hte
     fast: andor_server
     params:
       dev_id: 0

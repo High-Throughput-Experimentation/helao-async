@@ -81,10 +81,9 @@ BIO_HOST, BIO_PORT = "127.0.0.1", 8016
 
 SCENARIO = "GM-BIOOCV"
 
-# helao/hexagon/tests/smoke/golden_capture_biologic.py -> repo root is 4 parents
-# up (matches safe_root.py's own _repo_root()).
-REPO_ROOT = Path(__file__).resolve().parents[4]
-CONFIG_DIR = REPO_ROOT / "helao" / "deploy" / "hte" / "configs"
+# hte canary configs (P3a/P3e relocation) live alongside this module, in
+# its own configs/ sibling directory -- no longer under helao/deploy/hte/.
+CONFIG_DIR = Path(__file__).resolve().parent / "configs"
 
 # The run_OCV .hlo columns. BiologicExec._poll enqueues BiologicDriver.get_data's
 # data dict verbatim (base.py writes datadict keys straight through as hlo
@@ -293,7 +292,7 @@ def snapshot(
         config_prefix=config_prefix,
         config_path=str(config_path),
         legacy_git_sha=sha,
-        launch_cmd=f"conda run -n helao python launch.py {config_prefix} --no-hot-reload",
+        launch_cmd=f'conda run -n helao python launch.py "{config_path}" --no-hot-reload',
         sequence_name="manual_run_OCV",
         sequence_params={
             "manual": True,
