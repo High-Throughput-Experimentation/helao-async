@@ -242,6 +242,12 @@ async def andor_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
+    # P3a-2 constructor-connect fix: AndorDriver.__init__ no longer opens the
+    # camera (disconnected construct); open it here at startup before any
+    # acquire request reads app.driver.wl_arr.
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"Andor connect() returned status={connect_resp.status}")
+
     @app.post(f"/{server_key}/acquire", tags=["action"])
     @action_version(2)
     async def acquire(
@@ -279,8 +285,7 @@ async def andor_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
-    async def cancel_acquire(
-    ):
+    async def cancel_acquire():
         """Stop any running ``acquire`` executor on this server."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
@@ -303,8 +308,7 @@ async def andor_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
     @app.post(f"/{server_key}/adjust_nd", tags=["action"])
-    async def adjust_nd(
-    ):
+    async def adjust_nd():
         """Run the ND-filter auto-selection routine via :class:`AndorAdjustND`."""
         active = await app.base.setup_and_contain_action()
         executor = AndorAdjustND(active=active, oneoff=True)

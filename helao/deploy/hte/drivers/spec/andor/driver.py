@@ -63,10 +63,14 @@ class AndorDriver(HelaoDriver):
     frame: int
 
     def __init__(self, config: dict = {}):
-        """Construct the driver and immediately open the camera.
+        """Construct the driver WITHOUT opening the camera (§10.4
+        disconnected-construct).
 
-        Reads ``dev_id`` from ``config`` (default ``0``), instantiates the
-        SDK, calls :meth:`connect`, and marks the driver ready on success.
+        Reads ``dev_id`` from ``config`` (default ``0``) and initializes state
+        only -- no vendor SDK instantiation and no ``connect()`` here, so the
+        driver is constructible without the Andor runtime (e.g. on Linux for a
+        construct-test). ``andor_server.andor_dyn_endpoints`` calls
+        :meth:`connect` at server startup (P3a-2 constructor-connect fix).
 
         Args:
             config: Driver configuration dict from the action server.
@@ -83,21 +87,26 @@ class AndorDriver(HelaoDriver):
 
         self.timeout = 5000
 
-        _load_andor()
-        self.sdk3 = AndorSDK3()
+        # SDK handle created lazily in connect() (was `AndorSDK3()` here); the
+        # vendor runtime is never touched at construction time.
+        self.sdk3 = None
         self.device_id = self.config.get("dev_id", 0)
         LOGGER.info(f"using device_id {self.device_id} from config")
-        # if single context is used and held for the entire session, connect here, otherwise have executor call self.connect() in self.setup()
-        self.connect()
         self.ready = True
 
     def connect(self) -> DriverResponse:
         """Open the camera, configure imaging and prime spectrograph metadata.
 
+        Instantiates the Andor SDK on first call (create-once; reused across
+        reconnects), then opens the camera.
+
         Returns:
             A success :class:`DriverResponse` on connect, ``failed`` on error.
         """
         try:
+            if self.sdk3 is None:
+                _load_andor()
+                self.sdk3 = AndorSDK3()
             self.cam = self.sdk3.GetCamera(self.device_id)
             LOGGER.debug(f"connected to {self.device_id}")
             self.pixel_width = self.setup_image()

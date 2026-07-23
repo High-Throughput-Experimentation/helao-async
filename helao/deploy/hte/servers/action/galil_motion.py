@@ -54,6 +54,10 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from helao.core.models.file import FileConnParams
 from helao.core.error import ErrorCodes
 
+# P3a galil-split slice-4: the Bokeh plate-aligner is hosted by the vis layer,
+# not the driver (D6 fix). The server constructs the host after connect().
+from helao.hexagon.adapters.vis.galil_aligner_host import GalilAlignerHost
+
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -92,6 +96,27 @@ async def galil_dyn_endpoints(app: BaseAPI):
     LOGGER.info(f"Galil connect() returned status={connect_resp.status}")
 
     if app.driver.galil_enabled is True:
+
+        # P3a galil-split slice-4: construct the Bokeh plate-aligner in the vis
+        # layer (was `Galil.start_aligner` inside connect()). The host owns the
+        # Bokeh Server + HelaoVis + the aligner-session Active, and wires the
+        # driver's position-notify sink; gated on the `enable_aligner` config
+        # exactly as the driver's old `aligner_enabled` gate was.
+        app.aligner_host = None
+        if app.server_params.get("enable_aligner", False):
+            app.aligner_host = GalilAlignerHost(
+                driver=app.driver,
+                base=app.base,
+                server_cfg=app.base.server_cfg,
+                server_name=server_key,
+                config=app.server_params,
+            )
+            app.aligner_host.start()
+
+            @app.on_event("shutdown")
+            async def _shutdown_aligner_host():
+                if getattr(app, "aligner_host", None) is not None:
+                    app.aligner_host.shutdown()
 
         dev_axis = app.server_params.get("axis_id", {})
         dev_axisitems = make_str_enum("axis_id", {key: key for key in dev_axis})
@@ -142,16 +167,20 @@ async def galil_dyn_endpoints(app: BaseAPI):
             """Start the interactive plate-alignment routine.
 
             K7b: containing the action (``contain_action``) is done here,
-            not by the driver -- ``Galil.run_aligner_precheck`` reports
-            whether a new run may start and, if not, the exact rejection
-            code (mirroring the pre-migration nested gate precisely). Only
-            when it reports success is the ``Active`` created and handed to
-            ``Galil.start_aligner_run``, which manages the accompanying
-            Bokeh aligner UI; the final transfer matrix is delivered when
-            the user submits the alignment.
+            not by the driver. P3a slice-4: the precheck + run-start moved
+            from the driver to the vis-layer ``GalilAlignerHost`` (which owns
+            the Bokeh aligner UI + its Active); ``run_aligner_precheck``
+            reports whether a new run may start and, if not, the exact
+            rejection code. Only when it reports success is the ``Active``
+            created and handed to ``host.start_aligner_run``; the final
+            transfer matrix is delivered when the user submits the alignment.
             """
             A = app.base.setup_action()
-            ok, error_code = app.driver.run_aligner_precheck()
+            host = app.aligner_host
+            if host is None:
+                A.error_code = ErrorCodes.not_available
+                return A.as_dict()
+            ok, error_code = host.run_aligner_precheck()
             if ok:
                 active = await app.base.contain_action(
                     ActiveParams(
@@ -170,18 +199,21 @@ async def galil_dyn_endpoints(app: BaseAPI):
                         },
                     )
                 )
-                active_dict = await app.driver.start_aligner_run(active)
+                active_dict = await host.start_aligner_run(active)
             else:
                 A.error_code = error_code
                 active_dict = A.as_dict()
             return active_dict
 
         @app.post(f"/{server_key}/stop_aligner", tags=["action"])
-        async def stop_aligner(
-        ):
+        async def stop_aligner():
             """Abort an in-progress plate-alignment routine."""
             active = await app.base.setup_and_contain_action()
-            active.action.error_code = await app.driver.stop_aligner()
+            host = app.aligner_host
+            if host is None:
+                active.action.error_code = ErrorCodes.not_available
+            else:
+                active.action.error_code = await host.stop_aligner()
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -322,8 +354,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
         @app.post(f"/{server_key}/disconnect", tags=["action"])
-        async def disconnect(
-        ):
+        async def disconnect():
             """Disconnect from the Galil motion controller."""
             active = await app.base.setup_and_contain_action(action_abbr="disconnect")
             await active.enqueue_data_dflt(datadict=await app.driver.motor_disconnect())
@@ -333,8 +364,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
         if dev_axis:
 
             @app.post(f"/{server_key}/query_positions", tags=["action"])
-            async def query_positions(
-            ):
+            async def query_positions():
                 """Return the current position of every configured axis."""
                 active = await app.base.setup_and_contain_action(
                     action_abbr="query_position"
@@ -520,8 +550,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/stop", tags=["action"])
-        async def stop(
-        ):
+        async def stop():
             """De-energise every configured motor axis."""
             active = await app.base.setup_and_contain_action(action_abbr="stop")
             datadict = await app.driver.motor_off(axis=app.driver.get_all_axis())
@@ -533,8 +562,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         @app.post(f"/{server_key}/reset", tags=["action"])
-        async def reset(
-        ):
+        async def reset():
             """Reset the Galil controller. Emergency use only.
 
             Calls :meth:`Galil.reset_controller` -- the pre-migration

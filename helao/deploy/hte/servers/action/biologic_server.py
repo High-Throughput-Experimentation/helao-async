@@ -7,7 +7,6 @@ Wraps :class:`BiologicDriver` and exposes electrochemistry technique endpoints
 the hardware driver stays decoupled from the action-server base class.
 """
 
-
 __all__ = ["makeApp"]
 
 
@@ -54,7 +53,6 @@ from ...drivers.pstat.biologic.technique import (
     TECH_PEIS,
     TECH_CAOCV,
 )
-
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -321,6 +319,12 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     """
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
+
+    # P3a-2 constructor-connect fix: BiologicDriver.__init__ no longer opens the
+    # instrument (disconnected construct); connect here at startup. connect()
+    # sets app.driver.ready on success, satisfying the wait below.
+    connect_resp = app.driver.connect()
+    LOGGER.info(f"Biologic connect() returned status={connect_resp.status}")
 
     while not app.driver.ready:
         LOGGER.info("waiting for biologic init")
@@ -630,6 +634,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CAOCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
+
 
 def makeApp(server_key) -> BaseAPI:
     """Build the Biologic potentiostat FastAPI app.
