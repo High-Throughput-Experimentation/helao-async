@@ -25,8 +25,11 @@ lower-risk "dedicated MTA worker" variant. Switching to STA
 (``COINIT_APARTMENTTHREADED`` = ``0x2``) is a single constructor arg, to be
 decided against observed event reliability on the bench.
 
-**NOT Linux-runtime-verifiable and NOT runtime-wired.** Construct-test tier only;
-the real COM/threading behavior is an at-station gate. See
+**Wired as the gamry action server's driver** (``driver_classes=[GamryComAdapter]``)
+after at-station validation (single-pump/no-missed-points, PEIS, golden_diff,
+MTA apartment affinity — PR #205). The COM/threading behavior is not
+Linux-runtime-verifiable; the Linux tests cover the marshalling + drain +
+strategy machinery with COM stubbed. See
 ``docs/superpowers/plans/2026-07-22-P3a-gamry-com-sta-thread.md``.
 """
 
@@ -42,6 +45,7 @@ from helao.core.drivers.helao_driver import (
     DriverResponse,
     DriverResponseType,
     DriverStatus,
+    HelaoDriver,
 )
 from helao.helpers import helao_logging as logging
 
@@ -187,7 +191,7 @@ def _default_driver_factory(config: dict):
     return GamryDriver(config=config)
 
 
-class GamryComAdapter:
+class GamryComAdapter(HelaoDriver):
     """Disconnected-construct wrapper that runs the legacy GamryDriver on a
     dedicated COM thread.
 
@@ -195,6 +199,13 @@ class GamryComAdapter:
     is constructed on that thread in :meth:`connect`, so all COM object creation
     and calls share one owning thread. Verb return values are the legacy
     ``DriverResponse`` objects, unchanged.
+
+    A ``HelaoDriver`` so the gamry action server can construct it via
+    ``driver_classes=[GamryComAdapter]``. The gamry-server-facing state
+    (``model``/``ready``/``dtaqsink``) is exposed as read-only passthroughs to
+    the wrapped driver, and the diagnostic ``pstat`` COM reads are re-exposed as
+    thread-marshalled methods (``pstat_is_open``/``measure_v``/``measure_i``/
+    ``measure_a``) so no COM call ever escapes the owning thread.
     """
 
     #: strategy currently occupying the pstat, so stop/cleanup dispatch cleanly
@@ -211,6 +222,7 @@ class GamryComAdapter:
         driver_factory: Callable[[dict], Any] = _default_driver_factory,
     ):
         # No COM, no thread, no driver here (disconnected construct, §10.4).
+        super().__init__(config=config or {})
         self._config = config or {}
         self._coinit_flags = coinit_flags
         self._thread_factory = thread_factory
@@ -231,6 +243,42 @@ class GamryComAdapter:
     @property
     def active_strategy(self) -> Optional[str]:
         return self._active
+
+    # --- gamry-server-facing passthroughs (plain-attr reads, not COM calls) --
+    @property
+    def ready(self) -> bool:
+        """Legacy ``ready`` flag (the server's dyn_endpoints waits on it)."""
+        return bool(getattr(self._driver, "ready", False))
+
+    @property
+    def model(self) -> Any:
+        """Selected ``GamryPstat`` model (server reads ``model.ierange``);
+        available after :meth:`connect`."""
+        return getattr(self._driver, "model", None)
+
+    @property
+    def dtaqsink(self) -> Any:
+        """Active dtaq sink (server reads ``dtaqsink.status``, a plain str)."""
+        return getattr(self._driver, "dtaqsink", None)
+
+    @property
+    def pstat(self) -> Any:
+        """The wrapped driver's GamryCOM pstat object.
+
+        Exposed so the executors/diagnostic endpoints keep calling
+        ``driver.pstat.<M>()`` (DigitalIn TTL wait, MeasureV/I/A, measure_ocv).
+        Under the default MTA apartment (``coinit_flags=0x0``) COM marshals
+        these cross-thread calls automatically, so calling from the event-loop
+        thread is safe (validated at-station, PR #205 — no RPC_E_WRONG_THREAD).
+        NOTE: if ever switched to STA (``0x2``), these raw off-thread calls
+        would need routing through ``thread.submit`` instead.
+        """
+        return getattr(self._driver, "pstat", None)
+
+    @property
+    def GamryCOM(self) -> Any:
+        """The wrapped driver's GamryCOM type-library handle (see :attr:`pstat`)."""
+        return getattr(self._driver, "GamryCOM", None)
 
     def _require_thread(self) -> GamryComThread:
         if self._thread is None or not self._thread.running:

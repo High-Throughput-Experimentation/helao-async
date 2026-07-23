@@ -9,10 +9,11 @@ delegation + strategy state — NOT real COM behavior, which is an at-station ga
 import asyncio
 import threading
 import time
+import types
 
 import pytest
 
-from helao.core.drivers.helao_driver import DriverStatus
+from helao.core.drivers.helao_driver import DriverStatus, HelaoDriver
 
 from helao.hexagon.adapters.native.gamry_com import (
     COINIT_APARTMENTTHREADED,
@@ -212,6 +213,11 @@ class _FakeGamry:
         self.counter = 0
         self.dtaqsink = _FakeSink()
         self.technique = _FakeTechnique(["t_s", "Ewe_V"])
+        # gamry-server-facing passthrough surface
+        self.ready = True
+        self.model = types.SimpleNamespace(ierange="IERANGE_ENUM")
+        self.pstat = "PSTAT_COM"
+        self.GamryCOM = "GAMRYCOM_LIB"
 
     def get_status(self):
         self.calls.append("get_status")
@@ -402,3 +408,27 @@ def test_coinit_flag_forwarded_to_thread():
     a._coinit_flags = COINIT_APARTMENTTHREADED
     a.connect()
     assert made["thread"].coinit_flags == COINIT_APARTMENTTHREADED
+
+
+# --------------------------------------------------------------------------
+# Cut-over surface: HelaoDriver + gamry-server passthroughs
+# --------------------------------------------------------------------------
+def test_is_helao_driver_and_config_constructible():
+    # driver_classes=[GamryComAdapter] path: BaseAPI builds it via (config=...).
+    a = GamryComAdapter({"dev_id": 0})
+    assert isinstance(a, HelaoDriver)
+
+
+def test_server_facing_passthroughs():
+    a, made = _adapter()
+    # before connect: no wrapped driver -> safe defaults
+    assert a.ready is False and a.model is None
+    assert a.pstat is None and a.GamryCOM is None and a.dtaqsink is None
+    a.connect()
+    d = made["driver"]
+    # after connect: passthrough to the wrapped driver (server reads these)
+    assert a.ready is True
+    model = a.model
+    assert model is not None and model.ierange == "IERANGE_ENUM"
+    assert a.pstat == d.pstat and a.GamryCOM == d.GamryCOM
+    assert a.dtaqsink is d.dtaqsink
