@@ -812,7 +812,12 @@ def wait_for_server_ready(host, port, timeout=30.0, interval=0.5):
 def server_is_idle(group, server_entry):
     """Return True if a server is safe to restart (no active work).
 
-    - action: ``/get_status`` shows no endpoint with active actions.
+    - action: ``/get_status`` shows no endpoint with active actions, AND the
+      optional ``/hotreload_busy`` hook reports no pending background work
+      (data syncer / analysis / batch-conversion queues, which are not action
+      ``active_dict`` entries and would be lost on restart -- action servers get
+      no --restore). A 404 on ``/hotreload_busy`` means an older server without
+      the hook, so only the ``active_dict`` check gates it.
     - orchestrator: ``/global_status`` shows loop_state 'stopped' and no active
       actions. Pending (not-yet-dispatched) queue items are preserved across the
       restart via the --restore path, so they do not block idleness.
@@ -835,7 +840,19 @@ def server_is_idle(group, server_entry):
             if resp.status_code != 200:
                 return False
             endpoints = resp.json().get("endpoints", {})
-            return not any(ep.get("active_dict") for ep in endpoints.values())
+            if any(ep.get("active_dict") for ep in endpoints.values()):
+                return False
+            # No active HELAO action, but the server may still be draining a
+            # background processing queue (data syncer, analysis, batch
+            # conversions) that a restart would drop. Defer while busy. The
+            # /hotreload_busy hook is optional: a 404 (older server without the
+            # hook) means there is no background queue to protect.
+            bresp = requests.post(f"http://{host}:{port}/hotreload_busy", timeout=10)
+            if bresp.status_code == 404:
+                return True
+            if bresp.status_code != 200:
+                return False
+            return not bresp.json().get("busy", False)
     except Exception:
         return False
     # unknown group: be conservative
@@ -1009,10 +1026,12 @@ def main():
         The message includes the following hotkey instructions:
         - CTRL-x: Terminate orchestration group
         - CTRL-r: Restart options
+        - CTRL-t: Toggle hot-reload watcher on/off
         - CTRL-d: Disconnect
         """
         LAUNCH_LOGGER.info(
-            "CTRL-x to terminate orchestration group. CTRL-r for restart options. CTRL-d to disconnect."
+            "CTRL-x to terminate orchestration group. CTRL-r for restart options. "
+            "CTRL-t to toggle hot-reload. CTRL-d to disconnect."
         )
 
     def stop_server(groupname, servername):
@@ -1124,6 +1143,13 @@ def main():
                 )
                 return False
 
+    # Runtime on/off switch for the hot-reload watcher, flipped by the CTRL-t
+    # hotkey (see thread_waitforkey). The watcher thread always runs but only
+    # detects commits / restarts servers while this is set; when cleared it
+    # idles without advancing the tracked HEADs, so commits that land while
+    # paused are applied on resume.
+    hotreload_enabled = threading.Event()
+
     def thread_hotreload(poll_seconds):
         """Poll watched git repos; hot-reload idle servers whose loaded code changed.
 
@@ -1155,6 +1181,10 @@ def main():
         pending = set()  # (group, name) affected but not yet restarted
         while True:
             time.sleep(poll_seconds)
+            if not hotreload_enabled.is_set():
+                # Paused via CTRL-t: do not poll git or advance HEADs, so any
+                # commits during the pause are picked up once re-enabled.
+                continue
             changed = set()
             for r in repos:
                 cur = git_head(r)
@@ -1279,6 +1309,20 @@ def main():
                     else:
                         LAUNCH_LOGGER.warning(f"'{sind}' is not a valid option.")
                 result = None
+            if result == "\x14":
+                if hotreload_enabled.is_set():
+                    hotreload_enabled.clear()
+                    LAUNCH_LOGGER.info(
+                        "Detected CTRL-t: hot-reload watcher PAUSED "
+                        "(no servers will be restarted on git pull)."
+                    )
+                else:
+                    hotreload_enabled.set()
+                    LAUNCH_LOGGER.info(
+                        "Detected CTRL-t: hot-reload watcher RESUMED "
+                        "(idle servers restart on pulled code changes)."
+                    )
+                result = None
             hotkey_msg()
             result = wait_key()
         if result == "\x18":
@@ -1336,21 +1380,25 @@ def main():
     else:
         hot_reload_on = bool(hot_reload_cfg.get("enabled", True))
         reason = f"config hot_reload.enabled={hot_reload_cfg.get('enabled', True)}"
+    # The watcher thread always runs; whether it actually polls is governed by
+    # the hotreload_enabled Event, which the CTRL-t hotkey toggles at runtime.
+    # The resolved on/off state above only sets the initial position.
+    poll_seconds = int(hot_reload_cfg.get("poll_seconds", 30))
     if hot_reload_on:
-        poll_seconds = int(hot_reload_cfg.get("poll_seconds", 30))
+        hotreload_enabled.set()
         LAUNCH_LOGGER.info(
             f"Hot-reload ENABLED ({reason}, poll {poll_seconds}s). Idle servers "
-            f"whose loaded code changes on git pull will be restarted."
+            f"whose loaded code changes on git pull will be restarted. "
+            f"Toggle at runtime with CTRL-t."
         )
-        hr = threading.Thread(
-            target=thread_hotreload, args=(poll_seconds,), daemon=True
-        )
-        hr.start()
     else:
+        hotreload_enabled.clear()
         LAUNCH_LOGGER.info(
-            f"Hot-reload disabled ({reason}). Re-enable by omitting --no-hot-reload "
-            f"and setting hot_reload.enabled: true (or omitting it)."
+            f"Hot-reload disabled ({reason}). Toggle on at runtime with CTRL-t, "
+            f"or set hot_reload.enabled: true / omit --no-hot-reload at launch."
         )
+    hr = threading.Thread(target=thread_hotreload, args=(poll_seconds,), daemon=True)
+    hr.start()
 
 
 if __name__ == "__main__":
