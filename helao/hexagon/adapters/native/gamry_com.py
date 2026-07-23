@@ -36,6 +36,13 @@ import threading
 from concurrent.futures import Future
 from typing import Any, Callable, Optional
 
+import numpy as np
+
+from helao.core.drivers.helao_driver import (
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+)
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -50,11 +57,17 @@ _STOP = object()
 
 
 class GamryComThread:
-    """Dedicated worker thread owning the GamryCOM apartment.
+    """Dedicated worker thread owning the GamryCOM apartment AND the pump.
 
     All COM calls are marshalled here via :meth:`submit`; the loop interleaves
     draining submitted work with pumping COM messages so dtaq event-sink
     callbacks are delivered on this same (owning) thread.
+
+    This loop is the SOLE ``PumpEvents`` caller: measurement data flows in via
+    the sink callbacks it pumps, and ``GamryComAdapter.get_data`` only drains
+    the sink (never pumps). Keeping one pump owner avoids the double-pump that
+    delegating to the legacy ``GamryDriver.get_data`` (which pumps per call)
+    would cause, and gives the dtaq sink a single, continuously-serviced thread.
     """
 
     def __init__(
@@ -250,7 +263,51 @@ class GamryComAdapter:
         return self._require_thread().call(self._driver.measure, *args, **kwargs)
 
     def get_data(self, *args, **kwargs):
-        return self._require_thread().call(self._driver.get_data, *args, **kwargs)
+        """Drain newly-acquired dtaq points WITHOUT pumping COM events.
+
+        Single-pump ownership (the deepening): the GamryComThread's loop is the
+        sole ``PumpEvents`` caller, so dtaq sink callbacks are delivered
+        continuously on the owning thread. This drains the sink only — unlike
+        the legacy ``GamryDriver.get_data``, which calls
+        ``comtypes.client.PumpEvents(pump_rate)`` itself; delegating to it would
+        double-pump (loop + per-call). ``pump_rate`` args are accepted for
+        signature parity and ignored.
+        """
+        return self._require_thread().call(self._drain)
+
+    def _drain(self) -> DriverResponse:
+        """Snapshot the dtaq sink delta (runs on the COM thread; no pump).
+
+        Replicates the drain half of the legacy ``GamryDriver.get_data``
+        (points slice -> per-output-key columns, busy/ok status, counter
+        advance) minus the ``PumpEvents`` call.
+        """
+        driver = self._driver
+        sink = driver.dtaqsink
+        total = len(sink.acquired_points)
+        if driver.counter < total:
+            new_data = sink.acquired_points[driver.counter : total]
+            data_dict = {
+                k: v
+                for k, v in zip(
+                    driver.technique.dtaq.output_keys,
+                    np.matrix(new_data).T.tolist(),
+                )
+            }
+        else:
+            data_dict = {}
+        sink_state = sink.status
+        if sink_state == "measuring" or driver.counter < total:
+            status = DriverStatus.busy
+        else:
+            status = DriverStatus.ok
+        driver.counter = total
+        return DriverResponse(
+            response=DriverResponseType.success,
+            message=sink_state,
+            data=data_dict,
+            status=status,
+        )
 
     # --- EIS / ReadZ strategy --------------------------------------------
     def setup_eis(self, *args, **kwargs):
