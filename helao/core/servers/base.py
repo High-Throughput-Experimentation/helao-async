@@ -20,7 +20,7 @@ import os
 import sys
 from socket import gethostname
 from time import time
-from typing import List, Dict, Optional, Union
+from typing import List, Dict, Optional, Union, Callable
 from uuid import UUID, uuid1
 from glob import glob
 from copy import deepcopy, copy
@@ -204,6 +204,11 @@ class Base:
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
+
+        # Optional zero-arg callable a server sets to report pending background
+        # work (syncer/analysis/batch queues) to the hot-reload idle gate via
+        # the /hotreload_busy endpoint. None => server has no background queue.
+        self.hotreload_busy_hook: Optional[Callable[[], bool]] = None
 
         self.ntp_offset: float = 0.0  # add to system time for correction
         self.ntp_last_sync = None

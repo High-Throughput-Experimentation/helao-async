@@ -200,6 +200,16 @@ class AnalysisSyncer(HelaoSyncer):
             for i in range(self.max_tasks)
         }
 
+    def has_pending_work(self) -> bool:
+        """True while any analysis is queued for or actively running.
+
+        Consulted by the server's ``/hotreload_busy`` hook so the hot-reload
+        watcher will not restart the analysis server mid-flight -- action
+        servers get no ``--restore``, so a restart would drop the in-memory
+        queue. ``task_set`` covers both queued and running process UUIDs.
+        """
+        return bool(self.task_set) or bool(self.running_tasks)
+
     def get_loader(self):
         """Install the shared :class:`pgs3.EcheUvisLoader` and cache its handles.
 
@@ -517,9 +527,7 @@ def make_analysis_app(server_key) -> BaseAPI:
     def _register_endpoint(endpoint_name: str, ana_cls: BaseAnalysis):
         """Register one analysis action endpoint bound to ``ana_cls``."""
 
-        @app.post(
-            f"/{server_key}/{endpoint_name}", tags=["action"], name=endpoint_name
-        )
+        @app.post(f"/{server_key}/{endpoint_name}", tags=["action"], name=endpoint_name)
         async def _analyze(
             sequence_zip_path: str = "",
             params: dict = {},
@@ -550,5 +558,12 @@ def make_analysis_app(server_key) -> BaseAPI:
     def list_queued_tasks() -> list:
         """Return identifiers of analysis tasks queued but not yet running."""
         return list(app.driver.task_set)
+
+    # Hot-reload safety: defer restart while an analysis is queued or running.
+    # ``app.driver`` is not instantiated until the FastAPI startup event, so the
+    # hook reads it lazily at call time (None -> not busy).
+    app.base.hotreload_busy_hook = lambda: (
+        app.driver is not None and app.driver.has_pending_work()
+    )
 
     return app

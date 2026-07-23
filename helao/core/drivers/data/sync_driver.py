@@ -757,6 +757,15 @@ class SyncDriver:
             for i in range(self.max_tasks)
         }
 
+    def has_pending_work(self) -> bool:
+        """True while any yml is queued for or actively being synced.
+
+        Consulted by the server's ``/hotreload_busy`` hook so the hot-reload
+        watcher will not restart the syncer mid-flight -- action servers get no
+        ``--restore``, so a restart would drop the in-memory ``task_queue``.
+        """
+        return self.task_queue.qsize() > 0 or bool(self.running_tasks)
+
     def try_remove_empty(self, remove_target) -> bool:
         """Recursively ``rmdir`` ``remove_target`` if it (and its subtree) are empty.
 

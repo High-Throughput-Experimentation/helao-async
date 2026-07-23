@@ -97,4 +97,11 @@ def makeApp(server_key) -> BaseAPI:
         """Return the syncer's progress dictionary."""
         return app.driver.progress
 
+    # Hot-reload safety: defer restart while the syncer has queued or running
+    # tasks. ``app.driver`` is not instantiated until the FastAPI startup event,
+    # so the hook reads it lazily at call time (None -> not busy).
+    app.base.hotreload_busy_hook = lambda: (
+        app.driver is not None and app.driver.has_pending_work()
+    )
+
     return app

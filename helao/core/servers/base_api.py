@@ -724,6 +724,30 @@ class BaseAPI(HelaoFastAPI):
             """
             return loaded_repo_modules()
 
+        @self.post("/hotreload_busy", tags=["private"])
+        def hotreload_busy():
+            """Report whether this server has pending background work.
+
+            The hot-reload idle gate calls this after confirming no HELAO action
+            is active, to avoid restarting a server that is still draining a
+            background processing queue (data syncer tasks, analysis jobs, batch
+            conversions) which a restart would silently drop -- action servers
+            are not relaunched with ``--restore``.
+
+            Opt-in: a server declares background busyness by setting
+            ``app.base.hotreload_busy_hook`` to a zero-arg callable that returns
+            a truthy value while busy. Servers without a hook are never treated
+            as background-busy. If the hook raises, we fail safe (report busy)
+            so the watcher defers rather than restart into an unknown state.
+            """
+            hook = getattr(self.base, "hotreload_busy_hook", None)
+            if not callable(hook):
+                return {"busy": False}
+            try:
+                return {"busy": bool(hook())}
+            except Exception:
+                return {"busy": True}
+
         @self.post("/get_status", tags=["private"])
         def get_status():
             """Return the action server status with the driver/poller status appended."""
