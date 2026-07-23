@@ -12,6 +12,8 @@ import time
 
 import pytest
 
+from helao.core.drivers.helao_driver import DriverStatus
+
 from helao.hexagon.adapters.native.gamry_com import (
     COINIT_APARTMENTTHREADED,
     COINIT_MULTITHREADED,
@@ -184,10 +186,32 @@ class _InlineThread(GamryComThread):
         self.stopped = True
 
 
+class _FakeSink:
+    """dtaq event sink stand-in (points arrive via the thread pump)."""
+
+    def __init__(self):
+        self.acquired_points: list = []
+        self.status = "measuring"
+
+
+class _FakeDtaq:
+    def __init__(self, output_keys):
+        self.output_keys = output_keys
+
+
+class _FakeTechnique:
+    def __init__(self, output_keys):
+        self.dtaq = _FakeDtaq(output_keys)
+
+
 class _FakeGamry:
     def __init__(self, config):
         self.config = config
         self.calls = []
+        # drain surface (single-pump get_data reads these; never calls get_data)
+        self.counter = 0
+        self.dtaqsink = _FakeSink()
+        self.technique = _FakeTechnique(["t_s", "Ewe_V"])
 
     def get_status(self):
         self.calls.append("get_status")
@@ -205,8 +229,10 @@ class _FakeGamry:
         return "MEASURE"
 
     def get_data(self, *a, **k):
-        self.calls.append(("get_data", a, k))
-        return "DATA"
+        # Must NOT be called by the adapter (single-pump: adapter drains the
+        # sink itself). Recorded so a test can assert it's never invoked.
+        self.calls.append("get_data")
+        return "DELEGATED_GET_DATA"
 
     def setup_eis(self, *a, **k):
         self.calls.append("setup_eis")
@@ -288,7 +314,6 @@ def test_verbs_delegate_and_track_strategy():
     assert a.setup(technique="OCV") == "SETUP"
     assert a.active_strategy == "dc"
     assert a.measure() == "MEASURE"
-    assert a.get_data(0.1) == "DATA"
 
     assert a.cleanup() == "CLEANUP"
     assert a.active_strategy is None
@@ -302,6 +327,39 @@ def test_verbs_delegate_and_track_strategy():
     assert a.active_strategy is None  # idle poll resets after sampling
 
     assert "setup" in d.calls and "setup_eis" in d.calls
+
+
+def test_get_data_drains_sink_without_delegating_or_pumping():
+    # single-pump ownership: get_data drains the sink itself and must NOT call
+    # the legacy driver.get_data (where the per-call PumpEvents lives).
+    a, made = _adapter()
+    a.connect()
+    d = made["driver"]
+    d.dtaqsink.acquired_points = [[1.0, 2.0], [3.0, 4.0]]
+    d.dtaqsink.status = "measuring"
+
+    resp = a.get_data(0.1)  # pump_rate arg accepted + ignored
+    assert resp.data == {"t_s": [1.0, 3.0], "Ewe_V": [2.0, 4.0]}
+    assert resp.status == DriverStatus.busy  # still measuring
+    assert d.counter == 2  # advanced
+    assert "get_data" not in d.calls  # never delegated (no double-pump)
+
+
+def test_get_data_incremental_then_done():
+    a, made = _adapter()
+    a.connect()
+    d = made["driver"]
+    d.dtaqsink.acquired_points = [[1.0, 2.0]]
+    a.get_data()
+    # more points arrive (delivered by the thread pump, simulated here)
+    d.dtaqsink.acquired_points.append([3.0, 4.0])
+    resp = a.get_data()
+    assert resp.data == {"t_s": [3.0], "Ewe_V": [4.0]}  # only the new point
+    # measurement finishes, all drained -> ok + empty delta
+    d.dtaqsink.status = "done"
+    resp2 = a.get_data()
+    assert resp2.data == {}
+    assert resp2.status == DriverStatus.ok
 
 
 def test_stop_runs_driver_coroutine_on_thread():
