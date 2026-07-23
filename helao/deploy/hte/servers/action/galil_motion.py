@@ -45,8 +45,12 @@ import numpy as np
 from ...drivers.motion.galil_motion_driver import (
     MoveModes,
     TransformationModes,
-    Galil,
 )
+
+# P3a galil-3 native cut-over (2026-07-23): the galil motion server is backed by
+# the hexagon-native NativeGalilMotion (gclib behind a GalilCommandChannel port)
+# instead of the legacy in-tree Galil driver. Validated at-station (PR #204).
+from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.active_params import ActiveParams
@@ -624,9 +628,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
 def makeApp(server_key) -> BaseAPI:
     """Build the Galil motion FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by the :class:`Galil` motion driver
-    and defers endpoint registration (plus the driver's ``connect()`` call)
-    to :func:`galil_dyn_endpoints`.
+    Constructs a :class:`BaseAPI` backed by the native
+    :class:`NativeGalilMotion` driver (gclib behind a command-channel port) and
+    defers endpoint registration (plus the driver's ``connect()`` call) to
+    :func:`galil_dyn_endpoints`.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
@@ -640,7 +645,7 @@ def makeApp(server_key) -> BaseAPI:
         server_title=server_key,
         description="Galil motion server",
         version=2.0,
-        driver_classes=[Galil],
+        driver_classes=[NativeGalilMotion],
         dyn_endpoints=galil_dyn_endpoints,
     )
 
