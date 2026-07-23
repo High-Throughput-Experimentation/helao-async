@@ -8,10 +8,13 @@ verbs, queries) and native-2 (`_motor_move` transform-move orchestration +
 """
 
 import asyncio
+import types
 from typing import Optional
 
+import numpy as np
 import pytest
 
+from helao.core.drivers.helao_driver import HelaoDriver
 from helao.core.error import ErrorCodes
 from helao.hexagon.adapters.legacy.galil_command_channel import GclibCommandChannel
 from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
@@ -345,3 +348,101 @@ def test_setaxisref_disabled_returns_error():
     d, _ = _drv(config=cfg)
     d.connect()  # no ip -> galil_enabled False
     assert asyncio.run(d.setaxisref()) == "error"
+
+
+# --------------------------------------------------------------------------
+# native-3: HelaoDriver surface + server-facing verbs (cut-over enablement)
+# --------------------------------------------------------------------------
+def test_is_helao_driver_and_default_channel():
+    # driver_classes=[NativeGalilMotion] path: constructible from config alone,
+    # HelaoDriver subclass, default channel is the real gclib-backed one.
+    d = NativeGalilMotion({"axis_id": {"x": "A"}})
+    assert type(d._channel).__name__ == "GclibCommandChannel"
+    assert isinstance(d, HelaoDriver)
+
+
+def _active(params):
+    return types.SimpleNamespace(action=types.SimpleNamespace(action_params=params))
+
+
+def test_motor_move_public_extracts_params_and_guards_blocked():
+    d, ch = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()
+    ch.commands.clear()
+    out = asyncio.run(
+        d.motor_move(
+            _active(
+                {
+                    "d_mm": [1.0],
+                    "axis": ["x"],
+                    "mode": "absolute",
+                    "transformation": "motorxy",
+                }
+            )
+        )
+    )
+    assert out["moved_axis"] == ["A"] and out["counts"] == [1000]
+    assert d.blocked is False  # released after the move
+    assert "PAA=1000" in ch.commands
+
+    # a concurrent move (blocked already set) short-circuits
+    d.blocked = True
+    out2 = asyncio.run(d.motor_move(_active({"d_mm": [1.0], "axis": ["x"]})))
+    assert out2["err_code"] == ErrorCodes.in_progress
+
+
+def test_motor_disconnect_closes_channel():
+    d, ch = _connected({})
+    out = asyncio.run(d.motor_disconnect())
+    assert ch.closed is True
+    assert out == {"connection": "motor_offline"}
+
+
+def test_update_and_reset_plate_transfermatrix():
+    d, _ = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()  # builds transform; file_backup None (no states_root) -> save no-op
+    new = np.matrix([[1, 0, 5], [0, 1, 7], [0, 0, 1]])
+    ret = d.update_plate_transfermatrix(newtransfermatrix=new)
+    assert np.array_equal(ret, new)
+    assert np.array_equal(d.plate_transfermatrix, new)
+    # wrong shape -> falls back to identity default
+    bad = np.matrix([[1, 0], [0, 1]])
+    d.update_plate_transfermatrix(newtransfermatrix=bad)
+    assert np.array_equal(d.plate_transfermatrix, d.dflt_matrix)
+    # reset -> identity
+    d.update_plate_transfermatrix(newtransfermatrix=new)
+    d.reset_plate_transfermatrix()
+    assert np.array_equal(d.plate_transfermatrix, d.dflt_matrix)
+
+
+def test_solid_get_platemap_and_samples_xy_use_unified_db():
+    class _DB:
+        def __init__(self):
+            self.calls = []
+
+        async def get_platemap(self, samples):
+            self.calls.append(("platemap", samples[0].plate_id))
+            return ["PM"]
+
+        async def get_samples_xy(self, samples):
+            self.calls.append(("xy", samples[0].plate_id, samples[0].sample_no))
+            return [[1.0, 2.0]]
+
+    d, _ = _drv()
+    db = _DB()
+    pm = asyncio.run(d.solid_get_platemap(db, plate_id=6353))
+    xy = asyncio.run(d.solid_get_samples_xy(db, plate_id=6353, sample_no=7))
+    assert pm == {"platemap": ["PM"]}
+    assert xy == {"platexy": [[1.0, 2.0]]}
+    assert db.calls == [("platemap", 6353), ("xy", 6353, 7)]
+
+
+def test_stop_and_reset_abc():
+    d, ch = _connected({})
+    resp = asyncio.run(d.stop())
+    assert resp.response.value == "success"
+    assert "STA" in ch.commands  # aborted the configured axis
+    # reset = disconnect + reconnect
+    ch.commands.clear()
+    d.reset()
+    assert d.galil_enabled is True

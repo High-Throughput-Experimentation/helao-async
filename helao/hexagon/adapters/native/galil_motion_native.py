@@ -11,15 +11,22 @@ channel; only the real gclib I/O is at-station.
 
 native-1 implemented connect/lifecycle, the simple command verbs
 (stop/motor_off/motor_on/reset_controller/estop) and the position/status
-queries. native-2 adds ``_motor_move`` (coordinate-transform move
+queries. native-2 added ``_motor_move`` (coordinate-transform move
 orchestration: motor/plate/instr frames × relative/absolute/homing, speed
 clamp, ``SP``/``PR|PA|HM``/``BG`` sequence, settle-poll) and ``setaxisref``
-(homing), faithfully ported from the legacy driver. NOT runtime-wired; gclib
-I/O + cut-over are at-station.
+(homing). native-3 completes the full galil-server surface so this can be the
+sole ``app.driver``: it is now a ``HelaoDriver`` (with ``stop``/``reset``) and
+adds the public ``motor_move(active)``, ``motor_disconnect``, calibration-matrix
+management (``save``/``load``/``update``/``reset_plate_transfermatrix``) and the
+``solid_get_platemap``/``solid_get_samples_xy`` platemap lookups. All faithfully
+ported from the legacy driver. gclib I/O + at-station validation are the gate.
 """
 
 import asyncio
+import json
+import os
 import time
+import traceback
 from copy import deepcopy
 from socket import gethostname
 from typing import Any, List, Optional
@@ -30,8 +37,10 @@ from helao.core.drivers.helao_driver import (
     DriverResponse,
     DriverResponseType,
     DriverStatus,
+    HelaoDriver,
 )
 from helao.core.error import ErrorCodes
+from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.domain.motion_transform import TransformXY
@@ -47,20 +56,35 @@ _AXIS_LETTERS = "ABCDEFGH"
 _AXIS_INIT = [("MT", 2), ("CE", 4), ("TW", 32000), ("SD", 256000)]
 
 
-class NativeGalilMotion:
-    """Galil motion driver implemented directly over a GalilCommandChannel."""
+class NativeGalilMotion(HelaoDriver):
+    """Galil motion driver implemented directly over a GalilCommandChannel.
+
+    A ``HelaoDriver`` so the action server can construct it via
+    ``driver_classes=[NativeGalilMotion]`` (BaseAPI calls ``(config=...)``); the
+    command channel defaults to the real gclib-backed channel when none is
+    injected (tests inject a fake).
+    """
 
     def __init__(
         self,
         config: Optional[dict] = None,
         *,
-        channel: GalilCommandChannel,
+        channel: Optional[GalilCommandChannel] = None,
         base_hook: Any = None,
         position_sink: Any = None,
     ):
         # Disconnected construct: no channel.open(), no gclib, no I/O here.
-        self.config_dict = config or {}
-        self._channel = channel
+        super().__init__(config=config or {})
+        self.config_dict = self.config
+        if channel is None:
+            # production default: the at-station gclib channel (lazy import so
+            # this module still imports/constructs on Linux without gclib).
+            from helao.hexagon.adapters.legacy.galil_command_channel import (
+                GclibCommandChannel,
+            )
+
+            channel = GclibCommandChannel()
+        self._channel: GalilCommandChannel = channel
         self._base_hook = base_hook
         # Optional aligner position-notify queue (object with async `put`);
         # preserves the legacy query -> update_aligner feed. None = no feed.
@@ -68,6 +92,9 @@ class NativeGalilMotion:
 
         self.axis_id = self.config_dict.get("axis_id", {})
         self.dflt_matrix = np.matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+        # aligner reads plate_transfermatrix; set to loaded/default in connect().
+        self.plate_transfermatrix = self.dflt_matrix
+        self.file_backup_transfermatrix: Optional[str] = None
         self.transform: Optional[TransformXY] = None
         self.galil_enabled: Optional[bool] = None
         self.motor_busy = False
@@ -139,8 +166,15 @@ class NativeGalilMotion:
         or the config ``M_instr`` fallback.
         """
         helaodirs = getattr(self._base_hook, "helaodirs", None)
+        states_root = getattr(helaodirs, "states_root", None)
+        # legacy backup path used by update_plate_transfermatrix/save_transfermatrix
+        self.file_backup_transfermatrix = (
+            os.path.join(states_root, f"{gethostname().lower()}_last_plate_calib.json")
+            if states_root is not None
+            else None
+        )
         store = JsonFileCalibrationStore(
-            states_root=getattr(helaodirs, "states_root", None),
+            states_root=states_root,
             db_root=getattr(helaodirs, "db_root", None),
             hostname=gethostname().lower(),
         )
@@ -150,6 +184,7 @@ class NativeGalilMotion:
         if plate is None:
             plate = self.dflt_matrix
         store.save_plate_calibration(plate)
+        self.plate_transfermatrix = plate
 
         m_instr = None
         if helaodirs is not None:
@@ -195,6 +230,23 @@ class NativeGalilMotion:
         self.galil_enabled = False
         self._channel.close()
         return {"shutdown"}
+
+    async def stop(self) -> DriverResponse:
+        """HelaoDriver ABC: abort motion on every axis (device stays enabled)."""
+        try:
+            await self.stop_axis(self.get_all_axis())
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except Exception:
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
+    def reset(self) -> DriverResponse:
+        """HelaoDriver ABC: force-close and reopen the connection."""
+        self.disconnect()
+        return self.connect()
 
     # --- queries (pure parse over the channel) ----------------------------
     async def query_axis_position(self, axis, *args, **kwargs) -> dict:
@@ -624,6 +676,103 @@ class NativeGalilMotion:
             return retc2
         else:
             return "error"
+
+    # --- public server-facing verbs ---------------------------------------
+    async def motor_move(self, active) -> dict:
+        """Public move entry: extract params from ``active`` and run ``_motor_move``.
+
+        Guards concurrent moves with ``self.blocked`` (legacy parity).
+        """
+        d_mm = active.action.action_params.get("d_mm", [])
+        axis = active.action.action_params.get("axis", [])
+        speed = active.action.action_params.get("speed", None)
+        mode = active.action.action_params.get("mode", MoveModes.absolute)
+        transformation = active.action.action_params.get(
+            "transformation", TransformationModes.motorxy
+        )
+        if not self.blocked and self.galil_enabled:
+            self.blocked = True
+            retval = await self._motor_move(
+                d_mm=d_mm,
+                axis=axis,
+                speed=speed,
+                mode=mode,
+                transformation=transformation,
+            )
+            self.blocked = False
+            return retval
+        return {
+            "moved_axis": None,
+            "speed": None,
+            "accepted_rel_dist": None,
+            "supplied_rel_dist": None,
+            "err_dist": None,
+            "err_code": ErrorCodes.in_progress,
+            "counts": None,
+        }
+
+    async def motor_disconnect(self) -> dict:
+        """Close the channel and report the outcome (legacy motor_disconnect)."""
+        try:
+            self._channel.close()
+        except GalilChannelError as exc:
+            return {"connection": {"Unexpected GalilChannelError:", exc}}
+        return {"connection": "motor_offline"}
+
+    # --- calibration matrix management ------------------------------------
+    def save_transfermatrix(self, file) -> None:
+        """Write ``plate_transfermatrix`` to ``file`` as JSON (None = no-op)."""
+        if file is not None:
+            filedir, _ = os.path.split(file)
+            if filedir and not os.path.exists(filedir):
+                os.makedirs(filedir, exist_ok=True)
+            with open(file, "w") as f:
+                f.write(json.dumps(self.plate_transfermatrix.tolist()))
+
+    def load_transfermatrix(self, file):
+        """Read a JSON matrix from ``file`` (None if missing/malformed/wrong-shape)."""
+        if os.path.exists(file):
+            with open(file, "r") as f:
+                try:
+                    new_matrix = np.matrix(json.loads(f.readline()))
+                    if new_matrix.shape != self.dflt_matrix.shape:
+                        return None
+                    return new_matrix
+                except Exception:
+                    traceback.print_exc()
+                    return None
+        return None
+
+    def update_plate_transfermatrix(self, newtransfermatrix):
+        """Replace the plate matrix, propagate to the transform, persist to disk."""
+        if newtransfermatrix.shape != self.dflt_matrix.shape:
+            matrix = self.dflt_matrix
+        else:
+            matrix = newtransfermatrix
+        self.plate_transfermatrix = matrix
+        if self.transform is not None:
+            self.transform.update_Mplatexy(Mxy=self.plate_transfermatrix)
+        self.save_transfermatrix(file=self.file_backup_transfermatrix)
+        return self.plate_transfermatrix
+
+    def reset_plate_transfermatrix(self):
+        """Restore the plate transform matrix to the identity default."""
+        self.update_plate_transfermatrix(newtransfermatrix=self.dflt_matrix)
+
+    # --- platemap lookups (server owns unified_db; passed in) -------------
+    async def solid_get_platemap(self, unified_db, plate_id=None, **kwargs) -> dict:
+        return {
+            "platemap": await unified_db.get_platemap([SolidSample(plate_id=plate_id)])
+        }
+
+    async def solid_get_samples_xy(
+        self, unified_db, plate_id=None, sample_no=None, **kwargs
+    ) -> dict:
+        return {
+            "platexy": await unified_db.get_samples_xy(
+                [SolidSample(plate_id=plate_id, sample_no=sample_no)]
+            )
+        }
 
     # --- helpers ----------------------------------------------------------
     async def _notify(self, msg: dict) -> None:
