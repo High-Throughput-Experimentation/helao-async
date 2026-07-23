@@ -8,7 +8,6 @@ driver class is :class:`GamryDriver`; the server dynamically attaches one
 endpoint per supported technique once the driver is initialised.
 """
 
-
 __all__ = ["makeApp"]
 
 
@@ -40,6 +39,12 @@ from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI in
 from helao.helpers.yml_tools import yml_dumps
 from helao.helpers.bubble_detection import bubble_detection
 from ...drivers.pstat.gamry.driver import GamryDriver, DriverStatus, ControlMode
+
+# P3a gamry COM cut-over (2026-07-23): the gamry server is backed by the
+# hexagon GamryComAdapter (single COM-owning worker thread + single PumpEvents),
+# not the legacy in-thread GamryDriver. GamryDriver above is retained for
+# DriverStatus/ControlMode + executor type hints. Validated at-station (PR #205).
+from helao.hexagon.adapters.native.gamry_com import GamryComAdapter
 from ...drivers.pstat.gamry.technique import (
     GamryTechnique,
     TECH_LSV,
@@ -607,6 +612,11 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     server_key = app.base.server.server_name
     app.base.server_params["allow_concurrent_actions"] = False
 
+    # P3a gamry COM cut-over: GamryComAdapter is disconnected-construct (the COM
+    # thread + wrapped driver are built here, not in __init__), so connect at
+    # startup before reading ready/model.
+    app.driver.connect()
+
     while not app.driver.ready:
         LOGGER.info("waiting for gamry init")
         await asyncio.sleep(1)
@@ -1135,7 +1145,7 @@ def makeApp(server_key) -> BaseAPI:
         server_title=server_key,
         description="Gamry instrument/action server",
         version=4.0,
-        driver_classes=[GamryDriver],
+        driver_classes=[GamryComAdapter],
         # poller_class=GamryPoller,
         dyn_endpoints=gamry_dyn_endpoints,
     )
@@ -1159,8 +1169,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop(
-    ):
+    async def stop():
         """Stop every active executor on the server in a controlled way.
 
         Args:
