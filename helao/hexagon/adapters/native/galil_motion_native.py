@@ -9,13 +9,18 @@ the coordinate/parse math itself, reusing the slice-1 ``TransformXY`` and slice-
 command generation + TP/PA/SC parsing are unit-testable on Linux with a fake
 channel; only the real gclib I/O is at-station.
 
-native-1 (this module) implements connect/lifecycle, the simple command verbs
+native-1 implemented connect/lifecycle, the simple command verbs
 (stop/motor_off/motor_on/reset_controller/estop) and the position/status
-queries. ``_motor_move`` and ``setaxisref`` (the 380-line transform-move
-orchestration) are deferred to native-2 and raise ``NotImplementedError``
-rather than silently no-op. NOT runtime-wired.
+queries. native-2 adds ``_motor_move`` (coordinate-transform move
+orchestration: motor/plate/instr frames × relative/absolute/homing, speed
+clamp, ``SP``/``PR|PA|HM``/``BG`` sequence, settle-poll) and ``setaxisref``
+(homing), faithfully ported from the legacy driver. NOT runtime-wired; gclib
+I/O + cut-over are at-station.
 """
 
+import asyncio
+import time
+from copy import deepcopy
 from socket import gethostname
 from typing import Any, List, Optional
 
@@ -27,6 +32,7 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
 )
 from helao.core.error import ErrorCodes
+from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.domain.motion_transform import TransformXY
 from helao.hexagon.ports.galil_command_channel import (
@@ -65,14 +71,29 @@ class NativeGalilMotion:
         self.transform: Optional[TransformXY] = None
         self.galil_enabled: Optional[bool] = None
         self.motor_busy = False
-        # shared aligner/motion mutual-exclusion lock (see legacy _motor_move)
+        # aligner/motion compat lock (delegated by AlignerMotorContext); the
+        # current _motor_move guards on motor_busy, not this.
         self.blocked = False
+
+        self.motor_timeout = self.config_dict.get("timeout", 60)
+        self.motor_max_speed_count_sec = self.config_dict.get(
+            "max_speed_count_sec", 25000
+        )
+        self.motor_def_speed_count_sec = self.config_dict.get(
+            "def_speed_count_sec", 10000
+        )
+        self._speed = self.motor_def_speed_count_sec
 
     def set_position_sink(self, sink: Any) -> None:
         self._position_sink = sink
 
     def get_all_axis(self) -> List[str]:
         return [ax for ax in self.axis_id]
+
+    def _is_estopped(self) -> bool:
+        """Read the server estop flag via the base hook (legacy parity)."""
+        asm = getattr(self._base_hook, "actionservermodel", None)
+        return bool(getattr(asm, "estop", False))
 
     # --- lifecycle --------------------------------------------------------
     def connect(self) -> DriverResponse:
@@ -299,17 +320,310 @@ class NativeGalilMotion:
             await self.motor_off(self.get_all_axis())
         return switch
 
-    # --- deferred to native-2 (fail loud, never silent no-op) -------------
+    # --- coordinate-transform move orchestration (native-2) ---------------
     async def _motor_move(self, d_mm, axis, speed, mode, transformation) -> dict:
-        raise NotImplementedError(
-            "NativeGalilMotion._motor_move is deferred to galil native-2 "
-            "(coordinate-transform move orchestration)"
-        )
+        """Transform coordinates, issue the per-axis move sequence, settle-poll.
+
+        Faithful port of the legacy ``Galil._motor_move``: converts ``d_mm`` from
+        the requested frame (motor/plate/instrument) to motor-axis counts via
+        ``count_to_mm``, clamps speed, emits ``SP``/``PR|PA|HM``/``BG`` per axis,
+        then polls ``query_axis_moving`` until every axis stops or the timeout
+        fires. Same return dict + ErrorCodes semantics.
+        """
+        if self.motor_busy or not self.galil_enabled:
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.in_progress,
+                "counts": None,
+            }
+        self.motor_busy = True
+        # galil_enabled is True past the guard -> connect() ran -> transform set.
+        assert self.transform is not None
+        tf = self.transform
+
+        if not isinstance(axis, list):
+            axis = [axis]
+        if not isinstance(d_mm, list):
+            d_mm = [d_mm]
+
+        stopping = False
+        mode = MoveModes(mode)
+        transformation = TransformationModes(transformation)
+
+        tmpmotorpos = await self.query_axis_position(axis=self.get_all_axis())
+        current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        req_positionvec: list = [None, None, None, None, None, None]
+        reqdict = dict(zip(axis, d_mm))
+
+        for idx, ax in enumerate(["x", "y", "z", "Rx", "Ry", "Rz"]):
+            if ax in tmpmotorpos["ax"]:
+                current_positionvec[idx] = tmpmotorpos["position"][
+                    tmpmotorpos["ax"].index(ax)
+                ]
+                if ax in reqdict:
+                    req_positionvec[idx] = reqdict[ax]
+
+        if transformation == TransformationModes.motorxy:
+            pass
+        elif transformation == TransformationModes.platexy:
+            motorxy = [0.0, 0.0, 1.0]
+            motorxy[0] = current_positionvec[0]
+            motorxy[1] = current_positionvec[1]
+            current_platexy = tf.transform_motorxy_to_platexy(motorxy)
+            if mode == MoveModes.relative:
+                new_platexy = [0.0, 0.0, 1.0]
+                if req_positionvec[0] is not None:
+                    new_platexy[0] = current_platexy[0] + req_positionvec[0]
+                else:
+                    new_platexy[0] = current_platexy[0]
+                if req_positionvec[1] is not None:
+                    new_platexy[1] = current_platexy[1] + req_positionvec[1]
+                else:
+                    new_platexy[1] = current_platexy[1]
+                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
+                axis = ["x", "y"]
+                d_mm = [d for d in new_motorxy[0:2]]
+                mode = MoveModes.absolute
+            elif mode == MoveModes.absolute:
+                new_platexy = [0.0, 0.0, 1.0]
+                if req_positionvec[0] is not None:
+                    new_platexy[0] = req_positionvec[0]
+                else:
+                    new_platexy[0] = current_platexy[0]
+                if req_positionvec[1] is not None:
+                    new_platexy[1] = req_positionvec[1]
+                else:
+                    new_platexy[1] = current_platexy[1]
+                new_motorxy = tf.transform_platexy_to_motorxy(new_platexy)
+                axis = ["x", "y"]
+                d_mm = [d for d in new_motorxy[0:2]]
+            elif mode == MoveModes.homing:
+                pass
+        elif transformation == TransformationModes.instrxy:
+            current_instrxyz = tf.transform_motorxyz_to_instrxyz(
+                current_positionvec[0:3]
+            )
+            if mode == MoveModes.relative:
+                new_instrxyz = current_instrxyz
+                for i in range(3):
+                    if req_positionvec[i] is not None:
+                        new_instrxyz[i] = new_instrxyz[i] + req_positionvec[i]
+                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
+                axis = ["x", "y", "z"]
+                d_mm = [d for d in new_motorxyz[0:3]]
+                mode = MoveModes.absolute
+            elif mode == MoveModes.absolute:
+                new_instrxyz = current_instrxyz
+                for i in range(3):
+                    if req_positionvec[i] is not None:
+                        new_instrxyz[i] = req_positionvec[i]
+                new_motorxyz = tf.transform_instrxyz_to_motorxyz(new_instrxyz[0:3])
+                axis = ["x", "y", "z"]
+                d_mm = [d for d in new_motorxyz[0:3]]
+            elif mode == MoveModes.homing:
+                pass
+
+        ret_moved_axis: list = []
+        ret_speed: list = []
+        ret_accepted_rel_dist: list = []
+        ret_supplied_rel_dist: list = []
+        ret_err_dist: list = []
+        ret_err_code: list = []
+        ret_counts: list = []
+        timeofmove: list = []
+
+        if self._is_estopped():
+            self.motor_busy = False
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.estop,
+                "counts": None,
+            }
+
+        # remove not-configured axes
+        for ax in deepcopy(axis):
+            if ax not in self.axis_id:
+                axis.pop(axis.index(ax))
+
+        count_to_mm = self.config_dict.get("count_to_mm", {})
+        for d, ax in zip(d_mm, axis):
+            if len(ret_moved_axis) > 0:
+                stopping = False
+            if ax in self.axis_id:
+                axl = self.axis_id[ax]
+            else:
+                ret_moved_axis.append(None)
+                ret_speed.append(None)
+                ret_accepted_rel_dist.append(None)
+                ret_supplied_rel_dist.append(d)
+                ret_err_dist.append(None)
+                ret_err_code.append(ErrorCodes.setup)
+                ret_counts.append(None)
+                continue
+
+            try:
+                float_counts = d / count_to_mm[axl]
+                counts = int(np.floor(float_counts))
+                error_distance = count_to_mm[axl] * (float_counts - counts)
+                if speed is None:
+                    speed = self.motor_def_speed_count_sec
+                else:
+                    speed = int(np.floor(speed))
+                if speed > self.motor_max_speed_count_sec:
+                    speed = self.motor_max_speed_count_sec
+                self._speed = speed
+            except Exception:
+                ret_moved_axis.append(None)
+                ret_speed.append(None)
+                ret_accepted_rel_dist.append(None)
+                ret_supplied_rel_dist.append(d)
+                ret_err_dist.append(None)
+                ret_err_code.append(ErrorCodes.numerical)
+                ret_counts.append(None)
+                continue
+
+            try:
+                if stopping:
+                    cmd_seq = [
+                        f"ST{axl}",
+                        f"MO{axl}",
+                        f"SH{axl}",
+                        f"SP{axl}={speed}",
+                    ]
+                else:
+                    cmd_seq = [f"SP{axl}={speed}"]
+                if mode == MoveModes.relative:
+                    cmd_seq.append(f"PR{axl}={counts}")
+                elif mode == MoveModes.homing:
+                    cmd_seq.append(f"HM{axl}")
+                elif mode == MoveModes.absolute:
+                    cmd_seq.append(f"PA{axl}={counts}")
+                else:
+                    raise ValueError(f"invalid move mode {mode}")
+                cmd_seq.append(f"BG{axl}")
+                timeofmove.append(abs(counts / speed))
+                for cmd in cmd_seq:
+                    self._channel.command(cmd)
+                ret_moved_axis.append(axl)
+                ret_speed.append(speed)
+                ret_accepted_rel_dist.append(None)
+                ret_supplied_rel_dist.append(d)
+                ret_err_dist.append(error_distance)
+                ret_err_code.append(ErrorCodes.none)
+                ret_counts.append(counts)
+            except Exception:
+                ret_moved_axis.append(None)
+                ret_speed.append(None)
+                ret_accepted_rel_dist.append(None)
+                ret_supplied_rel_dist.append(d)
+                ret_err_dist.append(None)
+                ret_err_code.append(ErrorCodes.motor)
+                ret_counts.append(None)
+                continue
+
+        if len(timeofmove) > 0:
+            tmax = max(timeofmove)
+            if tmax > 30 * 60:
+                tmax = 30 * 60
+        else:
+            tmax = 0
+
+        qmove: dict = {"motor_status": [], "err_code": []}
+        if not self._is_estopped():
+            tstart = time.time()
+            while (
+                time.time() - tstart < self.motor_timeout
+            ) and not self._is_estopped():
+                qmove = await self.query_axis_moving(axis=axis)
+                await asyncio.sleep(0.5)
+                if all(status == "stopped" for status in qmove["motor_status"]):
+                    break
+            if not self._is_estopped():
+                if time.time() - tstart > self.motor_timeout:
+                    await self.stop_axis(axis)
+                newret_err_code = []
+                for erridx, err_code in enumerate(ret_err_code):
+                    if qmove["err_code"][erridx] != ErrorCodes.none:
+                        newret_err_code.append(ErrorCodes.timeout)
+                    else:
+                        newret_err_code.append(err_code)
+                ret_err_code = newret_err_code
+            else:
+                ret_err_code = [ErrorCodes.estop for _ in ret_err_code]
+        else:
+            ret_err_code = [ErrorCodes.estop for _ in ret_err_code]
+
+        _ = await self.query_axis_position(axis=axis)
+
+        self.motor_busy = False
+        return {
+            "moved_axis": ret_moved_axis,
+            "speed": ret_speed,
+            "accepted_rel_dist": ret_accepted_rel_dist,
+            "supplied_rel_dist": ret_supplied_rel_dist,
+            "err_dist": ret_err_dist,
+            "err_code": ret_err_code,
+            "counts": ret_counts,
+        }
 
     async def setaxisref(self):
-        raise NotImplementedError(
-            "NativeGalilMotion.setaxisref is deferred to galil native-2 (homing)"
-        )
+        """Home the linear axes, refine home, then zero absolute coords (``DP``).
+
+        Faithful port of legacy ``setaxisref``: skips Rx/Ry/Rz; fast home ->
+        2mm back-off -> slow home -> move to configured ``axis_zero`` -> ``DP``
+        zero. Returns the final move result, or ``"error"`` if disabled.
+        """
+        if not self.galil_enabled:
+            return "error"
+
+        axis = self.get_all_axis()
+        for rot in ("Rx", "Ry", "Rz"):
+            if rot in axis:
+                axis.remove(rot)
+
+        if axis is not None:
+            _ = await self._motor_move(
+                d_mm=[0 for _ in axis],
+                axis=axis,
+                speed=self.motor_max_speed_count_sec,
+                mode=MoveModes.homing,
+                transformation=TransformationModes.motorxy,
+            )
+            _ = await self._motor_move(
+                d_mm=[2 for _ in axis],
+                axis=axis,
+                speed=self.motor_max_speed_count_sec,
+                mode=MoveModes.relative,
+                transformation=TransformationModes.motorxy,
+            )
+            _ = await self._motor_move(
+                d_mm=[0 for _ in axis],
+                axis=axis,
+                speed=1000,
+                mode=MoveModes.homing,
+                transformation=TransformationModes.motorxy,
+            )
+            retc2 = await self._motor_move(
+                d_mm=[self.config_dict["axis_zero"][self.axis_id[ax]] for ax in axis],
+                axis=axis,
+                speed=None,
+                mode=MoveModes.relative,
+                transformation=TransformationModes.motorxy,
+            )
+            q = self._channel.command("TP")
+            cmd = "DP " + ",".join("0" for _ in range(len(q.split(","))))
+            self._channel.command(cmd)
+            return retc2
+        else:
+            return "error"
 
     # --- helpers ----------------------------------------------------------
     async def _notify(self, msg: dict) -> None:

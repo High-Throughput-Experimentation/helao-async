@@ -2,8 +2,9 @@
 
 Linux construct+unit tier. A FakeChannel stands in for gclib, so the command
 strings the driver emits and its TP/PA/SC parsing are verified exactly, without
-a controller. Real gclib I/O is at-station. `_motor_move`/`setaxisref` are
-deferred to native-2 (asserted to fail loud here).
+a controller. Real gclib I/O is at-station. Covers native-1 (lifecycle, simple
+verbs, queries) and native-2 (`_motor_move` transform-move orchestration +
+`setaxisref` homing).
 """
 
 import asyncio
@@ -11,6 +12,7 @@ from typing import Optional
 
 import pytest
 
+from helao.core.error import ErrorCodes
 from helao.hexagon.adapters.legacy.galil_command_channel import GclibCommandChannel
 from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
 from helao.hexagon.ports.galil_command_channel import (
@@ -250,11 +252,96 @@ def test_position_sink_receives_query_feed():
     assert q.items and q.items[-1]["ax"] == ["x", "y"]
 
 
-@pytest.mark.parametrize("call", ["motor_move", "setaxisref"])
-def test_deferred_verbs_fail_loud(call):
-    d, _ = _connected({})
-    with pytest.raises(NotImplementedError, match="native-2"):
-        if call == "motor_move":
-            asyncio.run(d._motor_move([1.0], ["x"], None, "absolute", "motorxy"))
-        else:
-            asyncio.run(d.setaxisref())
+# --------------------------------------------------------------------------
+# native-2: _motor_move + setaxisref (transform-move orchestration)
+# --------------------------------------------------------------------------
+def _move_responses(extra=None):
+    # single x axis, stopped stop-code so the settle-poll breaks immediately
+    base = {"MG _MOA": "0", "TP": "0", "PA ?": "0", "SC": "1"}
+    base.update(extra or {})
+    return base
+
+
+MOVE_CFG = {
+    "axis_id": {"x": "A"},
+    "galil_ip_str": "10.0.0.1",
+    "count_to_mm": {"A": 0.001},
+    "def_speed_count_sec": 10000,
+    "max_speed_count_sec": 25000,
+}
+
+
+def test_motor_move_absolute_motorxy_emits_SP_PA_BG():
+    d, ch = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()
+    ch.commands.clear()
+    out = asyncio.run(d._motor_move([1.0], ["x"], None, "absolute", "motorxy"))
+    # 1.0 mm / 0.001 (count_to_mm) = 1000 counts; default speed 10000
+    assert "SPA=10000" in ch.commands
+    assert "PAA=1000" in ch.commands
+    assert "BGA" in ch.commands
+    assert out["moved_axis"] == ["A"]
+    assert out["counts"] == [1000]
+    assert out["speed"] == [10000]
+    assert out["err_code"] == [ErrorCodes.none]
+    assert d.motor_busy is False  # released at the end
+
+
+def test_motor_move_relative_uses_PR():
+    d, ch = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()
+    ch.commands.clear()
+    asyncio.run(d._motor_move([2.0], ["x"], None, "relative", "motorxy"))
+    assert "PRA=2000" in ch.commands and "BGA" in ch.commands
+
+
+def test_motor_move_clamps_speed_to_max():
+    d, ch = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()
+    ch.commands.clear()
+    asyncio.run(d._motor_move([1.0], ["x"], 99999, "absolute", "motorxy"))
+    assert "SPA=25000" in ch.commands  # clamped to max_speed_count_sec
+
+
+def test_motor_move_busy_guard_returns_in_progress():
+    d, _ = _drv(responses=_move_responses(), config=dict(MOVE_CFG))
+    d.connect()
+    d.motor_busy = True
+    out = asyncio.run(d._motor_move([1.0], ["x"], None, "absolute", "motorxy"))
+    assert out["err_code"] == ErrorCodes.in_progress
+    assert out["counts"] is None
+
+
+def test_motor_move_estop_short_circuits():
+    class _EstopHook:
+        class actionservermodel:
+            estop = True
+
+    d, _ = _drv(
+        responses=_move_responses(), config=dict(MOVE_CFG), base_hook=_EstopHook()
+    )
+    d.connect()
+    out = asyncio.run(d._motor_move([1.0], ["x"], None, "absolute", "motorxy"))
+    assert out["err_code"] == ErrorCodes.estop
+    assert d.motor_busy is False
+
+
+def test_setaxisref_homes_and_zeros():
+    cfg = dict(MOVE_CFG)
+    cfg["axis_zero"] = {"A": 5.0}
+    d, ch = _drv(responses=_move_responses(), config=cfg)
+    d.connect()
+    ch.commands.clear()
+    retc2 = asyncio.run(d.setaxisref())
+    # homing moves emit HM; final absolute-zero via DP
+    assert "HMA" in ch.commands
+    assert "DP 0" in ch.commands
+    assert isinstance(retc2, dict) and retc2["moved_axis"] == ["A"]
+
+
+def test_setaxisref_disabled_returns_error():
+    cfg = dict(MOVE_CFG)
+    cfg.pop("galil_ip_str")
+    d, _ = _drv(config=cfg)
+    d.connect()  # no ip -> galil_enabled False
+    assert asyncio.run(d.setaxisref()) == "error"
