@@ -125,6 +125,20 @@ class NativeGalilMotion(HelaoDriver):
         asm = getattr(self._base_hook, "actionservermodel", None)
         return bool(getattr(asm, "estop", False))
 
+    def _read_error_code(self) -> str:
+        """Query the controller ``TC1`` (tell error code) for diagnostics.
+
+        Galil returns a bare ``"?"`` on a rejected command; ``TC1`` yields the
+        latched numeric code plus human text (e.g. ``"22 Begin not valid due to
+        limit switch"``), which is otherwise discarded. Never raises — reading
+        TC also clears the latched condition, which is fine inside error
+        handling; returns a placeholder if the channel itself is unusable.
+        """
+        try:
+            return self._channel.command("TC1").strip()
+        except Exception:
+            return "TC unavailable"
+
     # --- lifecycle --------------------------------------------------------
     def connect(self) -> DriverResponse:
         """Open the channel, run the axis-init sequence, and build the transform.
@@ -185,6 +199,12 @@ class NativeGalilMotion(HelaoDriver):
         if helaodirs is not None:
             plate = store.load_plate_calibration()
         if plate is None:
+            LOGGER.warning(
+                f"no plate calibration found at "
+                f"{self.file_backup_transfermatrix!r}; falling back to the "
+                f"identity plate transform -- motor targets may be "
+                f"miscalibrated (place the plate_calib file and reconnect)"
+            )
             plate = self.dflt_matrix
         store.save_plate_calibration(plate)
         self.plate_transfermatrix = plate
@@ -196,7 +216,13 @@ class NativeGalilMotion(HelaoDriver):
             if mplate is not None:
                 m_instr = self._convert_mplate_to_minstr(mplate.tolist())
         if m_instr is None:
-            LOGGER.info("Did not find refernce plate, loading Minstr from config")
+            if "M_instr" in self.config_dict:
+                LOGGER.info("Did not find refernce plate, loading Minstr from config")
+            else:
+                LOGGER.warning(
+                    "no instrument calibration found and no config 'M_instr'; "
+                    "falling back to the identity instrument transform"
+                )
             m_instr = self.config_dict.get(
                 "M_instr",
                 [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]],
@@ -578,6 +604,11 @@ class NativeGalilMotion(HelaoDriver):
                 ret_err_code.append(ErrorCodes.none)
                 ret_counts.append(counts)
             except Exception:
+                LOGGER.error(
+                    f"motor error on axis '{axl}' (cmd_seq={cmd_seq}); "
+                    f"controller TC1={self._read_error_code()}",
+                    exc_info=True,
+                )
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
