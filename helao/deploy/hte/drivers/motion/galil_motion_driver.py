@@ -189,6 +189,12 @@ class Galil(HelaoDriver):
 
             self.plate_transfermatrix = self._calib_store.load_plate_calibration()
             if self.plate_transfermatrix is None:
+                LOGGER.warning(
+                    f"no plate calibration found at "
+                    f"{self.file_backup_transfermatrix!r}; falling back to the "
+                    f"identity plate transform -- motor targets may be "
+                    f"miscalibrated (place the plate_calib file and reconnect)"
+                )
                 self.plate_transfermatrix = self.dflt_matrix
 
             self._calib_store.save_plate_calibration(self.plate_transfermatrix)
@@ -202,7 +208,15 @@ class Galil(HelaoDriver):
                     self.M_instr = self.convert_Mplate_to_Minstr(Mplate=Mplate.tolist())
 
             if self.M_instr is None:
-                LOGGER.info("Did not find refernce plate, loading Minstr from config")
+                if "M_instr" in self.config_dict:
+                    LOGGER.info(
+                        "Did not find refernce plate, loading Minstr from config"
+                    )
+                else:
+                    LOGGER.warning(
+                        "no instrument calibration found and no config 'M_instr'; "
+                        "falling back to the identity instrument transform"
+                    )
 
                 self.M_instr = self.config_dict.get(
                     "M_instr",
@@ -792,7 +806,11 @@ class Galil(HelaoDriver):
 
                 # continue
             except Exception:
-                LOGGER.error("motor error", exc_info=True)
+                LOGGER.error(
+                    f"motor error on axis '{axl}' (cmd_seq={cmd_seq}); "
+                    f"controller TC1={self._read_error_code()}",
+                    exc_info=True,
+                )
                 ret_moved_axis.append(None)
                 ret_speed.append(None)
                 ret_accepted_rel_dist.append(None)
@@ -1030,6 +1048,22 @@ class Galil(HelaoDriver):
         """
         asm = getattr(self._base_hook, "actionservermodel", None)
         return bool(getattr(asm, "estop", False))
+
+    def _read_error_code(self) -> str:
+        """Query the controller ``TC1`` (tell error code) for diagnostics.
+
+        Galil returns a bare ``"?"`` on a rejected command; ``TC1`` yields the
+        latched numeric code plus human text (e.g. ``"22 Begin not valid due to
+        limit switch"``), which is otherwise discarded. Never raises -- reading
+        TC also clears the latched condition, which is fine inside error
+        handling; returns a placeholder if the controller is unreachable.
+        """
+        try:
+            if self.galilcmd is None:
+                return "TC unavailable"
+            return str(self.galilcmd("TC1")).strip()
+        except Exception:
+            return "TC unavailable"
 
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
         """Engage the motion emergency stop.

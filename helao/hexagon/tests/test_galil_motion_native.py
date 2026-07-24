@@ -446,3 +446,41 @@ def test_stop_and_reset_abc():
     ch.commands.clear()
     d.reset()
     assert d.galil_enabled is True
+
+
+def test_build_transform_warns_on_missing_calibration(monkeypatch):
+    """Absent plate + instrument calibration -> identity fallback logs WARNING.
+
+    With no base hook, helaodirs is None so neither calibration file is read;
+    both fall back to identity and _build_transform must warn on each (the
+    diagnostic for a mis-placed plate_calib file that silently miscalibrates
+    motor targets).
+    """
+    from helao.hexagon.adapters.native import galil_motion_native as mod
+
+    d, _ = _drv()
+    warnings: list = []
+    monkeypatch.setattr(
+        mod.LOGGER, "warning", lambda msg, *a, **k: warnings.append(str(msg))
+    )
+    d._build_transform()
+    assert any("identity plate transform" in w for w in warnings)
+    assert any("identity instrument transform" in w for w in warnings)
+    assert np.allclose(np.asarray(d.plate_transfermatrix), np.eye(3))
+
+
+def test_build_transform_no_warning_when_config_m_instr_present(monkeypatch):
+    """A configured M_instr is a real transform -> no identity-instrument warning."""
+    from helao.hexagon.adapters.native import galil_motion_native as mod
+
+    cfg = dict(AXIS_CFG)
+    cfg["M_instr"] = [[2, 0, 0, 0], [0, 2, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+    d, _ = _drv(config=cfg)
+    warnings: list = []
+    monkeypatch.setattr(
+        mod.LOGGER, "warning", lambda msg, *a, **k: warnings.append(str(msg))
+    )
+    d._build_transform()
+    assert not any("identity instrument transform" in w for w in warnings)
+    # plate is still absent here -> the plate warning is still expected
+    assert any("identity plate transform" in w for w in warnings)
