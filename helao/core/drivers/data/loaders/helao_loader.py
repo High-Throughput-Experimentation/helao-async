@@ -14,9 +14,65 @@ from typing import Optional
 
 import boto3
 import pandas as pd
+from pydantic import PrivateAttr
 from sqlmodel import Session, text, create_engine
 from helao.core.models.credentials import HelaoCredentials
+from helao.core.models.file import FileInfo
 from helao.core.drivers.data.loaders.model_base import HelaoDataModelMixin
+
+
+class HelaoFile(FileInfo):
+    """``FileInfo`` that can fetch its own bytes from S3 via a ``HelaoLoader``.
+
+    Extends the plain file-metadata record with a reference to the loader that
+    produced the parent action/process record, so the file body can be pulled
+    from the S3 bucket on demand with :meth:`get_bytes`.
+    """
+
+    # Loader reference kept off the pydantic schema (not serialized/validated).
+    _loader: Optional["HelaoLoader"] = PrivateAttr(default=None)
+
+    @classmethod
+    def from_meta(
+        cls, file_dict: dict, loader: Optional["HelaoLoader"] = None
+    ) -> "HelaoFile":
+        """Build a ``HelaoFile`` from a serialized ``files`` entry.
+
+        Args:
+            file_dict: One entry from a record's ``files`` list.
+            loader: ``HelaoLoader`` used later to retrieve the file from S3.
+
+        Returns:
+            A ``HelaoFile`` mirroring ``file_dict`` with ``loader`` attached.
+        """
+        obj = cls.model_validate(file_dict)
+        obj._loader = loader
+        return obj
+
+    def __getitem__(self, key: str):
+        """Dict-style read access, for backward compatibility with ``files`` dicts."""
+        return getattr(self, key)
+
+    def get(self, key: str, default=None):
+        """Dict-style ``.get``, for backward compatibility with ``files`` dicts."""
+        return getattr(self, key, default)
+
+    @property
+    def s3_key(self) -> str:
+        """S3 key for this file under its action's ``raw_data`` prefix."""
+        return f"raw_data/{self.action_uuid}/{self.file_name}"
+
+    def get_bytes(self) -> io.BytesIO:
+        """Fetch this file's body from S3 and return it as a ``BytesIO``.
+
+        Raises:
+            RuntimeError: If no ``HelaoLoader`` reference is available.
+        """
+        if self._loader is None:
+            raise RuntimeError(
+                "HelaoFile has no HelaoLoader reference for S3 retrieval."
+            )
+        return self._loader.get_bytes(s3_bucket="helao.data", s3_key=self.s3_key)
 
 
 class HelaoSolid:
@@ -104,14 +160,45 @@ class HelaoModel:
 
 
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
-    """``HelaoModel`` mixed with HLO-data accessors for action and process records."""
+    """``HelaoModel`` mixed with HLO-data accessors for action and process records.
+
+    Overrides the mixin's ``files`` accessors to return :class:`HelaoFile`
+    objects (each bound to the module ``LOADER``) instead of raw dicts, so
+    callers can pull a file's bytes from S3 directly.
+    """
+
+    @staticmethod
+    def _is_data_file(f: "HelaoFile") -> bool:
+        """True if ``f`` is an HLO/JSON data payload (matches the mixin's filter)."""
+        return bool(
+            (f.file_name or "").endswith(".hlo")
+            or (f.file_name or "").endswith(".json")
+            or f.file_type in ["helao__json_file", "json__file"]
+        )
+
+    @property
+    def files(self) -> list:
+        """All ``files`` entries wrapped as :class:`HelaoFile` objects."""
+        meta = self.json
+        return [HelaoFile.from_meta(x, LOADER) for x in meta.get("files", [])]
+
+    @property
+    def data_files(self) -> list:
+        """``files`` entries that are HLO/JSON data payloads, as ``HelaoFile``."""
+        return [f for f in self.files if self._is_data_file(f)]
+
+    @property
+    def other_files(self) -> list:
+        """``files`` entries not classified as data files, as ``HelaoFile``."""
+        return [f for f in self.files if not self._is_data_file(f)]
 
     @property
     def hlo(self) -> dict:
         """Parsed HLO JSON for the primary data file (empty dict if none)."""
-        if not self.hlo_file:
+        if not self.data_files:
             return {}
-        return LOADER.get_hlo(self.hlo_file["action_uuid"], self.hlo_file["file_name"])
+        hlo_file = self.hlo_file
+        return LOADER.get_hlo(hlo_file.action_uuid, hlo_file.file_name)
 
 
 class HelaoAction(HelaoDataModel):
@@ -312,7 +399,9 @@ class HelaoLoader:
             return HelaoAction(action_uuid)
         return jd
 
-    def get_exp(self, experiment_uuid: UUID, hmod: bool = True) -> dict | HelaoExperiment:
+    def get_exp(
+        self, experiment_uuid: UUID, hmod: bool = True
+    ) -> dict | HelaoExperiment:
         """Return the experiment's JSON dict, or a ``HelaoExperiment`` wrapper when ``hmod``."""
         jd = self.exp_cache.get(
             experiment_uuid, self.get_json("experiment", experiment_uuid)
