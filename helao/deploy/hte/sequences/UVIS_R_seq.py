@@ -5,7 +5,7 @@ __all__ = ["UVIS_R", "UVIS_R_postseq", "UVIS_R_shutoff", "UVIS_GAIA_preset"]
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.deploy.priv.scripts.common.helao_nbio import PAPI
 from helao.helpers.lib_decorators import sequence
-
+from helao.deploy.hte.sequences.gaia_plates import REMAPPED_PLATES
 
 SEQUENCES = __all__
 
@@ -610,84 +610,10 @@ def UVIS_GAIA_preset(
     ]
     FULLREREF = [838, 2899, 5422, 8225, 11177, 14137, 17097, 20049, 22852, 25343, 27372]
 
-    REMAPPED_PLATES = [
-        10051,
-        10052,
-        10057,
-        10059,
-        10062,
-        10063,
-        10064,
-        10065,
-        10066,
-        10067,
-        10068,
-        10071,
-        10072,
-        10075,
-        10076,
-        10079,
-        10080,
-        10082,
-        10083,
-        10084,
-        10085,
-        10086,
-        10087,
-        10088,
-        10089,
-        10090,
-        10091,
-        10092,
-        10093,
-        10097,
-        10098,
-        10099,
-        10100,
-        10101,
-        10102,
-        10103,
-        10104,
-        10105,
-        10106,
-        10107,
-        10108,
-        10109,
-        10110,
-        10111,
-        10112,
-        10113,
-        10114,
-        10115,
-        10116,
-        10117,
-        10118,
-        10120,
-        10121,
-        10123,
-        10124,
-        10126,
-        10128,
-        10129,
-        10130,
-        10131,
-        10132,
-        10133,
-        10135,
-        10137,
-        10138,
-        10140,
-        10141,
-        10142,
-        10144,
-        10145,
-        10149,
-    ]
-
     els = PAPI.get_elements_plateid(plate_id)
     if els is None:
         els = []
-    
+
     if plate_id in REMAPPED_PLATES:
         return UVIS_R(
             plate_id=plate_id,
