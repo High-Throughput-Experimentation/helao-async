@@ -19,7 +19,10 @@ import pandas as pd
 from helao.helpers.yml_tools import yml_load
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_bytes
-from helao.core.drivers.data.loaders.model_base import HelaoDataModelMixin
+from helao.core.drivers.data.loaders.model_base import (
+    HelaoArtifact,
+    HelaoDataModelMixin,
+)
 from helao.core.models.run_dir import RunDir
 
 
@@ -484,9 +487,7 @@ class LocalLoader:
         """
         if self.target.endswith(".zip") and yml_path == "":
             rel_seqzip_path = fn
-            for seq_dir in sorted(
-                self.sequences.sequence_dir, key=len, reverse=True
-            ):
+            for seq_dir in sorted(self.sequences.sequence_dir, key=len, reverse=True):
                 if seq_dir and seq_dir in fn:
                     rel_seqzip_path = fn.split(seq_dir, 1)[-1].lstrip("/")
                     # MicroOrch zips are RUNS_FINISHED-rooted, so arcnames keep
@@ -504,6 +505,15 @@ class LocalLoader:
             fpath = os.path.join(os.path.dirname(yml_path), fn)
             fbytes = FM.read_bytes(fpath)
         return fbytes
+
+    def read_artifact_bytes(self, artifact: "HelaoArtifact") -> BytesIO:
+        """Read a :class:`HelaoArtifact`'s body via ``get_bytes`` as a ``BytesIO``.
+
+        The artifact's ``locator`` is a ``(yml_path, file_name)`` pair matching
+        :meth:`get_bytes`' signature (``yml_path=""`` routes through the
+        zip/sequence resolver for process-aggregated files).
+        """
+        return BytesIO(self.get_bytes(*artifact.locator))
 
     def get_parquet(self, yml_path: str, par_fn: str) -> pd.DataFrame:
         """Read a parquet file (zip-aware) into a dataframe.
@@ -576,7 +586,12 @@ class HelaoModel:
 
 
 class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
-    """``HelaoModel`` mixed with HLO-data accessors for action and process records."""
+    """``HelaoModel`` mixed with HLO-data accessors for action and process records.
+
+    Adds two parallel views over the record's ``files``: :attr:`files` (legacy
+    ``(file_name, file_type, run_use)`` tuples) and :attr:`artifacts`
+    (:class:`HelaoArtifact` objects that can read their own bytes).
+    """
 
     @property
     def hlo(self) -> tuple:
@@ -586,6 +601,24 @@ class HelaoDataModel(HelaoDataModelMixin, HelaoModel):
     def read_hlo_file(self, filename) -> tuple:
         """Read an arbitrary HLO ``filename`` from this record's directory."""
         return self.loader.get_hlo(self.yml_path, filename)
+
+    @property
+    def files(self) -> list:
+        """``(file_name, file_type, run_use)`` tuples for every file in the record."""
+        return [
+            (fd["file_name"], fd.get("file_type"), fd.get("run_use"))
+            for fd in self.json.get("files", [])
+        ]
+
+    @property
+    def artifacts(self) -> list:
+        """Record ``files`` as :class:`HelaoArtifact` objects bound to the loader."""
+        return [
+            HelaoArtifact.from_meta(
+                fd, loader=self.loader, locator=(self.yml_path, fd["file_name"])
+            )
+            for fd in self.json.get("files", [])
+        ]
 
 
 class HelaoAction(HelaoDataModel):
@@ -718,17 +751,40 @@ class HelaoProcess(HelaoModel):
         return self.loader.get_exp(exp_row)
 
     @property
-    def files(self) -> list:
-        """``(rel_path, file_type, run_use)`` tuples for every contributing action file."""
-        act_map = {
+    def _artifact_paths(self) -> dict:
+        """Map ``action_uuid`` to its run-tree ``action_output_dir`` for this process."""
+        return {
             ad["action_uuid"]: ad["action_output_dir"]
             for ad in self.json.get("dispatched_actions_abbr", [])
         }
+
+    @property
+    def files(self) -> list:
+        """``(rel_path, file_type, run_use)`` tuples for every contributing action file."""
+        act_map = self._artifact_paths
         return [
             (
                 f"{act_map[fd['action_uuid']]}/{fd['file_name']}",
                 fd["file_type"],
                 fd["run_use"],
+            )
+            for fd in self.json.get("files", [])
+        ]
+
+    @property
+    def artifacts(self) -> list:
+        """Contributing action files as :class:`HelaoArtifact` objects.
+
+        Each artifact's ``locator`` is ``("", rel_path)`` so ``read_artifact_bytes``
+        resolves it through the loader's zip/sequence-aware path, mirroring how
+        :attr:`files` paths are consumed today.
+        """
+        act_map = self._artifact_paths
+        return [
+            HelaoArtifact.from_meta(
+                fd,
+                loader=self.loader,
+                locator=("", f"{act_map[fd['action_uuid']]}/{fd['file_name']}"),
             )
             for fd in self.json.get("files", [])
         ]
@@ -754,4 +810,3 @@ class HelaoProcess(HelaoModel):
         """
         fm = FileMapper(self.yml_path)
         return fm.read_bytes(relative_path)
-
