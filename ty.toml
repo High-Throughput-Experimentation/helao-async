@@ -5,7 +5,7 @@
 # ty is used as a secondary, stricter pass.
 
 [environment]
-python-version = "3.12"
+python-version = "3.14"
 
 [rules]
 # `# type: ignore` comments in this repo are pyright directives. ty does not
