@@ -8,7 +8,9 @@ that promotes ``RUNS_ACTIVE`` directories to ``RUNS_FINISHED`` (or
 
 import os
 import asyncio
+import threading
 from glob import glob
+from io import StringIO
 from pathlib import Path
 from typing import Optional, Union
 
@@ -16,11 +18,54 @@ import aiofiles
 import aiohttp
 import aioshutil
 import ruamel.yaml
+from ruamel.yaml.representer import RepresenterError
 
 from helao.core.models.run_dir import RunDir
 
+#: Per-thread dumper cache. ``ruamel.yaml.YAML`` instances hold emitter state
+#: and are not thread-safe, so each thread gets its own.
+_DUMPERS = threading.local()
 
-def yml_dumps(obj, options=None) -> str:
+
+def _represent_none(self, data):
+    """Render ``None`` as the literal scalar ``null``."""
+    return self.represent_scalar("tag:yaml.org,2002:null", "null")
+
+
+def _get_dumper(fast: bool) -> ruamel.yaml.YAML:
+    """Return this thread's cached dumper for the ``fast``/round-trip variant.
+
+    ``fast=False`` is the round-trip (``typ="rt"``) dumper: it preserves
+    comments and ruamel's 2/4/2 indentation, and can represent round-trip
+    types such as ``CommentedMap``.
+
+    ``fast=True`` is the C-backed safe dumper (``typ="safe", pure=False``),
+    which is ~4x faster but only handles plain Python objects and emits block
+    sequences at the parent indent instead of ruamel's indented style. Mapping
+    key order is preserved (the safe representer's default alphabetical sort is
+    switched off) so the output stays diffable against the round-trip form; the
+    two parse to equal objects.
+    """
+    key = "fast" if fast else "rt"
+    yaml = getattr(_DUMPERS, key, None)
+    if yaml is not None:
+        return yaml
+
+    if fast:
+        yaml = ruamel.yaml.YAML(typ="safe", pure=False)
+        yaml.default_flow_style = False
+        yaml.representer.sort_base_mapping_type_on_output = False
+    else:
+        yaml = ruamel.yaml.YAML(typ="rt")
+    yaml.indent(mapping=2, sequence=4, offset=2)
+    yaml.allow_duplicate_keys = True
+    yaml.representer.add_representer(type(None), _represent_none)
+
+    setattr(_DUMPERS, key, yaml)
+    return yaml
+
+
+def yml_dumps(obj, options=None, fast: bool = False) -> str:
     """Serialize ``obj`` to a YAML string using HELAO formatting conventions.
 
     The dumper is configured for 2/4/2 indentation, allows duplicate keys,
@@ -29,25 +74,36 @@ def yml_dumps(obj, options=None) -> str:
     Args:
         obj: Python object to serialize.
         options: Extra keyword arguments forwarded to ``yaml.dump``.
+        fast: Use the C-backed safe emitter instead of the round-trip one.
+            ~4x faster, for callers serializing large volumes of plain
+            dict/list/scalar data (the offline batch converters write ~800
+            act/exp ymls per plate). Falls back to the round-trip dumper for
+            any object the safe representer cannot handle, so it is always
+            safe to pass; the only visible difference is block-sequence
+            indentation.
 
     Returns:
         YAML-formatted string.
     """
-    yaml = ruamel.yaml.YAML(typ="rt")
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    yaml.allow_duplicate_keys = True
-
-    # show null
-    def my_represent_none(self, data):
-        """Render ``None`` as the literal scalar ``null``."""
-        return self.represent_scalar("tag:yaml.org,2002:null", "null")
-
-    yaml.representer.add_representer(type(None), my_represent_none)
-
     if options is None:
         options = {}
-    from io import StringIO
 
+    if fast:
+        try:
+            return _dump_to_str(_get_dumper(True), obj, options)
+        except RepresenterError:
+            # Round-trip types (CommentedMap), numpy scalars, datetimes and
+            # friends: fall through to the general dumper rather than fail.
+            # Drop the cached instance first -- a dump that raised mid-emit
+            # leaves serializer/emitter state open, which would corrupt the
+            # next document written through it.
+            _DUMPERS.fast = None
+
+    return _dump_to_str(_get_dumper(False), obj, options)
+
+
+def _dump_to_str(yaml: ruamel.yaml.YAML, obj, options: dict) -> str:
+    """Dump ``obj`` with ``yaml`` into a string."""
     string_stream = StringIO()
     yaml.dump(obj, string_stream, **options)
     output_str = string_stream.getvalue()
@@ -94,7 +150,10 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3) -> b
         repeated failure.
     """
     from helao.helpers import helao_logging as logging
-    LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+
+    LOGGER = (
+        logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+    )
 
     yp = Path(yml_path)
 
@@ -150,7 +209,10 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
         Empty dict when ``hobj`` is not a supported type; otherwise None.
     """
     from helao.helpers import helao_logging as logging
-    LOGGER = logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+
+    LOGGER = (
+        logging.LOGGER if logging.LOGGER is not None else logging.make_logger(__file__)
+    )
 
     obj_type = hobj.__class__.__name__.lower()
     dest_dir = RunDir.FINISHED.value
