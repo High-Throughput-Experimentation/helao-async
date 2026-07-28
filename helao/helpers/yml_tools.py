@@ -3,7 +3,7 @@
 Wraps :mod:`ruamel.yaml` with HELAO conventions (2/4/2 indent, ``null`` for
 None, duplicate keys allowed) and provides the asynchronous :func:`move_dir`
 that promotes ``RUNS_ACTIVE`` directories to ``RUNS_FINISHED`` (or
-``RUNS_DIAG`` for manual actions) and notifies the DB server.
+``RUNS_DIAG`` for manual actions) and notifies the syncer server.
 """
 
 import os
@@ -137,12 +137,12 @@ def yml_load(input: Union[str, Path]):
     return obj
 
 
-async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3) -> bool:
-    """POST a finished YAML path to the DB server's ``/finish_yml`` endpoint.
+async def yml_finisher(yml_path: str, sync_config: dict = {}, retry: int = 3) -> bool:
+    """POST a finished YAML path to the syncer's ``/finish_yml`` endpoint.
 
     Args:
         yml_path: Filesystem path to the finalized YAML.
-        db_config: Mapping with at least ``host`` and ``port`` for the DB
+        sync_config: Mapping with at least ``host`` and ``port`` for the syncer
             server; missing keys cause an immediate False return.
         retry: Maximum number of attempts on non-200 responses.
 
@@ -158,11 +158,11 @@ async def yml_finisher(yml_path: str, db_config: dict = {}, retry: int = 3) -> b
 
     yp = Path(yml_path)
 
-    if "host" not in db_config or "port" not in db_config:
+    if "host" not in sync_config or "port" not in sync_config:
         return False
     else:
-        dbp_port = db_config["port"]
-        dbp_host = db_config["host"]
+        dbp_port = sync_config["port"]
+        dbp_host = sync_config["host"]
 
     if not yp.exists():
         LOGGER.info(f"{yml_path} was not found, was it already moved?")
@@ -330,7 +330,7 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
                     if not is_manual:
                         await yml_finisher(
                             yml_path,
-                            db_config=get_sync_server_cfg(base.world_cfg),
+                            sync_config=get_sync_server_cfg(base.world_cfg),
                         )
                     LOGGER.info(f"Successfully removed {yml_dir}")
                 if rm_success and obj_type == "action" and is_manual:
