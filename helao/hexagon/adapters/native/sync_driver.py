@@ -702,7 +702,7 @@ class SyncDriver:
 
         Args:
             config: Driver/server config dict; supplies AWS keys, bucket,
-                ``api_host``, ``max_tasks``, and ``auto_analyze_sequences``.
+                ``max_tasks``, and ``auto_analyze_sequences``.
             helaodirs: Resolved HELAO directory paths for this server.
         """
         self.config_dict = config
@@ -736,7 +736,6 @@ class SyncDriver:
             self.s3 = None
             self.s3r = None
         self.bucket = self.config_dict["aws_bucket"]
-        self.api_host = self.config_dict.get("api_host", None)
 
         # self.progress = {}
         self.sequence_objs = {}
@@ -1297,14 +1296,12 @@ class SyncDriver:
                 prog.dict["s3"] = True
                 prog.write_dict()
 
-        # next push prog.yml to API
+        # The API leg is retired: the SQL database is offline and to_api() was a
+        # no-op stub. The flag is still set so the "s3_done and api_done" gate
+        # below advances the run to RUNS_SYNCED.
         if not prog.api_done or force_api:
-            LOGGER.debug(f"Pushing prog.yml to API for {prog.yml.target.name}")
-            api_success = await self.to_api(meta, prog.yml.type)
-            LOGGER.debug(f"API push returned {api_success} for {prog.yml.target.name}")
-            if api_success:
-                prog.dict["api"] = True
-                prog.write_dict()
+            prog.dict["api"] = True
+            prog.write_dict()
 
         # get yml target name for popping later (after seq zip removes yml)
         yml_target_name = prog.yml.target.name
@@ -1733,11 +1730,12 @@ class SyncDriver:
                 continue
             if all(i in exp_prog.dict["process_actions_done"] for i in gids):
                 meta = exp_prog.dict["process_metas"][pidx]
-                model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
-                api_success = await self.to_api(model, "process")
-                if api_success:
-                    exp_prog.dict["process_api"].append(pidx)
-                    exp_prog.write_dict()
+                # The API push is retired (see sync_yml), but the meta is still
+                # validated here so a malformed process fails loudly instead of
+                # being marked done.
+                ProcessModel.model_validate(meta)
+                exp_prog.dict["process_api"].append(pidx)
+                exp_prog.write_dict()
         return exp_prog
 
     async def to_s3(
@@ -1796,26 +1794,6 @@ class SyncDriver:
         except Exception:
             LOGGER.error(f"Could not push {target}.", exc_info=True)
             return False
-
-    async def to_api(self, req_model: dict, meta_type: str, retries: int = 5) -> bool:
-        """Register a metadata record with the upstream API.
-
-        When no ``api_host`` is configured, returns ``True`` immediately (the
-        API leg is a no-op).
-
-        Args:
-            req_model: Metadata dict to register.
-            meta_type: Resource type (``action``/``experiment``/``sequence``/``process``).
-            retries: Number of retry attempts on failure.
-
-        Returns:
-            True on successful registration (or when the API is disabled).
-        """
-        if self.api_host is None:
-            LOGGER.info("Modelyst API is not configured. Skipping to API push.")
-            return True
-        else:
-            return True
 
     def list_pending(self, omit_manual_exps: bool = True) -> list:
         """Return ``*-seq.yml`` paths waiting under ``RUNS_FINISHED``.

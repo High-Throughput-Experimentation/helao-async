@@ -1,13 +1,12 @@
-"""Unit tests for syncer server-key resolution (SYNC, with the legacy DB alias).
+"""Unit tests for syncer server-key resolution (SYNC; the DB key is retired).
 
 No pytest; run with:
 
     conda run -n helao python -m helao.core.tests.unit_test_server_keys
 """
 
-from helao.helpers import server_keys
 from helao.helpers.server_keys import (
-    LEGACY_SYNC_SERVER_KEYS,
+    RETIRED_SYNC_SERVER_KEYS,
     SYNC_SERVER_KEY,
     get_sync_server_cfg,
     resolve_sync_server_key,
@@ -20,20 +19,27 @@ def test_resolves_sync_key():
     print("test_resolves_sync_key PASS")
 
 
-def test_resolves_legacy_db_key():
-    """An unmigrated config must keep syncing rather than silently disabling."""
+def test_retired_db_key_raises():
+    """An unmigrated config must fail loudly, not silently stop syncing."""
     cfg = {"servers": {"ORCH": {}, "DB": {"params": {"a": 1}}}}
-    assert resolve_sync_server_key(cfg) == "DB"
-    print("test_resolves_legacy_db_key PASS")
+    for call in (resolve_sync_server_key, get_sync_server_cfg):
+        try:
+            call(cfg)
+        except ValueError as exc:
+            assert "DB" in str(exc) and SYNC_SERVER_KEY in str(exc), exc
+        else:
+            raise AssertionError(f"{call.__name__} accepted a retired DB key")
+    print("test_retired_db_key_raises PASS")
 
 
-def test_sync_wins_over_legacy():
+def test_sync_present_ignores_stale_db_block():
+    """A config carrying both keys resolves SYNC and does not raise."""
     cfg = {
         "servers": {"DB": {"params": {"old": True}}, "SYNC": {"params": {"new": True}}}
     }
     assert resolve_sync_server_key(cfg) == "SYNC"
     assert get_sync_server_cfg(cfg)["params"] == {"new": True}
-    print("test_sync_wins_over_legacy PASS")
+    print("test_sync_present_ignores_stale_db_block PASS")
 
 
 def test_absent_returns_none():
@@ -53,45 +59,19 @@ def test_preferred_key_wins():
     print("test_preferred_key_wins PASS")
 
 
-def test_legacy_warns_once_per_key():
-    server_keys._WARNED.clear()
-    warnings = []
-
-    class _Rec:
-        def warning(self, msg, *a, **k):
-            warnings.append(msg)
-
-    orig = server_keys._logger
-    server_keys._logger = lambda: _Rec()
-    try:
-        cfg = {"servers": {"DB": {}}}
-        for _ in range(3):
-            assert resolve_sync_server_key(cfg) == "DB"
-        assert len(warnings) == 1, warnings
-        assert "DB" in warnings[0] and SYNC_SERVER_KEY in warnings[0]
-        # the SYNC key never warns
-        assert resolve_sync_server_key({"servers": {"SYNC": {}}}) == "SYNC"
-        assert len(warnings) == 1, warnings
-    finally:
-        server_keys._logger = orig
-        server_keys._WARNED.clear()
-    print("test_legacy_warns_once_per_key PASS")
-
-
-def test_legacy_tuple_shape():
+def test_retired_tuple_shape():
     assert SYNC_SERVER_KEY == "SYNC"
-    assert "DB" in LEGACY_SYNC_SERVER_KEYS
-    print("test_legacy_tuple_shape PASS")
+    assert "DB" in RETIRED_SYNC_SERVER_KEYS
+    print("test_retired_tuple_shape PASS")
 
 
 def run_all():
     test_resolves_sync_key()
-    test_resolves_legacy_db_key()
-    test_sync_wins_over_legacy()
+    test_retired_db_key_raises()
+    test_sync_present_ignores_stale_db_block()
     test_absent_returns_none()
     test_preferred_key_wins()
-    test_legacy_warns_once_per_key()
-    test_legacy_tuple_shape()
+    test_retired_tuple_shape()
     print("ALL SERVER_KEYS TESTS PASS")
 
 

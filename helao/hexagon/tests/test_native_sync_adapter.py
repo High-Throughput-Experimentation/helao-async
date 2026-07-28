@@ -46,7 +46,7 @@ async def test_falls_back_to_db_params_without_aws_config_path(tmp_path):
     syncer = NativeSyncer(host)  # type: ignore[reportArgumentType]
     try:
         assert syncer.bucket == "db-bucket"
-        assert syncer.s3 is None and syncer.api_host is None
+        assert syncer.s3 is None
     finally:
         await teardown_driver(syncer)
 
@@ -92,7 +92,6 @@ async def test_adapter_is_sync_port_and_delegates(tmp_path):
     assert adapter.n_queue() == 0
     await adapter.enqueue_yml(tmp_path / "RUNS_FINISHED" / "a-seq.yml", rank=2)
     assert adapter.n_queue() == 1
-    assert (await adapter.to_api({}, "action")) is True  # documented STUB
     assert (await adapter.reset_sync(str(tmp_path / "nope"))) is False
     assert adapter.list_pending() == []
 

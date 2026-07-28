@@ -82,7 +82,7 @@ class _BlockingS3:
 
 
 def _make_driver(tmp_root: str) -> SyncDriver:
-    """Build a SyncDriver with no AWS/API configured (``s3``/``api_host`` None)."""
+    """Build a SyncDriver with no AWS configured (``s3`` is None)."""
     hd = HelaoDirs(
         root=Path(tmp_root),
         save_root=Path(tmp_root) / RunDir.ACTIVE.value,
@@ -99,7 +99,6 @@ async def _run_checks() -> dict:
         drv = _make_driver(tmp_root)
         try:
             out["s3_none"] = drv.s3 is None
-            out["api_none"] = drv.api_host is None
 
             # no-op S3 path (s3 is None) returns True
             out["to_s3_noop_true"] = (
@@ -180,9 +179,8 @@ def sync_to_thread_unit_test() -> bool:
         if saved_aws is not None:
             os.environ["AWS_CONFIG_PATH"] = saved_aws
 
-    reporter.section("SyncDriver construction (S3/API disabled)")
+    reporter.section("SyncDriver construction (S3 disabled)")
     reporter.check("s3 client is None when unconfigured", lambda: res["s3_none"])
-    reporter.check("api_host is None when unconfigured", lambda: res["api_none"])
 
     reporter.section("to_s3 no-op path")
     reporter.check(

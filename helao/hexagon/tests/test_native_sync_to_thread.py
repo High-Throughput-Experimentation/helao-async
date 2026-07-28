@@ -94,7 +94,6 @@ async def test_construction_and_noop_s3(tmp_path):
     drv = make_sync_driver(str(tmp_path), NativeSyncDriver)
     try:
         assert drv.s3 is None, "s3_none"
-        assert drv.api_host is None, "api_none"
 
         # no-op S3 path (s3 is None) returns True
         assert (await drv.to_s3({"k": "v"}, "meta/x.json")) is True, "to_s3_noop_true"

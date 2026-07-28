@@ -79,8 +79,8 @@ class Orch(Base):
     sequence libraries, running the dispatch loop, maintaining a
     ``GlobalStatusModel`` of every action server, optionally hosting the Bokeh
     operator UI, and emitting heartbeat/status pings so the queues react to
-    remote events. Run syncing is enabled when a ``SYNC`` server (or the legacy
-    ``DB`` alias) is present in the world config.
+    remote events. Run syncing is enabled when a ``SYNC`` server is present in
+    the world config.
     """
 
     loop_task: asyncio.Task

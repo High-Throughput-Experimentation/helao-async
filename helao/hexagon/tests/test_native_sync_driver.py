@@ -20,7 +20,6 @@ async def test_construction_hermetic(tmp_path):
     drv = make_sync_driver(str(tmp_path), NativeSyncDriver)
     try:
         assert drv.s3 is None and drv.s3r is None and drv.aws_session is None
-        assert drv.api_host is None
         assert drv.bucket == "test-bucket"
         assert drv.task_queue.qsize() == 0
         assert len(drv.syncer_loops) == 1  # max_tasks=1

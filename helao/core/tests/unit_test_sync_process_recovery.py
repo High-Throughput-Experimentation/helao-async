@@ -16,7 +16,7 @@ and re-run finish_yml). Three distinct defects are covered:
      action on disk is dropped by ``sync_process`` so the experiment finishes,
      instead of looping forever on ``reset_sync`` + re-enqueue.
 
-Hermetic: no AWS/API configured (``s3``/``api_host`` are None), so uploads are
+Hermetic: no AWS configured (``s3`` is None), so uploads are
 no-ops and nothing touches the network.
 """
 
