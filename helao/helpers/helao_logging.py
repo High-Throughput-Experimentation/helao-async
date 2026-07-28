@@ -18,6 +18,7 @@ Usage::
 import copy
 import tempfile
 import os
+import re
 import subprocess
 import logging
 import time
@@ -71,6 +72,51 @@ LOGGER: logging.Logger = None
 HOST = gethostname()
 
 
+# Any run of whitespace, including the CR/LF that email headers forbid.
+_WHITESPACE_RUN = re.compile(r"\s+")
+
+# Longest message-derived title kept in an alert subject line. Long headers are
+# legal (the email policy folds them) but unreadable in a mail client, and the
+# title is also buffered per suppressed alert, so it is bounded here.
+MAX_SUBJECT_TITLE = 120
+
+# Subject title used when a record carries no usable message text.
+EMPTY_SUBJECT_TITLE = "(no message)"
+
+
+def subject_title(message: str) -> str:
+    """Collapse ``message`` into a single-line title for an email subject.
+
+    A ``"<title> ~ <detail>"`` message contributes everything before the first
+    ``~``; any other message contributes just its first whitespace-delimited
+    token.
+
+    Interior whitespace is collapsed to single spaces and the result is length
+    capped. Email headers may not contain CR or LF -- assigning one raises
+    ``ValueError`` from the email policy, which surfaces as a "--- Logging
+    error ---" traceback and drops the alert -- and a multi-line message (an
+    embedded traceback, say) reaches this function routinely.
+
+    Args:
+        message: Fully-formatted log record message.
+
+    Returns:
+        A single-line, non-empty title safe to embed in a header value.
+    """
+    if "~" in message:
+        title = _WHITESPACE_RUN.sub(" ", message.split("~", 1)[0]).strip()
+    else:
+        # ``str.split()`` splits on runs of any whitespace, so the first token
+        # is already free of CR/LF; an empty message yields no tokens at all.
+        tokens = message.split()
+        title = tokens[0] if tokens else ""
+    if not title:
+        return EMPTY_SUBJECT_TITLE
+    if len(title) > MAX_SUBJECT_TITLE:
+        title = title[:MAX_SUBJECT_TITLE].rstrip() + "..."
+    return title
+
+
 class GZipRotator:
     """Rotation callable that renames the rotated log file and gzips it."""
 
@@ -112,12 +158,12 @@ class TitledSMTPHandler(SMTPHandler):
         self._suppressed_subjects = []
 
     def _base_subject(self, record) -> str:
-        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``."""
-        message = record.getMessage()
-        if "~" in message:
-            title = message.split("~")[0].strip()
-        else:
-            title = message.split()[0].strip()
+        """Return ``"<LEVEL> - <title> on <HOST>"`` for ``record``.
+
+        The title is sanitised by :func:`subject_title`, so the result is always
+        a single line and safe to assign to the ``Subject`` header.
+        """
+        title = subject_title(record.getMessage())
         return f"{record.levelname} - {title} on {HOST}"
 
     def getSubject(self, record) -> str:

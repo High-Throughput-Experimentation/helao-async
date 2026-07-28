@@ -20,15 +20,20 @@ import traceback
 from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 
+from email.message import EmailMessage
+
 from helao.helpers import helao_logging as helao_log
 from helao.helpers.helao_logging import (
     ALERT_LEVEL,
+    EMPTY_SUBJECT_TITLE,
+    MAX_SUBJECT_TITLE,
     ColoredNtpOffsetFormatter,
     DedupTimedRotatingFileHandler,
     GZipRotator,
     NtpOffsetFormatter,
     make_logger,
     print_message,
+    subject_title,
 )
 from helao.core.tests._test_utils import TestReporter
 
@@ -188,6 +193,88 @@ def logging_unit_test() -> bool:
         reporter.check(
             "print_message concatenates positional args with spaces",
             lambda: capture2.records[0].getMessage() == "hi there",
+        )
+
+        reporter.section("alert subject lines are header-safe")
+        # Email headers may not contain CR/LF; assigning one raises ValueError
+        # from the email policy, which drops the alert and prints a "--- Logging
+        # error ---" traceback. Multi-line messages (embedded tracebacks) hit
+        # this routinely, and the "~" title branch used to pass them through.
+        multiline_tilde = (
+            "Sync failed for plate 10221\n"
+            "Traceback (most recent call last):\n"
+            "  File x ~ detail"
+        )
+        header_cases = {
+            "single-line with ~": "Sync failed ~ detail here",
+            "multi-line before ~": multiline_tilde,
+            "CR before ~": "Sync failed\rmore ~ detail",
+            "multi-line without ~": "Sync failed\nTraceback (most recent call last):",
+            "empty message": "",
+            "whitespace-only message": "   \n  ",
+            "long title": "x" * (MAX_SUBJECT_TITLE * 2) + " ~ detail",
+        }
+
+        def _assignable(value: str) -> bool:
+            """True when ``value`` survives assignment to a Subject header."""
+            try:
+                EmailMessage()["Subject"] = value
+            except ValueError:
+                return False
+            return True
+
+        for case_name, case_msg in header_cases.items():
+            title = subject_title(case_msg)
+            reporter.check(
+                f"subject_title is single-line and non-empty: {case_name}",
+                lambda t=title: bool(t) and "\n" not in t and "\r" not in t,
+            )
+            reporter.check(
+                f"subject_title is header-assignable: {case_name}",
+                lambda t=title: _assignable(f"ALERT - {t} on host"),
+            )
+
+        reporter.check(
+            "subject_title keeps the pre-~ segment of a single-line message",
+            lambda: subject_title("Sync failed ~ detail here") == "Sync failed",
+        )
+        reporter.check(
+            "subject_title collapses interior whitespace to single spaces",
+            lambda: subject_title(multiline_tilde)
+            == "Sync failed for plate 10221 Traceback (most recent call last): File x",
+        )
+        reporter.check(
+            "subject_title takes the first token when no ~ is present",
+            lambda: subject_title("Sync failed\nTraceback:") == "Sync",
+        )
+        reporter.check(
+            "subject_title substitutes a placeholder for an empty message",
+            lambda: subject_title("   \n  ") == EMPTY_SUBJECT_TITLE,
+        )
+        reporter.check(
+            "subject_title truncates an over-long title",
+            lambda: len(subject_title("x" * (MAX_SUBJECT_TITLE * 2) + " ~ d"))
+            == MAX_SUBJECT_TITLE + 3,
+        )
+
+        subject_handler = helao_log.TitledSMTPHandler(
+            mailhost=("localhost", 25),
+            fromaddr="a@b.c",
+            toaddrs=["d@e.f"],
+            subject="s",
+        )
+        multiline_record = logging.LogRecord(
+            name="t",
+            level=ALERT_LEVEL,
+            pathname=__file__,
+            lineno=1,
+            msg=multiline_tilde,
+            args=(),
+            exc_info=None,
+        )
+        reporter.check(
+            "_base_subject of a multi-line record is header-assignable",
+            lambda: _assignable(subject_handler._base_subject(multiline_record)),
         )
 
         reporter.section("TitledSMTPHandler throttles alert emails")
