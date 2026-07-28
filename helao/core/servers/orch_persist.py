@@ -100,7 +100,33 @@ class QueuePersister:
         else:
             save_path = pck_path.strip('"').strip("'")
         if os.path.exists(save_path):
-            queue_dict = pickle.load(open(save_path, "rb"))
+            try:
+                with open(save_path, "rb") as f:
+                    queue_dict = pickle.load(f)
+            except Exception:
+                # A pickle written by an older release can reference classes this
+                # one no longer has (e.g. a renamed model), and unpickling raises
+                # AttributeError. This runs inside the orchestrator's FastAPI
+                # startup_event, so an escape here fails the lifespan and the
+                # server exits instead of coming up -- a stale file on disk must
+                # not be able to keep the orchestrator down. Quarantine it so the
+                # next startup is clean rather than repeating the same failure.
+                quarantine = save_path.replace(
+                    ".pck",
+                    f"_unreadable_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck",
+                )
+                try:
+                    os.rename(save_path, quarantine)
+                    moved = f"moved it to '{os.path.basename(quarantine)}'"
+                except Exception:
+                    moved = "could not move it aside"
+                LOGGER.error(
+                    f"Could not unpickle '{save_path}' -- it was most likely "
+                    f"written by a different code version; {moved} and starting "
+                    f"with empty queues.",
+                    exc_info=True,
+                )
+                return save_path
         else:
             LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
             return save_path
