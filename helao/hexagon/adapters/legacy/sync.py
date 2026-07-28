@@ -52,9 +52,6 @@ class LegacySyncAdapter:
     ) -> bool:
         return await self._syncer.to_s3(msg, target, retries=retries, compress=compress)
 
-    async def to_api(self, req_model: dict, meta_type: str, retries: int = 5) -> bool:
-        return await self._syncer.to_api(req_model, meta_type, retries=retries)
-
     def list_pending(self, omit_manual_exps: bool = True) -> list:
         return self._syncer.list_pending(omit_manual_exps=omit_manual_exps)
 

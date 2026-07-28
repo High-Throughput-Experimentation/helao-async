@@ -30,7 +30,7 @@ import aiohttp
 
 from helao.helpers import helao_logging as logging
 from helao.helpers.dispatcher import async_private_dispatcher, endpoints_available
-from helao.helpers.server_keys import SYNC_SERVER_KEY, LEGACY_SYNC_SERVER_KEYS
+from helao.helpers.server_keys import SYNC_SERVER_KEY
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopStatus
 
@@ -140,7 +140,7 @@ class ServerMonitor:
         orch = self.orch
         status_summary = {}
         for serv_key, serv_dict in orch.world_cfg["servers"].items():
-            if serv_key in [SYNC_SERVER_KEY, *LEGACY_SYNC_SERVER_KEYS, "ANA"]:
+            if serv_key in [SYNC_SERVER_KEY, "ANA"]:
                 continue
             if "ignore_heartbeats" in serv_dict.get("params", {}):
                 continue

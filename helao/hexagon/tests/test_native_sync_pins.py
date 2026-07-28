@@ -121,7 +121,6 @@ def test_process_recovery_surface_parity():
 
 SYNC_DRIVER_TAIL = [
     "to_s3",
-    "to_api",
     "list_pending",
     "list_pending_acts",
     "list_pending_exps",

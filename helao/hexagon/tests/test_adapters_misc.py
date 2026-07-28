@@ -58,9 +58,6 @@ class _StubSyncer:
         self.calls.append(("to_s3", target))
         return True
 
-    async def to_api(self, req_model, meta_type, retries=5):
-        return True  # stub by decision (spec §1.3)
-
     def list_pending(self, omit_manual_exps=True):
         return ["p"]
 
