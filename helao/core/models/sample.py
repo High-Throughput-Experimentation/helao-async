@@ -13,7 +13,6 @@ from typing import ForwardRef
 from helao.core.version import get_hlo_version
 from helao.core.helaodict import HelaoDict
 
-
 """Sample-type pydantic models (liquid, gas, solid, assembly, none) and helpers."""
 __all__ = [
     "NoneSample",
@@ -164,7 +163,9 @@ class SampleModel(BaseModel, HelaoDict):
         from helao.core.models.status_transitions import sample_guarded_append
 
         sample_guarded_append(
-            self.status, new_status, owner=f"sample {self.global_label or self.sample_type}"
+            self.status,
+            new_status,
+            owner=f"sample {self.global_label or self.sample_type}",
         )
 
     def remove_sample_status(self, old_status: "SampleStatus") -> None:
@@ -172,7 +173,9 @@ class SampleModel(BaseModel, HelaoDict):
         from helao.core.models.status_transitions import sample_guarded_remove
 
         sample_guarded_remove(
-            self.status, old_status, owner=f"sample {self.global_label or self.sample_type}"
+            self.status,
+            old_status,
+            owner=f"sample {self.global_label or self.sample_type}",
         )
 
     def reset_sample_status(self, *new_statuses: "SampleStatus") -> None:
@@ -180,7 +183,9 @@ class SampleModel(BaseModel, HelaoDict):
         from helao.core.models.status_transitions import sample_guarded_reset
 
         sample_guarded_reset(
-            self.status, new_statuses, owner=f"sample {self.global_label or self.sample_type}"
+            self.status,
+            new_statuses,
+            owner=f"sample {self.global_label or self.sample_type}",
         )
 
     def create_initial_exp_dict(self) -> dict:

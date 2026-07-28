@@ -4,7 +4,6 @@
 from helao.deploy.hte.drivers.sensor.sprintir_driver import SprintIR
 from helao.core.models.hlostatus import HloStatus
 
-
 # Dependencies:
 # pip install pytest-mock
 import pytest

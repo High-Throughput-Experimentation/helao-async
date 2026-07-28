@@ -141,8 +141,7 @@ def helao_driver_unit_test() -> bool:
         )
         reporter.check(
             "timestamp_str is a non-empty formatted string",
-            lambda: isinstance(resp.timestamp_str, str)
-            and len(resp.timestamp_str) > 0,
+            lambda: isinstance(resp.timestamp_str, str) and len(resp.timestamp_str) > 0,
         )
 
         reporter.section("DriverResponse honours explicit fields")
@@ -174,8 +173,7 @@ def helao_driver_unit_test() -> bool:
         )
         reporter.check(
             "HelaoDriver._created_at exposes a formatted timestamp",
-            lambda: isinstance(drv._created_at, str)
-            and len(drv._created_at) > 0,
+            lambda: isinstance(drv._created_at, str) and len(drv._created_at) > 0,
         )
 
         # Confirm each abstract method dispatches to its concrete impl.
@@ -194,7 +192,9 @@ def helao_driver_unit_test() -> bool:
             lambda: all(c == 1 for c in drv.calls.values()),
         )
 
-        reporter.section("HelaoDriver refuses to instantiate without the abstract methods")
+        reporter.section(
+            "HelaoDriver refuses to instantiate without the abstract methods"
+        )
 
         def _try_instantiate_incomplete():
             _IncompleteDriver()  # type: ignore[abstract]

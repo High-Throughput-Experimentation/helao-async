@@ -126,7 +126,8 @@ async def _run_checks() -> dict:
     multi = _FakeActive([a1, a2])
     res2 = await Base.estop_actives(_FakeBase({a1.action_uuid: multi}))
     out["estop_actives_multi_all_marked"] = (
-        HloStatus.estopped in a1.action_status and HloStatus.estopped in a2.action_status
+        HloStatus.estopped in a1.action_status
+        and HloStatus.estopped in a2.action_status
     )
     out["estop_actives_multi_all_uuids"] = res2 == [
         str(a1.action_uuid),
@@ -177,19 +178,46 @@ def estop_sync_unit_test() -> bool:
             os.environ["AWS_CONFIG_PATH"] = saved_aws
 
     reporter.section("Base.estop_actives finalizes only in-flight actions")
-    reporter.check("idle server finalizes nothing (no artifact)", lambda: res["estop_actives_idle_empty"])
-    reporter.check("in-flight active is finalized", lambda: res["estop_actives_finalized"])
-    reporter.check("in-flight action marked estopped", lambda: res["estop_actives_marked"])
-    reporter.check("returns finalized action uuid", lambda: res["estop_actives_returns_uuid"])
-    reporter.check("multi-action active: all marked estopped", lambda: res["estop_actives_multi_all_marked"])
-    reporter.check("multi-action active: all uuids returned", lambda: res["estop_actives_multi_all_uuids"])
+    reporter.check(
+        "idle server finalizes nothing (no artifact)",
+        lambda: res["estop_actives_idle_empty"],
+    )
+    reporter.check(
+        "in-flight active is finalized", lambda: res["estop_actives_finalized"]
+    )
+    reporter.check(
+        "in-flight action marked estopped", lambda: res["estop_actives_marked"]
+    )
+    reporter.check(
+        "returns finalized action uuid", lambda: res["estop_actives_returns_uuid"]
+    )
+    reporter.check(
+        "multi-action active: all marked estopped",
+        lambda: res["estop_actives_multi_all_marked"],
+    )
+    reporter.check(
+        "multi-action active: all uuids returned",
+        lambda: res["estop_actives_multi_all_uuids"],
+    )
 
     reporter.section("HelaoYml.is_estopped + active-children gate")
-    reporter.check("gate sees both active children", lambda: res["gate_sees_two_active"])
-    reporter.check("is_estopped matches bare + repr forms", lambda: res["is_estopped_bare"])
-    reporter.check("estopped active children are non-blocking", lambda: res["estopped_children_nonblocking"])
-    reporter.check("running (non-estopped) child still blocks", lambda: res["running_child_blocks"])
-    reporter.check("running child is not flagged estopped", lambda: res["running_child_not_estopped"])
+    reporter.check(
+        "gate sees both active children", lambda: res["gate_sees_two_active"]
+    )
+    reporter.check(
+        "is_estopped matches bare + repr forms", lambda: res["is_estopped_bare"]
+    )
+    reporter.check(
+        "estopped active children are non-blocking",
+        lambda: res["estopped_children_nonblocking"],
+    )
+    reporter.check(
+        "running (non-estopped) child still blocks", lambda: res["running_child_blocks"]
+    )
+    reporter.check(
+        "running child is not flagged estopped",
+        lambda: res["running_child_not_estopped"],
+    )
 
     return reporter.success()
 

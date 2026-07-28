@@ -275,7 +275,10 @@ def logging_unit_test() -> bool:
         # Large interval so only a new message (not elapsed time) triggers flush.
         dedup_path = os.path.join(tmpdir, "dedup_flush.log")
         dh = DedupTimedRotatingFileHandler(
-            filename=dedup_path, when="D", interval=1, backupCount=1,
+            filename=dedup_path,
+            when="D",
+            interval=1,
+            backupCount=1,
             dedup_interval=3600,
         )
         dh.setFormatter(logging.Formatter("%(message)s"))
@@ -311,7 +314,10 @@ def logging_unit_test() -> bool:
         # dedup_interval=0 restores stock behaviour (every record written).
         stock_path = os.path.join(tmpdir, "dedup_off.log")
         sh = DedupTimedRotatingFileHandler(
-            filename=stock_path, when="D", interval=1, backupCount=1,
+            filename=stock_path,
+            when="D",
+            interval=1,
+            backupCount=1,
             dedup_interval=0,
         )
         sh.setFormatter(logging.Formatter("%(message)s"))
@@ -326,7 +332,10 @@ def logging_unit_test() -> bool:
         # Elapsed cooldown flushes a running summary without a new message.
         elapsed_path = os.path.join(tmpdir, "dedup_elapsed.log")
         eh = DedupTimedRotatingFileHandler(
-            filename=elapsed_path, when="D", interval=1, backupCount=1,
+            filename=elapsed_path,
+            when="D",
+            interval=1,
+            backupCount=1,
             dedup_interval=0.02,
         )
         eh.setFormatter(logging.Formatter("%(message)s"))

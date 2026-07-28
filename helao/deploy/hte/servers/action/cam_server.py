@@ -65,8 +65,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_image", tags=["action"])
-    async def cancel_acquire_image(
-    ):
+    async def cancel_acquire_image():
         """Stop the running Axis webcam executor (registered as ``axis``)."""
         active = await app.base.setup_and_contain_action()
         app.base.executors["axis"].stop_action_task()

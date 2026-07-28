@@ -164,8 +164,7 @@ def makeApp(server_key):
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_data", tags=["action"])
-    async def cancel_acquire_data(
-    ):
+    async def cancel_acquire_data():
         """Stop any running ``acquire_data`` executor."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():

@@ -47,7 +47,6 @@ from helao.core.models.process_contrib import ProcessContrib
 from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.lib_decorators import experiment
 
-
 EXPERIMENTS = __all__
 
 PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()

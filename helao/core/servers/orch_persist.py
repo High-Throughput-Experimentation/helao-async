@@ -126,9 +126,15 @@ class QueuePersister:
                 orch.last_dispatched_action_uuid = queue_dict["last_dispatched_act"]
                 orch.globalstatusmodel = queue_dict["globalstatusmodel"]
                 orch.active_run_id = queue_dict.get("active_run_id", None)
-                orch.action_history = DequeDict(queue_dict.get("action_history", []), maxlen=1000)
-                orch.experiment_history = DequeDict(queue_dict.get("experiment_history", []), maxlen=1000)
-                orch.sequence_history = DequeDict(queue_dict.get("sequence_history", []), maxlen=1000)
+                orch.action_history = DequeDict(
+                    queue_dict.get("action_history", []), maxlen=1000
+                )
+                orch.experiment_history = DequeDict(
+                    queue_dict.get("experiment_history", []), maxlen=1000
+                )
+                orch.sequence_history = DequeDict(
+                    queue_dict.get("sequence_history", []), maxlen=1000
+                )
                 if pck_path is None:
                     # Consume the default queues.pck after a successful restore so
                     # a stale file cannot be auto-replayed on a later restart
@@ -148,5 +154,8 @@ class QueuePersister:
                             "Could not archive restored queue pck.", exc_info=True
                         )
             except Exception:
-                LOGGER.warning("Error restoring queues from pck. Check if pck is compatible.", exc_info=True)
+                LOGGER.warning(
+                    "Error restoring queues from pck. Check if pck is compatible.",
+                    exc_info=True,
+                )
         return save_path

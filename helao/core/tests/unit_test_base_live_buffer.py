@@ -117,7 +117,9 @@ def _check_get_realtime_nowait() -> bool:
     passthrough_ok = base.get_realtime_nowait(epoch_ns=1000, offset=0.0) == 1000
 
     # explicit offset (seconds) is added as nanoseconds
-    offset_ok = base.get_realtime_nowait(epoch_ns=1000, offset=2.0) == 1000 + int(2.0 * 1e9)
+    offset_ok = base.get_realtime_nowait(epoch_ns=1000, offset=2.0) == 1000 + int(
+        2.0 * 1e9
+    )
 
     # offset=None defaults to base.ntp_offset
     base.ntp_offset = 3.0

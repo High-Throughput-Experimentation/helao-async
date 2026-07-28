@@ -102,7 +102,9 @@ async def _run_checks() -> dict:
             out["api_none"] = drv.api_host is None
 
             # no-op S3 path (s3 is None) returns True
-            out["to_s3_noop_true"] = (await drv.to_s3({"k": "v"}, "meta/x.json")) is True
+            out["to_s3_noop_true"] = (
+                await drv.to_s3({"k": "v"}, "meta/x.json")
+            ) is True
 
             # blocking upload must run off-loop
             drv.s3 = _BlockingS3()
@@ -144,7 +146,9 @@ async def _run_checks() -> dict:
             )
             out["moved_out_of_finished"] = not data.exists()
 
-            synced_dir = Path(str(fin).replace(RunDir.FINISHED.value, RunDir.SYNCED.value))
+            synced_dir = Path(
+                str(fin).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
+            )
             await asyncio.to_thread(move_to_synced, seq_yml)
             zip_target = synced_dir.parent / f"{synced_dir.name}.zip"
             await asyncio.to_thread(zip_dir, synced_dir, zip_target)
@@ -186,9 +190,13 @@ def sync_to_thread_unit_test() -> bool:
     )
 
     reporter.section("to_s3 offloads blocking upload")
-    reporter.check("to_s3 returns True after upload", lambda: res["to_s3_returned_true"])
+    reporter.check(
+        "to_s3 returns True after upload", lambda: res["to_s3_returned_true"]
+    )
     reporter.check("blocking uploader actually ran", lambda: res["uploader_ran"])
-    reporter.check("upload spent the full block time", lambda: res["upload_took_block_time"])
+    reporter.check(
+        "upload spent the full block time", lambda: res["upload_took_block_time"]
+    )
     reporter.check(
         "event loop stayed responsive during upload (offloaded)",
         lambda: res["loop_responsive_upload"],
@@ -197,7 +205,9 @@ def sync_to_thread_unit_test() -> bool:
     reporter.section("move_to_synced + zip_dir via to_thread")
     reporter.check("move_to_synced returned a Path", lambda: res["move_returned_path"])
     reporter.check("file moved into RUNS_SYNCED", lambda: res["moved_into_synced"])
-    reporter.check("file removed from RUNS_FINISHED", lambda: res["moved_out_of_finished"])
+    reporter.check(
+        "file removed from RUNS_FINISHED", lambda: res["moved_out_of_finished"]
+    )
     reporter.check("sequence zip created", lambda: res["zip_created"])
     reporter.check(
         "event loop stayed responsive during move+zip",

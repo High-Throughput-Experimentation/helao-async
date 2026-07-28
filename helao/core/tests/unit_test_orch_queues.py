@@ -46,7 +46,10 @@ def _make_orch() -> Orch:
     orch = Orch.__new__(Orch)
 
     orch.server = MachineModel(
-        server_name=ORCH_SERVER_NAME, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=8000
+        server_name=ORCH_SERVER_NAME,
+        machine_name=ORCH_MACHINE,
+        hostname="127.0.0.1",
+        port=8000,
     )
     orch.server_params = {}
 
@@ -140,12 +143,13 @@ async def _check_sequence_crud() -> bool:
 
     # prepend_sequences: stamps meta + shares the (now-reset) run_id, LIFO->front insert order
     pu = await orch.prepend_sequences([_mk_sequence("p1"), _mk_sequence("p2")])
-    prepend_ok = (
-        [s.sequence_uuid for s in orch.list_sequences()] == pu
-        and orch.sequence_dq[0].run_id == orch.sequence_dq[1].run_id
-    )
+    prepend_ok = [
+        s.sequence_uuid for s in orch.list_sequences()
+    ] == pu and orch.sequence_dq[0].run_id == orch.sequence_dq[1].run_id
 
-    return add_order_ok and run_id_ok and move_ok and remove_ok and clear_ok and prepend_ok
+    return (
+        add_order_ok and run_id_ok and move_ok and remove_ok and clear_ok and prepend_ok
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +245,9 @@ async def _check_action_crud() -> bool:
         orch.action_dq[1].action_order == 2
     )
 
-    return add_order_ok and orders_ok and move_ok and remove_ok and clear_ok and replace_ok
+    return (
+        add_order_ok and orders_ok and move_ok and remove_ok and clear_ok and replace_ok
+    )
 
 
 async def _check_supplement_error_action() -> bool:

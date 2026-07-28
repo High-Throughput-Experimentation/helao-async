@@ -57,7 +57,6 @@ from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 from helao.core.models.machine import MachineModel
 
-
 ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
 WORLD_CFG = {
     "root": ROOT,
@@ -114,7 +113,11 @@ async def conditional_stop(orch: MicroOrch) -> None:
     """Reproduce TEST_sub_conditional_stop via explicit ORCH dispatch."""
     # add_global_param, then to_global: global_test -> GLOBALS
     res = await orch.run_action(
-        _act("ORCH", "add_global_param", {"param_name": "global_test", "param_value": True})
+        _act(
+            "ORCH",
+            "add_global_param",
+            {"param_name": "global_test", "param_value": True},
+        )
     )
     GLOBALS["global_test"] = res.action_params["global_test"]
 

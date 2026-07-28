@@ -59,7 +59,6 @@ from helao.helpers.dequedict import DequeDict
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
 
-
 _FIXED_DT = datetime(2026, 1, 2, 3, 4, 5, 678901)
 _SEED = {"n": 0}
 
@@ -69,7 +68,10 @@ def _make_base(save_root: str) -> Base:
     base = Base.__new__(Base)
     base.app = SimpleNamespace(driver=None)
     base.server = MachineModel(
-        server_name="ACTSRV", machine_name="test-machine", hostname="127.0.0.1", port=8000
+        server_name="ACTSRV",
+        machine_name="test-machine",
+        hostname="127.0.0.1",
+        port=8000,
     )
     base.world_cfg = {
         "dummy": False,
@@ -181,10 +183,16 @@ class _PatchGlobals:
 
         self._orig = {
             (base_module, "move_dir"): base_module.move_dir,
-            (base_module, "async_private_dispatcher"): base_module.async_private_dispatcher,
+            (
+                base_module,
+                "async_private_dispatcher",
+            ): base_module.async_private_dispatcher,
             (base_module, "async_copy"): base_module.async_copy,
             (finalizer_module, "move_dir"): finalizer_module.move_dir,
-            (finalizer_module, "async_private_dispatcher"): finalizer_module.async_private_dispatcher,
+            (
+                finalizer_module,
+                "async_private_dispatcher",
+            ): finalizer_module.async_private_dispatcher,
             (finalizer_module, "set_time"): finalizer_module.set_time,
         }
         base_module.move_dir = _noop_move_dir
@@ -241,7 +249,9 @@ async def _check_finish_drains_late_data() -> bool:
         await _drain(active)
 
         active.enqueue_data_nowait(
-            DataModel(data={dflt: {"t": 1, "v": 111}}, errors=[], status=HloStatus.active)
+            DataModel(
+                data={dflt: {"t": 1, "v": 111}}, errors=[], status=HloStatus.active
+            )
         )
         undrained_at_entry = active.num_data_queued > active.num_data_written
 
@@ -286,14 +296,17 @@ async def _check_split_keep_active_then_finish_all() -> bool:
         parent_split = HloStatus.split in parent_action.action_status
         # uuid_list=[] keeps every prior action open (nothing finished yet)
         parent_open_after_split = HloStatus.finished not in parent_action.action_status
-        child_has_new_conns = (
-            len(new_keys) >= 1
-            and all(k in active.file_conn_dict for k in new_keys)
+        child_has_new_conns = len(new_keys) >= 1 and all(
+            k in active.file_conn_dict for k in new_keys
         )
 
         # stream to the child's new file connection, then finish everything
         await active.enqueue_data(
-            DataModel(data={new_keys[0]: {"t": 9, "v": 999}}, errors=[], status=HloStatus.active)
+            DataModel(
+                data={new_keys[0]: {"t": 9, "v": 999}},
+                errors=[],
+                status=HloStatus.active,
+            )
         )
         await _drain(active)
         await active.finish_all()
@@ -334,8 +347,7 @@ async def _check_substitute_closes_open_files() -> bool:
         await active.substitute()
         # file objects remain referenced but are now closed
         all_closed = all(
-            fc.file is None or fc.file.closed
-            for fc in active.file_conn_dict.values()
+            fc.file is None or fc.file.closed for fc in active.file_conn_dict.values()
         )
         # tidy up the still-running data logger so the loop has no dangling task
         active.data_logger.cancel()
@@ -355,7 +367,9 @@ async def _check_delegators_forward() -> bool:
     active.action_finalizer.split_and_keep_active = lambda: _spy("skeep")
     active.action_finalizer.split_and_finish_prev_uuids = lambda: _spy("sprev")
     active.action_finalizer.finish_all = lambda: _spy("fall")
-    active.action_finalizer.split = lambda uuid_list=None, new_fileconnparams=None: _spy("split")
+    active.action_finalizer.split = (
+        lambda uuid_list=None, new_fileconnparams=None: _spy("split")
+    )
     active.action_finalizer.substitute = lambda: _spy("subst")
     active.action_finalizer.finish = lambda finish_uuid_list=None: _spy("finish")
     active.action_finalizer._finish = lambda finish_uuid_list=None: _spy("_finish")
@@ -392,6 +406,7 @@ async def _check_empty_global_params_skips_dispatch() -> bool:
     active.action.to_global_params = ["never_produced_key"]  # absent from params/output
     calls = []
     with _PatchGlobals():
+
         async def _recording_dispatch(*args, **kwargs):
             calls.append(kwargs.get("private_action"))
             return {}, ErrorCodes.none

@@ -54,9 +54,7 @@ SPEC = {
                 "responses": {"201": {"description": "Created item."}},
             }
         },
-        "/boom": {
-            "get": {"operationId": "boom", "summary": "Boom", "responses": {}}
-        },
+        "/boom": {"get": {"operationId": "boom", "summary": "Boom", "responses": {}}},
         "/things": {
             "get": {
                 "operationId": "list_things",
@@ -165,20 +163,35 @@ def expect_raises(exc_type, fn, msg):
 def test_sync():
     print("test_sync")
     client = OpenAPIClient(URL)
-    check(client.get_item(item_id=5, q="hello") == {"item_id": "5", "q": "hello"},
-          "sync GET resolves path param + query")
-    check(client.create_item(request_body={"name": "x"}) == {"created": {"name": "x"}},
-          "sync POST sends request_body")
-    expect_raises(ValueError, lambda: client.get_item(q="hello"),
-                  "sync missing required path param raises ValueError")
-    expect_raises(ValueError, lambda: client.create_item(),
-                  "sync missing required request_body raises ValueError")
-    expect_raises(RuntimeError, lambda: client.boom(),
-                  "sync 500 response raises RuntimeError")
-    check("Get Item" in (client.get_item.__doc__ or ""),
-          "sync method has generated docstring from summary")
-    check("limit (" in (client.get_item.__doc__ or ""),
-          "generated docstring documents the limit parameter")
+    check(
+        client.get_item(item_id=5, q="hello") == {"item_id": "5", "q": "hello"},
+        "sync GET resolves path param + query",
+    )
+    check(
+        client.create_item(request_body={"name": "x"}) == {"created": {"name": "x"}},
+        "sync POST sends request_body",
+    )
+    expect_raises(
+        ValueError,
+        lambda: client.get_item(q="hello"),
+        "sync missing required path param raises ValueError",
+    )
+    expect_raises(
+        ValueError,
+        lambda: client.create_item(),
+        "sync missing required request_body raises ValueError",
+    )
+    expect_raises(
+        RuntimeError, lambda: client.boom(), "sync 500 response raises RuntimeError"
+    )
+    check(
+        "Get Item" in (client.get_item.__doc__ or ""),
+        "sync method has generated docstring from summary",
+    )
+    check(
+        "limit (" in (client.get_item.__doc__ or ""),
+        "generated docstring documents the limit parameter",
+    )
     client.close()
 
 
@@ -188,12 +201,16 @@ def test_async():
     async def run():
         client = AsyncOpenAPIClient(URL)
         r1 = await client.get_item(item_id=5, q="hello")
-        check(r1 == {"item_id": "5", "q": "hello"},
-              "async GET resolves path param + query")
+        check(
+            r1 == {"item_id": "5", "q": "hello"},
+            "async GET resolves path param + query",
+        )
         r2 = await client.create_item(request_body={"name": "x"})
         check(r2 == {"created": {"name": "x"}}, "async POST sends request_body")
-        check("Get Item" in (client.get_item.__doc__ or ""),
-              "async method has generated docstring from summary")
+        check(
+            "Get Item" in (client.get_item.__doc__ or ""),
+            "async method has generated docstring from summary",
+        )
         client.close()
 
     asyncio.run(run())
@@ -205,14 +222,18 @@ def test_sync_pagination():
     with capture_stdout() as out:
         res = client.list_things()  # default limit=100, fewer than cap
     check(res == list(range(25)), "sync default limit returns all 25 items")
-    check("Pagination detected for 'list_things'" in out.getvalue(),
-          "sync prints pagination-detected message")
+    check(
+        "Pagination detected for 'list_things'" in out.getvalue(),
+        "sync prints pagination-detected message",
+    )
 
     with capture_stdout() as out:
         res = client.list_things(limit=15)
     check(res == list(range(15)), "sync limit=15 caps to 15 items")
-    check("Reached limit=15 for 'list_things'" in out.getvalue(),
-          "sync prints more-results-available message at cap")
+    check(
+        "Reached limit=15 for 'list_things'" in out.getvalue(),
+        "sync prints more-results-available message at cap",
+    )
 
     with capture_stdout():
         res = client.list_things(limit=None)
@@ -224,8 +245,10 @@ def test_sync_pagination():
 
     plain = OpenAPIClient(URL)
     res = plain.list_things()
-    check(res == {"items": list(range(10)), "next_cursor": "10"},
-          "sync no-strategy returns raw first page")
+    check(
+        res == {"items": list(range(10)), "next_cursor": "10"},
+        "sync no-strategy returns raw first page",
+    )
     plain.close()
     client.close()
 
@@ -238,14 +261,18 @@ def test_async_pagination():
         with capture_stdout() as out:
             res = await client.list_things()
         check(res == list(range(25)), "async default limit returns all 25 items")
-        check("Pagination detected for 'list_things'" in out.getvalue(),
-              "async prints pagination-detected message")
+        check(
+            "Pagination detected for 'list_things'" in out.getvalue(),
+            "async prints pagination-detected message",
+        )
 
         with capture_stdout() as out:
             res = await client.list_things(limit=15)
         check(res == list(range(15)), "async limit=15 caps to 15 items")
-        check("Reached limit=15 for 'list_things'" in out.getvalue(),
-              "async prints more-results-available message at cap")
+        check(
+            "Reached limit=15 for 'list_things'" in out.getvalue(),
+            "async prints more-results-available message at cap",
+        )
 
         res = await client.list_things(limit=None)
         check(res == list(range(25)), "async limit=None fetches all items")

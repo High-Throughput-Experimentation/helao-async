@@ -93,33 +93,33 @@ def bubble_detection(
 
         amplitude_test_result = mean_amplitude > amplitude_threshold
 
-    # print("peaks at t:")
-    # print(test_red["t_s"].iloc[peaks])
+        # print("peaks at t:")
+        # print(test_red["t_s"].iloc[peaks])
 
-    # print("\ntroughs at t:")
-    # print(test_red["t_s"].iloc[troughs])
+        # print("\ntroughs at t:")
+        # print(test_red["t_s"].iloc[troughs])
 
-    # mean_amplitude = peak_avg - troughs_avg
-    # print("\n Mean amplitude:")
-    # print(mean_amplitude)
+        # mean_amplitude = peak_avg - troughs_avg
+        # print("\n Mean amplitude:")
+        # print(mean_amplitude)
 
-    # print("E_change: {}".format(E_changes))
-    # print("mean_amplitude: {}".format(mean_amplitude))
-    # print("last value: {}".format(last_val))
-    # print("RSD: {}".format(RSD))
+        # print("E_change: {}".format(E_changes))
+        # print("mean_amplitude: {}".format(mean_amplitude))
+        # print("last value: {}".format(last_val))
+        # print("RSD: {}".format(RSD))
 
-    # return (
-    #     RSD_test_result,
-    #     simple_test_result,
-    #     signal_change_result,
-    #     amplitude_test_result,
-    # )
+        # return (
+        #     RSD_test_result,
+        #     simple_test_result,
+        #     signal_change_result,
+        #     amplitude_test_result,
+        # )
 
-    # print("\nBubble detected:")
-    # print("RSD test: " + str(RSD_test_result))
-    # print("simple test: " + str(simple_test_result))
-    # print("signal change test: " + str(signal_change_result))
-    # print("amplitude test: " + str(amplitude_test_result))
+        # print("\nBubble detected:")
+        # print("RSD test: " + str(RSD_test_result))
+        # print("simple test: " + str(simple_test_result))
+        # print("signal change test: " + str(signal_change_result))
+        # print("amplitude test: " + str(amplitude_test_result))
 
         has_bubble = (
             RSD_test_result
@@ -137,5 +137,7 @@ def bubble_detection(
 
         return bool(has_bubble)
     except Exception:
-        LOGGER.error("bubble_detection failed; returning has_bubble=False", exc_info=True)
+        LOGGER.error(
+            "bubble_detection failed; returning has_bubble=False", exc_info=True
+        )
         return False

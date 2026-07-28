@@ -52,8 +52,14 @@ RESET_TARGETS = [
 
 
 def _assert_byte_identical(reporter: TestReporter, label: str, a, b) -> None:
-    reporter.check(f"{label}: model_dump() byte-identical", lambda: a.model_dump() == b.model_dump())
-    reporter.check(f"{label}: model_dump_json() byte-identical", lambda: a.model_dump_json() == b.model_dump_json())
+    reporter.check(
+        f"{label}: model_dump() byte-identical",
+        lambda: a.model_dump() == b.model_dump(),
+    )
+    reporter.check(
+        f"{label}: model_dump_json() byte-identical",
+        lambda: a.model_dump_json() == b.model_dump_json(),
+    )
 
 
 def _check_append(reporter: TestReporter, model_cls) -> None:
@@ -146,13 +152,19 @@ def sample_status_unit_test() -> bool:
 
     try:
         for model_cls in SUBTYPES:
-            reporter.section(f"{model_cls.__name__}.append_sample_status (sample_guarded_append)")
+            reporter.section(
+                f"{model_cls.__name__}.append_sample_status (sample_guarded_append)"
+            )
             _check_append(reporter, model_cls)
 
-            reporter.section(f"{model_cls.__name__}.remove_sample_status (sample_guarded_remove)")
+            reporter.section(
+                f"{model_cls.__name__}.remove_sample_status (sample_guarded_remove)"
+            )
             _check_remove(reporter, model_cls)
 
-            reporter.section(f"{model_cls.__name__}.reset_sample_status (sample_guarded_reset)")
+            reporter.section(
+                f"{model_cls.__name__}.reset_sample_status (sample_guarded_reset)"
+            )
             _check_reset(reporter, model_cls)
 
         return reporter.success()
@@ -166,5 +178,7 @@ def sample_status_unit_test() -> bool:
 if __name__ == "__main__":
     ok = sample_status_unit_test()
     if ok:
-        print("PASS: unit_test_sample_status — all guarded sample-status transitions byte-identical")
+        print(
+            "PASS: unit_test_sample_status — all guarded sample-status transitions byte-identical"
+        )
     sys.exit(0 if ok else 1)

@@ -42,9 +42,7 @@ from helao.core.models.sample import object_to_sample
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers import helao_logging as logging
 
-LOGGER = (
-    logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-)
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 # Pinned per plan Pre-mortem #3: short timeout + single retry keeps a transient
 # RPC failure from stalling the PAL IO loop on the HTTP-fallback backoff.

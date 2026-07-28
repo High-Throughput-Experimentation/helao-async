@@ -34,7 +34,6 @@ from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 from helao.core.models.machine import MachineModel
 
-
 ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
 WORLD_CFG = {
     "root": ROOT,
@@ -76,8 +75,10 @@ async def main() -> None:
 
         zip_path = os.path.join(ROOT, "simulatews_microorch_runs.zip")
         orch.zip_runs(zip_path)
-        print(f"\nran {len(acquisitions)} acquisitions; "
-              f"tracked {len(orch.runs)} artifacts; archived -> {zip_path}")
+        print(
+            f"\nran {len(acquisitions)} acquisitions; "
+            f"tracked {len(orch.runs)} artifacts; archived -> {zip_path}"
+        )
 
 
 if __name__ == "__main__":

@@ -20,7 +20,6 @@ from helao.core.drivers.helao_driver import (
     DriverStatus,
 )
 
-
 # class LocalDataHandler:
 #     def __init__(self):
 #         self.filename = ""
@@ -145,19 +144,27 @@ class HTEdata(HelaoDriver):
 
     def get_status(self) -> DriverResponse:
         """No physical device to poll; always reports ok."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def stop(self) -> DriverResponse:
         """No active activity to abort; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """No device state to reinitialize; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def disconnect(self) -> DriverResponse:
         """No physical connection to release; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def get_platexycalibration(self, plateid: int, *args, **kwargs):
         """Return the stored XY calibration for ``plateid`` (stub, returns ``None``)."""

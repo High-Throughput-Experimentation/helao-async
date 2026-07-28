@@ -1,11 +1,22 @@
 """Pure selection/plot/table logic for the data browser (no Bokeh imports)."""
+
 from dataclasses import dataclass
 
 from helao.core.servers.data_browser.readers import read_dataset
 
 SUMMARY_COLS = [
-    "source", "sequence", "experiment", "node", "technique", "sample",
-    "file_name", "n_points", "x_min", "x_max", "y_min", "y_max",
+    "source",
+    "sequence",
+    "experiment",
+    "node",
+    "technique",
+    "sample",
+    "file_name",
+    "n_points",
+    "x_min",
+    "x_max",
+    "y_min",
+    "y_max",
 ]
 
 
@@ -62,15 +73,25 @@ def summary_row(ds, xcol, ycol):
     n = min(len(x), len(y))
 
     def rng(v):
-        nums = [z for z in v[:n] if isinstance(z, (int, float)) and not isinstance(z, bool)]
+        nums = [
+            z for z in v[:n] if isinstance(z, (int, float)) and not isinstance(z, bool)
+        ]
         return (min(nums), max(nums)) if nums else (None, None)
 
     xr, yr = rng(x), rng(y)
     return {
-        "source": ds.source, "sequence": ds.sequence, "experiment": ds.experiment,
-        "node": ds.node, "technique": ds.technique, "sample": ds.sample,
-        "file_name": ds.file_name, "n_points": n,
-        "x_min": xr[0], "x_max": xr[1], "y_min": yr[0], "y_max": yr[1],
+        "source": ds.source,
+        "sequence": ds.sequence,
+        "experiment": ds.experiment,
+        "node": ds.node,
+        "technique": ds.technique,
+        "sample": ds.sample,
+        "file_name": ds.file_name,
+        "n_points": n,
+        "x_min": xr[0],
+        "x_max": xr[1],
+        "y_min": yr[0],
+        "y_max": yr[1],
     }
 
 
@@ -92,10 +113,19 @@ def load_selected(index_df, positions):
         except Exception as exc:  # corrupt/unreadable file
             skipped.append((label, f"read error: {exc}"))
             continue
-        datasets.append(SelectedDataset(
-            locator=row["locator"], label=label, source=row["source"],
-            sequence=row["sequence"], experiment=row["experiment"], node=row["node"],
-            technique=row["technique"], sample=row["sample"],
-            file_name=row["file_name"], meta=meta, data=data,
-        ))
+        datasets.append(
+            SelectedDataset(
+                locator=row["locator"],
+                label=label,
+                source=row["source"],
+                sequence=row["sequence"],
+                experiment=row["experiment"],
+                node=row["node"],
+                technique=row["technique"],
+                sample=row["sample"],
+                file_name=row["file_name"],
+                meta=meta,
+                data=data,
+            )
+        )
     return datasets, skipped

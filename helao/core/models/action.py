@@ -171,12 +171,23 @@ class ActionModel(ShortActionModel):
 
     def append_action_status(self, s: HloStatus) -> None:
         """Guarded append onto ``action_status`` (see status_transitions.guarded_append)."""
-        guarded_append(self.action_status, s, owner=f"action {self.action_uuid}/{self.action_name}")
+        guarded_append(
+            self.action_status, s, owner=f"action {self.action_uuid}/{self.action_name}"
+        )
 
     def replace_action_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``action_status`` (see status_transitions.guarded_replace)."""
-        guarded_replace(self.action_status, old, new, owner=f"action {self.action_uuid}/{self.action_name}")
+        guarded_replace(
+            self.action_status,
+            old,
+            new,
+            owner=f"action {self.action_uuid}/{self.action_name}",
+        )
 
     def reset_action_status(self, *statuses: HloStatus) -> None:
         """Guarded wholesale reset of ``action_status`` (see status_transitions.guarded_reset)."""
-        guarded_reset(self.action_status, statuses, owner=f"action {self.action_uuid}/{self.action_name}")
+        guarded_reset(
+            self.action_status,
+            statuses,
+            owner=f"action {self.action_uuid}/{self.action_name}",
+        )

@@ -75,8 +75,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_o2", tags=["action"])
-    async def cancel_acquire_o2(
-    ):
+    async def cancel_acquire_o2():
         """Stop any running ``acquire_o2`` executor.
 
         Iterates the server's executor registry and calls

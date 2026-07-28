@@ -212,7 +212,7 @@ def SetupSpectroscope(
                 )
             )
 
-            (shm, grat) = spc.GetGrating(0)
+            shm, grat = spc.GetGrating(0)
             print("Function GetGrating returned: {} Grat".format(grat))
 
             shm = spc.SetWavelength(0, centralWL)
@@ -222,14 +222,14 @@ def SetupSpectroscope(
                 )
             )
 
-            (shm, wave) = spc.GetWavelength(0)
+            shm, wave = spc.GetWavelength(0)
             print(
                 "Function GetWavelength returned: {} Wavelength: {}".format(
                     spc.GetFunctionReturnDescription(shm, 64)[1], wave
                 )
             )
 
-            (shm, min, max) = spc.GetWavelengthLimits(0, grat)
+            shm, min, max = spc.GetWavelengthLimits(0, grat)
             print(
                 "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
                     spc.GetFunctionReturnDescription(shm, 64)[1], min, max
@@ -304,7 +304,7 @@ def adjust_ND(cam, WL_arr) -> tuple:
                 )
             )
 
-            (shm, grat) = spc.GetGrating(0)
+            shm, grat = spc.GetGrating(0)
             print("Function GetGrating returned: {} Grat".format(grat))
 
             shm = spc.SetWavelength(0, 672.26)
@@ -314,21 +314,21 @@ def adjust_ND(cam, WL_arr) -> tuple:
                 )
             )
 
-            (shm, wave) = spc.GetWavelength(0)
+            shm, wave = spc.GetWavelength(0)
             print(
                 "Function GetWavelength returned: {} Wavelength: {}".format(
                     spc.GetFunctionReturnDescription(shm, 64)[1], wave
                 )
             )
 
-            (shm, min, max) = spc.GetWavelengthLimits(0, grat)
+            shm, min, max = spc.GetWavelengthLimits(0, grat)
             print(
                 "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
                     spc.GetFunctionReturnDescription(shm, 64)[1], min, max
                 )
             )
 
-            (shm, c0, c1, c2, c3) = spc.GetPixelCalibrationCoefficients(
+            shm, c0, c1, c2, c3 = spc.GetPixelCalibrationCoefficients(
                 0
             )  # these dont seem to be usefull for me
             coeff = [c0, c1, c2, c3]

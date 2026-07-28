@@ -28,7 +28,6 @@ from helao.core.drivers.helao_driver import (
     DriverPoller,
 )
 
-
 """ Notes:
 
 Setup serial connection with pyserial module:

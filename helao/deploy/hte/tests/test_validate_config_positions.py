@@ -79,8 +79,12 @@ def _test_real_post_p4_configs_pass():
             if isinstance(d.get("params"), dict) and d["params"].get("positions")
         ]
         assert len(owners) == 1, f"{f}: expected 1 positions owner, got {owners}"
-        assert validateConfig(_PIDD, conf, "."), f"{f}: validateConfig unexpectedly failed"
-    print(f"PASS: {len(files)} real post-P4 configs each have 1 positions owner and validate")
+        assert validateConfig(
+            _PIDD, conf, "."
+        ), f"{f}: validateConfig unexpectedly failed"
+    print(
+        f"PASS: {len(files)} real post-P4 configs each have 1 positions owner and validate"
+    )
 
 
 def main():

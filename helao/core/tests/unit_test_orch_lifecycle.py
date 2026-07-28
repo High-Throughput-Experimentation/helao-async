@@ -48,7 +48,10 @@ def _make_orch() -> Orch:
     orch = Orch.__new__(Orch)
 
     orch.server = MachineModel(
-        server_name=ORCH_SERVER_NAME, machine_name=ORCH_MACHINE, hostname="127.0.0.1", port=8000
+        server_name=ORCH_SERVER_NAME,
+        machine_name=ORCH_MACHINE,
+        hostname="127.0.0.1",
+        port=8000,
     )
     orch.ntp_offset = 0.0
     orch.global_params = {}
@@ -202,10 +205,9 @@ async def _check_write_active_experiment_exp() -> bool:
 
     await orch.write_active_experiment_exp()
 
-    return (
-        orch.active_experiment.initial_global_params == {"kept": 1}
-        and recorded["write_exp"] == ["exp1"]
-    )
+    return orch.active_experiment.initial_global_params == {"kept": 1} and recorded[
+        "write_exp"
+    ] == ["exp1"]
 
 
 async def _check_write_active_sequence_seq() -> bool:
@@ -215,10 +217,9 @@ async def _check_write_active_sequence_seq() -> bool:
 
     await orch.write_active_sequence_seq()
 
-    return (
-        orch.active_sequence.initial_global_params == {"kept": 2}
-        and recorded["write_seq"] == ["seq1"]
-    )
+    return orch.active_sequence.initial_global_params == {"kept": 2} and recorded[
+        "write_seq"
+    ] == ["seq1"]
 
 
 async def _run_checks() -> dict:

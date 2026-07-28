@@ -131,9 +131,7 @@ def import_autolibs(
 
     if lib_dir is None:
         config_deployment = os.path.basename(
-            os.path.dirname(
-                os.path.dirname(config_loader.CONFIG["loaded_config_path"])
-            )
+            os.path.dirname(os.path.dirname(config_loader.CONFIG["loaded_config_path"]))
         )
         lib_dir = world_config_dict.get(
             f"{lib_type}_path",

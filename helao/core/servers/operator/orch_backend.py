@@ -123,8 +123,15 @@ class OrchBackend(ABC):
         """Tear down subscriptions / background tasks."""
 
 
-_SEQ_KEYS = ["sequence_name", "sequence_label", "sequence_uuid", "campaign_name", "campaign_uuid"]
+_SEQ_KEYS = [
+    "sequence_name",
+    "sequence_label",
+    "sequence_uuid",
+    "campaign_name",
+    "campaign_uuid",
+]
 _EXP_KEYS = ["experiment_name", "experiment_uuid"]
+
 
 class RemoteBackend(OrchBackend):
     """Backend that drives a remote orchestrator over OrchAPI endpoints.
@@ -146,12 +153,16 @@ class RemoteBackend(OrchBackend):
         self._dispatch = async_private_dispatcher
 
         self.experiment_lib, self.experiment_codehash, _ = import_autolibs(
-            world_config_dict=vis.world_cfg, lib_dir=None,
-            user_lib_dir=vis.helaodirs.user_exp, lib_type="experiment",
+            world_config_dict=vis.world_cfg,
+            lib_dir=None,
+            user_lib_dir=vis.helaodirs.user_exp,
+            lib_type="experiment",
         )
         self.sequence_lib, self.sequence_codehash, _ = import_autolibs(
-            world_config_dict=vis.world_cfg, lib_dir=None,
-            user_lib_dir=vis.helaodirs.user_seq, lib_type="sequence",
+            world_config_dict=vis.world_cfg,
+            lib_dir=None,
+            user_lib_dir=vis.helaodirs.user_seq,
+            lib_type="sequence",
         )
         self._step_flags = {"actions": False, "experiments": False, "sequences": False}
         self._wss = None
@@ -162,7 +173,8 @@ class RemoteBackend(OrchBackend):
     @staticmethod
     def _detect_orch_key(world_cfg) -> str:
         orch_keys = [
-            k for k, v in world_cfg["servers"].items()
+            k
+            for k, v in world_cfg["servers"].items()
             if v.get("group") == "orchestrator"
         ]
         if not orch_keys:
@@ -171,8 +183,12 @@ class RemoteBackend(OrchBackend):
 
     async def _call(self, endpoint, params_dict=None, json_dict=None):
         resp, err = await self._dispatch(
-            self.orch_key, self.host, self.port, endpoint,
-            params_dict=params_dict or {}, json_dict=json_dict or {},
+            self.orch_key,
+            self.host,
+            self.port,
+            endpoint,
+            params_dict=params_dict or {},
+            json_dict=json_dict or {},
         )
         if err != ErrorCodes.none:
             LOGGER.warning(f"RemoteBackend {endpoint} failed: {err}")
@@ -186,7 +202,9 @@ class RemoteBackend(OrchBackend):
         return dict(self._step_flags)
 
     async def set_step_flag(self, kind, value):
-        resp = await self._call("set_step_flag", params_dict={"kind": kind, "value": value})
+        resp = await self._call(
+            "set_step_flag", params_dict={"kind": kind, "value": value}
+        )
         # Only trust the local cache if the orch accepted the change. _call
         # returns None on failure; without this guard the cached flag would
         # drift from the orch's true state on a failed RPC (e.g. mid-restart).
@@ -211,14 +229,18 @@ class RemoteBackend(OrchBackend):
                 # actions table matches the orch's a.action_server.disp_name().
                 server_name = srv.get("server_name")
                 machine_name = srv.get("machine_name")
-                srv_name = f"{server_name}@{machine_name}" if machine_name else server_name
+                srv_name = (
+                    f"{server_name}@{machine_name}" if machine_name else server_name
+                )
             else:
                 srv_name = srv
-            out.append({
-                "action_name": row.get("action_name"),
-                "action_server": srv_name,
-                "action_uuid": row.get("action_uuid"),
-            })
+            out.append(
+                {
+                    "action_name": row.get("action_name"),
+                    "action_server": srv_name,
+                    "action_uuid": row.get("action_uuid"),
+                }
+            )
         return out
 
     async def get_queue_object(self, kind, idx):
@@ -240,10 +262,14 @@ class RemoteBackend(OrchBackend):
         return resp or {}
 
     async def add_sequence(self, sequence):
-        return await self._call("append_sequence", json_dict={"sequence": sequence.model_dump()})
+        return await self._call(
+            "append_sequence", json_dict={"sequence": sequence.model_dump()}
+        )
 
     async def add_split_sequences(self, sequence):
-        return await self._call("append_split_sequences", json_dict={"sequence": sequence.model_dump()})
+        return await self._call(
+            "append_split_sequences", json_dict={"sequence": sequence.model_dump()}
+        )
 
     async def prepend_sequences(self, sequences):
         return await self._call(
@@ -302,6 +328,7 @@ class RemoteBackend(OrchBackend):
             if resp:
                 self._step_flags.update(resp)
             on_change()
+
         self._wss = Wss(self.host, self.port, "ws_status")
         self._ws_task = asyncio.create_task(self._ws_loop(on_change))
         self._poll_task = asyncio.create_task(self._poll_loop(on_change))

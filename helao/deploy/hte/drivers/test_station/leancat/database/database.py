@@ -12,7 +12,6 @@ from tenacity import retry, wait_exponential, stop_after_attempt
 from typing import Callable
 from ..logger import main_log
 
-
 # arg_app_config_path = sys.argv[1]
 
 # with open(arg_app_config_path, "r") as f:

@@ -3,6 +3,7 @@
     PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
         python -m helao.deploy.test.tests.test_data_browser
 """
+
 import json
 import os
 import tempfile
@@ -23,6 +24,7 @@ from helao.core.servers.data_browser import state as dbstate
 class _FakeDirs:
     def __init__(self, root):
         from pathlib import Path
+
         self.root = Path(root)
         self.log_root = None
 
@@ -119,18 +121,25 @@ def test_dir_walk_and_range():
 def _make_finished_tree(root):
     """Create root/RUNS_FINISHED/26.25/0618/<seq>/<exp>/<act>/ with an .hlo + act.yml."""
     act_dir = os.path.join(
-        root, RunDir.FINISHED.value, "26.25", "0618",
-        "141523__SDC_seq__lab1", "260618.141524__SDC_exp_CV",
+        root,
+        RunDir.FINISHED.value,
+        "26.25",
+        "0618",
+        "141523__SDC_seq__lab1",
+        "260618.141524__SDC_exp_CV",
         "1__0__sim__cv",
     )
     os.makedirs(act_dir)
     _write_hlo(os.path.join(act_dir, "cv_data.hlo"))
     with open(os.path.join(act_dir, "260618.141525-act.yml"), "w") as f:
-        yaml.safe_dump({
-            "technique_name": "CV",
-            "run_type": "data",
-            "samples_out": [{"global_label": "solid__lab1_1"}],
-        }, f)
+        yaml.safe_dump(
+            {
+                "technique_name": "CV",
+                "run_type": "data",
+                "samples_out": [{"global_label": "solid__lab1_1"}],
+            },
+            f,
+        )
 
 
 def test_runs_finished_index():
@@ -162,11 +171,18 @@ def _make_synced_zip(root):
         _write_hlo(hlo)
         actyml = os.path.join(tmp, "act.yml")
         with open(actyml, "w") as f:
-            yaml.safe_dump({"technique_name": "CV",
-                            "samples_out": [{"global_label": "solid__lab1_1"}]}, f)
+            yaml.safe_dump(
+                {
+                    "technique_name": "CV",
+                    "samples_out": [{"global_label": "solid__lab1_1"}],
+                },
+                f,
+            )
         zpath = os.path.join(day, "141523__SDC_seq__lab1.zip")
         with zipfile.ZipFile(zpath, "w") as zf:
-            zf.write(actyml, "260618.141524__SDC_exp_CV/1__0__sim__cv/260618.141525-act.yml")
+            zf.write(
+                actyml, "260618.141524__SDC_exp_CV/1__0__sim__cv/260618.141525-act.yml"
+            )
             zf.write(hlo, "260618.141524__SDC_exp_CV/1__0__sim__cv/cv_data.hlo")
 
 
@@ -190,23 +206,30 @@ def test_runs_synced_index():
 def _make_process(root):
     """Create a -prc.yml referencing the .hlo created by _make_finished_tree."""
     prc_dir = os.path.join(
-        root, "PROCESSES", "26.25", "0618",
-        "141523__SDC_seq__lab1", "260618.141524__SDC_exp_CV",
+        root,
+        "PROCESSES",
+        "26.25",
+        "0618",
+        "141523__SDC_seq__lab1",
+        "260618.141524__SDC_exp_CV",
     )
     os.makedirs(prc_dir)
     with open(os.path.join(prc_dir, "0__abc__CV-prc.yml"), "w") as f:
-        yaml.safe_dump({
-            "technique_name": "CV",
-            "run_type": "data",
-            "samples_out": [{"global_label": "solid__lab1_1"}],
-            "files": [{"file_name": "cv_data.hlo", "file_type": "helao__file"}],
-        }, f)
+        yaml.safe_dump(
+            {
+                "technique_name": "CV",
+                "run_type": "data",
+                "samples_out": [{"global_label": "solid__lab1_1"}],
+                "files": [{"file_name": "cv_data.hlo", "file_type": "helao__file"}],
+            },
+            f,
+        )
 
 
 def test_processes_index_resolves_to_runs():
     with tempfile.TemporaryDirectory() as d:
-        _make_finished_tree(d)   # the actual cv_data.hlo
-        _make_process(d)         # the -prc.yml that references it
+        _make_finished_tree(d)  # the actual cv_data.hlo
+        _make_process(d)  # the -prc.yml that references it
         df = sources.DerivedSourceIndex(d, "PROCESSES").index()
         assert len(df) == 1, df
         r = df.iloc[0]
@@ -233,16 +256,25 @@ def _make_analysis(root, with_local_output=True):
     ana_dir = os.path.join(root, "ANALYSES", "26.25", "0618", "150305__icpms__plate1")
     os.makedirs(ana_dir)
     with open(os.path.join(ana_dir, "uuid1234.yml"), "w") as f:
-        yaml.safe_dump({
-            "analysis_name": "icpms",
-            "global_sample_label": "solid__lab1_1",
-            "outputs": [{
-                "analysis_output_path": {"bucket": "b", "key": "analysis/uuid1234/conc.json", "region": "r"},
-                "content_type": "application/json",
-                "output_type": "concentration",
-                "output_name": "conc",
-            }],
-        }, f)
+        yaml.safe_dump(
+            {
+                "analysis_name": "icpms",
+                "global_sample_label": "solid__lab1_1",
+                "outputs": [
+                    {
+                        "analysis_output_path": {
+                            "bucket": "b",
+                            "key": "analysis/uuid1234/conc.json",
+                            "region": "r",
+                        },
+                        "content_type": "application/json",
+                        "output_type": "concentration",
+                        "output_name": "conc",
+                    }
+                ],
+            },
+            f,
+        )
     if with_local_output:
         with open(os.path.join(ana_dir, "conc.json"), "w") as f:
             json.dump({"element": ["Ni", "Fe"], "ppm": [12.0, 3.4]}, f)
@@ -303,8 +335,17 @@ def test_load_selected_end_to_end():
 
 
 def _ds(label, data, **kw):
-    base = dict(locator="L", source=RunDir.FINISHED, sequence="s", experiment="e",
-                node="n", technique="CV", sample="smp", file_name="f.hlo", meta={})
+    base = dict(
+        locator="L",
+        source=RunDir.FINISHED,
+        sequence="s",
+        experiment="e",
+        node="n",
+        technique="CV",
+        sample="smp",
+        file_name="f.hlo",
+        meta={},
+    )
     base.update(kw)
     return dbstate.SelectedDataset(label=label, data=data, **base)
 
@@ -336,6 +377,7 @@ def test_summary_row():
 
 def test_build_document_smoke():
     from helao.core.servers.data_browser.app import build_document
+
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
         doc = Document()
@@ -347,6 +389,7 @@ def test_build_document_smoke():
 
 def test_plot_tab_builds_traces():
     from helao.core.servers.data_browser.app import _UI
+
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
         doc = Document()
@@ -366,6 +409,7 @@ def test_plot_tab_builds_traces():
 
 def test_table_tab_summary_and_rows():
     from helao.core.servers.data_browser.app import _UI
+
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
         doc = Document()
@@ -387,6 +431,7 @@ def test_table_tab_summary_and_rows():
 
 def test_plot_replot_and_clear_safe():
     from helao.core.servers.data_browser.app import _UI
+
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
         doc = Document()
@@ -409,13 +454,20 @@ def test_plot_replot_and_clear_safe():
 
 def test_shims_expose_makebokehapp():
     import importlib
-    for mod in ("helao.deploy.hte.servers.visualizer.data_browser",
-                "helao.deploy.test.servers.visualizer.data_browser"):
+
+    for mod in (
+        "helao.deploy.hte.servers.visualizer.data_browser",
+        "helao.deploy.test.servers.visualizer.data_browser",
+    ):
         m = importlib.import_module(mod)
         assert hasattr(m, "makeBokehApp"), mod
         import inspect
+
         params = list(inspect.signature(m.makeBokehApp).parameters)
-        assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], (mod, params)
+        assert params == ["doc", "confPrefix", "server_key", "helao_repo_root"], (
+            mod,
+            params,
+        )
     print("test_shims_expose_makebokehapp PASS")
 
 

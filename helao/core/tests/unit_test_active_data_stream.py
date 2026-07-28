@@ -48,7 +48,6 @@ from helao.helpers.active_params import ActiveParams
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
 
-
 _FIXED_DT = datetime(2026, 1, 2, 3, 4, 5, 678901)
 
 
@@ -57,7 +56,10 @@ def _make_base(save_root: str) -> Base:
     base = Base.__new__(Base)
     base.app = SimpleNamespace(driver=None)
     base.server = MachineModel(
-        server_name="ACTSRV", machine_name="test-machine", hostname="127.0.0.1", port=8000
+        server_name="ACTSRV",
+        machine_name="test-machine",
+        hostname="127.0.0.1",
+        port=8000,
     )
     base.world_cfg = {
         "dummy": False,
@@ -194,7 +196,9 @@ async def _check_enqueue_drains_and_writes() -> bool:
             await active.enqueue_data_dflt({"t": i, "v": i * 10})
         # explicit enqueue_data on the same conn key
         await active.enqueue_data(
-            DataModel(data={dflt: {"t": 99, "v": 990}}, errors=[], status=HloStatus.active)
+            DataModel(
+                data={dflt: {"t": 99, "v": 990}}, errors=[], status=HloStatus.active
+            )
         )
         await _drain(active)
     finally:
@@ -221,11 +225,14 @@ async def _check_enqueue_drains_and_writes() -> bool:
     if "%%" not in body:
         return False
     data_lines = [
-        json.loads(ln)
-        for ln in body.split("%%", 1)[1].splitlines()
-        if ln.strip()
+        json.loads(ln) for ln in body.split("%%", 1)[1].splitlines() if ln.strip()
     ]
-    expected = [{"t": 0, "v": 0}, {"t": 1, "v": 10}, {"t": 2, "v": 20}, {"t": 99, "v": 990}]
+    expected = [
+        {"t": 0, "v": 0},
+        {"t": 1, "v": 10},
+        {"t": 2, "v": 20},
+        {"t": 99, "v": 990},
+    ]
     return data_lines == expected
 
 
@@ -237,9 +244,7 @@ async def _check_enqueue_nowait_counts() -> bool:
         DataModel(data={dflt: {"t": 0, "v": 0}}, errors=[], status=HloStatus.active)
     )
     after_data = active.num_data_queued
-    active.enqueue_data_nowait(
-        DataModel(data={}, errors=[], status=HloStatus.active)
-    )
+    active.enqueue_data_nowait(DataModel(data={}, errors=[], status=HloStatus.active))
     after_empty = active.num_data_queued
     return after_data == 1 and after_empty == 1
 

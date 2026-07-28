@@ -22,7 +22,6 @@ from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import private_dispatcher
 
-
 VALID_DATA_STATUS = (
     None,
     "active",

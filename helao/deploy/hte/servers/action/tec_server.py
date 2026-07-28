@@ -81,8 +81,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_record_tec", tags=["action"])
-    async def cancel_record_tec(
-    ):
+    async def cancel_record_tec():
         """Stop any running ``record_tec`` executors.
 
         Does not change the setpoint or enable/disable the controller.
@@ -123,8 +122,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/enable_tec", tags=["action"])
-    async def enable_tec(
-    ):
+    async def enable_tec():
         """Enable the TEC controller output.
 
         Args:
@@ -140,8 +138,7 @@ def makeApp(server_key) -> BaseAPI:
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/disable_tec", tags=["action"])
-    async def disable_tec(
-    ):
+    async def disable_tec():
         """Disable the TEC controller output.
 
         Args:
@@ -184,8 +181,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_wait_till_stable", tags=["action"])
-    async def cancel_wait_till_stable(
-    ):
+    async def cancel_wait_till_stable():
         """Stop any running ``wait_till_stable`` executors.
 
         Args:

@@ -515,7 +515,9 @@ class GPSim:
         progress = self.progress[plate_id]
         repeat_map = {
             # search full plate
-            StopCondition.none: len(self.acquired[plate_id] + self.acq_fromglobal[plate_id])
+            StopCondition.none: len(
+                self.acquired[plate_id] + self.acq_fromglobal[plate_id]
+            )
             < self.features[plate_id].shape[0],
             # below maximum iterations per plate
             StopCondition.max_iters: progress["plate_step"] < thresh_value,

@@ -102,7 +102,7 @@ class BaseAnalysis:
             "process_uuid": self.process_uuid,
             "global_sample_label": global_sample_label,
             "analysis_codehash": self.analysis_codehash,
-            "run_use": self.run_use
+            "run_use": self.run_use,
         }
         return UUID(hasher(hash_rep))
 

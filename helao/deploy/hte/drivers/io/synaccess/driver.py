@@ -57,7 +57,9 @@ class NetbooterDriver(HelaoDriver):
             self.client = httpx.Client(auth=self.auth, timeout=30.0)
             self.host_url = f"http://{hostname}/cmd.cgi?"
 
-    def switch_outlet(self, outlet_number: int, on: bool, repeat: int = 5) -> DriverResponse:
+    def switch_outlet(
+        self, outlet_number: int, on: bool, repeat: int = 5
+    ) -> DriverResponse:
         """Switch a single outlet on or off, retrying on non-200 responses.
 
         Args:
@@ -75,8 +77,8 @@ class NetbooterDriver(HelaoDriver):
                 return DriverResponse(
                     response=DriverResponseType.success,
                     message=f"switched outlet {outlet_number:d} {'on' if on else 'off'}",
-                status=DriverStatus.ok,
-            )
+                    status=DriverStatus.ok,
+                )
         return DriverResponse(
             response=DriverResponseType.failed,
             message=f"could not switch outlet {outlet_number:d} {'on' if on else 'off'}",
@@ -100,8 +102,8 @@ class NetbooterDriver(HelaoDriver):
                 return DriverResponse(
                     response=DriverResponseType.success,
                     message=f"switched all outlets {'on' if on else 'off'}",
-                status=DriverStatus.ok,
-            )
+                    status=DriverStatus.ok,
+                )
         return DriverResponse(
             response=DriverResponseType.failed,
             message=f"could not switch all outlets {'on' if on else 'off'}",

@@ -86,5 +86,5 @@ class Vis:
             self.server.server_name,
             log_dir=self.helaodirs.log_root,
             *args,
-            **kwargs
+            **kwargs,
         )

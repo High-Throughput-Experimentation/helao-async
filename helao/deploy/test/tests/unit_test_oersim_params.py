@@ -52,13 +52,13 @@ from helao.deploy.test.experiments.OERSIM_exp import (
 )
 from helao.deploy.test.sequences.OERSIM_seq import OERSIM_activelearn
 
-
 # --------------------------------------------------------------------------
 # Frozen legacy dict builders (post-typo-fix spelling): literal, ordered
 # dicts matching exactly what OERSIM_exp.py/OERSIM_seq.py author today. These
 # are the arbiter (D6) — both the typed models (check 1) and the actual
 # exp/seq function output (check 2) are compared against them.
 # --------------------------------------------------------------------------
+
 
 def _legacy_change_plate(plate_id):
     return {"plate_id": plate_id}
@@ -88,7 +88,9 @@ def _legacy_load_plate(plate_id, init_random_points):
     return {"plate_id": plate_id, "init_random_points": init_random_points}
 
 
-def _legacy_activelearn(init_random_points, stop_condition, thresh_value, repeat_experiment_kwargs):
+def _legacy_activelearn(
+    init_random_points, stop_condition, thresh_value, repeat_experiment_kwargs
+):
     return {
         "init_random_points": init_random_points,
         "stop_condition": stop_condition,
@@ -172,7 +174,10 @@ def _check_frozen_literal_equivalence(reporter: TestReporter) -> None:
     """Check 1: model_dump() == frozen legacy dict (order + yml bytes)."""
     reporter.section("frozen-literal dump equivalence (§7 check 1)")
     for model_cls, legacy_fn, default_kwargs, nondefault_kwargs in _MODEL_CASES:
-        for label, kwargs in (("defaults", default_kwargs), ("non-default", nondefault_kwargs)):
+        for label, kwargs in (
+            ("defaults", default_kwargs),
+            ("non-default", nondefault_kwargs),
+        ):
             model = model_cls(**kwargs)
             dump = model.model_dump()
             legacy = legacy_fn(**kwargs)
@@ -183,7 +188,8 @@ def _check_frozen_literal_equivalence(reporter: TestReporter) -> None:
             )
             reporter.check(
                 f"{name} [{label}]: key order == frozen legacy dict order",
-                lambda dump=dump, legacy=legacy: list(dump.keys()) == list(legacy.keys()),
+                lambda dump=dump, legacy=legacy: list(dump.keys())
+                == list(legacy.keys()),
             )
             reporter.check(
                 f"{name} [{label}]: yml_dumps bytes == frozen legacy dict yml_dumps bytes",
@@ -230,7 +236,9 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         ("non-default", 2750, 12),
     ):
         actions = _capture_actions(
-            OERSIM_sub_load_plate, plate_id=plate_id, init_random_points=init_random_points
+            OERSIM_sub_load_plate,
+            plate_id=plate_id,
+            init_random_points=init_random_points,
         )
         change_plate = _action_by_name(actions, "change_plate")
         initialize_plate = _action_by_name(actions, "initialize_plate")
@@ -255,7 +263,9 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         )
         reporter.check(
             f"OERSIM_sub_load_plate [{label}]: initialize_plate yml bytes equal",
-            lambda a=initialize_plate, e=legacy_initialize_plate: yml_dumps(a.action_params)
+            lambda a=initialize_plate, e=legacy_initialize_plate: yml_dumps(
+                a.action_params
+            )
             == yml_dumps(e),
         )
         reporter.check(
@@ -294,11 +304,13 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         )
         reporter.check(
             f"OERSIM_sub_decision [{label}]: check_condition key order matches",
-            lambda a=check_condition, e=legacy: list(a.action_params.keys()) == list(e.keys()),
+            lambda a=check_condition, e=legacy: list(a.action_params.keys())
+            == list(e.keys()),
         )
         reporter.check(
             f"OERSIM_sub_decision [{label}]: check_condition yml bytes equal",
-            lambda a=check_condition, e=legacy: yml_dumps(a.action_params) == yml_dumps(e),
+            lambda a=check_condition, e=legacy: yml_dumps(a.action_params)
+            == yml_dumps(e),
         )
 
     for label, kwargs in (
@@ -342,11 +354,14 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         )
         reporter.check(
             f"OERSIM_sub_activelearn [{label}]: check_condition yml bytes equal",
-            lambda a=check_condition, e=legacy: yml_dumps(a.action_params) == yml_dumps(e),
+            lambda a=check_condition, e=legacy: yml_dumps(a.action_params)
+            == yml_dumps(e),
         )
 
         measure_actions = [
-            a for a in actions if a.action_name in ("acquire_point", "measure_cp", "update_model")
+            a
+            for a in actions
+            if a.action_name in ("acquire_point", "measure_cp", "update_model")
         ]
         reporter.check(
             f"OERSIM_sub_activelearn [{label}]: measure_CP actions stay empty-param",
@@ -354,8 +369,18 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         )
 
     for label, kwargs in (
-        ("defaults", {"init_random_points": 5, "stop_condition": "max_iters", "thresh_value": 10}),
-        ("non-default", {"init_random_points": 8, "stop_condition": "none", "thresh_value": 42}),
+        (
+            "defaults",
+            {
+                "init_random_points": 5,
+                "stop_condition": "max_iters",
+                "thresh_value": 10,
+            },
+        ),
+        (
+            "non-default",
+            {"init_random_points": 8, "stop_condition": "none", "thresh_value": 42},
+        ),
     ):
         planned = OERSIM_activelearn(**kwargs)
         exp = planned[0]
@@ -366,7 +391,8 @@ def _check_authoring_path_equivalence(reporter: TestReporter) -> None:
         )
         reporter.check(
             f"OERSIM_activelearn seq [{label}]: experiment_params key order matches",
-            lambda exp=exp, e=legacy: list(exp.experiment_params.keys()) == list(e.keys()),
+            lambda exp=exp, e=legacy: list(exp.experiment_params.keys())
+            == list(e.keys()),
         )
         reporter.check(
             f"OERSIM_activelearn seq [{label}]: experiment_params yml bytes equal",
@@ -382,11 +408,13 @@ def _check_type_fidelity(reporter: TestReporter) -> None:
     float_dump = GPSIMCheckConditionParams(thresh_value=10.5).model_dump()
     reporter.check(
         "thresh_value=10 stays int in model_dump()",
-        lambda: type(int_dump["thresh_value"]) is int and int_dump["thresh_value"] == 10,
+        lambda: type(int_dump["thresh_value"]) is int
+        and int_dump["thresh_value"] == 10,
     )
     reporter.check(
         "thresh_value=10.5 stays float in model_dump()",
-        lambda: type(float_dump["thresh_value"]) is float and float_dump["thresh_value"] == 10.5,
+        lambda: type(float_dump["thresh_value"]) is float
+        and float_dump["thresh_value"] == 10.5,
     )
 
     str_dump = GPSIMCheckConditionParams(stop_condition="max_ei").model_dump()
@@ -395,7 +423,9 @@ def _check_type_fidelity(reporter: TestReporter) -> None:
         lambda: type(str_dump["stop_condition"]) is str,
     )
 
-    enum_input = GPSIMCheckConditionParams(stop_condition=StopCondition.max_ei).model_dump()
+    enum_input = GPSIMCheckConditionParams(
+        stop_condition=StopCondition.max_ei
+    ).model_dump()
     string_input = GPSIMCheckConditionParams(stop_condition="max_ei").model_dump()
     reporter.check(
         "enum-input vs string-input dump identically",

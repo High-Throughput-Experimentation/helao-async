@@ -48,7 +48,9 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 PLATE_API = HTEPlateAPI()
 
 
-def unpack_sequence(sequence_name: str, sequence_params, sequence_lib) -> List[Experiment]:
+def unpack_sequence(
+    sequence_name: str, sequence_params, sequence_lib
+) -> List[Experiment]:
     """Invoke the named sequence factory and return the list of planned experiments.
 
     Args:
@@ -75,9 +77,7 @@ async def seq_unpacker(orch) -> None:
         # )
         if orch.seq_model.data_request_id is not None:
             experimentmodel.data_request_id = orch.seq_model.data_request_id
-        await orch.add_experiment(
-            seq=orch.seq_model, experimentmodel=experimentmodel
-        )
+        await orch.add_experiment(seq=orch.seq_model, experimentmodel=experimentmodel)
         if i == 0:
             orch.globalstatusmodel.loop_state = LoopStatus.started
 

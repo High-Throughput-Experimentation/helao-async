@@ -567,8 +567,7 @@ def makeApp(server_key) -> BaseAPI:
             return active_action_dict
 
         @app.post(f"/{server_key}/cancel_acquire_monitors", tags=["action"])
-        async def cancel_acquire_monitors(
-        ):
+        async def cancel_acquire_monitors():
             """Stop any running ``acquire_monitors`` executor.
 
             Args:
@@ -728,8 +727,7 @@ def makeApp(server_key) -> BaseAPI:
             app.driver.stop_heatloop()
 
     @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop(
-    ):
+    async def stop():
         """Stop driver activity in a controlled way and record the result.
 
         Args:

@@ -25,7 +25,10 @@ from helao.core.models.file import HloHeaderModel
 from helao.core.servers.base_api import BaseAPI
 from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
-from ...drivers.power_supply.power_supply_driver import PowerSupplyDriver, DriverResponseType
+from ...drivers.power_supply.power_supply_driver import (
+    PowerSupplyDriver,
+    DriverResponseType,
+)
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -69,7 +72,8 @@ class ConstantCurrentSquareWaveExecutor(Executor):
                 OFF_0 = "off_0"
                 ON = "on"
                 OFF_1 = "off1"
-            self.PollFlag=PollFlag
+
+            self.PollFlag = PollFlag
             self.poll_flag = PollFlag.PRE
             # link attrs for convenience
             self.action_params = self.active.action.action_params
@@ -79,7 +83,7 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             self.duration = -1
         except Exception:
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
-          # init should never return for any python class!
+        # init should never return for any python class!
 
     async def _pre_exec(self) -> dict:
         """Open the power-supply connection and enable the output.
@@ -91,11 +95,16 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         resp = self.driver.connect()
 
         if resp.response != DriverResponseType.success:
-            LOGGER.error(f"ConstantCurrentSquareWaveExecutor connect failed:", exc_info=True)
+            LOGGER.error(
+                f"ConstantCurrentSquareWaveExecutor connect failed:", exc_info=True
+            )
             return {"error": ErrorCodes.critical_error}
         resp = self.driver.set_output(True)
         if resp.response != DriverResponseType.success:
-            LOGGER.error(f"ConstantCurrentSquareWaveExecutor set_output(True) failed:", exc_info=True)
+            LOGGER.error(
+                f"ConstantCurrentSquareWaveExecutor set_output(True) failed:",
+                exc_info=True,
+            )
             return {"error": ErrorCodes.critical_error}
         else:
             LOGGER.info(f"power supply is connected")
@@ -117,7 +126,9 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             LOGGER.warning("failed to set current to 0")
 
         self.poll_flag = self.PollFlag.OFF_0
-        return {"error": ErrorCodes.none, }
+        return {
+            "error": ErrorCodes.none,
+        }
 
     async def _poll(self) -> dict:
         """Advance the phase state machine and emit a voltage sample.
@@ -132,24 +143,24 @@ class ConstantCurrentSquareWaveExecutor(Executor):
             of ``active`` until ``sleep_time2`` is exceeded, ``finished``
             thereafter.
         """
-        current_a = self.action_params['current']
+        current_a = self.action_params["current"]
         # to do  - speed up the polling and add an exit condition. make errored reads ok
         sleep_time = self.action_params["sleep_time"]
         sleep_time1 = self.action_params["sleep_time1"]
         sleep_time2 = self.action_params["sleep_time2"]
-        
-        time_now = time.time()- self.start_time
 
-        if time_now >sleep_time2:
+        time_now = time.time() - self.start_time
+
+        if time_now > sleep_time2:
 
             resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
             resp = self.driver.set_output(output_on=False)
-            LOGGER.warning('poll completed')
+            LOGGER.warning("poll completed")
             return {"status": HloStatus.finished}
-            
+
         elif time_now > sleep_time1:
             if self.poll_flag == self.PollFlag.ON:
-                LOGGER.warning('changing poll flag from ON to OFF_1')
+                LOGGER.warning("changing poll flag from ON to OFF_1")
                 resp = await self.driver.apply_current_async(current=0, sleep_time=0.1)
                 time.sleep(0.1)
                 resp = self.driver.set_output(output_on=False)
@@ -159,47 +170,35 @@ class ConstantCurrentSquareWaveExecutor(Executor):
                 self.poll_flag = self.PollFlag.OFF_1
                 time.sleep(0.1)
                 if resp.response != DriverResponseType.success:
-                        LOGGER.error(f"set output failed in poll:", exc_info=True) 
-                LOGGER.info(f'poll, at time {time_now}, which is after the second time of {sleep_time1}')
-            
-            
-                    
-        
+                    LOGGER.error(f"set output failed in poll:", exc_info=True)
+                LOGGER.info(
+                    f"poll, at time {time_now}, which is after the second time of {sleep_time1}"
+                )
+
         elif time_now > sleep_time:
             if self.poll_flag == self.PollFlag.OFF_0:
                 resp = self.driver.set_output(output_on=True)
-                LOGGER.warning(f'output set for ON time, response is {resp.response}')
+                LOGGER.warning(f"output set for ON time, response is {resp.response}")
                 time.sleep(0.1)
                 if resp.response != DriverResponseType.success:
-                        LOGGER.error(f"set output failed in poll:", exc_info=True) 
-                resp = await self.driver.apply_current_async(current=current_a, sleep_time=0.1)   
-                LOGGER.warning(f'Current for ON applied, response is {resp.response}')
-                            
+                    LOGGER.error(f"set output failed in poll:", exc_info=True)
+                resp = await self.driver.apply_current_async(
+                    current=current_a, sleep_time=0.1
+                )
+                LOGGER.warning(f"Current for ON applied, response is {resp.response}")
+
                 self.poll_flag = self.PollFlag.ON
-            LOGGER.info(f'poll, at time {time_now}, which is after {sleep_time}')
+            LOGGER.info(f"poll, at time {time_now}, which is after {sleep_time}")
 
         else:
 
-            LOGGER.info(f'poll, at time {time_now}, which is before {sleep_time}')
+            LOGGER.info(f"poll, at time {time_now}, which is before {sleep_time}")
 
-       
-        resp=await self.driver.get_voltage_async(sleep_time=0.05)
-        LOGGER.info(f'polled voltage is {resp.data['voltage_v']}')
-        resp.data['t_s']=time_now
-        return {'data': resp.data, "status": HloStatus.active}
+        resp = await self.driver.get_voltage_async(sleep_time=0.05)
+        LOGGER.info(f"polled voltage is {resp.data['voltage_v']}")
+        resp.data["t_s"] = time_now
+        return {"data": resp.data, "status": HloStatus.active}
 
-
-        
-            
-
-                
-            
-        
-            
-
-        
-
-        
     async def _post_exec(self) -> dict:
         """Disconnect from the supply on completion.
 
@@ -211,6 +210,8 @@ class ConstantCurrentSquareWaveExecutor(Executor):
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
+
+
 class ApplyVoltageExecutor(Executor):
     """Executor that applies a constant voltage and polls current.
 
@@ -243,7 +244,7 @@ class ApplyVoltageExecutor(Executor):
             self.duration = -1
         except Exception:
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
-          # init should never return for any python class!
+        # init should never return for any python class!
 
     async def _pre_exec(self) -> dict:
         """Open the power-supply connection and enable the output.
@@ -269,7 +270,9 @@ class ApplyVoltageExecutor(Executor):
         """
         voltage = self.action_params["voltage"]
         sleep_time = self.action_params["sleep_time"]
-        resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
+        resp = await self.driver.apply_voltage_async(
+            voltage=voltage, sleep_time=sleep_time
+        )
         resp = self.driver.set_output(output_on=True)
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
@@ -339,7 +342,7 @@ class SquareWaveExecutor(Executor):
             self.duration = -1
         except Exception:
             LOGGER.error(f"Failed to initialize apply_voltage executor:", exc_info=True)
-          # init should never return for any python class!
+        # init should never return for any python class!
 
     async def _pre_exec(self) -> dict:
         """Open the power-supply connection and enable the output.
@@ -373,22 +376,35 @@ class SquareWaveExecutor(Executor):
             resp = self.driver.set_output(output_on=False)
             time.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
-                LOGGER.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                LOGGER.error(
+                    f"SquareWaveExecutor set_output(output_on=False) failed:",
+                    exc_info=True,
+                )
                 return {"error": ErrorCodes.critical_error}
             resp = self.driver.set_output(output_on=True)
             if resp.response != DriverResponseType.success:
-                LOGGER.error(f"SquareWaveExecutor set_output(output_on=True) failed:", exc_info=True)
+                LOGGER.error(
+                    f"SquareWaveExecutor set_output(output_on=True) failed:",
+                    exc_info=True,
+                )
                 return {"error": ErrorCodes.critical_error}
-            resp = await self.driver.apply_voltage_async(voltage=voltage, sleep_time=sleep_time)
+            resp = await self.driver.apply_voltage_async(
+                voltage=voltage, sleep_time=sleep_time
+            )
             if resp.response != DriverResponseType.success:
-                LOGGER.error(f"SquareWaveExecutor apply_voltage_async failed:", exc_info=True)
+                LOGGER.error(
+                    f"SquareWaveExecutor apply_voltage_async failed:", exc_info=True
+                )
                 return {"error": ErrorCodes.critical_error}
             resp = self.driver.set_output(output_on=False)
             time.sleep(sleep_time)
             if resp.response != DriverResponseType.success:
-                LOGGER.error(f"SquareWaveExecutor set_output(output_on=False) failed:", exc_info=True)
+                LOGGER.error(
+                    f"SquareWaveExecutor set_output(output_on=False) failed:",
+                    exc_info=True,
+                )
                 return {"error": ErrorCodes.critical_error}
-            
+
             return {"error": ErrorCodes.none}
         except Exception:
             LOGGER.error(f"SquareWaveExecutor failed:", exc_info=True)
@@ -405,9 +421,11 @@ class SquareWaveExecutor(Executor):
             resp = await self.driver.get_current_async(sleep_time=0.1)
             LOGGER.info(f"SquareWaveExecutor poll response: {resp}")
             if resp.response != DriverResponseType.success:
-                LOGGER.error(f"SquareWaveExecutor poll response not success:", exc_info=True)
+                LOGGER.error(
+                    f"SquareWaveExecutor poll response not success:", exc_info=True
+                )
                 return {"error": ErrorCodes.critical_error}
-            
+
             return {"error": ErrorCodes.none, "data": resp.data}
         except Exception:
             LOGGER.error(f"SquareWaveExecutor poll failed:", exc_info=True)
@@ -424,7 +442,6 @@ class SquareWaveExecutor(Executor):
         if resp.response != DriverResponseType.success:
             return {"error": ErrorCodes.critical_error}
         return {"error": ErrorCodes.none}
-
 
 
 async def power_supply_dyn_endpoints(app: BaseAPI):
@@ -477,7 +494,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Start executor
         executor = ApplyVoltageExecutor(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
-        
 
         return active_action_dict
 
@@ -519,10 +535,8 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Start executor
         executor = SquareWaveExecutor(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
-        
 
         return active_action_dict
-
 
     @app.post(f"/{server_key}/constant_current_square_wave", tags=["action"])
     async def constant_current_square_wave(
@@ -572,7 +586,6 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Start executor
         executor = ConstantCurrentSquareWaveExecutor(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
-        
 
         return active_action_dict
 
@@ -605,7 +618,3 @@ def makeApp(server_key) -> BaseAPI:
         app.driver.disconnect()
 
     return app
-
-
-
-

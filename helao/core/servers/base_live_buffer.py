@@ -87,9 +87,7 @@ class LiveBuffer:
         base = self.base
         return base.live_buffer[live_key]
 
-    async def get_realtime(
-        self, epoch_ns=None, offset=None
-    ) -> int:
+    async def get_realtime(self, epoch_ns=None, offset=None) -> int:
         """Asynchronous wrapper around :meth:`get_realtime_nowait`.
 
         Args:
@@ -102,9 +100,7 @@ class LiveBuffer:
         base = self.base
         return base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
-    def get_realtime_nowait(
-        self, epoch_ns=None, offset=None
-    ) -> int:
+    def get_realtime_nowait(self, epoch_ns=None, offset=None) -> int:
         """Return the wall-clock time in nanoseconds, optionally with a custom offset.
 
         Args:

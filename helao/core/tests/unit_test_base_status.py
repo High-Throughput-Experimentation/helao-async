@@ -110,7 +110,9 @@ async def _check_send_statuspackage() -> bool:
     base_status_module.async_private_dispatcher = _fake_dispatch
     try:
         base = _make_base(calls)
-        resp, ec = await base.send_statuspackage("CLIENT", "10.0.0.1", 9100, action_name=None)
+        resp, ec = await base.send_statuspackage(
+            "CLIENT", "10.0.0.1", 9100, action_name=None
+        )
     finally:
         base_status_module.async_private_dispatcher = orig
 
@@ -148,7 +150,9 @@ async def _check_send_nbstatuspackage() -> bool:
     try:
         base = _make_base(calls)
         actionmodel = Action(action_name="nbtest").get_act()
-        resp, ec = await base.send_nbstatuspackage("CLIENT", "10.0.0.1", 9100, actionmodel)
+        resp, ec = await base.send_nbstatuspackage(
+            "CLIENT", "10.0.0.1", 9100, actionmodel
+        )
     finally:
         base_status_module.async_private_dispatcher = orig
 
@@ -243,8 +247,7 @@ async def _check_ws_relay() -> bool:
     await task
 
     relayed_ok = (
-        len(ws.sent) == 1
-        and pickle.loads(pyzstd.decompress(ws.sent[0])) == message
+        len(ws.sent) == 1 and pickle.loads(pyzstd.decompress(ws.sent[0])) == message
     )
     # subscriber is removed only on error; normal StopAsyncIteration exit leaves
     # the queue_context to clean up -> no lingering subscribers either way

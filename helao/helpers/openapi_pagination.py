@@ -93,8 +93,13 @@ class OffsetPagination(PaginationStrategy):
         items_field: Optional explicit items key (else auto-located).
     """
 
-    def __init__(self, offset_param="offset",
-                 total_field="total", page_size=100, items_field=None):
+    def __init__(
+        self,
+        offset_param="offset",
+        total_field="total",
+        page_size=100,
+        items_field=None,
+    ):
         self.offset_param = offset_param
         self.total_field = total_field
         self.page_size = page_size
@@ -139,8 +144,13 @@ class PagePagination(PaginationStrategy):
         items_field: Optional explicit items key (else auto-located).
     """
 
-    def __init__(self, page_param="page",
-                 total_pages_field="total_pages", page_size=100, items_field=None):
+    def __init__(
+        self,
+        page_param="page",
+        total_pages_field="total_pages",
+        page_size=100,
+        items_field=None,
+    ):
         self.page_param = page_param
         self.total_pages_field = total_pages_field
         self.page_size = page_size
@@ -157,7 +167,11 @@ class PagePagination(PaginationStrategy):
         items = self._items(body) or []
         current = sent_params.get(self.page_param, 1)
         if isinstance(body, dict) and self.total_pages_field in body:
-            return {self.page_param: current + 1} if current < body[self.total_pages_field] else None
+            return (
+                {self.page_param: current + 1}
+                if current < body[self.total_pages_field]
+                else None
+            )
         return {self.page_param: current + 1} if len(items) >= self.page_size else None
 
     def total_hint(self, response, body):
@@ -218,12 +232,14 @@ class AutoPagination(PaginationStrategy):
             for field in _CURSOR_FIELDS:
                 if field in body:
                     value = body.get(field)
-                    if isinstance(value, str) and value.startswith(("http://", "https://")):
+                    if isinstance(value, str) and value.startswith(
+                        ("http://", "https://")
+                    ):
                         return _BodyNextUrlPagination(url_field=field)
                     if field == "next":
                         param = "cursor"
                     elif field.startswith("next_"):
-                        param = field[len("next_"):]
+                        param = field[len("next_") :]
                     else:
                         param = field
                     return CursorPagination(cursor_field=field, param=param)

@@ -1,20 +1,51 @@
 """Bokeh document builder for the data browser visualizer."""
+
 from socket import gethostname
 
 from bokeh.layouts import column, row
 from bokeh.models import (
-    Button, ColumnDataSource, DataTable, Div, InlineStyleSheet, RadioButtonGroup,
-    Select, Spacer, TableColumn, Tabs, TabPanel, TextInput,
+    Button,
+    ColumnDataSource,
+    DataTable,
+    Div,
+    InlineStyleSheet,
+    RadioButtonGroup,
+    Select,
+    Spacer,
+    TableColumn,
+    Tabs,
+    TabPanel,
+    TextInput,
 )
 from bokeh.palettes import Category10
 from bokeh.plotting import figure
 
 from helao.core.servers.data_browser import sources, state as dbstate
 
-INDEX_TABLE_COLS = ["source", "sequence", "experiment", "node", "technique",
-                    "sample", "run_type", "file_name", "file_type", "date", "available"]
-FILTER_COLS = ["source", "sequence", "experiment", "node", "technique",
-               "sample", "run_type", "file_name", "date"]
+INDEX_TABLE_COLS = [
+    "source",
+    "sequence",
+    "experiment",
+    "node",
+    "technique",
+    "sample",
+    "run_type",
+    "file_name",
+    "file_type",
+    "date",
+    "available",
+]
+FILTER_COLS = [
+    "source",
+    "sequence",
+    "experiment",
+    "node",
+    "technique",
+    "sample",
+    "run_type",
+    "file_name",
+    "date",
+]
 PALETTE = Category10[10]
 
 
@@ -43,13 +74,19 @@ class _UI:
         # --- header ---
         header = Div(
             text=f"<b>Data Browser on {gethostname().lower()}</b>",
-            styles={"font-size": "180%", "color": "#2471A3"}, width=1000, height=32)
+            styles={"font-size": "180%", "color": "#2471A3"},
+            width=1000,
+            height=32,
+        )
 
         # --- control bar ---
         self.group_sel = RadioButtonGroup(labels=list(sources.GROUPS.keys()), active=0)
-        self.source_sel = Select(title="Source",
-                                 options=sources.GROUPS["RUNS"],
-                                 value=sources.GROUPS["RUNS"][0], width=160)
+        self.source_sel = Select(
+            title="Source",
+            options=sources.GROUPS["RUNS"],
+            value=sources.GROUPS["RUNS"][0],
+            width=160,
+        )
         self.date_start = TextInput(title="From (YY.WW/MMDD)", width=140)
         self.date_end = TextInput(title="To (YY.WW/MMDD)", width=140)
         self.scan_btn = Button(label="Scan", button_type="primary", width=80)
@@ -58,9 +95,13 @@ class _UI:
         self.group_sel.on_change("active", self._on_group_change)
         self.scan_btn.on_click(self._on_scan)
 
-        control = row(column(Spacer(height=18), self.group_sel),
-                      self.source_sel, self.date_start,
-                      self.date_end, column(Spacer(height=18), self.scan_btn))
+        control = row(
+            column(Spacer(height=18), self.group_sel),
+            self.source_sel,
+            self.date_start,
+            self.date_end,
+            column(Spacer(height=18), self.scan_btn),
+        )
 
         # --- index (full width) ---
         self.filter_in = TextInput(title="Filter index", width=300)
@@ -69,13 +110,18 @@ class _UI:
         self.index_table = DataTable(
             source=self.index_source,
             columns=[TableColumn(field=c, title=c) for c in INDEX_TABLE_COLS],
-            selectable="checkbox", sizing_mode="stretch_both")
+            selectable="checkbox",
+            sizing_mode="stretch_both",
+        )
         # source table holds the top 30% of the app height
         index_box = column(
-            self.index_table, sizing_mode="stretch_width",
-            stylesheets=[InlineStyleSheet(css=":host { height: 30vh; }")])
-        self.add_btn = Button(label="+ Add selected to plot",
-                              button_type="success", width=300)
+            self.index_table,
+            sizing_mode="stretch_width",
+            stylesheets=[InlineStyleSheet(css=":host { height: 30vh; }")],
+        )
+        self.add_btn = Button(
+            label="+ Add selected to plot", button_type="success", width=300
+        )
         self.clear_btn = Button(label="Clear plot", width=300)
         self.add_btn.on_click(self._on_add)
         self.clear_btn.on_click(self._on_clear)
@@ -84,43 +130,67 @@ class _UI:
         self.right = self._build_right()
         # plot + data tables fill the lower 70% of the app height
         right_box = column(
-            self.right, sizing_mode="stretch_width",
-            stylesheets=[InlineStyleSheet(css=":host { height: 70vh; }")])
+            self.right,
+            sizing_mode="stretch_width",
+            stylesheets=[InlineStyleSheet(css=":host { height: 70vh; }")],
+        )
 
         self.layout = column(
-            header, control, self.filter_in, index_box, buttons, right_box,
-            sizing_mode="stretch_width")
+            header,
+            control,
+            self.filter_in,
+            index_box,
+            buttons,
+            right_box,
+            sizing_mode="stretch_width",
+        )
 
     def _build_right(self):
         # axis controls
         self.x_sel = Select(title="X", options=[], width=180)
         self.y_sel = Select(title="Y", options=[], width=180)
-        self.type_sel = Select(title="Type", options=["line", "scatter"],
-                               value="line", width=120)
+        self.type_sel = Select(
+            title="Type", options=["line", "scatter"], value="line", width=120
+        )
         for w in (self.x_sel, self.y_sel, self.type_sel):
             w.on_change("value", self._on_axis_change)
-        self.plot = figure(tools="pan,box_zoom,wheel_zoom,reset,save",
-                           sizing_mode="stretch_both")
+        self.plot = figure(
+            tools="pan,box_zoom,wheel_zoom,reset,save", sizing_mode="stretch_both"
+        )
         plot_panel = TabPanel(
-            child=column(row(self.x_sel, self.y_sel, self.type_sel), self.plot,
-                         sizing_mode="stretch_both"),
-            title="Plot")
+            child=column(
+                row(self.x_sel, self.y_sel, self.type_sel),
+                self.plot,
+                sizing_mode="stretch_both",
+            ),
+            title="Plot",
+        )
         # table panel (Task 13)
-        self.summary_source = ColumnDataSource(data={c: [] for c in dbstate.SUMMARY_COLS})
+        self.summary_source = ColumnDataSource(
+            data={c: [] for c in dbstate.SUMMARY_COLS}
+        )
         self.summary_table = DataTable(
             source=self.summary_source,
             columns=[TableColumn(field=c, title=c) for c in dbstate.SUMMARY_COLS],
-            height=180, selectable=True, sizing_mode="stretch_width")
+            height=180,
+            selectable=True,
+            sizing_mode="stretch_width",
+        )
         self.summary_source.selected.on_change("indices", self._on_summary_select)
         self.rows_source = ColumnDataSource(data={})
-        self.rows_table = DataTable(source=self.rows_source, columns=[],
-                                    height=200, sizing_mode="stretch_width")
+        self.rows_table = DataTable(
+            source=self.rows_source, columns=[], height=200, sizing_mode="stretch_width"
+        )
         table_panel = TabPanel(
-            child=column(Div(text="<b>Trace summary</b> (select a row to view data)"),
-                         self.summary_table,
-                         Div(text="<b>Data rows</b>"), self.rows_table,
-                         sizing_mode="stretch_both"),
-            title="Table")
+            child=column(
+                Div(text="<b>Trace summary</b> (select a row to view data)"),
+                self.summary_table,
+                Div(text="<b>Data rows</b>"),
+                self.rows_table,
+                sizing_mode="stretch_both",
+            ),
+            title="Table",
+        )
         self.tabs = Tabs(tabs=[plot_panel, table_panel], sizing_mode="stretch_both")
         return self.tabs
 
@@ -152,7 +222,9 @@ class _UI:
             src = ColumnDataSource(data=tr)
             color = PALETTE[i % len(PALETTE)]
             if self.type_sel.value == "scatter":
-                self.plot.scatter("x", "y", source=src, color=color, legend_label=ds.label)
+                self.plot.scatter(
+                    "x", "y", source=src, color=color, legend_label=ds.label
+                )
             else:
                 self.plot.line("x", "y", source=src, color=color, legend_label=ds.label)
         self.plot.xaxis.axis_label = xcol
@@ -162,7 +234,9 @@ class _UI:
         xcol, ycol = self.x_sel.value, self.y_sel.value
         rows = [dbstate.summary_row(ds, xcol, ycol) for ds in self.selected]
         if rows:
-            self.summary_source.data = {c: [r[c] for r in rows] for c in dbstate.SUMMARY_COLS}
+            self.summary_source.data = {
+                c: [r[c] for r in rows] for c in dbstate.SUMMARY_COLS
+            }
         else:
             self.summary_source.data = {c: [] for c in dbstate.SUMMARY_COLS}
         self.rows_source.data = {}
@@ -205,7 +279,9 @@ class _UI:
         finally:
             self.scan_btn.button_type = "primary"
             self.scan_btn.disabled = False
-        self.status.text = f"indexed {len(self.index_df)} datasets from {self._current_source()}"
+        self.status.text = (
+            f"indexed {len(self.index_df)} datasets from {self._current_source()}"
+        )
         self._refresh_index_table()
 
     def _filtered_df(self):
@@ -215,8 +291,11 @@ class _UI:
         if not q:
             return self.index_df
         cols = FILTER_COLS
-        mask = self.index_df[cols].astype(str).apply(
-            lambda r: q in " ".join(r.values).lower(), axis=1)
+        mask = (
+            self.index_df[cols]
+            .astype(str)
+            .apply(lambda r: q in " ".join(r.values).lower(), axis=1)
+        )
         return self.index_df[mask]
 
     def _refresh_index_table(self):

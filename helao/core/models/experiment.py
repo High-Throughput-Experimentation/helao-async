@@ -133,12 +133,25 @@ class ExperimentModel(ShortExperimentModel):
 
     def append_experiment_status(self, s: HloStatus) -> None:
         """Guarded append onto ``experiment_status`` (see status_transitions.guarded_append)."""
-        guarded_append(self.experiment_status, s, owner=f"experiment {self.experiment_uuid}/{self.experiment_name}")
+        guarded_append(
+            self.experiment_status,
+            s,
+            owner=f"experiment {self.experiment_uuid}/{self.experiment_name}",
+        )
 
     def replace_experiment_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``experiment_status`` (see status_transitions.guarded_replace)."""
-        guarded_replace(self.experiment_status, old, new, owner=f"experiment {self.experiment_uuid}/{self.experiment_name}")
+        guarded_replace(
+            self.experiment_status,
+            old,
+            new,
+            owner=f"experiment {self.experiment_uuid}/{self.experiment_name}",
+        )
 
     def reset_experiment_status(self, *statuses: HloStatus) -> None:
         """Guarded wholesale reset of ``experiment_status`` (see status_transitions.guarded_reset)."""
-        guarded_reset(self.experiment_status, statuses, owner=f"experiment {self.experiment_uuid}/{self.experiment_name}")
+        guarded_reset(
+            self.experiment_status,
+            statuses,
+            owner=f"experiment {self.experiment_uuid}/{self.experiment_name}",
+        )

@@ -58,8 +58,7 @@ def TEST_sub_noblocking(
 
 
 @experiment(version=1)
-def TEST_sub_conditional_stop(
-):
+def TEST_sub_conditional_stop():
     """Build an experiment that sets a global param and conditionally stops.
 
     Sets ``global_test`` then calls ``conditional_stop`` to halt the
