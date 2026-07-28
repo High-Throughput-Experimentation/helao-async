@@ -340,9 +340,12 @@ class HelaoLoader:
 
     def get_act(self, action_uuid: UUID, hmod: bool = True) -> dict | HelaoAction:
         """Return the action's JSON dict, or a ``HelaoAction`` wrapper when ``hmod``."""
-        jd = self.act_cache.get(action_uuid, self.get_json("action", action_uuid))
-        if self.cache_json:
-            self.act_cache[action_uuid] = jd
+        if self.cache_json and action_uuid in self.act_cache:
+            jd = self.act_cache[action_uuid]
+        else:
+            jd = self.get_json("action", action_uuid)
+            if self.cache_json:
+                self.act_cache[action_uuid] = jd
         if hmod:
             return HelaoAction(action_uuid)
         return jd
@@ -351,11 +354,12 @@ class HelaoLoader:
         self, experiment_uuid: UUID, hmod: bool = True
     ) -> dict | HelaoExperiment:
         """Return the experiment's JSON dict, or a ``HelaoExperiment`` wrapper when ``hmod``."""
-        jd = self.exp_cache.get(
-            experiment_uuid, self.get_json("experiment", experiment_uuid)
-        )
-        if self.cache_json:
-            self.exp_cache[experiment_uuid] = jd
+        if self.cache_json and experiment_uuid in self.exp_cache:
+            jd = self.exp_cache[experiment_uuid]
+        else:
+            jd = self.get_json("experiment", experiment_uuid)
+            if self.cache_json:
+                self.exp_cache[experiment_uuid] = jd
         if hmod:
             return HelaoExperiment(experiment_uuid)
         return jd
@@ -369,18 +373,24 @@ class HelaoLoader:
         if sequence_uuid != self.last_seq_uuid:
             self.clear_cache()
             self.last_seq_uuid = sequence_uuid
-        jd = self.seq_cache.get(sequence_uuid, self.get_json("sequence", sequence_uuid))
-        if self.cache_json:
-            self.seq_cache[sequence_uuid] = jd
+        if self.cache_json and sequence_uuid in self.seq_cache:
+            jd = self.seq_cache[sequence_uuid]
+        else:
+            jd = self.get_json("sequence", sequence_uuid)
+            if self.cache_json:
+                self.seq_cache[sequence_uuid] = jd
         if hmod:
             return HelaoSequence(sequence_uuid)
         return jd
 
     def get_prc(self, process_uuid: UUID, hmod: bool = True) -> dict | HelaoProcess:
         """Return the process's JSON dict, or a ``HelaoProcess`` wrapper when ``hmod``."""
-        jd = self.pro_cache.get(process_uuid, self.get_json("process", process_uuid))
-        if self.cache_json:
-            self.pro_cache[process_uuid] = jd
+        if self.cache_json and process_uuid in self.pro_cache:
+            jd = self.pro_cache[process_uuid]
+        else:
+            jd = self.get_json("process", process_uuid)
+            if self.cache_json:
+                self.pro_cache[process_uuid] = jd
         if hmod:
             return HelaoProcess(process_uuid)
         return jd
@@ -417,31 +427,24 @@ class HelaoLoader:
 
     def get_sql(self, helao_type: str, obj_uuid: UUID) -> dict:
         """Return the metadata DB row for ``(helao_type, obj_uuid)`` as a dict."""
-        if (
-            helao_type,
-            obj_uuid,
-        ) not in self.sql_cache.keys() or not self.cache_sql:
-            sql_command = f"""
-                SELECT *
-                FROM helao_{helao_type} ht
-                WHERE ht.{helao_type}_uuid = '{obj_uuid}'
-                LIMIT 1
-            """
-            resp = self.run_raw_query(sql_command)
-            self.sql_cache[
-                (
-                    helao_type,
-                    obj_uuid,
-                )
-            ] = (
-                resp[0]._asdict() if resp else {}
-            )
-        return self.sql_cache[
-            (
-                helao_type,
-                obj_uuid,
-            )
-        ]
+        cache_key = (helao_type, obj_uuid)
+        if self.cache_sql and cache_key in self.sql_cache:
+            return self.sql_cache[cache_key]
+
+        sql_command = f"""
+            SELECT *
+            FROM helao_{helao_type} ht
+            WHERE ht.{helao_type}_uuid = '{obj_uuid}'
+            LIMIT 1
+        """
+        resp = self.run_raw_query(sql_command)
+        row = resp[0]._asdict() if resp else {}
+        # Only retain the row when caching is on: the previous version wrote
+        # every result into sql_cache even with cache_sql=False, so the dict
+        # grew without bound while never being read from.
+        if self.cache_sql:
+            self.sql_cache[cache_key] = row
+        return row
 
 
 LOADER: HelaoLoader = None
