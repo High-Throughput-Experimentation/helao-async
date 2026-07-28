@@ -151,7 +151,7 @@ servers:
   #   bokeh: action_visualizer
   #   params:
   #     doc_name: ECHE4 Visualizer
-  # DB:
+  # SYNC:
   #   host: hte-eche-04.htejcap.caltech.edu
   #   port: 8010
   #   group: action

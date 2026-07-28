@@ -128,7 +128,7 @@ servers:
     fast: calc_server
     params: {}
     verbose: false
-  DB:
+  SYNC:
     host: hte-ecms-02.htejcap.caltech.edu
     port: 8010
     group: action

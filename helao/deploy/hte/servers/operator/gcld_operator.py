@@ -14,6 +14,7 @@ import httpx
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.premodels import Sequence
 from helao.helpers.dispatcher import private_dispatcher
+from helao.helpers.server_keys import SYNC_SERVER_KEY, resolve_sync_server_key
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.config_loader import read_config
 from ...sequences.UVIS_T_seq import UVIS_T, UVIS_T_postseq
@@ -341,18 +342,22 @@ def wait_for_orch(
     return current_loop, active_seq, last_seq
 
 
-def num_uploads(db_cfg) -> int:
-    """Return the total number of running plus queued upload tasks on the DB server.
+def num_uploads(sync_cfg, sync_key: str = SYNC_SERVER_KEY) -> int:
+    """Return the total number of running plus queued upload tasks on the syncer.
 
     Args:
-        db_cfg: Mapping with ``host`` and ``port`` keys identifying the
-            HELAO ``DB`` server.
+        sync_cfg: Mapping with ``host`` and ``port`` keys identifying the
+            HELAO syncer server.
+        sync_key: Server key the syncer is registered under, as resolved by
+            :func:`resolve_sync_server_key`.
 
     Returns:
         int: Sum of currently-running and queued task counts reported by the
         ``tasks`` endpoint.
     """
-    resp, err = private_dispatcher("DB", db_cfg["host"], db_cfg["port"], "tasks")
+    resp, err = private_dispatcher(
+        sync_key, sync_cfg["host"], sync_cfg["port"], "tasks"
+    )
     return len(resp.get("running", [])) + resp.get("num_queued", 0)
 
 
@@ -386,7 +391,13 @@ def main():
     operator = HelaoOperator(inst_config, "ORCH")
 
     world_cfg = read_config(inst_config, helao_repo_root)
-    db_cfg = world_cfg["servers"]["DB"]
+    sync_key = resolve_sync_server_key(world_cfg)
+    if sync_key is None:
+        raise KeyError(
+            f"no syncer server found in {inst_config}; expected a "
+            f"'{SYNC_SERVER_KEY}' server block"
+        )
+    sync_cfg = world_cfg["servers"][sync_key]
     test_idx = 0
     resumed = False
     request_count = 0
@@ -534,14 +545,14 @@ def main():
                 )
                 time.sleep(30)
 
-                # when orchestrator has stopped, check DB server for upload state
-                num_sync_tasks = num_uploads(db_cfg)
+                # when orchestrator has stopped, check syncer for upload state
+                num_sync_tasks = num_uploads(sync_cfg, sync_key)
                 while num_sync_tasks > 0:
                     print(
                         f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
                     )
                     time.sleep(10)
-                    num_sync_tasks = num_uploads(db_cfg)
+                    num_sync_tasks = num_uploads(sync_cfg, sync_key)
 
                 # INSITU ANALYSIS
                 ana_seq = ana_constructor(

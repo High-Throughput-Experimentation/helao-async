@@ -165,7 +165,7 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: ANEC Visualizer
-  DB:
+  SYNC:
     host: hte-anec-03.htejcap.caltech.edu
     port: 8010
     group: action

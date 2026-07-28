@@ -53,7 +53,7 @@ servers:
     params:
       doc_name: Data Browser
       max_points: 50000
-  DB:
+  SYNC:
     host: 127.0.0.1
     port: 8010
     group: action

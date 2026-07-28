@@ -107,7 +107,7 @@ def make_world(root: str) -> dict:
                 "deployment": "hexagon",
                 "params": {},
             },
-            "DB": {
+            "SYNC": {
                 "host": DB_HOST,
                 "port": DB_PORT,
                 "group": "action",
@@ -151,7 +151,7 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
 
     sim_app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
-    db_app = db_makeApp("DB")
+    db_app = db_makeApp("SYNC")
     sim_server, sim_task = await _serve(sim_app, SIM_HOST, SIM_PORT)
     db_server, db_task = await _serve(db_app, DB_HOST, DB_PORT)
     orch_app = makeOrchApp("ORCH")

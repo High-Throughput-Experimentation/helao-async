@@ -202,7 +202,7 @@ def _make_orch(tmp_root: Path) -> Orch:
     orch.sequence_codehash_lib = {}
     orch.sequence_codepath_lib = {}
 
-    orch.use_db = True
+    orch.use_sync = True
     orch.syncer = SimpleNamespace(to_s3=_make_fake_to_s3())
 
     orch.sequence_dq = zdeque([])

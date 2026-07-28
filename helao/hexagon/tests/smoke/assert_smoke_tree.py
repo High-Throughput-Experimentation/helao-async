@@ -29,7 +29,7 @@ def main(root: str) -> int:
     check(len(active) == 0, f"RUNS_ACTIVE empty (got {active})")
 
     # 5. logging contract (F3): flat per-server logs under <root>/LOGS
-    for key in ("ORCH", "SIM", "DB"):
+    for key in ("ORCH", "SIM", "SYNC"):
         check((root_p / "LOGS" / f"{key}.log").is_file(), f"LOGS/{key}.log exists")
 
     # 6. the hexagon loop actually ran (its parked/started log line)

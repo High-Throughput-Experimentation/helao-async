@@ -144,7 +144,7 @@ async def _check_ping_action_servers() -> bool:
     servers = {
         "SRV1": {"host": "127.0.0.1", "port": 8001},
         "SRV2": {"host": "127.0.0.1", "port": 8002},
-        "DB": {"host": "127.0.0.1", "port": 8003},
+        "SYNC": {"host": "127.0.0.1", "port": 8003},
         "SRV3": {
             "host": "127.0.0.1",
             "port": 8004,
@@ -176,7 +176,7 @@ async def _check_ping_action_servers() -> bool:
         attempted == ["SRV1", "SRV2"]
         and summary.get("SRV1") == ("idle", "idle")
         and summary.get("SRV2") == ("unreachable", "unknown")
-        and "DB" not in summary
+        and "SYNC" not in summary
         and "SRV3" not in summary
         and "VIS" not in summary
     )

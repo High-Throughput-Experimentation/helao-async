@@ -44,6 +44,7 @@ from helao.core.servers.base import Base
 from helao.core.models.process import ProcessModel
 from helao.core.models.action import ShortActionModel
 from helao.helpers.premodels import Action
+from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.premodels import Experiment
 from helao.helpers.premodels import Sequence
 from helao.core.models.file import FileInfo
@@ -2069,7 +2070,7 @@ class HelaoSyncer(SyncDriver):
     """``SyncDriver`` variant that gets its config from a running HELAO ``Base`` server.
 
     The constructor pulls ``params`` from the action server's own
-    ``server_cfg`` first, falling back to the global ``servers[db_server_name]``
+    ``server_cfg`` first, falling back to the global ``servers[sync_server_name]``
     block when no AWS path is set locally.
 
     Attributes:
@@ -2078,24 +2079,26 @@ class HelaoSyncer(SyncDriver):
 
     base: Base
 
-    def __init__(self, action_serv: Base, db_server_name: str = "DB"):
+    def __init__(self, action_serv: Base, sync_server_name: Optional[str] = None):
         """Pick up driver params from ``action_serv`` and initialize ``SyncDriver``.
 
         Args:
             action_serv: Action/orchestrator server whose ``server_cfg`` /
                 ``world_cfg`` supplies syncer configuration.
-            db_server_name: Server key to fall back to when local params lack
-                an ``aws_config_path``. Defaults to ``"DB"``.
+            sync_server_name: Server key to fall back to when local params lack
+                an ``aws_config_path``. Defaults to whichever of ``SYNC`` or the
+                legacy ``DB`` alias the group defines.
         """
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        # to load this driver on orch, we check the default "DB" key or take a manually-specified key
-        if (
-            not self.config_dict.get("aws_config_path", False)
-            and db_server_name in self.world_config["servers"]
-        ):
-            self.config_dict = self.world_config["servers"][db_server_name].get(
+        # to load this driver on orch, we resolve the syncer server key (SYNC,
+        # or the legacy DB alias) or take a manually-specified key
+        resolved_key = resolve_sync_server_key(
+            self.world_config, preferred=sync_server_name
+        )
+        if not self.config_dict.get("aws_config_path", False) and resolved_key:
+            self.config_dict = self.world_config["servers"][resolved_key].get(
                 "params", {}
             )
         LOGGER.info("initializing SyncDriver")

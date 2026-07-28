@@ -31,6 +31,7 @@ from helao.core.error import ErrorCodes
 
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.import_autolibs import import_autolibs
+from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.dispatcher import (
     async_action_dispatcher,  # noqa: F401  re-export: EstopController + orch_dispatch import it from here so orch stays the single golden-master patch point
 )
@@ -78,8 +79,8 @@ class Orch(Base):
     sequence libraries, running the dispatch loop, maintaining a
     ``GlobalStatusModel`` of every action server, optionally hosting the Bokeh
     operator UI, and emitting heartbeat/status pings so the queues react to
-    remote events. Database integration is enabled when a ``DB`` server is
-    present in the world config.
+    remote events. Run syncing is enabled when a ``SYNC`` server (or the legacy
+    ``DB`` alias) is present in the world config.
     """
 
     loop_task: asyncio.Task
@@ -114,9 +115,12 @@ class Orch(Base):
             )
         )
 
-        self.use_db = "DB" in self.world_cfg["servers"].keys()
-        if self.use_db:
-            self.syncer = HelaoSyncer(action_serv=self, db_server_name="DB")
+        sync_server_key = resolve_sync_server_key(self.world_cfg)
+        self.use_sync = sync_server_key is not None
+        if self.use_sync:
+            self.syncer = HelaoSyncer(
+                action_serv=self, sync_server_name=sync_server_key
+            )
 
         # instantiate experiment/experiment queue, action queue
         self.sequence_dq = zdeque([])

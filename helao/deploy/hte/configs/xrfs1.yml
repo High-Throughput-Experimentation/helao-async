@@ -34,7 +34,7 @@ servers:
       positions:
         custom:
           cell1_we: cell
-  DB:
+  SYNC:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8010
     group: action

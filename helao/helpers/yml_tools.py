@@ -21,6 +21,7 @@ import ruamel.yaml
 from ruamel.yaml.representer import RepresenterError
 
 from helao.core.models.run_dir import RunDir
+from helao.helpers.server_keys import get_sync_server_cfg
 
 #: Per-thread dumper cache. ``ruamel.yaml.YAML`` instances hold emitter state
 #: and are not thread-safe, so each thread gets its own.
@@ -329,7 +330,7 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
                     if not is_manual:
                         await yml_finisher(
                             yml_path,
-                            db_config=base.world_cfg.get("servers", {}).get("DB", {}),
+                            db_config=get_sync_server_cfg(base.world_cfg),
                         )
                     LOGGER.info(f"Successfully removed {yml_dir}")
                 if rm_success and obj_type == "action" and is_manual:
