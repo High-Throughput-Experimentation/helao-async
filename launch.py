@@ -60,6 +60,22 @@ from helao.helpers import helao_logging as logging
 # reaps the process afterward.
 SHUTDOWN_POST_TIMEOUT = 30
 
+# API server launch priority (matches folders in root helao-dev/).
+# The "operator" group is launched the same way as visualizers (a bokeh
+# subprocess via bokeh_launcher.py, resolved from servers/operator/), but is
+# ordered immediately after the orchestrator group so a standalone operator
+# can connect to a live orchestrator as soon as it starts.
+#
+# Module-level so a cold start (:func:`launcher`) and the CTRL-r "R" full
+# relaunch drive the same order from one definition.
+LAUNCH_ORDER = ["action", "orchestrator", "operator", "visualizer"]
+
+# Groups whose servers accept a graceful POST /shutdown before being signalled,
+# in the order the request is sent. Orchestrators go first so they detach their
+# subscribers (and export any non-empty queues) while the action servers they
+# talk to are still up.
+SHUTDOWN_POST_ORDER = ["orchestrator", "action"]
+
 LAUNCH_LOGGER: Logger = None
 
 
@@ -601,13 +617,6 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     # get the BaseModel which contains all the dirs for helao
     helaodirs = helao_dirs(confDict, "launcher")
 
-    # API server launch priority (matches folders in root helao-dev/).
-    # The "operator" group is launched the same way as visualizers (a bokeh
-    # subprocess via bokeh_launcher.py, resolved from servers/operator/), but is
-    # ordered immediately after the orchestrator group so a standalone operator
-    # can connect to a live orchestrator as soon as it starts.
-    LAUNCH_ORDER = ["action", "orchestrator", "operator", "visualizer"]
-
     pidd = Pidd(
         pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
     )
@@ -619,6 +628,46 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     else:
         LAUNCH_LOGGER.info(f"Configuration for '{confPrefix}' is valid.")
 
+    launch_server_groups(
+        pidd=pidd,
+        confArg=confArg,
+        confDict=confDict,
+        helao_repo_root=helao_repo_root,
+        extraopt=extraopt,
+        restore=restore,
+    )
+    return pidd
+
+
+def launch_server_groups(
+    pidd, confArg, confDict, helao_repo_root, extraopt="", restore=False
+):
+    """Launch every configured server group into ``pidd``, in ``LAUNCH_ORDER``.
+
+    Skips servers already running (matched by key/host/port) and servers whose
+    host:port is occupied by something else, so it is safe to call against a
+    partially-populated group. Shared by the cold start (:func:`launcher`) and
+    by the CTRL-r "R" full relaunch, so both bring servers up in exactly the
+    same order by exactly the same code path.
+
+    ``pidd.servers`` and ``pidd.orchServs`` are (re)derived from ``confDict``
+    here rather than by the caller, so a relaunch after a config edit picks up
+    the current server set.
+
+    Args:
+        pidd (Pidd): Process registry to populate. Mutated in place, so existing
+            closures over it stay valid across a relaunch.
+        confArg (str): Config path/prefix forwarded to each server launcher.
+        confDict (dict): Loaded configuration.
+        helao_repo_root (str): Repo root used as the subprocess cwd.
+        extraopt (str, optional): ``liveonly``/``gpvis``/``nolive``/``actionvis``
+            visualizer filter. Defaults to "".
+        restore (bool, optional): When True, pass ``--restore`` to launched
+            orchestrators so they import their saved queues. Defaults to False.
+
+    Returns:
+        Pidd: The same ``pidd`` that was passed in, now populated.
+    """
     # get running pids
     active = pidd.list_active()
     activeKHP = [(k, h, p) for k, h, p, _ in active]
@@ -1056,6 +1105,42 @@ def main():
         )
         return S
 
+    def graceful_shutdown_all():
+        """POST /shutdown to every managed server, in ``SHUTDOWN_POST_ORDER``.
+
+        Gives each server its cooperative shutdown hook (drivers disconnect,
+        orchestrators detach subscribers and export any non-empty queues to
+        ``STATES/queues.pck``) before anything is signalled. Errors are logged
+        per server and never abort the sweep -- a server that is already dead,
+        wedged, or lacks a ``/shutdown`` route must not block the rest.
+
+        Shared by CTRL-x teardown and the CTRL-r "R" full relaunch so both get
+        the same ordering and the same queue-export guarantee.
+
+        Orchestrators are addressed via ``pidd.orchServs`` (only those this
+        launcher actually started) rather than the whole configured group, so an
+        externally-managed orchestrator is never shut down from here. Visualizer
+        and operator bokeh apps expose no ``/shutdown`` route and are left to be
+        signalled by ``pidd.close()``.
+        """
+        for group in SHUTDOWN_POST_ORDER:
+            if group not in pidd.servers:
+                continue
+            LAUNCH_LOGGER.info(f"Shutting down {group} group.")
+            if group == "orchestrator":
+                servers = list(pidd.orchServs)
+            else:
+                servers = list(pidd.servers[group])
+            for server in servers:
+                try:
+                    LAUNCH_LOGGER.info(f"Shutting down {server}.")
+                    stop_server(group, server)
+                except Exception:
+                    LAUNCH_LOGGER.error(
+                        f" ... got error shutting down {group}/{server}: ",
+                        exc_info=True,
+                    )
+
     # Serializes all pidd mutation across the keypress thread (CTRL-r/CTRL-x) and
     # the hot-reload daemon so their read-modify-write on pidd.d / the pickle /
     # pidd.procs can't interleave and drop, resurrect, or double-restart a server.
@@ -1142,6 +1227,83 @@ def main():
                     exc_info=True,
                 )
                 return False
+
+    def relaunch_all():
+        """Shut down every server, then relaunch the whole group cold-start style.
+
+        The CTRL-r "R" option. Sequence:
+
+        1. POST /shutdown to every server via :func:`graceful_shutdown_all`, so
+           drivers disconnect cleanly and orchestrators export any non-empty
+           queues to ``STATES/queues.pck``.
+        2. ``pidd.close()`` to signal/reap whatever is left, in ``KILL_ORDER``.
+        3. Recreate the pid pickle, which ``close()`` deletes after a clean
+           teardown. Mirrors what ``Pidd.__init__`` does for an absent file;
+           without it every subsequent ``list_active()`` raises
+           ``FileNotFoundError``.
+        4. Verify nothing survived. A survivor still holds its host:port, so
+           relaunching would log "already in use" and silently leave that server
+           down; abort instead and leave the group torn down for the operator to
+           inspect.
+        5. ``launch_server_groups`` to bring everything back up in
+           ``LAUNCH_ORDER`` -- the same function the cold start uses.
+
+        Orchestrators are relaunched with ``--restore`` so the queues exported in
+        step 1 are imported back, matching what the hot-reload watcher already
+        does for an in-session orchestrator restart. The import archives
+        ``queues.pck`` as ``queues_imported_<ts>.pck``, so it is never replayed
+        twice.
+
+        Holds ``pidd_lock`` throughout so the hot-reload watcher cannot restart a
+        server into the middle of the teardown.
+
+        Returns:
+            bool: True if every server was torn down and the relaunch ran.
+        """
+        with pidd_lock:
+            LAUNCH_LOGGER.info("Full relaunch: shutting down all servers.")
+            try:
+                graceful_shutdown_all()
+                pidd.close()
+                # close() removes the pid pickle once everything is down; recreate
+                # it from the (now empty) in-memory dict so the reads below and the
+                # relaunch's store_pid calls have a file to work with.
+                pidd.write_global()
+            except Exception:
+                LAUNCH_LOGGER.error(
+                    " ... got error during full-relaunch shutdown: ", exc_info=True
+                )
+                return False
+
+            survivors = pidd.list_active()
+            if survivors:
+                LAUNCH_LOGGER.error(
+                    f"Full relaunch aborted: {[k for k, _, _, _ in survivors]} "
+                    f"survived shutdown and still hold their ports. Nothing was "
+                    f"relaunched; resolve those processes then use CTRL-r again."
+                )
+                return False
+
+            LAUNCH_LOGGER.info(
+                f"All servers down. Relaunching in cold-start order: "
+                f"{'/'.join(LAUNCH_ORDER)}."
+            )
+            try:
+                launch_server_groups(
+                    pidd=pidd,
+                    confArg=confArg,
+                    confDict=config,
+                    helao_repo_root=helao_repo_root,
+                    extraopt=extraopt,
+                    restore=True,
+                )
+            except Exception:
+                LAUNCH_LOGGER.error(
+                    " ... got error during full relaunch: ", exc_info=True
+                )
+                return False
+            LAUNCH_LOGGER.info("Full relaunch complete.")
+            return True
 
     # Runtime on/off switch for the hot-reload watcher, flipped by the CTRL-t
     # hotkey (see thread_waitforkey). The watcher thread always runs but only
@@ -1269,6 +1431,8 @@ def main():
         Keypress Actions:
         - CTRL-r: Lists currently running servers and prompts the user to select a server to restart.
             - Restarts the selected server and re-registers it with orchestrators if necessary.
+            - Entering capital "R" instead shuts every server down and relaunches
+              the whole group in cold-start order (see ``relaunch_all``).
         - CTRL-x: Terminates the orchestration group and shuts down servers in the specified order.
         - Other keys: Disconnects the action monitor and provides instructions to reconnect.
 
@@ -1291,17 +1455,28 @@ def main():
                     print("Currently running server type/name:")
                     for i, (gk, sk) in enumerate(slist):
                         print(f"{i}: {gk}/{sk}")
+                    print("R: shut down ALL servers and relaunch the whole group")
                     if len(slist) > 1:
                         optionstr = f"{min(opts)}-{max(opts)}"
                     else:
                         optionstr = "0"
                     sind = input(
-                        f"Enter server num to restart or blank to cancel [{optionstr}]: "
+                        f"Enter server num to restart, R to relaunch all, "
+                        f"or blank to cancel [{optionstr}/R]: "
                     )
                     if sind in [str(o) for o in opts]:
                         sg, sn = slist[int(sind)]
                         LAUNCH_LOGGER.info(f"Got option {sind}. Restarting {sg}/{sn}.")
                         restart_server(sg, sn)
+                        break
+                    # Capital-R only: a lowercase 'r' is far more likely to be a
+                    # stray keypress than a deliberate request to bounce every
+                    # server on a running instrument.
+                    elif sind == "R":
+                        LAUNCH_LOGGER.info(
+                            "Got option R. Shutting down all servers and relaunching."
+                        )
+                        relaunch_all()
                         break
                     elif sind == "":
                         LAUNCH_LOGGER.info("Cancelling restart.")
@@ -1327,32 +1502,10 @@ def main():
             result = wait_key()
         if result == "\x18":
             LAUNCH_LOGGER.info("Detected CTRL-x, terminating orchestration group.")
-            for server in pidd.orchServs:
-                try:
-                    stop_server("orchestrator", server)
-                except Exception:
-                    LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
-            # in case a /shutdown is added to other FastAPI servers (not the shutdown without '/')
-            # KILL_ORDER = ["visualizer", "action", "server"] # orch are killed above
-            # no /shutdown in visualizers
-            KILL_ORDER = ["action"]  # orch are killed above
-            for group in KILL_ORDER:
-                LAUNCH_LOGGER.info(f"Shutting down {group} group.")
-                if group in pidd.servers.keys():
-                    G = pidd.servers[group]
-                    for server in G.keys():
-                        try:
-                            LAUNCH_LOGGER.info(f"Shutting down {server}.")
-                            S = G[server]
-                            # will produce a 404 if not found. Bounded wait: the
-                            # handler runs the driver shutdown (gamry disconnect +
-                            # kill GamryCOM) before responding.
-                            requests.post(
-                                f"http://{S['host']}:{S['port']}/shutdown",
-                                timeout=SHUTDOWN_POST_TIMEOUT,
-                            )
-                        except Exception:
-                            LAUNCH_LOGGER.error(" ... got error: ", exc_info=True)
+            # Orchestrators first (they detach subscribers and export non-empty
+            # queues), then action servers. Visualizer/operator bokeh apps have
+            # no /shutdown route, so pidd.close() signals those.
+            graceful_shutdown_all()
             # hold pidd_lock so a concurrent hot-reload restart can't interleave
             # its pidd mutation with the teardown's kill loop.
             with pidd_lock:
