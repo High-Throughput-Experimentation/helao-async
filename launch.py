@@ -143,17 +143,20 @@ class ConsoleMux:
 
     Attributes:
         stream: Destination for forwarded output (the launcher's real stdout).
+        active: True once :meth:`activate` has opted this process in to piping
+            children. Off by default -- see :meth:`activate`.
         enabled: True once at least one child has been registered, i.e. children
             are on pipes and their output flows through here.
     """
 
     def __init__(self, stream=None):
-        """Initialise an idle mux with the display enabled.
+        """Initialise an idle, inactive mux with the display enabled.
 
         Args:
             stream: Output stream to forward to. Defaults to ``sys.stdout``.
         """
         self.stream = stream if stream is not None else sys.stdout
+        self.active = False
         self.enabled = False
         self._display = threading.Event()
         self._display.set()
@@ -166,14 +169,30 @@ class ConsoleMux:
 
     # -- child registration -------------------------------------------------
 
-    @staticmethod
-    def spawn_kwargs() -> dict:
-        """``Popen`` kwargs that route a child's output into the mux."""
+    def activate(self):
+        """Opt this process in to piping child output through the mux.
+
+        Off by default, and only ``main()`` turns it on, because piping is only
+        safe for a launcher that outlives its children. A process that spawns
+        servers and then exits (``append.py``) closes the pipe read end on the
+        way out, and the next console write kills the server -- verified: the
+        child is reaped and never finishes its writes. Such callers must keep
+        inheriting the terminal, which is what an inactive mux gives them.
+        """
+        self.active = True
+
+    def spawn_kwargs(self) -> dict:
+        """``Popen`` kwargs routing a child's output into the mux.
+
+        Empty while inactive, so the child inherits this process's stdout and
+        stderr exactly as it did before the mux existed.
+        """
+        if not self.active:
+            return {}
         return {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT}
 
-    @staticmethod
-    def child_env() -> dict:
-        """Environment for a piped child.
+    def child_env(self):
+        """Environment for a spawned child, or ``None`` to inherit unchanged.
 
         ``HELAO_FORCE_COLOR`` tells the child to emit ANSI even though its own
         stdout is a pipe, because this launcher forwards it to a real terminal.
@@ -182,6 +201,8 @@ class ConsoleMux:
         child line-buffered; a non-tty stdout would otherwise block-buffer and
         arrive in delayed multi-kilobyte chunks.
         """
+        if not self.active:
+            return None
         env = dict(os.environ)
         env["PYTHONUNBUFFERED"] = "1"
         try:
@@ -1409,6 +1430,10 @@ def main():
     # are a small share of the terminal, but the per-keypress hotkey hint would
     # otherwise print straight over the menu.
     CONSOLE.install_log_gate(LAUNCH_LOGGER)
+    # This process owns the CTRL-r menu and outlives its servers, so it is safe
+    # to pipe their output through the mux. Opt in explicitly; fire-and-forget
+    # callers of launcher() must not (see ConsoleMux.activate).
+    CONSOLE.activate()
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
     for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
@@ -1639,11 +1664,16 @@ def main():
         5. ``launch_server_groups`` to bring everything back up in
            ``LAUNCH_ORDER`` -- the same function the cold start uses.
 
-        Orchestrators are relaunched with ``--restore`` so the queues exported in
-        step 1 are imported back, matching what the hot-reload watcher already
-        does for an in-session orchestrator restart. The import archives
-        ``queues.pck`` as ``queues_imported_<ts>.pck``, so it is never replayed
-        twice.
+        Orchestrators are relaunched with whatever ``restore`` setting this
+        session was launched with, NOT unconditionally: a cold start only imports
+        queues when the operator opted in via ``--restore`` or
+        ``restore_queues_on_startup``, and "relaunch like a cold start" has to
+        mean that too. Forcing it on turned out to break production -- it opts the
+        orchestrator into importing ``STATES/queues.pck`` even when the config
+        never asked for it, and a pickle left by an older release raises
+        ``AttributeError`` inside the FastAPI startup event, so the orchestrator
+        exits instead of coming up. Step 1 still exports the queues either way,
+        so nothing is lost; they can be imported deliberately.
 
         Holds ``pidd_lock`` throughout so the hot-reload watcher cannot restart a
         server into the middle of the teardown.
@@ -1686,7 +1716,7 @@ def main():
                     confDict=config,
                     helao_repo_root=helao_repo_root,
                     extraopt=extraopt,
-                    restore=True,
+                    restore=restore,
                 )
             except Exception:
                 LAUNCH_LOGGER.error(
