@@ -1,4 +1,32 @@
+[project]
+name = "helao-async"
+# Mirrors the newest `release/YYYY.MM.DD` git tag. The version that actually
+# lands in every exp/prg/hlo file is the git commit hash, resolved at runtime
+# by helao/core/version.py -- this field is metadata only, so it needs a bump
+# whenever a new release tag is cut.
+version = "2026.06.01"
+description = "Caltech HTE group's distributed instrument control software (HELAO)"
+requires-python = ">=3.14"
+
+# Dependencies are deliberately NOT listed here, and there is no
+# [build-system]: this repo is not pip-installable, it runs off PYTHONPATH
+# (set into the conda env by setup_env.sh / setup_env.bat).
+#
+# The authoritative dependency lists are helao_dev_linux-64.yml and
+# helao_dev_win-64.yml, which build the `helao` conda env. Duplicating them
+# here would create a second source of truth that silently drifts -- and two
+# entries could not be reproduced from PyPI anyway: pyMeCom and easy-biologic
+# are installed from GitHub archive URLs rather than PyPI releases.
+
 [tool.black]
+# Pinned so black does NOT infer its target from [project].requires-python
+# above. With the target left implicit, black reads ">=3.14" and starts
+# emitting 3.14-only syntax -- e.g. it rewrites `except (A, B):` to the
+# PEP 758 unparenthesized `except A, B:` in galil_motion_native.py, and
+# wants to touch 18 more files than it otherwise would (126 -> 144 across
+# helao/). Keeping the target at py312 holds the formatting baseline steady
+# and keeps the source readable on older interpreters.
+target-version = ["py312"]
 # Five native re-body modules under helao/hexagon/adapters/native/ are
 # VERBATIM, byte-identical copies of legacy code: four CARDS-P6 write
 # collaborators (helao/core/servers/active_data_*.py, base_meta_writer.py) and
