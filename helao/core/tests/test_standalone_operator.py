@@ -3,6 +3,7 @@
     PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async conda run -n helao \
         python -m helao.core.tests.test_standalone_operator
 """
+
 import asyncio
 
 from helao.helpers.premodels import Experiment as _ExpModel
@@ -54,6 +55,7 @@ class _FakeDirsOp:
     def __init__(self):
         import tempfile
         from pathlib import Path
+
         self.root = Path(tempfile.mkdtemp())
         self.log_root = None
         self.user_exp = None
@@ -62,6 +64,7 @@ class _FakeDirsOp:
 
 class _FakeVisOp:
     """Vis stand-in with the minimum surface BokehOperator reads."""
+
     def __init__(self, doc):
         self.doc = doc
         self.helaodirs = _FakeDirsOp()
@@ -108,21 +111,40 @@ def test_remote_backend_dispatch_and_serialize():
 
     calls = []
 
-    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+    async def fake_dispatch(
+        server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw
+    ):
         calls.append((endpoint, params_dict, json_dict))
         canned = {
-            "list_sequences": [{
-                "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
-                "campaign_name": "camp", "campaign_uuid": "cu", "junk": 1,
-            }],
-            "list_actions": [{
-                "action_name": "noop", "action_uuid": "au",
-                "action_server": {"server_name": "motor", "machine_name": "host"},
-            }],
-            "get_orch_state": {"loop_state": "stopped", "n_sequences": 2,
-                               "n_experiments": 0, "n_actions": 0,
-                               "current_stop_message": ""},
-            "get_step_flags": {"actions": True, "experiments": False, "sequences": False},
+            "list_sequences": [
+                {
+                    "sequence_name": "seq0",
+                    "sequence_label": "lbl",
+                    "sequence_uuid": "su",
+                    "campaign_name": "camp",
+                    "campaign_uuid": "cu",
+                    "junk": 1,
+                }
+            ],
+            "list_actions": [
+                {
+                    "action_name": "noop",
+                    "action_uuid": "au",
+                    "action_server": {"server_name": "motor", "machine_name": "host"},
+                }
+            ],
+            "get_orch_state": {
+                "loop_state": "stopped",
+                "n_sequences": 2,
+                "n_experiments": 0,
+                "n_actions": 0,
+                "current_stop_message": "",
+            },
+            "get_step_flags": {
+                "actions": True,
+                "experiments": False,
+                "sequences": False,
+            },
             "append_sequence": {"sequence_uuid": "newseq"},
         }
         return canned.get(endpoint, {}), ErrorCodes.none
@@ -130,6 +152,7 @@ def test_remote_backend_dispatch_and_serialize():
     class _Seq:
         def __init__(self):
             self.sequence_name = "seq0"
+
         def model_dump(self):
             return {"sequence_name": self.sequence_name}
 
@@ -141,10 +164,15 @@ def test_remote_backend_dispatch_and_serialize():
     be._step_flags = {"actions": False, "experiments": False, "sequences": False}
 
     seqs = asyncio.run(be.list_sequences())
-    assert seqs == [{
-        "sequence_name": "seq0", "sequence_label": "lbl", "sequence_uuid": "su",
-        "campaign_name": "camp", "campaign_uuid": "cu",
-    }]
+    assert seqs == [
+        {
+            "sequence_name": "seq0",
+            "sequence_label": "lbl",
+            "sequence_uuid": "su",
+            "campaign_name": "camp",
+            "campaign_uuid": "cu",
+        }
+    ]
     acts = asyncio.run(be.list_actions())
     assert acts[0]["action_server"] == "motor@host"
     asyncio.run(be.add_sequence(_Seq()))
@@ -158,6 +186,7 @@ def test_remote_backend_dispatch_and_serialize():
 def test_operator_accepts_backend():
     import inspect
     from helao.core.servers.operator.bokeh_operator import BokehOperator
+
     params = list(inspect.signature(BokehOperator.__init__).parameters)
     assert params == ["self", "vis_serv", "backend"], params
     print("test_operator_accepts_backend PASS")
@@ -167,9 +196,7 @@ class _MockBackend:
     def __init__(self):
         # seq0 unpacks to a single planned experiment so populate_sequence can
         # construct a valid Sequence (planned_experiments must be experiments).
-        self.sequence_lib = {
-            "seq0": lambda x=1: [_ExpModel(experiment_name="exp0")]
-        }
+        self.sequence_lib = {"seq0": lambda x=1: [_ExpModel(experiment_name="exp0")]}
         self.experiment_lib = {"exp0": _exp0}
         self._flags = {"actions": False, "experiments": False, "sequences": False}
         self.started = False
@@ -194,16 +221,27 @@ class _MockBackend:
         self._flags[kind] = value
 
     async def list_sequences(self):
-        return [{"sequence_name": "seq0", "sequence_label": "l",
-                 "sequence_uuid": "0123456789abcdef", "campaign_name": "c",
-                 "campaign_uuid": "fedcba9876543210"}]
+        return [
+            {
+                "sequence_name": "seq0",
+                "sequence_label": "l",
+                "sequence_uuid": "0123456789abcdef",
+                "campaign_name": "c",
+                "campaign_uuid": "fedcba9876543210",
+            }
+        ]
 
     async def list_experiments(self):
         return [{"experiment_name": "exp0", "experiment_uuid": "1111222233334444"}]
 
     async def list_actions(self):
-        return [{"action_name": "noop", "action_server": "motor",
-                 "action_uuid": "aaaabbbbccccdddd"}]
+        return [
+            {
+                "action_name": "noop",
+                "action_server": "motor",
+                "action_uuid": "aaaabbbbccccdddd",
+            }
+        ]
 
     async def get_histories(self):
         return {"action": [], "experiment": [], "sequence": []}
@@ -212,10 +250,15 @@ class _MockBackend:
         return {"motor": ["idle", "ok"]}
 
     async def get_orch_state(self):
-        return {"loop_state": self.loop_state, "active_sequence": self.active_sequence,
-                "active_experiment": {},
-                "n_sequences": 1, "n_experiments": 1, "n_actions": 1,
-                "current_stop_message": ""}
+        return {
+            "loop_state": self.loop_state,
+            "active_sequence": self.active_sequence,
+            "active_experiment": {},
+            "n_sequences": 1,
+            "n_experiments": 1,
+            "n_actions": 1,
+            "current_stop_message": "",
+        }
 
     async def add_sequence(self, sequence):
         self.added.append(sequence)
@@ -287,6 +330,7 @@ def test_operator_tables_from_backend():
 def test_plate_api_disabled_by_default():
     from bokeh.document import Document
     from helao.core.servers.operator.bokeh_operator import BokehOperator
+
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     assert op.dataAPI is None  # no plate_api param -> disabled
     op.cleanup_session(None)
@@ -330,6 +374,7 @@ def test_plate_callbacks_noop_when_plate_api_disabled():
 
 def test_shim_exposes_makebokehapp():
     import importlib, inspect
+
     m = importlib.import_module("helao.deploy.hte.servers.operator.standalone_operator")
     assert hasattr(m, "makeBokehApp")
     params = list(inspect.signature(m.makeBokehApp).parameters)
@@ -432,7 +477,9 @@ def test_orch_prepend_order_and_run_id():
 
     names = [s.sequence_name for s in orch.sequence_dq]
     assert names == ["A", "B", "C", "existing"], names
-    assert a.run_id == b.run_id == c.run_id == inflight, "prepend reuses in-flight run_id"
+    assert (
+        a.run_id == b.run_id == c.run_id == inflight
+    ), "prepend reuses in-flight run_id"
 
     # empty prepend is a no-op and must not mint a stray run_id
     before = orch.active_run_id
@@ -447,6 +494,7 @@ def test_queue_object_payload():
     class _Item:
         def __init__(self, name):
             self._name = name
+
         def as_dict(self):
             return {"sequence_name": self._name, "sequence_params": {"x": 1}}
 
@@ -459,7 +507,8 @@ def test_queue_object_payload():
 
     orch = _O()
     assert orch_api._queue_object_payload(orch, "sequence", 1) == {
-        "sequence_name": "B", "sequence_params": {"x": 1},
+        "sequence_name": "B",
+        "sequence_params": {"x": 1},
     }
     assert orch_api._queue_object_payload(orch, "sequence", 9) == {}
     assert orch_api._queue_object_payload(orch, "bogus", 0) == {}
@@ -480,6 +529,7 @@ def test_prepend_sequences_helper():
     assert len(orch.prepended) == 2
     # dict inputs are coerced to Sequence instances
     from helao.helpers.premodels import Sequence
+
     assert all(isinstance(s, Sequence) for s in orch.prepended)
     print("test_prepend_sequences_helper PASS")
 
@@ -490,13 +540,16 @@ def test_remote_backend_prepend():
 
     calls = []
 
-    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+    async def fake_dispatch(
+        server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw
+    ):
         calls.append((endpoint, params_dict, json_dict))
         return {"sequence_uuids": ["u1", "u2"]}, ErrorCodes.none
 
     class _Seq:
         def __init__(self, name):
             self.name = name
+
         def model_dump(self):
             return {"sequence_name": self.name}
 
@@ -541,7 +594,7 @@ def test_plan_buffer_order():
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.plan = [Sequence(sequence_name="A")]
     op.sequence_dropdown.value = "seq0"
-    op.populate_sequence(prepend=True)   # inserts seq0 at front
+    op.populate_sequence(prepend=True)  # inserts seq0 at front
     op.plan.append(Sequence(sequence_name="C"))
     names = [s.sequence_name for s in op.plan]
     assert names == ["seq0", "A", "C"], names
@@ -635,9 +688,11 @@ def test_queue_controls_enable_gate():
     op = BokehOperator(_FakeVisOp(Document()), be)
 
     def _disabled():
-        return (op.button_queue_move_up.disabled,
-                op.button_queue_move_down.disabled,
-                op.button_queue_remove.disabled)
+        return (
+            op.button_queue_move_up.disabled,
+            op.button_queue_move_down.disabled,
+            op.button_queue_remove.disabled,
+        )
 
     # Running -> the single unified button set is disabled on every tab.
     be.loop_state = "started"
@@ -682,7 +737,13 @@ def test_queue_button_dispatch_routing():
     # _active_queue_target resolves the right (source, move_fn, remove_fn) per tab.
     for idx, source, move_fn, remove_fn, col in (
         (0, op.sequence_source, be.move_sequence, be.remove_sequence, "sequence_name"),
-        (1, op.experiment_source, be.move_experiment, be.remove_experiment, "experiment_name"),
+        (
+            1,
+            op.experiment_source,
+            be.move_experiment,
+            be.remove_experiment,
+            "experiment_name",
+        ),
         (2, op.action_source, be.move_action, be.remove_action, "action_name"),
     ):
         op.queue_tabs.active = idx
@@ -767,8 +828,9 @@ def test_prepend_button_enable_gate():
 
 def test_sanitize_sequence_label():
     from helao.core.servers.orch import sanitize_sequence_label
+
     assert sanitize_sequence_label("a b__c d") == "a_b_c_d"
-    assert sanitize_sequence_label("a_b") == "a_b"        # single underscore preserved
+    assert sanitize_sequence_label("a_b") == "a_b"  # single underscore preserved
     assert sanitize_sequence_label("") == ""
     assert sanitize_sequence_label(None) is None
     print("test_sanitize_sequence_label PASS")
@@ -799,9 +861,7 @@ def test_orch_move_and_remove_sequence():
     from helao.helpers.zdeque import zdeque
 
     orch = Orch.__new__(Orch)
-    orch.sequence_dq = zdeque(
-        [Sequence(sequence_name=n) for n in ("A", "B", "C")]
-    )
+    orch.sequence_dq = zdeque([Sequence(sequence_name=n) for n in ("A", "B", "C")])
 
     asyncio.run(orch.move_sequence(2, 0))
     assert [s.sequence_name for s in orch.sequence_dq] == ["C", "A", "B"]
@@ -826,9 +886,7 @@ def test_orch_move_and_remove_experiment_action():
     orch.experiment_dq = zdeque(
         [Experiment(experiment_name=n) for n in ("A", "B", "C")]
     )
-    orch.action_dq = zdeque(
-        [Action(action_name=n) for n in ("X", "Y", "Z")]
-    )
+    orch.action_dq = zdeque([Action(action_name=n) for n in ("X", "Y", "Z")])
 
     asyncio.run(orch.move_experiment(2, 0))
     assert [e.experiment_name for e in orch.experiment_dq] == ["C", "A", "B"]
@@ -877,7 +935,9 @@ def test_remote_backend_move_remove():
 
     calls = []
 
-    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+    async def fake_dispatch(
+        server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw
+    ):
         calls.append((endpoint, params_dict))
         return {"n_sequences": 0}, ErrorCodes.none
 
@@ -908,7 +968,9 @@ def test_remote_backend_stop_reset_run_id():
 
     calls = []
 
-    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+    async def fake_dispatch(
+        server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw
+    ):
         calls.append((endpoint, params_dict))
         return {}, ErrorCodes.none
 
@@ -1003,6 +1065,7 @@ def _drain_callbacks(doc, iterations=20):
     awaitable body actually executes rather than just creating a coroutine object.
     """
     import inspect
+
     for _ in range(iterations):
         scheduled = list(doc.session_callbacks)
         if not scheduled:
@@ -1127,8 +1190,10 @@ def test_parse_arg_docs():
 
 def test_tree_header_text():
     from helao.core.servers.operator.bokeh_operator import (
-        _tree_header_text, _server_header_text,
+        _tree_header_text,
+        _server_header_text,
     )
+
     obj = {"sequence_name": "seq0", "sequence_uuid": "0123456789abcdef"}
     assert _tree_header_text("sequence", obj) == "seq0 · 89abcdef"
     assert _tree_header_text("action", {"action_name": "noop"}) == "noop"
@@ -1147,7 +1212,9 @@ def test_remote_backend_get_queue_object():
 
     calls = []
 
-    async def fake_dispatch(server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw):
+    async def fake_dispatch(
+        server_key, host, port, endpoint, params_dict=None, json_dict=None, **kw
+    ):
         calls.append((endpoint, params_dict))
         return {"sequence_name": "B", "sequence_params": {"x": 1}}, ErrorCodes.none
 
@@ -1170,8 +1237,16 @@ def test_history_objects_retained():
     class _BE(_MockBackend):
         async def get_histories(self):
             return {
-                "action": [("au1", {"action_name": "noop", "action_uuid": "au1",
-                                    "action_server": "test_server"})],
+                "action": [
+                    (
+                        "au1",
+                        {
+                            "action_name": "noop",
+                            "action_uuid": "au1",
+                            "action_server": "test_server",
+                        },
+                    )
+                ],
                 "experiment": [],
                 "sequence": [],
             }
@@ -1200,7 +1275,10 @@ def test_planhistory_tree_render_plan():
     op.experiment_plan_source.selected.indices = [0]
     op._render_planhistory_tree()
     assert "seqX" in op.planhistory_tree_header.text
-    assert "<details open><summary>sequence_params</summary>" in op.planhistory_tree_div.text
+    assert (
+        "<details open><summary>sequence_params</summary>"
+        in op.planhistory_tree_div.text
+    )
     assert "plate_id: 7" in op.planhistory_tree_div.text
     op.cleanup_session(None)
     print("test_planhistory_tree_render_plan PASS")
@@ -1212,13 +1290,17 @@ def test_queue_tree_render_action_server():
 
     vis = _FakeVisOp(Document())
     vis.world_cfg["servers"]["MOTOR"] = {
-        "group": "action", "host": "10.0.0.1", "port": 8005,
+        "group": "action",
+        "host": "10.0.0.1",
+        "port": 8005,
         "params": {"axis": "x"},
     }
     op = BokehOperator(vis, _MockBackend())
     asyncio.run(op.get_orch_status_summary())
     op.action_server_source.data = {
-        "action_server": ["MOTOR"], "server_status": ["idle"], "driver_status": ["ok"],
+        "action_server": ["MOTOR"],
+        "server_status": ["idle"],
+        "driver_status": ["ok"],
     }
     op.queue_tabs.active = 3  # Action Servers tab
     op.action_server_source.selected.indices = [0]
@@ -1239,8 +1321,11 @@ def test_queue_tree_render_lazy_sequence():
     class _BE(_MockBackend):
         async def get_queue_object(self, kind, idx):
             fetched["args"] = (kind, idx)
-            return {"sequence_name": "Q", "sequence_uuid": "ffff0000ffff1111",
-                    "sequence_params": {"k": 9}}
+            return {
+                "sequence_name": "Q",
+                "sequence_uuid": "ffff0000ffff1111",
+                "sequence_params": {"k": 9},
+            }
 
     op = BokehOperator(_FakeVisOp(Document()), _BE())
     op.queue_tabs.active = 0  # Sequences tab
