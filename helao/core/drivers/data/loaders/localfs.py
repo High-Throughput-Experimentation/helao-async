@@ -384,9 +384,9 @@ class LocalLoader:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
             path = self.actions.iloc[index].action_localpath
-        metad = self.act_cache.get(path, self.get_yml(path))
-        self.act_cache[path] = metad
-        return HelaoAction(path, metad, self)
+        if path not in self.act_cache:
+            self.act_cache[path] = self.get_yml(path)
+        return HelaoAction(path, self.act_cache[path], self)
 
     def get_exp(self, index=None, path: Optional[str] = None) -> "HelaoExperiment":
         """Load an experiment by dataframe ``index`` or yml ``path``.
@@ -405,9 +405,9 @@ class LocalLoader:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
             path = self.experiments.iloc[index].experiment_localpath
-        metad = self.exp_cache.get(path, self.get_yml(path))
-        self.exp_cache[path] = metad
-        return HelaoExperiment(path, metad, self)
+        if path not in self.exp_cache:
+            self.exp_cache[path] = self.get_yml(path)
+        return HelaoExperiment(path, self.exp_cache[path], self)
 
     def get_seq(self, index=None, path: Optional[str] = None) -> "HelaoSequence":
         """Load a sequence by dataframe ``index`` or yml ``path``.
@@ -426,9 +426,9 @@ class LocalLoader:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
             path = self.sequences.iloc[index].sequence_localpath
-        metad = self.seq_cache.get(path, self.get_yml(path))
-        self.seq_cache[path] = metad
-        return HelaoSequence(path, metad, self)
+        if path not in self.seq_cache:
+            self.seq_cache[path] = self.get_yml(path)
+        return HelaoSequence(path, self.seq_cache[path], self)
 
     def get_prc(self, index=None, path: Optional[str] = None) -> "HelaoProcess":
         """Load a process by dataframe ``index`` or yml ``path``.
@@ -447,9 +447,9 @@ class LocalLoader:
             raise IndexError("neither index, nor path arguments were supplied")
         if path is None:
             path = self.processes.iloc[index].process_localpath
-        metad = self.prc_cache.get(path, self.get_yml(path))
-        self.prc_cache[path] = metad
-        return HelaoProcess(path, metad, self)
+        if path not in self.prc_cache:
+            self.prc_cache[path] = self.get_yml(path)
+        return HelaoProcess(path, self.prc_cache[path], self)
 
     def get_hlo(self, yml_path: str, hlo_fn: str) -> tuple:
         """Read an HLO file as ``(meta_dict, data_dict)`` (zip-aware).
