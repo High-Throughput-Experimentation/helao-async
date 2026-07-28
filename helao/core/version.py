@@ -4,13 +4,24 @@ import os
 import inspect
 import subprocess
 from datetime import datetime
+from functools import lru_cache
 from socket import gethostname
 
 __all__ = ["hlo_version", "get_hlo_version"]
 
 
+@lru_cache(maxsize=None)
 def get_branch_commithash() -> tuple:
-    """Return ``(branch, short_commit_hash)`` of the working tree, or ``("", "")`` on failure."""
+    """Return ``(branch, short_commit_hash)`` of the working tree, or ``("", "")`` on failure.
+
+    Cached for the life of the process: every ``hlo_version`` model default
+    calls this, so an uncached version spawns two ``git rev-parse``
+    subprocesses per Action/Experiment/Sample constructed. A batch converter
+    that builds ~400 sequences was spending ~4 s per plate here alone. The
+    checkout cannot change under a running process in any supported flow --
+    the hot-reload watcher restarts the server on a pulled commit, which
+    rebuilds the cache.
+    """
     try:
         command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
         branch = (
@@ -29,8 +40,14 @@ def get_branch_commithash() -> tuple:
         return "", ""
 
 
+@lru_cache(maxsize=None)
 def get_filehash(filename: str) -> str:
-    """Return the short git hash of the last commit that touched `filename`, or ``""`` on failure."""
+    """Return the short git hash of the last commit that touched `filename`, or ``""`` on failure.
+
+    Cached per filename for the same reason as :func:`get_branch_commithash`:
+    the ``git log`` subprocess is far more expensive than the lookup, and the
+    answer is fixed for the life of the process.
+    """
     try:
         filename = os.path.abspath(filename)
         parent_dir = os.path.dirname(filename)
@@ -47,6 +64,7 @@ def get_filehash(filename: str) -> str:
         return short_hash
     except Exception:
         return ""
+
 
 def get_hlo_version() -> str:
     """Return the HELAO version string.
