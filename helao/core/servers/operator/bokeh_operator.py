@@ -93,9 +93,7 @@ def _render_node(key, val, top=False, open_keys=()):
             for i, v in enumerate(val)
         )
         return f"<details{open_attr}><summary>{label} [{len(val)}]</summary>{inner}</details>"
-    return (
-        f"<div style='margin-left:1em'>{label}: {_html.escape(str(val))}</div>"
-    )
+    return f"<div style='margin-left:1em'>{label}: {_html.escape(str(val))}</div>"
 
 
 def _object_to_html(obj, open_keys=()):
@@ -193,6 +191,7 @@ class BokehOperator:
             cached_api = _PLATE_API_CACHE.get(plate_api_name)
             if cached_api is None:
                 from helao.helpers.plate_api import HTEPlateAPI
+
                 cached_api = HTEPlateAPI()
                 _PLATE_API_CACHE[plate_api_name] = cached_api
             self.dataAPI = cached_api
@@ -423,7 +422,10 @@ class BokehOperator:
         )
         self.sequence_dropdown.on_change("value", self.callback_sequence_select)
         self.sequence_version_div = Div(
-            text="", width=300, height=31, margin=(22, 5, 0, 5),
+            text="",
+            width=300,
+            height=31,
+            margin=(22, 5, 0, 5),
             styles={"line-height": "31px", "color": "#566573"},
         )
 
@@ -432,7 +434,10 @@ class BokehOperator:
         )
         self.experiment_dropdown.on_change("value", self.callback_experiment_select)
         self.experiment_version_div = Div(
-            text="", width=300, height=31, margin=(22, 5, 0, 5),
+            text="",
+            width=300,
+            height=31,
+            margin=(22, 5, 0, 5),
             styles={"line-height": "31px", "color": "#566573"},
         )
 
@@ -450,7 +455,10 @@ class BokehOperator:
             "Start Orch", "success", 70, self.callback_start_orch
         )
         self.button_estop_orch = self._make_button(
-            "ESTOP", "danger", int(self.max_width * 0.25), self.callback_estop_orch,
+            "ESTOP",
+            "danger",
+            int(self.max_width * 0.25),
+            self.callback_estop_orch,
             height=100,
             sizing_mode="fixed",
             stylesheets=[
@@ -511,7 +519,9 @@ class BokehOperator:
             "Clear plan", "default", 100, self.callback_clear_expplan
         )
         self.orch_status_button = Button(
-            label="Disabled", disabled=False, button_type="danger",
+            label="Disabled",
+            disabled=False,
+            button_type="danger",
             sizing_mode="stretch_width",
         )  # success: green, danger: red; fills width left by the other buttons
 
@@ -582,17 +592,25 @@ class BokehOperator:
             text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
         )
         self.planhistory_tree_div = Div(
-            text="", sizing_mode="stretch_width",
-            styles={"overflow": "auto", "max-height": "200px",
-                    "background-color": "white"},
+            text="",
+            sizing_mode="stretch_width",
+            styles={
+                "overflow": "auto",
+                "max-height": "200px",
+                "background-color": "white",
+            },
         )
         self.queue_tree_header = Div(
             text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
         )
         self.queue_tree_div = Div(
-            text="", sizing_mode="stretch_width",
-            styles={"overflow": "auto", "max-height": "200px",
-                    "background-color": "white"},
+            text="",
+            sizing_mode="stretch_width",
+            styles={
+                "overflow": "auto",
+                "max-height": "200px",
+                "background-color": "white",
+            },
         )
 
         self.error_txt = Div(
@@ -828,15 +846,25 @@ class BokehOperator:
                         ],
                         [
                             row(
-                                column(self.planhistory_tabs,
-                                       sizing_mode="stretch_width",
-                                       stylesheets=[InlineStyleSheet(
-                                           css=":host { flex: 7 1 0% !important; }")]),
-                                column(self.planhistory_tree_header,
-                                       self.planhistory_tree_div,
-                                       sizing_mode="stretch_width",
-                                       stylesheets=[InlineStyleSheet(
-                                           css=":host { flex: 3 1 0% !important; }")]),
+                                column(
+                                    self.planhistory_tabs,
+                                    sizing_mode="stretch_width",
+                                    stylesheets=[
+                                        InlineStyleSheet(
+                                            css=":host { flex: 7 1 0% !important; }"
+                                        )
+                                    ],
+                                ),
+                                column(
+                                    self.planhistory_tree_header,
+                                    self.planhistory_tree_div,
+                                    sizing_mode="stretch_width",
+                                    stylesheets=[
+                                        InlineStyleSheet(
+                                            css=":host { flex: 3 1 0% !important; }"
+                                        )
+                                    ],
+                                ),
                                 sizing_mode="stretch_width",
                             ),
                         ],
@@ -870,15 +898,25 @@ class BokehOperator:
                         ),
                         [
                             row(
-                                column(self.queue_tabs,
-                                       sizing_mode="stretch_width",
-                                       stylesheets=[InlineStyleSheet(
-                                           css=":host { flex: 7 1 0% !important; }")]),
-                                column(self.queue_tree_header,
-                                       self.queue_tree_div,
-                                       sizing_mode="stretch_width",
-                                       stylesheets=[InlineStyleSheet(
-                                           css=":host { flex: 3 1 0% !important; }")]),
+                                column(
+                                    self.queue_tabs,
+                                    sizing_mode="stretch_width",
+                                    stylesheets=[
+                                        InlineStyleSheet(
+                                            css=":host { flex: 7 1 0% !important; }"
+                                        )
+                                    ],
+                                ),
+                                column(
+                                    self.queue_tree_header,
+                                    self.queue_tree_div,
+                                    sizing_mode="stretch_width",
+                                    stylesheets=[
+                                        InlineStyleSheet(
+                                            css=":host { flex: 3 1 0% !important; }"
+                                        )
+                                    ],
+                                ),
                                 sizing_mode="stretch_width",
                             ),
                         ],
@@ -961,8 +999,10 @@ class BokehOperator:
 
         # Tree views react to row-selection in the active tab + tab switches.
         for _src in (
-            self.experiment_plan_source, self.action_history_source,
-            self.experiment_history_source, self.sequence_history_source,
+            self.experiment_plan_source,
+            self.action_history_source,
+            self.experiment_history_source,
+            self.sequence_history_source,
         ):
             _src.selected.on_change(
                 "indices", lambda a, o, n: self._render_planhistory_tree()
@@ -971,16 +1011,20 @@ class BokehOperator:
             "active", lambda a, o, n: self._render_planhistory_tree()
         )
         for _src in (
-            self.sequence_source, self.experiment_source,
-            self.action_source, self.action_server_source,
+            self.sequence_source,
+            self.experiment_source,
+            self.action_source,
+            self.action_server_source,
         ):
             _src.selected.on_change(
                 "indices", lambda a, o, n: self._render_queue_tree()
             )
         self.queue_tabs.on_change(
             "active",
-            lambda a, o, n: (self._render_queue_tree(),
-                             self._refresh_queue_button_state()),
+            lambda a, o, n: (
+                self._render_queue_tree(),
+                self._refresh_queue_button_state(),
+            ),
         )
 
         # select the first item to force an update of the layout
@@ -1001,12 +1045,24 @@ class BokehOperator:
         # queue_tabs index -> (source, move_fn, remove_fn, name_col) for the
         # unified reorder buttons. The Action Servers tab (3) has no entry.
         self._queue_targets = {
-            0: (self.sequence_source, self.backend.move_sequence,
-                self.backend.remove_sequence, "sequence_name"),
-            1: (self.experiment_source, self.backend.move_experiment,
-                self.backend.remove_experiment, "experiment_name"),
-            2: (self.action_source, self.backend.move_action,
-                self.backend.remove_action, "action_name"),
+            0: (
+                self.sequence_source,
+                self.backend.move_sequence,
+                self.backend.remove_sequence,
+                "sequence_name",
+            ),
+            1: (
+                self.experiment_source,
+                self.backend.move_experiment,
+                self.backend.remove_experiment,
+                "experiment_name",
+            ),
+            2: (
+                self.action_source,
+                self.backend.move_action,
+                self.backend.remove_action,
+                "action_name",
+            ),
         }
         self.backend.subscribe(self._on_backend_change)
         self.vis.doc.on_session_destroyed(self.cleanup_session)
@@ -1050,7 +1106,9 @@ class BokehOperator:
         """Build a STEP/RUN toggle button reflecting the backend step flag for ``kind``."""
         is_step = self.backend.get_step_flags()[kind]
         label = f"{'STEP' if is_step else 'RUN'}-THRU {kind}"
-        btn = Button(label=label, button_type="danger" if is_step else "success", width=170)
+        btn = Button(
+            label=label, button_type="danger" if is_step else "success", width=170
+        )
         btn.on_event(ButtonClick, callback)
         return btn
 
@@ -1083,7 +1141,12 @@ class BokehOperator:
             )
 
     def _build_lib(
-        self, lib: dict, filter_type, config_key: str, model_class, name_field: str,
+        self,
+        lib: dict,
+        filter_type,
+        config_key: str,
+        model_class,
+        name_field: str,
         codehash_map: dict = None,
     ) -> tuple:
         """Inspect ``lib`` and return ``(items, select_list)`` for sequence/experiment dropdowns.
@@ -1394,41 +1457,45 @@ class BokehOperator:
         # variable whitespace appears above this block. See ``layout1``/``2``/``3``.
         # The load-last-params button + save-params checkbox row is rendered just
         # below the description block (see ``_build_param_header``).
-        param_layout = [
-            layout(
-                [
+        param_layout = (
+            [
+                layout(
                     [
-                        Div(
-                            text=cfg["descr_label"],
-                            width=200 + 50,
-                            height=15,
-                        ),
+                        [
+                            Div(
+                                text=cfg["descr_label"],
+                                width=200 + 50,
+                                height=15,
+                            ),
+                        ],
+                        [getattr(self, cfg["descr_attr"])],
+                        Spacer(height=10),
                     ],
-                    [getattr(self, cfg["descr_attr"])],
-                    Spacer(height=10),
-                ],
-                background="#D6DBDF",
-                width=self.max_width,
-                height_policy="min",
-            ),
-        ] + self._build_param_header(mode) + [
-            Spacer(height=10),
-            layout(
-                [
+                    background="#D6DBDF",
+                    width=self.max_width,
+                    height_policy="min",
+                ),
+            ]
+            + self._build_param_header(mode)
+            + [
+                Spacer(height=10),
+                layout(
                     [
-                        Div(
-                            text=cfg["header"],
-                            width=200 + 50,
-                            height=15,
-                            styles={"font-size": "100%", "color": "black"},
-                        ),
+                        [
+                            Div(
+                                text=cfg["header"],
+                                width=200 + 50,
+                                height=15,
+                                styles={"font-size": "100%", "color": "black"},
+                            ),
+                        ],
                     ],
-                ],
-                background=self.color_sq_param_inputs,
-                width=self.max_width,
-                height_policy="min",
-            ),
-        ]
+                    background=self.color_sq_param_inputs,
+                    width=self.max_width,
+                    height_policy="min",
+                ),
+            ]
+        )
         setattr(self, cfg["layout_attr"], param_layout)
 
         param_input = getattr(self, cfg["input_attr"])
@@ -1547,8 +1614,12 @@ class BokehOperator:
             self.action_history_lists["action_endpoint"].append(
                 f"{actdict['action_server']}/{actdict['action_name']}"
             )
-            self.action_history_lists["start"].append(actdict.get("action_timestamp", None))
-            self.action_history_lists["finish"].append(actdict.get("action_finished_timestamp", None))
+            self.action_history_lists["start"].append(
+                actdict.get("action_timestamp", None)
+            )
+            self.action_history_lists["finish"].append(
+                actdict.get("action_finished_timestamp", None)
+            )
             # Append to EVERY column once per row (default "" when the key is
             # missing) so all ColumnDataSource columns stay equal length —
             # otherwise Bokeh refuses to render the table ("columns must be of
@@ -1563,9 +1634,15 @@ class BokehOperator:
         for expuuid, expdict in sorted(hist["experiment"], key=lambda x: x[0])[::-1]:
             self._hist_objs["experiment"].append(expdict)
             self.experiment_history_lists["experiment_uuid"].append(str(expuuid)[-8:])
-            self.experiment_history_lists["experiment_name"].append(expdict["experiment_name"])
-            self.experiment_history_lists["start"].append(expdict.get("experiment_timestamp", None))
-            self.experiment_history_lists["finish"].append(expdict.get("experiment_finished_timestamp", None))
+            self.experiment_history_lists["experiment_name"].append(
+                expdict["experiment_name"]
+            )
+            self.experiment_history_lists["start"].append(
+                expdict.get("experiment_timestamp", None)
+            )
+            self.experiment_history_lists["finish"].append(
+                expdict.get("experiment_finished_timestamp", None)
+            )
             for k in ["experiment_status", "sequence_label", "campaign_name"]:
                 val = expdict.get(k)
                 if isinstance(val, list):
@@ -1576,16 +1653,24 @@ class BokehOperator:
         for sequuid, seqdict in sorted(hist["sequence"], key=lambda x: x[0])[::-1]:
             self._hist_objs["sequence"].append(seqdict)
             self.sequence_history_lists["sequence_uuid"].append(str(sequuid)[-8:])
-            self.sequence_history_lists["sequence_name"].append(seqdict["sequence_name"])
-            self.sequence_history_lists["start"].append(seqdict.get("sequence_timestamp", None))
-            self.sequence_history_lists["finish"].append(seqdict.get("sequence_finished_timestamp", None))
+            self.sequence_history_lists["sequence_name"].append(
+                seqdict["sequence_name"]
+            )
+            self.sequence_history_lists["start"].append(
+                seqdict.get("sequence_timestamp", None)
+            )
+            self.sequence_history_lists["finish"].append(
+                seqdict.get("sequence_finished_timestamp", None)
+            )
             for k in ["sequence_status", "sequence_label", "campaign_name"]:
                 val = seqdict.get(k)
                 if isinstance(val, list):
                     val = val[-1] if val else ""
                 self.sequence_history_lists[k].append("" if val is None else val)
         self._assign(self.action_history_source, "data", self.action_history_lists)
-        self._assign(self.experiment_history_source, "data", self.experiment_history_lists)
+        self._assign(
+            self.experiment_history_source, "data", self.experiment_history_lists
+        )
         self._assign(self.sequence_history_source, "data", self.sequence_history_lists)
 
     async def get_orch_status_summary(self):
@@ -1920,7 +2005,9 @@ class BokehOperator:
     def callback_stop_orch(self, event):
         LOGGER.info("stopping operator orch")
         reset = 0 in self.reset_run_id_on_stop.active
-        self.vis.doc.add_next_tick_callback(partial(self.backend.stop, reset_run_id=reset))
+        self.vis.doc.add_next_tick_callback(
+            partial(self.backend.stop, reset_run_id=reset)
+        )
         self.vis.doc.add_next_tick_callback(partial(self.update_tables))
 
     def callback_skip_exp(self, event):
@@ -2058,7 +2145,9 @@ class BokehOperator:
             )
         }
         for k, v in sequence_params.items():
-            LOGGER.info(f"added sequence param '{k}' with value {v} and type {type(v)} ")
+            LOGGER.info(
+                f"added sequence param '{k}' with value {v} and type {type(v)} "
+            )
 
         self.write_params("seq", selected_sequence, sequence_params)
         expplan_list = self.backend.unpack_sequence(
@@ -2144,8 +2233,11 @@ class BokehOperator:
     def update_stepwise_toggle(self, sender):
         """Update a step-through button's label and colour after its flag flips."""
         sender_type = sender.label.split("[")[0].strip().split()[-1].strip()
-        count_key = {"actions": "n_actions", "experiments": "n_experiments",
-                     "sequences": "n_sequences"}[sender_type]
+        count_key = {
+            "actions": "n_actions",
+            "experiments": "n_experiments",
+            "sequences": "n_sequences",
+        }[sender_type]
         numq = self._queue_counts.get(count_key, 0)
         self.flip_stepwise_flag(sender_type)
         if sender.button_type == "danger":
@@ -2254,8 +2346,11 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             idx_col_w = 35
             input_w = 400
             type_hint = (
-                str(argtypes[idx]).split()[-1].strip(chr(39) + "<>]")
-                .split(".")[-1].replace("[", " of ")
+                str(argtypes[idx])
+                .split()[-1]
+                .strip(chr(39) + "<>]")
+                .split(".")[-1]
+                .replace("[", " of ")
             )
             name_div = Div(
                 text=f"{args[idx]}",
@@ -2351,14 +2446,22 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
                 private_input.append(
                     TextInput(
-                        value="", title="elements", name="elements",
-                        disabled=True, width=120, height=40
+                        value="",
+                        title="elements",
+                        name="elements",
+                        disabled=True,
+                        width=120,
+                        height=40,
                     )
                 )
                 private_input.append(
                     TextInput(
-                        value="", title="code", name="code",
-                        disabled=True, width=60, height=40
+                        value="",
+                        title="code",
+                        name="code",
+                        disabled=True,
+                        width=60,
+                        height=40,
                     )
                 )
                 private_input.append(
@@ -2396,7 +2499,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
             elif args[idx] == "solid_custom_position":
                 param_input[-1] = Select(
-                    title=args[idx], value=None, options=self.dev_customitems,
+                    title=args[idx],
+                    value=None,
+                    options=self.dev_customitems,
                     name=args[idx],
                 )
                 if self.dev_customitems:
@@ -2415,7 +2520,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
             elif args[idx] == "liquid_custom_position":
                 param_input[-1] = Select(
-                    title=args[idx], value=None, options=self.dev_customitems,
+                    title=args[idx],
+                    value=None,
+                    options=self.dev_customitems,
                     name=args[idx],
                 )
                 if self.dev_customitems:
@@ -2783,7 +2890,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 status_label = "running"
             status_type = "success"
         elif loop_state == LoopStatus.stopped.value:
-            stop_msg = f": {self._current_stop_message}" if self._current_stop_message else ""
+            stop_msg = (
+                f": {self._current_stop_message}" if self._current_stop_message else ""
+            )
             status_label = f"stopped{stop_msg}"
             status_type = "warning" if stop_msg else "primary"
         else:
@@ -2797,7 +2906,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         # _refresh_queue_button_state also runs on tab switch (queue_tabs
         # on_change) so the single button set matches whichever queue is shown.
         self._loop_state = loop_state
-        self._manual_seq = bool((state.get("active_sequence") or {}).get("manual_action"))
+        self._manual_seq = bool(
+            (state.get("active_sequence") or {}).get("manual_action")
+        )
         self._refresh_queue_button_state()
         self._assign(self.button_add_expplan, "label", f"Add plan [{len(self.plan)}]")
         end_time = time.time()
@@ -2827,17 +2938,29 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
         """Render the tree beside the non-queued (plan/history) tabs."""
         active = self.planhistory_tabs.active
         if active == 0:  # Plan
-            src, kind, getter = self.experiment_plan_source, "sequence", \
-                lambda i: self.plan[i].as_dict()
+            src, kind, getter = (
+                self.experiment_plan_source,
+                "sequence",
+                lambda i: self.plan[i].as_dict(),
+            )
         elif active == 1:  # Action History
-            src, kind, getter = self.action_history_source, "action", \
-                lambda i: self._hist_objs["action"][i]
+            src, kind, getter = (
+                self.action_history_source,
+                "action",
+                lambda i: self._hist_objs["action"][i],
+            )
         elif active == 2:  # Experiment History
-            src, kind, getter = self.experiment_history_source, "experiment", \
-                lambda i: self._hist_objs["experiment"][i]
+            src, kind, getter = (
+                self.experiment_history_source,
+                "experiment",
+                lambda i: self._hist_objs["experiment"][i],
+            )
         else:  # Sequence History
-            src, kind, getter = self.sequence_history_source, "sequence", \
-                lambda i: self._hist_objs["sequence"][i]
+            src, kind, getter = (
+                self.sequence_history_source,
+                "sequence",
+                lambda i: self._hist_objs["sequence"][i],
+            )
         idxs = src.selected.indices
         if not idxs:
             self._clear_tree(self.planhistory_tree_header, self.planhistory_tree_div)
@@ -2849,8 +2972,11 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             self._clear_tree(self.planhistory_tree_header, self.planhistory_tree_div)
             return
         self._set_tree(
-            self.planhistory_tree_header, self.planhistory_tree_div,
-            _tree_header_text(kind, obj), obj, self._open_keys(obj),
+            self.planhistory_tree_header,
+            self.planhistory_tree_div,
+            _tree_header_text(kind, obj),
+            obj,
+            self._open_keys(obj),
         )
 
     def _render_queue_tree(self):
@@ -2869,13 +2995,19 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                 return
             cfg = self.vis.world_cfg["servers"].get(name, {})
             self._set_tree(
-                self.queue_tree_header, self.queue_tree_div,
-                _server_header_text(name, cfg), cfg, ["params"],
+                self.queue_tree_header,
+                self.queue_tree_div,
+                _server_header_text(name, cfg),
+                cfg,
+                ["params"],
             )
             return
         kind = {0: "sequence", 1: "experiment", 2: "action"}[active]
-        src = {0: self.sequence_source, 1: self.experiment_source,
-               2: self.action_source}[active]
+        src = {
+            0: self.sequence_source,
+            1: self.experiment_source,
+            2: self.action_source,
+        }[active]
         idxs = src.selected.indices
         if not idxs:
             self._clear_tree(self.queue_tree_header, self.queue_tree_div)
@@ -2892,8 +3024,11 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
             self._clear_tree(self.queue_tree_header, self.queue_tree_div)
             return
         self._set_tree(
-            self.queue_tree_header, self.queue_tree_div,
-            _tree_header_text(kind, obj), obj, self._open_keys(obj),
+            self.queue_tree_header,
+            self.queue_tree_div,
+            _tree_header_text(kind, obj),
+            obj,
+            self._open_keys(obj),
         )
 
     def _restore_last_meta(self):
