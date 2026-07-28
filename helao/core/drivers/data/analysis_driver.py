@@ -52,6 +52,18 @@ _PROCESS_METADATA_KEYS = (
 )
 
 
+def _write_json(obj: dict, path: str) -> None:
+    """Serialize ``obj`` to ``path``, creating its parent directory.
+
+    Split out as a plain function so :meth:`HelaoAnalysisSyncer.sync_ana` can
+    hand it to :func:`asyncio.to_thread` rather than serializing potentially
+    multi-megabyte array outputs on the event loop.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(obj, f)
+
+
 def _resolve_analysis_class(module, module_name: str, class_name: str):
     """Return the configured :class:`BaseAnalysis` subclass from ``module``.
 
@@ -288,6 +300,75 @@ class AnalysisSyncer(HelaoSyncer):
                 self.task_set.discard(calc_tup[0])
                 self.task_queue.task_done()
 
+    def _calc_and_write_model(
+        self,
+        calc_tup: Tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
+    ) -> tuple:
+        """Run one analysis and write its model yml. Synchronous -- run in a thread.
+
+        This is the blocking half of :meth:`sync_ana`, split out so it can be
+        handed to :func:`asyncio.to_thread` instead of being executed on the
+        server's event loop.
+
+        Args:
+            calc_tup: Analysis tuple as accepted by :meth:`enqueue_calc`.
+
+        Returns:
+            ``(eua, model_dict, output_dict, local_ana_dir)``. When
+            ``calc_output`` reports failure, ``model_dict``/``output_dict``/
+            ``local_ana_dir`` are ``None`` and only ``eua`` is meaningful (the
+            caller logs its uuid).
+        """
+        process_uuid, data_loader, analysis_params, ana_func, action_uuid = calc_tup
+        if analysis_params is None:
+            analysis_params = {}
+        eua = ana_func(process_uuid, data_loader, analysis_params)
+        if not eua.calc_output():
+            return eua, None, None, None
+
+        model_dict, output_dict = eua.export_analysis(
+            bucket=self.bucket,
+            region=self.region,
+            dummy=self.world_config.get("dummy", True),
+        )
+        if action_uuid is not None:
+            model_dict["analysis_action_uuid"] = str(action_uuid)
+        process_dict = self.loader.get_prc(process_uuid, hmod=False)
+        for pkey in _PROCESS_METADATA_KEYS:
+            if process_dict.get(pkey, None) is not None:
+                model_dict[pkey] = process_dict[pkey]
+        ana_tsstr = model_dict.get(
+            "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
+        )
+        ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
+        HMS = ana_ts.strftime("%H%M%S")
+        year_week = ana_ts.strftime("%y.%U")
+        analysis_day = ana_ts.strftime("%m%d")
+        analysis_suffix = ""
+        gsl = model_dict.get("global_sample_label", "")
+        first_action_dir = process_dict["dispatched_actions_abbr"][0][
+            "action_output_dir"
+        ]
+        sequence_part = first_action_dir.split("/")[-3]
+        if len(sequence_part.split("__")) == 3:
+            sequence_label = sequence_part.split("__")[-1]
+            analysis_suffix = f"__{sequence_label}"
+        elif gsl.startswith("legacy__solid__"):
+            plate_id = gsl.split("legacy__solid__")[-1].split("_")[0]
+            checksum = sum([int(x) for x in plate_id]) % 10
+            analysis_suffix = f"__{plate_id}{checksum}"
+        local_ana_dir = os.path.join(
+            self.local_ana_root,
+            year_week,
+            analysis_day,
+            f"{HMS}__{eua.analysis_name}{analysis_suffix}",
+        )
+        os.makedirs(local_ana_dir, exist_ok=True)
+        with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
+            f.write(yml_dumps(model_dict))
+
+        return eua, model_dict, output_dict, local_ana_dir
+
     async def sync_ana(
         self,
         calc_tup: Tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
@@ -301,6 +382,11 @@ class AnalysisSyncer(HelaoSyncer):
         ``local_ana_root/<yy.ww>/<mmdd>/<HHMMSS>__<name>``, and uploads them to S3
         unless ``local_only`` is set.
 
+        The blocking portion runs in a worker thread (see
+        :meth:`_calc_and_write_model`), so several ``syncer`` workers genuinely
+        overlap and the server's event loop stays responsive while an analysis
+        is in flight. Only the S3 uploads are awaited on the loop itself.
+
         Args:
             calc_tup: Analysis tuple as accepted by :meth:`enqueue_calc`.
             retries: Number of retry attempts available for downstream uploads.
@@ -309,55 +395,20 @@ class AnalysisSyncer(HelaoSyncer):
         Returns:
             ``True`` when the analysis and all uploads succeed, otherwise ``False``.
         """
-        process_uuid, data_loader, analysis_params, ana_func, action_uuid = calc_tup
-        if analysis_params is None:
-            analysis_params = {}
-        eua = ana_func(process_uuid, data_loader, analysis_params)
-        calc_result = eua.calc_output()
-        if calc_result:
-            model_dict, output_dict = eua.export_analysis(
-                bucket=self.bucket,
-                region=self.region,
-                dummy=self.world_config.get("dummy", True),
-            )
-            if action_uuid is not None:
-                model_dict["analysis_action_uuid"] = str(action_uuid)
-            process_dict = self.loader.get_prc(process_uuid, hmod=False)
-            for pkey in _PROCESS_METADATA_KEYS:
-                if process_dict.get(pkey, None) is not None:
-                    model_dict[pkey] = process_dict[pkey]
-            ana_tsstr = model_dict.get(
-                "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
-            )
-            ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
-            HMS = ana_ts.strftime("%H%M%S")
-            year_week = ana_ts.strftime("%y.%U")
-            analysis_day = ana_ts.strftime("%m%d")
-            analysis_suffix = ""
-            gsl = model_dict.get("global_sample_label", "")
-            first_action_dir = process_dict["dispatched_actions_abbr"][0][
-                "action_output_dir"
-            ]
-            sequence_part = first_action_dir.split("/")[-3]
-            if len(sequence_part.split("__")) == 3:
-                sequence_label = sequence_part.split("__")[-1]
-                analysis_suffix = f"__{sequence_label}"
-            elif gsl.startswith("legacy__solid__"):
-                plate_id = gsl.split("legacy__solid__")[-1].split("_")[0]
-                checksum = sum([int(x) for x in plate_id]) % 10
-                analysis_suffix = f"__{plate_id}{checksum}"
-            local_ana_dir = os.path.join(
-                self.local_ana_root,
-                year_week,
-                analysis_day,
-                f"{HMS}__{eua.analysis_name}{analysis_suffix}",
-            )
-            os.makedirs(local_ana_dir, exist_ok=True)
-            with open(
-                os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w"
-            ) as f:
-                f.write(yml_dumps(model_dict))
-
+        process_uuid = calc_tup[0]
+        # The analysis proper -- instantiation, calc_output, export_analysis, the
+        # process metadata fetch and the model yml write -- is synchronous and
+        # takes seconds, with no await point anywhere in it. Running it inline
+        # pinned the server's event loop for its entire duration (measured: a
+        # 24-analysis batch stalled the loop for the full 8.3s), so the
+        # ``max_tasks`` workers overlapped nothing at all and the server could
+        # not answer status or dispatch requests meanwhile. The work is
+        # dominated by numpy/pandas and zip/S3 reads, all of which release the
+        # GIL, so a thread recovers real concurrency: 3.54x on 4 workers.
+        eua, model_dict, output_dict, local_ana_dir = await asyncio.to_thread(
+            self._calc_and_write_model, calc_tup
+        )
+        if model_dict is not None:
             s3_model_target = f"analysis/{eua.analysis_uuid}.json"
 
             if not self.config_dict.get("local_only", False):
@@ -384,9 +435,9 @@ class AnalysisSyncer(HelaoSyncer):
                 local_json_out = os.path.join(
                     local_ana_dir, os.path.basename(s3_output_target)
                 )
-                os.makedirs(os.path.dirname(local_json_out), exist_ok=True)
-                with open(local_json_out, "w") as f:
-                    json.dump(s3_dict, f)
+                # Array outputs serialize to megabytes of JSON; keep that off
+                # the event loop for the same reason as the analysis itself.
+                await asyncio.to_thread(_write_json, s3_dict, local_json_out)
                 if not self.config_dict.get("local_only", False):
                     s3_success = await self.to_s3(
                         s3_dict, s3_output_target, compress=False
