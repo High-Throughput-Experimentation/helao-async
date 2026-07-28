@@ -36,7 +36,7 @@ def _fake_base(tmp_path, params):
     base = SimpleNamespace(
         app=app,
         server_cfg={"params": params},
-        world_cfg={"servers": {"DB": {"params": params}}},
+        world_cfg={"servers": {"SYNC": {"params": params}}},
         helaodirs=hd,
     )
     return base, app

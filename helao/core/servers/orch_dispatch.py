@@ -1168,7 +1168,7 @@ class DispatchRunner:
         # write a temporary exp
         orch.exp_model = orch.active_experiment.get_exp()
         await orch.write_active_experiment_exp()
-        if orch.use_db:
+        if orch.use_sync:
             try:
                 meta_s3_key = f"experiment/{orch.exp_model.experiment_uuid}.json"
                 LOGGER.info(
@@ -1295,7 +1295,7 @@ class DispatchRunner:
             orch.seq_model = orch.active_sequence.get_seq()
             await orch.write_seq(orch.active_sequence)
 
-            if orch.use_db:
+            if orch.use_sync:
                 try:
                     meta_s3_key = f"sequence/{orch.seq_model.sequence_uuid}.json"
                     LOGGER.info(

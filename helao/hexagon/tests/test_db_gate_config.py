@@ -36,7 +36,7 @@ def test_config_validates(prefix):
 @pytest.mark.parametrize("prefix", _FAMILY)
 def test_db_routes_through_hexagon_shim(prefix):
     conf = _load(prefix)
-    db = conf["servers"]["DB"]
+    db = conf["servers"]["SYNC"]
     assert db["deployment"] == "hexagon"
     assert db["fast"] == "sim_db_server"
     assert db["group"] == "action"

@@ -9,10 +9,10 @@
 # action, so a runtime RUNS-tree golden diff is N/A for this server -- the
 # openapi surface diff (this script) is the topology-appropriate parity
 # check. See dbpack.yml's header comment for the aws_bucket/AWS_CONFIG_PATH
-# gate investigation that makes DB launchable on Linux without real AWS.
+# gate investigation that makes the syncer launchable on Linux without real AWS.
 #
 # Launches the LEGACY dbpack group and the HEXAGON dbpackhex group in turn,
-# dumps each DB server's live /openapi.json, and diffs them. An identical
+# dumps each syncer server's live /openapi.json, and diffs them. An identical
 # route/schema surface proves the hexagon makeActionApp factory produces a
 # byte-parity action server for this cut-over target.
 #
@@ -85,7 +85,7 @@ run_one() {
   # serve requests until the startup event -- HelaoSyncer init + dyn
   # endpoints -- completes, so a socket-only wait races startup (connection
   # refused). Retrying the fetch both waits for readiness and captures.
-  echo "[canary] waiting for DB /openapi.json to serve, then fetching -> $outjson"
+  echo "[canary] waiting for SYNC /openapi.json to serve, then fetching -> $outjson"
   local up=0
   for i in $(seq 1 90); do
     if conda run -n helao python -c "

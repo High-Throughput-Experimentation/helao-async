@@ -189,7 +189,7 @@ servers:
   #     - hispec_process_all
   #   verbose: true
   
-  # DB:
+  # SYNC:
   #   host: hte-eche-11.htejcap.caltech.edu
   #   port: 8010
   #   group: action

@@ -11,7 +11,7 @@ simulation: true
 run_type: dbpack_server
 root: /tmp/INST_hlo_dbpack
 servers:
-  DB:
+  SYNC:
     host: 127.0.0.1
     port: 8010
     group: action

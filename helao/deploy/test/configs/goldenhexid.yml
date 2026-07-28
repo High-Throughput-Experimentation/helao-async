@@ -32,7 +32,7 @@ servers:
     params: {}
     hlo_postprocess_libs:
       - hlo_to_csv
-  DB:
+  SYNC:
     host: 127.0.0.1
     port: 8010
     group: action

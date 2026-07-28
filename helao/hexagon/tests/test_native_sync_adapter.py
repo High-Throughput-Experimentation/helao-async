@@ -29,7 +29,7 @@ def _host(tmp_path, local_params, world_db_params):
     )
     return SimpleNamespace(
         server_cfg={"params": local_params},
-        world_cfg={"servers": {"DB": {"params": world_db_params}}},
+        world_cfg={"servers": {"SYNC": {"params": world_db_params}}},
         helaodirs=hd,
     )
 
@@ -79,7 +79,7 @@ async def test_keeps_local_params_with_aws_config_path(tmp_path, monkeypatch):
 @pytest.mark.asyncio
 async def test_adapter_is_sync_port_and_delegates(tmp_path):
     # world_db_params carries a stub aws_bucket: _host() always inserts a
-    # "DB" world-server entry, so an empty dict here would still trigger the
+    # "SYNC" world-server entry, so an empty dict here would still trigger the
     # (legacy-identical) no-aws_config_path fallback in NativeSyncer.__init__
     # and crash on the required aws_bucket lookup -- this test only cares
     # about adapter delegation, not config-fallback semantics (covered above).

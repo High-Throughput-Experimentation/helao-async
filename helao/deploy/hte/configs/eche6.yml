@@ -135,7 +135,7 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: ECHE6 Visualizer
-  DB:
+  SYNC:
     host: hte-eche-06.htejcap.caltech.edu
     port: 8010
     group: action

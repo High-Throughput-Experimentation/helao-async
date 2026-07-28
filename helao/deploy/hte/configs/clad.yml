@@ -234,7 +234,7 @@ servers:
     bokeh: live_visualizer
     params:
       doc_name: Sensor Visualizer
-  DB:
+  SYNC:
     host: hte-adss-03.htejcap.caltech.edu
     port: 8010
     group: action

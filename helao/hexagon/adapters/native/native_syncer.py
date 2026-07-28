@@ -11,10 +11,11 @@ behavior; only the config-resolution constructor is deliberately rewritten
 here (D2).
 """
 
-from typing import Protocol
+from typing import Optional, Protocol
 
 from helao.core.models.helaodirs import HelaoDirs
 from helao.helpers import helao_logging as logging
+from helao.helpers.server_keys import resolve_sync_server_key
 from helao.hexagon.adapters.native.sync_driver import SyncDriver
 
 __all__ = ["SyncerHost", "NativeSyncer"]
@@ -36,20 +37,20 @@ class NativeSyncer(SyncDriver):
     Replicates HelaoSyncer.__init__'s config resolution
     (helao/core/drivers/data/sync_driver.py:2072-2093) against the
     ``SyncerHost`` protocol: local ``server_cfg['params']`` first, falling
-    back to the global ``servers[db_server_name]['params']`` block when the
-    local params carry no ``aws_config_path``. The P2e DB shim constructs
+    back to the global ``servers[sync_server_name]['params']`` block when the
+    local params carry no ``aws_config_path``. The P2e sync shim constructs
     this class; nothing in P2c wires it live.
     """
 
-    def __init__(self, action_serv: SyncerHost, db_server_name: str = "DB"):
+    def __init__(self, action_serv: SyncerHost, sync_server_name: Optional[str] = None):
         self.host = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        if (
-            not self.config_dict.get("aws_config_path", False)
-            and db_server_name in self.world_config["servers"]
-        ):
-            self.config_dict = self.world_config["servers"][db_server_name].get(
+        resolved_key = resolve_sync_server_key(
+            self.world_config, preferred=sync_server_name
+        )
+        if not self.config_dict.get("aws_config_path", False) and resolved_key:
+            self.config_dict = self.world_config["servers"][resolved_key].get(
                 "params", {}
             )
         LOGGER.info("initializing SyncDriver")

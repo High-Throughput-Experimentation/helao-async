@@ -1,4 +1,4 @@
-# SMOKE config (hexagon-composed ORCH + SIM + DB; P2e sync cut-over).
+# SMOKE config (hexagon-composed ORCH + SIM + SYNC; P2e sync cut-over).
 # Copy of golden.yml minus the bokeh servers (vis/operator hosting is P2),
 # with `deployment: hexagon` flipping ORCH and SIM onto the hexagon factory.
 # Ports match golden.yml so harness/capture.py works unmodified.
@@ -35,7 +35,7 @@ servers:
     params: {}
     hlo_postprocess_libs:
       - hlo_to_csv
-  DB:
+  SYNC:
     host: 127.0.0.1
     port: 8010
     group: action

@@ -15,7 +15,7 @@ def _world(tmp_path):
         "dummy": True,
         "simulation": True,
         "servers": {
-            "DB": {
+            "SYNC": {
                 "host": "127.0.0.1",
                 "port": 8910,
                 "group": "action",
@@ -42,7 +42,7 @@ def test_db_shim_wraps_legacy_and_registers_sync_hook_last(installed_config):
     from helao.deploy.hexagon.servers.action import sim_db_server as shim
 
     assert shim.LEGACY_MODULE == "helao.deploy.test.servers.action.sim_db_server"
-    app = shim.makeApp("DB")
+    app = shim.makeApp("SYNC")
     assert isinstance(app, HelaoFastAPI)
     assert app.hexagon_wiring is not None  # type: ignore[attr-defined]
     assert app.hexagon_sync_graft is None  # type: ignore[attr-defined]  # applied at startup
@@ -76,7 +76,7 @@ async def test_db_shim_startup_hook_calls_graft_with_base_params(
         return "HANDLE"
 
     monkeypatch.setattr(shim, "graft_native_sync", fake_graft)
-    app = shim.makeApp("DB")
+    app = shim.makeApp("SYNC")
     app.base = SimpleNamespace(
         server_cfg={"params": {"aws_bucket": "helao-sim", "s3_record": True}}
     )
@@ -100,7 +100,7 @@ async def test_db_shim_shutdown_hook_closes_graft(installed_config, monkeypatch)
             closed["n"] += 1
 
     monkeypatch.setattr(shim, "graft_native_sync", lambda b, p: FakeHandle())
-    app = shim.makeApp("DB")
+    app = shim.makeApp("SYNC")
     app.base = SimpleNamespace(server_cfg={"params": {}})
     startup = [
         h for h in app.router.on_startup if h.__name__ == "_hexagon_sync_graft_startup"

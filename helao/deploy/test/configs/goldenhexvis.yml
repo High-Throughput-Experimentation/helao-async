@@ -2,7 +2,7 @@
 # hexagon ORCH+SIM (goldenhex.yml servers verbatim + golden.yml's bokeh
 # entries, each flipped to `deployment: hexagon` so bokeh_launcher resolves
 # the helao/deploy/hexagon shim modules). goldenhex.yml itself stays a pure
-# action/orch parity config. DB stays legacy (cut-over is P2e).
+# action/orch parity config. SYNC stays legacy (cut-over is P2e).
 dummy: true
 simulation: true
 show_debug: true
@@ -62,7 +62,7 @@ servers:
     deployment: hexagon
     params:
       doc_name: Action Visualizer
-  DB:
+  SYNC:
     host: 127.0.0.1
     port: 8010
     group: action

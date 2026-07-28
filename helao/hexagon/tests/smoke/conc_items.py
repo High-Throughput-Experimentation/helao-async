@@ -262,7 +262,7 @@ def item7_idle_drain_and_history(root: Path, orch_key: str, prefix: str) -> int:
 
     # §9.1 on the launched hexagon path: flat log files at the contract path
     logs = root / "LOGS"
-    for key in (orch_key, "SIM", "DB"):
+    for key in (orch_key, "SIM", "SYNC"):
         assert (logs / f"{key}.log").exists(), f"missing {key}.log under LOGS"
     assert (logs / "ntpLastSync.txt").exists()
     assert not (root / "LOGS_FW").exists(), "parallel log dir must never exist"

@@ -10,6 +10,7 @@ from helao.core.servers.operator.helao_operator import HelaoOperator
 
 from data_request_client.client import DataRequestsClient, CreateDataRequestModel
 from helao.helpers.config_loader import read_config
+from helao.helpers.server_keys import SYNC_SERVER_KEY, resolve_sync_server_key
 from ...sequences.TEST_seq import TEST_consecutive_noblocking
 from helao.core.models.orchstatus import LoopStatus
 
@@ -46,7 +47,13 @@ def main():
     operator = HelaoOperator(inst_config, "ORCH")
 
     world_cfg = read_config(inst_config, helao_repo_root)
-    db_cfg = world_cfg["servers"]["DB"]
+    sync_key = resolve_sync_server_key(world_cfg)
+    if sync_key is None:
+        raise KeyError(
+            f"no syncer server found in the config; expected a "
+            f"'{SYNC_SERVER_KEY}' server block"
+        )
+    sync_cfg = world_cfg["servers"][sync_key]
 
     while True:
         with CLIENT:
@@ -129,13 +136,13 @@ def main():
             time.sleep(30)
 
             # when orchestrator has stopped, check DB server for upload state
-            num_sync_tasks = num_uploads(db_cfg)
+            num_sync_tasks = num_uploads(sync_cfg, sync_key)
             while num_sync_tasks > 0:
                 print(
                     f"{gen_ts()} Waiting for {num_sync_tasks} sequence uploads to finish."
                 )
                 time.sleep(10)
-                num_sync_tasks = num_uploads(db_cfg)
+                num_sync_tasks = num_uploads(sync_cfg, sync_key)
 
             seq2 = seq_constructor(
                 plate_id=PLATE_ID,
