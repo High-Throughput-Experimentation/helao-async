@@ -29,6 +29,7 @@ servers:
     params:
       orch_key: ORCH
       poll_interval: 5
+      plate_api: HTEPlateAPI
   SPEC_T:
     host: 127.0.0.1
     port: 8004

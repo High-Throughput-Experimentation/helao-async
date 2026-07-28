@@ -293,6 +293,41 @@ def test_plate_api_disabled_by_default():
     print("test_plate_api_disabled_by_default PASS")
 
 
+def test_plate_callbacks_noop_when_plate_api_disabled():
+    """Regression: refresh_inputs must not fire the plate callbacks when dataAPI is None.
+
+    The plateid/sampleno callbacks are only registered behind a
+    ``self.dataAPI is not None`` guard, but refresh_inputs re-fired them
+    unconditionally, so selecting a sequence with a ``solid_plate_id`` param
+    crashed with ``'NoneType' object has no attribute 'get_platemap_plateid'``.
+    """
+    from bokeh.document import Document
+    from bokeh.models import TextInput
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    assert op.dataAPI is None
+
+    scheduled = []
+    op.vis.doc.add_next_tick_callback = lambda cb: scheduled.append(cb)
+
+    plate_input = TextInput(value="6284", name="solid_plate_id")
+    sample_input = TextInput(value="1", name="solid_sample_no")
+    op.refresh_inputs([plate_input, sample_input], [])
+    assert not scheduled  # no plate callbacks scheduled
+
+    # and the plate-data helpers bail out instead of dereferencing None
+    assert op.get_pm(6284, plate_input) is False
+    assert op.get_samples([0.0], [0.0], plate_input) == [None]
+    assert op.get_elements_plateid(6284, plate_input) is False
+    assert op.get_sample_infos([0], plate_input) is False
+    op.callback_changed_plateid("value", "", "6284", plate_input)
+    op.callback_changed_sampleno("value", "", "1", sample_input)
+
+    op.cleanup_session(None)
+    print("test_plate_callbacks_noop_when_plate_api_disabled PASS")
+
+
 def test_shim_exposes_makebokehapp():
     import importlib, inspect
     m = importlib.import_module("helao.deploy.hte.servers.operator.standalone_operator")
@@ -1267,6 +1302,7 @@ def run_all():
     test_tree_header_text()
     test_operator_label_sanitize_callback()
     test_save_restore_label_campaign()
+    test_plate_callbacks_noop_when_plate_api_disabled()
     test_shim_exposes_makebokehapp()
     test_orch_run_id_sharing()
     test_orch_resolve_active_run_id()

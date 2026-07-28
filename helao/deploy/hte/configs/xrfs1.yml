@@ -24,6 +24,7 @@ servers:
     params:
       orch_key: ORCH
       poll_interval: 5
+      plate_api: HTEPlateAPI
   SAMPLE:
     host: hte-xrfs-01.htejcap.caltech.edu
     port: 8008
