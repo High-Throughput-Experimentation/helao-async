@@ -2100,6 +2100,10 @@ class BokehOperator:
 
     def refresh_inputs(self, param_input, private_input):
         """Re-fire ``solid_plate_id`` / ``solid_sample_no`` callbacks to refresh dependent widgets."""
+        if self.dataAPI is None:
+            # plate-map hook disabled (no 'plate_api' in server params), so the
+            # plateid/sampleno callbacks were never registered on these inputs
+            return
         input_plate_id = self.find_input(param_input, "solid_plate_id")
         input_sample_no = self.find_input(param_input, "solid_sample_no")
         if input_plate_id is not None:
@@ -2527,6 +2531,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
     def get_pm(self, plateid: int, sender):
         """Look up the plate map for ``plateid`` and trigger a plate-map redraw."""
+        if self.dataAPI is None:
+            return False
+
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
             return False
@@ -2556,6 +2563,8 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
     def get_samples(self, X, Y, sender):
         """Return the indices of plate-map entries closest to each ``(X[i], Y[i])`` pair."""
         # X and Y are vectors
+        if self.dataAPI is None:
+            return [None]
 
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
@@ -2576,6 +2585,8 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
     def get_elements_plateid(self, plateid: int, sender):
         """Populate the ``elements`` widget with the element list for ``plateid``."""
+        if self.dataAPI is None:
+            return False
 
         private_input, param_input = self.find_param_private_input(sender)
         if private_input is None or param_input is None:
@@ -2629,6 +2640,9 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
     def get_sample_infos(self, PMnum: Optional[List] = None, sender=None):
         """Update sample-related widgets and the highlighted marker on the plate map for ``PMnum``."""
+        if self.dataAPI is None:
+            return False
+
         LOGGER.info("updating samples")
 
         private_input, param_input = self.find_param_private_input(sender)

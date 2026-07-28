@@ -49,6 +49,7 @@ servers:
     params:
       orch_key: ORCH
       poll_interval: 5
+      plate_api: HTEPlateAPI
   MOTOR:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8003
