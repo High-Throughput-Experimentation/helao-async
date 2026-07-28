@@ -10,7 +10,7 @@ Development happens on `unstable`; only stable releases land on `main`.
 
 ## Environment & common commands
 
-The codebase runs inside a conda env named `helao` (Python 3.12), and `PYTHONPATH` must point at the repo root. The setup script sets this in the conda env config.
+The codebase runs inside a conda env named `helao` (Python 3.14, pinned by `helao_dev_linux-64.yml` / `helao_dev_win-64.yml`), and `PYTHONPATH` must point at the repo root. The setup script sets this in the conda env config.
 
 ```
 bash setup_env.sh                   # (Linux) create+configure 'helao' env
@@ -48,7 +48,7 @@ There is no pytest harness and no project-wide build step. New "tests" are typic
 black <changed_files>          # run inside the `helao` conda env, right before committing
 ```
 
-There is no separate linter config; `ty` (Astral type checker) may be used as a stricter secondary pass over the pyright default (`ty.toml` pins Python 3.12), but `pyright` (`pyrightconfig.json`, basic mode) remains the authoritative type checker — do not remove `# type: ignore` directives that pyright needs.
+There is no separate linter config; `ty` (Astral type checker) may be used as a stricter secondary pass over the pyright default (`ty.toml` pins Python 3.14), but `pyright` (`pyrightconfig.json`, basic mode) remains the authoritative type checker — do not remove `# type: ignore` directives that pyright needs.
 
 ## Architecture
 
