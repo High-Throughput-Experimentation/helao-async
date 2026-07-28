@@ -154,7 +154,9 @@ def _make_fake_sample_app() -> FastAPI:
 class _ServerThread(threading.Thread):
     def __init__(self, app, port):
         super().__init__(daemon=True)
-        self._config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
+        self._config = uvicorn.Config(
+            app, host="127.0.0.1", port=port, log_level="error"
+        )
         self.server = uvicorn.Server(self._config)
 
     def run(self):
@@ -185,7 +187,10 @@ async def _run_fidelity(shim: SampleArchiveShim):
     assert isinstance(sample2, AssemblySample), f"not AssemblySample: {type(sample2)}"
     assert len(sample2.parts) == 2, f"parts dropped: {len(sample2.parts)}"
     part_types = sorted(type(p).__name__ for p in sample2.parts)
-    assert part_types == ["LiquidSample", "SolidSample"], f"part subtypes wrong: {part_types}"
+    assert part_types == [
+        "LiquidSample",
+        "SolidSample",
+    ], f"part subtypes wrong: {part_types}"
 
     # unified_db.get_samples: nested assembly rehydration via list
     got = await shim.unified_db.get_samples(
@@ -210,14 +215,21 @@ async def _run_fidelity(shim: SampleArchiveShim):
     d = await shim.tray_get_next_full(after_tray=0, after_slot=0, after_vial=0)
     assert d == {"tray": 1, "slot": 2, "vial": 3}
     assert (await shim.tray_new_position(req_vol=1.0))["tray"] == 1
-    assert (await shim.tray_update_position(tray=1, slot=1, vial=1,
-            sample=LiquidSample(sample_no=1))) is True
+    assert (
+        await shim.tray_update_position(
+            tray=1, slot=1, vial=1, sample=LiquidSample(sample_no=1)
+        )
+    ) is True
     ok, s = await shim.custom_update_position(
-        custom="c", sample=LiquidSample(sample_no=1))
+        custom="c", sample=LiquidSample(sample_no=1)
+    )
     assert ok is True and isinstance(s, LiquidSample)
     nerr, nlist = await shim.new_ref_samples(
         samples_in=[LiquidSample(sample_no=1)],
-        sample_out_type="liquid", sample_position="p", action=None)
+        sample_out_type="liquid",
+        sample_position="p",
+        action=None,
+    )
     assert nerr == ErrorCodes.none and isinstance(nlist[0], LiquidSample)
     assert (await shim.custom_dest_allowed(custom="c")) is True
     assert (await shim.custom_assembly_allowed(custom="c")) is False
@@ -237,10 +249,14 @@ async def _run_fail_loud():
         ("custom_query_sample", shim.custom_query_sample(custom="c")),
         ("custom_dest_allowed", shim.custom_dest_allowed(custom="c")),
         ("custom_is_destroyed", shim.custom_is_destroyed(custom="c")),
-        ("unified_db.get_samples", shim.unified_db.get_samples(
-            samples=[LiquidSample(sample_no=1)])),
-        ("unified_db.update_samples", shim.unified_db.update_samples(
-            samples=[LiquidSample(sample_no=1)])),
+        (
+            "unified_db.get_samples",
+            shim.unified_db.get_samples(samples=[LiquidSample(sample_no=1)]),
+        ),
+        (
+            "unified_db.update_samples",
+            shim.unified_db.update_samples(samples=[LiquidSample(sample_no=1)]),
+        ),
     ]
     for name, coro in calls:
         try:

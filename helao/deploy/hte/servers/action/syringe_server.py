@@ -9,7 +9,6 @@ volume, plus private endpoints for direct pump control.
 __all__ = ["makeApp"]
 
 
-
 from ...drivers.pump.legato_driver import KDS100, KDS100Poller, PumpExec
 from helao.core.servers.base_api import BaseAPI
 from helao.core.models.data import DataModel
@@ -90,8 +89,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/get_present_volume", tags=["action"])
-    async def get_present_volume(
-    ):
+    async def get_present_volume():
         """Read and record the driver's tracked syringe volume.
 
         Enqueues a data row with the current ``present_volume_ul`` and stores

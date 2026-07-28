@@ -61,9 +61,7 @@ class EndpointManager:
     def endpoint_queues_init(self):
         """Create a per-endpoint action queue for every action route on this server."""
         for urld in self.base.fast_urls:
-            if urld.get("path", "").strip("/").startswith(
-                self.base.server.server_name
-            ):
+            if urld.get("path", "").strip("/").startswith(self.base.server.server_name):
                 endpoint_name = urld["path"].strip("/").split("/")[-1]
                 self.base.endpoint_queues[endpoint_name] = zdeque([])
 

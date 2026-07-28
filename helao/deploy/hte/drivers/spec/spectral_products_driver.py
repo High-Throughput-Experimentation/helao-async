@@ -29,7 +29,6 @@ from helao.core.drivers.helao_driver import (
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
 
-
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
@@ -139,7 +138,9 @@ class SM303(HelaoDriver):
         """
         if self.spec is not None:
             self.unset_external_trigger()
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """Force-close and reopen the spectrometer connection."""
@@ -391,7 +392,9 @@ class SM303(HelaoDriver):
         await asyncio.sleep(delay)
         if self.spec is not None:
             self.unset_external_trigger()
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
         """Device-level e-stop hook: disable the external trigger when engaged.

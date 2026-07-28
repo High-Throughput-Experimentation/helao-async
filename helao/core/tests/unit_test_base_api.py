@@ -135,9 +135,7 @@ def base_api_unit_test() -> bool:
             lambda: ACTION_CTX.get() is None,
         )
 
-        reporter.section(
-            "wrap_action_endpoint folds fn defaults into action_params"
-        )
+        reporter.section("wrap_action_endpoint folds fn defaults into action_params")
         # Simulates the ZMQ-RPC fast path: caller supplies only `action` and
         # `payload`; `switch` falls back to its Python default and must still
         # appear in action.action_params so the action record matches what
@@ -159,18 +157,13 @@ def base_api_unit_test() -> bool:
         )
         reporter.check(
             "fn default appears in action.action_params when kwarg omitted",
-            lambda: defaults_captured["ctx"].action.action_params.get("switch")
-            is True,
+            lambda: defaults_captured["ctx"].action.action_params.get("switch") is True,
         )
 
-        reporter.section(
-            "caller-supplied value still wins over fn default"
-        )
+        reporter.section("caller-supplied value still wins over fn default")
         defaults_overridden = {}
 
-        def endpoint_with_overrideable_default(
-            action: Action, switch: bool = True
-        ):
+        def endpoint_with_overrideable_default(action: Action, switch: bool = True):
             defaults_overridden["ctx"] = ACTION_CTX.get()
             return switch
 
@@ -208,14 +201,18 @@ def base_api_unit_test() -> bool:
         )
 
         reporter.section("ActiveParams round-trip")
-        action = Action(action_name="do_stuff", action_server=MachineModel(server_name="S"))
+        action = Action(
+            action_name="do_stuff", action_server=MachineModel(server_name="S")
+        )
         action.init_act()
         ap = ActiveParams(
             action=action,
-            file_conn_params_dict={action.action_uuid: FileConnParams(
-                file_conn_key=action.action_uuid,
-                json_data_keys=["t_s", "v"],
-            )},
+            file_conn_params_dict={
+                action.action_uuid: FileConnParams(
+                    file_conn_key=action.action_uuid,
+                    json_data_keys=["t_s", "v"],
+                )
+            },
         )
         reporter.check(
             "ActiveParams.action is the original Action",

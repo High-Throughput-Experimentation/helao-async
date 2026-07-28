@@ -16,7 +16,6 @@ from socket import gethostname
 
 from helao.core.models.machine import MachineModel as MM
 
-
 REF_TABLE = {"leakless": 0.21, "inhouse": 0.21, "rhe": 0.0}
 
 

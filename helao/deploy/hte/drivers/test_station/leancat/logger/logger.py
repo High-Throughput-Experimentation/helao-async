@@ -9,7 +9,6 @@ import sys
 import logging
 from datetime import datetime
 
-
 log_level_acquired = True
 
 # with open(arg_app_config_path, "r") as f:

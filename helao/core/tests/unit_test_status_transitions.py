@@ -52,15 +52,39 @@ RESET_TARGETS = [
 
 # (model_class, status_field, append_method, replace_method, reset_method)
 MODEL_SPECS = [
-    (ActionModel, "action_status", "append_action_status", "replace_action_status", "reset_action_status"),
-    (ExperimentModel, "experiment_status", "append_experiment_status", "replace_experiment_status", "reset_experiment_status"),
-    (SequenceModel, "sequence_status", "append_sequence_status", "replace_sequence_status", "reset_sequence_status"),
+    (
+        ActionModel,
+        "action_status",
+        "append_action_status",
+        "replace_action_status",
+        "reset_action_status",
+    ),
+    (
+        ExperimentModel,
+        "experiment_status",
+        "append_experiment_status",
+        "replace_experiment_status",
+        "reset_experiment_status",
+    ),
+    (
+        SequenceModel,
+        "sequence_status",
+        "append_sequence_status",
+        "replace_sequence_status",
+        "reset_sequence_status",
+    ),
 ]
 
 
 def _assert_byte_identical(reporter: TestReporter, label: str, a, b) -> None:
-    reporter.check(f"{label}: model_dump() byte-identical", lambda: a.model_dump() == b.model_dump())
-    reporter.check(f"{label}: model_dump_json() byte-identical", lambda: a.model_dump_json() == b.model_dump_json())
+    reporter.check(
+        f"{label}: model_dump() byte-identical",
+        lambda: a.model_dump() == b.model_dump(),
+    )
+    reporter.check(
+        f"{label}: model_dump_json() byte-identical",
+        lambda: a.model_dump_json() == b.model_dump_json(),
+    )
     # yml_dumps(model_dump()) chokes on raw HloStatus enum members (ruamel has no
     # representer for the str-Enum subtype); as_dict() is the actual production
     # serialization pathway (HelaoDict, used for -act/-exp/-seq.yml output) and
@@ -71,7 +95,9 @@ def _assert_byte_identical(reporter: TestReporter, label: str, a, b) -> None:
     )
 
 
-def _check_append(reporter: TestReporter, model_cls, field: str, method_name: str) -> None:
+def _check_append(
+    reporter: TestReporter, model_cls, field: str, method_name: str
+) -> None:
     for start_state in START_STATES:
         for s in HloStatus:
             a = model_cls(**{field: list(start_state)})
@@ -95,7 +121,9 @@ def _legacy_replace(status_list, old_status, new_status) -> None:
         status_list.append(new_status)
 
 
-def _check_replace(reporter: TestReporter, model_cls, field: str, method_name: str) -> None:
+def _check_replace(
+    reporter: TestReporter, model_cls, field: str, method_name: str
+) -> None:
     for start_state in START_STATES:
         for new_status in HloStatus:
             # normal case: swap-in-place when HloStatus.active is present
@@ -125,7 +153,9 @@ def _check_replace(reporter: TestReporter, model_cls, field: str, method_name: s
         )
 
 
-def _check_reset(reporter: TestReporter, model_cls, field: str, method_name: str) -> None:
+def _check_reset(
+    reporter: TestReporter, model_cls, field: str, method_name: str
+) -> None:
     for start_state in START_STATES:
         for new_statuses in RESET_TARGETS:
             a = model_cls(**{field: list(start_state)})
@@ -142,14 +172,19 @@ def _check_reset(reporter: TestReporter, model_cls, field: str, method_name: str
 
 def _check_schema_freeze(reporter: TestReporter) -> None:
     current = json.dumps(
-        [ActionModel.model_json_schema(), ExperimentModel.model_json_schema(), SequenceModel.model_json_schema()],
+        [
+            ActionModel.model_json_schema(),
+            ExperimentModel.model_json_schema(),
+            SequenceModel.model_json_schema(),
+        ],
         indent=1,
         sort_keys=True,
         default=str,
     )
     reporter.check(
         f"schema freeze: model_json_schema() equals baseline ({SCHEMA_BASELINE_PATH})",
-        lambda: SCHEMA_BASELINE_PATH.is_file() and current == SCHEMA_BASELINE_PATH.read_text(),
+        lambda: SCHEMA_BASELINE_PATH.is_file()
+        and current == SCHEMA_BASELINE_PATH.read_text(),
     )
 
 
@@ -158,7 +193,13 @@ def status_transitions_unit_test() -> bool:
     reporter = TestReporter("status_transitions")
 
     try:
-        for model_cls, field, append_method, replace_method, reset_method in MODEL_SPECS:
+        for (
+            model_cls,
+            field,
+            append_method,
+            replace_method,
+            reset_method,
+        ) in MODEL_SPECS:
             reporter.section(f"{model_cls.__name__}.{append_method} (guarded_append)")
             _check_append(reporter, model_cls, field, append_method)
 
@@ -168,7 +209,9 @@ def status_transitions_unit_test() -> bool:
             reporter.section(f"{model_cls.__name__}.{reset_method} (guarded_reset)")
             _check_reset(reporter, model_cls, field, reset_method)
 
-        reporter.section("Schema freeze (methods must not appear in model_json_schema())")
+        reporter.section(
+            "Schema freeze (methods must not appear in model_json_schema())"
+        )
         _check_schema_freeze(reporter)
 
         return reporter.success()
@@ -182,5 +225,7 @@ def status_transitions_unit_test() -> bool:
 if __name__ == "__main__":
     ok = status_transitions_unit_test()
     if ok:
-        print("PASS: unit_test_status_transitions — all guarded transitions byte-identical, schema unchanged")
+        print(
+            "PASS: unit_test_status_transitions — all guarded transitions byte-identical, schema unchanged"
+        )
     sys.exit(0 if ok else 1)

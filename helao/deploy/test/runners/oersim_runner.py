@@ -58,7 +58,6 @@ from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
 from helao.core.models.machine import MachineModel
 
-
 # --- wiring (matches demo0.yml CPSIM/GPSIM host:port) ----------------------
 ROOT = os.environ.get("HELAO_ROOT", "C:/INST_hlo")
 WORLD_CFG = {
@@ -152,7 +151,11 @@ async def main() -> None:
             # from_global plate_id; to_global: acquire_point -> _feature
             await _capture(
                 orch,
-                _act("GPSIM", "acquire_point", _inject({}, {"_loaded_plate_id": "plate_id"})),
+                _act(
+                    "GPSIM",
+                    "acquire_point",
+                    _inject({}, {"_loaded_plate_id": "plate_id"}),
+                ),
                 to_global={"_feature": "_feature"},
             )
             # from_global: _feature -> measure_cp.comp_vec
@@ -161,7 +164,11 @@ async def main() -> None:
             )
             # from_global: _loaded_plate_id -> update_model.plate_id
             await orch.run_action(
-                _act("GPSIM", "update_model", _inject({}, {"_loaded_plate_id": "plate_id"}))
+                _act(
+                    "GPSIM",
+                    "update_model",
+                    _inject({}, {"_loaded_plate_id": "plate_id"}),
+                )
             )
             print(f"step {step + 1}/{ITERATIONS}: feature={GLOBALS.get('_feature')}")
 

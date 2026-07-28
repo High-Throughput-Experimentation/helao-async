@@ -163,9 +163,7 @@ async def _check_write_seq() -> bool:
     await base.write_seq(sequence)
 
     ts = sequence.sequence_timestamp.strftime("%y%m%d.%H%M%S%f")
-    output_file = os.path.join(
-        save_root, sequence.get_sequence_dir(), f"{ts}-seq.yml"
-    )
+    output_file = os.path.join(save_root, sequence.get_sequence_dir(), f"{ts}-seq.yml")
     assert os.path.isfile(output_file), f"expected seq file at {output_file}"
     loaded = yml_load(output_file)
     return (

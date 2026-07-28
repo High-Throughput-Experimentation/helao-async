@@ -118,7 +118,9 @@ def _check_routing_equivalence(reporter: TestReporter) -> None:
 
 
 def _check_model_level(reporter: TestReporter) -> None:
-    reporter.section("model-level: ActionModel/ExperimentModel/ProcessModel dict samples")
+    reporter.section(
+        "model-level: ActionModel/ExperimentModel/ProcessModel dict samples"
+    )
     sample_dicts = [
         LiquidSample(sample_no=1).model_dump(),
         GasSample(sample_no=2).model_dump(),
@@ -153,7 +155,8 @@ def _check_model_level(reporter: TestReporter) -> None:
         revalidated = model_cls(**dumped)
         reporter.check(
             f"{model_cls.__name__}: model_dump() re-validates byte-identically",
-            lambda m=m, revalidated=revalidated: m.model_dump_json() == revalidated.model_dump_json(),
+            lambda m=m, revalidated=revalidated: m.model_dump_json()
+            == revalidated.model_dump_json(),
         )
 
 
@@ -163,7 +166,9 @@ def _check_assembly_recursion(reporter: TestReporter) -> None:
     inner_liquid = LiquidSample(sample_no=1)
     inner_solid = SolidSample(plate_id=1, sample_no=2)
     inner_assembly = AssemblySample(parts=[inner_liquid, inner_solid])
-    outer_constructed = AssemblySample(parts=[inner_assembly, LiquidSample(sample_no=3)])
+    outer_constructed = AssemblySample(
+        parts=[inner_assembly, LiquidSample(sample_no=3)]
+    )
 
     outer_dict = outer_constructed.model_dump()
     outer_from_dict = AssemblySample.model_validate(outer_dict)
@@ -174,7 +179,8 @@ def _check_assembly_recursion(reporter: TestReporter) -> None:
     )
     reporter.check(
         "nested assembly: constructed vs dict-validated model_dump_json() byte-identical",
-        lambda: outer_constructed.model_dump_json() == outer_from_dict.model_dump_json(),
+        lambda: outer_constructed.model_dump_json()
+        == outer_from_dict.model_dump_json(),
     )
     reporter.check(
         "nested assembly: inner part resolved as AssemblySample (proves model_rebuild recursion)",
@@ -219,7 +225,8 @@ def _check_object_to_sample(reporter: TestReporter) -> None:
         via_direct = expected_cls.model_validate(block)
         reporter.check(
             f"object_to_sample({label}) returns {expected_cls.__name__}",
-            lambda via_helper=via_helper, expected_cls=expected_cls: type(via_helper) is expected_cls,
+            lambda via_helper=via_helper, expected_cls=expected_cls: type(via_helper)
+            is expected_cls,
         )
         reporter.check(
             f"object_to_sample({label}) matches direct validation",

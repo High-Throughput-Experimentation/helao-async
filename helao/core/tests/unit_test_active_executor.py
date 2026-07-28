@@ -51,7 +51,6 @@ from helao.helpers.executor import Executor
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
 
-
 _FIXED_DT = datetime(2026, 1, 2, 3, 4, 5, 678901)
 _SEED = {"n": 0}
 
@@ -61,7 +60,10 @@ def _make_base(save_root: str) -> Base:
     base = Base.__new__(Base)
     base.app = SimpleNamespace(driver=None)
     base.server = MachineModel(
-        server_name="ACTSRV", machine_name="test-machine", hostname="127.0.0.1", port=8000
+        server_name="ACTSRV",
+        machine_name="test-machine",
+        hostname="127.0.0.1",
+        port=8000,
     )
     base.world_cfg = {
         "dummy": False,
@@ -164,8 +166,12 @@ class _ScriptedExecutor(Executor):
     tests can assert the loop transitions + abort path without racing on
     scheduling."""
 
-    def __init__(self, active, *, oneoff, max_polls=0, forever=False, poll_rate=0.0, **kwargs):
-        super().__init__(active, poll_rate=poll_rate, oneoff=oneoff, concurrent=True, **kwargs)
+    def __init__(
+        self, active, *, oneoff, max_polls=0, forever=False, poll_rate=0.0, **kwargs
+    ):
+        super().__init__(
+            active, poll_rate=poll_rate, oneoff=oneoff, concurrent=True, **kwargs
+        )
         self._max_polls = max_polls
         self._forever = forever
         self._poll_count = 0
@@ -185,7 +191,9 @@ class _ScriptedExecutor(Executor):
             status = HloStatus.active
         else:
             status = (
-                HloStatus.active if self._poll_count < self._max_polls else HloStatus.finished
+                HloStatus.active
+                if self._poll_count < self._max_polls
+                else HloStatus.finished
             )
         return {
             "data": {"t": self._poll_count, "v": self._poll_count * 10},

@@ -51,7 +51,9 @@ class HelaoOperator:
             f"HelaoOperator initialized for orchestrator {self.orch_key} on {self.orch_host}:{self.orch_port}"
         )
 
-    def request(self, endpoint: str, path_params: dict = {}, json_params: dict = {}) -> dict:
+    def request(
+        self, endpoint: str, path_params: dict = {}, json_params: dict = {}
+    ) -> dict:
         """Dispatch a request to the orchestrator and return its response.
 
         Args:

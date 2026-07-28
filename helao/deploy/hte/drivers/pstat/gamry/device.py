@@ -19,7 +19,6 @@ from .range import (
     Gamry_IErange_REF30K,
 )
 
-
 TTL_OUTPUTS = {
     0: (1, 1),
     1: (2, 2),
@@ -103,5 +102,5 @@ GAMRY_DEVICES = {
     "PCI4G300": PCI4G300,
     "PCI4G750": PCI4G750,
     "DEFAULT": DEFAULT,
-    "REF30K": REF30K
+    "REF30K": REF30K,
 }

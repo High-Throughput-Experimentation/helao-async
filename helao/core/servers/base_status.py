@@ -315,11 +315,16 @@ class StatusBroadcaster:
                 self.base.actionservermodel.last_action_uuid = status_msg.action_uuid
 
                 # sort the status (nonactive_dict is empty at this point)
-                self.base.actionservermodel.endpoints[status_msg.action_name].sort_status()
+                self.base.actionservermodel.endpoints[
+                    status_msg.action_name
+                ].sort_status()
                 LOGGER.info(
                     f"log_status_task sending status {status_msg.action_status} for action {status_msg.action_name} with uuid {status_msg.action_uuid} on {status_msg.action_server.disp_name()} to subscribers ({self.base.status_clients})."
                 )
-                if len(self.base.status_clients) == 0 and self.base.orch_key is not None:
+                if (
+                    len(self.base.status_clients) == 0
+                    and self.base.orch_key is not None
+                ):
                     await self.base.attach_client(
                         self.base.orch_key, self.base.orch_host, self.base.orch_port
                     )

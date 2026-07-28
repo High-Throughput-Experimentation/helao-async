@@ -14,6 +14,7 @@ named after an S3 key).
 A zip member locator uses ``::`` as the separator, so zip file paths containing
 ``::`` are not supported (a non-issue on normal filesystems).
 """
+
 import io
 import json
 import os
@@ -35,7 +36,7 @@ def make_zip_locator(zip_path: str, member: str) -> str:
 def parse_locator(locator: str) -> tuple:
     """Return ('file', path) or ('zip', zip_path, member)."""
     if locator.startswith(ZIP_PREFIX):
-        zip_path, member = locator[len(ZIP_PREFIX):].split(ZIP_SEP, 1)
+        zip_path, member = locator[len(ZIP_PREFIX) :].split(ZIP_SEP, 1)
         return ("zip", zip_path, member)
     return ("file", locator)
 

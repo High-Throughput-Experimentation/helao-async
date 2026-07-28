@@ -42,7 +42,6 @@ from helao.core.models.machine import MachineModel
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.premodels import Action
 
-
 _FIXED_DT = datetime(2026, 1, 2, 3, 4, 5, 678901)
 
 
@@ -51,7 +50,10 @@ def _make_base(save_root: str) -> Base:
     base = Base.__new__(Base)
     base.app = SimpleNamespace(driver=None)
     base.server = MachineModel(
-        server_name="ACTSRV", machine_name="test-machine", hostname="127.0.0.1", port=8000
+        server_name="ACTSRV",
+        machine_name="test-machine",
+        hostname="127.0.0.1",
+        port=8000,
     )
     base.world_cfg = {
         "dummy": False,
@@ -165,8 +167,10 @@ async def _check_finish_hlo_header() -> bool:
     after = active.file_conn_dict[dflt].params.hloheader.epoch_ns
     # existing stamp must not be overwritten
     active.finish_hlo_header(realtime=999)
-    return before is None and after == 123456789 and (
-        active.file_conn_dict[dflt].params.hloheader.epoch_ns == 123456789
+    return (
+        before is None
+        and after == 123456789
+        and (active.file_conn_dict[dflt].params.hloheader.epoch_ns == 123456789)
     )
 
 
@@ -229,9 +233,8 @@ async def _check_track_file() -> bool:
     with open(outside, "w") as f:
         f.write("payload")
     await active.track_file("df__aux", outside, [])
-    return (
-        outside in active.action.aux_file_paths
-        and any(fi.file_name == "aux_data.dat" for fi in active.action.files)
+    return outside in active.action.aux_file_paths and any(
+        fi.file_name == "aux_data.dat" for fi in active.action.files
     )
 
 

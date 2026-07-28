@@ -4,6 +4,7 @@ Each source indexer walks the cheap ``YY.WW/MMDD`` directory layout, scoped to a
 date range, and returns a pandas DataFrame with :data:`INDEX_COLUMNS`. Reading a
 row's data is done separately via ``readers.read_dataset(row.locator, row.file_type)``.
 """
+
 import posixpath
 import zipfile
 from pathlib import Path
@@ -15,8 +16,18 @@ from helao.core.models.run_dir import RunDir
 from helao.core.servers.data_browser.readers import make_zip_locator
 
 INDEX_COLUMNS = [
-    "source", "sequence", "experiment", "node", "technique", "sample",
-    "run_type", "file_name", "file_type", "date", "available", "locator",
+    "source",
+    "sequence",
+    "experiment",
+    "node",
+    "technique",
+    "sample",
+    "run_type",
+    "file_name",
+    "file_type",
+    "date",
+    "available",
+    "locator",
 ]
 
 DATA_EXTS = (".hlo", ".json", ".parquet")
@@ -147,13 +158,22 @@ class RunsSourceIndex(SourceIndex):
                 technique, sample, run_type = _meta_fields(meta)
                 for f in sorted(act_dir.iterdir()):
                     if f.is_file() and f.suffix.lower() in DATA_EXTS:
-                        rows.append(_row(
-                            source=self.source, sequence=seq_name,
-                            experiment=exp_name, node=act_dir.name,
-                            technique=technique, sample=sample, run_type=run_type,
-                            file_name=f.name, file_type=f.suffix.lower().lstrip("."),
-                            date=date_str, available=True, locator=str(f),
-                        ))
+                        rows.append(
+                            _row(
+                                source=self.source,
+                                sequence=seq_name,
+                                experiment=exp_name,
+                                node=act_dir.name,
+                                technique=technique,
+                                sample=sample,
+                                run_type=run_type,
+                                file_name=f.name,
+                                file_type=f.suffix.lower().lstrip("."),
+                                date=date_str,
+                                available=True,
+                                locator=str(f),
+                            )
+                        )
         return rows
 
     def _index_zips(self, date_str, day):
@@ -177,15 +197,22 @@ class RunsSourceIndex(SourceIndex):
                     actdir = posixpath.dirname(n)
                     meta = act_meta.get(actdir, {})
                     technique, sample, run_type = _meta_fields(meta)
-                    rows.append(_row(
-                        source=self.source, sequence=seq_name,
-                        experiment=posixpath.basename(posixpath.dirname(actdir)),
-                        node=posixpath.basename(actdir),
-                        technique=technique, sample=sample, run_type=run_type,
-                        file_name=posixpath.basename(n), file_type=ext.lstrip("."),
-                        date=date_str, available=True,
-                        locator=make_zip_locator(str(zip_path), n),
-                    ))
+                    rows.append(
+                        _row(
+                            source=self.source,
+                            sequence=seq_name,
+                            experiment=posixpath.basename(posixpath.dirname(actdir)),
+                            node=posixpath.basename(actdir),
+                            technique=technique,
+                            sample=sample,
+                            run_type=run_type,
+                            file_name=posixpath.basename(n),
+                            file_type=ext.lstrip("."),
+                            date=date_str,
+                            available=True,
+                            locator=make_zip_locator(str(zip_path), n),
+                        )
+                    )
         return rows
 
 
@@ -255,14 +282,24 @@ class DerivedSourceIndex(SourceIndex):
                 if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
                     continue
                 locator, available = _resolve_run_file(
-                    self.root, date_str, seq_dir.name, exp_dir.name, fn)
-                rows.append(_row(
-                    source="PROCESSES", sequence=_seq_name(seq_dir.name),
-                    experiment=exp_dir.name, node=prc_yml.stem,
-                    technique=technique, sample=sample, run_type=run_type,
-                    file_name=fn, file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
-                    date=date_str, available=available, locator=locator,
-                ))
+                    self.root, date_str, seq_dir.name, exp_dir.name, fn
+                )
+                rows.append(
+                    _row(
+                        source="PROCESSES",
+                        sequence=_seq_name(seq_dir.name),
+                        experiment=exp_dir.name,
+                        node=prc_yml.stem,
+                        technique=technique,
+                        sample=sample,
+                        run_type=run_type,
+                        file_name=fn,
+                        file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
+                        date=date_str,
+                        available=available,
+                        locator=locator,
+                    )
+                )
         return rows
 
     def _index_analyses(self, date_str, day):
@@ -281,28 +318,54 @@ class DerivedSourceIndex(SourceIndex):
                     fn = posixpath.basename(key) if key else ""
                     name = (out or {}).get("output_name") or fn
                     local = local_jsons.get(fn)
-                    rows.append(_row(
-                        source="ANALYSES", sequence=ana_name, experiment="",
-                        node=name, technique=(out or {}).get("output_type", ""),
-                        sample=sample, run_type="", file_name=fn or name,
-                        file_type="json", date=date_str,
-                        available=local is not None,
-                        locator=str(local) if local is not None else "",
-                    ))
+                    rows.append(
+                        _row(
+                            source="ANALYSES",
+                            sequence=ana_name,
+                            experiment="",
+                            node=name,
+                            technique=(out or {}).get("output_type", ""),
+                            sample=sample,
+                            run_type="",
+                            file_name=fn or name,
+                            file_type="json",
+                            date=date_str,
+                            available=local is not None,
+                            locator=str(local) if local is not None else "",
+                        )
+                    )
             else:
                 for fn, p in local_jsons.items():
-                    rows.append(_row(
-                        source="ANALYSES", sequence=ana_name, experiment="",
-                        node=fn, technique="", sample=sample, run_type="",
-                        file_name=fn, file_type="json", date=date_str,
-                        available=True, locator=str(p),
-                    ))
+                    rows.append(
+                        _row(
+                            source="ANALYSES",
+                            sequence=ana_name,
+                            experiment="",
+                            node=fn,
+                            technique="",
+                            sample=sample,
+                            run_type="",
+                            file_name=fn,
+                            file_type="json",
+                            date=date_str,
+                            available=True,
+                            locator=str(p),
+                        )
+                    )
         return rows
 
 
-SOURCES = [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value, "PROCESSES", "ANALYSES"]
-GROUPS = {"RUNS": [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value],
-          "DERIVED": ["PROCESSES", "ANALYSES"]}
+SOURCES = [
+    RunDir.FINISHED.value,
+    RunDir.DIAG.value,
+    RunDir.SYNCED.value,
+    "PROCESSES",
+    "ANALYSES",
+]
+GROUPS = {
+    "RUNS": [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value],
+    "DERIVED": ["PROCESSES", "ANALYSES"],
+}
 
 
 def build_source_index(root, source):

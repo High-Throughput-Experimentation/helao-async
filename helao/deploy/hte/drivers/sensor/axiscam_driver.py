@@ -50,19 +50,27 @@ class AxisCam(HelaoDriver):
 
     def get_status(self) -> DriverResponse:
         """No physical device to poll; always reports ok."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def stop(self) -> DriverResponse:
         """No active activity to abort; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """No device state to reinitialize; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def disconnect(self) -> DriverResponse:
         """No persistent connection to release; always succeeds."""
-        return DriverResponse(response=DriverResponseType.success, status=DriverStatus.ok)
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def acquire_image(self) -> bytes:
         """Fetch a single JPEG snapshot from the camera.

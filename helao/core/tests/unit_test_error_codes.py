@@ -13,7 +13,6 @@ import traceback
 from helao.core.error import ErrorCodes
 from helao.core.tests._test_utils import TestReporter
 
-
 _EXPECTED_MEMBERS = {
     "none",
     "critical",
@@ -77,7 +76,9 @@ def error_codes_unit_test() -> bool:
             lambda: len(values) == len(set(values)),
         )
 
-        reporter.section("ErrorCodes inherits from str (so JSON/dump treats it as text)")
+        reporter.section(
+            "ErrorCodes inherits from str (so JSON/dump treats it as text)"
+        )
         reporter.check(
             "ErrorCodes.none is a str instance",
             lambda: isinstance(ErrorCodes.none, str),

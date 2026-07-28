@@ -131,7 +131,8 @@ async def _check_ws_globstat_forwards_and_preserves_disconnect_quirk() -> bool:
     return (
         subscribed_ok
         and ws.accepted is True
-        and ws.sent == [json.dumps({"orch_state": "idle"}), json.dumps({"orch_state": "busy"})]
+        and ws.sent
+        == [json.dumps({"orch_state": "idle"}), json.dumps({"orch_state": "busy"})]
         # preserved quirk: the disconnect handler's `gs_sub in subscribers`
         # check compares the async generator to registered Queue objects
         # and is always False, so the subscriber queue is never removed

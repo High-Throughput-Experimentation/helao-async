@@ -1625,7 +1625,10 @@ def run_check_mode() -> int:
         print(f"FATAL: frozen S0 reference dir missing: {BASELINE_S0_DIR}")
         return 1
 
-    with tempfile.TemporaryDirectory() as capture_dir, tempfile.TemporaryDirectory() as tmp_root:
+    with (
+        tempfile.TemporaryDirectory() as capture_dir,
+        tempfile.TemporaryDirectory() as tmp_root,
+    ):
         captured = asyncio.run(run_all_scenarios(Path(capture_dir), Path(tmp_root)))
 
     results = _diff_against_baseline_s0(captured)
@@ -1848,7 +1851,12 @@ def main():
         f"Dev/record-mode scratch traces written to: {BASELINE_DIR} (NOT the frozen gate -- see baseline_S0/, run with --check to verify against it)"
     )
 
-    with tempfile.TemporaryDirectory() as d1, tempfile.TemporaryDirectory() as d2, tempfile.TemporaryDirectory() as t1, tempfile.TemporaryDirectory() as t2:
+    with (
+        tempfile.TemporaryDirectory() as d1,
+        tempfile.TemporaryDirectory() as d2,
+        tempfile.TemporaryDirectory() as t1,
+        tempfile.TemporaryDirectory() as t2,
+    ):
         run1 = asyncio.run(run_all_scenarios(Path(d1), Path(t1)))
         run2 = asyncio.run(run_all_scenarios(Path(d2), Path(t2)))
         det_failures = []

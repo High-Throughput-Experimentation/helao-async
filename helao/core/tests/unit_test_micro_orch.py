@@ -77,9 +77,10 @@ def _port_pair_free(port: int) -> bool:
     if rpc_port > 65535:
         return False
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as http_s, socket.socket(
-            socket.AF_INET, socket.SOCK_STREAM
-        ) as rpc_s:
+        with (
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as http_s,
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM) as rpc_s,
+        ):
             http_s.bind(("127.0.0.1", port))
             rpc_s.bind(("127.0.0.1", rpc_port))
         return True

@@ -77,7 +77,14 @@ class _BaseOpenAPIClient:
         raise NotImplementedError
 
     def _make_method(
-        self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, op_details
+        self,
+        op_id,
+        http_method,
+        path_template,
+        params_spec,
+        req_body_spec,
+        base_url,
+        op_details,
     ):
         """Return a ``(self_instance, **kwargs)`` callable. Implemented by subclasses."""
         raise NotImplementedError
@@ -109,7 +116,14 @@ class _BaseOpenAPIClient:
         return final_server_url
 
     def _build_request(
-        self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, kwargs
+        self,
+        op_id,
+        http_method,
+        path_template,
+        params_spec,
+        req_body_spec,
+        base_url,
+        kwargs,
     ):
         """Resolve path/query params and request body into call arguments.
 
@@ -197,13 +211,19 @@ class _BaseOpenAPIClient:
         strat = self.pagination
         response, params = first_response, dict(sent_params)
         seen_requests = set()
-        bar = tqdm(total=strat.total_hint(first_response, body)) if limit is None else None
+        bar = (
+            tqdm(total=strat.total_hint(first_response, body))
+            if limit is None
+            else None
+        )
         try:
             while True:
                 nxt = strat.next_request(response, body, params)
                 if limit is not None and len(collected) >= limit:
                     if nxt is not None:
-                        print(f"Reached limit={limit} for '{op_id}'; more results available.")
+                        print(
+                            f"Reached limit={limit} for '{op_id}'; more results available."
+                        )
                     return collected[:limit]
                 if nxt is None:
                     return collected
@@ -232,13 +252,19 @@ class _BaseOpenAPIClient:
         strat = self.pagination
         response, params = first_response, dict(sent_params)
         seen_requests = set()
-        bar = tqdm(total=strat.total_hint(first_response, body)) if limit is None else None
+        bar = (
+            tqdm(total=strat.total_hint(first_response, body))
+            if limit is None
+            else None
+        )
         try:
             while True:
                 nxt = strat.next_request(response, body, params)
                 if limit is not None and len(collected) >= limit:
                     if nxt is not None:
-                        print(f"Reached limit={limit} for '{op_id}'; more results available.")
+                        print(
+                            f"Reached limit={limit} for '{op_id}'; more results available."
+                        )
                     return collected[:limit]
                 if nxt is None:
                     return collected
@@ -290,7 +316,9 @@ class _BaseOpenAPIClient:
                 error_message += f" - Response: {e.response.text[:200]}"
             raise RuntimeError(error_message) from e
 
-    def _build_docstring(self, op_id, http_method, params_spec, req_body_spec, op_details):
+    def _build_docstring(
+        self, op_id, http_method, params_spec, req_body_spec, op_details
+    ):
         """Build a method docstring from the operation's summary/params/responses."""
         docstring_parts = []
         if "summary" in op_details:
@@ -309,9 +337,9 @@ class _BaseOpenAPIClient:
             param_docs_list.append(f"    {p_name} ({p_type}, {p_req}): {p_desc}")
 
         if http_method == "post" and req_body_spec:
-            rb_desc = req_body_spec.get(
-                "description", "Request body content."
-            ).split("\n")[0]
+            rb_desc = req_body_spec.get("description", "Request body content.").split(
+                "\n"
+            )[0]
             rb_req = "required" if req_body_spec.get("required", False) else "optional"
             rb_type = "any"
             if (
@@ -452,12 +480,25 @@ class OpenAPIClient(_BaseOpenAPIClient):
             )
 
     def _make_method(
-        self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, op_details
+        self,
+        op_id,
+        http_method,
+        path_template,
+        params_spec,
+        req_body_spec,
+        base_url,
+        op_details,
     ):
         def dynamic_method(self_instance, limit=100, **kwargs):
             """Generated method that dispatches an API call with pagination."""
             full_url, raw_query, body = self_instance._build_request(
-                op_id, http_method, path_template, params_spec, req_body_spec, base_url, kwargs
+                op_id,
+                http_method,
+                path_template,
+                params_spec,
+                req_body_spec,
+                base_url,
+                kwargs,
             )
 
             def do_request(extra):
@@ -470,7 +511,9 @@ class OpenAPIClient(_BaseOpenAPIClient):
                     op_id, http_method, full_url, merged, body
                 )
 
-            first = self_instance._raw_request(op_id, http_method, full_url, raw_query, body)
+            first = self_instance._raw_request(
+                op_id, http_method, full_url, raw_query, body
+            )
             return self_instance._paginate(op_id, raw_query, first, limit, do_request)
 
         return dynamic_method
@@ -503,12 +546,25 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
             )
 
     def _make_method(
-        self, op_id, http_method, path_template, params_spec, req_body_spec, base_url, op_details
+        self,
+        op_id,
+        http_method,
+        path_template,
+        params_spec,
+        req_body_spec,
+        base_url,
+        op_details,
     ):
         async def dynamic_method(self_instance, limit=100, **kwargs):
             """Generated async method that dispatches an API call with pagination."""
             full_url, raw_query, body = self_instance._build_request(
-                op_id, http_method, path_template, params_spec, req_body_spec, base_url, kwargs
+                op_id,
+                http_method,
+                path_template,
+                params_spec,
+                req_body_spec,
+                base_url,
+                kwargs,
             )
 
             async def do_request(extra):
@@ -524,6 +580,8 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
             first = await self_instance._raw_request(
                 op_id, http_method, full_url, raw_query, body
             )
-            return await self_instance._apaginate(op_id, raw_query, first, limit, do_request)
+            return await self_instance._apaginate(
+                op_id, raw_query, first, limit, do_request
+            )
 
         return dynamic_method

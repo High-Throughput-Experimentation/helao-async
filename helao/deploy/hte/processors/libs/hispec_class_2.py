@@ -175,7 +175,9 @@ class SpEC:
         self.spec_scans = cycle_dict
         return self.spec_scans
 
-    def populate_CV_scans(self, cycle_header: str = "cycle", time_header: str = "t_s") -> Dict:
+    def populate_CV_scans(
+        self, cycle_header: str = "cycle", time_header: str = "t_s"
+    ) -> Dict:
         """Split ``self.CV`` into per-cycle, per-direction sub-frames.
 
         Uses the derivative of the sawtooth interpolation to assign a
@@ -705,7 +707,9 @@ def fit_current_to_univariate_spline(
     return spl
 
 
-def Downsample_Potential(SpEC_scans_dataframe, voltage_resolution: float) -> pd.DataFrame:
+def Downsample_Potential(
+    SpEC_scans_dataframe, voltage_resolution: float
+) -> pd.DataFrame:
     """Average spectra falling within a voltage bin of fixed resolution.
 
     Args:

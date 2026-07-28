@@ -60,8 +60,12 @@ def extra_models_unit_test() -> bool:
         )
         reporter.check(
             "RunUse exposes every documented spectroscopy reference",
-            lambda: {RunUse.ref, RunUse.ref_light, RunUse.ref_dark, RunUse.ref_bkg}
-            .issubset(set(RunUse)),
+            lambda: {
+                RunUse.ref,
+                RunUse.ref_light,
+                RunUse.ref_dark,
+                RunUse.ref_bkg,
+            }.issubset(set(RunUse)),
         )
 
         reporter.section("ProcessContrib enum")
@@ -96,8 +100,7 @@ def extra_models_unit_test() -> bool:
         reporter.section("YmlType enum")
         reporter.check(
             "YmlType has the three top-level kinds",
-            lambda: {m.value for m in YmlType}
-            == {"action", "experiment", "sequence"},
+            lambda: {m.value for m in YmlType} == {"action", "experiment", "sequence"},
         )
 
         reporter.section("HelaoDirs defaults and Path round-trip")
@@ -243,9 +246,7 @@ def extra_models_unit_test() -> bool:
             lambda: adm.data_keys == ["t_s", "v"],
         )
         aom = AnalysisOutputModel(
-            analysis_output_path=S3Locator(
-                bucket="b", key="k", region="us-east-1"
-            ),
+            analysis_output_path=S3Locator(bucket="b", key="k", region="us-east-1"),
             content_type="application/json",
             output_type="curve",
             output={"slope": 1.5, "ok": True},

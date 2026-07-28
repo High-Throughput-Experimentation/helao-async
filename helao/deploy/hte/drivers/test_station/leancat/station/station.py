@@ -12,7 +12,6 @@ from psycopg2 import sql
 from ..database import query
 from ..logger import script_log
 
-
 # with open(arg_app_config_path, "r") as f:
 #     app_config = json.loads(f.read())
 

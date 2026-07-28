@@ -169,10 +169,14 @@ class HelaoData:
                     for x in glob(os.path.join(yml_reldir, "**", "*"), recursive=True)
                     if x.split(".")[-1] not in skip_exts and os.path.isfile(x)
                 ]
-                nosync_path = self.ymldir.replace(RunDir.SYNCED.value, RunDir.NOSYNC.value)
+                nosync_path = self.ymldir.replace(
+                    RunDir.SYNCED.value, RunDir.NOSYNC.value
+                )
 
             if os.path.exists(nosync_path):
-                self._nosync_files = [p for p in self._data_files if RunDir.NOSYNC.value in p]
+                self._nosync_files = [
+                    p for p in self._data_files if RunDir.NOSYNC.value in p
+                ]
 
             self.children = self.seq + self.exp + self.act
         else:
@@ -252,9 +256,7 @@ class HelaoData:
         """
         parts = Path(p).parts
         runpos = next(
-            i
-            for i, v in enumerate(parts)
-            if v.startswith("RUNS_") or v == "PROCESSES"
+            i for i, v in enumerate(parts) if v.startswith("RUNS_") or v == "PROCESSES"
         )
         return os.path.join(*parts[runpos + 1 :])
 

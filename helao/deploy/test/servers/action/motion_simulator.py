@@ -64,7 +64,9 @@ class MotionSim:
             self.config_dict["platemap_path"], skiprows=2, header=None, names=pm_cols
         )
 
-    def solid_get_samples_xy(self, plate_id: int, sample_no: int, *args, **kwargs) -> dict:
+    def solid_get_samples_xy(
+        self, plate_id: int, sample_no: int, *args, **kwargs
+    ) -> dict:
         """Look up the (x, y) coordinates of a sample on a plate.
 
         Args:

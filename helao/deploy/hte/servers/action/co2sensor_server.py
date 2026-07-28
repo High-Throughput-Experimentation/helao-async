@@ -66,8 +66,7 @@ def makeApp(server_key) -> BaseAPI:
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
-    async def cancel_acquire_co2(
-    ):
+    async def cancel_acquire_co2():
         """Stop any active ``acquire_co2`` executors on this server."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():

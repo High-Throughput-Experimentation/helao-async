@@ -152,6 +152,7 @@ class Gamry_IErange_dflt(StrEnum):
     mode14 = "mode14"
     mode15 = "mode15"
 
+
 class Gamry_IErange_REF30K(StrEnum):
     """Current ranges for Reference 30K booster potentiostats (300 pA to 30 A)."""
 
@@ -173,6 +174,7 @@ class Gamry_IErange_REF30K(StrEnum):
     # mode14 = "mode14"
     # mode15 = "mode15"
 
+
 def split_val_unit(val_string: str) -> tuple[float, str]:
     """Split a value+unit string into a numeric magnitude and unit suffix.
 
@@ -184,6 +186,7 @@ def split_val_unit(val_string: str) -> tuple[float, str]:
         ``None`` on parse failure) and ``unit`` is the trailing alphabetic
         suffix.
     """
+
     def to_float(val):
         try:
             return float(val)

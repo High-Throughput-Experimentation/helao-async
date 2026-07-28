@@ -23,7 +23,6 @@ from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.core.error import ErrorCodes
 
-
 valid_data_status = (
     None,
     HloStatus.active,
@@ -44,6 +43,7 @@ def async_partial(f, *args):
     Returns:
         Coroutine function: ``async def`` wrapper around ``f``.
     """
+
     async def f2(*args2):
         """Inner coroutine that forwards ``args + args2`` to ``f``."""
         result = f(*args, *args2)

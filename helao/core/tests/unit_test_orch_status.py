@@ -149,9 +149,7 @@ def orch_status_unit_test() -> bool:
         )
         reporter.check(
             "server_free is False while the server has an active action",
-            lambda: gsm.server_free(
-                MachineModel(server_name="DRV", machine_name="h")
-            )
+            lambda: gsm.server_free(MachineModel(server_name="DRV", machine_name="h"))
             is False,
         )
 
@@ -189,8 +187,9 @@ def orch_status_unit_test() -> bool:
         json_dict = gsm.as_json()
         reporter.check(
             "as_json renders server_dict keys as 'server@machine' strings",
-            lambda: all(isinstance(k, str) and "@" in k
-                       for k in json_dict["server_dict"].keys()),
+            lambda: all(
+                isinstance(k, str) and "@" in k for k in json_dict["server_dict"].keys()
+            ),
         )
 
         return reporter.success()

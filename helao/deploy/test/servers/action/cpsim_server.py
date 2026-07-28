@@ -54,8 +54,7 @@ def makeApp(server_key):
         return active_action_dict
 
     @app.post(f"/{server_key}/cancel_measure_cp", tags=["action"])
-    async def cancel_measure_cp(
-    ):
+    async def cancel_measure_cp():
         """Stop any running ``measure_cp`` executor."""
         active = await app.base.setup_and_contain_action()
         for exec_id, executor in app.base.executors.items():
@@ -65,8 +64,7 @@ def makeApp(server_key):
         return finished_action.as_dict()
 
     @app.post(f"/{server_key}/get_loaded_plate", tags=["action"])
-    async def get_loaded_plate(
-    ):
+    async def get_loaded_plate():
         """Return the loaded plate id plus the requesting orchestrator's coords."""
         active = await app.base.setup_and_contain_action()
         plate_id = app.driver.loaded_plate

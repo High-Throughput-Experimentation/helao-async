@@ -131,10 +131,14 @@ def _check_next_step_table() -> bool:
     )
 
     # N10: intent-stop is NOT handled at the outer level -> LaunchAction
-    ok &= isinstance(p.next_step(_snap(loop_intent=LoopIntent.stop, n_acts=1)), LaunchAction)
+    ok &= isinstance(
+        p.next_step(_snap(loop_intent=LoopIntent.stop, n_acts=1)), LaunchAction
+    )
 
     # N11: intent-skip is consumed inside the coordinator -> LaunchAction
-    ok &= isinstance(p.next_step(_snap(loop_intent=LoopIntent.skip, n_acts=1)), LaunchAction)
+    ok &= isinstance(
+        p.next_step(_snap(loop_intent=LoopIntent.skip, n_acts=1)), LaunchAction
+    )
 
     return bool(ok)
 
@@ -145,7 +149,9 @@ def _check_ladder_else_branch() -> bool:
     pinned by calling ladder_step directly -- the post-driver-health ladder
     that preserves the dead-but-present branch verbatim."""
     p = DispatchPolicy()
-    s = p.ladder_step(_snap(loop_state=LoopStatus.started, n_acts=0, n_exps=0, n_seqs=0))
+    s = p.ladder_step(
+        _snap(loop_state=LoopStatus.started, n_acts=0, n_exps=0, n_seqs=0)
+    )
     return isinstance(s, LogQueuesEmpty)
 
 
@@ -245,15 +251,19 @@ def _check_start_condition_steps() -> bool:
     p = DispatchPolicy()
     ok = True
 
-    ok &= isinstance(p.start_condition_step(ActionStartCondition.no_wait), NoWaitProceed)
     ok &= isinstance(
-        p.start_condition_step(ActionStartCondition.wait_for_endpoint), AwaitEndpointFree
+        p.start_condition_step(ActionStartCondition.no_wait), NoWaitProceed
+    )
+    ok &= isinstance(
+        p.start_condition_step(ActionStartCondition.wait_for_endpoint),
+        AwaitEndpointFree,
     )
     ok &= isinstance(
         p.start_condition_step(ActionStartCondition.wait_for_server), AwaitServerFree
     )
     ok &= isinstance(
-        p.start_condition_step(ActionStartCondition.wait_for_orch), AwaitWaitEndpointFree
+        p.start_condition_step(ActionStartCondition.wait_for_orch),
+        AwaitWaitEndpointFree,
     )
     ok &= isinstance(
         p.start_condition_step(ActionStartCondition.wait_for_previous),
@@ -364,7 +374,7 @@ def _check_finalization_guards() -> bool:
     ok &= should_set_stopped(LoopStatus.started) is True
     ok &= should_set_stopped(OrchStatus.estopped) is False
     ok &= should_set_stopped(LoopStatus.estopped) is False  # str-enum value equality
-    ok &= (LoopStatus.estopped == OrchStatus.estopped)  # Q2 pin
+    ok &= LoopStatus.estopped == OrchStatus.estopped  # Q2 pin
 
     # should_export == any(> 0)
     ok &= should_export(0, 0, 0) is False

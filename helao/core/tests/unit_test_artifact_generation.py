@@ -154,8 +154,7 @@ def artifact_generation_unit_test() -> bool:
         )
         reporter.check(
             "read_hlo recovers the column_headings list",
-            lambda: list(meta["column_headings"])
-            == original_header["column_headings"],
+            lambda: list(meta["column_headings"]) == original_header["column_headings"],
         )
         reporter.check(
             "read_hlo column 't_s' has three entries",

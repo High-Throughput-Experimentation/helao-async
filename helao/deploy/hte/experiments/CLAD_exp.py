@@ -43,7 +43,6 @@ from helao.deploy.hte.experiments.ADSS_exp import (
 from helao.core.models.run_use import RunUse
 from helao.helpers.lib_decorators import experiment
 
-
 EXPERIMENTS = __all__
 
 SAMPLE_server = MachineModel(
@@ -764,8 +763,7 @@ def CLAD_sub_refill_syringe(
 
 
 @experiment(version=1)
-def CLAD_sub_standby(
-) -> list:
+def CLAD_sub_standby() -> list:
     """Drive the station to a safe standby: peristaltic pump off, inlet gas valve closed.
 
     Returns:

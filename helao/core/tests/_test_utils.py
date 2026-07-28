@@ -17,7 +17,6 @@ import traceback
 import colorama
 from colorama import Fore, Style
 
-
 colorama.init(strip=not sys.stdout.isatty())
 
 

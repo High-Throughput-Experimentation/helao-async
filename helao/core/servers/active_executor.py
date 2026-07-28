@@ -84,8 +84,12 @@ class ExecutorRunner:
         """
         # append action_uuid to local queue before running task if concurrency not allowed
         if not executor.concurrent:
-            self.active.base.local_action_task_queue.append(executor.active.action.action_uuid)
-        self.active.action_task = self.active.base.aloop.create_task(self.active.action_loop_task(executor))
+            self.active.base.local_action_task_queue.append(
+                executor.active.action.action_uuid
+            )
+        self.active.action_task = self.active.base.aloop.create_task(
+            self.active.action_loop_task(executor)
+        )
         self.active.action_task.add_done_callback(self.active.executor_done_callback)
         LOGGER.info("Executor task started.")
         return self.active.action.as_dict()
@@ -111,7 +115,8 @@ class ExecutorRunner:
         # stall action_loop task if concurrency is not allowed
         while (
             self.active.base.local_action_task_queue
-            and self.active.base.local_action_task_queue[0] != self.active.action.action_uuid
+            and self.active.base.local_action_task_queue[0]
+            != self.active.action.action_uuid
             and not executor.concurrent
         ):
             await asyncio.sleep(0.1)

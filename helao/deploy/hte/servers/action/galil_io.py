@@ -99,8 +99,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return active_action_dict
 
             @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
-            async def cancel_acquire_analog_in(
-            ):
+            async def cancel_acquire_analog_in():
                 """Stop any running ``acquire_analog_in`` executors on this server."""
                 active = await app.base.setup_and_contain_action()
                 for exec_id, executor in app.base.executors.items():
@@ -261,8 +260,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/stop_digital_cycle", tags=["action"])
             @action_version(2)
-            async def stop_digital_cycle(
-            ):
+            async def stop_digital_cycle():
                 """Stop the currently running digital toggle cycle."""
                 active = await app.base.setup_and_contain_action()
 
@@ -275,8 +273,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return finished_action.as_dict()
 
         @app.post(f"/{server_key}/reset", tags=["action"])
-        async def reset(
-        ):
+        async def reset():
             """Reset the Galil controller. Emergency use only."""
             active = await app.base.setup_and_contain_action(action_abbr="reset")
             reset_resp = app.driver.reset()

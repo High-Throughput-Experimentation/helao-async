@@ -96,12 +96,7 @@ def _act_meta(order: int, process_finish: bool = False) -> dict:
 def _make_exp_tree(root: Path, runs: str, exp_uuid: str, process_order_groups=None):
     """Create ``<root>/<runs>/26.23/0610/<seq>/<exp>/`` and return the exp yml path."""
     exp_dir = (
-        root
-        / runs
-        / "26.23"
-        / "0610"
-        / f"{_ts(0)}__test__seq"
-        / f"{_ts(0)}__test_exp"
+        root / runs / "26.23" / "0610" / f"{_ts(0)}__test__seq" / f"{_ts(0)}__test_exp"
     )
     exp_yml = exp_dir / f"{_ts(0)}-exp.yml"
     _write_yml(exp_yml, _exp_meta(exp_uuid, process_order_groups))
@@ -138,7 +133,9 @@ async def _run_checks() -> dict:
             ep = drv.update_process(HelaoYml(a1), _act_meta(1, True))
 
             out["legacy_metas_populated"] = len(ep.dict["process_metas"]) > 0
-            out["legacy_actions_done"] = set(ep.dict["process_actions_done"].keys()) == {
+            out["legacy_actions_done"] = set(
+                ep.dict["process_actions_done"].keys()
+            ) == {
                 0,
                 1,
             }
@@ -156,7 +153,10 @@ async def _run_checks() -> dict:
             # exp in FINISHED, both contributing actions ALREADY in SYNCED
             # (cross-run resume: they'd never be re-enqueued). Fresh .prg.
             exp_yml = _make_exp_tree(
-                root, RunDir.FINISHED.value, _uuid(1002), process_order_groups={0: [0, 1]}
+                root,
+                RunDir.FINISHED.value,
+                _uuid(1002),
+                process_order_groups={0: [0, 1]},
             )
             synced_exp_yml = _make_exp_tree(
                 root, RunDir.SYNCED.value, _uuid(1002), process_order_groups={0: [0, 1]}
@@ -174,16 +174,14 @@ async def _run_checks() -> dict:
                 ep.dict["process_actions_done"].keys()
             ) == {0, 1}
             out["reconcile_both_dispatched"] = (
-                0 in metas
-                and len(metas[0].get("dispatched_actions_abbr", [])) == 2
+                0 in metas and len(metas[0].get("dispatched_actions_abbr", [])) == 2
             )
 
             # idempotency: reconcile again must NOT double-count
             ep = drv.reconcile_processes(ep)
-            out["reconcile_idempotent"] = (
-                len(ep.dict["process_metas"][0]["dispatched_actions_abbr"]) == 2
-                and set(ep.dict["process_actions_done"].keys()) == {0, 1}
-            )
+            out["reconcile_idempotent"] = len(
+                ep.dict["process_metas"][0]["dispatched_actions_abbr"]
+            ) == 2 and set(ep.dict["process_actions_done"].keys()) == {0, 1}
         finally:
             for t in drv.syncer_loops.values():
                 t.cancel()
@@ -196,10 +194,16 @@ async def _run_checks() -> dict:
             root = Path(tmp_root)
             # group 1 is planned but its action (order 1) never dispatched/synced
             exp_yml = _make_exp_tree(
-                root, RunDir.FINISHED.value, _uuid(1003), process_order_groups={0: [0], 1: [1]}
+                root,
+                RunDir.FINISHED.value,
+                _uuid(1003),
+                process_order_groups={0: [0], 1: [1]},
             )
             synced_exp_yml = _make_exp_tree(
-                root, RunDir.SYNCED.value, _uuid(1003), process_order_groups={0: [0], 1: [1]}
+                root,
+                RunDir.SYNCED.value,
+                _uuid(1003),
+                process_order_groups={0: [0], 1: [1]},
             )
             _make_action(synced_exp_yml, 0)  # only group 0 has an action
 
@@ -213,9 +217,7 @@ async def _run_checks() -> dict:
             out["phantom_real_group_synced"] = 0 in ep.dict["process_s3"]
 
             s3_unf_after, api_unf_after = ep.list_unfinished_procs()
-            out["phantom_experiment_completes"] = (
-                not s3_unf_after and not api_unf_after
-            )
+            out["phantom_experiment_completes"] = not s3_unf_after and not api_unf_after
         finally:
             for t in drv.syncer_loops.values():
                 t.cancel()
@@ -239,7 +241,10 @@ async def _run_checks() -> dict:
                 m["action_split"] = split
                 m["process_contrib"] = ["samples_out"]
                 m["samples_out"] = [
-                    {"global_label": f"sample_split_{split}", "action_uuid": [m["action_uuid"]]}
+                    {
+                        "global_label": f"sample_split_{split}",
+                        "action_uuid": [m["action_uuid"]],
+                    }
                 ]
                 return m
 
@@ -250,16 +255,18 @@ async def _run_checks() -> dict:
 
             ep = drv.get_progress(exp_yml)
             for split in (0, 1):
-                ay = exp_yml.parent / f"0__{split}__srv__test_action" / f"{_ts(1 + split)}-act.yml"
+                ay = (
+                    exp_yml.parent
+                    / f"0__{split}__srv__test_action"
+                    / f"{_ts(1 + split)}-act.yml"
+                )
                 ep = drv.update_process(HelaoYml(ay), _split_meta(split))
 
             metas = ep.dict["process_metas"]
             out["split_both_dispatched"] = (
                 0 in metas and len(metas[0].get("dispatched_actions_abbr", [])) == 2
             )
-            labels = {
-                s.get("global_label") for s in metas[0].get("samples_out", [])
-            }
+            labels = {s.get("global_label") for s in metas[0].get("samples_out", [])}
             out["split_both_samples_kept"] = labels == {
                 "sample_split_0",
                 "sample_split_1",
@@ -267,7 +274,11 @@ async def _run_checks() -> dict:
 
             # replay must not double-count either split
             for split in (0, 1):
-                ay = exp_yml.parent / f"0__{split}__srv__test_action" / f"{_ts(1 + split)}-act.yml"
+                ay = (
+                    exp_yml.parent
+                    / f"0__{split}__srv__test_action"
+                    / f"{_ts(1 + split)}-act.yml"
+                )
                 ep = drv.update_process(HelaoYml(ay), _split_meta(split))
             out["split_idempotent"] = (
                 len(ep.dict["process_metas"][0]["dispatched_actions_abbr"]) == 2
@@ -284,10 +295,16 @@ async def _run_checks() -> dict:
             root = Path(tmp_root)
             # action order 0 declared in BOTH group 0 and group 1
             exp_yml = _make_exp_tree(
-                root, RunDir.FINISHED.value, _uuid(1005), process_order_groups={0: [0], 1: [0]}
+                root,
+                RunDir.FINISHED.value,
+                _uuid(1005),
+                process_order_groups={0: [0], 1: [0]},
             )
             synced_exp_yml = _make_exp_tree(
-                root, RunDir.SYNCED.value, _uuid(1005), process_order_groups={0: [0], 1: [0]}
+                root,
+                RunDir.SYNCED.value,
+                _uuid(1005),
+                process_order_groups={0: [0], 1: [0]},
             )
             _make_action(synced_exp_yml, 0)
 
@@ -326,32 +343,52 @@ def sync_process_recovery_unit_test() -> bool:
 
     reporter.section("legacy experiment populates process_metas")
     reporter.check("legacy_experiment flag set", lambda: res["legacy_flag"])
-    reporter.check("process_metas populated (was empty pre-fix)", lambda: res["legacy_metas_populated"])
+    reporter.check(
+        "process_metas populated (was empty pre-fix)",
+        lambda: res["legacy_metas_populated"],
+    )
     reporter.check("both actions recorded as done", lambda: res["legacy_actions_done"])
     reporter.check("finisher index recorded", lambda: res["legacy_finisher_recorded"])
 
     reporter.section("cross-run reconcile from on-disk actions")
-    reporter.check("process_metas empty before reconcile", lambda: res["reconcile_before_empty"])
-    reporter.check("group rebuilt after reconcile", lambda: res["reconcile_group_present"])
+    reporter.check(
+        "process_metas empty before reconcile", lambda: res["reconcile_before_empty"]
+    )
+    reporter.check(
+        "group rebuilt after reconcile", lambda: res["reconcile_group_present"]
+    )
     reporter.check("both actions folded in", lambda: res["reconcile_actions_done"])
-    reporter.check("group has both dispatched actions", lambda: res["reconcile_both_dispatched"])
-    reporter.check("reconcile is idempotent (no double-count)", lambda: res["reconcile_idempotent"])
+    reporter.check(
+        "group has both dispatched actions", lambda: res["reconcile_both_dispatched"]
+    )
+    reporter.check(
+        "reconcile is idempotent (no double-count)", lambda: res["reconcile_idempotent"]
+    )
 
     reporter.section("phantom group dropped, experiment finishes")
-    reporter.check("both groups unfinished before", lambda: res["phantom_unfinished_before"])
+    reporter.check(
+        "both groups unfinished before", lambda: res["phantom_unfinished_before"]
+    )
     reporter.check("phantom group dropped", lambda: res["phantom_group_dropped"])
     reporter.check("real group synced", lambda: res["phantom_real_group_synced"])
-    reporter.check("experiment completes (no infinite loop)", lambda: res["phantom_experiment_completes"])
+    reporter.check(
+        "experiment completes (no infinite loop)",
+        lambda: res["phantom_experiment_completes"],
+    )
 
     reporter.section("split actions (same action_order) all folded")
-    reporter.check("both splits folded into process", lambda: res["split_both_dispatched"])
+    reporter.check(
+        "both splits folded into process", lambda: res["split_both_dispatched"]
+    )
     reporter.check("both splits' samples kept", lambda: res["split_both_samples_kept"])
     reporter.check("split fold is idempotent", lambda: res["split_idempotent"])
 
     reporter.section("overlapping process groups (action in 2 groups)")
     reporter.check("both group metas built", lambda: res["overlap_both_metas_built"])
     reporter.check("both groups synced", lambda: res["overlap_both_synced"])
-    reporter.check("experiment completes (no stall)", lambda: res["overlap_experiment_completes"])
+    reporter.check(
+        "experiment completes (no stall)", lambda: res["overlap_experiment_completes"]
+    )
 
     return reporter.success()
 

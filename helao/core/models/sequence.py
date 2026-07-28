@@ -56,10 +56,10 @@ class ShortSequenceModel(BaseModel, HelaoDict):
     def _coerce_planned_experiments(cls, v):
         if isinstance(v, list):
             return [
-                item.model_dump() if isinstance(item, BaseModel) else item
-                for item in v
+                item.model_dump() if isinstance(item, BaseModel) else item for item in v
             ]
         return v
+
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     run_id: Optional[UUID] = None
@@ -122,10 +122,10 @@ class SequenceModel(ShortSequenceModel):
     def _coerce_dispatched_experiments(cls, v):
         if isinstance(v, list):
             return [
-                item.model_dump() if isinstance(item, BaseModel) else item
-                for item in v
+                item.model_dump() if isinstance(item, BaseModel) else item for item in v
             ]
         return v
+
     sync_data: bool = True
     manual_action: bool = False
     initial_global_params: dict = Field(default={})
@@ -133,12 +133,25 @@ class SequenceModel(ShortSequenceModel):
 
     def append_sequence_status(self, s: HloStatus) -> None:
         """Guarded append onto ``sequence_status`` (see status_transitions.guarded_append)."""
-        guarded_append(self.sequence_status, s, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")
+        guarded_append(
+            self.sequence_status,
+            s,
+            owner=f"sequence {self.sequence_uuid}/{self.sequence_name}",
+        )
 
     def replace_sequence_status(self, old: HloStatus, new: HloStatus) -> None:
         """Guarded swap-or-append onto ``sequence_status`` (see status_transitions.guarded_replace)."""
-        guarded_replace(self.sequence_status, old, new, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")
+        guarded_replace(
+            self.sequence_status,
+            old,
+            new,
+            owner=f"sequence {self.sequence_uuid}/{self.sequence_name}",
+        )
 
     def reset_sequence_status(self, *statuses: HloStatus) -> None:
         """Guarded wholesale reset of ``sequence_status`` (see status_transitions.guarded_reset)."""
-        guarded_reset(self.sequence_status, statuses, owner=f"sequence {self.sequence_uuid}/{self.sequence_name}")
+        guarded_reset(
+            self.sequence_status,
+            statuses,
+            owner=f"sequence {self.sequence_uuid}/{self.sequence_name}",
+        )

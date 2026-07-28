@@ -240,20 +240,22 @@ def makeApp(server_key) -> BaseAPI:
                 f"Error getting global params in calc_server.py, try perhaps the host details set here are wrong: {e}"
             )
         result = min(min_offset_ocv, new_ocv)
-        if result<lower_limit:
+        if result < lower_limit:
             result = lower_limit
-            LOGGER.warning(f"minimum potential was below lower limit, setting to {lower_limit}")
-        elif result>upper_limit:
+            LOGGER.warning(
+                f"minimum potential was below lower limit, setting to {lower_limit}"
+            )
+        elif result > upper_limit:
             result = upper_limit
-            LOGGER.warning(f"minimum potential was above upper limit, setting to {upper_limit}")
+            LOGGER.warning(
+                f"minimum potential was above upper limit, setting to {upper_limit}"
+            )
 
-        
         LOGGER.info(f"minimum potential was: {result}")
         await active.enqueue_data_dflt(datadict={"result": result})
         active.action.action_params["min_offset_ocv"] = result
         finished_action = await active.finish()
         return finished_action.as_dict()
-
 
     @app.post(f"/{server_key}/check_CP_Ewe_bounds", tags=["action"])
     @action_version(2)
@@ -262,8 +264,7 @@ def makeApp(server_key) -> BaseAPI:
         limted_Ewe_V__mean_final: float | bool = False,
         lower_limit: float = -1,
         upper_limit: float = 3,
-
-            ):
+    ):
         """Clamp the trailing-mean CP Ewe to ``[lower_limit, upper_limit]``.
 
         Reads ``CP_Ewe_V__mean_final`` from the inherited action params,
@@ -275,7 +276,9 @@ def makeApp(server_key) -> BaseAPI:
         try:
             Ewe_V__mean_final = active.action.action_params["CP_Ewe_V__mean_final"]
             if not isinstance(Ewe_V__mean_final, (int, float, np.floating)):
-                LOGGER.warning(f"Ewe_V__mean_final not found in global params, setting to 0.4, value was: {Ewe_V__mean_final}")
+                LOGGER.warning(
+                    f"Ewe_V__mean_final not found in global params, setting to 0.4, value was: {Ewe_V__mean_final}"
+                )
                 Ewe_V__mean_final = 0.4
 
             else:
@@ -285,18 +288,23 @@ def makeApp(server_key) -> BaseAPI:
             print(
                 f"Error getting global params in calc_server.py, try perhaps the host details set here are wrong: {e}"
             )
-        if Ewe_V__mean_final<lower_limit:
+        if Ewe_V__mean_final < lower_limit:
             limted_Ewe_V__mean_final = lower_limit
-            LOGGER.info(f"Ewe_V__mean_final was below lower limit, setting to {lower_limit}")
-        elif Ewe_V__mean_final>upper_limit:
+            LOGGER.info(
+                f"Ewe_V__mean_final was below lower limit, setting to {lower_limit}"
+            )
+        elif Ewe_V__mean_final > upper_limit:
             limted_Ewe_V__mean_final = upper_limit
-            LOGGER.info(f"Ewe_V__mean_final was above upper limit, setting to {upper_limit}")
+            LOGGER.info(
+                f"Ewe_V__mean_final was above upper limit, setting to {upper_limit}"
+            )
         else:
             limted_Ewe_V__mean_final = Ewe_V__mean_final
-        await active.enqueue_data_dflt(datadict={"CP_Ewe_V__mean_final": limted_Ewe_V__mean_final})
+        await active.enqueue_data_dflt(
+            datadict={"CP_Ewe_V__mean_final": limted_Ewe_V__mean_final}
+        )
         active.action.action_params["CP_Ewe_V__mean_final"] = limted_Ewe_V__mean_final
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-                
     return app

@@ -174,9 +174,7 @@ class C_vis(ActionVisualizer):
 
         # combine all sublayouts into a single one
         docs_url = f"http://{self.host}:{self.port}/docs#/"
-        server_link = (
-            f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
-        )
+        server_link = f'<a href="{docs_url}" target="_blank">\'{self.serv_key}\'</a>'
         headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [

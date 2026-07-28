@@ -35,7 +35,6 @@ from ruamel.yaml import YAML
 
 from .yml_tools import yml_load
 
-
 _yaml = YAML()
 
 
@@ -314,5 +313,6 @@ def __getattr__(name):
     """Lazily re-export ``HelaoData`` from :mod:`helao.helpers.helao_data`."""
     if name == "HelaoData":
         from .helao_data import HelaoData
+
         return HelaoData
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

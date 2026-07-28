@@ -94,8 +94,7 @@ class StatusIngester:
 
         if (
             orch.active_experiment is not None
-            and orch.active_experiment.experiment_uuid
-            == actionmodel.experiment_uuid
+            and orch.active_experiment.experiment_uuid == actionmodel.experiment_uuid
         ):
             matching_experiment = True
         else:
@@ -121,20 +120,17 @@ class StatusIngester:
                 "experiment_uuid": actionmodel.experiment_uuid,
                 "sequence_name": (
                     orch.active_sequence.sequence_name
-                    if orch.active_sequence is not None
-                    and matching_experiment
+                    if orch.active_sequence is not None and matching_experiment
                     else None
                 ),
                 "sequence_label": (
                     orch.active_sequence.sequence_label
-                    if orch.active_sequence is not None
-                    and matching_experiment
+                    if orch.active_sequence is not None and matching_experiment
                     else None
                 ),
                 "sequence_uuid": (
                     orch.active_sequence.sequence_uuid
-                    if orch.active_sequence is not None
-                    and matching_experiment
+                    if orch.active_sequence is not None and matching_experiment
                     else None
                 ),
             },

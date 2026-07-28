@@ -32,14 +32,14 @@ def _check_unpack_sequence_name_in_lib() -> bool:
         calls.append(kwargs)
         return ["exp1", "exp2"]
 
-    result = orch_unpack.unpack_sequence(
-        "my_seq", {"a": 1}, {"my_seq": _factory}
-    )
+    result = orch_unpack.unpack_sequence("my_seq", {"a": 1}, {"my_seq": _factory})
     return result == ["exp1", "exp2"] and calls == [{"a": 1}]
 
 
 def _check_unpack_sequence_name_absent() -> bool:
-    result = orch_unpack.unpack_sequence("missing_seq", {}, {"other_seq": lambda **kw: ["x"]})
+    result = orch_unpack.unpack_sequence(
+        "missing_seq", {}, {"other_seq": lambda **kw: ["x"]}
+    )
     return result == []
 
 

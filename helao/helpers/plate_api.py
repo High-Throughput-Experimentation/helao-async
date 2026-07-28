@@ -281,7 +281,9 @@ class HTEPlateAPI:
 
         printd = self.get_print(print_id)
         if "sources" not in printd.keys() and isinstance(plateid, int):
-            LOGGER.warning("No sources found in print record. Using alternate retrieval.")
+            LOGGER.warning(
+                "No sources found in print record. Using alternate retrieval."
+            )
             printd = self.get_print_plateid(plateid)
 
         if printd is not None and self.loader is not None:
