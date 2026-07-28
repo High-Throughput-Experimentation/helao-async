@@ -38,6 +38,8 @@ import subprocess
 import re
 import threading
 import zipfile
+from collections import deque
+from contextlib import contextmanager
 from glob import glob
 
 import click
@@ -51,6 +53,10 @@ from helao.helpers.config_loader import read_config
 from helao.helpers.time_utils import get_ntp_time
 
 from logging import Logger
+
+# ``logging`` below is helao's logging helper, NOT the stdlib module, so the
+# stdlib gets an explicit alias for the handler/filter classes ConsoleMux needs.
+import logging as pylogging
 from helao.helpers import helao_logging as logging
 
 # Upper bound (seconds) for a blocking POST /shutdown. The server's shutdown
@@ -75,6 +81,373 @@ LAUNCH_ORDER = ["action", "orchestrator", "operator", "visualizer"]
 # subscribers (and export any non-empty queues) while the action servers they
 # talk to are still up.
 SHUTDOWN_POST_ORDER = ["orchestrator", "action"]
+
+# ---------------------------------------------------------------------------
+# Console multiplexer: child output pump + CTRL-r menu isolation
+# ---------------------------------------------------------------------------
+# Servers are spawned on pipes rather than inheriting the launcher's terminal,
+# so the CTRL-r menu can be shown without being scrolled away -- roughly 96% of
+# the terminal's lines come from the servers, not the launcher, so gating the
+# launcher's own logging alone would not help.
+#
+# INVARIANT: reader threads drain their pipe UNCONDITIONALLY, whatever the menu
+# is doing. A child writing to a full pipe blocks inside write(); for a helao
+# server that means its asyncio loop stops serving HTTP, status websockets and
+# driver polling *while the process stays alive and its PID stays valid*, so
+# neither Pidd._pid_is_server nor server_is_idle would notice. Only the display
+# is gated -- drained lines go to an in-memory buffer and are flushed on resume.
+
+# Launcher-side buffer holding output produced while the display is suppressed.
+CONSOLE_BUFFER_MAX_BYTES = 1024 * 1024
+
+# Target capacity for each child pipe. 16x the Linux default, so a stalled
+# reader has ~8000 lines of slack before the child could block at all.
+CHILD_PIPE_SIZE = 1024 * 1024
+F_SETPIPE_SZ = 1031
+F_GETPIPE_SZ = 1032
+
+# Pipe occupancy that force-ends menu isolation. Linux pipes are grown to
+# CHILD_PIPE_SIZE so half is a wide margin; on Windows the size is fixed by
+# CreatePipe at spawn time and is not tunable from Python, so the available
+# margin is smaller and the trigger is correspondingly tighter.
+PIPE_HIGH_WATER = 0.25 if os.name == "nt" else 0.5
+
+# Launcher-buffer occupancy that force-ends isolation, before lines get dropped.
+CONSOLE_BUFFER_HIGH_WATER = 0.75
+
+# Seconds between watchdog pressure checks while isolation is active.
+CONSOLE_WATCHDOG_INTERVAL = 0.25
+
+# DEC private mode 1049: switch to/from the alternate screen buffer. Used only
+# when stdout is a tty -- colorama does not translate this sequence (its regex
+# accepts only digits and semicolons before the final letter, and "?1049h" has a
+# "?"), so on a redirected stream it would leak through as literal garbage.
+ALT_SCREEN_ON = "\x1b[?1049h"
+ALT_SCREEN_OFF = "\x1b[?1049l"
+
+
+def _mux_log(level, message, **kwargs):
+    """Log from :class:`ConsoleMux`, tolerating an unconfigured LAUNCH_LOGGER.
+
+    ``append.py`` calls :func:`launcher` without initialising LAUNCH_LOGGER, so
+    the mux must not be what raises there. Resolved at call time because
+    ``main()`` rebinds the global.
+    """
+    if LAUNCH_LOGGER is None:
+        return
+    getattr(LAUNCH_LOGGER, level)(message, **kwargs)
+
+
+class ConsoleMux:
+    """Pumps child-server output to the terminal, suppressible for the menu.
+
+    Attributes:
+        stream: Destination for forwarded output (the launcher's real stdout).
+        enabled: True once at least one child has been registered, i.e. children
+            are on pipes and their output flows through here.
+    """
+
+    def __init__(self, stream=None):
+        """Initialise an idle mux with the display enabled.
+
+        Args:
+            stream: Output stream to forward to. Defaults to ``sys.stdout``.
+        """
+        self.stream = stream if stream is not None else sys.stdout
+        self.enabled = False
+        self._display = threading.Event()
+        self._display.set()
+        self._lock = threading.Lock()
+        self._buffer = deque()
+        self._buffered_bytes = 0
+        self._dropped_lines = 0
+        self._pipes = {}  # server_key -> binary pipe object being drained
+        self._suppress_reason = None
+
+    # -- child registration -------------------------------------------------
+
+    @staticmethod
+    def spawn_kwargs() -> dict:
+        """``Popen`` kwargs that route a child's output into the mux."""
+        return {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT}
+
+    @staticmethod
+    def child_env() -> dict:
+        """Environment for a piped child.
+
+        ``HELAO_FORCE_COLOR`` tells the child to emit ANSI even though its own
+        stdout is a pipe, because this launcher forwards it to a real terminal.
+        Only set when that terminal actually exists, so a redirected launcher
+        still produces clean, escape-free output. ``PYTHONUNBUFFERED`` keeps the
+        child line-buffered; a non-tty stdout would otherwise block-buffer and
+        arrive in delayed multi-kilobyte chunks.
+        """
+        env = dict(os.environ)
+        env["PYTHONUNBUFFERED"] = "1"
+        try:
+            if sys.stdout.isatty():
+                env["HELAO_FORCE_COLOR"] = "1"
+        except Exception:
+            pass
+        return env
+
+    def register(self, server_key, proc):
+        """Start draining ``proc``'s output under ``server_key``.
+
+        Grows the pipe to :data:`CHILD_PIPE_SIZE` where supported, then starts a
+        daemon reader thread. Registration failure is logged and ignored: losing
+        the terminal copy of a server's log is survivable (the per-server
+        rotating file handler is unaffected), whereas raising here would abort a
+        launch.
+        """
+        if proc.stdout is None:
+            return
+        try:
+            self._grow_pipe(proc.stdout)
+            self._pipes[server_key] = proc.stdout
+            self.enabled = True
+            threading.Thread(
+                target=self._reader,
+                args=(server_key, proc.stdout),
+                name=f"console_mux__{server_key}",
+                daemon=True,
+            ).start()
+        except Exception:
+            _mux_log(
+                "error",
+                f"Could not attach console mux to {server_key}; its output will "
+                f"not reach the terminal (LOGS/{server_key}.log is unaffected).",
+                exc_info=True,
+            )
+
+    def unregister(self, server_key):
+        """Forget ``server_key``'s pipe. The reader thread exits on EOF."""
+        self._pipes.pop(server_key, None)
+
+    def _grow_pipe(self, pipe):
+        """Enlarge ``pipe``'s kernel buffer, where the platform allows it."""
+        if os.name == "nt":
+            # CreatePipe fixes the size at creation and subprocess does not
+            # expose it, so there is nothing to grow.
+            return
+        try:
+            import fcntl
+
+            fcntl.fcntl(pipe.fileno(), F_SETPIPE_SZ, CHILD_PIPE_SIZE)
+        except Exception:
+            # Non-fatal: an ungrown pipe is the 64 KiB default, which the
+            # always-draining reader keeps near empty anyway.
+            pass
+
+    # -- draining -----------------------------------------------------------
+
+    def _reader(self, server_key, pipe):
+        """Drain ``pipe`` line by line until EOF. Never gates on the display."""
+        try:
+            for raw in iter(pipe.readline, b""):
+                self._emit(raw.decode("utf8", "replace"))
+        except Exception:
+            pass
+        finally:
+            self.unregister(server_key)
+            # Close our read end at EOF so repeated restarts do not leak fds.
+            try:
+                pipe.close()
+            except Exception:
+                pass
+
+    def _emit(self, text):
+        """Forward ``text`` now, or buffer it while the display is suppressed."""
+        if self._display.is_set():
+            try:
+                self.stream.write(text)
+                self.stream.flush()
+            except Exception:
+                pass
+            return
+        with self._lock:
+            self._buffer.append(text)
+            self._buffered_bytes += len(text)
+            while self._buffered_bytes > CONSOLE_BUFFER_MAX_BYTES and self._buffer:
+                self._buffered_bytes -= len(self._buffer.popleft())
+                self._dropped_lines += 1
+
+    # -- pressure -----------------------------------------------------------
+
+    def pipe_pressure(self):
+        """Return ``(server_key, occupied_fraction)`` for the fullest pipe.
+
+        The fraction is how close that child is to blocking on a write. Returns
+        ``(None, 0.0)`` when unmeasurable, which includes Windows -- there is no
+        cheap equivalent of ``FIONREAD`` for an anonymous pipe, so the buffer
+        pressure check below carries the load there.
+        """
+        if os.name == "nt":
+            return None, 0.0
+        worst_key, worst_frac = None, 0.0
+        try:
+            import fcntl
+            import struct
+            import termios
+        except Exception:
+            return None, 0.0
+        for server_key, pipe in list(self._pipes.items()):
+            try:
+                fd = pipe.fileno()
+                pending = struct.unpack(
+                    "i", fcntl.ioctl(fd, termios.FIONREAD, b"\0" * 4)
+                )[0]
+                capacity = fcntl.fcntl(fd, F_GETPIPE_SZ)
+                frac = pending / capacity if capacity else 0.0
+            except Exception:
+                continue
+            if frac > worst_frac:
+                worst_key, worst_frac = server_key, frac
+        return worst_key, worst_frac
+
+    def buffer_pressure(self) -> float:
+        """Occupied fraction of the launcher-side buffer."""
+        with self._lock:
+            return self._buffered_bytes / CONSOLE_BUFFER_MAX_BYTES
+
+    # -- isolation ----------------------------------------------------------
+
+    def _flush(self):
+        """Write out everything buffered, noting any dropped lines."""
+        with self._lock:
+            pending, dropped = list(self._buffer), self._dropped_lines
+            self._buffer.clear()
+            self._buffered_bytes = 0
+            self._dropped_lines = 0
+        try:
+            if dropped:
+                self.stream.write(
+                    f"... {dropped} line(s) dropped: launcher console buffer "
+                    f"({CONSOLE_BUFFER_MAX_BYTES // 1024} KiB) overflowed while "
+                    f"the menu was open; see the per-server logs under LOGS/.\n"
+                )
+            for chunk in pending:
+                self.stream.write(chunk)
+            self.stream.flush()
+        except Exception:
+            pass
+
+    def resume(self, reason=None):
+        """End suppression: leave the alternate screen and flush the buffer.
+
+        Idempotent and safe to call from the watchdog thread while the menu's
+        blocking ``input()`` is still pending -- that intentionally restores the
+        output flow around the live prompt rather than cancelling the prompt.
+
+        Args:
+            reason: When set, logged to explain an automatic resume so it does
+                not look like a glitch.
+        """
+        with self._lock:
+            if self._display.is_set():
+                return
+            alt = self._suppress_reason == "alt"
+            self._suppress_reason = None
+        if alt:
+            try:
+                self.stream.write(ALT_SCREEN_OFF)
+                self.stream.flush()
+            except Exception:
+                pass
+        self._display.set()
+        self._flush()
+        if reason:
+            _mux_log("warning", f"Menu isolation ended early: {reason}")
+
+    @contextmanager
+    def isolated(self):
+        """Suppress child output for the duration of the block.
+
+        Enters the alternate screen buffer when stdout is a tty so the menu never
+        touches the scrollback. A watchdog thread ends isolation early if any
+        child pipe or the launcher buffer crosses its high-water mark, so a burst
+        of logging can never push a child toward a blocking write.
+        """
+        if not self.enabled:
+            # Children were never piped (nothing launched yet); isolating would
+            # suppress nothing and the alternate screen would just hide the menu
+            # from a scrollback the caller can still read.
+            yield
+            return
+        is_tty = False
+        try:
+            is_tty = self.stream.isatty()
+        except Exception:
+            pass
+        with self._lock:
+            self._display.clear()
+            self._suppress_reason = "alt" if is_tty else "plain"
+        if is_tty:
+            try:
+                self.stream.write(ALT_SCREEN_ON)
+                self.stream.flush()
+            except Exception:
+                pass
+        stop = threading.Event()
+        threading.Thread(
+            target=self._watchdog,
+            args=(stop,),
+            name="console_mux__watchdog",
+            daemon=True,
+        ).start()
+        try:
+            yield
+        finally:
+            stop.set()
+            self.resume()
+
+    def _watchdog(self, stop):
+        """End isolation if child pipes or the buffer approach saturation."""
+        while not stop.wait(CONSOLE_WATCHDOG_INTERVAL):
+            if self._display.is_set():
+                return
+            key, frac = self.pipe_pressure()
+            if frac >= PIPE_HIGH_WATER:
+                self.resume(
+                    f"{key} pipe at {frac:.0%} of capacity (limit "
+                    f"{PIPE_HIGH_WATER:.0%}); resuming output so it cannot block"
+                )
+                return
+            buffered = self.buffer_pressure()
+            if buffered >= CONSOLE_BUFFER_HIGH_WATER:
+                self.resume(
+                    f"launcher console buffer at {buffered:.0%} of "
+                    f"{CONSOLE_BUFFER_MAX_BYTES // 1024} KiB (limit "
+                    f"{CONSOLE_BUFFER_HIGH_WATER:.0%}); resuming output so no "
+                    f"lines are dropped"
+                )
+                return
+
+    # -- launcher's own logging --------------------------------------------
+
+    def install_log_gate(self, logger):
+        """Suppress ``logger``'s console handlers while isolation is active.
+
+        The launcher's own records are only ~4% of the terminal's lines, but they
+        include the per-keypress hotkey hint, which would otherwise print over
+        the menu.
+        """
+        mux = self
+
+        class _Gate(pylogging.Filter):
+            def filter(self, record):
+                return mux._display.is_set()
+
+        for handler in logger.handlers:
+            if isinstance(handler, pylogging.StreamHandler) and not isinstance(
+                handler, pylogging.FileHandler
+            ):
+                handler.addFilter(_Gate())
+
+
+# Single mux shared by launcher(), launch_server_groups() and restart_server(),
+# so every spawned child is drained by the same pump.
+CONSOLE = ConsoleMux()
 
 LAUNCH_LOGGER: Logger = None
 
@@ -716,13 +1089,19 @@ def launch_server_groups(
                     if codeKey == "fast":
                         if group == "orchestrator":
                             pidd.orchServs.append(server)
-                        cmd = ["python", "fast_launcher.py", confArg, server]
+                        cmd = ["python", "-u", "fast_launcher.py", confArg, server]
                         if restore and group == "orchestrator":
                             cmd.append("--restore")
                             LAUNCH_LOGGER.info(
                                 f"{server} launched with --restore; will import saved queues."
                             )
-                        p = subprocess.Popen(cmd, cwd=helao_repo_root)
+                        p = subprocess.Popen(
+                            cmd,
+                            cwd=helao_repo_root,
+                            env=CONSOLE.child_env(),
+                            **CONSOLE.spawn_kwargs(),
+                        )
+                        CONSOLE.register(server, p)
                         ppid = p.pid
                     elif codeKey == "bokeh":
                         if (
@@ -730,8 +1109,14 @@ def launch_server_groups(
                             and servPy == "live_visualizer"
                         ):
                             continue
-                        cmd = ["python", "bokeh_launcher.py", confArg, server]
-                        p = subprocess.Popen(cmd, cwd=helao_repo_root)
+                        cmd = ["python", "-u", "bokeh_launcher.py", confArg, server]
+                        p = subprocess.Popen(
+                            cmd,
+                            cwd=helao_repo_root,
+                            env=CONSOLE.child_env(),
+                            **CONSOLE.spawn_kwargs(),
+                        )
+                        CONSOLE.register(server, p)
                         ppid = p.pid
                     else:
                         LAUNCH_LOGGER.warning(
@@ -1020,6 +1405,10 @@ def main():
     LAUNCH_LOGGER = logging.make_logger(
         __file__, log_dir=helaodirs.log_root, log_level=config.get("log_level", 20)
     )
+    # Gate the launcher's own console output on menu isolation too. Its records
+    # are a small share of the terminal, but the per-keypress hotkey hint would
+    # otherwise print straight over the menu.
+    CONSOLE.install_log_gate(LAUNCH_LOGGER)
     # compress old logs:
     log_root = os.path.join(config["root"], "LOGS")
     for server_name in ["_MASTER_", "bokeh_launcher", "fast_launcher"]:
@@ -1176,15 +1565,17 @@ def main():
                 LAUNCH_LOGGER.info(f"{servername} successful shutdown() event.")
                 pidd.kill_server(servername)
                 LAUNCH_LOGGER.info(f"Successfully closed {servername} process.")
-                cmd = ["python", f"{codeKey}_launcher.py", confArg, servername]
+                cmd = ["python", "-u", f"{codeKey}_launcher.py", confArg, servername]
                 if restore and groupname == "orchestrator":
                     cmd.append("--restore")
+                CONSOLE.unregister(servername)
                 p = subprocess.Popen(
                     cmd,
                     cwd=helao_repo_root,
-                    stdout=sys.stdout,
-                    stderr=sys.stderr,
+                    env=CONSOLE.child_env(),
+                    **CONSOLE.spawn_kwargs(),
                 )
+                CONSOLE.register(servername, p)
                 pidd.store_pid(servername, S["host"], S["port"], p.pid)
                 pidd.procs[servername] = p
                 if groupname == "action":
@@ -1452,18 +1843,22 @@ def main():
                 ]
                 opts = range(len(slist))
                 while True:
-                    print("Currently running server type/name:")
-                    for i, (gk, sk) in enumerate(slist):
-                        print(f"{i}: {gk}/{sk}")
-                    print("R: shut down ALL servers and relaunch the whole group")
-                    if len(slist) > 1:
-                        optionstr = f"{min(opts)}-{max(opts)}"
-                    else:
-                        optionstr = "0"
-                    sind = input(
-                        f"Enter server num to restart, R to relaunch all, "
-                        f"or blank to cancel [{optionstr}/R]: "
-                    )
+                    # Only the prompt is isolated. The restart itself runs with
+                    # output visible -- that is exactly when you want to watch
+                    # the servers come back up.
+                    with CONSOLE.isolated():
+                        print("Currently running server type/name:")
+                        for i, (gk, sk) in enumerate(slist):
+                            print(f"{i}: {gk}/{sk}")
+                        print("R: shut down ALL servers and relaunch the whole group")
+                        if len(slist) > 1:
+                            optionstr = f"{min(opts)}-{max(opts)}"
+                        else:
+                            optionstr = "0"
+                        sind = input(
+                            f"Enter server num to restart, R to relaunch all, "
+                            f"or blank to cancel [{optionstr}/R]: "
+                        )
                     if sind in [str(o) for o in opts]:
                         sg, sn = slist[int(sind)]
                         LAUNCH_LOGGER.info(f"Got option {sind}. Restarting {sg}/{sn}.")

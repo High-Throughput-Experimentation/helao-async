@@ -56,7 +56,16 @@ from helao.helpers.yml_tools import yml_load
 
 if __name__ == "__main__":
     log_root = "."
-    colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected
+    # launch.py sets HELAO_FORCE_COLOR when it pumps our output through its own
+    # tty stdout: emit raw ANSI so the launcher's colorama translates it (which
+    # on Windows must happen against a real console handle, not our pipe),
+    # instead of stripping just because our own stdout is a pipe.
+    if os.environ.get("HELAO_FORCE_COLOR") == "1":
+        colorama.init(strip=False, convert=False)
+    else:
+        colorama.init(
+            strip=not sys.stdout.isatty()
+        )  # strip colors if stdout is redirected
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     server_key = sys.argv[2]
     confArg = sys.argv[1]
