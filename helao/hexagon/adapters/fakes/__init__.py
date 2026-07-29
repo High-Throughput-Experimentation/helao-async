@@ -274,3 +274,33 @@ class FakeStatePersistence:
     def import_queues(self) -> Optional[dict]:
         payload, self._stored = self._stored, None  # consume-and-archive
         return payload
+
+
+class FakeTableCatalog:
+    """In-memory `TableCatalogPort`: rows supplied as dicts, no file at all.
+
+    Lets a deployment library be exercised with a known table (and with an
+    empty one, to cover the caller's fallback path) without a station CSV.
+    """
+
+    def __init__(self, rows: Optional[List[dict]] = None):
+        _banner("FakeTableCatalog")
+        self._rows: List[dict] = list(rows or [])
+
+    def rows(self) -> List[dict]:
+        return list(self._rows)
+
+    def lookup_one(self, **keys) -> Optional[dict]:
+        matched = self._matching(**keys)
+        return dict(matched[0]) if len(matched) == 1 else None
+
+    def lookup_first(self, **keys) -> Optional[dict]:
+        matched = self._matching(**keys)
+        return dict(matched[0]) if matched else None
+
+    def _matching(self, **keys) -> List[dict]:
+        return [
+            row
+            for row in self._rows
+            if all(key in row and row[key] == val for key, val in keys.items())
+        ]

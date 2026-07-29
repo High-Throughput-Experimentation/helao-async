@@ -12,8 +12,10 @@ from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdap
 from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.adapters.native.native_syncer import NativeSyncer
 from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
+from helao.hexagon.adapters.native.csv_catalog import CsvTableCatalog
 
 __all__ = [
+    "CsvTableCatalog",
     "NativeMetaFileWriter",
     "NativeDataFileWriter",
     "NativeDataStreamer",
