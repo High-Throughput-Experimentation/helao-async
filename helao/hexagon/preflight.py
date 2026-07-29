@@ -168,11 +168,31 @@ def _checklist_presence(servers: dict, checklist_dir: Optional[Path]) -> list[st
     return issues
 
 
-def _lib_module_path(entry: str, default_dir: Path) -> Optional[Path]:
-    """Resolve a library list entry (bare name or repo-relative path) to a file."""
+def _lib_module_path(
+    entry: str, default_dir: Path, deployment: Optional[str] = None
+) -> Optional[Path]:
+    """Resolve a library list entry (bare name or repo-relative path) to a file.
+
+    Bare names resolve the way `helao.helpers.import_autolibs` does at runtime:
+    the config's own deployment first, then the `hte` fallback. Without the
+    deployment leg, a config whose libraries live only in its own deployment
+    resolves to None here and is silently skipped by the collision check --
+    the gate reads as passing while checking nothing.
+    """
     if entry.endswith(".py") or "/" in entry:
         p = (REPO_ROOT / entry) if not Path(entry).is_absolute() else Path(entry)
         return p if p.exists() else None
+    if deployment and deployment != HEXAGON:
+        p = (
+            REPO_ROOT
+            / "helao"
+            / "deploy"
+            / deployment
+            / default_dir.name
+            / f"{entry}.py"
+        )
+        if p.exists():
+            return p
     p = default_dir / f"{entry}.py"
     return p if p.exists() else None
 
@@ -186,7 +206,7 @@ def _top_level_funcs(path: Path) -> list[str]:
     ]
 
 
-def _library_collisions(cfg: dict) -> list[str]:
+def _library_collisions(cfg: dict, deployment: Optional[str] = None) -> list[str]:
     if cfg.get("allow_shadow"):
         return []
     issues: list[str] = []
@@ -196,7 +216,7 @@ def _library_collisions(cfg: dict) -> list[str]:
     ):
         name_to_mods: dict[str, list[str]] = defaultdict(list)
         for entry in cfg.get(cfg_key, []) or []:
-            path = _lib_module_path(str(entry), default_dir)
+            path = _lib_module_path(str(entry), default_dir, deployment)
             if path is None:
                 continue
             for fn in _top_level_funcs(path):
@@ -220,7 +240,7 @@ def preflight_config(config: str) -> list[str]:
     issues += _config_sanity(servers)
     issues += _shim_completeness(servers)
     issues += _checklist_presence(servers, checklist_dir)
-    issues += _library_collisions(cfg)
+    issues += _library_collisions(cfg, deployment)
     return issues
 
 

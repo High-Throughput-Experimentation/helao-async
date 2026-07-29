@@ -48,8 +48,10 @@ LIBRARY_MODULES = _library_modules(
 
 
 def test_library_module_set_nonempty():
-    # 13 experiment modules + 14 sequence modules on unstable (spec §8.1).
-    assert len(LIBRARY_MODULES) == 27, LIBRARY_MODULES
+    # 13 experiment modules + 13 sequence modules on unstable (spec §8.1).
+    # Deliberately an exact count, not a floor: adding an hte library should
+    # force a conscious look at this sweep. Update it when the set changes.
+    assert len(LIBRARY_MODULES) == 26, LIBRARY_MODULES
 
 
 @pytest.mark.parametrize("mod", LIBRARY_MODULES)
