@@ -61,6 +61,7 @@ dependencies:
   - pymodbus
   - pyright
   - pyserial
+  - pytest-asyncio
   - python-dotenv
   - python-multipart
   - python=3.14
