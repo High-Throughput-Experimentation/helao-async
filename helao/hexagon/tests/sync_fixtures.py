@@ -27,6 +27,19 @@ NATIVE_SYNC_PATH = (
 )
 REGION_START = 62  # first line of the verbatim legacy region (LOGGER = ...)
 
+#: The verbatim region is everything from REGION_START down to the end of
+#: legacy ``SyncDriver`` -- i.e. it stops just before the Base-coupled
+#: ``HelaoSyncer`` subclass, which the native module deliberately replaces with
+#: ``NativeSyncer`` (D2) and therefore does NOT copy.
+#:
+#: This boundary is DERIVED from the sentinel below rather than hardcoded. A
+#: literal end line silently rots: any insertion or deletion above
+#: ``HelaoSyncer`` shifts it, and it drifted twice in two commits (``d88cabe3``
+#: removed ``to_api``, ``dadd5e44`` added ``has_pending_work``) until the line
+#: number had slid past ``class HelaoSyncer`` and the pin was asserting
+#: byte-identity for a class the native module is supposed to omit.
+HELAO_SYNCER_SENTINEL = "class HelaoSyncer(SyncDriver):"
+
 
 def _source_of(owner, name: str) -> str:
     obj = inspect.getattr_static(owner, name)
@@ -46,12 +59,44 @@ def assert_source_parity(native_owner, legacy_owner, names) -> None:
     assert not diffs, f"native members drifted from legacy source: {diffs}"
 
 
-def assert_verbatim_region(end_line: int) -> None:
+def verbatim_region_end(legacy_lines: list[str]) -> int:
+    """1-based legacy line where the verbatim region ends: the last line of
+    ``SyncDriver``, i.e. the final non-blank line before ``HelaoSyncer``.
+
+    Fails loud if the sentinel is gone, since a silently-missing sentinel would
+    make the pin vacuous.
+    """
+    sentinel = [
+        i
+        for i, line in enumerate(legacy_lines)
+        if line.startswith(HELAO_SYNCER_SENTINEL)
+    ]
+    assert len(sentinel) == 1, (
+        f"expected exactly one {HELAO_SYNCER_SENTINEL!r} in "
+        f"{LEGACY_SYNC_PATH.name}, found {len(sentinel)}"
+    )
+    end = sentinel[0]  # 0-based index of the sentinel == 1-based line above it
+    while end > REGION_START and not legacy_lines[end - 1].strip():
+        end -= 1  # back over the blank run between the two classes
+    return end
+
+
+def assert_verbatim_region(end_line: int | None = None) -> None:
     """Legacy lines REGION_START..end_line must appear byte-identical in the
     native module (contiguous-copy capstone; complements per-member pins).
-    Reads the LIVE legacy file, so it also pins against legacy drift."""
+    Reads the LIVE legacy file, so it also pins against legacy drift.
+
+    ``end_line`` defaults to the derived end of ``SyncDriver``; pass an explicit
+    line only to pin a narrower prefix.
+    """
     legacy = LEGACY_SYNC_PATH.read_text().splitlines(keepends=True)
+    if end_line is None:
+        end_line = verbatim_region_end(legacy)
     region = "".join(legacy[REGION_START - 1 : end_line])
+    assert HELAO_SYNCER_SENTINEL not in region, (
+        f"the verbatim region reaches into {HELAO_SYNCER_SENTINEL!r}, which the "
+        "native module replaces with NativeSyncer and does not copy"
+    )
     native = NATIVE_SYNC_PATH.read_text()
     assert region in native, (
         f"legacy lines {REGION_START}..{end_line} are not byte-identical "
