@@ -33,6 +33,7 @@ CLI flags (position-independent; parsed separately from `extraopt`):
 
 Other utilities:
 - `python run_unit_tests.py` — runs `helao.core.tests.unit_test_sample_models.sample_model_unit_test`. `launch.py` runs this automatically before launching anything and aborts on failure.
+- `python -m helao.core.tests.check_queue_pcks <STATES dir>` — read-only report of which `queues*.pck` files the current build could actually restore (missing model classes, or a payload schema this build does not write). Never loads a pickle; walks the opcode stream instead. Exits 1 if any file is unrestorable, so it can gate a cleanup sweep.
 
 There is no pytest harness and no project-wide build step. New "tests" are typically standalone scripts under `helao/core/tests/` or `helao/deploy/<deployment>/tests/`.
 
