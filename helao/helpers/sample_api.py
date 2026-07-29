@@ -28,6 +28,7 @@ import shortuuid
 from uuid import UUID
 
 from helao.helpers import helao_logging as logging
+from helao.hexagon.domain.sample_volume import update_vol as domain_update_vol
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from .plate_api import HTEPlateAPI
@@ -1335,28 +1336,15 @@ def update_vol(BS, delta_vol_ml: float, dilute: bool):
     concentration before mixing is preserved (negative sentinel when the old
     volume was non-positive).
 
+    The arithmetic now lives in
+    :func:`helao.hexagon.domain.sample_volume.update_vol` (pure, no I/O, so the
+    domain layer can use it without importing this SQLite-backed module). This
+    wrapper stays as the legacy entry point and passes this module's LOGGER
+    through, so existing callers keep their log routing unchanged.
+
     Args:
         BS: Sample model with ``volume_ml`` (and optionally ``dilution_factor``).
         delta_vol_ml: Signed change in volume, in milliliters.
         dilute: When True, recompute ``dilution_factor`` from the new volume.
     """
-    if hasattr(BS, "volume_ml"):
-        old_vol = BS.volume_ml
-        tot_vol = old_vol + delta_vol_ml
-        if tot_vol <= 0:
-            LOGGER.error(
-                "new volume is <= 0, setting it to zero and setting status to destroyed"
-            )
-            BS.zero_volume()
-            tot_vol = 0
-        BS.volume_ml = tot_vol
-        if dilute:
-            if hasattr(BS, "dilution_factor"):
-                old_df = BS.dilution_factor
-                if old_vol <= 0:
-                    LOGGER.error("previous volume is <= 0, setting new df to 0.")
-                    new_df = -1
-                else:
-                    new_df = tot_vol / (old_vol / old_df)
-                BS.dilution_factor = new_df
-                LOGGER.info(f"updated sample dilution-factor: {BS.dilution_factor}")
+    domain_update_vol(BS, delta_vol_ml, dilute, logger=LOGGER)
