@@ -6,8 +6,11 @@ D6/slice-2 precedent). Base-free: no ``helao_logging``, no
 ``helao.core.servers.base``, no vendor (paramiko/nidaqmx) imports -- stdlib
 ``logging`` only, mirroring ``motion_transform.py``'s allow-list.
 
-Constructed with ``(sample_state: SampleStatePort, cams)`` (P3a-PAL plan
-Decision 2): the port is injected rather than a ``DataSink``/``Active``
+Constructed with ``(sample_state: SampleStateProtocol, cams)`` (P3a-PAL plan
+Decision 2): the collaborator contract is declared here in the domain
+(``domain/sample_state.py``) and re-exported by ``ports/sample_state.py`` as
+``SampleStatePort`` for adapters to bind to -- the domain must not import
+``ports``. The port is injected rather than a ``DataSink``/``Active``
 handle, and ``action_uuid``/``action`` are read only as PLAIN PARAMS on the
 methods that need them -- never held as instance state. ``cams`` is the
 same ``CAMS``-shaped table the driver builds from server config (an
@@ -34,7 +37,7 @@ import logging
 from copy import deepcopy
 from typing import List, Optional, Tuple, Union
 
-from helao.helpers.sample_api import update_vol
+from helao.hexagon.domain.sample_volume import update_vol
 from helao.hexagon.domain.models import (
     Action,
     ErrorCodes,
@@ -52,7 +55,7 @@ from helao.hexagon.domain.models import (
     SolidSample,
     _positiontype,
 )
-from helao.hexagon.ports.sample_state import SampleStatePort
+from helao.hexagon.domain.sample_state import SampleStateProtocol
 
 LOGGER = logging.getLogger(__name__)
 
@@ -61,7 +64,8 @@ __all__ = ["PalReconciliation"]
 
 class PalReconciliation:
     """Resolves PAL source/dest positions and reconciles post-trigger sample
-    state against a :class:`SampleStatePort`.
+    state against a :class:`SampleStateProtocol` (exposed to adapters and
+    composition as ``ports.sample_state.SampleStatePort``).
 
     Attributes:
         sample_state: Injected sample-state port (never a DataSink/Active
@@ -70,7 +74,7 @@ class PalReconciliation:
             ``self.cams[method_name].value`` is ever read, in slice 3b).
     """
 
-    def __init__(self, sample_state: SampleStatePort, cams):
+    def __init__(self, sample_state: SampleStateProtocol, cams):
         self.sample_state = sample_state
         self.cams = cams
 
