@@ -26,6 +26,7 @@ stage still imports cleanly after it, and vice versa.
 
 import pickle
 import os
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -34,6 +35,34 @@ from helao.helpers.time_utils import gen_uuid
 from helao.helpers.dequedict import DequeDict
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+# Layout version of the ``queues.pck`` payload, compared on import so a pickle
+# this code cannot faithfully restore is declined with a clear message instead of
+# being half-applied.
+#
+# Bump ONLY when the pickled dict's keys or value types change incompatibly. This
+# is deliberately NOT the release version: ``get_hlo_version()`` is the short git
+# commit hash, so stamping that would reject every pickle after any unrelated
+# commit -- which would break ``--restore`` and the hot-reload orchestrator
+# restart that depends on it.
+#
+# Note this check only catches payloads whose *layout* changed. A payload that
+# still matches but references a since-renamed model class fails earlier, when
+# unpickling resolves the class; :meth:`QueuePersister.import_queues` quarantines
+# that case separately.
+QUEUE_PCK_SCHEMA = 1
+
+# How many timestamped exports to keep. The dispatch post-loop writes one every
+# time the orchestrator stops with non-empty queues, so uncapped they accumulate
+# indefinitely -- instruments have been found holding files over a year old.
+TIMESTAMPED_EXPORT_RETENTION = 5
+
+# Matches only the timestamped export series written by ``export_queues``
+# (``queues_<YYMMDD>.<HHMMSS>.pck``). Deliberately excludes the
+# ``queues_imported_<ts>.pck`` and ``queues_unreadable_<ts>.pck`` archives: those
+# are forensic records of a restore and of a failed load, and pruning them would
+# delete the evidence someone is most likely to want.
+_TIMESTAMPED_EXPORT_RE = re.compile(r"^queues_\d{6}\.\d{6}\.pck$")
 
 
 class QueuePersister:
@@ -49,6 +78,11 @@ class QueuePersister:
     def export_queues(self, timestamp_pck: bool = False) -> str:
         """Pickle the deques, active/last sequence and experiment, and histories under ``STATES/``.
 
+        Stamps :data:`QUEUE_PCK_SCHEMA` into the payload so :meth:`import_queues`
+        can decline a layout it cannot restore. When ``timestamp_pck`` is set, the
+        timestamped series is pruned to :data:`TIMESTAMPED_EXPORT_RETENTION` files
+        afterwards.
+
         Args:
             timestamp_pck: When True, embed a timestamp in the pickle filename.
 
@@ -58,6 +92,7 @@ class QueuePersister:
         orch = self.orch
         save_dir = orch.world_cfg["root"]
         queue_dict = {
+            "schema": QUEUE_PCK_SCHEMA,
             "seq": list(orch.sequence_dq),
             "exp": list(orch.experiment_dq),
             "act": list(orch.action_dq),
@@ -79,9 +114,65 @@ class QueuePersister:
             pck_name = f"queues_{datetime.now().strftime('%y%m%d.%H%M%S')}.pck"
         else:
             pck_name = "queues.pck"
-        save_path = os.path.join(save_dir, "STATES", pck_name)
-        pickle.dump(queue_dict, open(save_path, "wb"))
+        states_dir = os.path.join(save_dir, "STATES")
+        save_path = os.path.join(states_dir, pck_name)
+        with open(save_path, "wb") as f:
+            pickle.dump(queue_dict, f)
+        if timestamp_pck:
+            self.prune_timestamped_exports(states_dir)
         return save_path
+
+    def prune_timestamped_exports(
+        self, states_dir: str, keep: int = TIMESTAMPED_EXPORT_RETENTION
+    ) -> list:
+        """Delete all but the newest ``keep`` timestamped exports in ``states_dir``.
+
+        Only the ``queues_<YYMMDD>.<HHMMSS>.pck`` series is considered (see
+        :data:`_TIMESTAMPED_EXPORT_RE`); the plain ``queues.pck`` and the
+        ``_imported_``/``_unreadable_`` archives are left alone. Newest is decided
+        by the timestamp in the filename rather than mtime, so a copied or touched
+        file cannot reorder the series.
+
+        Never raises: this runs from :meth:`export_queues`, which itself runs
+        during orchestrator shutdown, and failing to tidy up must not turn into a
+        failure to save the queues.
+
+        Args:
+            states_dir: The ``STATES`` directory to prune.
+            keep: How many of the newest exports to retain.
+
+        Returns:
+            The filenames removed, newest-last.
+        """
+        try:
+            names = sorted(
+                n for n in os.listdir(states_dir) if _TIMESTAMPED_EXPORT_RE.match(n)
+            )
+        except Exception:
+            LOGGER.error(
+                f"Could not list '{states_dir}' to prune timestamped queue "
+                f"exports; leaving them in place.",
+                exc_info=True,
+            )
+            return []
+        if len(names) <= keep:
+            return []
+        removed = []
+        for name in names[:-keep]:
+            try:
+                os.remove(os.path.join(states_dir, name))
+                removed.append(name)
+            except Exception:
+                LOGGER.error(f"Could not remove '{name}'.", exc_info=True)
+        if removed:
+            LOGGER.info(
+                f"Pruned {len(removed)} timestamped queue export(s), keeping the "
+                f"newest {keep}: removed {removed[0]}..{removed[-1]}"
+                if len(removed) > 1
+                else f"Pruned 1 timestamped queue export, keeping the newest "
+                f"{keep}: removed {removed[0]}"
+            )
+        return removed
 
     def import_queues(self, pck_path: Optional[str] = None) -> str:
         """Restore deques/active/last state from a previously exported pickle.
@@ -129,6 +220,21 @@ class QueuePersister:
                 return save_path
         else:
             LOGGER.info("Exported queues.pck does not exist. Cannot restore.")
+            return save_path
+        # Layout check. The pickle loaded, so its class references all resolve;
+        # what this catches is a payload whose shape this code cannot faithfully
+        # restore. Pickles written before the schema stamp existed report None and
+        # are declined for the same reason -- there is no way to confirm they match.
+        found_schema = queue_dict.get("schema")
+        if found_schema != QUEUE_PCK_SCHEMA:
+            LOGGER.error(
+                f"Refusing to restore '{save_path}': payload schema is "
+                f"{found_schema!r} but this code writes and expects "
+                f"{QUEUE_PCK_SCHEMA!r}. The file was written by a different "
+                f"version; leaving it in place and starting with empty queues. "
+                f"Delete it, or restore it deliberately with a build whose schema "
+                f"matches."
+            )
             return save_path
         if orch.sequence_dq or orch.experiment_dq or orch.action_dq:
             LOGGER.info("Existing queues are not empty. Cannot restore.")
