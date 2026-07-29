@@ -32,8 +32,6 @@ CLI flags (position-independent; parsed separately from `extraopt`):
 - `--hot-reload` / `--no-hot-reload` — the hot-reload watcher (watches the parent repo and each nested `helao/deploy/*` git repo; on a pulled commit, restarts idle servers whose loaded code changed) runs **on by default**. Disable with `--no-hot-reload` or `hot_reload.enabled: false` in the config; `hot_reload.poll_seconds` (default 30) tunes the poll interval. Precedence: `--no-hot-reload` > `--hot-reload` > config. Affected servers are mapped via each server's `/loaded_modules` endpoint (bokeh servers use a `STATES/loaded_modules_<key>.json` startup snapshot); orchestrators are only reloaded when idle and restart with `--restore`.
 
 Other utilities:
-- `python append.py <running_prefix> <append_prefix>` — start additional servers and merge them into a running group.
-- `python cli.py <config_prefix>` — interactive REPL that introspects each FastAPI server's endpoints and lets you invoke them.
 - `python run_unit_tests.py` — runs `helao.core.tests.unit_test_sample_models.sample_model_unit_test`. `launch.py` runs this automatically before launching anything and aborts on failure.
 
 There is no pytest harness and no project-wide build step. New "tests" are typically standalone scripts under `helao/core/tests/` or `helao/deploy/<deployment>/tests/`.
