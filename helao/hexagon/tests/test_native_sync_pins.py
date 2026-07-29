@@ -4,7 +4,10 @@ Every pinned member's source must be byte-identical to the LIVE legacy
 module (helao/core/drivers/data/sync_driver.py) — proves the copy is exact
 AND pins against future legacy drift. The verbatim-region test is the
 capstone: the whole contiguous legacy region must appear unmodified inside
-the native module. REGION_END grows per task (T2: 528 ... T7: 2057)."""
+the native module. The region grew per task during P2c (T2: 528 ... T7: the
+full region); since T7 it spans everything up to the end of legacy
+``SyncDriver``, derived from the ``HelaoSyncer`` sentinel rather than pinned
+to a line number that shifts on every legacy edit."""
 
 import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
@@ -12,8 +15,6 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_source_parity,
     assert_verbatim_region,
 )
-
-REGION_END = 2057  # T7: full verbatim region capstone
 
 MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
 
@@ -63,7 +64,7 @@ PROGRESS = [
 
 
 def test_verbatim_region():
-    assert_verbatim_region(REGION_END)
+    assert_verbatim_region()
 
 
 def test_module_functions_parity():
