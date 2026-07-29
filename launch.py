@@ -129,9 +129,10 @@ ALT_SCREEN_OFF = "\x1b[?1049l"
 def _mux_log(level, message, **kwargs):
     """Log from :class:`ConsoleMux`, tolerating an unconfigured LAUNCH_LOGGER.
 
-    ``append.py`` calls :func:`launcher` without initialising LAUNCH_LOGGER, so
-    the mux must not be what raises there. Resolved at call time because
-    ``main()`` rebinds the global.
+    LAUNCH_LOGGER is only populated by :func:`main`, so a caller that drives
+    :func:`launcher` directly may leave it ``None``; the mux must not be what
+    raises in that case. Resolved at call time because ``main()`` rebinds the
+    global.
     """
     if LAUNCH_LOGGER is None:
         return
@@ -174,10 +175,11 @@ class ConsoleMux:
 
         Off by default, and only ``main()`` turns it on, because piping is only
         safe for a launcher that outlives its children. A process that spawns
-        servers and then exits (``append.py``) closes the pipe read end on the
-        way out, and the next console write kills the server -- verified: the
-        child is reaped and never finishes its writes. Such callers must keep
-        inheriting the terminal, which is what an inactive mux gives them.
+        servers and then exits closes the pipe read end on the way out, and the
+        server is killed on its next console write -- verified directly: the
+        child is reaped without finishing its writes. Any future fire-and-forget
+        caller of :func:`launcher` must therefore leave this off and let its
+        children inherit the terminal, which is what an inactive mux gives them.
         """
         self.active = True
 
@@ -672,8 +674,9 @@ class Pidd:
 
     def _reap_child(self, k):
         """Reap the OS child for server ``k`` so a terminated process does not
-        linger as an unwaited zombie. No-op if this launcher never spawned it
-        (e.g. servers appended by ``append.py`` or a fresh ``Pidd`` in cli.py)."""
+        linger as an unwaited zombie. No-op if this launcher never spawned it,
+        e.g. a ``Pidd`` that adopted pids from an existing pickle rather than
+        launching them."""
         p = self.procs.get(k)
         if p is not None:
             try:
