@@ -33,8 +33,8 @@ auto-imports `sequence_lib`/`experiment_lib` and self-discovers the orch server.
 
 ## Decisions (locked)
 
-1. **Scope**: deployments `hte`, `test`, `priv`, `lila`, `mea`. **Exclude
-   `lila_gl`.** `priv`, `lila`, `mea` are separate nested git repos and get
+1. **Scope**: deployments `hte`, `test`, `Deployment-C`, `Deployment-A`, `Deployment-B`. **Exclude
+   `Deployment-D`.** `Deployment-C`, `Deployment-A`, `Deployment-B` are separate nested git repos and get
    their own commits.
 2. **Module home**: keep the single copy
    `helao/deploy/hte/servers/operator/standalone_operator.py`. The bokeh
@@ -46,7 +46,7 @@ auto-imports `sequence_lib`/`experiment_lib` and self-discovers the orch server.
 4. **Operator server key**: `OPERATOR`.
 5. **Operator port**: reclaim the **same port the integrated operator used in
    that config** (its old `bokeh_port`). This avoids new collisions — in
-   `hte`/`mea`/3 `priv` configs port 5001 is the `VIS` server and the operator
+   `hte`/`Deployment-B`/3 `Deployment-C` configs port 5001 is the `VIS` server and the operator
    used 5002.
 
 ## Architecture (after)
@@ -80,7 +80,7 @@ WebSocket. The orchestrator imports no Bokeh and no operator code.
 
 ### 3. `helao/helpers/config_loader.py`
 - `OrchServerParams`: keep an `enable_op` field (deprecated, ignored) so the
-  untouched `lila_gl` config still validates; ensure no code reads `enable_op`
+  untouched `Deployment-D` config still validates; ensure no code reads `enable_op`
   or `bokeh_port`. If the model forbids extra keys, leaving the field in place
   is what prevents a validation error on legacy configs.
 
@@ -100,7 +100,7 @@ OPERATOR:
     poll_interval: 5
 ```
 
-For `.py` configs (`lila/electrode-demo.py`, `lila/simulation.py`) add the
+For `.py` configs (`Deployment-A/electrode-demo.py`, `Deployment-A/simulation.py`) add the
 equivalent dict entry.
 
 `test/configs/test.yml` special case: it already has a `STANDALONE_OP` entry on
@@ -113,10 +113,10 @@ remove `enable_op/bokeh_port` from `ORCH`.
 | Deployment | Configs | Operator port |
 |---|---|---|
 | hte | adss, adss3, anec, ccsi1, ccsi2, clad, eche4, eche5, eche6, eche7, eche8, eche10, ecms1, ecms2, hispec, partialccsi1, power_supply_test, uvis, xrfs1 | 5002 |
-| mea | amts | 5002 |
-| priv | icpm1, note1, xrfs_priv1 | 5002 |
-| priv | test_alert, uvis4 | 5001 |
-| lila | electrode-demo, simulation | 5001 |
+| Deployment-B | amts | 5002 |
+| Deployment-C | icpm1, note1, xrfs_priv1 | 5002 |
+| Deployment-C | test_alert, uvis4 | 5001 |
+| Deployment-A | electrode-demo, simulation | 5001 |
 | test | test, demo0, ws_demo | 5001 |
 | test | demo1 | 5011 |
 
@@ -150,14 +150,14 @@ non-operator server, and confirm `group: operator` uniqueness rules in
 - **Update latency**: the in-process push (`update_operator`) is gone;
   `RemoteBackend` relies on the status WebSocket plus a 5 s poll. Acceptable;
   matches the already-shipped standalone behavior.
-- **Legacy `enable_op` in untouched configs** (`lila_gl`): kept as an ignored
+- **Legacy `enable_op` in untouched configs** (`Deployment-D`): kept as an ignored
   field in `OrchServerParams` so those configs still validate.
-- **Nested-repo commits** (`priv`, `lila`, `mea`): each requires `cd` into the
+- **Nested-repo commits** (`Deployment-C`, `Deployment-A`, `Deployment-B`): each requires `cd` into the
   deployment and a commit on its own remote/branch.
 
 ## Out of scope
 
-- `lila_gl` deployment.
+- `Deployment-D` deployment.
 - `helao/core/servers/operator/helao_operator.py` (separate non-Bokeh operator;
   untouched).
 - Any change to `BokehOperator` UI behavior.

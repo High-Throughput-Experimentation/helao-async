@@ -18,17 +18,17 @@
 - Modify `helao/core/servers/operator/orch_backend.py` — delete `_OpShim` + `LocalBackend`; keep `OrchBackend` ABC + `RemoteBackend`.
 - Modify `helao/core/tests/test_standalone_operator.py` — delete the four `LocalBackend`/`_OpShim` test cases + their `run_all()` calls.
 - Modify `helao/helpers/config_loader.py` — mark `enable_op` deprecated/ignored in `OrchServerParams`.
-- Modify configs (hte + test tracked; priv + lila + mea in nested repos) — drop `enable_op`/`bokeh_port`, add an `OPERATOR` server entry on the reclaimed port.
+- Modify configs (hte + test tracked; Deployment-C + Deployment-A + Deployment-B in nested repos) — drop `enable_op`/`bokeh_port`, add an `OPERATOR` server entry on the reclaimed port.
 
 ### Reclaimed operator port table
 
 | Deployment | Configs | Operator port |
 |---|---|---|
 | hte | adss, adss3, anec, ccsi1, ccsi2, clad, eche4, eche5, eche6, eche7, eche8, eche10, ecms1, ecms2, hispec, partialccsi1, power_supply_test, uvis, xrfs1 | 5002 |
-| mea | amts | 5002 |
-| priv | icpm1, note1, xrfs_priv1 | 5002 |
-| priv | test_alert, uvis4 | 5001 |
-| lila | electrode-demo, simulation | 5001 |
+| Deployment-B | amts | 5002 |
+| Deployment-C | icpm1, note1, xrfs_priv1 | 5002 |
+| Deployment-C | test_alert, uvis4 | 5001 |
+| Deployment-A | electrode-demo, simulation | 5001 |
 | test | test, demo0, ws_demo | 5001 |
 | test | demo1 | 5011 |
 
@@ -513,19 +513,19 @@ Expected: group launches; the `OPERATOR` server starts and serves Bokeh on `http
 
 ---
 
-## Task 7: Migrate nested-repo configs (priv, lila, mea)
+## Task 7: Migrate nested-repo configs (Deployment-C, Deployment-A, Deployment-B)
 
 These deployments are **separate git repositories** nested in-tree and invisible to the parent repo's `git status`. Each requires `cd` into the deployment dir and a commit on its own remote/branch.
 
 **Files:**
-- `helao/deploy/priv/configs/icpm1.yml`, `note1.yml`, `xrfs_priv1.yml` (operator port **5002**)
-- `helao/deploy/priv/configs/test_alert.yml`, `uvis4.yml` (operator port **5001**)
-- `helao/deploy/lila/configs/electrode-demo.py`, `simulation.py` (operator port **5001**)
-- `helao/deploy/mea/configs/amts.yml` (operator port **5002**)
+- `helao/deploy/Deployment-C/configs/icpm1.yml`, `note1.yml`, `xrfs_priv1.yml` (operator port **5002**)
+- `helao/deploy/Deployment-C/configs/test_alert.yml`, `uvis4.yml` (operator port **5001**)
+- `helao/deploy/Deployment-A/configs/electrode-demo.py`, `simulation.py` (operator port **5001**)
+- `helao/deploy/Deployment-B/configs/amts.yml` (operator port **5002**)
 
-- [ ] **Step 1: Edit the priv `.yml` configs**
+- [ ] **Step 1: Edit the Deployment-C `.yml` configs**
 
-For each priv yaml, remove `enable_op` + `bokeh_port` from `ORCH` `params:` (leave `params: {}` if empty) and add the operator entry. For `icpm1.yml`, `note1.yml`, `xrfs_priv1.yml` use `port: 5002`; for `test_alert.yml`, `uvis4.yml` use `port: 5001`:
+For each Deployment-C yaml, remove `enable_op` + `bokeh_port` from `ORCH` `params:` (leave `params: {}` if empty) and add the operator entry. For `icpm1.yml`, `note1.yml`, `xrfs_priv1.yml` use `port: 5002`; for `test_alert.yml`, `uvis4.yml` use `port: 5001`:
 
 ```yaml
   OPERATOR:
@@ -538,7 +538,7 @@ For each priv yaml, remove `enable_op` + `bokeh_port` from `ORCH` `params:` (lea
       poll_interval: 5
 ```
 
-- [ ] **Step 2: Edit `mea/configs/amts.yml`**
+- [ ] **Step 2: Edit `Deployment-B/configs/amts.yml`**
 
 Remove `enable_op: true` + `bokeh_port: 5002` from `ORCH` `params:`; add:
 
@@ -553,9 +553,9 @@ Remove `enable_op: true` + `bokeh_port: 5002` from `ORCH` `params:`; add:
       poll_interval: 5
 ```
 
-- [ ] **Step 3: Edit the lila `.py` configs (dict format, port 5001)**
+- [ ] **Step 3: Edit the Deployment-A `.py` configs (dict format, port 5001)**
 
-In `lila/configs/simulation.py` and `lila/configs/electrode-demo.py`, change the `ORCH` entry's `"params"` to drop `enable_op`/`bokeh_port`:
+In `Deployment-A/configs/simulation.py` and `Deployment-A/configs/electrode-demo.py`, change the `ORCH` entry's `"params"` to drop `enable_op`/`bokeh_port`:
 
 ```python
     "ORCH": {
@@ -589,9 +589,9 @@ Run:
 PYTHONPATH=$PWD conda run -n helao python -c "
 from helao.helpers.config_loader import read_config
 import glob
-paths = (glob.glob('helao/deploy/priv/configs/*.yml')
-         + ['helao/deploy/mea/configs/amts.yml']
-         + glob.glob('helao/deploy/lila/configs/*.py'))
+paths = (glob.glob('helao/deploy/Deployment-C/configs/*.yml')
+         + ['helao/deploy/Deployment-B/configs/amts.yml']
+         + glob.glob('helao/deploy/Deployment-A/configs/*.py'))
 targets = {'icpm1','note1','xrfs_priv1','test_alert','uvis4','amts','simulation','electrode-demo'}
 for path in paths:
     name = path.split('/')[-1].rsplit('.',1)[0]
@@ -612,9 +612,9 @@ Expected: prints each name with port 5002 (icpm1/note1/xrfs_priv1/amts) or 5001 
 - [ ] **Step 5: Commit each nested repo separately**
 
 ```bash
-cd helao/deploy/priv && git add configs/*.yml && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
-cd helao/deploy/lila && git add configs/simulation.py configs/electrode-demo.py && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
-cd helao/deploy/mea && git add configs/amts.yml && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
+cd helao/deploy/Deployment-C && git add configs/*.yml && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
+cd helao/deploy/Deployment-A && git add configs/simulation.py configs/electrode-demo.py && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
+cd helao/deploy/Deployment-B && git add configs/amts.yml && git commit -m "feat(configs): launch standalone OPERATOR server, drop integrated op" && cd -
 ```
 
 Push each nested repo per its own workflow (ask the user before pushing nested repos).
@@ -623,6 +623,6 @@ Push each nested repo per its own workflow (ask the user before pushing nested r
 
 ## Notes / out of scope
 
-- `lila_gl` is excluded; its configs keep `enable_op`/`bokeh_port` (now ignored fields).
+- `Deployment-D` is excluded; its configs keep `enable_op`/`bokeh_port` (now ignored fields).
 - `helao/core/servers/operator/helao_operator.py` is untouched.
 - No change to `BokehOperator` UI behavior.
