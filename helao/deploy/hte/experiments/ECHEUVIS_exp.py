@@ -7,7 +7,7 @@ Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
 ``ANA``, ``ORCH``).
 """
 
-__all__ = [
+EXPERIMENTS = [
     "ECHEUVIS_analysis_stability",
     "ECHEUVIS_sub_CA_led",
     "ECHEUVIS_sub_CP_led",
@@ -45,8 +45,6 @@ from helao.deploy.hte.drivers.io.enum import TriggerType
 from helao.helpers.constants import SPECSRV_MAP
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 PSTAT_server = MM(server_name="PSTAT", machine_name=gethostname().lower()).as_dict()
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()

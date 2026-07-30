@@ -1,11 +1,9 @@
 """Sequence library exposing UV-Vis transmission programs and a post-analysis."""
 
-__all__ = ["UVIS_T", "UVIS_T_postseq"]
+SEQUENCES = ["UVIS_T", "UVIS_T_postseq"]
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=5)

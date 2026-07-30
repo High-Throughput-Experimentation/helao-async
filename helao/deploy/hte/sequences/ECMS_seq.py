@@ -6,7 +6,7 @@ purges, CO2 baselines, mass-spec calibration, and electrochemical actions
 (CV/CA/pulseCA) for both single-pass and recirculating configurations.
 """
 
-__all__ = [
+SEQUENCES = [
     "ECMS_CV_recirculation_mixedreactant",
     "ECMS_initiation",
     "ECMS_initiation_recirculation",
@@ -27,8 +27,6 @@ __all__ = [
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=2)

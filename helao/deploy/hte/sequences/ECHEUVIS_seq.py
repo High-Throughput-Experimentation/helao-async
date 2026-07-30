@@ -6,7 +6,7 @@ measurements, LED-triggered electrochemistry (CV/CA/CP/multiCA), and a
 post-sequence analysis hook.
 """
 
-__all__ = [
+SEQUENCES = [
     "ECHEUVIS_CA_led",
     "ECHEUVIS_CP_led",
     "ECHEUVIS_CV_led",
@@ -21,8 +21,6 @@ from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.constants import SPEC_MAP
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=5)

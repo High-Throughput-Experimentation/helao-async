@@ -1,6 +1,6 @@
 """Archived demo experiment library wrapping basic PSTAT techniques."""
 
-__all__ = [
+EXPERIMENTS = [
     "DEMO_sub_CA",
     "DEMO_sub_CP",
     "DEMO_sub_OCV",
@@ -15,7 +15,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()

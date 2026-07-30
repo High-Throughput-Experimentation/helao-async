@@ -1,11 +1,9 @@
-__all__ = [
+SEQUENCES = [
     "ICPMS_postseq",
 ]
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=1)

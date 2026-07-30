@@ -5,7 +5,7 @@ calls against the ``SIM`` server to validate end-to-end live-data
 visualization through websockets.
 """
 
-__all__ = ["SIM_websocket_data"]
+EXPERIMENTS = ["SIM_websocket_data"]
 
 from socket import gethostname
 
@@ -15,7 +15,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()

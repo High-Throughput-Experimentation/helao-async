@@ -8,7 +8,7 @@ Action targets are referenced by ``server_key`` strings (``PSTAT``,
 ``MOTOR``, ``NI``, ``PAL``, ``WORKSYRINGE``, ``CLEANSYRINGE``, ``ORCH``).
 """
 
-__all__ = [
+EXPERIMENTS = [
     #    "ADSS_sub_abs_move",
     "ADSS_sub_add_liquid",
     "ADSS_sub_CA",  # latest
@@ -78,8 +78,6 @@ from helao.deploy.hte.drivers.motion.galil_motion_driver import (
 from helao.deploy.hte.drivers.robot.pal_driver import PALtools, Spacingmethod
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()

@@ -6,8 +6,7 @@ from helao.core.models.machine import MachineModel
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
-__all__ = ["PSTAT_exp_CP"]
-EXPERIMENTS = __all__
+EXPERIMENTS = ["PSTAT_exp_CP"]
 PSTAT_server = MachineModel(
     server_name="PSTAT", machine_name=gethostname().lower()
 ).as_dict()

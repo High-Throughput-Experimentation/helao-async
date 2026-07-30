@@ -6,7 +6,7 @@ clean injects, KOH/co2 testing routines, and shutdown sub-experiments from
 the CCSI experiment library.
 """
 
-__all__ = [
+SEQUENCES = [
     "CCSI_cleancycles",
     # "CCSI_debug_liquidloads",
     "CCSI_initialization",
@@ -27,8 +27,6 @@ from typing import Union
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=5)

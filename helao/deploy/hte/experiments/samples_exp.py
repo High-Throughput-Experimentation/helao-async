@@ -1,6 +1,6 @@
 """Sample bookkeeping experiments: create/load PAL samples and orch waits."""
 
-__all__ = [
+EXPERIMENTS = [
     "create_and_load_liquid_sample",
     "create_assembly_sample",
     "create_gas_sample",
@@ -26,8 +26,6 @@ from helao.core.models.sample import (
 )
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 PAL_server = MachineModel(
     server_name="PAL", machine_name=gethostname().lower()

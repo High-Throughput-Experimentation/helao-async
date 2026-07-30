@@ -1,6 +1,6 @@
 """Experiment library wrapping ICP-MS concentration analysis."""
 
-__all__ = [
+EXPERIMENTS = [
     "ICPMS_analysis_concentration",
 ]
 
@@ -9,8 +9,6 @@ from socket import gethostname
 from helao.core.models.machine import MachineModel as MM
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 

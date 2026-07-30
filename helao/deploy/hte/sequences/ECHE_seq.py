@@ -6,7 +6,7 @@ startup, OCV/CV/CA/CP electrochemistry (including LED-toggled photo
 variants), and shutdown sub-experiments from the ECHE experiment library.
 """
 
-__all__ = [
+SEQUENCES = [
     "ECHE_4CA_led_1CV_led",
     "ECHE_CA",
     "ECHE_CA_led",
@@ -26,8 +26,6 @@ from helao.core.models.echem_params import ref_offset
 from helao.core.models.electrolyte import Electrolyte
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=1)

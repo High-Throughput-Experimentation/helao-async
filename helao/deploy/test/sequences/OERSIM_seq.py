@@ -1,6 +1,6 @@
 """Sequence library for the OER active-learning simulator."""
 
-__all__ = [
+SEQUENCES = [
     "OERSIM_activelearn",
 ]
 
@@ -9,8 +9,6 @@ from typing import Union
 from helao.deploy.test.param_models import OERSIMActivelearnSeqParams
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=1)

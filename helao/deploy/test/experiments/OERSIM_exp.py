@@ -6,7 +6,7 @@ measure CPs, decide on the next acquisition, and conditionally requeue
 themselves.
 """
 
-__all__ = [
+EXPERIMENTS = [
     "OERSIM_sub_activelearn",
     "OERSIM_sub_decision",
     "OERSIM_sub_load_plate",
@@ -27,8 +27,6 @@ from helao.deploy.test.param_models import (
 )
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 CPSIM_server = MM(server_name="CPSIM", machine_name=gethostname().lower()).as_dict()

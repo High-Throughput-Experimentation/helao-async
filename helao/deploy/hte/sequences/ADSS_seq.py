@@ -7,7 +7,7 @@ sampling, drain, and cell-cleaning sub-experiments defined in the matching
 ADSS experiment library.
 """
 
-__all__ = [
+SEQUENCES = [
     "ADSS_CA_cell_1potential",
     "ADSS_PA_CV_single",
     "ADSS_PA_CV_TRI",
@@ -20,8 +20,6 @@ __all__ = [
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=8)

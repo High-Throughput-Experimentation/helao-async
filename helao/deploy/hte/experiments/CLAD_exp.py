@@ -7,7 +7,7 @@ Action targets are referenced by ``server_key`` strings (e.g. ``MOTOR``,
 ``ORCH``).
 """
 
-__all__ = [
+EXPERIMENTS = [
     "CLAD_sub_clean_cell",
     "CLAD_sub_fill_cell",
     "CLAD_sub_load_assembly",
@@ -39,8 +39,6 @@ from helao.deploy.hte.experiments.ADSS_exp import (
 )
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 SAMPLE_server = MachineModel(
     server_name="SAMPLE", machine_name=gethostname().lower()
