@@ -1,8 +1,8 @@
 """Archived demo experiment library wrapping basic PSTAT techniques."""
 
 __all__ = [
-    "DEMO_sub_CP",
     "DEMO_sub_CA",
+    "DEMO_sub_CP",
     "DEMO_sub_OCV",
 ]
 

@@ -1,10 +1,10 @@
 __all__ = [
-    "HISPEC_CV",
-    "HISPEC_EIS_only",
-    # "ECHEUVIS_CV_led",
     # "ECHEUVIS_CA_led",
     # "ECHEUVIS_CP_led",
+    # "ECHEUVIS_CV_led",
     "ECHEUVIS_postseq",
+    "HISPEC_CV",
+    "HISPEC_EIS_only",
 ]
 
 from helao.core.models.electrolyte import Electrolyte

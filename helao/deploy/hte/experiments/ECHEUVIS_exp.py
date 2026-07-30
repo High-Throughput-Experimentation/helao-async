@@ -8,16 +8,16 @@ Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
 """
 
 __all__ = [
-    "ECHEUVIS_sub_CV_led",
+    "ECHEUVIS_analysis_stability",
     "ECHEUVIS_sub_CA_led",
     "ECHEUVIS_sub_CP_led",
+    "ECHEUVIS_sub_CV_led",
     "ECHEUVIS_sub_OCV_led",
-    "ECHEUVIS_sub_interrupt",
-    "ECHEUVIS_sub_startup",
-    "ECHEUVIS_sub_shutdown",
-    "ECHEUVIS_sub_engage",
     "ECHEUVIS_sub_disengage",
-    "ECHEUVIS_analysis_stability",
+    "ECHEUVIS_sub_engage",
+    "ECHEUVIS_sub_interrupt",
+    "ECHEUVIS_sub_shutdown",
+    "ECHEUVIS_sub_startup",
 ]
 
 from helao.helpers import helao_logging as logging

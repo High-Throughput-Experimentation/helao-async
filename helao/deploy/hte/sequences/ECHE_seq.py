@@ -8,17 +8,17 @@ variants), and shutdown sub-experiments from the ECHE experiment library.
 
 __all__ = [
     "ECHE_4CA_led_1CV_led",
-    "ECHE_CV_CA_CV",
-    "ECHE_CV",
-    "ECHE_CV_led",
     "ECHE_CA",
     "ECHE_CA_led",
     "ECHE_CP",
     "ECHE_CP_led",
-    "ECHE_movetosample",
-    "ECHE_move",
+    "ECHE_CV",
+    "ECHE_CV_CA_CV",
+    "ECHE_CV_led",
     "ECHE_CVs_CAs",
     "ECHE_cleanCVs_regCVs_CAs",
+    "ECHE_move",
+    "ECHE_movetosample",
 ]
 
 

@@ -7,20 +7,20 @@ the CCSI experiment library.
 """
 
 __all__ = [
-    # "CCSI_initialization_bysteps",
-    "CCSI_initialization",
-    #    "CCSI_validation_KOH_procedure",
-    # "CCSI_repeated_KOH_testing",
-    #    "CCSI_test_KOH_testing",
-    #    "CCSI_newer_KOH_testing",
-    #    "CCSI_Solution_testing",
     "CCSI_Solution_co2maintainconcentration",
-    "CCSI_cleancycles",
+    #    "CCSI_Solution_testing",
     #    "CCSI_Solution_testing_cleans",
     # "CCSI_Solution_testing_fixed_cleans",
-    "CCSI_priming",
-    #    "CCSI_leaktest",
+    "CCSI_cleancycles",
     # "CCSI_debug_liquidloads",
+    "CCSI_initialization",
+    # "CCSI_initialization_bysteps",
+    #    "CCSI_leaktest",
+    #    "CCSI_newer_KOH_testing",
+    "CCSI_priming",
+    # "CCSI_repeated_KOH_testing",
+    #    "CCSI_test_KOH_testing",
+    #    "CCSI_validation_KOH_procedure",
 ]
 
 from typing import Union

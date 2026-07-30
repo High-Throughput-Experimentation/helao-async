@@ -7,12 +7,12 @@ post-sequence analysis hook.
 """
 
 __all__ = [
-    "ECHEUVIS_CV_led",
     "ECHEUVIS_CA_led",
-    "ECHEUVIS_multiCA_led",
     "ECHEUVIS_CP_led",
-    "ECHEUVIS_postseq",
+    "ECHEUVIS_CV_led",
     "ECHEUVIS_diagnostic_CV",
+    "ECHEUVIS_multiCA_led",
+    "ECHEUVIS_postseq",
 ]
 
 import random
