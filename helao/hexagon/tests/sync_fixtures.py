@@ -10,6 +10,7 @@ tempdir trees; hermetic — no AWS/API).
 
 Tests layer — may import anything (boundary rule)."""
 
+import ast
 import asyncio
 import inspect
 from datetime import datetime
@@ -25,20 +26,28 @@ LEGACY_SYNC_PATH = (
 NATIVE_SYNC_PATH = (
     Path(__file__).resolve().parents[1] / "adapters" / "native" / "sync_driver.py"
 )
-REGION_START = 62  # first line of the verbatim legacy region (LOGGER = ...)
-
-#: The verbatim region is everything from REGION_START down to the end of
-#: legacy ``SyncDriver`` -- i.e. it stops just before the Base-coupled
-#: ``HelaoSyncer`` subclass, which the native module deliberately replaces with
+#: The verbatim region is the whole of legacy ``SyncDriver`` and the
+#: module-level definitions above it: it starts at the first statement below
+#: the import block and stops just before the Base-coupled ``HelaoSyncer``
+#: subclass, which the native module deliberately replaces with
 #: ``NativeSyncer`` (D2) and therefore does NOT copy.
 #:
-#: This boundary is DERIVED from the sentinel below rather than hardcoded. A
-#: literal end line silently rots: any insertion or deletion above
-#: ``HelaoSyncer`` shifts it, and it drifted twice in two commits (``d88cabe3``
-#: removed ``to_api``, ``dadd5e44`` added ``has_pending_work``) until the line
-#: number had slid past ``class HelaoSyncer`` and the pin was asserting
-#: byte-identity for a class the native module is supposed to omit.
+#: BOTH boundaries are DERIVED from sentinels rather than hardcoded, because a
+#: literal line number silently rots.
+#:
+#: The end drifted twice in two commits (``d88cabe3`` removed ``to_api``,
+#: ``dadd5e44`` added ``has_pending_work``) until the literal had slid past
+#: ``class HelaoSyncer`` and the pin was asserting byte-identity for a class
+#: the native module is supposed to omit.
+#:
+#: The start was a literal ``62`` until an import-sort sweep exposed the same
+#: rot in the other direction: legacy carried ``from glob import glob``
+#: orphaned below a blank line, so sorting hoisted it into the main import
+#: block and moved ``LOGGER`` from line 63 to 57. Nothing inside the region
+#: changed -- the literal was simply measuring from the wrong end of a block
+#: that any import-only tool may legally reflow.
 HELAO_SYNCER_SENTINEL = "class HelaoSyncer(SyncDriver):"
+REGION_START_SENTINEL = "LOGGER = logging.make_logger"
 
 
 def _source_of(owner, name: str) -> str:
@@ -59,6 +68,27 @@ def assert_source_parity(native_owner, legacy_owner, names) -> None:
     assert not diffs, f"native members drifted from legacy source: {diffs}"
 
 
+def verbatim_region_start(legacy_lines: list[str]) -> int:
+    """1-based legacy line where the verbatim region begins: the ``LOGGER = ...``
+    assignment, i.e. the first statement below the import block.
+
+    Fails loud if the sentinel is gone or ambiguous, since a silently-wrong
+    start would slide the region into the import block -- where an import-only
+    tool may legally reorder lines -- and make the pin fail for a reason that
+    has nothing to do with the copied code.
+    """
+    hits = [
+        i
+        for i, line in enumerate(legacy_lines)
+        if line.startswith(REGION_START_SENTINEL)
+    ]
+    assert len(hits) == 1, (
+        f"expected exactly one {REGION_START_SENTINEL!r} in "
+        f"{LEGACY_SYNC_PATH.name}, found {len(hits)}"
+    )
+    return hits[0] + 1  # 0-based index -> 1-based line
+
+
 def verbatim_region_end(legacy_lines: list[str]) -> int:
     """1-based legacy line where the verbatim region ends: the last line of
     ``SyncDriver``, i.e. the final non-blank line before ``HelaoSyncer``.
@@ -76,31 +106,67 @@ def verbatim_region_end(legacy_lines: list[str]) -> int:
         f"{LEGACY_SYNC_PATH.name}, found {len(sentinel)}"
     )
     end = sentinel[0]  # 0-based index of the sentinel == 1-based line above it
-    while end > REGION_START and not legacy_lines[end - 1].strip():
+    start = verbatim_region_start(legacy_lines)
+    while end > start and not legacy_lines[end - 1].strip():
         end -= 1  # back over the blank run between the two classes
     return end
 
 
 def assert_verbatim_region(end_line: int | None = None) -> None:
-    """Legacy lines REGION_START..end_line must appear byte-identical in the
-    native module (contiguous-copy capstone; complements per-member pins).
-    Reads the LIVE legacy file, so it also pins against legacy drift.
+    """The legacy verbatim region must appear byte-identical in the native
+    module (contiguous-copy capstone; complements per-member pins). Reads the
+    LIVE legacy file, so it also pins against legacy drift.
 
-    ``end_line`` defaults to the derived end of ``SyncDriver``; pass an explicit
-    line only to pin a narrower prefix.
+    Both bounds are sentinel-derived; ``end_line`` defaults to the derived end
+    of ``SyncDriver``, and is passed explicitly only to pin a narrower prefix.
     """
     legacy = LEGACY_SYNC_PATH.read_text().splitlines(keepends=True)
+    start_line = verbatim_region_start(legacy)
     if end_line is None:
         end_line = verbatim_region_end(legacy)
-    region = "".join(legacy[REGION_START - 1 : end_line])
+    region = "".join(legacy[start_line - 1 : end_line])
     assert HELAO_SYNCER_SENTINEL not in region, (
         f"the verbatim region reaches into {HELAO_SYNCER_SENTINEL!r}, which the "
         "native module replaces with NativeSyncer and does not copy"
     )
     native = NATIVE_SYNC_PATH.read_text()
     assert region in native, (
-        f"legacy lines {REGION_START}..{end_line} are not byte-identical "
+        f"legacy lines {start_line}..{end_line} are not byte-identical "
         f"inside {NATIVE_SYNC_PATH.name}"
+    )
+
+
+def assert_region_holds_no_imports() -> None:
+    """The verbatim region must contain no import statement.
+
+    This is what makes the pin robust against import-only tooling (isort /
+    ``ruff --select I``): such a tool may reorder, merge, or hoist imports and
+    thereby shift every line number in the file, but it cannot touch a region
+    that holds no imports. Sorting all ten pin files was measured to leave
+    every member body byte-identical for exactly this reason -- the only
+    movement was the import block above the region.
+
+    Fails loud if a future edit drops an import below the region start (the
+    orphaned ``from glob import glob`` that used to sit just above it is the
+    live example of how easily that happens), because at that point an import
+    sweep CAN rewrite pinned bytes and the sweep must exclude these files
+    instead -- the way black's ``force-exclude`` in pyproject.toml already
+    does, since reformatting is not body-preserving the way sorting is.
+    """
+    source = LEGACY_SYNC_PATH.read_text()
+    lines = source.splitlines(keepends=True)
+    start, end = verbatim_region_start(lines), verbatim_region_end(lines)
+    offenders = [
+        (node.lineno, ast.get_source_segment(source, node))
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, (ast.Import, ast.ImportFrom))
+        and start <= node.lineno <= end
+    ]
+    assert not offenders, (
+        f"import statements inside the verbatim region "
+        f"(lines {start}..{end}) of {LEGACY_SYNC_PATH.name}: {offenders}. "
+        "An import-sort sweep could rewrite pinned bytes; either move them "
+        "above the region or exclude the pin files from the sweep."
     )
 
 
