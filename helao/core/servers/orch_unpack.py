@@ -34,7 +34,6 @@ import from ``orch.py`` at module top. None of the functions below need
 anything from ``orch.py``.
 """
 
-from typing import List
 from uuid import UUID
 
 from helao.helpers import helao_logging as logging
@@ -50,7 +49,7 @@ PLATE_API = HTEPlateAPI()
 
 def unpack_sequence(
     sequence_name: str, sequence_params, sequence_lib
-) -> List[Experiment]:
+) -> list[Experiment]:
     """Invoke the named sequence factory and return the list of planned experiments.
 
     Args:

@@ -2,7 +2,7 @@
 
 __all__ = ["DataModel", "DataPackageModel"]
 
-from typing import List, Dict, Optional
+from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -15,14 +15,14 @@ class DataModel(BaseModel, HelaoDict):
     """A batch of action data keyed by file-connection UUID.
 
     Attributes:
-        data (Dict[UUID, dict]): Per-file payloads keyed by `file_conn_key`.
-        errors (List[ErrorCodes]): Errors raised while producing this batch.
+        data (dict[UUID, dict]): Per-file payloads keyed by `file_conn_key`.
+        errors (list[ErrorCodes]): Errors raised while producing this batch.
         status (Optional[HloStatus]): Current status of the data stream.
     """
 
     # data is contained in a dict and keyed by file_conn_key
-    data: Dict[UUID, dict] = Field(default={})
-    errors: List[ErrorCodes] = Field(default=[])
+    data: dict[UUID, dict] = Field(default={})
+    errors: list[ErrorCodes] = Field(default=[])
     status: Optional[HloStatus] = HloStatus.active
 
 
@@ -33,11 +33,11 @@ class DataPackageModel(BaseModel, HelaoDict):
         action_uuid (UUID): UUID of the action that produced the data.
         action_name (str): Name of the source action endpoint.
         datamodel (DataModel): The wrapped per-file data batch.
-        errors (List[ErrorCodes]): Envelope-level errors.
+        errors (list[ErrorCodes]): Envelope-level errors.
     """
 
     action_uuid: UUID
     action_name: str
     datamodel: DataModel
-    errors: List[ErrorCodes] = Field(default=[])
+    errors: list[ErrorCodes] = Field(default=[])
     # status: Optional[HloStatus] = None

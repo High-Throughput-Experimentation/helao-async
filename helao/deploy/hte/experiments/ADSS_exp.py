@@ -62,7 +62,7 @@ __all__ = [
 ]
 
 
-from typing import Optional, List
+from typing import Optional
 from socket import gethostname
 
 from helao.helpers.premodels import ActionPlanMaker
@@ -913,7 +913,7 @@ def ADSS_sub_CA(
     bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = False,
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
@@ -1095,7 +1095,7 @@ def ADSS_sub_CA_photo(
     bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = False,
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
@@ -1283,7 +1283,7 @@ def ADSS_sub_CV(
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = False,
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
@@ -1472,7 +1472,7 @@ def ADSS_sub_OCV(
     bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = False,
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
@@ -1680,7 +1680,7 @@ def ADSS_sub_OCV_photo(
     bubbler_gas: str = "",
     previous_liquid_injected: str = "",
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = False,
     aliquot_pre: bool = False,
     aliquot_post: bool = False,
@@ -1826,7 +1826,7 @@ def ADSS_sub_insitu_actions(
     insert_electrolyte_time_sec: float = 1800,
     electrolyte_sample_no: int = 1,
     aliquot_volume_ul: int = 200,
-    aliquot_times_sec: List[float] = [],
+    aliquot_times_sec: list[float] = [],
     aliquot_insitu: bool = True,
     injector_wash_one: bool = False,
     washmod_in: int = 0,

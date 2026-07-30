@@ -33,7 +33,8 @@ import inspect
 import os
 import zipfile
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Optional, Union
+from collections.abc import Callable
 from uuid import UUID, uuid1
 
 import aiofiles
@@ -53,7 +54,7 @@ from helao.helpers.yml_tools import yml_dumps
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def _is_terminal(action_status: Optional[List[Any]]) -> bool:
+def _is_terminal(action_status: Optional[list[Any]]) -> bool:
     """Return ``True`` once an action's status list no longer marks it active.
 
     Args:
@@ -70,7 +71,7 @@ def _is_terminal(action_status: Optional[List[Any]]) -> bool:
 
 
 # (server_name, action_name, nonblocking) — what start-condition checks need.
-_PendingMeta = Tuple[str, str, bool]
+_PendingMeta = tuple[str, str, bool]
 
 
 class MicroOrch:
@@ -126,12 +127,12 @@ class MicroOrch:
         self.dispatcher = RPCDispatcher(server_key)
         self.dispatcher.register("update_status", self._on_update_status)
 
-        self._clients: Dict[str, RPCClient] = {}
-        self._pending: Dict[UUID, asyncio.Future] = {}
+        self._clients: dict[str, RPCClient] = {}
+        self._pending: dict[UUID, asyncio.Future] = {}
         # Mirrors _pending; populated/cleared in lockstep with it so
         # start-condition checks can introspect what's in flight.
-        self._pending_meta: Dict[UUID, _PendingMeta] = {}
-        self._latest: Dict[UUID, dict] = {}
+        self._pending_meta: dict[UUID, _PendingMeta] = {}
+        self._latest: dict[UUID, dict] = {}
         self._subscribed: set = set()
         # Single condition variable: anyone waiting on a start condition
         # gets a notify_all() whenever an action terminates.
@@ -140,7 +141,7 @@ class MicroOrch:
         # Mirrors Orch.global_params: experiment functions can read these
         # in via ``from_global_act_params`` and write them out via
         # ``to_global_params`` on their actions.
-        self.global_params: Dict[str, Any] = {}
+        self.global_params: dict[str, Any] = {}
         self.last_action_uuid: Optional[UUID] = None
 
         # Artifact read-back configuration.
@@ -154,7 +155,7 @@ class MicroOrch:
             loader_factory = LocalLoader
         self.loader_factory = loader_factory
         # Run tracking (Task 4 populates this).
-        self.runs: List[dict] = []
+        self.runs: list[dict] = []
 
     # ------------------------------------------------------------------
     # lifecycle
@@ -438,7 +439,7 @@ class MicroOrch:
             self.last_action_uuid = action_uuid
 
         client = self._client_for(server_name)
-        rpc_args: Dict[str, Any] = dict(params or {})
+        rpc_args: dict[str, Any] = dict(params or {})
         rpc_args["action"] = action.as_dict()
         method = f"{server_name}/{action_name}"
         try:
@@ -560,7 +561,7 @@ class MicroOrch:
 
     async def run_experiment(
         self,
-        exp_func: Callable[..., Union[List[Action], Experiment]],
+        exp_func: Callable[..., Union[list[Action], Experiment]],
         experiment: Optional[Experiment] = None,
         await_completion: bool = True,
         dispatch_timeout: float = 60.0,
@@ -652,7 +653,7 @@ class MicroOrch:
         for i, act in enumerate(actions):
             self._stage_action(act, order=i)
 
-        results: List[dict] = []
+        results: list[dict] = []
         for act in actions:
             self._apply_from_global(act)
             await self._wait_for_start_condition(act)
@@ -663,7 +664,7 @@ class MicroOrch:
         if not await_completion:
             return results
 
-        terminal_results: List[dict] = []
+        terminal_results: list[dict] = []
         for act, immediate in zip(actions, results):
             status = (
                 immediate.get("action_status") if isinstance(immediate, dict) else None
@@ -703,8 +704,8 @@ class MicroOrch:
 
     async def run_sequence(
         self,
-        seq_func: Callable[..., List["ShortExperimentModel"]],
-        experiment_lib: Dict[str, Callable[..., Union[List[Action], Experiment]]],
+        seq_func: Callable[..., list["ShortExperimentModel"]],
+        experiment_lib: dict[str, Callable[..., Union[list[Action], Experiment]]],
         sequence: Optional["Sequence"] = None,
         await_completion: bool = True,
         dispatch_timeout: float = 60.0,
@@ -713,7 +714,7 @@ class MicroOrch:
     ) -> Any:
         """Expand a sequence-library function and run its planned experiments.
 
-        ``seq_func`` returns ``List[ShortExperimentModel]`` (via
+        ``seq_func`` returns ``list[ShortExperimentModel]`` (via
         ``ExperimentPlanMaker``); ``experiment_lib`` maps each plan's
         ``experiment_name`` to its experiment function. Each experiment runs
         under this sequence's identity. The finished sequence is written to
@@ -732,7 +733,7 @@ class MicroOrch:
 
         planned = seq_func(**supplied)
 
-        raw_results: List[Any] = []
+        raw_results: list[Any] = []
         for plan in planned:
             exp_func = experiment_lib.get(plan.experiment_name)
             if exp_func is None:
@@ -1103,7 +1104,7 @@ class MicroOrch:
         """
         return self._latest.get(action_uuid)
 
-    def pending_uuids(self) -> List[UUID]:
+    def pending_uuids(self) -> list[UUID]:
         """Return the UUIDs of actions awaiting a terminal status update.
 
         Returns:

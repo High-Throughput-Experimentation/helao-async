@@ -20,7 +20,8 @@ import os
 import sys
 from socket import gethostname
 from time import time
-from typing import List, Dict, Optional, Union, Callable
+from typing import Optional, Union
+from collections.abc import Callable
 from uuid import UUID, uuid1
 from glob import glob
 from copy import deepcopy, copy
@@ -184,7 +185,7 @@ class Base:
         LOGGER.info(f"Found run_type in config: {self.typed_cfg.run_type}")
         self.run_type = self.typed_cfg.run_type.lower()
 
-        self.actives: Dict[UUID, Active] = {}
+        self.actives: dict[UUID, Active] = {}
         self.history = DequeDict(
             maxlen=200
         )  # store history of active actions (contained)
@@ -217,7 +218,7 @@ class Base:
         self.local_action_queue = zdeque([])
         self.fast_urls = []
 
-        self.hlo_postprocessors: List[HloPostProcessor] = []
+        self.hlo_postprocessors: list[HloPostProcessor] = []
         self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
 
         self.import_postprocessors(
@@ -401,7 +402,7 @@ class Base:
 
     async def setup_and_contain_action(
         self,
-        json_data_keys: List[str] = [],
+        json_data_keys: list[str] = [],
         action_abbr: Optional[str] = None,
         file_type: Optional[str] = None,
         hloheader: Optional[HloHeaderModel] = None,
@@ -721,7 +722,7 @@ class Base:
         return self.meta_writer.dflt_file_conn_key()
 
     def replace_status(
-        self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus
+        self, status_list: list[HloStatus], old_status: HloStatus, new_status: HloStatus
     ):
         """Swap ``old_status`` for ``new_status`` in ``status_list``, or append if missing.
 
@@ -945,7 +946,7 @@ class Active:
         for aux_uuid in activeparams.aux_listen_uuids:
             self.add_new_listen_uuid(aux_uuid)
 
-        self.file_conn_dict: Dict(str, FileConn) = {}
+        self.file_conn_dict: dict(str, FileConn) = {}
         for (
             file_conn_key,
             file_conn_param,
@@ -1095,7 +1096,7 @@ class Active:
 
     def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
+        file_conn_keys: Optional[list[UUID]] = None,
         realtime: Optional[int] = None,
     ):
         """Stamp ``epoch_ns`` on each file connection's HLO header if not already set.
@@ -1261,8 +1262,8 @@ class Active:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[List[str] | str] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[list[str] | str] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file asynchronously and return its path, or ``None`` if save is disabled."""
@@ -1286,8 +1287,8 @@ class Active:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[List[str] | str] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[list[str] | str] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file synchronously and return its path, or ``None`` if save is disabled."""
@@ -1316,7 +1317,7 @@ class Active:
 
     async def append_sample(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ],
         IO: str,
@@ -1379,9 +1380,9 @@ class Active:
 
     async def split(
         self,
-        uuid_list: Optional[List[UUID]] = None,
+        uuid_list: Optional[list[UUID]] = None,
         new_fileconnparams: Optional[FileConnParams] = None,
-    ) -> List[UUID]:
+    ) -> list[UUID]:
         """Fork the current action into a new sibling with fresh file connections.
 
         The previous action is marked split, a new action UUID is generated,
@@ -1406,7 +1407,7 @@ class Active:
 
     async def finish(
         self,
-        finish_uuid_list: Optional[List[UUID]] = None,
+        finish_uuid_list: Optional[list[UUID]] = None,
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
         """Finalize the listed actions (or all of them) and clean up file/data resources.
@@ -1429,7 +1430,7 @@ class Active:
 
     async def _finish(
         self,
-        finish_uuid_list: Optional[List[UUID]] = None,
+        finish_uuid_list: Optional[list[UUID]] = None,
     ) -> Action:
         """Finalization body for :meth:`finish`; must be called under ``finish_lock``."""
         return await self.action_finalizer._finish(finish_uuid_list=finish_uuid_list)
@@ -1438,7 +1439,7 @@ class Active:
         self,
         file_type: str,
         file_path: str,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ],
         action: Optional[Action] = None,

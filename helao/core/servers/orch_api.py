@@ -8,7 +8,7 @@ action endpoints exposed by every orchestrator deployment.
 import time
 import asyncio
 from enum import Enum
-from typing import Union, Optional, List
+from typing import Union, Optional
 from collections import namedtuple
 
 from fastapi import Body, WebSocket
@@ -425,7 +425,7 @@ class OrchAPI(HelaoFastAPI):
             return {"sequence_uuid": seq_uuid}
 
         @self.post("/prepend_sequences", tags=["private"])
-        async def prepend_sequences(sequences: List[Sequence] = Body([], embed=True)):
+        async def prepend_sequences(sequences: list[Sequence] = Body([], embed=True)):
             """Prepend a list of sequences to the front of the orch queue."""
             uuids = await _prepend_sequences(self.orch, sequences)
             return {"sequence_uuids": uuids}
@@ -518,7 +518,7 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.list_all_experiments()
 
         @self.post("/drop_experiment_inds", tags=["private"])
-        def drop_experiment_inds(inds: List[int]):
+        def drop_experiment_inds(inds: list[int]):
             """Drop queued experiments at the given indices and return the remaining queue."""
             return self.orch.drop_experiment_inds(inds)
 

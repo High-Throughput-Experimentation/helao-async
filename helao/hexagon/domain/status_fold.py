@@ -25,16 +25,16 @@ the commands under the ingestion lock.
 Drift fixed vs the task brief's sample code (verified against
 helao/core/models/server.py -- GlobalStatusModel._sort_status /
 update_global_with_acts):
-``update_global_with_acts`` returns ``List[Tuple[UUID, str]]`` -- one
+``update_global_with_acts`` returns ``list[tuple[UUID, str]]`` -- one
 ``(uuid, hlostatus.name)`` pair per bucket a uuid newly lands in (a single
 status *name string*, not a nested collection of status names). The brief's
 sample built ``PushLiveBuffer.items`` as
-``Tuple[Tuple[UUID, Tuple[str, ...]], ...]`` and iterated
+``tuple[tuple[UUID, tuple[str, ...]], ...]`` and iterated
 ``tuple(str(s) for s in statuses)`` over the second element -- since that
 element is a plain string in the real API, iterating it would silently
 iterate its *characters* (e.g. ``"finished"`` -> ``('f','i',...)``) instead
 of raising. Fixed by keeping ``PushLiveBuffer.items`` flat --
-``Tuple[Tuple[UUID, str], ...]`` -- matching ``update_global_with_acts``
+``tuple[tuple[UUID, str], ...]`` -- matching ``update_global_with_acts``
 verbatim (byte-identical to the ``for act_uuid, act_status in
 recent_nonactive`` loop in orch_status_sync.update_status, which calls
 ``put_lbuf`` once per pair).
@@ -46,13 +46,13 @@ contains it, a later bucket holding the same uuid (e.g. a dual
 ``errored``+``finished`` landing from a single ``EndpointModel.sort_status``
 call) is skipped by that same guard and does not append a second entry --
 verified empirically against the real model. The flat
-``Tuple[Tuple[UUID, str], ...]`` shape is chosen purely for byte-identical
+``tuple[tuple[UUID, str], ...]`` shape is chosen purely for byte-identical
 API fidelity with ``update_global_with_acts``, not because a genuine
 duplicate-uuid entry is exercised or even reachable through this guard.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from helao.hexagon.domain.models import (
@@ -89,7 +89,7 @@ class PushLiveBuffer:
     more than once, e.g. once for ``errored`` and once for ``finished``).
     """
 
-    items: Tuple[Tuple[UUID, str], ...]
+    items: tuple[tuple[UUID, str], ...]
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,7 @@ def fold_status(
     *,
     loop_started: bool,
     last_dispatched_action_uuid: Optional[UUID],
-) -> Tuple[OrchStatus, Tuple[object, ...]]:
+) -> tuple[OrchStatus, tuple[object, ...]]:
     """Fold one pushed ActionServerModel into gsm; return (orch_state, cmds)."""
     commands: list = []
 

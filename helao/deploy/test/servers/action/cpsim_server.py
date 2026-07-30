@@ -9,7 +9,6 @@ the requesting orchestrator's coordinates (``get_loaded_plate``).
 
 __all__ = ["makeApp"]
 
-from typing import List
 
 from helao.core.servers.base_api import BaseAPI
 from ...drivers.pstat.cpsim_driver import CPSim, CPSimExec
@@ -39,7 +38,7 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/measure_cp", tags=["action"])
     async def measure_cp(
-        comp_vec: List[int] = [],
+        comp_vec: list[int] = [],
         acquisition_rate: float = 0.2,
     ):
         """Start a :class:`CPSimExec` that streams the stored CP for ``comp_vec``."""

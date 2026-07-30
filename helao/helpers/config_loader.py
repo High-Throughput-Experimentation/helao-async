@@ -19,7 +19,7 @@ __all__ = [
 
 import os
 from glob import glob
-from typing import List, Dict, Optional, Tuple
+from typing import Optional
 from pathlib import Path
 from importlib.util import spec_from_file_location
 from importlib.util import module_from_spec
@@ -135,7 +135,7 @@ def read_config(confArg, *args, **kwargs):
     return config
 
 
-def read_validated_config(conf_arg: str) -> Tuple[dict, "HelaoConfig"]:
+def read_validated_config(conf_arg: str) -> tuple[dict, "HelaoConfig"]:
     """Read a config and validate it against :class:`HelaoConfig`. Pure — no module state.
 
     Returns:
@@ -193,7 +193,7 @@ class OrchServerParams(BaseModel):
 
     enable_op: Optional[bool] = None  # deprecated, ignored
     heartbeat_interval: Optional[float] = 10.0
-    ignore_heartbeats: Optional[List[str]] = None
+    ignore_heartbeats: Optional[list[str]] = None
     verify_plates: Optional[bool] = True
 
 
@@ -245,10 +245,10 @@ class HelaoConfig(BaseModel):
     root: str
     dummy: Optional[bool] = True
     simulation: Optional[bool] = True
-    experiment_libraries: Optional[List[str]] = None
+    experiment_libraries: Optional[list[str]] = None
     experiment_params: Optional[dict] = None
-    sequence_libraries: Optional[List[str]] = None
+    sequence_libraries: Optional[list[str]] = None
     sequence_params: Optional[dict] = None
-    servers: Optional[Dict[str, ServerConfig]] = None
+    servers: Optional[dict[str, ServerConfig]] = None
     alert_config_path: Optional[str] = None
-    builtin_ref_motorxy: Optional[List[float]] = None
+    builtin_ref_motorxy: Optional[list[float]] = None

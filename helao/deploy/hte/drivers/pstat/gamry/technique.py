@@ -7,7 +7,7 @@ OCV, and RCA.
 """
 
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Optional
 from enum import StrEnum
 
 from .dtaq import (
@@ -72,8 +72,8 @@ class GamryTechnique:
     set_decimation: Optional[bool] = None
     set_vchrangemode: Optional[bool] = None
     set_ierangemode: Optional[bool] = None
-    vchrange_keys: Optional[List[str]] = None
-    ierange_keys: Optional[List[str]] = None
+    vchrange_keys: Optional[list[str]] = None
+    ierange_keys: Optional[list[str]] = None
 
 
 TECH_LSV = GamryTechnique(

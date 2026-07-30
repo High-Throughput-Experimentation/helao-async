@@ -7,7 +7,7 @@ from pydantic import BaseModel, validator, root_validator, Field
 from pydantic.tools import parse_obj_as
 
 import datetime
-from typing import List, Optional, Union, Literal, Annotated
+from typing import Optional, Union, Literal, Annotated
 from typing import ForwardRef
 
 from helao.core.version import get_hlo_version
@@ -107,17 +107,17 @@ class SampleModel(BaseModel, HelaoDict):
         machine_name (Optional[str]): Source machine name.
         sample_hash (Optional[str]): Optional content hash.
         server_name (Optional[str]): Server that created the sample.
-        action_uuid (List[UUID]): Actions that referenced this sample.
+        action_uuid (list[UUID]): Actions that referenced this sample.
         sample_creation_action_uuid (Optional[UUID]): Action that created the sample.
         sample_creation_experiment_uuid (Optional[UUID]): Experiment that created the sample.
         sample_position (Optional[str]): Position label on the station.
         inheritance (Optional[SampleInheritance]): Inheritance rule (internal use).
-        status (List[SampleStatus]): Lifecycle status flags (internal use).
-        chemical (List[str]): Chemicals composing the sample.
-        partial_molarity (List[str]): Per-chemical molarity entries.
-        supplier (List[str]): Suppliers per chemical.
-        lot_number (List[str]): Lot numbers per chemical.
-        source (List[str]): Source labels.
+        status (list[SampleStatus]): Lifecycle status flags (internal use).
+        chemical (list[str]): Chemicals composing the sample.
+        partial_molarity (list[str]): Per-chemical molarity entries.
+        supplier (list[str]): Suppliers per chemical.
+        lot_number (list[str]): Lot numbers per chemical.
+        source (list[str]): Source labels.
         prep_date (Optional[datetime.date]): Preparation date.
         comment (Optional[str]): Free-form comment.
         etc (dict): Catch-all for additional fields not in the standard schema.
@@ -141,19 +141,19 @@ class SampleModel(BaseModel, HelaoDict):
     server_name: Optional[str] = None
 
     # action related
-    action_uuid: List[UUID] = Field(default=[])
+    action_uuid: list[UUID] = Field(default=[])
     sample_creation_action_uuid: Optional[UUID] = None
     sample_creation_experiment_uuid: Optional[UUID] = None
 
     # metadata
     sample_position: Optional[str] = None
     inheritance: Optional[SampleInheritance] = None  # only for internal use
-    status: List[SampleStatus] = Field(default=[])  # only for internal use
-    chemical: List[str] = Field(default=[])
-    partial_molarity: List[str] = Field(default=[])
-    supplier: List[str] = Field(default=[])
-    lot_number: List[str] = Field(default=[])
-    source: List[str] = Field(default=[])
+    status: list[SampleStatus] = Field(default=[])  # only for internal use
+    chemical: list[str] = Field(default=[])
+    partial_molarity: list[str] = Field(default=[])
+    supplier: list[str] = Field(default=[])
+    lot_number: list[str] = Field(default=[])
+    source: list[str] = Field(default=[])
     prep_date: Optional[datetime.date] = None
     comment: Optional[str] = None
     etc: dict = Field(default={})
@@ -257,13 +257,13 @@ class NoneSample(SampleModel):
         sample_type (Literal[None]): Always `None`.
         global_label (Literal[None]): Always `None`.
         inheritance (Optional[SampleInheritance]): Internal inheritance state.
-        status (List[SampleStatus]): Internal lifecycle status flags.
+        status (list[SampleStatus]): Internal lifecycle status flags.
     """
 
     sample_type: Literal[None] = None
     global_label: Literal[None] = None
     inheritance: Optional[SampleInheritance] = None  # only for internal use
-    status: List[SampleStatus] = Field(default=[])  # only for internal use
+    status: list[SampleStatus] = Field(default=[])  # only for internal use
 
     def get_global_label(self) -> None:
         """Always returns `None` for the sentinel sample."""
@@ -402,13 +402,13 @@ class AssemblySample(SampleModel):
 
     Attributes:
         sample_type (Literal[SampleType.assembly]): Discriminator pinned to ``assembly``.
-        parts (List): Constituent samples (any sample subtype).
+        parts (list): Constituent samples (any sample subtype).
         sample_position (Optional[str]): Position label; default ``"cell1_we"``.
         parent_assembly_label (Optional[str]): Label of a parent assembly, if any.
     """
 
     sample_type: Literal[SampleType.assembly] = SampleType.assembly
-    parts: List[SampleUnion] = Field(default=[])
+    parts: list[SampleUnion] = Field(default=[])
     sample_position: Optional[str] = "cell1_we"  # usual default assembly position
     parent_assembly_label: Optional[str] = None
 
@@ -459,10 +459,10 @@ class SampleList(BaseModel, HelaoDict):
     """Container holding a list of samples of any supported type.
 
     Attributes:
-        samples (Optional[List]): The contained samples (union of sample types).
+        samples (Optional[list]): The contained samples (union of sample types).
     """
 
-    samples: Optional[List[SampleUnion]] = Field(default=[])
+    samples: Optional[list[SampleUnion]] = Field(default=[])
 
 
 # Design C, two-stage nested union (CARDS P3 3c, D1): the four enum-tagged

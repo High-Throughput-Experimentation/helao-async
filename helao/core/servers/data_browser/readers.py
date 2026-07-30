@@ -19,7 +19,7 @@ import io
 import json
 import os
 import zipfile
-from typing import Optional, Tuple
+from typing import Optional
 
 import pyarrow.parquet as pq
 
@@ -41,7 +41,7 @@ def parse_locator(locator: str) -> tuple:
     return ("file", locator)
 
 
-def _read_bytes(locator: str) -> Tuple[str, bytes]:
+def _read_bytes(locator: str) -> tuple[str, bytes]:
     """Return (file_name, content_bytes) for any locator."""
     parsed = parse_locator(locator)
     if parsed[0] == "zip":
@@ -52,7 +52,7 @@ def _read_bytes(locator: str) -> Tuple[str, bytes]:
         return os.path.basename(parsed[1]), f.read()
 
 
-def read_dataset(locator: str, fmt: Optional[str] = None) -> Tuple[dict, dict]:
+def read_dataset(locator: str, fmt: Optional[str] = None) -> tuple[dict, dict]:
     """Read any supported column-bearing file into (meta, {column: list})."""
     file_name, content = _read_bytes(locator)
     if fmt is None:
@@ -66,7 +66,7 @@ def read_dataset(locator: str, fmt: Optional[str] = None) -> Tuple[dict, dict]:
     raise ValueError(f"unsupported data format: {fmt!r} ({file_name})")
 
 
-def _read_json(content: bytes) -> Tuple[dict, dict]:
+def _read_json(content: bytes) -> tuple[dict, dict]:
     """Parse a JSON data file into (meta, {column: list})."""
     obj = json.loads(content.decode("utf-8"))
     if isinstance(obj, dict):
@@ -83,7 +83,7 @@ def _read_json(content: bytes) -> Tuple[dict, dict]:
     return {}, {}
 
 
-def _read_parquet(content: bytes) -> Tuple[dict, dict]:
+def _read_parquet(content: bytes) -> tuple[dict, dict]:
     table = pq.read_table(io.BytesIO(content))
     data = {name: table.column(name).to_pylist() for name in table.column_names}
     meta = {}

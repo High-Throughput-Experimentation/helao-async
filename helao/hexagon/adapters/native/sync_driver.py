@@ -38,7 +38,7 @@ from configparser import ConfigParser
 from zipfile import ZipFile
 from pathlib import Path
 from datetime import datetime
-from typing import Union, Optional, Dict, List, Protocol
+from typing import Union, Optional, Protocol
 import traceback
 from collections import defaultdict
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -461,7 +461,7 @@ class HelaoYml:
         return sorted(all_children, key=lambda x: x.timestamp)
 
     @property
-    def misc_files(self) -> List[Path]:
+    def misc_files(self) -> list[Path]:
         """Files inside the target directory that are not ``.yml``/``.hlo``/``.lock``.
 
         Action ymls recurse into subdirectories; experiments and sequences
@@ -487,14 +487,14 @@ class HelaoYml:
             ]
 
     @property
-    def lock_files(self) -> List[Path]:
+    def lock_files(self) -> list[Path]:
         """``.lock`` files in the immediate target directory."""
         return [
             x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".lock"
         ]
 
     @property
-    def hlo_files(self) -> List[Path]:
+    def hlo_files(self) -> list[Path]:
         """``.hlo`` files in the immediate target directory."""
         return [
             x for x in self.targetdir.glob("*") if x.is_file() and x.suffix == ".hlo"
@@ -553,7 +553,7 @@ class Progress:
 
     ymlpath: HelaoYml
     prg: Path
-    dict: Dict
+    dict: dict
 
     def __init__(self, path: Union[Path, str]):
         """Resolve the yml/prg pair and load (or initialize) the progress dict.
@@ -654,7 +654,7 @@ class Progress:
         """Reload ``self.dict`` from the ``.prg`` file on disk."""
         self.dict = yml_load(self.prg)
 
-    def write_dict(self, new_dict: Optional[Dict] = None):
+    def write_dict(self, new_dict: Optional[dict] = None):
         """Persist the progress dict to the ``.prg`` file as YAML.
 
         Args:
@@ -694,7 +694,7 @@ class SyncDriver:
         running_tasks: Asyncio tasks currently syncing, keyed by yml name.
     """
 
-    progress: Dict[str, Progress]
+    progress: dict[str, Progress]
     running_tasks: dict
 
     def __init__(self, config: dict, helaodirs: HelaoDirs):
@@ -752,8 +752,8 @@ class SyncDriver:
         #     the sequence sync holds it as the writer, which waits for every
         #     in-flight descendant and blocks until it owns the subtree --
         #     guaranteeing a parent never syncs concurrently with a descendant.
-        self.exp_locks: Dict[str, asyncio.Lock] = {}
-        self.seq_locks: Dict[str, AsyncRWLock] = {}
+        self.exp_locks: dict[str, asyncio.Lock] = {}
+        self.seq_locks: dict[str, AsyncRWLock] = {}
         self.aiolock = asyncio.Lock()
         # push happens via async task queue
         # processes are checked after each action push
@@ -1408,7 +1408,7 @@ class SyncDriver:
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
 
-    def update_process(self, act_yml: HelaoYml, act_meta: Dict) -> Progress:
+    def update_process(self, act_yml: HelaoYml, act_meta: dict) -> Progress:
         """Fold a finished action into its parent experiment's process metadata.
 
         Determines which process group the action contributes to (handling

@@ -17,7 +17,6 @@ __all__ = [
 ]
 
 import asyncio
-from typing import Dict, Tuple
 
 import aiohttp
 import requests
@@ -41,13 +40,13 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 # (e.g. test harnesses) can invoke ``aclose_all_rpc_clients()``.
 # ---------------------------------------------------------------------------
 
-_RPC_CLIENTS: Dict[Tuple[str, int], RPCClient] = {}
+_RPC_CLIENTS: dict[tuple[str, int], RPCClient] = {}
 _RPC_CLIENTS_LOCK = asyncio.Lock()
 
 # Sibling cache for the sync (``zmq.REQ``-backed) clients used by
 # :func:`private_dispatcher`.  No async lock needed -- sync callers can't
 # race on a single-threaded REQ socket the way async tasks can.
-_SYNC_RPC_CLIENTS: Dict[Tuple[str, int], RPCSyncClient] = {}
+_SYNC_RPC_CLIENTS: dict[tuple[str, int], RPCSyncClient] = {}
 
 # Short timeout for the RPC probe.  If the peer's dispatcher is up, replies
 # arrive in <10 ms on localhost; if it's down, the DEALER socket happily

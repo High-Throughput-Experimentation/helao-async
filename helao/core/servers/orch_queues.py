@@ -30,7 +30,7 @@ imports this module at module top).
 
 import asyncio
 from copy import deepcopy
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from helao.helpers import helao_logging as logging
@@ -226,7 +226,7 @@ class RunQueues:
         else:
             return await orch.add_sequence(sequence)
 
-    async def prepend_sequences(self, sequences: List[Sequence]) -> List[UUID]:
+    async def prepend_sequences(self, sequences: list[Sequence]) -> list[UUID]:
         """Insert ``sequences`` at the front of the queue, preserving their order.
 
         Stamps uuid/codehash/run_id like :meth:`add_sequence`. Reuses the
@@ -398,7 +398,7 @@ class RunQueues:
             (i, D.get_exp().experiment_name) for i, D in enumerate(orch.experiment_dq)
         ]
 
-    def drop_experiment_inds(self, inds: List[int]) -> list:
+    def drop_experiment_inds(self, inds: list[int]) -> list:
         """Remove the queued experiments at ``inds`` and return :meth:`list_all_experiments`."""
         orch = self.orch
         for i in sorted(inds, reverse=True):

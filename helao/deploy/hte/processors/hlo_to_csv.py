@@ -8,7 +8,6 @@ registered with its file type renamed from ``helao__file`` to
 """
 
 import os
-from typing import List
 from copy import copy
 
 import pandas as pd
@@ -24,11 +23,11 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class PostProcess(HloPostProcessor):
     """Convert HLO data files to CSV and register the new files."""
 
-    def process(self) -> List[FileInfo]:
+    def process(self) -> list[FileInfo]:
         """Write a CSV copy of each ``.hlo`` data file in the action output.
 
         Returns:
-            List[FileInfo]: Original files plus one ``*_csv__file``
+            list[FileInfo]: Original files plus one ``*_csv__file``
             entry per converted HLO file.
         """
         processed_file_list = []

@@ -20,7 +20,7 @@ FinishActiveEstopped's executor.
 """
 
 from dataclasses import dataclass
-from typing import List, Tuple, Union
+from typing import Union
 
 from helao.hexagon.domain.models import HloStatus
 from helao.hexagon.domain.orchestration import EstopFanout, FinishActiveEstopped
@@ -46,10 +46,10 @@ _VALID_ROLES = frozenset({"recorder", "stop_private"})
 class EstopTopology:
     """Declarative stop topology derived from a config's ``servers:`` block."""
 
-    orch_keys: Tuple[str, ...]
-    recorder_keys: Tuple[str, ...]
-    stop_private_keys: Tuple[str, ...]
-    all_server_keys: Tuple[str, ...]  # fanout targets (non-bokeh servers)
+    orch_keys: tuple[str, ...]
+    recorder_keys: tuple[str, ...]
+    stop_private_keys: tuple[str, ...]
+    all_server_keys: tuple[str, ...]  # fanout targets (non-bokeh servers)
 
 
 def derive_estop_topology(servers_cfg: dict) -> EstopTopology:
@@ -61,10 +61,10 @@ def derive_estop_topology(servers_cfg: dict) -> EstopTopology:
     drift -- the failure mode that let a private deployment's two cascades
     diverge).
     """
-    orch_keys: List[str] = []
-    recorder_keys: List[str] = []
-    stop_private_keys: List[str] = []
-    all_server_keys: List[str] = []
+    orch_keys: list[str] = []
+    recorder_keys: list[str] = []
+    stop_private_keys: list[str] = []
+    all_server_keys: list[str] = []
     for key, cfg in servers_cfg.items():
         if "bokeh" in cfg:
             continue  # visualizer/operator bokeh apps take no estop calls
@@ -131,14 +131,14 @@ class StopOrch:
 class StopRecorders:
     """POST /stop_record on every recorder key."""
 
-    keys: Tuple[str, ...]
+    keys: tuple[str, ...]
 
 
 @dataclass(frozen=True)
 class StopPrivate:
     """POST /stop_private on every tagged key."""
 
-    keys: Tuple[str, ...]
+    keys: tuple[str, ...]
 
 
 Command = Union[StopOrch, StopRecorders, StopPrivate, EstopFanout, FinishActiveEstopped]
@@ -150,12 +150,12 @@ class EstopPolicy:
     def __init__(self, topology: EstopTopology):
         self.topology = topology
 
-    def commands_for(self, trigger: Trigger) -> Tuple[Command, ...]:
+    def commands_for(self, trigger: Trigger) -> tuple[Command, ...]:
         if isinstance(trigger, (DriverFaultEdge, UiEstopButton)):
             # the (previously hardcoded) station-side cascade: orchestrators
             # first, then recorders, then stop_private targets -- fixed order,
             # not reorderable by config (see module docstring).
-            cmds: List[Command] = [StopOrch(key=k) for k in self.topology.orch_keys]
+            cmds: list[Command] = [StopOrch(key=k) for k in self.topology.orch_keys]
             if self.topology.recorder_keys:
                 cmds.append(StopRecorders(keys=self.topology.recorder_keys))
             if self.topology.stop_private_keys:
@@ -168,7 +168,7 @@ class EstopPolicy:
         return (EstopFanout(switch=False), FinishActiveEstopped())
 
 
-def mark_estopped(status_list: List[HloStatus]) -> List[HloStatus]:
+def mark_estopped(status_list: list[HloStatus]) -> list[HloStatus]:
     """The estopped terminal-status shape (orch_estop._mark_estopped):
     active is swapped in place for finished, estopped appended once -- the
     result always ends ``[..., finished, estopped]``, never bare

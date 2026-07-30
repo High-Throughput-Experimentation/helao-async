@@ -9,7 +9,7 @@ NOT import the deployment tree that defines the concrete shim at module top
 (keeps the adapter importable without that deployment tree present); the
 composition that constructs the real shim lives in later phases."""
 
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 from helao.hexagon.domain.models import Action, ErrorCodes
 
@@ -26,7 +26,7 @@ class SampleShimAdapter:
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-    ) -> Tuple[ErrorCodes, Any]:
+    ) -> tuple[ErrorCodes, Any]:
         return await self._shim.tray_query_sample(tray=tray, slot=slot, vial=vial)
 
     async def tray_get_next_full(
@@ -57,7 +57,7 @@ class SampleShimAdapter:
     # -- custom positions --
     async def custom_query_sample(
         self, custom: Optional[str] = None
-    ) -> Tuple[ErrorCodes, Any]:
+    ) -> tuple[ErrorCodes, Any]:
         return await self._shim.custom_query_sample(custom=custom)
 
     async def custom_update_position(
@@ -65,7 +65,7 @@ class SampleShimAdapter:
         custom: Optional[str] = None,
         sample: Optional[Any] = None,
         dilute: bool = False,
-    ) -> Tuple[bool, Any]:
+    ) -> tuple[bool, Any]:
         return await self._shim.custom_update_position(
             custom=custom, sample=sample, dilute=dilute
         )
@@ -82,13 +82,13 @@ class SampleShimAdapter:
     # -- creation --
     async def new_ref_samples(
         self,
-        samples_in: Optional[List] = None,
+        samples_in: Optional[list] = None,
         sample_out_type: Any = "",
         sample_position: str = "",
         action: Optional[Action] = None,
         combine_liquids: bool = False,
         combine_gases: bool = False,
-    ) -> Tuple[ErrorCodes, list]:
+    ) -> tuple[ErrorCodes, list]:
         return await self._shim.new_ref_samples(
             samples_in=samples_in,
             sample_out_type=sample_out_type,

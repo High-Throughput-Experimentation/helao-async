@@ -16,15 +16,7 @@ __all__ = [
 ]
 
 from copy import deepcopy
-from typing import (
-    List,
-    Dict,
-    Optional,
-    Union,
-    Literal,
-    Tuple,
-    ForwardRef,
-)
+from typing import Optional, Union, Literal, ForwardRef
 from enum import Enum
 from pydantic import BaseModel, Field, root_validator
 
@@ -134,7 +126,7 @@ class Custom(BaseModel, HelaoDict):
         sample_in: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ],
-    ) -> Tuple[
+    ) -> tuple[
         bool, Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ]:
         """Load a sample into this position if it is currently empty.
@@ -171,9 +163,9 @@ class _VT_template(BaseModel, HelaoDict):
     max_vol_ml: float
     VTtype: str
     positions: int  # = positions
-    vials: List[bool] = Field(default=[])
-    blocked: List[bool] = Field(default=[])
-    samples: List[
+    vials: list[bool] = Field(default=[])
+    blocked: list[bool] = Field(default=[])
+    samples: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
     # reset_tray()
@@ -212,9 +204,9 @@ class _VT_template(BaseModel, HelaoDict):
 
     def reset_tray(self):
         """Clear all vial, block, and sample state to the empty defaults."""
-        self.vials: List[bool] = [False for i in range(self.positions)]
-        self.blocked: List[bool] = [False for i in range(self.positions)]
-        self.samples: List[
+        self.vials: list[bool] = [False for i in range(self.positions)]
+        self.blocked: list[bool] = [False for i in range(self.positions)]
+        self.samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [NoneSample() for i in range(self.positions)]
 
@@ -253,7 +245,7 @@ class _VT_template(BaseModel, HelaoDict):
 
     def unload(
         self,
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Return copies of all non-empty samples and reset the tray."""
         ret_sample = []
         for sample in self.samples:
@@ -324,8 +316,8 @@ class Positions(BaseModel, HelaoDict):
     """
 
     # a dict keyed by tray_num, then slot_num and then the VT as value
-    trays_dict: Dict[int, Dict[int, Union[VTUnion, None]]] = Field(default={})
-    customs_dict: Dict[str, Custom] = Field(default={})
+    trays_dict: dict[int, dict[int, Union[VTUnion, None]]] = Field(default={})
+    customs_dict: dict[str, Custom] = Field(default={})
 
 
 VTUnion = Union[

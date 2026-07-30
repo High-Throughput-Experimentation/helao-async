@@ -29,7 +29,7 @@ import time
 import traceback
 from copy import deepcopy
 from socket import gethostname
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import numpy as np
 
@@ -117,7 +117,7 @@ class NativeGalilMotion(HelaoDriver):
     def set_position_sink(self, sink: Any) -> None:
         self._position_sink = sink
 
-    def get_all_axis(self) -> List[str]:
+    def get_all_axis(self) -> list[str]:
         return [ax for ax in self.axis_id]
 
     def _is_estopped(self) -> bool:

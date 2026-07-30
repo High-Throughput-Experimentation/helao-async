@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import re
 import uuid as uuid_mod
-from typing import Dict
 
 RE_UUID = re.compile(
     r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-" r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -30,8 +29,8 @@ class UuidMapper:
     """Assigns 'UUID-<n>' ordinals in first-seen order; one instance per capture."""
 
     def __init__(self) -> None:
-        self._map: Dict[str, str] = {}
-        self._derived: Dict[str, str] = {}
+        self._map: dict[str, str] = {}
+        self._derived: dict[str, str] = {}
 
     def register_derived(
         self, raw_process_uuid: str, experiment_uuid: str, pidx

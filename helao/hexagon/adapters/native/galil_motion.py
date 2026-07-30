@@ -48,7 +48,7 @@ CUT-OVER CHECKLIST (resolve before repointing ``app.driver`` at this adapter):
 """
 
 import asyncio
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from helao.core.drivers.helao_driver import (
     DriverResponse,
@@ -214,5 +214,5 @@ class GalilMotionHardwareAdapter:
     async def reset_controller(self):
         return await self._driver.reset_controller()
 
-    def get_all_axis(self) -> List[str]:
+    def get_all_axis(self) -> list[str]:
         return self._driver.get_all_axis()

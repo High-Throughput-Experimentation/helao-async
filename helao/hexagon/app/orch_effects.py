@@ -8,7 +8,7 @@ an RPC/HTTP call to its own server (KEEP #3)."""
 
 import asyncio
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from helao.helpers import helao_logging
@@ -384,7 +384,7 @@ class OrchCommandRunner:
 
     async def execute_retry_driver_health(
         self, cmd: RetryDriverHealth
-    ) -> "Tuple[str, ...]":
+    ) -> "tuple[str, ...]":
         """Verbatim orch_dispatch._exec_driver_health retry cadence, MINUS
         the exhaustion stop: the remainder is returned so HexRuntime can
         feed the DriverHealthUnrecovered event (P2a — the reducer's

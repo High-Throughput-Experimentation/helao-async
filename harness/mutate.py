@@ -19,7 +19,7 @@ import shutil
 import sys
 import uuid
 from pathlib import Path
-from typing import Callable, Dict
+from collections.abc import Callable
 
 from harness.parity import run_parity
 from harness.treepass import explode_zips
@@ -82,7 +82,7 @@ def mutate_break_uuid_link(root: Path) -> str:
     return f"rewired experiment_uuid in {act.name}"
 
 
-MUTATIONS: Dict[str, Callable[[Path], str]] = {
+MUTATIONS: dict[str, Callable[[Path], str]] = {
     "param_value": mutate_param_value,
     "drop_file": mutate_drop_file,
     "add_hlo_column": mutate_add_hlo_column,
@@ -95,7 +95,7 @@ def run_self_test(golden_set: Path, workdir: Path) -> dict:
     workdir.mkdir(parents=True, exist_ok=True)
     baseline = explode_zips(golden_set / "root", workdir / "baseline")
     sanity = run_parity(golden_set, baseline)
-    caught: Dict[str, bool] = {}
+    caught: dict[str, bool] = {}
     for name, fn in MUTATIONS.items():
         mut_root = workdir / name
         shutil.copytree(baseline, mut_root)

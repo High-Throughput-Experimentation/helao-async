@@ -18,7 +18,6 @@ __all__ = [
     "ADSS_PA_CV_single",
 ]
 
-from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
 
@@ -42,7 +41,7 @@ def ADSS_CA_cell_1potential(
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
     aliquot_tf: bool = True,
-    aliquot_times_sec: List[float] = [60, 600, 1140],
+    aliquot_times_sec: list[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
     insert_electrolyte_bool: bool = False,
     insert_electrolyte_ul: int = 0,
@@ -50,7 +49,7 @@ def ADSS_CA_cell_1potential(
     keep_electrolyte: bool = False,
     use_electrolyte: bool = False,
     OCV_duration: float = 60,
-    OCValiquot_times_sec: List[float] = [20],
+    OCValiquot_times_sec: list[float] = [20],
     samplerate_sec: float = 1,
     led_illumination: bool = False,
     led_dutycycle: float = 1,
@@ -396,12 +395,12 @@ def ADSS_PA_CVs_CAs_cell(
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
     recirculate_wait_time_m: float = 0.5,
-    CV_cycles: List[int] = [5, 3, 3],
-    Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    scanrate_voltsec: List[float] = [
+    CV_cycles: list[int] = [5, 3, 3],
+    Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    scanrate_voltsec: list[float] = [
         0.02,
         0.02,
         0.02,
@@ -409,16 +408,16 @@ def ADSS_PA_CVs_CAs_cell(
     CV_samplerate_sec: float = 0.05,
     # number_of_preCAs: int = 3,
     number_of_postCAs: int = 2,
-    CA_potentials_vs: List[float] = [0.6, 0.4],
+    CA_potentials_vs: list[float] = [0.6, 0.4],
     potential_versus: str = "rhe",
-    CA_duration_sec: List[float] = [60, 60],
+    CA_duration_sec: list[float] = [60, 60],
     CA_samplerate_sec: float = 0.1,
     gamry_i_range: str = "auto",
     ph: float = 9.53,
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
-    aliquot_postCV: List[int] = [1, 0, 0],
-    aliquot_postCA: List[int] = [1, 0],
+    aliquot_postCV: list[int] = [1, 0, 0],
+    aliquot_postCA: list[int] = [1, 0],
     aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
     Drain: bool = False,
@@ -709,7 +708,7 @@ def ADSS_PA_CVs_CAs_cell(
 def ADSS_PA_CVs_CAs_CVs_cell_simple(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 5917,
-    plate_sample_no: List[int] = [16304],  #  instead of map select
+    plate_sample_no: list[int] = [16304],  #  instead of map select
     same_sample: bool = False,
     keep_electrolyte: bool = False,
     use_electrolyte: bool = False,
@@ -719,12 +718,12 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     liquid_sample_volume_ul: float = 4000,
     recirculate_wait_time_m: float = 0.5,
     recirculate_reverse_wait_time_s: float = 1,
-    CV_cycles: List[int] = [5, 3, 3],
-    Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    scanrate_voltsec: List[float] = [
+    CV_cycles: list[int] = [5, 3, 3],
+    Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    scanrate_voltsec: list[float] = [
         0.02,
         0.02,
         0.02,
@@ -732,24 +731,24 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     CV_samplerate_sec: float = 0.05,
     # number_of_preCAs: int = 3,
     number_of_postCAs: int = 2,
-    CA_potentials_vs: List[float] = [0.6, 0.4],
+    CA_potentials_vs: list[float] = [0.6, 0.4],
     potential_versus: str = "rhe",
-    CA_duration_sec: List[float] = [60, 60],
+    CA_duration_sec: list[float] = [60, 60],
     CA_samplerate_sec: float = 0.1,
-    CV2_cycles: List[int] = [5, 3, 3],
-    CV2_Vinit_vsRHE: List[float] = [
+    CV2_cycles: list[int] = [5, 3, 3],
+    CV2_Vinit_vsRHE: list[float] = [
         1.23,
         1.23,
         1.23,
     ],  # Initial value in volts or amps.
-    CV2_Vapex1_vsRHE: List[float] = [
+    CV2_Vapex1_vsRHE: list[float] = [
         1.23,
         1.23,
         1.23,
     ],  # Apex 1 value in volts or amps.
-    CV2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    CV2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    CV2_scanrate_voltsec: List[float] = [
+    CV2_Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    CV2_Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    CV2_scanrate_voltsec: list[float] = [
         0.02,
         0.02,
         0.02,
@@ -760,8 +759,8 @@ def ADSS_PA_CVs_CAs_CVs_cell_simple(
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
     aliquot_init: bool = True,
-    aliquot_postCV: List[int] = [1, 0, 0],
-    aliquot_postCA: List[int] = [1, 0],
+    aliquot_postCV: list[int] = [1, 0, 0],
+    aliquot_postCA: list[int] = [1, 0],
     aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
     # Drain: bool = False,
@@ -1106,16 +1105,16 @@ def ADSS_CA_cell_multipotential(
     # liquid_custom_position: str = "elec_res1",
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
-    CA_potentials_vs: List[float] = [-0.5, 0.0, 0.5, 1.0],
+    CA_potentials_vs: list[float] = [-0.5, 0.0, 0.5, 1.0],
     potential_versus: str = "oer",
     ph: float = 9.53,
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
     CA_duration_sec: float = 1320,
-    aliquot_times_sec: List[float] = [60, 600, 1140],
+    aliquot_times_sec: list[float] = [60, 600, 1140],
     aliquot_volume_ul: int = 200,
     OCV_duration: float = 60,
-    OCValiquot_times_sec: List[float] = [20],
+    OCValiquot_times_sec: list[float] = [20],
     samplerate_sec: float = 1,
     led_illumination: bool = False,
     led_dutycycle: float = 1,
@@ -1435,12 +1434,12 @@ def ADSS_PA_CVs_testing(
     liquid_sample_no: int = 220,
     liquid_sample_volume_ul: float = 4000,
     recirculate_wait_time_m: float = 5,
-    CV_cycles: List[int] = [10, 3],
-    Vinit_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Initial value in volts or amps.
-    Vapex1_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: List[float] = [1.2, 1.2, 1.2],  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Final value in volts or amps.
-    scanrate_voltsec: List[float] = [
+    CV_cycles: list[int] = [10, 3],
+    Vinit_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Initial value in volts or amps.
+    Vapex1_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: list[float] = [1.2, 1.2, 1.2],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Final value in volts or amps.
+    scanrate_voltsec: list[float] = [
         0.1,
         0.02,
         0.02,
@@ -1448,16 +1447,16 @@ def ADSS_PA_CVs_testing(
     CV_samplerate_sec: float = 0.05,
     # number_of_preCAs: int = 3,
     # number_of_postCAs: int = 2,
-    # CA_potentials_vs: List[float] = [0.6,0.4],
+    # CA_potentials_vs: list[float] = [0.6,0.4],
     potential_versus: str = "rhe",
-    # CA_duration_sec: List[float] = [60,60],
+    # CA_duration_sec: list[float] = [60,60],
     # CA_samplerate_sec: float = 0.1,
-    CV2_cycles: List[int] = [3],
-    CV2_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    CV2_Vapex1_vsRHE: List[float] = [0.05],  # Apex 1 value in volts or amps.
-    CV2_Vapex2_vsRHE: List[float] = [1.2],  # Apex 2 value in volts or amps.
-    CV2_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    CV2_scanrate_voltsec: List[float] = [
+    CV2_cycles: list[int] = [3],
+    CV2_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    CV2_Vapex1_vsRHE: list[float] = [0.05],  # Apex 1 value in volts or amps.
+    CV2_Vapex2_vsRHE: list[float] = [1.2],  # Apex 2 value in volts or amps.
+    CV2_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    CV2_scanrate_voltsec: list[float] = [
         0.02
     ],  # scan rate in volts/second or amps/second.
     CV2_samplerate_sec: float = 0.05,
@@ -1465,8 +1464,8 @@ def ADSS_PA_CVs_testing(
     ph: float = 9.53,
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
-    # aliquot_postCV: List[int] = [1,0,0],
-    # aliquot_postCA: List[int] = [1,0],
+    # aliquot_postCV: list[int] = [1,0,0],
+    # aliquot_postCA: list[int] = [1,0],
     # aliquot_volume_ul: int = 200,
     Syringe_rate_ulsec: float = 300,
     # Drain: bool = False,
@@ -1849,7 +1848,7 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     liquid_sample_no: int = 1053,
     liquid_sample_volume_ul: float = 4000,
     phosphoric_sample_no: int = 99999,
-    phosphoric_location: List[int] = [2, 2, 54],
+    phosphoric_location: list[int] = [2, 2, 54],
     phosphoric_quantity_ul: int = 0,
     recirculate_wait_time_m: float = 5,
     postN2_recirculate_wait_time_m: float = 5,
@@ -1857,27 +1856,27 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     CleaningCV_Vinit_vsRHE: float = 0.05,
     CleaningCV_Vapex2_vsRHE: float = 1.5,
     CleaningCV_scanrate_voltsec: float = 0.1,
-    CV_cycles: List[int] = [10, 3],
-    Vinit_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Initial value in volts or amps.
-    Vapex1_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Apex 1 value in volts or amps.
-    Vapex2_vsRHE: List[float] = [1.2, 1.2, 1.2],  # Apex 2 value in volts or amps.
-    Vfinal_vsRHE: List[float] = [0.05, 0.05, 0.05],  # Final value in volts or amps.
-    scanrate_voltsec: List[float] = [
+    CV_cycles: list[int] = [10, 3],
+    Vinit_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Initial value in volts or amps.
+    Vapex1_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Apex 1 value in volts or amps.
+    Vapex2_vsRHE: list[float] = [1.2, 1.2, 1.2],  # Apex 2 value in volts or amps.
+    Vfinal_vsRHE: list[float] = [0.05, 0.05, 0.05],  # Final value in volts or amps.
+    scanrate_voltsec: list[float] = [
         0.1,
         0.02,
         0.02,
     ],  # scan rate in volts/second or amps/second.
     CV_samplerate_sec: float = 0.05,
-    CA_potentials_vs: List[float] = [0.6, 0.4],
+    CA_potentials_vs: list[float] = [0.6, 0.4],
     potential_versus: str = "rhe",
-    CA_duration_sec: List[float] = [60, 60],
+    CA_duration_sec: list[float] = [60, 60],
     CA_samplerate_sec: float = 0.1,
-    CV2_cycles: List[int] = [3],
-    CV2_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    CV2_Vapex1_vsRHE: List[float] = [0.05],  # Apex 1 value in volts or amps.
-    CV2_Vapex2_vsRHE: List[float] = [1.2],  # Apex 2 value in volts or amps.
-    CV2_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    CV2_scanrate_voltsec: List[float] = [
+    CV2_cycles: list[int] = [3],
+    CV2_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    CV2_Vapex1_vsRHE: list[float] = [0.05],  # Apex 1 value in volts or amps.
+    CV2_Vapex2_vsRHE: list[float] = [1.2],  # Apex 2 value in volts or amps.
+    CV2_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    CV2_scanrate_voltsec: list[float] = [
         0.02
     ],  # scan rate in volts/second or amps/second.
     CV2_samplerate_sec: float = 0.05,
@@ -1886,8 +1885,8 @@ def ADSS_PA_CVs_CAs_CVs_autogasswitching(
     ref_type: str = "leakless",
     ref_offset__V: float = 0.0,
     aliquot_init: bool = True,
-    aliquot_postCV: List[int] = [1, 0, 0],
-    aliquot_postCA: List[int] = [1, 0],
+    aliquot_postCV: list[int] = [1, 0, 0],
+    aliquot_postCA: list[int] = [1, 0],
     aliquot_volume_ul: int = 100,
     Syringe_rate_ulsec: float = 300,
     # Drain: bool = False,
@@ -2290,16 +2289,16 @@ def ADSS_PA_CV_TRI(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
     plate_id_ref_Pt: int = 6173,
-    plate_sample_no_list: List[int] = [
+    plate_sample_no_list: list[int] = [
         16304
     ],  #  need as many samples as you expect combinations of UPL and LPL
-    LPL_list: List[float] = [
+    LPL_list: list[float] = [
         0.05,
         0.55,
         0.05,
         0.55,
     ],
-    UPL_list: List[float] = [
+    UPL_list: list[float] = [
         1.3,
         0.8,
         1.3,
@@ -2342,27 +2341,27 @@ def ADSS_PA_CV_TRI(
     # phosphoric acid injection info
     Inject_PA: bool = True,
     phosphoric_sample_no: int = 1261,
-    phosphoric_location: List[int] = [2, 3, 54],
+    phosphoric_location: list[int] = [2, 3, 54],
     phosphoric_quantity_ul: int = 90,
     inject_recirculate_wait_time_sec: float = 60,
     # liquid_custom_position: str = "elec_res1",
     # Ref Pt measurement CVs
-    ref_CV_cycles: List[int] = [8],
-    ref_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    ref_Vapex1_vsRHE: List[float] = [1.3],  # Apex 1 value in volts or amps.
-    ref_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
-    ref_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    ref_CV_scanrate_voltsec: List[float] = [
+    ref_CV_cycles: list[int] = [8],
+    ref_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    ref_Vapex1_vsRHE: list[float] = [1.3],  # Apex 1 value in volts or amps.
+    ref_Vapex2_vsRHE: list[float] = [0.05],  # Apex 2 value in volts or amps.
+    ref_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    ref_CV_scanrate_voltsec: list[float] = [
         0.1
     ],  # scan rate in volts/second or amps/second.
     ref_CV_samplerate_sec: float = 0.01,
     # cleaning CVs
-    cleaning_CV_cycles: List[int] = [20],
-    cleaning_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    cleaning_Vapex1_vsRHE: List[float] = [1.5],  # Apex 1 value in volts or amps.
-    cleaning_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
-    cleaning_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    cleaning_scanrate_voltsec: List[float] = [
+    cleaning_CV_cycles: list[int] = [20],
+    cleaning_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    cleaning_Vapex1_vsRHE: list[float] = [1.5],  # Apex 1 value in volts or amps.
+    cleaning_Vapex2_vsRHE: list[float] = [0.05],  # Apex 2 value in volts or amps.
+    cleaning_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    cleaning_scanrate_voltsec: list[float] = [
         0.2
     ],  # scan rate in volts/second or amps/second.
     cleaning_CV_samplerate_sec: float = 0.02,
@@ -2370,20 +2369,20 @@ def ADSS_PA_CV_TRI(
     testing_CV_scanrate_voltsec: float = 0.1,
     testing_CV_samplerate_sec: float = 0.01,
     # CVs in N2 for background
-    CV_N2_cycles: List[int] = [5],
-    # CV_N2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    # CV_N2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    # CV_N2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    # CV_N2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    # CV_N2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_N2_cycles: list[int] = [5],
+    # CV_N2_Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    # CV_N2_Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    # CV_N2_Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    # CV_N2_Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    # CV_N2_scanrate_voltsec: list[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     # CV_N2_samplerate_sec: float = 0.05,
     # CVs in O2 and with and without PA
-    CV_O2_cycles: List[int] = [5, 25, 50],
-    # CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    # CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    # CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    # CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    # CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_O2_cycles: list[int] = [5, 25, 50],
+    # CV_O2_Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    # CV_O2_Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    # CV_O2_Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    # CV_O2_Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    # CV_O2_scanrate_voltsec: list[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     # CV_O2_samplerate_sec: float = 0.05,
     # OCP info
     OCP_samplerate_sec: float = 0.5,
@@ -2393,10 +2392,10 @@ def ADSS_PA_CV_TRI(
     ref_offset__V: float = -0.005,
     # aliquote info
     aliquot_init: bool = True,
-    aliquot_after_cleaningCV: List[int] = [0],
-    aliquote_after_CV_init: List[int] = [1],
-    aliquote_CV_O2: List[int] = [1, 1, 1],
-    aliquote_CV_final: List[int] = [0],
+    aliquot_after_cleaningCV: list[int] = [0],
+    aliquote_after_CV_init: list[int] = [1],
+    aliquote_CV_O2: list[int] = [1, 1, 1],
+    aliquote_CV_final: list[int] = [0],
     aliquot_volume_ul: int = 100,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_peek",
@@ -3659,16 +3658,16 @@ def ADSS_PA_CV_TRI_new(
     # solid_custom_position: str = "cell1_we",
     plate_id: int = 6307,
     plate_id_ref_Pt: int = 6173,
-    plate_sample_no_list: List[int] = [
+    plate_sample_no_list: list[int] = [
         16304
     ],  #  need as many samples as you expect combinations of UPL and LPL
-    LPL_list: List[float] = [
+    LPL_list: list[float] = [
         0.05,
         0.55,
         0.05,
         0.55,
     ],
-    UPL_list: List[float] = [
+    UPL_list: list[float] = [
         1.3,
         0.8,
         1.3,
@@ -3712,7 +3711,7 @@ def ADSS_PA_CV_TRI_new(
     fill_recirculate_reverse_wait_time_sec: float = 15,
     # phosphoric acid injection info
     phosphoric_sample_no: int = 1261,
-    phosphoric_location: List[int] = [2, 3, 54],
+    phosphoric_location: list[int] = [2, 3, 54],
     phosphoric_quantity_ul: int = 90,
     inject_recirculate_wait_time_sec: float = 60,
     # liquid_custom_position: str = "elec_res1",
@@ -3720,22 +3719,22 @@ def ADSS_PA_CV_TRI_new(
     phos_PAL_Injector_id: str = "LS5_peek",
     PAL_cleanvol_ul: int = 500,
     # Ref Pt measurement CVs
-    ref_CV_cycles: List[int] = [8],
-    ref_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    ref_Vapex1_vsRHE: List[float] = [1.3],  # Apex 1 value in volts or amps.
-    ref_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
-    ref_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    ref_CV_scanrate_voltsec: List[float] = [
+    ref_CV_cycles: list[int] = [8],
+    ref_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    ref_Vapex1_vsRHE: list[float] = [1.3],  # Apex 1 value in volts or amps.
+    ref_Vapex2_vsRHE: list[float] = [0.05],  # Apex 2 value in volts or amps.
+    ref_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    ref_CV_scanrate_voltsec: list[float] = [
         0.1
     ],  # scan rate in volts/second or amps/second.
     ref_CV_samplerate_sec: float = 0.01,
     # cleaning CVs
-    cleaning_CV_cycles: List[int] = [20],
-    cleaning_Vinit_vsRHE: List[float] = [0.05],  # Initial value in volts or amps.
-    cleaning_Vapex1_vsRHE: List[float] = [1.5],  # Apex 1 value in volts or amps.
-    cleaning_Vapex2_vsRHE: List[float] = [0.05],  # Apex 2 value in volts or amps.
-    cleaning_Vfinal_vsRHE: List[float] = [0.05],  # Final value in volts or amps.
-    cleaning_scanrate_voltsec: List[float] = [
+    cleaning_CV_cycles: list[int] = [20],
+    cleaning_Vinit_vsRHE: list[float] = [0.05],  # Initial value in volts or amps.
+    cleaning_Vapex1_vsRHE: list[float] = [1.5],  # Apex 1 value in volts or amps.
+    cleaning_Vapex2_vsRHE: list[float] = [0.05],  # Apex 2 value in volts or amps.
+    cleaning_Vfinal_vsRHE: list[float] = [0.05],  # Final value in volts or amps.
+    cleaning_scanrate_voltsec: list[float] = [
         0.2
     ],  # scan rate in volts/second or amps/second.
     cleaning_CV_samplerate_sec: float = 0.02,
@@ -3743,20 +3742,20 @@ def ADSS_PA_CV_TRI_new(
     testing_CV_scanrate_voltsec: float = 0.1,
     testing_CV_samplerate_sec: float = 0.01,
     # CVs in N2 for background
-    CV_N2_cycles: List[int] = [5],
-    # CV_N2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    # CV_N2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    # CV_N2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    # CV_N2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    # CV_N2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_N2_cycles: list[int] = [5],
+    # CV_N2_Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    # CV_N2_Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    # CV_N2_Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    # CV_N2_Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    # CV_N2_scanrate_voltsec: list[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     # CV_N2_samplerate_sec: float = 0.05,
     # CVs in O2 and with and without PA
-    CV_O2_cycles: List[int] = [5, 25, 50],
-    # CV_O2_Vinit_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
-    # CV_O2_Vapex1_vsRHE: List[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
-    # CV_O2_Vapex2_vsRHE: List[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
-    # CV_O2_Vfinal_vsRHE: List[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
-    # CV_O2_scanrate_voltsec: List[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
+    CV_O2_cycles: list[int] = [5, 25, 50],
+    # CV_O2_Vinit_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Initial value in volts or amps.
+    # CV_O2_Vapex1_vsRHE: list[float] = [1.23, 1.23, 1.23],  # Apex 1 value in volts or amps.
+    # CV_O2_Vapex2_vsRHE: list[float] = [0.6, 0.4, 0],  # Apex 2 value in volts or amps.
+    # CV_O2_Vfinal_vsRHE: list[float] = [0.6, 0.4, 0],  # Final value in volts or amps.
+    # CV_O2_scanrate_voltsec: list[float] = [0.02,0.02,0.02],  # scan rate in volts/second or amps/second.
     # CV_O2_samplerate_sec: float = 0.05,
     # OCP info
     OCP_samplerate_sec: float = 0.5,
@@ -3765,10 +3764,10 @@ def ADSS_PA_CV_TRI_new(
     ref_type: str = "leakless",
     ref_offset__V: float = -0.005,
     # aliquote info
-    aliquot_after_cleaningCV: List[int] = [0],
-    aliquote_after_CV_init: List[int] = [1],
-    aliquote_CV_O2: List[int] = [1, 1, 1],
-    aliquote_CV_final: List[int] = [0],
+    aliquot_after_cleaningCV: list[int] = [0],
+    aliquote_after_CV_init: list[int] = [1],
+    aliquote_CV_O2: list[int] = [1, 1, 1],
+    aliquote_CV_final: list[int] = [0],
     aliquot_volume_ul: int = 100,
     PAL_Injector: str = "LS 4",
     PAL_Injector_id: str = "LS4_peek",

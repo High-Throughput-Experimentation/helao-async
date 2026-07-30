@@ -23,7 +23,6 @@ __all__ = [
     # "CCSI_debug_liquidloads",
 ]
 
-from typing import List
 from typing import Union
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
@@ -238,7 +237,7 @@ def CCSI_initialization(
 # def CCSI_repeated_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 1,
 #     gas_sample_no: int = 1,
-#     KOH_volume_ul: List[float] = [0,500, 50],
+#     KOH_volume_ul: list[float] = [0,500, 50],
 #     KOH_reservoir_sample_no: int = 2,
 #     total_sample_volume_ul: float = 5000,
 #     Clean_reservoir_sample_no: int = 1,
@@ -341,7 +340,7 @@ def CCSI_initialization(
 # def CCSI_test_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 1,
 #     gas_sample_no: int = 1,
-#     KOH_volume_ul: List[float] = [0,500, 50],
+#     KOH_volume_ul: list[float] = [0,500, 50],
 #     KOH_reservoir_sample_no: int = 2,
 #     total_sample_volume_ul: float = 5000,
 #     Clean_reservoir_sample_no: int = 1,
@@ -447,7 +446,7 @@ def CCSI_initialization(
 # def CCSI_newer_KOH_testing(  #assumes initialization performed previously
 #     sequence_version: int = 2,
 #     gas_sample_no: int = 1,
-#     KOH_volume_ul: List[float] = [0,500, 50],
+#     KOH_volume_ul: list[float] = [0,500, 50],
 #     KOH_reservoir_sample_no: int = 2,
 #     total_sample_volume_ul: float = 5000,
 #     Clean_reservoir_sample_no: int = 1,
@@ -682,7 +681,7 @@ def CCSI_initialization(
 @sequence(version=8)
 def CCSI_Solution_testing(  # assumes initialization performed previously
     gas_sample_no: int = 2,
-    Solution_volume_ul: List[float] = [0, 500, 50],
+    Solution_volume_ul: list[float] = [0, 500, 50],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
@@ -873,7 +872,7 @@ def CCSI_Solution_testing(  # assumes initialization performed previously
 # def CCSI_Solution_test_constantpressure(  #assumes initialization performed previously
 #     sequence_version: int = 6, #4 new threshold criteria 5, sample purgetime, 6 no preclean
 #     gas_sample_no: int = 2,
-#     Solution_volume_ul: List[float] = [0,500, 50],
+#     Solution_volume_ul: list[float] = [0,500, 50],
 #     Solution_reservoir_sample_no: int = 2,
 #     Solution_name: str = "",
 #     total_sample_volume_ul: float = 5000,
@@ -1004,16 +1003,16 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     #                   20 renaming water addition to secondliquid // adding secondliquid prerinse #21 second liquid rinse volume
     initial_gas_sample_no: int = 2,
     pureco2_sample_no: int = 1,
-    Solution_volume_ul: List[float] = [0, 0, 0],
+    Solution_volume_ul: list[float] = [0, 0, 0],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "acetonitrile",
-    total_sample_volume_ul: List[float] = [5000, 5000, 5000],
+    total_sample_volume_ul: list[float] = [5000, 5000, 5000],
     total_cell_volume_ul: float = 12500,
     secondliquid_injection: bool = False,
     secondliquid_injection_before_IL: bool = False,
     secondliquid_injection_reservoir_sample_no: int = 468,
     secondliquid_injection_syringe_rate_ulsec: float = 10,
-    secondliquid_injection_volume_ul: List[float] = [50, 50, 50],
+    secondliquid_injection_volume_ul: list[float] = [50, 50, 50],
     secondliquid_injection_FillWait: float = 30,
     Clean_reservoir_sample_no: int = 1,
     Clean_syringe_rate_ulsec: float = 300,
@@ -1023,7 +1022,7 @@ def CCSI_Solution_co2maintainconcentration(  # assumes initialization performed 
     SyringePushWait_s: float = 60,
     n2_push: bool = False,
     co2_filltime_s: float = 15,
-    co2measure_duration: List[float] = [1200, 1800, 2400],
+    co2measure_duration: list[float] = [1200, 1800, 2400],
     co2measure_acqrate: float = 0.5,
     flowrate_sccm: float = 0.5,
     flowramp_sccm: float = 0,
@@ -1602,7 +1601,7 @@ def CCSI_cleancycles(
 @sequence(version=2)
 def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed previously
     gas_sample_no: int = 2,
-    Solution_volume_ul: List[float] = [0, 500, 50],
+    Solution_volume_ul: list[float] = [0, 500, 50],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
@@ -1767,7 +1766,7 @@ def CCSI_Solution_testing_fixed_cleans(  # assumes initialization performed prev
 
 @sequence(version=1)
 def CCSI_priming(  # assumes initialization performed previously
-    Solution_volume_ul: List[float] = [2000],
+    Solution_volume_ul: list[float] = [2000],
     Solution_reservoir_sample_no: int = 2,
     Solution_name: str = "",
     total_sample_volume_ul: float = 5000,
@@ -1974,10 +1973,10 @@ def CCSI_priming(  # assumes initialization performed previously
 # #                   v 14, list for solution/total sample volumes+ extra clean 15 added rinses/16agitation
 #     initial_gas_sample_no: int = 2,
 #     pureco2_sample_no: int = 1,
-#     Solution_volume_ul: List[float] = [0,0,0],
+#     Solution_volume_ul: list[float] = [0,0,0],
 #     Solution_reservoir_sample_no: int = 2,
 #     Solution_name: str = "acetonitrile",
-#     total_sample_volume_ul: List[float] = [5000],
+#     total_sample_volume_ul: list[float] = [5000],
 #     total_cell_volume_ul: float = 12500,
 
 #     Clean_reservoir_sample_no: int = 1,

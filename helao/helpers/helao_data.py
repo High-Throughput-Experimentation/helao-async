@@ -9,7 +9,6 @@ experiments, actions) and helpers for reading associated ``.hlo``,
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from typing import Tuple
 
 import os
 import builtins
@@ -272,7 +271,7 @@ class HelaoData:
 
     def read_hlo(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
-    ) -> Tuple[dict, dict]:
+    ) -> tuple[dict, dict]:
         """Read a ``.hlo`` file and return its YAML header and data dict.
 
         When this ``HelaoData`` wraps a zip archive (and ``hlotarget`` is not a
@@ -300,7 +299,7 @@ class HelaoData:
 
     def read_parquet(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
-    ) -> Tuple[dict, pd.DataFrame]:
+    ) -> tuple[dict, pd.DataFrame]:
         """Read a Parquet file and return ``({}, column_dict)``.
 
         Args:
@@ -327,7 +326,7 @@ class HelaoData:
 
     def read_json(
         self, hlotarget: str, keep_keys: list = [], omit_keys: list = []
-    ) -> Tuple[dict, dict]:
+    ) -> tuple[dict, dict]:
         """Read a JSON data file and return ``({}, parsed_dict)``.
 
         Args:
@@ -382,7 +381,7 @@ class HelaoData:
         bytes = zipfile.Path(self.target, hlotarget).read_bytes()
         return bytes
 
-    def read_data_file(self, target_data_file: str) -> Tuple[dict, dict]:
+    def read_data_file(self, target_data_file: str) -> tuple[dict, dict]:
         """Dispatch to the reader matching the file extension.
 
         Args:

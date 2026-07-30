@@ -20,7 +20,7 @@ Contract (see plan Principle 5 / Pre-mortem #2/#3/#4):
   transport failure. It does **not** raise merely because the response body
   is ``None`` (void endpoints such as ``update_samples`` succeed with a
   ``None`` body).
-* Outbound ``Sample``/``List[SampleUnion]``/``Action`` arguments are
+* Outbound ``Sample``/``list[SampleUnion]``/``Action`` arguments are
   serialized to plain dicts (``.as_dict()`` / ``model_dump(mode="json")``)
   before being placed in ``params_dict``/``json_dict``, because the HTTP
   fallback's JSON encoder cannot serialize raw pydantic models.
@@ -33,7 +33,7 @@ Contract (see plan Principle 5 / Pre-mortem #2/#3/#4):
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
@@ -69,7 +69,7 @@ def _to_jsonable(obj: Any) -> Any:
 
 
 def _samples_to_jsonable(samples: Optional[list]) -> list:
-    """Serialize a ``List[SampleUnion]`` argument to a list of plain dicts."""
+    """Serialize a ``list[SampleUnion]`` argument to a list of plain dicts."""
     if not samples:
         return []
     return [_to_jsonable(s) for s in samples]
@@ -129,11 +129,11 @@ class _UnifiedDBShim:
 
     async def get_samples(
         self,
-        samples: Optional[List] = None,
+        samples: Optional[list] = None,
         *args,
         **kwargs,
     ) -> list:
-        """Resolve sample references; returns ``List[SampleUnion]``."""
+        """Resolve sample references; returns ``list[SampleUnion]``."""
         resp = await self._parent._dispatch(
             "get_samples",
             json_dict={"samples": _samples_to_jsonable(samples)},
@@ -142,11 +142,11 @@ class _UnifiedDBShim:
 
     async def new_samples(
         self,
-        samples: Optional[List] = None,
+        samples: Optional[list] = None,
         *args,
         **kwargs,
     ) -> list:
-        """Persist new samples; returns the persisted ``List[SampleUnion]``."""
+        """Persist new samples; returns the persisted ``list[SampleUnion]``."""
         resp = await self._parent._dispatch(
             "new_samples",
             json_dict={"samples": _samples_to_jsonable(samples)},
@@ -155,7 +155,7 @@ class _UnifiedDBShim:
 
     async def update_samples(
         self,
-        samples: Optional[List] = None,
+        samples: Optional[list] = None,
         *args,
         **kwargs,
     ) -> None:
@@ -181,7 +181,7 @@ class SampleArchiveShim:
         self.unified_db = _UnifiedDBShim(self)
 
     # -- internals -------------------------------------------------------
-    def _addr(self) -> Tuple[str, int]:
+    def _addr(self) -> tuple[str, int]:
         """Resolve the SAMPLE server ``(host, port)`` at call time.
 
         Raises:
@@ -225,7 +225,7 @@ class SampleArchiveShim:
         vial: Optional[int] = None,
         *args,
         **kwargs,
-    ) -> Tuple[ErrorCodes, Any]:
+    ) -> tuple[ErrorCodes, Any]:
         """Return ``(error, sample)`` for the given tray/slot/vial location."""
         resp = await self._dispatch(
             "tray_query_sample",
@@ -296,7 +296,7 @@ class SampleArchiveShim:
         custom: Optional[str] = None,
         *args,
         **kwargs,
-    ) -> Tuple[ErrorCodes, Any]:
+    ) -> tuple[ErrorCodes, Any]:
         """Return ``(error, sample)`` for the sample at a custom position."""
         resp = await self._dispatch(
             "custom_query_sample",
@@ -313,7 +313,7 @@ class SampleArchiveShim:
         dilute: bool = False,
         *args,
         **kwargs,
-    ) -> Tuple[bool, Any]:
+    ) -> tuple[bool, Any]:
         """Replace the sample at ``custom``; returns ``(success, sample)``."""
         resp = await self._dispatch(
             "custom_update_position",
@@ -366,7 +366,7 @@ class SampleArchiveShim:
     # -- reference sample creation --------------------------------------
     async def new_ref_samples(
         self,
-        samples_in: Optional[List] = None,
+        samples_in: Optional[list] = None,
         sample_out_type: Any = "",
         sample_position: str = "",
         action: Optional[Any] = None,
@@ -374,7 +374,7 @@ class SampleArchiveShim:
         combine_gases: bool = False,
         *args,
         **kwargs,
-    ) -> Tuple[ErrorCodes, list]:
+    ) -> tuple[ErrorCodes, list]:
         """Build new reference samples; returns ``(error_code, samples)``."""
         resp = await self._dispatch(
             "new_ref_samples",

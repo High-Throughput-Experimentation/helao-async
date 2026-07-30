@@ -16,7 +16,6 @@ __all__ = [
 ]
 
 import random
-from typing import List
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.constants import SPEC_MAP
 from helao.core.models.electrolyte import Electrolyte
@@ -1400,7 +1399,7 @@ def ECHEUVIS_multiCA_led(
     measurement_area: float = 0.071,  # 3mm diameter droplet
     liquid_volume_ml: float = 1.0,
     ref_vs_nhe: float = 0.21,
-    CA_potential_vsRHE: List[float] = [0.8, 0.6, 0.4, 0.2],
+    CA_potential_vsRHE: list[float] = [0.8, 0.6, 0.4, 0.2],
     CA_duration_sec: float = 300,
     CA_samplerate_sec: float = 0.05,
     OCV_duration_sec: float = 5,

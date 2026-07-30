@@ -9,7 +9,7 @@ from psycopg2 import connect, sql
 from psycopg2 import OperationalError, ProgrammingError, Error
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 from tenacity import retry, wait_exponential, stop_after_attempt
-from typing import Callable
+from collections.abc import Callable
 from ..logger import main_log
 
 # arg_app_config_path = sys.argv[1]

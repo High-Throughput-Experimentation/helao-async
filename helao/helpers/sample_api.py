@@ -22,7 +22,7 @@ import os
 import sqlite3
 from socket import gethostname
 import pandas as pd
-from typing import List, Tuple, Union
+from typing import Union
 import aiofiles
 import shortuuid
 from uuid import UUID
@@ -296,10 +296,10 @@ class SampleModelAPI:
 
     async def new_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Insert new samples of this API's sample type into the database.
 
         Samples whose runtime type does not match this API's sample class are
@@ -374,10 +374,10 @@ class SampleModelAPI:
 
     async def get_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Look up samples by ``sample_no`` and return populated models.
 
         Negative ``sample_no`` values index from the most recent record; positive
@@ -445,7 +445,7 @@ class SampleModelAPI:
 
     async def list_new_samples(
         self, limit: int = 10, give_only: bool = False
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Return the most recently created samples as dicts.
 
         Args:
@@ -527,7 +527,7 @@ class SampleModelAPI:
 
     async def update_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ):
@@ -619,20 +619,20 @@ class SampleModelAPI:
 
     async def get_platemap(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[list]:
+    ) -> list[list]:
         """Return platemaps for the given samples; unsupported for non-solid types."""
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
 
     async def get_samples_xy(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Tuple[float, float]]:
+    ) -> list[tuple[float, float]]:
         """Return ``(x, y)`` coordinates per sample; unsupported for non-solid types."""
         LOGGER.error(f"not supported for {self._sample_type}")
         return []
@@ -722,10 +722,10 @@ class SolidSampleAPI(SampleModelAPI):
 
     async def get_platemap(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[list]:
+    ) -> list[list]:
         """Return the legacy platemap entry list for each sample's plate."""
         pmlist = []
         for sample in samples:
@@ -737,10 +737,10 @@ class SolidSampleAPI(SampleModelAPI):
 
     async def get_samples_xy(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Tuple[float, float]]:
+    ) -> list[tuple[float, float]]:
         """Return ``[x, y]`` coordinates per sample from the legacy platemap."""
         xylist = []
         for sample in samples:
@@ -758,10 +758,10 @@ class SolidSampleAPI(SampleModelAPI):
 
     async def new_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Unsupported for solid samples; returns an empty list."""
         LOGGER.error("new_sample is not supported yet for solid sample")
         await asyncio.sleep(0.01)
@@ -771,10 +771,10 @@ class SolidSampleAPI(SampleModelAPI):
 
     async def get_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Resolve solid samples via the legacy platemap (validates legacy entries by xy)."""
         await asyncio.sleep(0.01)
         ret_samples = []
@@ -813,10 +813,10 @@ class SolidSampleAPI(SampleModelAPI):
 
     async def update_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """No-op update for solid samples: revalidates and returns the samples."""
         # self._base.print_message("Update is not supported yet "
         #                          "for solid sample", error=True)
@@ -1074,10 +1074,10 @@ class UnifiedSampleDataAPI:
 
     async def new_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Dispatch ``new_samples`` to the appropriate per-type backend.
 
         Args:
@@ -1111,10 +1111,10 @@ class UnifiedSampleDataAPI:
 
     async def get_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
-    ) -> List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
+    ) -> list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]:
         """Dispatch ``get_samples`` per sample type; recurse into assembly parts.
 
         Args:
@@ -1172,7 +1172,7 @@ class UnifiedSampleDataAPI:
 
     async def update_samples(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> None:
@@ -1201,7 +1201,7 @@ class UnifiedSampleDataAPI:
 
     async def get_samples_xy(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> list:
@@ -1238,7 +1238,7 @@ class UnifiedSampleDataAPI:
 
     async def get_platemap(
         self,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = [],
     ) -> list:
@@ -1275,13 +1275,13 @@ class UnifiedSampleDataAPI:
 
 
 def unpack_samples_helper(
-    samples: List[
+    samples: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = [],
-) -> Tuple[
-    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
-    List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+) -> tuple[
+    list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+    list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
 ]:
     """Split a sample list by primitive type, flattening any assemblies.
 

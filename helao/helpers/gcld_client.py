@@ -8,7 +8,7 @@ create, update, and acknowledge ``DataRequest`` objects, and the
 import os
 import datetime
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import Optional
 from uuid import UUID
 
 import httpx
@@ -85,7 +85,7 @@ class CreateDataRequestModel(BaseModel):
         analysis: Optional analysis dictionary.
     """
 
-    composition: Dict[str, float]
+    composition: dict[str, float]
     score: Optional[float] = None
     sample_label: Optional[str] = None
     analysis: Optional[dict] = None
@@ -231,7 +231,7 @@ class DataRequestsClient:
 
     def read_data_requests(
         self, status: Optional[Status] = None
-    ) -> List[ReadDataRequest]:
+    ) -> list[ReadDataRequest]:
         """Retrieve all data requests, optionally filtered by status.
 
         Args:

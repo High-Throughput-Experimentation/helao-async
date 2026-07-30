@@ -13,7 +13,7 @@ highlights the P1b adapter must honor:
 - NEVER self-RPC from inside the dispatch loop (in-process self-ops).
 """
 
-from typing import Optional, Protocol, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import Action, ErrorCodes
 
@@ -28,7 +28,7 @@ class TransportPort(Protocol):
         params: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]: ...
+    ) -> tuple[Optional[dict], ErrorCodes]: ...
 
     async def dispatch_private(
         self,
@@ -40,7 +40,7 @@ class TransportPort(Protocol):
         json_dict: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]: ...
+    ) -> tuple[Optional[dict], ErrorCodes]: ...
 
     async def check_endpoint(self, url: str, timeout: float = 3.0) -> bool:
         """HEAD probe (endpoints_available / heartbeat monitor)."""

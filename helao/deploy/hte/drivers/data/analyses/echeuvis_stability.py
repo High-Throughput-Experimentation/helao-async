@@ -10,7 +10,6 @@ reference clipping, and emits per-sample stability figures of merit via
 
 import sys
 from copy import copy
-from typing import List
 from uuid import UUID
 from datetime import datetime
 
@@ -157,10 +156,10 @@ class EcheUvisInputs(AnalysisInput):
         process_params: ``process_params`` dict from the in-situ row.
     """
 
-    # ref_darks: List[HelaoProcess]
-    # ref_dark_spec_acts: List[HelaoAction]
-    # ref_lights: List[HelaoProcess]
-    # ref_light_spec_acts: List[HelaoAction]
+    # ref_darks: list[HelaoProcess]
+    # ref_dark_spec_acts: list[HelaoAction]
+    # ref_lights: list[HelaoProcess]
+    # ref_light_spec_acts: list[HelaoAction]
     baseline: HelaoProcess
     baseline_spec_act: HelaoAction
     baseline_ocv_act: HelaoAction
@@ -322,7 +321,7 @@ class EcheUvisInputs(AnalysisInput):
 
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
-    ) -> List[AnalysisDataModel]:
+    ) -> list[AnalysisDataModel]:
         """Build :class:`AnalysisDataModel` entries for each spec action.
 
         Args:

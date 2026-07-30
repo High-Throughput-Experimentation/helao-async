@@ -9,7 +9,8 @@ helao.helpers.gen_uuid.gen_uuid through the composition root.
 """
 
 from collections import defaultdict
-from typing import Callable, Dict, List, Optional, Sequence as Seq, Tuple
+from typing import Optional
+from collections.abc import Callable, Sequence as Seq
 from uuid import UUID
 
 from helao.hexagon.domain.models import (
@@ -49,7 +50,7 @@ def ensure_run_id(
 def resolve_active_run_id(
     sequence_run_id: Optional[UUID],
     active_run_id: Optional[UUID],
-) -> Tuple[Optional[UUID], Optional[UUID]]:
+) -> tuple[Optional[UUID], Optional[UUID]]:
     """At dequeue, sync run ids (orch_queues.py:136-142).
 
     Returns (run_id_for_sequence, new_active_run_id): the sequence's own
@@ -103,7 +104,7 @@ def bump_retry(
 def assign_process_groups(
     actions: Seq[Action],
     mint: UuidFactory,
-) -> Tuple[Dict[int, List[int]], List[UUID]]:
+) -> tuple[dict[int, list[int]], list[UUID]]:
     """Process grouping at experiment expansion (orch_dispatch.py:1124-1158).
 
     Mutates each contributing action's process_uuid in place (as legacy does)
@@ -111,7 +112,7 @@ def assign_process_groups(
     truncation ``init_process_uuids[:len(process_order_groups)]`` is a legacy
     quirk reproduced deliberately (parity over intuition).
     """
-    process_order_groups: Dict[int, List[int]] = defaultdict(list)
+    process_order_groups: dict[int, list[int]] = defaultdict(list)
     process_count = 0
     init_process_uuids = [mint()]
     for i, act in enumerate(actions):
@@ -128,9 +129,9 @@ def assign_process_groups(
 
 
 def merge_planned_experiments(
-    operator_plan: List[ShortExperimentModel],
-    fresh_plan: List[ShortExperimentModel],
-) -> List[ShortExperimentModel]:
+    operator_plan: list[ShortExperimentModel],
+    fresh_plan: list[ShortExperimentModel],
+) -> list[ShortExperimentModel]:
     """Planned-experiment merge at sequence dispatch (orch_dispatch.py:1264-1293).
 
     Empty operator plan -> fresh plan. Operator plan at least as long as the
@@ -143,7 +144,7 @@ def merge_planned_experiments(
         return list(fresh_plan)
     if len(operator_plan) >= len(fresh_plan):
         remaining = list(fresh_plan)
-        new_planned: List[ShortExperimentModel] = []
+        new_planned: list[ShortExperimentModel] = []
         for exp_model in operator_plan:
             if not remaining:
                 new_planned.append(exp_model)

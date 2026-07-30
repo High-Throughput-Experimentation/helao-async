@@ -26,7 +26,8 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
-from typing import Iterable, List, Optional, Set
+from typing import Optional
+from collections.abc import Iterable
 
 from helao.core.models.run_dir import ALL_RUN_DIRS, RunDir
 
@@ -48,13 +49,13 @@ _NON_RUN_GENERATED = (
 #: which already excludes it). This is separate from validate_root(), which
 #: refuses a root that contains *this running* repo -- a station's ``CODE`` copy
 #: may be a different checkout, so it is guarded here by name too.
-PROTECTED_DIRS: Set[str] = {"CODE"}
+PROTECTED_DIRS: set[str] = {"CODE"}
 
 #: Every subdirectory name HELAO generates under ``root``. Only these may ever
 #: be considered for deletion; anything else is out of scope by construction.
 #: PROTECTED_DIRS is subtracted so a protected name can never leak into the
 #: deletable set even if _NON_RUN_GENERATED is later edited.
-GENERATED_DIRS: Set[str] = (
+GENERATED_DIRS: set[str] = (
     {d.value for d in ALL_RUN_DIRS} | set(_NON_RUN_GENERATED)
 ) - PROTECTED_DIRS
 
@@ -63,7 +64,7 @@ GENERATED_DIRS: Set[str] = (
 #: (USER_CONFIG calibration, DATABASE, RUNS_FINISHED/SYNCED, ANALYSES,
 #: PROCESSES, LOGS) holds data that is expensive or impossible to regenerate.
 #: RunDir.ACTIVE.value is used (not a literal) so an enum rename is caught here.
-EPHEMERAL_DIRS: Set[str] = {"STATES", RunDir.ACTIVE.value}  # RUNS_ACTIVE
+EPHEMERAL_DIRS: set[str] = {"STATES", RunDir.ACTIVE.value}  # RUNS_ACTIVE
 
 
 def _repo_root() -> Path:
@@ -101,7 +102,7 @@ def reset_generated(
     root: Optional[str],
     names: Optional[Iterable[str]] = None,
     dry_run: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Delete code-generated subdirs under ``root``; return the paths removed.
 
     ``names`` defaults to :data:`EPHEMERAL_DIRS`. Every requested name must be in
@@ -126,7 +127,7 @@ def reset_generated(
             f"allowed generated dirs: {sorted(GENERATED_DIRS)}"
         )
 
-    removed: List[str] = []
+    removed: list[str] = []
     for name in sorted(requested):
         # last-ditch guard: never delete a protected dir under any code path
         if name in PROTECTED_DIRS:
@@ -146,7 +147,7 @@ def reset_generated(
     return removed
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
 

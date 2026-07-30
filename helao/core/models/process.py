@@ -6,7 +6,7 @@ __all__ = [
 ]
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -51,10 +51,10 @@ class ProcessModel(ShortProcessModel):
         process_params (Optional[dict]): Parameters captured for the process.
         process_group_index (Optional[int]): Index of this process within its group.
         data_request_id (Optional[UUID]): Optional data-request linkage.
-        dispatched_actions_abbr (List[ShortActionModel]): Short records for contributing actions.
-        samples_in (List): Input samples (union of sample types).
-        samples_out (List): Output samples (union of sample types).
-        files (List[FileInfo]): Files associated with the process.
+        dispatched_actions_abbr (list[ShortActionModel]): Short records for contributing actions.
+        samples_in (list): Input samples (union of sample types).
+        samples_out (list): Output samples (union of sample types).
+        files (list[FileInfo]): Files associated with the process.
         campaign_name (Optional[str]): Campaign label.
         campaign_uuid (Optional[UUID]): Campaign UUID.
         run_id (Optional[UUID]): Run identifier.
@@ -73,10 +73,10 @@ class ProcessModel(ShortProcessModel):
     process_params: Optional[dict] = {}
     process_group_index: Optional[int] = None
     data_request_id: Optional[UUID] = None
-    dispatched_actions_abbr: List[ShortActionModel] = Field(default=[])
-    samples_in: List[SampleUnion] = Field(default=[])
-    samples_out: List[SampleUnion] = Field(default=[])
-    files: List[FileInfo] = Field(default=[])
+    dispatched_actions_abbr: list[ShortActionModel] = Field(default=[])
+    samples_in: list[SampleUnion] = Field(default=[])
+    samples_out: list[SampleUnion] = Field(default=[])
+    files: list[FileInfo] = Field(default=[])
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
     run_id: Optional[UUID] = None

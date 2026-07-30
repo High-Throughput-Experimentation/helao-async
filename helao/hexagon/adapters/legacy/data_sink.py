@@ -5,7 +5,7 @@ surface the NI-DAQmx callback already uses). The lbuf members route via
 active.base — the ONE sanctioned base reach-in; this port exists precisely
 to replace the 72 scattered active.action / 18 full-Base reach-ins."""
 
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from helao.hexagon.domain.models import (
@@ -43,7 +43,7 @@ class ActiveDataSinkAdapter:
 
     async def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
+        file_conn_keys: Optional[list[UUID]] = None,
         realtime: Optional[int] = None,
     ) -> None:
         # legacy Active.finish_hlo_header is sync (base.py:1091); the port is

@@ -21,7 +21,6 @@ from __future__ import annotations
 import gzip
 import json
 from pathlib import Path, PurePosixPath
-from typing import List
 
 from harness.hlo_pass import (
     diff_hlo_body,
@@ -49,7 +48,7 @@ def _manifest_entry_key(entry: tuple) -> str:
 
 def diff_s3_manifest(
     gpath: Path, cpath: Path, mg: UuidMapper, mc: UuidMapper
-) -> List[dict]:
+) -> list[dict]:
     def entries(path: Path, mapper: UuidMapper) -> set:
         out = set()
         for line in Path(path).read_text().splitlines():
@@ -60,7 +59,7 @@ def diff_s3_manifest(
         return out
 
     g, c = entries(gpath, mg), entries(cpath, mc)
-    diffs: List[dict] = []
+    diffs: list[dict] = []
     for missing in sorted(g - c):
         diffs.append(
             {
@@ -87,7 +86,7 @@ def diff_s3_record(
     mg: UuidMapper,
     mc: UuidMapper,
     manifest: ProvenanceManifest,
-) -> List[dict]:
+) -> list[dict]:
     name = PurePosixPath(norm).name
     if name == "manifest.jsonl":
         return diff_s3_manifest(gpath, cpath, mg, mc)
@@ -133,9 +132,9 @@ def diff_s3_record(
     return []
 
 
-def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> List[dict]:
+def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> list[dict]:
     """Per-capture consistency: the intentional on-disk vs S3 differences hold."""
-    diffs: List[dict] = []
+    diffs: list[dict] = []
     disk_files = {
         fi.get("file_name"): fi
         for fi in disk_act.get("files", [])
@@ -191,14 +190,14 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> List[dict]:
     return diffs
 
 
-def internal_s3_checks(root: Path) -> List[dict]:
+def internal_s3_checks(root: Path) -> list[dict]:
     """Pair S3 action metas with on-disk act ymls (raw uuid) in ONE capture."""
     act_index: dict = {}
     for act_yml in Path(root).rglob("*-act.yml"):
         d = load_yml_plain(act_yml)
         if isinstance(d, dict) and d.get("action_uuid"):
             act_index[str(d["action_uuid"]).lower()] = d
-    diffs: List[dict] = []
+    diffs: list[dict] = []
     s3_root = Path(root) / "S3_SIM"
     if not s3_root.is_dir():
         return diffs

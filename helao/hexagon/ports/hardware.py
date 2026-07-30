@@ -14,7 +14,8 @@ Contract (normative, from helao/core/drivers/helao_driver.py + core-03):
   thread offload where needed.
 """
 
-from typing import AsyncContextManager, Protocol, runtime_checkable
+from contextlib import AbstractAsyncContextManager
+from typing import Protocol, runtime_checkable
 
 from helao.core.drivers.helao_driver import (
     DriverResponse,
@@ -52,7 +53,7 @@ class ExclusiveAccess(Protocol):
     ``_send_sync`` fork, Advantech pause/resume) and the disabled Gamry poller.
     """
 
-    def exclusive(self) -> AsyncContextManager[None]: ...
+    def exclusive(self) -> AbstractAsyncContextManager[None]: ...
 
 
 @runtime_checkable

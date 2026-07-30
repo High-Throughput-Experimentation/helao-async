@@ -8,7 +8,7 @@ setpoint, enable/disable control, and wait for thermal stability.
 
 __all__ = ["makeApp"]
 
-from typing import List, Union
+from typing import Union
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI
 from helao.core.models.sample import (
@@ -51,7 +51,7 @@ def makeApp(server_key) -> BaseAPI:
     async def record_tec(
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):

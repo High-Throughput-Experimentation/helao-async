@@ -1,7 +1,8 @@
 """Auxiliary ports (spec §4.3.12)."""
 
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 __all__ = [
     "HealthPort",
@@ -30,7 +31,7 @@ class PlateInfoPort(Protocol):
 
     async def get_platemap_plateid(self, plate_id: int) -> list: ...
 
-    async def has_access(self, plate_id: int, usernames: List[str]) -> bool: ...
+    async def has_access(self, plate_id: int, usernames: list[str]) -> bool: ...
 
 
 @runtime_checkable
@@ -40,11 +41,11 @@ class LibraryPort(Protocol):
     COLLISION CHECK (silent shadowing becomes a loud preflight error,
     config-overridable for intentional shadowing)."""
 
-    def experiment_lib(self) -> Dict[str, Callable]: ...
+    def experiment_lib(self) -> dict[str, Callable]: ...
 
-    def sequence_lib(self) -> Dict[str, Callable]: ...
+    def sequence_lib(self) -> dict[str, Callable]: ...
 
-    def provenance(self, func_name: str) -> Tuple[str, str]:
+    def provenance(self, func_name: str) -> tuple[str, str]:
         """Return (codehash, codepath) for a registered library function."""
         ...
 
@@ -55,11 +56,11 @@ class HealthPort(Protocol):
     monitors (active_action_monitor default 10 s + ignore_heartbeats;
     driver-health status_summary gate)."""
 
-    async def endpoints_available(self, urls: List[str]) -> List[Tuple[str, bool]]: ...
+    async def endpoints_available(self, urls: list[str]) -> list[tuple[str, bool]]: ...
 
-    async def ping_action_servers(self) -> Dict[str, str]: ...
+    async def ping_action_servers(self) -> dict[str, str]: ...
 
-    def status_summary(self) -> Dict[str, str]:
+    def status_summary(self) -> dict[str, str]:
         """server_key -> driver status string; 'unknown' gates dispatch."""
         ...
 

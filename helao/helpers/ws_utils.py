@@ -12,7 +12,6 @@ import asyncio
 import collections
 import pickle
 import time
-from typing import List
 
 import pyzstd
 import websockets
@@ -36,7 +35,7 @@ class WsPublisher:
         xform_func: Callable applied to each message before serialization.
     """
 
-    active_connections: List[WebSocket]
+    active_connections: list[WebSocket]
 
     def __init__(self, source_queue, xform_func=lambda x: x):
         """Capture the source queue and optional message transform."""

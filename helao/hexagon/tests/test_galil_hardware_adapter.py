@@ -8,7 +8,6 @@ at-station gate and is not exercised here.
 """
 
 import asyncio
-from typing import Tuple
 
 import pytest
 
@@ -112,7 +111,7 @@ class _FakeGalil:
         return ""
 
 
-def _adapter() -> Tuple[GalilMotionHardwareAdapter, _FakeGalil]:
+def _adapter() -> tuple[GalilMotionHardwareAdapter, _FakeGalil]:
     fake = _FakeGalil()
     # duck-typed stand-in for the legacy Galil; the adapter only delegates.
     return GalilMotionHardwareAdapter(fake), fake  # type: ignore[arg-type]

@@ -3,7 +3,7 @@
 __all__ = ["HloFileGroup", "HloHeaderModel", "FileConnParams", "FileConn", "FileInfo"]
 
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import Optional
 from pydantic import BaseModel, Field, validator
 from uuid import UUID
 from copy import deepcopy
@@ -31,17 +31,17 @@ class HloHeaderModel(BaseModel, HelaoDict):
     Attributes:
         hlo_version (Optional[str]): HELAO version stamped at construction.
         action_name (Optional[str]): Name of the action that owns the file.
-        column_headings (List[str]): Column names for tabular payloads.
-        optional (Optional[Dict]): Instrument- or server-specific extra fields.
+        column_headings (list[str]): Column names for tabular payloads.
+        optional (Optional[dict]): Instrument- or server-specific extra fields.
         epoch_ns (Optional[int]): Reference timestamp in nanoseconds since epoch.
     """
 
     hlo_version: Optional[str] = Field(default_factory=get_hlo_version)
     action_name: Optional[str] = None
-    column_headings: List[str] = Field(default=[])
+    column_headings: list[str] = Field(default=[])
     # this can hold instrument/server specific optional header
     # entries
-    optional: Optional[Dict] = Field(default={})
+    optional: Optional[dict] = Field(default={})
     epoch_ns: Optional[int] = None
 
 
@@ -51,8 +51,8 @@ class FileConnParams(BaseModel, HelaoDict):
     Attributes:
         file_conn_key (UUID): Required key identifying this connection
             (e.g. sample label or action UUID when only one file is produced).
-        sample_global_labels (List[str]): Global labels of samples associated with the file.
-        json_data_keys (List[str]): JSON data keys written to the file.
+        sample_global_labels (list[str]): Global labels of samples associated with the file.
+        json_data_keys (list[str]): JSON data keys written to the file.
         file_type (str): File type tag (default ``"helao__file"``).
         file_group (Optional[HloFileGroup]): Which storage bucket to route the file to.
         file_name (Optional[str]): Output file name; `None` autogenerates one.
@@ -66,8 +66,8 @@ class FileConnParams(BaseModel, HelaoDict):
 
     # but samples are optional
     # only need the global label, but not the full sample basemodel
-    sample_global_labels: List[str] = Field(default=[])
-    json_data_keys: List[str] = Field(default=[])
+    sample_global_labels: list[str] = Field(default=[])
+    json_data_keys: list[str] = Field(default=[])
     # type of file
     file_type: str = "helao__file"
     file_group: Optional[HloFileGroup] = HloFileGroup.helao_files
@@ -122,8 +122,8 @@ class FileInfo(BaseModel, HelaoDict):
     Attributes:
         file_type (Optional[str]): File type tag.
         file_name (Optional[str]): File name on disk.
-        data_keys (List[str]): Data keys present in the file.
-        sample (List[str]): Sample labels associated with the file.
+        data_keys (list[str]): Data keys present in the file.
+        sample (list[str]): Sample labels associated with the file.
         action_uuid (Optional[UUID]): UUID of the producing action.
         run_use (Optional[RunUse]): Intended use of the file's data.
         nosync (bool): True to exclude the file from data sync.
@@ -131,8 +131,8 @@ class FileInfo(BaseModel, HelaoDict):
 
     action_uuid: Optional[UUID] = None
     run_use: Optional[RunUse] = None
-    sample: List[str] = Field(default=[])
+    sample: list[str] = Field(default=[])
     file_name: Optional[str] = None
     file_type: Optional[str] = None
-    data_keys: List[str] = Field(default=[])
+    data_keys: list[str] = Field(default=[])
     nosync: bool = False

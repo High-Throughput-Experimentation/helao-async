@@ -7,7 +7,7 @@ acquisition via the :class:`AxisCamExec` executor.
 
 __all__ = ["makeApp"]
 
-from typing import List, Union
+from typing import Union
 from fastapi import Body
 from helao.core.models.sample import (
     AssemblySample,
@@ -45,7 +45,7 @@ def makeApp(server_key) -> BaseAPI:
     async def acquire_image(
         duration: float = -1,
         acquisition_rate: float = 1,
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):

@@ -14,8 +14,6 @@ values on the orch are ``(status_str, driver_status)`` tuples; the port
 wants the driver status string ('unknown' gates dispatch), so the adapter
 projects the second element."""
 
-from typing import Dict, List, Tuple
-
 from helao.helpers.dispatcher import (
     endpoints_available as legacy_endpoints_available,
 )
@@ -38,7 +36,7 @@ class LegacyHealthAdapter:
             )
         return self._orch
 
-    async def endpoints_available(self, urls: List[str]) -> List[Tuple[str, bool]]:
+    async def endpoints_available(self, urls: list[str]) -> list[tuple[str, bool]]:
         _, unavail = await legacy_endpoints_available(list(urls))
         bad = {u for u, _ in unavail}
         return [(u, u not in bad) for u in urls]
@@ -48,11 +46,11 @@ class LegacyHealthAdapter:
     # only endpoints_available; the driver-health gate reads
     # orch.status_summary directly at orch_effects.py:206). Revisit the
     # projections when they gain a real consumer.
-    async def ping_action_servers(self) -> Dict[str, str]:
+    async def ping_action_servers(self) -> dict[str, str]:
         orch = self._require_orch()
         summary = await orch.server_monitor.ping_action_servers()
         return {k: status_str for k, (status_str, _driver) in summary.items()}
 
-    def status_summary(self) -> Dict[str, str]:
+    def status_summary(self) -> dict[str, str]:
         orch = self._require_orch()
         return {k: driver for k, (_status, driver) in orch.status_summary.items()}

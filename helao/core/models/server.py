@@ -5,7 +5,7 @@ __all__ = [
     "GlobalStatusModel",
 ]
 
-from typing import Dict, Optional, Tuple, List
+from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -28,8 +28,8 @@ class EndpointModel(BaseModel, HelaoDict):
 
     Attributes:
         endpoint_name (str): Endpoint (action) name.
-        active_dict (Dict[UUID, Action]): Active actions keyed by UUID.
-        nonactive_dict (Dict[HloStatus, Dict[UUID, Action]]): Finished actions
+        active_dict (dict[UUID, Action]): Active actions keyed by UUID.
+        nonactive_dict (dict[HloStatus, dict[UUID, Action]]): Finished actions
             bucketed by status (``finished`` plus any `main_finished_status`).
         max_uuids (Optional[int]): Optional cap on retained UUIDs; `None` means unbounded.
     """
@@ -37,11 +37,11 @@ class EndpointModel(BaseModel, HelaoDict):
     endpoint_name: str
     # status is a dict (keyed by action uuid)
     # which hold a dict of active actions
-    active_dict: Dict[UUID, Action] = Field(default={})
+    active_dict: dict[UUID, Action] = Field(default={})
 
     # holds the finished uuids
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, Action]] = Field(default={})
+    nonactive_dict: dict[HloStatus, dict[UUID, Action]] = Field(default={})
 
     # none is infinite
     max_uuids: Optional[int] = None
@@ -98,14 +98,14 @@ class ActionServerModel(BaseModel, HelaoDict):
 
     Attributes:
         action_server (MachineModel): Identity of the server.
-        endpoints (Dict[str, EndpointModel]): Per-endpoint status keyed by endpoint name.
+        endpoints (dict[str, EndpointModel]): Per-endpoint status keyed by endpoint name.
         estop (bool): True if the server has signalled an emergency stop.
         last_action_uuid (Optional[UUID]): UUID of the most recently dispatched action.
     """
 
     action_server: MachineModel
     # endpoints keyed by the name of the endpoint (action_name)
-    endpoints: Dict[str, EndpointModel] = Field(default={})
+    endpoints: dict[str, EndpointModel] = Field(default={})
     # signals estop of the action server
     estop: bool = False
     last_action_uuid: Optional[UUID] = None
@@ -147,27 +147,27 @@ class GlobalStatusModel(BaseModel, HelaoDict):
 
     Attributes:
         orchestrator (MachineModel): Identity of the owning orchestrator.
-        server_dict (Dict[Tuple, ActionServerModel]): Action server status keyed by
+        server_dict (dict[tuple, ActionServerModel]): Action server status keyed by
             `MachineModel.as_key()`.
-        active_dict (Dict[UUID, Action]): All active actions for this orch.
-        nonactive_dict (Dict[HloStatus, Dict[UUID, Action]]): Finished actions
+        active_dict (dict[UUID, Action]): All active actions for this orch.
+        nonactive_dict (dict[HloStatus, dict[UUID, Action]]): Finished actions
             bucketed by status.
         loop_intent (LoopIntent): Requested loop transition.
         loop_state (LoopStatus): Current dispatch-loop state.
         orch_state (OrchStatus): Orchestrator top-level state.
-        counter_dispatched_actions (Dict[UUID, int]): Dispatch counters keyed by experiment UUID.
+        counter_dispatched_actions (dict[UUID, int]): Dispatch counters keyed by experiment UUID.
     """
 
     orchestrator: MachineModel
     # a dict of actionserversmodels keyed by the server name
     # use MachineModel.as_key() for the dict key
-    server_dict: Dict[Tuple, ActionServerModel] = Field(default={})
+    server_dict: dict[tuple, ActionServerModel] = Field(default={})
 
     # a dict of all active actions for this orch
-    active_dict: Dict[UUID, Action] = Field(default={})
+    active_dict: dict[UUID, Action] = Field(default={})
     # a dict of all finished actions
     # keyed by either main_finished_status or "finished"
-    nonactive_dict: Dict[HloStatus, Dict[UUID, Action]] = Field(default={})
+    nonactive_dict: dict[HloStatus, dict[UUID, Action]] = Field(default={})
 
     # some control parameters for the orch
 
@@ -178,7 +178,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
     # the state of the orch
     orch_state: OrchStatus = OrchStatus.idle
     # counter for dispatched actions, keyed by experiment uuid
-    counter_dispatched_actions: Dict[UUID, int] = Field(default={})
+    counter_dispatched_actions: dict[UUID, int] = Field(default={})
 
     def as_json(self) -> dict:
         """Return a JSON-friendly dict with `server_dict` keys flattened to ``server@machine`` strings."""
@@ -297,7 +297,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         recent_nonactive = self._sort_status()
         return recent_nonactive
 
-    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> Dict[UUID, Action]:
+    def find_hlostatus_in_finished(self, hlostatus: HloStatus) -> dict[UUID, Action]:
         """Return finished actions whose status set contains `hlostatus`."""
         uuid_dict = {}
 
@@ -328,7 +328,7 @@ class GlobalStatusModel(BaseModel, HelaoDict):
         """Initialize the dispatched-action counter for a new experiment."""
         self.counter_dispatched_actions[exp_uuid] = 0
 
-    def finish_experiment(self, exp_uuid: UUID) -> List[Action]:
+    def finish_experiment(self, exp_uuid: UUID) -> list[Action]:
         """Return all finished actions for `exp_uuid` and clear the nonactive buckets and counter."""
         # we don't filter by orch as this should have happened already when they
         # were added to the finished_exps

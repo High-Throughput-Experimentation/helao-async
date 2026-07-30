@@ -10,7 +10,8 @@ branch on object-vs-JSON. See the method docstrings for the contract.
 
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Callable, Optional
+from typing import Optional
+from collections.abc import Callable
 
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.import_autolibs import import_autolibs

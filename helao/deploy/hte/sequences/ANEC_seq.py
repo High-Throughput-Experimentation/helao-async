@@ -34,7 +34,6 @@ __all__ = [
     "HPLC_Archiveliquid_analysis",
 ]
 
-from typing import List
 from typing import Optional
 from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
@@ -151,11 +150,11 @@ def ANEC_series_CA(
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
     volume_ul_cell_liquid: float = 1000,
-    WE_potential__V: List[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
+    WE_potential__V: list[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
-    CA_duration_sec: List[float] = [900, 900, 900, 900, 900],
+    CA_duration_sec: list[float] = [900, 900, 900, 900, 900],
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
@@ -276,11 +275,11 @@ def ANEC_series_CAliquidOnly(
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
     volume_ul_cell_liquid: float = 1000,
-    WE_potential__V: List[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
+    WE_potential__V: list[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
-    CA_duration_sec: List[float] = [900, 900, 900, 900, 900],
+    CA_duration_sec: list[float] = [900, 900, 900, 900, 900],
     SampleRate: float = 0.01,
     IErange: str = "auto",
     ref_offset__V: float = 0.0,
@@ -477,11 +476,11 @@ def ANEC_photo_CA(
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
     volume_ul_cell_liquid: float = 1000,
-    WE_potential__V: List[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
+    WE_potential__V: list[float] = [-0.9, -1.0, -1.1, -1.2, -1.3],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
-    CA_duration_sec: List[float] = [900, 900, 900, 900, 900],
+    CA_duration_sec: list[float] = [900, 900, 900, 900, 900],
     SampleRate: float = 0.01,
     IErange: str = "auto",
     gamrychannelwait: int = -1,
@@ -632,11 +631,11 @@ def ANEC_photo_CAgasonly(
     solid_sample_no: int = 1,
     reservoir_liquid_sample_no: int = 1511,
     volume_ul_cell_liquid: float = 1000,
-    WE_potential__V: List[float] = [-0.2, -0.3, -0.4, -0.5, -0.6],
+    WE_potential__V: list[float] = [-0.2, -0.3, -0.4, -0.5, -0.6],
     WE_versus: str = "ref",
     ref_type: str = "leakless",
     pH: float = 6.8,
-    CA_duration_sec: List[float] = [600, 600, 600, 600, 600],
+    CA_duration_sec: list[float] = [600, 600, 600, 600, 600],
     SampleRate: float = 0.01,
     IErange: str = "auto",
     gamrychannelwait: int = -1,
@@ -2036,7 +2035,7 @@ def ANEC_ferricyanide_protocol(
     Cycles: int = 1,
     SampleRate_CV: float = 0.1,
     liquidDrain_time: float = 80.0,
-    target_temperature_degc: List[float] = [25.0],
+    target_temperature_degc: list[float] = [25.0],
     CV_only: str = "yes",
 ) -> list:
     """Full ferricyanide validation protocol with multi-step CA/CV.
@@ -2133,17 +2132,17 @@ def ANEC_ferricyanide_protocol(
 
 def ANEC_create_and_load_liquid_sample(
     volume_ml: float = 0.84,
-    source: List[str] = ["autoGDE"],
-    partial_molarity: List[str] = ["unknown"],
-    chemical: List[str] = ["unknown"],
+    source: list[str] = ["autoGDE"],
+    partial_molarity: list[str] = ["unknown"],
+    chemical: list[str] = ["unknown"],
     ph: float = 7.8,
-    supplier: List[str] = ["N/A"],
-    lot_number: List[str] = ["N/A"],
+    supplier: list[str] = ["N/A"],
+    lot_number: list[str] = ["N/A"],
     electrolyte_name: str = "1M KHCO3",
     prep_date: str = "2024-03-19",
     tray: int = 2,
     slot: int = 1,
-    vial: List[int] = [1, 2, 3, 4, 5],
+    vial: list[int] = [1, 2, 3, 4, 5],
 ) -> list:
     """Create and load identical liquid samples into a tray's vials.
 
@@ -2195,12 +2194,12 @@ def ANEC_create_and_load_liquid_sample(
 #     sequence_version: int = 1,
 #     no_of_samples: int = 5,
 #     volume_ml: float = 0.84,
-#     source: List[str] = ["autoGDE"],
-#     partial_molarity: List[str] = ["unknown"],
-#     chemical: List[str] = ["unknown"],
+#     source: list[str] = ["autoGDE"],
+#     partial_molarity: list[str] = ["unknown"],
+#     chemical: list[str] = ["unknown"],
 #     ph: float = 7.8,
-#     supplier: List[str] = ["N/A"],
-#     lot_number: List[str] = ["N/A"],
+#     supplier: list[str] = ["N/A"],
+#     lot_number: list[str] = ["N/A"],
 #     electrolyte_name: str = "1M KHCO3",
 #     prep_date: str = "2024-03-19",
 #
@@ -2217,10 +2216,10 @@ def ANEC_create_and_load_liquid_sample(
 #
 # def ANEC_create_liquid_tray(
 #     sequence_version: int = 1,
-#     liquid_sample_no: List[int] = [1, 1, 1, 1, 1],
+#     liquid_sample_no: list[int] = [1, 1, 1, 1, 1],
 #     machine_name: str = "hte-ecms-01",
 #     slot: int = 1,
-#     vial: List[int] = [1, 2, 3, 4, 5],
+#     vial: list[int] = [1, 2, 3, 4, 5],
 #
 #
 # ):

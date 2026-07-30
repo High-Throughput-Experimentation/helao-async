@@ -10,7 +10,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Optional
 
 from helao.hexagon.domain.models import (
     Action,
@@ -55,9 +55,9 @@ class FakeTransport:
         _banner("FakeTransport")
         self._respond_with = respond_with
         self._fail_with = fail_with
-        self.dispatched: List[Tuple[str, dict]] = []
-        self.private_calls: List[Tuple[str, str, dict]] = []
-        self.probed: List[str] = []
+        self.dispatched: list[tuple[str, dict]] = []
+        self.private_calls: list[tuple[str, str, dict]] = []
+        self.probed: list[str] = []
 
     async def dispatch_action(
         self,
@@ -65,7 +65,7 @@ class FakeTransport:
         params: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]:
+    ) -> tuple[Optional[dict], ErrorCodes]:
         method = f"{action.action_server.server_name}/{action.action_name}"
         payload = dict(params or {})
         payload["action"] = action.as_dict()
@@ -84,7 +84,7 @@ class FakeTransport:
         json_dict: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]:
+    ) -> tuple[Optional[dict], ErrorCodes]:
         self.private_calls.append(
             (
                 server_key,
@@ -104,10 +104,10 @@ class FakeTransport:
 class FakeArtifactStore:
     def __init__(self):
         _banner("FakeArtifactStore")
-        self.writes: List[Tuple[str, object]] = []
-        self.data_lines: List[Tuple[object, object]] = []
-        self.moved: List[object] = []
-        self.finished: List[object] = []
+        self.writes: list[tuple[str, object]] = []
+        self.data_lines: list[tuple[object, object]] = []
+        self.moved: list[object] = []
+        self.finished: list[object] = []
 
     async def write_act(self, action: Action) -> None:
         self.writes.append(("act", action))
@@ -146,9 +146,9 @@ class FakeDataSink:
 
     def __init__(self):
         _banner("FakeDataSink")
-        self.enqueued: List[DataModel] = []
-        self.files: List[Tuple[str, str]] = []
-        self.samples: List[Tuple[str, list]] = []
+        self.enqueued: list[DataModel] = []
+        self.files: list[tuple[str, str]] = []
+        self.samples: list[tuple[str, list]] = []
         self.lbuf: dict = {}
         self.estopped = False
 
@@ -222,10 +222,10 @@ class FakeDataSink:
 class FakeStatusPush:
     def __init__(self):
         _banner("FakeStatusPush")
-        self.clients: List[Tuple[str, str, int]] = []
-        self.sent: List[ActionServerModel] = []
-        self.nonblocking: List[tuple] = []
-        self.published: List[Tuple[str, dict]] = []
+        self.clients: list[tuple[str, str, int]] = []
+        self.sent: list[ActionServerModel] = []
+        self.nonblocking: list[tuple] = []
+        self.published: list[tuple[str, dict]] = []
 
     async def attach_client(
         self, client_servkey, client_host, client_port, retry_limit: int = 5
@@ -283,11 +283,11 @@ class FakeTableCatalog:
     empty one, to cover the caller's fallback path) without a station CSV.
     """
 
-    def __init__(self, rows: Optional[List[dict]] = None):
+    def __init__(self, rows: Optional[list[dict]] = None):
         _banner("FakeTableCatalog")
-        self._rows: List[dict] = list(rows or [])
+        self._rows: list[dict] = list(rows or [])
 
-    def rows(self) -> List[dict]:
+    def rows(self) -> list[dict]:
         return list(self._rows)
 
     def lookup_one(self, **keys) -> Optional[dict]:
@@ -298,7 +298,7 @@ class FakeTableCatalog:
         matched = self._matching(**keys)
         return dict(matched[0]) if matched else None
 
-    def _matching(self, **keys) -> List[dict]:
+    def _matching(self, **keys) -> list[dict]:
         return [
             row
             for row in self._rows

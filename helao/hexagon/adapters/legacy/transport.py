@@ -11,7 +11,7 @@ methods directly; this adapter is for PEER dispatch only.
 """
 
 import asyncio
-from typing import Optional, Tuple
+from typing import Optional
 
 from helao.helpers.dispatcher import (
     async_action_dispatcher,
@@ -34,7 +34,7 @@ class LegacyTransportAdapter:
         params: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]:
+    ) -> tuple[Optional[dict], ErrorCodes]:
         return await async_action_dispatcher(
             self._config.world_cfg(),
             action,
@@ -57,7 +57,7 @@ class LegacyTransportAdapter:
         json_dict: Optional[dict] = None,
         timeout: float = 60,
         retries: int = 5,
-    ) -> Tuple[Optional[dict], ErrorCodes]:
+    ) -> tuple[Optional[dict], ErrorCodes]:
         return await async_private_dispatcher(
             server_key,
             host,

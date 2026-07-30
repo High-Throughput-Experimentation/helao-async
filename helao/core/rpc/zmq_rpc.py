@@ -18,7 +18,8 @@ import asyncio
 import inspect
 import itertools
 import pathlib
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Optional
+from collections.abc import Awaitable, Callable
 
 import msgspec
 import zmq
@@ -55,7 +56,7 @@ class RPCRequest(msgspec.Struct, omit_defaults=True):
 
     id: int
     method: str
-    args: Dict[str, Any] = {}
+    args: dict[str, Any] = {}
 
 
 class RPCResponse(msgspec.Struct, omit_defaults=True):
@@ -127,7 +128,7 @@ _RESP_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 # ---------------------------------------------------------------------------
 
 
-def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
+def _coerce_args(fn: Callable, args: dict[str, Any]) -> dict[str, Any]:
     """Bind a flat caller-supplied args dict to ``fn``'s declared parameters.
 
     Handles three FastAPI-style patterns:
@@ -154,7 +155,7 @@ def _coerce_args(fn: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
 
     params = sig.parameters
     remaining = dict(args)
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
 
     # Pass 1: name-by-name pickup (covers Body(embed=True) and query params).
     for name, param in params.items():
@@ -243,7 +244,7 @@ class RPCDispatcher:
     def __init__(self, server_key: str) -> None:
         """Create an unbound dispatcher tagged with ``server_key`` for logging."""
         self.server_key = server_key
-        self._methods: Dict[str, Callable[..., Awaitable[Any]]] = {}
+        self._methods: dict[str, Callable[..., Awaitable[Any]]] = {}
         self._socket: Optional[zmq.asyncio.Socket] = None
         self._task: Optional[asyncio.Task] = None
         self._endpoint: Optional[str] = None
@@ -260,7 +261,7 @@ class RPCDispatcher:
         self._methods[name] = fn
 
     @property
-    def methods(self) -> Dict[str, Callable[..., Any]]:
+    def methods(self) -> dict[str, Callable[..., Any]]:
         """Read-only view of the registered method table."""
         return self._methods
 
@@ -394,7 +395,7 @@ class RPCClient:
         self.default_timeout = default_timeout
         self._socket: Optional[zmq.asyncio.Socket] = None
         self._ids = itertools.count(1)
-        self._pending: Dict[int, asyncio.Future] = {}
+        self._pending: dict[int, asyncio.Future] = {}
         self._reader: Optional[asyncio.Task] = None
         self._lock = asyncio.Lock()
 
@@ -438,7 +439,7 @@ class RPCClient:
         self,
         method: str,
         timeout: Optional[float] = None,
-        args: Optional[Dict[str, Any]] = None,
+        args: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Any:
         """Invoke ``method`` on the remote dispatcher and return its result.
@@ -550,7 +551,7 @@ class RPCSyncClient:
         self,
         method: str,
         timeout: Optional[float] = None,
-        args: Optional[Dict[str, Any]] = None,
+        args: Optional[dict[str, Any]] = None,
         **kwargs: Any,
     ) -> Any:
         """Send a single request and block for the reply.

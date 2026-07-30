@@ -20,7 +20,7 @@ serialize estop with the loop — and test both races either way (spec
 """
 
 from dataclasses import dataclass, replace
-from typing import Tuple, Union
+from typing import Union
 
 from helao.hexagon.domain.dispatch_policy import (
     DispatchPolicy,
@@ -61,7 +61,7 @@ class OrchestrationState:
     n_acts: int = 0
     active_experiment_present: bool = False
     active_sequence_present: bool = False
-    na_drivers: Tuple[str, ...] = ()
+    na_drivers: tuple[str, ...] = ()
     step_thru_actions: bool = False
     step_thru_experiments: bool = False
     step_thru_sequences: bool = False
@@ -138,14 +138,14 @@ class HeartbeatFailed:
     a PruneDeadActions — the pure-hexagon dead-peer exit (decision Q3)."""
 
     message: str
-    dead_action_uuids: Tuple[str, ...] = ()
+    dead_action_uuids: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class DriverHealthUnrecovered:
     """DriverHealthWait retries exhausted, still unknown (T12)."""
 
-    na_drivers: Tuple[str, ...]
+    na_drivers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -248,7 +248,7 @@ class RetryDriverHealth:
     exhaustion; then FALL THROUGH to the ladder in the same iteration (no
     continue — re-asking next_step would livelock)."""
 
-    na_drivers: Tuple[str, ...]
+    na_drivers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -342,7 +342,7 @@ class PruneDeadActions:
     register history — makes legacy orch_wait_for_all_actions's
     actions_idle() true WITHOUT editing it (decision Q3)."""
 
-    action_uuids: Tuple[str, ...]
+    action_uuids: tuple[str, ...]
 
 
 Command = Union[
@@ -370,7 +370,7 @@ Command = Union[
     PruneDeadActions,
 ]
 
-StepResult = Tuple[OrchestrationState, Tuple[Command, ...]]
+StepResult = tuple[OrchestrationState, tuple[Command, ...]]
 
 
 # ===========================================================================
@@ -544,7 +544,7 @@ def step(state: OrchestrationState, event: Event) -> StepResult:
         return new, (SetStopMessage(message=event.message),)
 
     if isinstance(event, HeartbeatFailed):  # T12 (+ P2a dead-peer prune)
-        cmds: Tuple[Command, ...] = (
+        cmds: tuple[Command, ...] = (
             SetStopMessage(message=event.message),
             AlertOperator(message=event.message),
         )

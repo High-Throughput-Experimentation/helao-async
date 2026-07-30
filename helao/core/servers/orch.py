@@ -13,7 +13,6 @@ from helao.helpers import helao_logging as logging
 
 import asyncio
 import sys
-from typing import List
 from uuid import UUID
 import re
 import traceback
@@ -179,13 +178,13 @@ class Orch(Base):
         self.status_summary = {}
         self.global_params = {}
 
-        self.exp_postprocessors: List[MetaProcessor] = []
+        self.exp_postprocessors: list[MetaProcessor] = []
         self.exp_postprocess_libs = self.server_cfg.get("exp_postprocess_libs", [])
         self.import_postprocessors(
             self.exp_postprocess_libs, self.exp_postprocessors, MetaProcessor
         )
 
-        self.seq_postprocessors: List[MetaProcessor] = []
+        self.seq_postprocessors: list[MetaProcessor] = []
         self.seq_postprocess_libs = self.server_cfg.get("seq_postprocess_libs", [])
         self.import_postprocessors(
             self.seq_postprocess_libs, self.seq_postprocessors, MetaProcessor
@@ -364,7 +363,7 @@ class Orch(Base):
         """Drain ``globstat_q`` indefinitely so subscribers can read messages eagerly."""
         return await self.status_ingester.globstat_broadcast_task()
 
-    def unpack_sequence(self, sequence_name: str, sequence_params) -> List[Experiment]:
+    def unpack_sequence(self, sequence_name: str, sequence_params) -> list[Experiment]:
         """Invoke the named sequence factory and return the list of planned experiments.
 
         Args:
@@ -636,7 +635,7 @@ class Orch(Base):
         """
         return await self.run_queues.add_split_sequences(sequence)
 
-    async def prepend_sequences(self, sequences: List[Sequence]) -> List[UUID]:
+    async def prepend_sequences(self, sequences: list[Sequence]) -> list[UUID]:
         """Insert ``sequences`` at the front of the queue, preserving their order.
 
         Stamps uuid/codehash/run_id like :meth:`add_sequence`. Reuses the
@@ -720,7 +719,7 @@ class Orch(Base):
         """Return ``(index, experiment_name)`` tuples for every queued experiment."""
         return self.run_queues.list_all_experiments()
 
-    def drop_experiment_inds(self, inds: List[int]) -> list:
+    def drop_experiment_inds(self, inds: list[int]) -> list:
         """Remove the queued experiments at ``inds`` and return :meth:`list_all_experiments`."""
         return self.run_queues.drop_experiment_inds(inds)
 

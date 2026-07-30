@@ -11,7 +11,7 @@ acquisition (``acquire_analog_in`` via :class:`AiMonExec`) and an emergency
 
 __all__ = ["makeApp"]
 
-from typing import Optional, Union, List
+from typing import Optional, Union
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.io.galil_io_driver import Galil, GalilPoller, TriggerType, AiMonExec
@@ -79,7 +79,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             async def acquire_analog_in(
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
-                fast_samples_in: List[
+                fast_samples_in: list[
                     Union[
                         AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
                     ]
@@ -210,15 +210,15 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 trigger_name: app.driver.dev_diitems = "gamry_ttl0",
                 triggertype: TriggerType = TriggerType.fallingedge,
                 out_name: Optional[
-                    Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
+                    Union[app.driver.dev_doitems, list[app.driver.dev_doitems]]
                 ] = "led",
                 out_name_gamry: app.driver.dev_doitems = "gamry_aux",
-                toggle_init_delay: Union[float, List[float]] = 0,
-                toggle_duty: Union[float, List[float]] = 0.5,
-                toggle_period: Union[float, List[float]] = 2.0,
-                toggle_duration: Union[float, List[float]] = -1,
+                toggle_init_delay: Union[float, list[float]] = 0,
+                toggle_duty: Union[float, list[float]] = 0.5,
+                toggle_period: Union[float, list[float]] = 2.0,
+                toggle_duration: Union[float, list[float]] = -1,
                 req_out_name: Optional[
-                    Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]
+                    Union[app.driver.dev_doitems, list[app.driver.dev_doitems]]
                 ] = None,
             ):
                 """Toggle a digital output on a trigger-driven cycle.

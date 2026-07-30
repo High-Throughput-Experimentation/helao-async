@@ -14,7 +14,7 @@ Signatures mirror the legacy Active surface verbatim
 active_finalizer.py) so P1b adapters are thin delegation.
 """
 
-from typing import List, Optional, Protocol, Union, runtime_checkable
+from typing import Optional, Protocol, Union, runtime_checkable
 from uuid import UUID
 
 from helao.hexagon.domain.models import (
@@ -57,7 +57,7 @@ class DataSinkPort(Protocol):
 
     async def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
+        file_conn_keys: Optional[list[UUID]] = None,
         realtime: Optional[int] = None,
     ) -> None: ...
 
@@ -70,8 +70,8 @@ class DataSinkPort(Protocol):
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[Union[List[str], str]] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[Union[list[str], str]] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]: ...
 
@@ -83,8 +83,8 @@ class DataSinkPort(Protocol):
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[Union[List[str], str]] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[Union[list[str], str]] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """THREAD-SAFE."""
@@ -94,21 +94,21 @@ class DataSinkPort(Protocol):
         self,
         file_type: str,
         file_path: str,
-        samples: List[_Sample],
+        samples: list[_Sample],
         action: Optional[Action] = None,
     ) -> None: ...
 
     # --- sample bookkeeping ---
     async def append_sample(
-        self, samples: List[_Sample], IO: str, action: Optional[Action] = None
+        self, samples: list[_Sample], IO: str, action: Optional[Action] = None
     ) -> None: ...
 
     # --- lifecycle ---
     async def split(
         self,
-        uuid_list: Optional[List[UUID]] = None,
+        uuid_list: Optional[list[UUID]] = None,
         new_fileconnparams: Optional[FileConnParams] = None,
-    ) -> List[UUID]: ...
+    ) -> list[UUID]: ...
 
     def set_estop(self, action: Optional[Action] = None) -> None:
         """THREAD-SAFE."""

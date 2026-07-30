@@ -8,7 +8,7 @@ technique name.
 """
 
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional
 
 from enum import StrEnum
 
@@ -87,8 +87,8 @@ class BiologicTechnique:
 
     technique_name: str
     easy_class_name: str
-    parameter_map: Optional[Dict[str, str]] = None
-    field_map: Optional[Dict[str, str]] = None
+    parameter_map: Optional[dict[str, str]] = None
+    field_map: Optional[dict[str, str]] = None
 
 
 TECH_OCV = BiologicTechnique(

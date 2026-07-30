@@ -14,7 +14,7 @@ Exposes two surfaces:
   driver's bookkeeping methods, called by the PAL driver's dispatcher shim.
   Sample-receiving endpoints coerce their inputs with
   :func:`object_to_sample`, because the ZMQ-RPC fast path does not rehydrate
-  ``List[SampleUnion]``/``Union[...]`` params (only genuine ``BaseModel``
+  ``list[SampleUnion]``/``Union[...]`` params (only genuine ``BaseModel``
   subclasses), so those arrive as raw dicts.
 """
 
@@ -25,7 +25,7 @@ from socket import gethostname
 from time import strftime
 
 from fastapi import Body, Query
-from typing import Optional, List, Union
+from typing import Optional, Union
 
 from helao.core.servers.base_api import BaseAPI, action_version
 from ...drivers.data.archive_driver import Archive, ScanDirection, ScanOperator
@@ -719,7 +719,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/db_get_samples", tags=["action"])
     async def db_get_samples(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
             [
@@ -759,7 +759,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/db_new_samples", tags=["action"])
     async def db_new_samples(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
             [
@@ -819,9 +819,9 @@ def makeApp(server_key) -> BaseAPI:
         sample_code: int = Query(0, ge=0, le=2),
         skip_n_samples: int = Query(0, ge=0),
         direction: Optional[ScanDirection] = None,
-        sample_nos: List[int] = [],
+        sample_nos: list[int] = [],
         sample_nos_operator: Optional[ScanOperator] = None,
-        # platemap_xys: List[Tuple[int, int]] = [],
+        # platemap_xys: list[tuple[int, int]] = [],
         platemap_xys: list = [],
         platemap_xys_operator: Optional[ScanOperator] = None,
     ):
@@ -943,13 +943,13 @@ def makeApp(server_key) -> BaseAPI:
     #
     # Thin wrappers returning the raw Archive method result. Sample-receiving
     # endpoints coerce inbound params with object_to_sample() because the
-    # ZMQ-RPC fast path delivers List[SampleUnion]/Union params as raw dicts
+    # ZMQ-RPC fast path delivers list[SampleUnion]/Union params as raw dicts
     # (only genuine BaseModel-subclass annotations are auto-rehydrated).
     # ------------------------------------------------------------------
 
     @app.post(f"/get_samples", tags=["private"])
     async def get_samples(
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
@@ -959,7 +959,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/new_samples", tags=["private"])
     async def new_samples(
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
@@ -969,7 +969,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/update_samples", tags=["private"])
     async def update_samples(
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):
@@ -1043,7 +1043,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/new_ref_samples", tags=["private"])
     async def new_ref_samples(
-        samples_in: List[
+        samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         sample_out_type: str = "",
