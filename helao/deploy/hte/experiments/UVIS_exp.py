@@ -6,7 +6,7 @@ the SPEC_T/SPEC_R spectrometer servers, the motion and IO servers, the PAL
 sample archive, and the CAM/PDU/CALC/ANA helpers.
 """
 
-__all__ = [
+EXPERIMENTS = [
     "UVIS_analysis_dry",
     "UVIS_calc_abs",
     "UVIS_measure_references",
@@ -34,8 +34,6 @@ from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.spec.enum import SpecType
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 MOTOR_server = MM(server_name="MOTOR", machine_name=gethostname().lower()).as_dict()
 IO_server = MM(server_name="IO", machine_name=gethostname().lower()).as_dict()

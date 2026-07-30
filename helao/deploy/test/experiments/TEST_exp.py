@@ -5,7 +5,7 @@ Defines short experiments that combine ``wait``/``add_global_param``/
 non-blocking dispatch and conditional sequence termination.
 """
 
-__all__ = ["TEST_sub_conditional_stop", "TEST_sub_noblocking"]
+EXPERIMENTS = ["TEST_sub_conditional_stop", "TEST_sub_noblocking"]
 
 
 from socket import gethostname
@@ -19,8 +19,6 @@ from helao.helpers.premodels import ActionPlanMaker
 # from helao.core.models.action_start_condition import ActionStartCondition
 # from helao.core.models.process_contrib import ProcessContrib
 
-
-EXPERIMENTS = __all__
 
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()

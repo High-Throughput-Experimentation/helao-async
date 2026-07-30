@@ -8,7 +8,7 @@ Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
 """
 
 # editted 111224
-__all__ = [
+EXPERIMENTS = [
     "ECMS_sub_alloff",
     "ECMS_sub_CA",
     "ECMS_sub_CA_CO2flow",
@@ -53,7 +53,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()

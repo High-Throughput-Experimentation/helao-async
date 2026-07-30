@@ -6,7 +6,7 @@ electrochemistry (OCV/CA/CV), product sampling, GC/HPLC archiving, and
 cleanup sub-experiments defined in the ANEC experiment library.
 """
 
-__all__ = [
+SEQUENCES = [
     "ANEC_CA_DOE_demo",
     "ANEC_CA_DOE_demo_headspace",
     "ANEC_CA_pretreat",
@@ -38,8 +38,6 @@ from typing import Optional
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=2)

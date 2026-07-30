@@ -1,12 +1,10 @@
 """Sequence library exposing a diffuse-reflectance UV-Vis program."""
 
-__all__ = ["UVIS_DR"]
+SEQUENCES = ["UVIS_DR"]
 
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=3)

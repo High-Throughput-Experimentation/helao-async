@@ -6,7 +6,7 @@ test libraries hardcode server_name="ORCH", so exercising a non-default
 orch identity (MINOR-8) requires a library that targets the renamed key.
 Referenced by path from goldenhexid.yml; zero legacy edits."""
 
-__all__ = ["SIM_websocket_data_hexid"]
+EXPERIMENTS = ["SIM_websocket_data_hexid"]
 
 from socket import gethostname
 
@@ -16,7 +16,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 HEXORC_server = MachineModel(server_name="HEXORC", machine_name=ORCH_HOST).as_dict()

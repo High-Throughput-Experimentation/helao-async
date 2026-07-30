@@ -1,14 +1,12 @@
 """Sequence library exposing a single looping chronopotentiometry program."""
 
-__all__ = [
+SEQUENCES = [
     "CP_loop",
 ]
 
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=1)

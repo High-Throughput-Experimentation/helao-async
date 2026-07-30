@@ -1,12 +1,10 @@
 """Sequence library exposing a combined transmission-and-reflectance program."""
 
-__all__ = ["UVIS_TR"]
+SEQUENCES = ["UVIS_TR"]
 
 
 from helao.helpers.lib_decorators import sequence
 from helao.helpers.premodels import ExperimentPlanMaker
-
-SEQUENCES = __all__
 
 
 @sequence(version=3)

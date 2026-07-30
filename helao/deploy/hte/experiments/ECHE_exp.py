@@ -6,7 +6,7 @@ Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
 ``MOTOR``, ``IO``, ``PAL``, ``ORCH``).
 """
 
-__all__ = [
+EXPERIMENTS = [
     "ECHE_sub_add_liquid",
     "ECHE_sub_CA",
     "ECHE_sub_CA_led",
@@ -38,8 +38,6 @@ from helao.deploy.hte.drivers.io.enum import TriggerType
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
-
-EXPERIMENTS = __all__
 
 PSTAT_server = MachineModel(
     server_name="PSTAT", machine_name=gethostname().lower()

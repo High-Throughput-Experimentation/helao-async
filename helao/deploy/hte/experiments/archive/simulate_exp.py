@@ -15,7 +15,7 @@
 
 """Archived simulator experiment library for screening-style demo workflows."""
 
-__all__ = ["SIM_measure_CP"]
+EXPERIMENTS = ["SIM_measure_CP"]
 
 from socket import gethostname
 
@@ -24,7 +24,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 ANA_server = MachineModel(server_name="ANA", machine_name=ORCH_HOST).as_dict()

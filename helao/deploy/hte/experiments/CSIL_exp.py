@@ -8,7 +8,7 @@ actions to enqueue. Action targets are referenced by ``server_key`` strings
 ``WATERSYRINGE``, ``ORCH``).
 """
 
-__all__ = [
+EXPERIMENTS = [
     # "CCSI_debug_co2purge",
     "CCSI_leaktest_co2",
     "CCSI_sub_alloff",
@@ -56,7 +56,6 @@ from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
 # list valid experiment functions
-EXPERIMENTS = __all__
 
 ORCH_HOST = gethostname().lower()
 PSTAT_server = MachineModel(server_name="PSTAT", machine_name=ORCH_HOST).as_dict()

@@ -6,7 +6,7 @@ function returns a list of planned actions built by an `ActionPlanMaker`.
 """
 
 # everything is a 'machine model schema '
-__all__ = [
+EXPERIMENTS = [
     # "HISPEC_analysis_stability",
     "HISPEC_calculate_lower_vertex_potential",
     "HISPEC_sub_add_liquid",
@@ -56,7 +56,6 @@ from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
 from helao.helpers.lib_decorators import experiment
 from helao.helpers.premodels import ActionPlanMaker
 
-EXPERIMENTS = __all__
 # these must all be defined but you may not use any of them in the experiment
 PSTAT_server = MM(
     server_name="PSTAT", machine_name=gethostname().lower()
