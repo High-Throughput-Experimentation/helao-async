@@ -12,6 +12,7 @@ to a line number that shifts on every legacy edit."""
 import helao.core.drivers.data.sync_driver as legacy_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.hexagon.tests.sync_fixtures import (
+    assert_region_holds_no_imports,
     assert_source_parity,
     assert_verbatim_region,
 )
@@ -65,6 +66,13 @@ PROGRESS = [
 
 def test_verbatim_region():
     assert_verbatim_region()
+
+
+def test_region_holds_no_imports():
+    """Guard on the region's robustness to import-only tooling, not on the
+    copied code itself: with no imports inside the region, an import sort can
+    shift line numbers freely without rewriting a pinned byte."""
+    assert_region_holds_no_imports()
 
 
 def test_module_functions_parity():
