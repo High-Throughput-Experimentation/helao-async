@@ -24,6 +24,33 @@ class _FakeGlobalStatus:
         return {"loop_state": self.loop_state}
 
 
+def _bare_orch():
+    """A real ``Orch`` with ``__init__`` bypassed but its collaborators wired.
+
+    ``Orch.__init__`` does far more than these tests need (config, network,
+    queue files), so they build the object with ``__new__`` and set only the
+    attributes under test.
+
+    The CARDS P5 decomposition moved the queue-CRUD and run-id bodies out of
+    ``Orch`` into the ``RunQueues`` collaborator, which ``__init__`` assigns at
+    orch.py:209 -- the one line ``__new__`` skips. Every ``Orch.__new__`` test
+    therefore started failing with ``'Orch' object has no attribute
+    'run_queues'`` even though production is fine. Wiring it here (rather than
+    at each of the eight call sites) is deliberate: the duplicated
+    hand-construction is exactly why all of them rotted together.
+
+    Sufficient because RunQueues holds only the back-reference and resolves
+    orch state at call time -- never caching a deque or attribute -- so the
+    per-test attribute assignments that follow still take effect.
+    """
+    from helao.core.servers.orch import Orch
+    from helao.core.servers.orch_queues import RunQueues
+
+    orch = Orch.__new__(Orch)
+    orch.run_queues = RunQueues(orch)
+    return orch
+
+
 class _FakeOrch:
     """Minimal stand-in for Orch exposing only what the new endpoints/backends touch."""
 
@@ -388,11 +415,10 @@ def test_shim_exposes_makebokehapp():
 
 
 def test_orch_run_id_sharing():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.sequence_dq = zdeque([])
     orch.active_run_id = None
     orch.sequence_codehash_lib = {}
@@ -417,11 +443,10 @@ def test_orch_run_id_sharing():
 
 
 def test_orch_resolve_active_run_id():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.time_utils import gen_uuid
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.active_run_id = None
 
     rid = gen_uuid()
@@ -437,11 +462,10 @@ def test_orch_resolve_active_run_id():
 
 
 def test_orch_split_run_id():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.sequence_dq = zdeque([])
     orch.active_run_id = None
     orch.sequence_codehash_lib = {}
@@ -459,11 +483,10 @@ def test_orch_split_run_id():
 
 
 def test_orch_prepend_order_and_run_id():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.sequence_dq = zdeque([])
     orch.active_run_id = None
     orch.sequence_codehash_lib = {}
@@ -853,11 +876,10 @@ def test_sanitize_sequence_label():
 
 
 def test_orch_add_sequence_sanitizes_label():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.sequence_dq = zdeque([])
     orch.active_run_id = None
     orch.sequence_codehash_lib = {}
@@ -872,11 +894,10 @@ def test_orch_add_sequence_sanitizes_label():
 
 
 def test_orch_move_and_remove_sequence():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Sequence
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.sequence_dq = zdeque([Sequence(sequence_name=n) for n in ("A", "B", "C")])
 
     asyncio.run(orch.move_sequence(2, 0))
@@ -894,11 +915,10 @@ def test_orch_move_and_remove_sequence():
 
 
 def test_orch_move_and_remove_experiment_action():
-    from helao.core.servers.orch import Orch
     from helao.helpers.premodels import Action, Experiment
     from helao.helpers.zdeque import zdeque
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.experiment_dq = zdeque(
         [Experiment(experiment_name=n) for n in ("A", "B", "C")]
     )
@@ -926,9 +946,8 @@ def test_orch_stop_reset_run_id():
     from uuid import uuid4
 
     from helao.core.models.orchstatus import LoopStatus
-    from helao.core.servers.orch import Orch
 
-    orch = Orch.__new__(Orch)
+    orch = _bare_orch()
     orch.active_run_id = uuid4()
 
     class _GSM:
