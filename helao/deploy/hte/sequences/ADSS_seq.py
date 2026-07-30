@@ -9,12 +9,12 @@ ADSS experiment library.
 
 __all__ = [
     "ADSS_CA_cell_1potential",
+    "ADSS_PA_CV_single",
     "ADSS_PA_CV_TRI",
     "ADSS_PA_CV_TRI_new",
-    "ADSS_PA_CV_single",
+    "ADSS_PA_CVs_CAs_cell",
     "ADSS_PA_CVs_CAs_CVs_autogasswitching",
     "ADSS_PA_CVs_CAs_CVs_cell_simple",
-    "ADSS_PA_CVs_CAs_cell",
     "ADSS_PA_CVs_testing",
 ]
 

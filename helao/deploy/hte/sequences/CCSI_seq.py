@@ -7,10 +7,6 @@ the CCSI experiment library.
 """
 
 __all__ = [
-    "CCSI_Solution_co2maintainconcentration",
-    #    "CCSI_Solution_testing",
-    #    "CCSI_Solution_testing_cleans",
-    # "CCSI_Solution_testing_fixed_cleans",
     "CCSI_cleancycles",
     # "CCSI_debug_liquidloads",
     "CCSI_initialization",
@@ -19,6 +15,10 @@ __all__ = [
     #    "CCSI_newer_KOH_testing",
     "CCSI_priming",
     # "CCSI_repeated_KOH_testing",
+    "CCSI_Solution_co2maintainconcentration",
+    #    "CCSI_Solution_testing",
+    #    "CCSI_Solution_testing_cleans",
+    # "CCSI_Solution_testing_fixed_cleans",
     #    "CCSI_test_KOH_testing",
     #    "CCSI_validation_KOH_procedure",
 ]
