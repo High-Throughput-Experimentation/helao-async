@@ -18,8 +18,8 @@ import re
 import shutil
 import sys
 import uuid
-from pathlib import Path
 from collections.abc import Callable
+from pathlib import Path
 
 from harness.parity import run_parity
 from harness.treepass import explode_zips

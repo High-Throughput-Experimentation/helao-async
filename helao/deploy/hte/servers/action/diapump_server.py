@@ -11,8 +11,9 @@ __all__ = ["makeApp"]
 
 from typing import Optional
 
-from ...drivers.pump.simdos_driver import SIMDOS, SIMDOSPoller, RunExec
 from helao.core.servers.base_api import BaseAPI
+
+from ...drivers.pump.simdos_driver import SIMDOS, RunExec, SIMDOSPoller
 
 
 def makeApp(server_key) -> BaseAPI:

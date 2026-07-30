@@ -19,28 +19,27 @@ always-on and are handled by the paired :class:`cNIMAXPoller`.
 
 __all__ = ["cNIMAX", "cNIMAXPoller", "CellIVExec", "DevMonExec"]
 
-import time
 import asyncio
+import time
 import traceback
-from typing import Optional
 from collections.abc import Callable
+from typing import Optional
 
-from helao.helpers.executor import Executor
-from helao.core.error import ErrorCodes
-from helao.helpers.make_str_enum import make_str_enum
-from helao.core.models.sample import SampleInheritance, SampleStatus
-from helao.core.models.file import FileConnParams, HloHeaderModel
-from helao.core.models.data import DataModel
-from helao.core.models.hlostatus import HloStatus
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
-    DriverResponse,
-    DriverStatus,
-    DriverResponseType,
     DriverPoller,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
-
+from helao.core.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.models.file import FileConnParams, HloHeaderModel
+from helao.core.models.hlostatus import HloStatus
+from helao.core.models.sample import SampleInheritance, SampleStatus
 from helao.helpers import helao_logging as logging
+from helao.helpers.executor import Executor
+from helao.helpers.make_str_enum import make_str_enum
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -53,16 +52,16 @@ def _load_nidaqmx():
     global CurrentShuntResistorLocation, UnitsPreScaled, TriggerType
     import nidaqmx as _nidaqmx
     from nidaqmx.constants import (
-        LineGrouping,
-        Edge,
         AcquisitionType,
-        TerminalConfiguration,
-        VoltageUnits,
-        TemperatureUnits,
-        ThermocoupleType,
         CurrentShuntResistorLocation,
-        UnitsPreScaled,
+        Edge,
+        LineGrouping,
+        TemperatureUnits,
+        TerminalConfiguration,
+        ThermocoupleType,
         TriggerType,
+        UnitsPreScaled,
+        VoltageUnits,
     )
 
     nidaqmx = _nidaqmx

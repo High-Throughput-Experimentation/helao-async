@@ -15,10 +15,10 @@ watcher can confirm an on-disk change actually differs from what the server
 loaded.
 """
 
+import hashlib
+import json
 import os
 import sys
-import json
-import hashlib
 from typing import Optional
 
 import helao

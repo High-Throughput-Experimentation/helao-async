@@ -5,16 +5,15 @@ recently-finished sequence runs (under year/week-numbered folders) for
 re-running with overridden parameters.
 """
 
-import os
 import glob
 import inspect
+import os
 from datetime import datetime, timedelta
 
-from helao.helpers.specification_parser import BaseParser
-from helao.helpers.sequence_constructor import constructor
-from helao.helpers.helao_data import HelaoData
-
 from helao.helpers import helao_logging as logging
+from helao.helpers.helao_data import HelaoData
+from helao.helpers.sequence_constructor import constructor
+from helao.helpers.specification_parser import BaseParser
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

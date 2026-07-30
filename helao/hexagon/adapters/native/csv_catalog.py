@@ -21,8 +21,8 @@ byte-for-byte what the station wrote before.
 """
 
 import os
-from typing import Any, Optional
 from collections.abc import Mapping, Sequence
+from typing import Any, Optional
 
 import pandas as pd
 

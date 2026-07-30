@@ -6,7 +6,9 @@ to record timestamp annotations.
 """
 
 import queue
+
 from psycopg2 import sql
+
 from ..database import query
 from ..logger import script_log
 

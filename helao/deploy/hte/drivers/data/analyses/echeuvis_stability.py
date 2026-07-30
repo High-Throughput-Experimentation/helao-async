@@ -10,24 +10,23 @@ reference clipping, and emits per-sample stability figures of merit via
 
 import sys
 from copy import copy
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
 from helao.core.version import get_filehash
-
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
+from helao.core.drivers.data.loaders.helao_loader import HelaoAction, HelaoProcess
 from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.core.models.run_use import RunUse
-from helao.core.drivers.data.loaders.helao_loader import HelaoProcess, HelaoAction
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],

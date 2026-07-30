@@ -7,6 +7,7 @@ the P3c load-time collision check has a frozen expected set.
 """
 
 from __future__ import annotations
+
 import ast
 from collections import defaultdict
 from pathlib import Path

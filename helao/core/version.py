@@ -1,7 +1,7 @@
 """Helpers for resolving HELAO version strings and source-file git hashes."""
 
-import os
 import inspect
+import os
 import subprocess
 from datetime import datetime
 from functools import lru_cache

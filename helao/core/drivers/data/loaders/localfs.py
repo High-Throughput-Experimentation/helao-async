@@ -7,23 +7,23 @@ content via :class:`helao.helpers.file_mapper.FileMapper`.
 """
 
 import os
-from io import BytesIO
-from glob import glob
-from uuid import UUID
 from datetime import datetime
-from zipfile import ZipFile
+from glob import glob
+from io import BytesIO
 from typing import Optional
+from uuid import UUID
+from zipfile import ZipFile
 
 import pandas as pd
 
-from helao.helpers.yml_tools import yml_load
-from helao.helpers.file_mapper import FileMapper
-from helao.helpers.hlo_data import read_hlo_bytes
 from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
 )
 from helao.core.models.run_dir import RunDir
+from helao.helpers.file_mapper import FileMapper
+from helao.helpers.hlo_data import read_hlo_bytes
+from helao.helpers.yml_tools import yml_load
 
 
 def parse_seq_path(ymlp, target) -> tuple:

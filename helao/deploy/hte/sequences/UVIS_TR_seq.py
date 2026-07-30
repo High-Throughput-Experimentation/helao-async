@@ -3,8 +3,8 @@
 __all__ = ["UVIS_TR"]
 
 
-from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
+from helao.helpers.premodels import ExperimentPlanMaker
 
 SEQUENCES = __all__
 

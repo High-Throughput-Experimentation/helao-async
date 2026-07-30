@@ -14,7 +14,7 @@ import json
 
 import httpx
 
-from helao.helpers.openapi_client import OpenAPIClient, AsyncOpenAPIClient
+from helao.helpers.openapi_client import AsyncOpenAPIClient, OpenAPIClient
 from helao.helpers.openapi_pagination import CursorPagination
 
 SPEC = {

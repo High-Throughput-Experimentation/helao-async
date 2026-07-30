@@ -11,14 +11,14 @@ ever dispatches an RPC/HTTP request to its own server — every effect is a
 direct method call on the wrapped legacy Orch."""
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Optional
-from collections.abc import Callable
 
 from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion
 from helao.hexagon.app.orch_effects import (
-    _LazyServerLogger,
     OrchCommandRunner,
+    _LazyServerLogger,
     apply_state_delta,
     derive_state,
 )

@@ -11,9 +11,9 @@ from uuid import uuid4
 
 import pytest
 
-from helao.core.servers.active_data_stream import DataStreamer
 from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.active_data_stream import DataStreamer
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.tests.native_fixtures import make_base, mk_active

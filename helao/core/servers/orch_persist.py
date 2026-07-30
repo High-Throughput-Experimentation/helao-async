@@ -24,15 +24,15 @@ instance or any other collaborator -- so a ``queues.pck`` written before this
 stage still imports cleanly after it, and vice versa.
 """
 
-import pickle
 import os
+import pickle
 import re
 from datetime import datetime
 from typing import Optional
 
 from helao.helpers import helao_logging as logging
-from helao.helpers.time_utils import gen_uuid
 from helao.helpers.dequedict import DequeDict
+from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

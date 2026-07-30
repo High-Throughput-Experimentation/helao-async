@@ -36,9 +36,9 @@ anything from ``orch.py``.
 
 from uuid import UUID
 
+from helao.core.models.orchstatus import LoopStatus
 from helao.helpers import helao_logging as logging
 from helao.helpers.plate_api import HTEPlateAPI
-from helao.core.models.orchstatus import LoopStatus
 from helao.helpers.premodels import Experiment
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

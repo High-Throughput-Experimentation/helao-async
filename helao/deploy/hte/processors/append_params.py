@@ -5,8 +5,8 @@ Demonstrates the :class:`MetaProcessor` contract by appending an
 params dict at finalization time.
 """
 
-from helao.helpers.processors import MetaProcessor
 from helao.helpers import helao_logging as logging
+from helao.helpers.processors import MetaProcessor
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

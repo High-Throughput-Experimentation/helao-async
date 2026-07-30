@@ -6,10 +6,10 @@ station through ``leancat_helao.station.Station``.
 """
 
 import json
+from logging.handlers import TimedRotatingFileHandler
 
 # save a default log file system temp
 from helao.helpers import helao_logging as logging
-from logging.handlers import TimedRotatingFileHandler
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 import leancat_helao.config

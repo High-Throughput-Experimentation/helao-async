@@ -37,14 +37,15 @@ Execution:
 
 __all__ = []
 
-import sys
-import os
 import asyncio
-from glob import glob
+import os
+import sys
 from functools import partial
+from glob import glob
 from importlib import import_module
-from bokeh.server.server import Server
+
 import colorama
+from bokeh.server.server import Server
 
 # pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
 # family, which the Windows Proactor loop (the default on Windows) does not
@@ -58,8 +59,8 @@ import colorama
 # selector loop on Windows.
 if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
-from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
+from helao.helpers import helao_logging as logging
 from helao.helpers.yml_tools import yml_load
 
 if __name__ == "__main__":

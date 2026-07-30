@@ -5,11 +5,12 @@ Provides a :class:`Db` wrapper around ``psycopg2`` with autocommit and
 reopens the connection when a query raises.
 """
 
-from psycopg2 import connect, sql
-from psycopg2 import OperationalError, ProgrammingError, Error
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from tenacity import retry, wait_exponential, stop_after_attempt
 from collections.abc import Callable
+
+from psycopg2 import Error, OperationalError, ProgrammingError, connect, sql
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+from tenacity import retry, stop_after_attempt, wait_exponential
+
 from ..logger import main_log
 
 # arg_app_config_path = sys.argv[1]

@@ -9,10 +9,10 @@ list rather than a ``const`` literal.
 __all__ = ["make_str_enum"]
 
 from enum import StrEnum
-from pydantic_core import CoreSchema
 
 from pydantic import GetJsonSchemaHandler
 from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 
 @classmethod

@@ -12,10 +12,10 @@ import argparse
 import pickle
 import sys
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from collections.abc import Callable
 
 import psutil
 import requests

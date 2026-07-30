@@ -1,11 +1,12 @@
 """Credential settings loaded from a `.env` file for AWS, DB, and plate APIs."""
 
-from typing import ClassVar
-from pydantic import SecretStr, PostgresDsn
-from pydantic_settings import BaseSettings
-from textwrap import dedent
 import urllib
 from pathlib import Path
+from textwrap import dedent
+from typing import ClassVar
+
+from pydantic import PostgresDsn, SecretStr
+from pydantic_settings import BaseSettings
 
 
 class HelaoCredentials(BaseSettings):

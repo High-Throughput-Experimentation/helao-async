@@ -8,18 +8,19 @@ their metadata and primary HLO file via a module-level ``LOADER`` instance.
 
 import io
 import json
-from uuid import UUID
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 import boto3
 import pandas as pd
-from sqlmodel import Session, text, create_engine
-from helao.core.models.credentials import HelaoCredentials
+from sqlmodel import Session, create_engine, text
+
 from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
 )
+from helao.core.models.credentials import HelaoCredentials
 
 
 class HelaoSolid:

@@ -44,8 +44,8 @@ from time import time
 
 import numpy as np
 
-from helao.helpers import helao_logging as logging
 from helao.core.servers.base_primitives import Timer
+from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

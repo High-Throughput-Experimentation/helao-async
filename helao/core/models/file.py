@@ -2,15 +2,17 @@
 
 __all__ = ["HloFileGroup", "HloHeaderModel", "FileConnParams", "FileConn", "FileInfo"]
 
+from copy import deepcopy
 from enum import Enum
 from typing import Optional
-from pydantic import BaseModel, Field, validator
 from uuid import UUID
-from copy import deepcopy
 
-from helao.core.version import get_hlo_version
-from .run_use import RunUse
+from pydantic import BaseModel, Field, validator
+
 from helao.core.helaodict import HelaoDict
+from helao.core.version import get_hlo_version
+
+from .run_use import RunUse
 
 
 class HloFileGroup(str, Enum):

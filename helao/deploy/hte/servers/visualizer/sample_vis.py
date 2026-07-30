@@ -1,27 +1,28 @@
-import websockets
 import asyncio
 import json
 from datetime import datetime
 from functools import partial
 
+import websockets
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
     CheckboxButtonGroup,
+    ColumnDataSource,
+    DataTable,
+    TableColumn,
     TextInput,
 )
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-from bokeh.models import DataTable, TableColumn
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.models.hlostatus import HloStatus
+from helao.core.error import ErrorCodes
 from helao.core.models.data import DataPackageModel
+from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
-from helao.core.error import ErrorCodes
 
 valid_data_status = (
     None,

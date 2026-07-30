@@ -47,9 +47,9 @@ __all__ = [
 ]
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Optional
-from collections.abc import Callable
 
 from helao.hexagon.domain.models import (
     ActionStartCondition,

@@ -25,9 +25,9 @@ The generated-directory names are the source of truth from
 import argparse
 import shutil
 import sys
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Optional
-from collections.abc import Iterable
 
 from helao.core.models.run_dir import ALL_RUN_DIRS, RunDir
 

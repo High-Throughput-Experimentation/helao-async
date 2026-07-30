@@ -6,26 +6,26 @@ routines used by the GP simulator action server, plus :class:`GPSimExec`, the
 :class:`Executor` that fits the model from inside a running action.
 """
 
-import os
 import asyncio
+import os
 import time
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.error import ErrorCodes
-from helao.core.models.hlostatus import HloStatus
-from helao.helpers.file_utils import unzpickle
-from helao.core.servers.base import Base, Active
-from helao.helpers.executor import Executor
-from helao.helpers.premodels import Experiment
-from helao.helpers.dispatcher import async_private_dispatcher
-from helao.deploy.test.param_models import StopCondition, resolve_stop_condition
-
-import numpy as np
 import gpflow
+import numpy as np
 from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
+
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.base import Active, Base
+from helao.deploy.test.param_models import StopCondition, resolve_stop_condition
+from helao.helpers.dispatcher import async_private_dispatcher
+from helao.helpers.executor import Executor
+from helao.helpers.file_utils import unzpickle
+from helao.helpers.premodels import Experiment
 
 
 def calc_eta(cp_dict) -> float:

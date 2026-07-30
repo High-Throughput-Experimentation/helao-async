@@ -7,16 +7,14 @@ per plate.
 
 from functools import partial
 
+import numpy as np
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    ColumnDataSource,
     TextInput,
 )
+from bokeh.models.widgets import DataTable, Div, TableColumn, Toggle
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div
-from bokeh.models.widgets import DataTable, TableColumn
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-from bokeh.models.widgets import Toggle
-import numpy as np
 
 from helao.helpers import helao_logging as logging
 

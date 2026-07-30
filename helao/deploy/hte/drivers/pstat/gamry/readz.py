@@ -9,17 +9,19 @@ points cooked from the dtaq and extracts the impedance result tuple on
 completion.
 """
 
-import time
 import asyncio
+import time
+
 import numpy as np
 
-from .signal import ControlMode
 from helao.core.drivers.helao_driver import (
     DriverResponse,
     DriverResponseType,
     DriverStatus,
 )
 from helao.helpers import helao_logging as logging
+
+from .signal import ControlMode
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

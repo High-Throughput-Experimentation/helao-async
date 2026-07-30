@@ -42,13 +42,13 @@ from helao.core.drivers.helao_driver import (
 from helao.core.error import ErrorCodes
 from helao.core.models.sample import SolidSample
 from helao.deploy.hte.drivers.motion.enum import MoveModes, TransformationModes
+from helao.helpers import helao_logging as logging
 from helao.hexagon.adapters.legacy.calibration_store import JsonFileCalibrationStore
 from helao.hexagon.domain.motion_transform import TransformXY
 from helao.hexagon.ports.galil_command_channel import (
     GalilChannelError,
     GalilCommandChannel,
 )
-from helao.helpers import helao_logging as logging
 
 __all__ = ["NativeGalilMotion"]
 

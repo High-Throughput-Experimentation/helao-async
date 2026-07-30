@@ -30,11 +30,11 @@ import time
 import traceback
 from pathlib import Path
 
-from helao.core.tests._test_utils import TestReporter
 from helao.core.drivers.data.sync_driver import SyncDriver, move_to_synced
-from helao.helpers.file_utils import zip_dir
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
+from helao.core.tests._test_utils import TestReporter
+from helao.helpers.file_utils import zip_dir
 
 # Blocking duration injected into the fake uploader. The "responsive" check
 # asserts the loop stall stayed well under this; a regression that drops the

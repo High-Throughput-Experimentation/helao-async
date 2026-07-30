@@ -28,12 +28,14 @@ from pathlib import Path
 
 import pytest
 
+from helao.core.models.run_dir import RunDir
+from helao.helpers.file_utils import zip_dir
 from helao.hexagon.adapters.native.sync_driver import (
     SyncDriver as NativeSyncDriver,
+)
+from helao.hexagon.adapters.native.sync_driver import (
     move_to_synced,
 )
-from helao.helpers.file_utils import zip_dir
-from helao.core.models.run_dir import RunDir
 from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
 # Blocking duration injected into the fake uploader. The "responsive" check

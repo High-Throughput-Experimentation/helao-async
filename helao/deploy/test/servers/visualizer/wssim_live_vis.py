@@ -8,14 +8,14 @@ two-column table.
 from datetime import datetime
 from functools import partial
 
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    ColumnDataSource,
+    DatetimeTickFormatter,
     TextInput,
 )
+from bokeh.models.widgets import DataTable, Div, TableColumn
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div
-from bokeh.models.widgets import DataTable, TableColumn
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter
 
 from helao.helpers import helao_logging as logging
 

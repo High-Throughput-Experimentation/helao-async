@@ -29,7 +29,6 @@ from pathlib import Path
 from harness.manifest import ProvenanceManifest
 from harness.treepass import snapshot as tree_snapshot
 from harness.uuidmap import UuidMapper
-
 from helao.hexagon.tests.smoke.golden_capture import settle
 from helao.hexagon.tests.smoke.golden_capture_cam import (
     CAM_CONTENT_MASKED_FILES,

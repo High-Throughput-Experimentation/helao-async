@@ -9,9 +9,9 @@ mirrors the result into a live dictionary.
 
 import asyncio
 from abc import ABC, abstractmethod
-from enum import StrEnum
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from helao.helpers import helao_logging as logging

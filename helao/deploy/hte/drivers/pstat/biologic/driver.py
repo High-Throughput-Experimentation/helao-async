@@ -23,12 +23,11 @@ import pandas as pd
 # easy_biologic (the vendor SDK) is imported lazily in connect() / via
 # technique.resolve_easy_class so the driver imports and constructs without the
 # SDK present (P3a-2 hermetic disconnected-construct).
-
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
     DriverResponse,
-    DriverStatus,
     DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
 
 from .technique import BiologicTechnique, resolve_easy_class

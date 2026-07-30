@@ -11,47 +11,47 @@ __all__ = ["makeApp"]
 
 
 import asyncio
-import time
 import itertools
-from typing import Optional, Union
+import time
 from collections import defaultdict, deque
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
 from fastapi import Body
 
 from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import (
     AssemblySample,
-    LiquidSample,
     GasSample,
-    SolidSample,
+    LiquidSample,
     NoneSample,
+    SolidSample,
 )
-from helao.core.models.hlostatus import HloStatus
-
 from helao.core.servers.base_api import BaseAPI, action_version
-from helao.helpers.executor import Executor
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 from helao.helpers.bubble_detection import bubble_detection
+from helao.helpers.executor import Executor
+
 from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import (
-    EC_IRange,
-    EC_ERange,
     EC_Bandwidth,
-    EC_IRange_map,
-    EC_ERange_map,
     EC_Bandwidth_map,
+    EC_ERange,
+    EC_ERange_map,
+    EC_IRange,
+    EC_IRange_map,
 )
 from ...drivers.pstat.biologic.technique import (
-    BiologicTechnique,
-    TECH_OCV,
     TECH_CA,
+    TECH_CAOCV,
     TECH_CP,
     TECH_CV,
     TECH_GEIS,
+    TECH_OCV,
     TECH_PEIS,
-    TECH_CAOCV,
+    BiologicTechnique,
 )
 
 global LOGGER

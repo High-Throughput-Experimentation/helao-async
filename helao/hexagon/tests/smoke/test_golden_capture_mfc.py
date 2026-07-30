@@ -28,7 +28,6 @@ import tempfile
 from pathlib import Path
 
 from harness.manifest import ProvenanceManifest
-
 from helao.hexagon.tests.smoke.golden_capture import settle
 from helao.hexagon.tests.smoke.golden_capture_mfc import (
     DEVICE_NAME,

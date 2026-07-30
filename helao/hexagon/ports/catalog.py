@@ -29,8 +29,8 @@ an adapter-layer third party, per the `PlateInfoPort` precedent in
 `auxiliary.py`.
 """
 
-from typing import Any, Optional, Protocol, runtime_checkable
 from collections.abc import Mapping, Sequence
+from typing import Any, Optional, Protocol, runtime_checkable
 
 __all__ = ["TableCatalogPort"]
 

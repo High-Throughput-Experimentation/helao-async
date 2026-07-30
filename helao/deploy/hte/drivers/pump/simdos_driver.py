@@ -8,25 +8,26 @@ executor that runs the pump in continuous mode for a fixed duration.
 
 __all__ = ["SIMDOS", "SIMDOSPoller", "RunExec"]
 
-import serial
 import time
-from enum import IntEnum, Enum
+from enum import Enum, IntEnum
 from typing import Any, Optional
+
+import serial
 
 # import traceback
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.models.hlostatus import HloStatus
-from helao.core.error import ErrorCodes
-from helao.helpers.executor import Executor
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
-    DriverResponse,
-    DriverStatus,
-    DriverResponseType,
     DriverPoller,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
+from helao.helpers.executor import Executor
 
 """ Notes:
 

@@ -25,8 +25,8 @@ import sys
 
 from helao.deploy.hte.drivers.pump.legato_driver import (
     KDS100,
-    KDS100Poller,
     LOGGER,
+    KDS100Poller,
 )
 
 

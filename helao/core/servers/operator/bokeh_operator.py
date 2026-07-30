@@ -10,49 +10,49 @@ Also exposes two small pydantic models (:class:`return_sequence_lib`,
 sequence and experiment libraries.
 """
 
-import time
+import builtins
+import html as _html
+import importlib
+import inspect
 import io
 import json
 import os
+import re
 import sys
-import importlib
-import html as _html
+import time
 from enum import Enum
+from functools import partial
+from socket import gethostname
 from typing import Optional
 from uuid import UUID
-from pybase64 import b64decode
-from socket import gethostname
-import inspect
-from pydantic import BaseModel
+
 import numpy as np
-from functools import partial
-import builtins
-import re
-
-from helao.helpers import helao_logging as logging
-
-from helao.helpers.to_json import parse_bokeh_input
-from helao.helpers.time_utils import md5_string
-from helao.core.servers.vis import Vis
+from bokeh.events import ButtonClick, DoubleTap
+from bokeh.layouts import Spacer, column, layout, row
+from bokeh.models import (
+    Button,
+    CheckboxGroup,
+    ColumnDataSource,
+    CustomJS,
+    DataTable,
+    InlineStyleSheet,
+    Select,
+    TableColumn,
+    TabPanel,
+    Tabs,
+)
+from bokeh.models.widgets import Div, FileInput
+from bokeh.models.widgets.inputs import TextAreaInput, TextInput
+from bokeh.plotting import figure
+from pybase64 import b64decode
+from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.helpers.premodels import Sequence, Experiment
-
-from bokeh.layouts import column, row
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-from bokeh.models import DataTable, TableColumn
-from bokeh.models import Select
-from bokeh.models import Button
-from bokeh.models import CheckboxGroup
-from bokeh.models import TabPanel, Tabs
-from bokeh.models import CustomJS
-from bokeh.models import InlineStyleSheet
-from bokeh.models.widgets import Div
-from bokeh.models.widgets.inputs import TextInput, TextAreaInput
-from bokeh.plotting import figure
-from bokeh.events import ButtonClick, DoubleTap
-from bokeh.models.widgets import FileInput
+from helao.core.servers.vis import Vis
+from helao.helpers import helao_logging as logging
+from helao.helpers.premodels import Experiment, Sequence
+from helao.helpers.time_utils import md5_string
+from helao.helpers.to_json import parse_bokeh_input
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

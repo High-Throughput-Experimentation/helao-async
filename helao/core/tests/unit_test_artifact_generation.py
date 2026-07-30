@@ -20,21 +20,21 @@ import os
 import tempfile
 import traceback
 
+from helao.core.models.action import ActionModel
 from helao.core.models.file import (
     FileInfo,
-    HloHeaderModel,
     HloFileGroup,
+    HloHeaderModel,
 )
 from helao.core.models.machine import MachineModel
-from helao.core.models.action import ActionModel
+from helao.core.tests._test_utils import TestReporter
 from helao.helpers.hlo_data import (
-    read_hlo,
-    read_hlo_header,
     hlo_to_parquet,
     read_helao_metadata,
+    read_hlo,
+    read_hlo_header,
 )
 from helao.helpers.yml_tools import yml_dumps, yml_load
-from helao.core.tests._test_utils import TestReporter
 
 
 def _write_synthetic_hlo(path: str) -> dict:

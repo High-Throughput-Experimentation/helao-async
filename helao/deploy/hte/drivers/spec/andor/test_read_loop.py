@@ -6,12 +6,13 @@ module runs the loop end-to-end (cool, set up spectroscope, periodic
 acquire/save, warm down).
 """
 
-from pyAndorSDK3 import AndorSDK3
-from collections import deque
-import numpy as np
 import time as time
-import pandas as pd
+from collections import deque
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from pyAndorSDK3 import AndorSDK3
 from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 sdk3 = AndorSDK3()

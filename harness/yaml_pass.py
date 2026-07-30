@@ -33,10 +33,9 @@ import math
 from pathlib import Path
 from typing import Any, Optional, Union
 
-from helao.helpers.yml_tools import yml_load
-
 from harness.classify import normalize_name, normalize_relpath
 from harness.uuidmap import UuidMapper
+from helao.helpers.yml_tools import yml_load
 
 # --- §5.5 volatile lists (exhaustive; keep in lockstep with the spec) ------
 UUID_KEY_SUFFIXES = ("_uuid",)

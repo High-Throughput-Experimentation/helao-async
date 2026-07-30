@@ -8,21 +8,21 @@ emits :class:`DryUvisOutputs` via :class:`DryUvisAnalysis`.
 
 import sys
 from copy import copy
-from uuid import UUID
 from datetime import datetime
+from uuid import UUID
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from pydantic import BaseModel
 from scipy.signal import savgol_filter
 from scipy.stats import binned_statistic
 
+from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
+from helao.core.drivers.data.loaders.helao_loader import HelaoAction, HelaoProcess
+from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
 from helao.core.version import get_filehash
 
-from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
-from helao.core.models.analysis import AnalysisDataModel, AnalysisInput
-from helao.core.drivers.data.loaders.helao_loader import HelaoProcess, HelaoAction
-from .echeuvis_stability import refadjust, parse_spechlo
+from .echeuvis_stability import parse_spechlo, refadjust
 
 ANALYSIS_DEFAULTS = {
     "ev_parts": [1.8, 2.2, 2.6, 3.0],

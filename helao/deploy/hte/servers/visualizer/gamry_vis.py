@@ -1,16 +1,16 @@
-from functools import partial
 from copy import deepcopy
+from functools import partial
 
+from bokeh.events import ButtonClick
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    Button,
+    ColumnDataSource,
     RadioButtonGroup,
     TextInput,
 )
-from bokeh.plotting import figure
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-from bokeh.models import Button
-from bokeh.events import ButtonClick
+from bokeh.plotting import figure
 
 from helao.helpers import helao_logging as logging
 

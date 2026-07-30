@@ -8,10 +8,10 @@ import time
 
 import pytest
 
+from helao.core.error import ErrorCodes
 from helao.hexagon.adapters.legacy.config import LegacyConfigAdapter
 from helao.hexagon.adapters.legacy.transport import LegacyTransportAdapter
 from helao.hexagon.ports.transport import TransportPort
-from helao.core.error import ErrorCodes
 
 HOST, PORT = "127.0.0.1", 8123  # RPC mirror -> 18123
 
@@ -46,6 +46,7 @@ async def test_private_dispatch_roundtrip_via_colocated_rpc():
     failure mode this contract exists to prevent — the operator
     blank-render incident, spec §7.1)."""
     import uvicorn
+
     from helao.helpers import config_loader
 
     world = _world()

@@ -15,27 +15,27 @@ import sys
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-import psutil
 import time
-from enum import Enum
 from copy import copy
+from enum import Enum
 
 import numpy as np
+import psutil
 
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
-    DriverResponse,
-    DriverStatus,
-    DriverResponseType,
     DriverPoller,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
 
-from .device import GamryPstat, GAMRY_DEVICES, TTL_OUTPUTS, TTL_OFF
-from .sink import GamryDtaqSink, DummySink
-from .technique import GamryTechnique
-from .range import get_range, RANGES
-from .signal import ControlMode
+from .device import GAMRY_DEVICES, TTL_OFF, TTL_OUTPUTS, GamryPstat
+from .range import RANGES, get_range
 from .readz import ReadZ
+from .signal import ControlMode
+from .sink import DummySink, GamryDtaqSink
+from .technique import GamryTechnique
 
 DUMMY_SINK = DummySink()
 

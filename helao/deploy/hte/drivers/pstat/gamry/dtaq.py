@@ -7,8 +7,8 @@ and read from the dtaq without per-technique branching.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 from enum import StrEnum
+from typing import Optional
 
 
 class DtaqType(StrEnum):

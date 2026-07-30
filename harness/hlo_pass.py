@@ -18,11 +18,10 @@ import fnmatch
 import math
 from pathlib import Path
 
-from helao.helpers.hlo_data import read_hlo
-
 from harness.manifest import ProvenanceManifest
 from harness.uuidmap import UuidMapper
 from harness.yaml_pass import diff_meta, normalize_meta
+from helao.helpers.hlo_data import read_hlo
 
 
 def _is_nan(v: object) -> bool:

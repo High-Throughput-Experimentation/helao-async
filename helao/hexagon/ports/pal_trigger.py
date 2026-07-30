@@ -21,8 +21,8 @@ False; `_sendcommand_triggerwait` returns `ErrorCodes.none` immediately
 without waiting).
 """
 
-from typing import Optional, Protocol, runtime_checkable
 from collections.abc import Callable
+from typing import Optional, Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import ErrorCodes
 

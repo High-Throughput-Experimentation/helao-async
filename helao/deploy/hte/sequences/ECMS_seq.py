@@ -25,8 +25,8 @@ __all__ = [
     "ECMS_series_CA_change_gasflow",
 ]
 
-from helao.helpers.premodels import ExperimentPlanMaker
 from helao.helpers.lib_decorators import sequence
+from helao.helpers.premodels import ExperimentPlanMaker
 
 SEQUENCES = __all__
 

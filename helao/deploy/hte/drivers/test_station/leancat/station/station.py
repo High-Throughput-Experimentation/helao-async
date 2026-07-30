@@ -7,8 +7,10 @@ LEANCAT ``opcVariables`` table.
 """
 
 from typing import Any
-from opcua import ua, Client, Node
+
+from opcua import Client, Node, ua
 from psycopg2 import sql
+
 from ..database import query
 from ..logger import script_log
 

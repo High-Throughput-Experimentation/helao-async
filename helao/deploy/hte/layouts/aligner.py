@@ -10,35 +10,33 @@ import asyncio
 import base64
 import json
 import os
-from socket import gethostname
 from functools import partial
+from socket import gethostname
 
 import numpy as np
-
-from bokeh.models import ColumnDataSource
-from bokeh.models import Paragraph
-from bokeh.plotting import figure
-from bokeh.models import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import (
-    Button,
-    TextAreaInput,
-    TextInput,
-    Select,
-    CheckboxGroup,
-    Toggle,
-)
 from bokeh.events import ButtonClick, DoubleTap, MouseWheel, Pan
 
 # from bokeh.models import TapTool, PanTool
-from bokeh.layouts import gridplot
-from bokeh.models import FileInput
+from bokeh.layouts import Spacer, gridplot, layout
+from bokeh.models import (
+    Button,
+    CheckboxGroup,
+    ColumnDataSource,
+    Div,
+    FileInput,
+    Paragraph,
+    Select,
+    TextAreaInput,
+    TextInput,
+    Toggle,
+)
+from bokeh.plotting import figure
 
-from helao.helpers import helao_logging as logging
-from helao.core.servers.vis import Vis
-from helao.helpers.plate_api import HTEPlateAPI
-from helao.core.models.data import DataModel
 from helao.core.error import ErrorCodes
+from helao.core.models.data import DataModel
+from helao.core.servers.vis import Vis
+from helao.helpers import helao_logging as logging
+from helao.helpers.plate_api import HTEPlateAPI
 
 from ..drivers.motion.enum import MoveModes, TransformationModes
 

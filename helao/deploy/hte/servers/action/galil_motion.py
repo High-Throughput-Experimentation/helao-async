@@ -39,30 +39,30 @@ __all__ = ["makeApp"]
 
 from enum import Enum
 from typing import Optional, Union
+
 import numpy as np
 
-
-from ...drivers.motion.galil_motion_driver import (
-    MoveModes,
-    TransformationModes,
-)
+from helao.core.error import ErrorCodes
+from helao.core.models.file import FileConnParams
+from helao.core.servers.base_api import BaseAPI
+from helao.helpers import helao_logging as logging
+from helao.helpers.active_params import ActiveParams
+from helao.helpers.make_str_enum import make_str_enum
+from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 # P3a galil-3 native cut-over (2026-07-23): the galil motion server is backed by
 # the hexagon-native NativeGalilMotion (gclib behind a GalilCommandChannel port)
 # instead of the legacy in-tree Galil driver. Validated at-station (PR #204).
 from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers.make_str_enum import make_str_enum
-from helao.helpers.active_params import ActiveParams
-from helao.helpers.sample_api import UnifiedSampleDataAPI
-from helao.core.models.file import FileConnParams
-from helao.core.error import ErrorCodes
 
 # P3a galil-split slice-4: the Bokeh plate-aligner is hosted by the vis layer,
 # not the driver (D6 fix). The server constructs the host after connect().
 from helao.hexagon.adapters.vis.galil_aligner_host import GalilAlignerHost
 
-from helao.helpers import helao_logging as logging
+from ...drivers.motion.galil_motion_driver import (
+    MoveModes,
+    TransformationModes,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

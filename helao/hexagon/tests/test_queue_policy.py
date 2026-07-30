@@ -1,7 +1,7 @@
 """Pure queue/run-id/process-group/plan-merge policies (core-01 §2/§3)."""
 
 from itertools import count
-from uuid import UUID, uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from helao.hexagon.domain import queue_policy as qp
 from helao.hexagon.domain.models import (

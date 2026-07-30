@@ -6,7 +6,8 @@ the rest of the driver can accept plain strings from configs and actions.
 """
 
 from enum import StrEnum
-from easy_biologic.lib.ec_lib import IRange, ERange, Bandwidth
+
+from easy_biologic.lib.ec_lib import Bandwidth, ERange, IRange
 
 
 class EC_IRange(StrEnum):

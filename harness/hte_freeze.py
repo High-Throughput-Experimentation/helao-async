@@ -5,8 +5,10 @@ frozen route set as the endpoint-parity baseline for the P3 wave.
 """
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
+
 from harness.endpoints import extract_routes
 
 HTE_ACTION = Path("helao/deploy/hte/servers/action")

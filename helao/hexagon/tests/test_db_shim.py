@@ -37,9 +37,8 @@ def installed_config(tmp_path, monkeypatch):
 
 
 def test_db_shim_wraps_legacy_and_registers_sync_hook_last(installed_config):
-    from helao.helpers.server_api import HelaoFastAPI
-
     from helao.deploy.hexagon.servers.action import sim_db_server as shim
+    from helao.helpers.server_api import HelaoFastAPI
 
     assert shim.LEGACY_MODULE == "helao.deploy.test.servers.action.sim_db_server"
     app = shim.makeApp("SYNC")

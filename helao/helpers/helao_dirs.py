@@ -10,8 +10,8 @@ populated ``HelaoDirs`` model.
 __all__ = ["helao_dirs"]
 
 import os
-import zipfile
 import re
+import zipfile
 from glob import glob
 from typing import Optional
 

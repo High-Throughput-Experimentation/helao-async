@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+
 import pytest
-from harness.hte_freeze import SERVERS, HTE_ACTION, OUT
-from harness.endpoints import extract_routes, diff_route_sets
+
+from harness.endpoints import diff_route_sets, extract_routes
+from harness.hte_freeze import HTE_ACTION, OUT, SERVERS
 
 
 @pytest.mark.parametrize("module,key", SERVERS)
