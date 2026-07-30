@@ -25,7 +25,6 @@ Must be called with a running event loop: ``SyncDriver.__init__`` spawns the
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict
 
 from helao.deploy.test.servers.action.sim_db_server import RecordingS3Client
 from helao.helpers import helao_logging as logging
@@ -40,7 +39,7 @@ __all__ = ["NativeSyncGraft", "graft_native_sync"]
 class NativeSyncGraft:
     app: object
     native: NativeSyncer
-    originals: Dict[str, object] = field(default_factory=dict)
+    originals: dict[str, object] = field(default_factory=dict)
 
     def close(self) -> None:
         """Symmetric unhook: cancel the native worker loops, restore the

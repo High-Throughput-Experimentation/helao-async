@@ -32,7 +32,8 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Callable, Dict, Optional, Tuple
+from typing import Optional
+from collections.abc import Callable
 
 import requests
 
@@ -113,7 +114,7 @@ def submit_and_start(seq: Sequence) -> None:
     orch_post("start")
 
 
-def loop_state() -> Tuple[str, bool]:
+def loop_state() -> tuple[str, bool]:
     gs = requests.post(
         f"http://{ORCH_HOST}:{ORCH_PORT}/global_status", timeout=10
     ).json()
@@ -220,21 +221,21 @@ def build_gm4_sequence(label: str) -> Sequence:
 
 
 # --- scenario drivers (return sequence_name, sequence_params for provenance) -
-def run_gm1(root: Path) -> Tuple[str, dict]:
+def run_gm1(root: Path) -> tuple[str, dict]:
     seq = build_gm1_sequence()
     submit_and_start(seq)
     quiesce(root)
     return str(seq.sequence_name), dict(seq.sequence_params)
 
 
-def run_gm2(root: Path) -> Tuple[str, dict]:
+def run_gm2(root: Path) -> tuple[str, dict]:
     seq = build_gm2_sequence()
     submit_and_start(seq)
     quiesce(root)
     return str(seq.sequence_name), dict(seq.sequence_params)
 
 
-def run_gm3(root: Path) -> Tuple[str, dict]:
+def run_gm3(root: Path) -> tuple[str, dict]:
     """Manual action: direct POST bypasses the orch (RUNS_DIAG tree)."""
     r = requests.post(
         f"http://{SIM_HOST}:{SIM_PORT}/SIM/acquire_data",
@@ -248,7 +249,7 @@ def run_gm3(root: Path) -> Tuple[str, dict]:
     return "", {"duration": 2.0, "acquisition_rate": 0.2, "manual": True}
 
 
-def run_gm4(root: Path) -> Tuple[str, dict]:
+def run_gm4(root: Path) -> tuple[str, dict]:
     # Leg 1 — stop-intent drain, then resume to completion.
     submit_and_start(build_gm4_sequence("GM4_stop"))
     time.sleep(5)  # inside experiment 1's first 20 s wait
@@ -278,7 +279,7 @@ def run_gm4(root: Path) -> Tuple[str, dict]:
     }
 
 
-def run_gm5(root: Path) -> Tuple[str, dict]:
+def run_gm5(root: Path) -> tuple[str, dict]:
     """GM-1 through the sync leg + reset_sync/finish_pending round-trip."""
     seq = build_gm1_sequence()
     submit_and_start(seq)
@@ -296,7 +297,7 @@ def run_gm5(root: Path) -> Tuple[str, dict]:
     )
 
 
-SCENARIOS: Dict[str, Callable[[Path], Tuple[str, dict]]] = {
+SCENARIOS: dict[str, Callable[[Path], tuple[str, dict]]] = {
     "GM-1": run_gm1,
     "GM-2": run_gm2,
     "GM-3": run_gm3,
@@ -304,7 +305,7 @@ SCENARIOS: Dict[str, Callable[[Path], Tuple[str, dict]]] = {
     "GM-5": run_gm5,
 }
 
-SCENARIO_MASKS: Dict[str, tuple] = {
+SCENARIO_MASKS: dict[str, tuple] = {
     # (masked_hlo_columns, hlo_row_count_tolerance, content_masked_files)
     "GM-1": (WSSIM_MASKED, WSSIM_TOLERANCE, WSSIM_CONTENT_MASKED),
     "GM-2": ({}, {}, {}),

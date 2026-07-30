@@ -21,7 +21,7 @@ legacy BaseAPI keeps hosting the routes (Q1).
 
 from copy import copy
 from dataclasses import dataclass, field
-from typing import Dict, cast
+from typing import cast
 
 from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
@@ -38,7 +38,7 @@ __all__ = ["ActiveWriteGraft", "graft_active_write_path"]
 @dataclass
 class ActiveWriteGraft:
     base: object
-    originals: Dict[str, object] = field(default_factory=dict)
+    originals: dict[str, object] = field(default_factory=dict)
 
     def close(self) -> None:
         """Symmetric unhook: restore the pre-graft bound method + meta writer."""

@@ -16,7 +16,7 @@ __all__ = ["makeApp"]
 
 import asyncio
 import time
-from typing import Optional, List, Union
+from typing import Optional, Union
 from fastapi import Body
 from helao.helpers.executor import Executor
 from helao.helpers.active_params import ActiveParams
@@ -159,7 +159,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/acquire_spec", tags=["action"])
     @action_version(2)
     async def acquire_spec(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         int_time_ms: int = 35,
@@ -207,7 +207,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
     @action_version(2)
     async def acquire_spec_adv(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         int_time_ms: int = 35,
@@ -345,7 +345,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/acquire_spec_extrig", tags=["action"])
     async def acquire_spec_extrig(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         edge_mode: TriggerType = TriggerType.risingedge,

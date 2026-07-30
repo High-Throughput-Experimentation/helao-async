@@ -15,7 +15,7 @@ import asyncio
 import json
 import time
 import itertools
-from typing import Optional, List, Union
+from typing import Optional, Union
 from collections import defaultdict, deque
 
 import numpy as np
@@ -626,7 +626,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_LSV", tags=["action"])
     @action_version(3)
     async def run_LSV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
@@ -702,7 +702,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     @action_version(3)
     async def run_CA(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vval__V: float = 0.0,
@@ -767,7 +767,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     @action_version(3)
     async def run_CP(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Ival__A: float = 0.0,
@@ -832,7 +832,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CV", tags=["action"])
     @action_version(3)
     async def run_CV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
@@ -906,7 +906,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
     @action_version(3)
     async def run_OCV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Tval__s: float = 10.0,
@@ -965,7 +965,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_RCA", tags=["action"])
     @action_version(3)
     async def run_RCA(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vinit__V: float = 0.0,
@@ -1034,7 +1034,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
     async def run_PEIS(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         versus_OCV: bool = True,  # adds mean OCV value to offset vs ref if True
@@ -1084,7 +1084,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
     @app.post(f"/{server_key}/run_GEIS", tags=["action"])
     async def run_GEIS(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Ioffset__A: float = 0.01,  # Initial value in volts or amps.

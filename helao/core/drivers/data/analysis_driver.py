@@ -24,7 +24,7 @@ import inspect
 import os
 from datetime import datetime
 from importlib import import_module
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 import json
@@ -258,7 +258,7 @@ class AnalysisSyncer(HelaoSyncer):
 
     async def enqueue_calc(
         self,
-        calc_tup: Tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
+        calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
     ):
         """Push a single analysis tuple onto :attr:`task_queue`.
 
@@ -302,7 +302,7 @@ class AnalysisSyncer(HelaoSyncer):
 
     def _calc_and_write_model(
         self,
-        calc_tup: Tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
+        calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
     ) -> tuple:
         """Run one analysis and write its model yml. Synchronous -- run in a thread.
 
@@ -371,7 +371,7 @@ class AnalysisSyncer(HelaoSyncer):
 
     async def sync_ana(
         self,
-        calc_tup: Tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
+        calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
         retries: int = 3,
     ) -> bool:
         """Run one analysis and push its model and outputs to disk and S3.

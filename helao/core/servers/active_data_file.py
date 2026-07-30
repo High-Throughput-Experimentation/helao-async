@@ -44,7 +44,7 @@ helpers here via the ``Active`` delegators.
 
 import os
 import pathlib
-from typing import List, Optional, Union
+from typing import Optional, Union
 from uuid import UUID
 
 import aiofiles
@@ -163,7 +163,7 @@ class DataFileWriter:
 
     def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
+        file_conn_keys: Optional[list[UUID]] = None,
         realtime: Optional[int] = None,
     ):
         """Stamp ``epoch_ns`` on each file connection's HLO header if not already set.
@@ -327,8 +327,8 @@ class DataFileWriter:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[List[str] | str] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[list[str] | str] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file asynchronously and return its path, or ``None`` if save is disabled."""
@@ -363,8 +363,8 @@ class DataFileWriter:
         file_group: HloFileGroup = HloFileGroup.aux_files,
         header: Optional[str] = None,
         sample_str: Optional[str] = None,
-        file_sample_label: Optional[List[str] | str] = None,
-        json_data_keys: Optional[List[str]] = None,
+        file_sample_label: Optional[list[str] | str] = None,
+        json_data_keys: Optional[list[str]] = None,
         action: Optional[Action] = None,
     ) -> Optional[str]:
         """Write a single complete file synchronously and return its path, or ``None`` if save is disabled."""
@@ -395,7 +395,7 @@ class DataFileWriter:
         self,
         file_type: str,
         file_path: str,
-        samples: List[
+        samples: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ],
         action: Optional[Action] = None,

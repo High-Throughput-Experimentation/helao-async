@@ -10,7 +10,7 @@ __all__ = ["makeApp"]
 
 import time
 import asyncio
-from typing import List, Union
+from typing import Union
 from fastapi import Body
 import numpy as np
 
@@ -148,7 +148,7 @@ def makeApp(server_key):
     async def acquire_data(
         duration: float = -1,
         acquisition_rate: float = 0.2,
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
     ):

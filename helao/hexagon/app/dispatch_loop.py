@@ -12,7 +12,8 @@ direct method call on the wrapped legacy Orch."""
 
 import asyncio
 from dataclasses import dataclass, field, replace
-from typing import Callable, Dict, Optional
+from typing import Optional
+from collections.abc import Callable
 
 from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion
 from helao.hexagon.app.orch_effects import (
@@ -158,7 +159,7 @@ class HexagonGraft:
     runtime: HexRuntime
     loop: HexDispatchLoop
     effects: OrchCommandRunner
-    originals: Dict[str, Optional[Callable]] = field(default_factory=dict)
+    originals: dict[str, Optional[Callable]] = field(default_factory=dict)
     ingestion: Optional[HexStatusIngestion] = None
     health_monitor: Optional[HexHealthMonitor] = None
 

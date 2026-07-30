@@ -38,7 +38,7 @@ Exit helao and restart.
 __all__ = ["makeApp"]
 
 from enum import Enum
-from typing import Optional, List, Union
+from typing import Optional, Union
 import numpy as np
 
 
@@ -153,7 +153,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         @app.post(f"/{server_key}/load_plate_alignment", tags=["action"])
         async def load_plate_alignment(
-            matrix: List = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+            matrix: list = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
         ):
             """Install ``matrix`` as the plate-to-motor transform matrix."""
             active = await app.base.setup_and_contain_action()
@@ -275,8 +275,8 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/move", tags=["action"])
             async def move(
-                d_mm: List[float] = [0, 0],
-                axis: List[str] = ["x", "y"],
+                d_mm: list[float] = [0, 0],
+                axis: list[str] = ["x", "y"],
                 speed: Optional[int] = None,
                 mode: MoveModes = MoveModes.relative,
                 transformation: TransformationModes = TransformationModes.motorxy,  # default, nothing to do
@@ -385,7 +385,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_position", tags=["action"])
             async def query_position(
-                # axis: Union[List[str], str] = None
+                # axis: Union[list[str], str] = None
                 axis: dev_axisitems = None,
             ):
                 """Return the current position of a single named axis."""
@@ -404,7 +404,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_moving", tags=["action"])
             async def query_moving(
-                axis: Union[List[str], str] = None,
+                axis: Union[list[str], str] = None,
             ):
                 """Return whether the given axis or list of axes is currently moving."""
                 active = await app.base.setup_and_contain_action(
@@ -424,7 +424,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/axis_off", tags=["action"])
             async def axis_off(
-                # axis: Union[List[str], str] = None
+                # axis: Union[list[str], str] = None
                 axis: dev_axisitems = None,
             ):
                 """De-energise (turn off) the named motor axis."""

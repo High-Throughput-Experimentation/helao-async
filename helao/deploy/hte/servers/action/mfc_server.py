@@ -11,7 +11,7 @@ direct device control.
 
 __all__ = ["makeApp"]
 
-from typing import Optional, List, Union
+from typing import Optional, Union
 from fastapi import Body
 from helao.core.servers.base_api import BaseAPI, action_version
 from helao.core.models.sample import (
@@ -143,7 +143,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[
+            fast_samples_in: list[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
             exec_id: Optional[str] = None,
@@ -219,7 +219,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             stay_open: bool = False,
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[
+            fast_samples_in: list[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
             exec_id: Optional[str] = None,

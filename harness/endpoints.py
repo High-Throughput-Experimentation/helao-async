@@ -20,7 +20,7 @@ import ast
 import json
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 HTTP_METHODS = {"post", "get", "put", "delete", "head", "websocket"}
 
@@ -29,7 +29,7 @@ def _path_str(node: ast.expr) -> Optional[str]:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return node.value
     if isinstance(node, ast.JoinedStr):
-        parts: List[str] = []
+        parts: list[str] = []
         for v in node.values:
             if isinstance(v, ast.Constant):
                 parts.append(str(v.value))
@@ -52,7 +52,7 @@ def _decorator_route(dec: ast.expr) -> Optional[dict]:
     path = _path_str(dec.args[0])
     if path is None:
         return None
-    tags: List[str] = []
+    tags: list[str] = []
     for kw in dec.keywords:
         if kw.arg == "tags" and isinstance(kw.value, ast.List):
             tags = [
@@ -63,8 +63,8 @@ def _decorator_route(dec: ast.expr) -> Optional[dict]:
     return {"path": path, "method": func.attr, "tags": tags}
 
 
-def _params(fn) -> List[dict]:
-    out: List[dict] = []
+def _params(fn) -> list[dict]:
+    out: list[dict] = []
     args = fn.args
     defaults = [None] * (len(args.args) - len(args.defaults)) + list(args.defaults)
     for a, d in zip(args.args, defaults):
@@ -80,9 +80,9 @@ def _params(fn) -> List[dict]:
     return out
 
 
-def extract_routes(module_path: Path, server_key: Optional[str] = None) -> List[dict]:
+def extract_routes(module_path: Path, server_key: Optional[str] = None) -> list[dict]:
     tree = ast.parse(Path(module_path).read_text())
-    routes: List[dict] = []
+    routes: list[dict] = []
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for dec in node.decorator_list:
@@ -104,7 +104,7 @@ def extract_routes(module_path: Path, server_key: Optional[str] = None) -> List[
     return sorted(routes, key=lambda r: (r["path"], r["method"]))
 
 
-def diff_route_sets(frozen: List[dict], current: List[dict]) -> List[dict]:
+def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     """Checklist diff: every frozen route present with equal schema, no extras."""
 
     def key(r: dict):
@@ -112,7 +112,7 @@ def diff_route_sets(frozen: List[dict], current: List[dict]) -> List[dict]:
 
     fmap = {key(r): r for r in frozen}
     cmap = {key(r): r for r in current}
-    diffs: List[dict] = []
+    diffs: list[dict] = []
     for k in sorted(set(fmap) - set(cmap)):
         diffs.append({"path": k[0], "method": k[1], "kind": "missing"})
     for k in sorted(set(cmap) - set(fmap)):

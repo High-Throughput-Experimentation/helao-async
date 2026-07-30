@@ -75,7 +75,7 @@ async def test_drain_loop_lazy_open_separator_and_rows(tmp_path):
     await active.enqueue_data(
         DataModel(data={dflt: {"t_s": 2, "value": set()}}, errors=[])
     )  # not serializable
-    # DataModel.data is typed Dict[UUID, dict], so the normal constructor
+    # DataModel.data is typed dict[UUID, dict], so the normal constructor
     # rejects a str payload outright; model_construct bypasses validation to
     # exercise the legacy string-payload branch (byte-copied but
     # public-path-unreachable via the real constructor).

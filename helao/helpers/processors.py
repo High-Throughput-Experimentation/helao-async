@@ -10,7 +10,6 @@ __all__ = ["HloPostProcessor", "MetaProcessor"]
 import os
 from abc import ABC, abstractmethod
 from glob import glob
-from typing import List
 
 from helao.core.models.file import FileInfo
 from helao.core.models.run_dir import RunDir
@@ -54,7 +53,7 @@ class HloPostProcessor(ABC):
         self.files = action.files
 
     @abstractmethod
-    def process(self) -> List[FileInfo]:
+    def process(self) -> list[FileInfo]:
         """Run post-processing and return the updated file list.
 
         Returns:

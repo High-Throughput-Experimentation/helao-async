@@ -13,7 +13,7 @@ here), so async bodies are driven via `asyncio.run(...)` from plain
 
 import asyncio
 import itertools
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from helao.hexagon.domain.models import (
     AssemblySample,
@@ -686,7 +686,7 @@ class _FakeCamsTable:
     """Duck-typed stand-in for the `CAMS` Enum: iterable of members with
     `.name` + `.value` (a `_cam`), and subscriptable by method name."""
 
-    def __init__(self, methods: Dict[str, Any]):
+    def __init__(self, methods: dict[str, Any]):
         self._members = {
             name: _FakeCamEnumMember(name, cam) for name, cam in methods.items()
         }
@@ -698,7 +698,7 @@ class _FakeCamsTable:
         return self._members[key]
 
 
-def _fake_cams_table(methods: Dict[str, Any]) -> _FakeCamsTable:
+def _fake_cams_table(methods: dict[str, Any]) -> _FakeCamsTable:
     return _FakeCamsTable(methods)
 
 

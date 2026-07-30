@@ -106,7 +106,8 @@ import inspect
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
+from typing import Optional
+from collections.abc import Callable
 from uuid import UUID
 
 from helao.helpers import helao_logging as logging
@@ -139,7 +140,7 @@ class DispatchSnapshot:
     n_acts: int  # len(orch.action_dq) (:1127/:1171)
     n_exps: int  # len(orch.experiment_dq) (:1127/:1206)
     n_seqs: int  # len(orch.sequence_dq) (:1127/:1215)
-    na_drivers: Tuple[str, ...]  # unknown drivers in orch.status_summary (:1141-1143)
+    na_drivers: tuple[str, ...]  # unknown drivers in orch.status_summary (:1141-1143)
     step_thru_actions: bool  # orch.step_thru_actions (:1179)
     step_thru_experiments: bool  # orch.step_thru_experiments (:1188)
     step_thru_sequences: bool  # orch.step_thru_sequences (:1199)
@@ -174,7 +175,7 @@ class ExitLoop:
 class DriverHealthWait:
     """Unknown driver states (:1140-1164) -- NON-terminal; runs once then falls through."""
 
-    na_drivers: Tuple[str, ...]
+    na_drivers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -471,7 +472,7 @@ class DispatchPolicy:
 
     # --- finalization (:1234-1261) ---
 
-    def finalization_plan(self, fsnap: FinalizationSnapshot) -> List:
+    def finalization_plan(self, fsnap: FinalizationSnapshot) -> list:
         """The fixed ordered post-loop plan; per-step guards are re-checked live by the runner."""
         return [
             CloseOutExperiment(),
@@ -846,7 +847,7 @@ class DispatchRunner:
 
     async def _dispatch_action_locked(
         self, A
-    ) -> Tuple[Optional[ErrorCodes], Optional[dict]]:
+    ) -> tuple[Optional[ErrorCodes], Optional[dict]]:
         """Run the ``aiolock`` dispatch critical section intact (:944-1058), verbatim.
 
         The A12 in-lock estop recheck (:956-962) MUST stay a LIVE read inside
@@ -1088,7 +1089,7 @@ class DispatchRunner:
 
     async def _expand_experiment_actions(
         self,
-    ) -> Tuple[Optional[ErrorCodes], Optional[list]]:
+    ) -> tuple[Optional[ErrorCodes], Optional[list]]:
         """Expand the active experiment into staged actions (:644-727), verbatim."""
         orch = self.orch
         exp_func = orch.experiment_lib[orch.active_experiment.experiment_name]

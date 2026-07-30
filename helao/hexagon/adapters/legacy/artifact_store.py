@@ -71,7 +71,7 @@ class LegacyArtifactStoreAdapter:
         # the legacy streaming seam: DataModel keyed by file_conn_key; the
         # legacy log_data_task performs lazy open + header + %% + json line.
         # Port drift: write_data_line's `payload` is typed `object` (spec
-        # §4.3.3), but legacy DataModel.data is Dict[UUID, dict] — every real
+        # §4.3.3), but legacy DataModel.data is dict[UUID, dict] — every real
         # caller passes a dict row: the cast documents that parity
         # requirement rather than loosening DataModel itself.
         await active.enqueue_data(

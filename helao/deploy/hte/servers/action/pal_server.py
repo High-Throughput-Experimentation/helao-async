@@ -12,7 +12,7 @@ __all__ = ["makeApp"]
 
 
 from fastapi import Body
-from typing import Optional, List
+from typing import Optional
 
 from helao.core.servers.base_api import BaseAPI
 from helao.core.error import ErrorCodes
@@ -256,7 +256,7 @@ def makeApp(server_key) -> BaseAPI:
             ],
             totalruns: int = 1,
             # its a necessary param, but as its the only dict, it partially breaks swagger
-            sampleperiod: List[float] = [0.0],
+            sampleperiod: list[float] = [0.0],
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -559,7 +559,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
         async def PAL_transfer_tray_tray(
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -616,7 +616,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
         async def PAL_transfer_tray_custom(
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -669,7 +669,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
         async def PAL_transfer_custom_tray(
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -721,7 +721,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/PAL_transfer_custom_custom", tags=["action"])
         async def PAL_transfer_custom_custom(
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -772,7 +772,7 @@ def makeApp(server_key) -> BaseAPI:
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
-            sampleperiod: List[float] = Body([0], embed=True),
+            sampleperiod: list[float] = Body([0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -894,7 +894,7 @@ def makeApp(server_key) -> BaseAPI:
             dest_tray: int = 0,
             dest_slot: int = 0,
             dest_vial: int = 0,
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,
@@ -938,7 +938,7 @@ def makeApp(server_key) -> BaseAPI:
             tool: Optional[PALtools] = None,
             source: dev_customitems = None,
             volume_ul: int = 200,
-            sampleperiod: List[float] = Body([0.0], embed=True),
+            sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
             timeoffset: float = 0.0,

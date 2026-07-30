@@ -26,7 +26,7 @@ import os
 import pathlib
 import traceback
 import asyncio
-from typing import Union, Optional, List
+from typing import Union, Optional
 
 
 from helao.helpers import helao_logging as logging
@@ -425,11 +425,11 @@ class Galil(HelaoDriver):
         self,
         trigger_name: str,
         triggertype: TriggerType,
-        out_name: Union[str, List[str]],
-        toggle_init_delay: Union[float, List[float]],  # seconds
-        toggle_duty: Union[float, List[float]],  # fraction
-        toggle_period: Union[float, List[float]],  # seconds
-        toggle_duration: Union[float, List[float]],  # seconds
+        out_name: Union[str, list[str]],
+        toggle_init_delay: Union[float, list[float]],  # seconds
+        toggle_duty: Union[float, list[float]],  # fraction
+        toggle_period: Union[float, list[float]],  # seconds
+        toggle_duration: Union[float, list[float]],  # seconds
         out_name_gamry: Optional[str] = None,
         req_out_name: Optional[str] = None,
         stop_via_ttl: Optional[bool] = True,

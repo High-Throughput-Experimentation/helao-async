@@ -8,7 +8,6 @@ emits :class:`DryUvisOutputs` via :class:`DryUvisAnalysis`.
 
 import sys
 from copy import copy
-from typing import List
 from uuid import UUID
 from datetime import datetime
 
@@ -93,10 +92,10 @@ class DryUvisInputs(AnalysisInput):
         process_params: ``process_params`` from the in-situ process.
     """
 
-    ref_darks: List[HelaoProcess]
-    ref_dark_spec_acts: List[HelaoAction]
-    ref_lights: List[HelaoProcess]
-    ref_light_spec_acts: List[HelaoAction]
+    ref_darks: list[HelaoProcess]
+    ref_dark_spec_acts: list[HelaoAction]
+    ref_lights: list[HelaoProcess]
+    ref_light_spec_acts: list[HelaoAction]
     insitu_spec_act: HelaoAction
     process_params: dict
 
@@ -174,7 +173,7 @@ class DryUvisInputs(AnalysisInput):
 
     def get_datamodels(
         self, global_sample_label: str, *args, **kwargs
-    ) -> List[AnalysisDataModel]:
+    ) -> list[AnalysisDataModel]:
         """Emit :class:`AnalysisDataModel` entries for every spec action.
 
         Args:

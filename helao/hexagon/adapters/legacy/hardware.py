@@ -9,7 +9,8 @@ work; the disconnected-construct rule (no I/O in __init__) is the driver's
 own contract, inherited unchanged."""
 
 import asyncio
-from typing import Any, Callable
+from typing import Any
+from collections.abc import Callable
 
 from helao.core.drivers.helao_driver import DriverResponse, HelaoDriver
 

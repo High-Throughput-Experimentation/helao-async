@@ -37,7 +37,8 @@ import queue
 import sys
 import threading
 from concurrent.futures import Future
-from typing import Any, Callable, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 import numpy as np
 

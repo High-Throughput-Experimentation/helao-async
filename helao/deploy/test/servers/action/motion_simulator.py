@@ -8,7 +8,7 @@ sleeps a fixed duration instead of computing a motion time.
 __all__ = ["makeApp"]
 
 import asyncio
-from typing import Optional, List
+from typing import Optional
 import pandas as pd
 
 from helao.helpers import helao_logging as logging
@@ -96,7 +96,7 @@ class MotionSim:
             retxy = [float(firstmatch.x), float(firstmatch.y)]
         return {"platexy": retxy}
 
-    def move(self, d_mm: List[float], axis: List[str], speed: Optional[int] = None):
+    def move(self, d_mm: list[float], axis: list[str], speed: Optional[int] = None):
         """No-op move stub.
 
         Args:
@@ -145,8 +145,8 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/move", tags=["action"])
     async def move(
-        d_mm: List[float] = [0, 0],
-        axis: List[str] = ["x", "y"],
+        d_mm: list[float] = [0, 0],
+        axis: list[str] = ["x", "y"],
         speed: Optional[int] = None,
     ):
         """Simulate axis motion by sleeping for a fixed 3 seconds."""

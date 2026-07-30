@@ -35,7 +35,7 @@ to the shipped driver.
 
 import logging
 from copy import deepcopy
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 
 from helao.hexagon.domain.sample_volume import update_vol
 from helao.hexagon.domain.models import (
@@ -83,7 +83,7 @@ class PalReconciliation:
         after_tray: int,
         after_slot: int,
         after_vial: int,
-    ) -> Tuple[
+    ) -> tuple[
         ErrorCodes,
         int,
         int,
@@ -357,9 +357,9 @@ class PalReconciliation:
 
     async def _check_dest_tray(
         self, microcam: PalMicroCam, action: Optional[Action] = None
-    ) -> Tuple[
+    ) -> tuple[
         PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
         """Resolve a tray destination, creating a new sample ref if the vial is empty.
 
@@ -374,13 +374,13 @@ class PalReconciliation:
             contains the newly created reference sample (or is empty if the
             vial already held a sample and is being diluted).
         """
-        samples_out_list: List[
+        samples_out_list: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_initial: List[
+        dest_samples_initial: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_final: List[
+        dest_samples_final: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
 
@@ -461,9 +461,9 @@ class PalReconciliation:
 
     async def _check_dest_custom(
         self, microcam: PalMicroCam, action: Optional[Action] = None
-    ) -> Tuple[
+    ) -> tuple[
         PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
         """Resolve a custom destination, creating a new sample, diluting, or assembling.
 
@@ -479,13 +479,13 @@ class PalReconciliation:
         Returns:
             Tuple of the resolved :class:`PALposition` and the new output samples.
         """
-        samples_out_list: List[
+        samples_out_list: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_initial: List[
+        dest_samples_initial: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_final: List[
+        dest_samples_final: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
 
@@ -746,9 +746,9 @@ class PalReconciliation:
 
     async def _check_dest_next_empty(
         self, microcam: PalMicroCam, action: Optional[Action] = None
-    ) -> Tuple[
+    ) -> tuple[
         PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
         """Find the next empty vial with enough volume capacity and create a sample ref.
 
@@ -757,13 +757,13 @@ class PalReconciliation:
             action: Job-context ``Action`` forwarded to
                 ``sample_state.new_ref_samples`` (Decision 2).
         """
-        samples_out_list: List[
+        samples_out_list: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_initial: List[
+        dest_samples_initial: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_final: List[
+        dest_samples_final: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
 
@@ -822,22 +822,22 @@ class PalReconciliation:
             samples_out_list,
         )
 
-    async def _check_dest_next_full(self, microcam: PalMicroCam) -> Tuple[
+    async def _check_dest_next_full(self, microcam: PalMicroCam) -> tuple[
         PALposition,
-        List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
+        list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]],
     ]:
         """Find the next full vial after the requested tray cursor as the destination.
 
         Args:
             microcam: Microcam carrying the requested tray-relative cursor.
         """
-        samples_out_list: List[
+        samples_out_list: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_initial: List[
+        dest_samples_initial: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
-        dest_samples_final: List[
+        dest_samples_final: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
 
@@ -911,7 +911,7 @@ class PalReconciliation:
             ``ErrorCodes.none`` on success.
         """
 
-        samples_out_list: List[
+        samples_out_list: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = []
         palposition = PALposition()
@@ -1188,7 +1188,7 @@ class PalReconciliation:
         self,
         palaction: PalAction,
         action_uuid=None,
-    ) -> Tuple[ErrorCodes, bool, list, list]:
+    ) -> tuple[ErrorCodes, bool, list, list]:
         """Reconcile sample state for one ``palaction`` after its PAL triggers
         fire: refresh input samples, materialize output samples, update
         volumes, persist to the sample DB, and write back archive positions

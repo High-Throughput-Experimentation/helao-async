@@ -14,7 +14,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, Dict, Optional
+from typing import Optional
+from collections.abc import Callable
 
 import psutil
 import requests
@@ -110,7 +111,7 @@ def parse_hist_ts(s: str) -> datetime:
     return datetime.strptime(s.strip(), HIST_TS_FMT)
 
 
-ITEMS: Dict[str, Callable[[Path, str, str], int]] = {}
+ITEMS: dict[str, Callable[[Path, str, str], int]] = {}
 # Registered below: ITEMS["item2"], ITEMS["item4"], ITEMS["item6"], ITEMS["item7"]
 # Signature: (root, orch_key, prefix) -> rc
 

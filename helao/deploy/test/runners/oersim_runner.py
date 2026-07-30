@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import os
 import asyncio
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from helao.core.runners.micro_orch import MicroOrch
 from helao.helpers.premodels import Action
@@ -74,7 +74,7 @@ ITERATIONS = 8  # active-learning steps (orchestrator default stop: max_iters)
 
 # Script-level global store -- the MicroOrch-script stand-in for
 # Orch.global_params. to_global writes here; from_global reads from here.
-GLOBALS: Dict[str, Any] = {}
+GLOBALS: dict[str, Any] = {}
 
 
 def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
@@ -86,7 +86,7 @@ def _act(server: str, name: str, params: Optional[dict] = None) -> Action:
     )
 
 
-def _inject(params: dict, mapping: Dict[str, str]) -> dict:
+def _inject(params: dict, mapping: dict[str, str]) -> dict:
     """from_global: copy ``GLOBALS[gkey]`` into ``params[param_name]``.
 
     ``mapping`` is ``{global_key: action_param_name}`` -- the same shape as an
@@ -98,7 +98,7 @@ def _inject(params: dict, mapping: Dict[str, str]) -> dict:
 
 
 async def _capture(
-    orch: MicroOrch, action: Action, to_global: Optional[Dict[str, str]] = None
+    orch: MicroOrch, action: Action, to_global: Optional[dict[str, str]] = None
 ):
     """run_action, then to_global: copy named ``action_params`` into ``GLOBALS``.
 

@@ -8,7 +8,6 @@ service resources shareable across instruments.
 
 import asyncio
 import socket
-from typing import List
 from zeroconf import IPVersion
 from zeroconf.asyncio import AsyncServiceInfo, AsyncZeroconf
 
@@ -49,14 +48,14 @@ class ZeroconfManager:
         self.loop = asyncio.get_event_loop()
         self.irq = asyncio.Queue(1)
 
-    async def register_services(self, infos: List[AsyncServiceInfo]) -> None:
+    async def register_services(self, infos: list[AsyncServiceInfo]) -> None:
         """Open the AsyncZeroconf instance and register each service info."""
         self.aiozc = AsyncZeroconf(ip_version=self.ip_version)
         tasks = [self.aiozc.async_register_service(info) for info in infos]
         background_tasks = await asyncio.gather(*tasks)
         await asyncio.gather(*background_tasks)
 
-    async def unregister_services(self, infos: List[AsyncServiceInfo]) -> None:
+    async def unregister_services(self, infos: list[AsyncServiceInfo]) -> None:
         """Unregister each service info and close the AsyncZeroconf instance."""
         assert self.aiozc is not None
         tasks = [self.aiozc.async_unregister_service(info) for info in infos]

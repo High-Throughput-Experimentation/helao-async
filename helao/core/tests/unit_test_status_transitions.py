@@ -13,7 +13,7 @@ duplicate-append and replace-when-missing cases.
 Also asserts the combined ``model_json_schema()`` of the three models is
 byte-identical to the pre-3a baseline captured at
 ``.omc/artifacts/p3a/schema_baseline.json`` — proving the new methods add
-nothing to the pydantic schema and the fields stay ``List[HloStatus]``.
+nothing to the pydantic schema and the fields stay ``list[HloStatus]``.
 
 Not a pytest test: this is a standalone script (matching the convention of
 the other ``helao.core.tests.unit_test_*`` modules) invoked directly or via

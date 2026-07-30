@@ -22,7 +22,7 @@ import json
 from collections import defaultdict
 from io import BytesIO
 from pathlib import Path
-from typing import Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .helao_data import HelaoData
@@ -40,7 +40,7 @@ _yaml = YAML()
 
 def read_hlo(
     path: str, keep_keys: list = [], omit_keys: list = []
-) -> Tuple[dict, dict]:
+) -> tuple[dict, dict]:
     """Read a ``.hlo`` file and return its header and body as dicts.
 
     Accepts either a filesystem path or the raw file content as ``bytes``
@@ -66,7 +66,7 @@ def read_hlo(
 
 def read_hlo_stream(
     stream, keep_keys: list = [], omit_keys: list = []
-) -> Tuple[dict, dict]:
+) -> tuple[dict, dict]:
     """Parse an HLO ``(meta, data)`` pair from an open binary stream.
 
     Shares the parsing core of :func:`read_hlo` so callers holding an
@@ -144,7 +144,7 @@ def read_hlo_stream(
 
 def read_hlo_bytes(
     content, keep_keys: list = [], omit_keys: list = []
-) -> Tuple[dict, dict]:
+) -> tuple[dict, dict]:
     """Parse an HLO ``(meta, data)`` pair from the raw file content.
 
     Thin wrapper over :func:`read_hlo_stream` for callers that hold the whole

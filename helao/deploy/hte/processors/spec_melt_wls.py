@@ -8,7 +8,6 @@ with the action's ``comment``) and removes the original ``.hlo`` file.
 """
 
 import os
-from typing import List
 from copy import copy
 from pathlib import Path
 
@@ -25,11 +24,11 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class PostProcess(HloPostProcessor):
     """Melt spectral HLO data into wavelength long form and write parquet."""
 
-    def process(self) -> List[FileInfo]:
+    def process(self) -> list[FileInfo]:
         """Convert each spectral HLO file to a melted parquet file.
 
         Returns:
-            List[FileInfo]: Updated file list with each converted
+            list[FileInfo]: Updated file list with each converted
             spec file replaced by its new ``*_parquet__file`` entry.
         """
         processed_file_list = []

@@ -50,7 +50,6 @@ from helao.core.models.echem_params import resolve_we_versus, ref_offset
 
 # from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes, TransformationModes
 from helao.deploy.hte.drivers.io.enum import TriggerType
-from typing import List
 from helao.helpers.lib_decorators import experiment
 
 # list valid experiment functions
@@ -1593,9 +1592,9 @@ def ECMS_sub_pulsecali(
 def ECMS_sub_preCA_CO2flow(
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
-    flow_change_duration_sec: List[float] = [10.0, 60.0],
-    CO2_flow_rate_sccm: List[float] = [0.0, 10.0],
-    # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+    flow_change_duration_sec: list[float] = [10.0, 60.0],
+    CO2_flow_rate_sccm: list[float] = [0.0, 10.0],
+    # inert_gas_flow_rate_sccm: list[float] = [10.0,0.0,10.0]
 ) -> list:
     """Iterate through a CO2/inert-gas flow profile via the MFCs (no electrochemistry).
 
@@ -1680,9 +1679,9 @@ def ECMS_sub_CA_CO2flow(
     pH: float = 6.8,
     MS_equilibrium_time: float = 10.0,
     total_MFC_flow_rate_sccm: float = 10.0,
-    flow_change_duration_sec: List[float] = [60.0, 60.0, 60.0],
-    CO2_flow_rate_sccm: List[float] = [0.0, 10.0, 0.0],
-    # inert_gas_flow_rate_sccm: List[float] = [10.0,0.0,10.0]
+    flow_change_duration_sec: list[float] = [60.0, 60.0, 60.0],
+    CO2_flow_rate_sccm: list[float] = [0.0, 10.0, 0.0],
+    # inert_gas_flow_rate_sccm: list[float] = [10.0,0.0,10.0]
 ) -> list:
     """Run a CA experiment in parallel with a stepped CO2/inert-gas flow profile.
 

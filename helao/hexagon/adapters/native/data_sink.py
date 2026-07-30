@@ -16,7 +16,7 @@ while legacy BaseAPI hosts). The lbuf members route via ``active.base`` —
 the ONE sanctioned base reach-in, same as the legacy adapter.
 """
 
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from helao.hexagon.adapters.errors import UnwiredPortError
@@ -76,7 +76,7 @@ class NativeDataSinkAdapter:
 
     async def finish_hlo_header(
         self,
-        file_conn_keys: Optional[List[UUID]] = None,
+        file_conn_keys: Optional[list[UUID]] = None,
         realtime: Optional[int] = None,
     ) -> None:
         # legacy finish_hlo_header is sync (base.py:1091); async-first port,

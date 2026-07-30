@@ -8,7 +8,7 @@ __all__ = [
 ]
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union, Dict
+from typing import Optional, Union
 from uuid import UUID
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -72,18 +72,18 @@ class AnalysisOutputModel(BaseModel, HelaoDict):
         content_type (str): MIME or content type of the artifact.
         content_encoding (Optional[str]): Optional content encoding.
         output_type (str): Type tag classifying the output.
-        output_keys (Optional[List[str]]): Keys produced by the analysis, if applicable.
+        output_keys (Optional[list[str]]): Keys produced by the analysis, if applicable.
         output_name (Optional[str]): Display name for the output.
-        output (Optional[Dict[str, ...]]): Inline scalar/structured output values.
+        output (Optional[dict[str, ...]]): Inline scalar/structured output values.
     """
 
     analysis_output_path: S3Locator
     content_type: str
     content_encoding: Optional[str] = None
     output_type: str
-    output_keys: Optional[List[str]] = None
+    output_keys: Optional[list[str]] = None
     output_name: Optional[str] = None
-    output: Optional[Dict[str, Union[float, str, bool, int, list, dict, None]]] = None
+    output: Optional[dict[str, Union[float, str, bool, int, list, dict, None]]] = None
 
 
 class AnalysisModel(ShortAnalysisModel):
@@ -102,8 +102,8 @@ class AnalysisModel(ShortAnalysisModel):
         global_sample_label (Optional[str]): Global sample label, if relevant.
         process_uuid (Optional[UUID]): Associated process UUID.
         process_params (Optional[dict]): Associated process parameters.
-        inputs (List[AnalysisDataModel]): Input data references.
-        outputs (List[AnalysisOutputModel]): Output artifacts.
+        inputs (list[AnalysisDataModel]): Input data references.
+        outputs (list[AnalysisOutputModel]): Output artifacts.
         data_request_id (Optional[UUID]): Optional data-request linkage.
         campaign_name (Optional[str]): Campaign label.
         campaign_uuid (Optional[UUID]): Campaign UUID.
@@ -122,8 +122,8 @@ class AnalysisModel(ShortAnalysisModel):
     global_sample_label: Optional[str] = None
     process_uuid: Optional[UUID] = None
     process_params: Optional[dict] = None
-    inputs: List[AnalysisDataModel]
-    outputs: List[AnalysisOutputModel]
+    inputs: list[AnalysisDataModel]
+    outputs: list[AnalysisOutputModel]
     data_request_id: Optional[UUID] = None
     campaign_name: Optional[str] = None
     campaign_uuid: Optional[UUID] = None
@@ -141,7 +141,7 @@ class AnalysisInput(ABC):
     process_params: dict
 
     @abstractmethod
-    def get_datamodels(self, *args, **kwargs) -> List[AnalysisDataModel]:
+    def get_datamodels(self, *args, **kwargs) -> list[AnalysisDataModel]:
         """Return the `AnalysisDataModel` instances representing this input."""
         return NotImplemented
 

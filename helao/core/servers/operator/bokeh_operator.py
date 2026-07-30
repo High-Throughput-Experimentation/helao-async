@@ -18,7 +18,7 @@ import sys
 import importlib
 import html as _html
 from enum import Enum
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 from pybase64 import b64decode
 from socket import gethostname
@@ -172,7 +172,7 @@ class BokehOperator:
     orchestrator's APIs via the bound :class:`Vis` instance.
     """
 
-    plan: List[Sequence]
+    plan: list[Sequence]
 
     def __init__(self, vis_serv: Vis, backend):
         """Build the Bokeh layout and bind the operator UI to ``backend``.
@@ -2745,7 +2745,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 
         return private_input, param_input
 
-    def get_sample_infos(self, PMnum: Optional[List] = None, sender=None):
+    def get_sample_infos(self, PMnum: Optional[list] = None, sender=None):
         """Update sample-related widgets and the highlighted marker on the plate map for ``PMnum``."""
         if self.dataAPI is None:
             return False

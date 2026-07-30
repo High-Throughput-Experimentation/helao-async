@@ -7,7 +7,7 @@ and read from the dtaq without per-technique branching.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional
 from enum import StrEnum
 
 
@@ -42,9 +42,9 @@ class GamryDtaq:
 
     name: str
     dtaq_type: Optional[DtaqType] = None
-    output_keys: List[str] = field(default_factory=list)
-    int_param_keys: List[str] = field(default_factory=list)
-    bool_param_keys: List[str] = field(default_factory=list)
+    output_keys: list[str] = field(default_factory=list)
+    int_param_keys: list[str] = field(default_factory=list)
+    bool_param_keys: list[str] = field(default_factory=list)
 
 
 DTAQ_CPIV = GamryDtaq(

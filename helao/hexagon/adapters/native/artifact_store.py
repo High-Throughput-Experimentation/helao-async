@@ -25,7 +25,7 @@ Q2 (binding): sample/status mutations are NOT here — see
 """
 
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from helao.helpers.file_utils import zip_dir
@@ -57,7 +57,7 @@ class NativeArtifactStoreAdapter:
 
     def collaborators_for(
         self, active
-    ) -> Tuple[NativeDataStreamer, NativeDataFileWriter, NativeActionFinalizer]:
+    ) -> tuple[NativeDataStreamer, NativeDataFileWriter, NativeActionFinalizer]:
         """Per-Active native collaborator set (cache-nothing: each holds only
         the back-reference; safe to construct fresh per Active)."""
         return (

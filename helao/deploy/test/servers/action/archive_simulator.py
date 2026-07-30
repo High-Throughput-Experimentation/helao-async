@@ -9,7 +9,6 @@ composition space, measured samples) plus action endpoints ``load_space``,
 __all__ = ["makeApp"]
 
 
-from typing import List
 import pandas as pd
 
 from helao.helpers import helao_logging as logging
@@ -284,7 +283,7 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/query_plate", tags=["action"])
     async def query_plate(
-        elements: List[str] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
+        elements: list[str] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
         ph: int = 13,
     ):
         active = await app.base.setup_and_contain_action()
@@ -308,7 +307,7 @@ def makeApp(server_key):
 
     @app.post(f"/{server_key}/acquire", tags=["action"])
     async def acquire(
-        element_fracs: List[int] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+        element_fracs: list[int] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ):
         active = await app.base.setup_and_contain_action()
         sample_no = app.driver.acquire(**active.action.action_params)

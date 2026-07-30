@@ -24,7 +24,7 @@ callers (`pal_server.py`) rely on changes.
 """
 
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -155,10 +155,10 @@ class PALposition(BaseModel, HelaoDict):
     """
 
     position: Optional[str] = None  # dest can be cust. or tray
-    samples_initial: List[
+    samples_initial: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
-    samples_final: List[
+    samples_final: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
     tray: Optional[int] = None
@@ -183,19 +183,19 @@ class PalAction(BaseModel, HelaoDict):
         done_time: PAL ``done`` trigger timestamp.
     """
 
-    samples_in: List[
+    samples_in: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
-    samples_out: List[
+    samples_out: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
 
     dest: Optional[PALposition] = None
     source: Optional[PALposition] = None
 
-    dilute: List[bool] = Field(default=[])
-    dilute_type: List[Union[str, None]] = Field(default=[])
-    samples_in_delta_vol_ml: List[float] = Field(default=[])
+    dilute: list[bool] = Field(default=[])
+    dilute_type: list[Union[str, None]] = Field(default=[])
+    samples_in_delta_vol_ml: list[float] = Field(default=[])
 
     start_time: Optional[int] = None
     continue_time: Optional[int] = None
@@ -238,7 +238,7 @@ class PalMicroCam(BaseModel, HelaoDict):
     cam: _cam = _cam()
     repeat: int = 0
 
-    run: List[PalAction] = Field(default=[])
+    run: list[PalAction] = Field(default=[])
 
 
 class PalCam(BaseModel, HelaoDict):
@@ -259,17 +259,17 @@ class PalCam(BaseModel, HelaoDict):
         aux_output_filepath: Path used for the PAL auxiliary log.
     """
 
-    samples_in: List[
+    samples_in: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
-    samples_out: List[
+    samples_out: list[
         Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
     ] = Field(default=[])
 
-    microcams: List[PalMicroCam] = Field(default=[])
+    microcams: list[PalMicroCam] = Field(default=[])
 
     totalruns: int = 1
-    sampleperiod: List[float] = Field(default=[])
+    sampleperiod: list[float] = Field(default=[])
     spacingmethod: Spacingmethod = "linear"
     spacingfactor: float = 1.0
     timeoffset: float = 0.0  # sec

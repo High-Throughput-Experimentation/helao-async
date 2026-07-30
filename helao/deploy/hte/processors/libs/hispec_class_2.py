@@ -5,7 +5,7 @@ calibrating, splitting and plotting linear-sweep spectroelectrochemistry
 data (DeltaOD, differential spectra, co-plots of DeltaA and CV traces).
 """
 
-from typing import Optional, Dict
+from typing import Optional
 from scipy.signal import sawtooth
 
 import pandas as pd
@@ -13,7 +13,6 @@ import numpy as np
 import os
 import json
 from pathlib import Path
-from typing import Tuple
 from collections import defaultdict
 import ruamel.yaml
 from typing import Union
@@ -40,8 +39,8 @@ class SpEC:
         Andorspec: Optional[pd.DataFrame] = None,
         CV: Optional[pd.DataFrame] = None,
         interpolation: Optional[tuple] = None,
-        spec_scans: Optional[Dict] = None,
-        CV_scans: Optional[Dict] = None,
+        spec_scans: Optional[dict] = None,
+        CV_scans: Optional[dict] = None,
     ):
         """Store optional pre-loaded data; missing fields default to empty.
 
@@ -111,7 +110,7 @@ class SpEC:
         time_header: str = "t (s)",
         U_header: str = "U (V)",
         J_header: str = "J (A)",
-    ) -> Dict:
+    ) -> dict:
         """Split ``self.Andorspec`` into per-cycle per-direction spectra.
 
         For each cycle/direction the dataframe is reshaped so the
@@ -177,7 +176,7 @@ class SpEC:
 
     def populate_CV_scans(
         self, cycle_header: str = "cycle", time_header: str = "t_s"
-    ) -> Dict:
+    ) -> dict:
         """Split ``self.CV`` into per-cycle, per-direction sub-frames.
 
         Uses the derivative of the sawtooth interpolation to assign a
@@ -814,7 +813,7 @@ def yml_load(input: Union[str, Path]):
 
 def read_hlo(
     path: str, keep_keys: list = [], omit_keys: list = []
-) -> Tuple[dict, dict]:
+) -> tuple[dict, dict]:
     """Parse a ``.hlo`` file into its YAML header and per-line JSON records.
 
     ``keep_keys`` takes precedence over ``omit_keys`` if both are

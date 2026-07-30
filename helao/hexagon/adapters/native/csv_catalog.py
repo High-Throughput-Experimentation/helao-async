@@ -21,7 +21,8 @@ byte-for-byte what the station wrote before.
 """
 
 import os
-from typing import Any, List, Mapping, Optional, Sequence
+from typing import Any, Optional
+from collections.abc import Mapping, Sequence
 
 import pandas as pd
 
@@ -114,7 +115,7 @@ class CsvTableCatalog:
     def rows(self) -> Sequence[Mapping[str, Any]]:
         """Return every row as a column-keyed mapping (empty if unreadable)."""
         table = self._table()
-        out: List[Mapping[str, Any]] = []
+        out: list[Mapping[str, Any]] = []
         for pos in range(len(table)):
             out.append(self._row_at(table, pos))
         return out

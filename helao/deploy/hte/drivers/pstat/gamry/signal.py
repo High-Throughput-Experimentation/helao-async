@@ -10,7 +10,7 @@ its unit.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Union
+from typing import Union
 from enum import StrEnum
 
 
@@ -44,9 +44,9 @@ class GamrySignal:
 
     name: str
     mode: ControlMode
-    param_keys: List[str] = field(default_factory=list)
-    init_keys: List[str] = field(default_factory=list)
-    map_keys: Dict[str, Union[int, float, str]] = field(default_factory=dict)
+    param_keys: list[str] = field(default_factory=list)
+    init_keys: list[str] = field(default_factory=list)
+    map_keys: dict[str, Union[int, float, str]] = field(default_factory=dict)
 
 
 VSIGNAL_RAMP = GamrySignal(

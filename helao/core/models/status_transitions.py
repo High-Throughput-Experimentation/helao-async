@@ -6,7 +6,7 @@ later increment (3e) gated on soak telemetry from these warnings.
 
 3c adds the sample-status lifecycle half: a generic ``guarded_remove`` plus
 ``sample_guarded_append``/``sample_guarded_remove``/``sample_guarded_reset``
-wrappers for ``SampleModel.status`` (``List[SampleStatus]``). Same log-only
+wrappers for ``SampleModel.status`` (``list[SampleStatus]``). Same log-only
 policy; ``SampleStatus`` is imported lazily inside the contradiction-warning
 helper to avoid a ``sample.py`` <-> ``status_transitions.py`` import cycle.
 """
@@ -22,7 +22,7 @@ __all__ = [
 ]
 
 import logging
-from typing import List, Sequence
+from collections.abc import Sequence
 
 from helao.core.models.hlostatus import HloStatus
 
@@ -31,7 +31,7 @@ _LOGGER = logging.getLogger(
 )  # stdlib on purpose: core/models stays infra-import-free
 
 
-def _warn_contradiction(status_list: List[HloStatus], owner: str) -> None:
+def _warn_contradiction(status_list: list[HloStatus], owner: str) -> None:
     if HloStatus.active in status_list and HloStatus.finished in status_list:
         _LOGGER.warning(
             "contradictory lifecycle state (active+finished) on %s: %s",
@@ -41,7 +41,7 @@ def _warn_contradiction(status_list: List[HloStatus], owner: str) -> None:
 
 
 def guarded_append(
-    status_list: List[HloStatus], new_status: HloStatus, *, owner: str = "?"
+    status_list: list[HloStatus], new_status: HloStatus, *, owner: str = "?"
 ) -> None:
     """Append exactly as legacy inline `.append()` did; warn on duplicate/contradiction."""
     if new_status in status_list:
@@ -53,7 +53,7 @@ def guarded_append(
 
 
 def guarded_replace(
-    status_list: List[HloStatus],
+    status_list: list[HloStatus],
     old_status: HloStatus,
     new_status: HloStatus,
     *,
@@ -68,7 +68,7 @@ def guarded_replace(
 
 
 def guarded_reset(
-    status_list: List[HloStatus], new_statuses: Sequence[HloStatus], *, owner: str = "?"
+    status_list: list[HloStatus], new_statuses: Sequence[HloStatus], *, owner: str = "?"
 ) -> None:
     """Wholesale re-init, in place (equivalent to legacy `x.field = [s]` for all consumers)."""
     status_list[:] = list(new_statuses)

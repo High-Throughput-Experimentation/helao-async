@@ -31,7 +31,7 @@ golden master patches on ``active_finalizer``/``base``).
 import asyncio
 import os
 from copy import deepcopy, copy
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from helao.helpers import helao_logging as logging
@@ -74,9 +74,9 @@ class NativeActionFinalizer:
 
     async def split(
         self,
-        uuid_list: Optional[List[UUID]] = None,
+        uuid_list: Optional[list[UUID]] = None,
         new_fileconnparams: Optional[FileConnParams] = None,
-    ) -> List[UUID]:
+    ) -> list[UUID]:
         """Fork the current action into a new sibling with fresh file connections.
 
         The previous action is marked split, a new action UUID is generated,
@@ -198,7 +198,7 @@ class NativeActionFinalizer:
 
     async def finish(
         self,
-        finish_uuid_list: Optional[List[UUID]] = None,
+        finish_uuid_list: Optional[list[UUID]] = None,
         # end_state: HloStatus = HloStatus.finished
     ) -> Action:
         """Finalize the listed actions (or all of them) and clean up file/data resources.
@@ -222,7 +222,7 @@ class NativeActionFinalizer:
 
     async def _finish(
         self,
-        finish_uuid_list: Optional[List[UUID]] = None,
+        finish_uuid_list: Optional[list[UUID]] = None,
     ) -> Action:
         """Finalization body for :meth:`finish`; must be called under ``finish_lock``."""
         if finish_uuid_list is None:

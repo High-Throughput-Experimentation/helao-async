@@ -17,7 +17,6 @@ from __future__ import annotations
 import fnmatch
 import math
 from pathlib import Path
-from typing import List, Set
 
 from helao.helpers.hlo_data import read_hlo
 
@@ -54,8 +53,8 @@ def normalize_hlo_header(header: dict, mapper: UuidMapper) -> dict:
     return normalize_meta(hdr, mapper)
 
 
-def masked_columns_for(norm_name: str, masked_hlo_columns: dict) -> Set[str]:
-    cols: Set[str] = set()
+def masked_columns_for(norm_name: str, masked_hlo_columns: dict) -> set[str]:
+    cols: set[str] = set()
     for pattern, columns in (masked_hlo_columns or {}).items():
         if fnmatch.fnmatch(norm_name, pattern):
             cols.update(columns)
@@ -71,9 +70,9 @@ def row_tolerance_for(norm_name: str, tolerances: dict) -> int:
 
 
 def diff_hlo_body(
-    g_data: dict, c_data: dict, masked: Set[str], tolerance: int
-) -> List[dict]:
-    diffs: List[dict] = []
+    g_data: dict, c_data: dict, masked: set[str], tolerance: int
+) -> list[dict]:
+    diffs: list[dict] = []
     for col in sorted(set(g_data) | set(c_data)):
         if col not in g_data:
             diffs.append(
@@ -118,7 +117,7 @@ def diff_hlo(
     mapper_g: UuidMapper,
     mapper_c: UuidMapper,
     manifest: ProvenanceManifest,
-) -> List[dict]:
+) -> list[dict]:
     g_meta, g_data = read_hlo(str(golden_path))
     c_meta, c_data = read_hlo(str(candidate_path))
     diffs = diff_meta(

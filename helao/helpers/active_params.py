@@ -2,7 +2,6 @@
 
 __all__ = ["ActiveParams"]
 
-from typing import List, Dict
 from pydantic import BaseModel, Field, validator
 from uuid import UUID
 
@@ -29,8 +28,8 @@ class ActiveParams(BaseModel, HelaoDict):
     action: Action
     # a dict keyed by file_conn_key of FileConnParams
     # for all files of active
-    file_conn_params_dict: Dict[UUID, FileConnParams] = Field(default={})
-    aux_listen_uuids: List[UUID] = Field(default=[])
+    file_conn_params_dict: dict[UUID, FileConnParams] = Field(default={})
+    aux_listen_uuids: list[UUID] = Field(default=[])
 
     class Config:
         arbitrary_types_allowed = True

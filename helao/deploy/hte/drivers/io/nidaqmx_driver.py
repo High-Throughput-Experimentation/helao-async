@@ -22,7 +22,8 @@ __all__ = ["cNIMAX", "cNIMAXPoller", "CellIVExec", "DevMonExec"]
 import time
 import asyncio
 import traceback
-from typing import Optional, Callable, List
+from typing import Optional
+from collections.abc import Callable
 
 from helao.helpers.executor import Executor
 from helao.core.error import ErrorCodes
@@ -151,7 +152,7 @@ class cNIMAX(HelaoDriver):
         self.task_6289cellcurrent = None
         self.task_6284cellvoltage = None
         self.task_monitors = None
-        self.task_monitor_keys: List[str] = []
+        self.task_monitor_keys: list[str] = []
         self.IO_do_meas = False  # signal flag for intent (start/stop)
         self.IO_measuring = False  # status flag of measurement
         self.activeCell = [False for _ in range(9)]

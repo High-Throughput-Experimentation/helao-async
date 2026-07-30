@@ -21,7 +21,8 @@ False; `_sendcommand_triggerwait` returns `ErrorCodes.none` immediately
 without waiting).
 """
 
-from typing import Callable, Optional, Protocol, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
+from collections.abc import Callable
 
 from helao.hexagon.domain.models import ErrorCodes
 
@@ -57,7 +58,7 @@ class PalTriggerPort(Protocol):
 
     async def wait_for_triggers(
         self,
-    ) -> Tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
+    ) -> tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
         """Wait for the start, then continue, then done trigger, each
         bounded by the adapter's configured timeout.
 

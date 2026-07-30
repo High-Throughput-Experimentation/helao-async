@@ -31,7 +31,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, Optional, Union
 
 from helao.helpers.yml_tools import yml_load
 
@@ -161,7 +161,7 @@ def normalize_meta(
 
 
 def apply_meta_key_mask(
-    meta: Any, dotted_keys: List[str], sentinel: str = "MASKED"
+    meta: Any, dotted_keys: list[str], sentinel: str = "MASKED"
 ) -> Any:
     """Neutralize the VALUE at each dotted key path, in place, if present.
 
@@ -188,9 +188,9 @@ def apply_meta_key_mask(
     return meta
 
 
-def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
+def diff_meta(golden: Any, candidate: Any, path: str = "") -> list[dict]:
     """Structural diff of two ALREADY-NORMALIZED objects; [] when identical."""
-    diffs: List[dict] = []
+    diffs: list[dict] = []
     if isinstance(golden, bool) != isinstance(candidate, bool) or (
         type(golden) is not type(candidate)
         and not (
@@ -231,7 +231,7 @@ def diff_meta(golden: Any, candidate: Any, path: str = "") -> List[dict]:
     return diffs
 
 
-def diff_prg(golden: dict, candidate: dict) -> List[dict]:
+def diff_prg(golden: dict, candidate: dict) -> list[dict]:
     """.prg sidecars: only the terminal s3/api booleans are contractual (§5.7)."""
     diffs = []
     for k in ("s3", "api"):

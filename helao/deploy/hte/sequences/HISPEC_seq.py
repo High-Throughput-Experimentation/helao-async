@@ -980,7 +980,7 @@ def HISPEC_EIS_only(
 #     measurement_area: float = 0.071,  # 3mm diameter droplet
 #     liquid_volume_ml: float = 1.0,
 #     ref_vs_nhe: float = 0.21,
-#     CA_potential_vsRHE: List[float] = [0.8, 0.6, 0.4, 0.2],
+#     CA_potential_vsRHE: list[float] = [0.8, 0.6, 0.4, 0.2],
 #     CA_duration_sec: float = 300,
 #     CA_samplerate_sec: float = 0.05,
 #     OCV_duration_sec: float = 5,

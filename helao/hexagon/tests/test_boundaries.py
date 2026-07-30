@@ -22,7 +22,6 @@ Layer rules:
 import ast
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 HEXAGON_ROOT = Path(__file__).resolve().parents[1]  # .../helao/hexagon
 HEXAGON_PKG = "helao.hexagon"
@@ -68,7 +67,7 @@ VENDOR_BANNED = frozenset(
 
 DOMAIN_THIRD_PARTY = frozenset({"pydantic", "numpy"})
 
-DOMAIN_ALLOW_PREFIXES: Tuple[str, ...] = (
+DOMAIN_ALLOW_PREFIXES: tuple[str, ...] = (
     "helao.core.models",
     "helao.helpers.premodels",
     "helao.core.helaodict",
@@ -76,7 +75,7 @@ DOMAIN_ALLOW_PREFIXES: Tuple[str, ...] = (
     "helao.hexagon.domain",
 )
 
-PORTS_ALLOW_PREFIXES: Tuple[str, ...] = (
+PORTS_ALLOW_PREFIXES: tuple[str, ...] = (
     "helao.hexagon.domain",
     "helao.hexagon.ports",
     "helao.core.drivers.helao_driver",
@@ -106,9 +105,9 @@ def _absolutize(pyfile: Path, node: ast.ImportFrom) -> str:
     return ".".join(parts)
 
 
-def _imported_modules(pyfile: Path) -> List[Tuple[int, str]]:
+def _imported_modules(pyfile: Path) -> list[tuple[int, str]]:
     tree = ast.parse(pyfile.read_text(encoding="utf-8"))
-    found: List[Tuple[int, str]] = []
+    found: list[tuple[int, str]] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
@@ -162,7 +161,7 @@ def _allowed(module: str, layer: str) -> bool:
     return any(module == p or module.startswith(p + ".") for p in prefixes)
 
 
-def iter_violations(pyfile: Path) -> List[Tuple[int, str, str]]:
+def iter_violations(pyfile: Path) -> list[tuple[int, str, str]]:
     """Return (lineno, module, layer) for every disallowed import in pyfile."""
     layer = _layer_of(pyfile)
     return [
@@ -172,7 +171,7 @@ def iter_violations(pyfile: Path) -> List[Tuple[int, str, str]]:
     ]
 
 
-def _walk_layer(layer: str) -> List[Path]:
+def _walk_layer(layer: str) -> list[Path]:
     d = HEXAGON_ROOT / layer
     return sorted(d.rglob("*.py")) if d.is_dir() else []
 

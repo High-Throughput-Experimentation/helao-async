@@ -10,7 +10,7 @@ from __future__ import annotations
 import dataclasses
 import fnmatch
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from ruamel.yaml import YAML
 
@@ -60,10 +60,10 @@ class ProvenanceManifest:
     sequence_params: dict
     capture_timestamp: str
     harness_version: str
-    masked_hlo_columns: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
-    hlo_row_count_tolerance: Dict[str, int] = dataclasses.field(default_factory=dict)
-    content_masked_files: Dict[str, str] = dataclasses.field(default_factory=dict)
-    masked_meta_keys: Dict[str, List[str]] = dataclasses.field(default_factory=dict)
+    masked_hlo_columns: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    hlo_row_count_tolerance: dict[str, int] = dataclasses.field(default_factory=dict)
+    content_masked_files: dict[str, str] = dataclasses.field(default_factory=dict)
+    masked_meta_keys: dict[str, list[str]] = dataclasses.field(default_factory=dict)
     notes: str = ""
 
     def save(self, golden_dir: Path) -> Path:
@@ -85,9 +85,9 @@ class ProvenanceManifest:
             data = _yaml.load(f)
         return cls(**{k: v for k, v in dict(data).items()})
 
-    def masked_meta_keys_for(self, norm: str) -> List[str]:
+    def masked_meta_keys_for(self, norm: str) -> list[str]:
         """Dotted meta keys to mask for a normalized YAML path (fnmatch)."""
-        out: List[str] = []
+        out: list[str] = []
         for pattern, keys in (self.masked_meta_keys or {}).items():
             if fnmatch.fnmatch(norm, pattern):
                 out.extend(keys)

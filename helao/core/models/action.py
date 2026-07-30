@@ -3,7 +3,7 @@
 __all__ = ["ActionModel", "ShortActionModel"]
 
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import Optional, Union
 from uuid import UUID
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
@@ -74,7 +74,7 @@ class ActionModel(ShortActionModel):
         experiment_uuid (Optional[UUID]): UUID of the parent experiment.
         experiment_timestamp (Optional[datetime]): Timestamp of the parent experiment.
         action_timestamp (Optional[datetime]): Timestamp when the action was created.
-        action_status (List[HloStatus]): Accumulated status flags for the action.
+        action_status (list[HloStatus]): Accumulated status flags for the action.
         action_order (Optional[int]): Intended dispatch order.
         action_retry (Optional[int]): Retry counter.
         action_split (Optional[int]): Split index for parallelized/split actions.
@@ -90,15 +90,15 @@ class ActionModel(ShortActionModel):
         action_finished_timestamp (Optional[datetime]): When the action completed.
         parent_action_uuid (Optional[UUID]): UUID of the parent action, if any.
         child_action_uuid (Optional[UUID]): UUID of the child action, if any.
-        samples_in (List): Input samples (union of sample model types).
-        samples_out (List): Output samples (union of sample model types).
-        files (List[FileInfo]): Files produced by the action.
+        samples_in (list): Input samples (union of sample model types).
+        samples_out (list): Output samples (union of sample model types).
+        files (list[FileInfo]): Files produced by the action.
         manual_action (bool): True if performed manually rather than dispatched.
         nonblocking (bool): True if the orchestrator does not wait for completion.
         exec_id (Optional[str]): Execution identifier used by the runner.
         technique_name (Optional[Union[str, list]]): Technique(s) associated with the action.
         process_finish (bool): True marks the action as the terminator of a process group.
-        process_contrib (List[ProcessContrib]): Fields this action contributes to its process.
+        process_contrib (list[ProcessContrib]): Fields this action contributes to its process.
         error_code (Optional[ErrorCodes]): Final error code.
         process_uuid (Optional[UUID]): UUID of the enclosing process.
         data_request_id (Optional[UUID]): Optional data-request linkage.
@@ -109,7 +109,7 @@ class ActionModel(ShortActionModel):
         start_condition (ActionStartCondition): Gate that must clear before dispatch.
         save_act (bool): True to persist the action YAML record.
         save_data (bool): True to persist data files.
-        aux_file_paths (List[Path]): Auxiliary files to ship with the action.
+        aux_file_paths (list[Path]): Auxiliary files to ship with the action.
         from_global_act_params (dict): Parameters injected from the global context.
         to_global_params (Union[list, dict]): Parameters to publish to the global context.
     """
@@ -123,7 +123,7 @@ class ActionModel(ShortActionModel):
     experiment_uuid: Optional[UUID] = None
     experiment_timestamp: Optional[datetime] = None
     action_timestamp: Optional[datetime] = None
-    action_status: List[HloStatus] = Field(default=[])
+    action_status: list[HloStatus] = Field(default=[])
     action_order: Optional[int] = 0
     action_retry: Optional[int] = 0
     action_split: Optional[int] = 0
@@ -139,15 +139,15 @@ class ActionModel(ShortActionModel):
     action_finished_timestamp: Optional[datetime] = None
     parent_action_uuid: Optional[UUID] = None
     child_action_uuid: Optional[UUID] = None
-    samples_in: List[SampleUnion] = Field(default=[])
-    samples_out: List[SampleUnion] = Field(default=[])
-    files: List[FileInfo] = Field(default=[])
+    samples_in: list[SampleUnion] = Field(default=[])
+    samples_out: list[SampleUnion] = Field(default=[])
+    files: list[FileInfo] = Field(default=[])
     manual_action: bool = False
     nonblocking: bool = False
     exec_id: Optional[str] = None
     technique_name: Optional[Union[str, list]] = None
     process_finish: bool = False
-    process_contrib: List[ProcessContrib] = Field(default=[])
+    process_contrib: list[ProcessContrib] = Field(default=[])
     error_code: Optional[ErrorCodes] = ErrorCodes.none
     process_uuid: Optional[UUID] = None
     data_request_id: Optional[UUID] = None
@@ -160,7 +160,7 @@ class ActionModel(ShortActionModel):
     start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
     save_act: bool = True  # default should be true
     save_data: bool = True  # default should be true
-    aux_file_paths: List[Path] = Field(default=[])
+    aux_file_paths: list[Path] = Field(default=[])
     from_global_act_params: dict = {}
     to_global_params: Union[list, dict] = []
 

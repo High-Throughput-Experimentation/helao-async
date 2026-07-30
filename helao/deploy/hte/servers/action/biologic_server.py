@@ -13,7 +13,7 @@ __all__ = ["makeApp"]
 import asyncio
 import time
 import itertools
-from typing import Optional, List, Union
+from typing import Optional, Union
 from collections import defaultdict, deque
 
 import numpy as np
@@ -333,7 +333,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CA", tags=["action"])
     @action_version(2)
     async def run_CA(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vval__V: float = 0.0,
@@ -377,7 +377,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CP", tags=["action"])
     @action_version(2)
     async def run_CP(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Ival__A: float = 0.0,
@@ -420,7 +420,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CV", tags=["action"])
     @action_version(2)
     async def run_CV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vinit__V: float = 0.0,  # Initial value in volts or amps.
@@ -472,7 +472,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_OCV", tags=["action"])
     @action_version(2)
     async def run_OCV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Tval__s: float = 10.0,
@@ -502,7 +502,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_PEIS", tags=["action"])
     @action_version(3)
     async def run_PEIS(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Vinit__V: float = 0.00,  # Initial value in volts or amps.
@@ -547,7 +547,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_GEIS", tags=["action"])
     @action_version(3)
     async def run_GEIS(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         Iinit__A: float = 0.01,  # Initial value in volts or amps.
@@ -592,11 +592,11 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     @app.post(f"/{server_key}/run_CAOCV", tags=["action"])
     @action_version(2)
     async def run_CAOCV(
-        fast_samples_in: List[
+        fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
-        CA_Vval__V_list: List[float] = Body([], embed=True),
-        CA_Tval__s_list: List[float] = Body([], embed=True),
+        CA_Vval__V_list: list[float] = Body([], embed=True),
+        CA_Tval__s_list: list[float] = Body([], embed=True),
         CA_AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
         CA_IRange: EC_IRange = EC_IRange.AUTO,
         CA_ERange: EC_ERange = EC_ERange.AUTO,

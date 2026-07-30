@@ -48,7 +48,8 @@ __all__ = [
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Tuple
+from typing import Optional
+from collections.abc import Callable
 
 from helao.hexagon.domain.models import (
     ActionStartCondition,
@@ -74,7 +75,7 @@ class DispatchSnapshot:
     n_acts: int  # len(orch.action_dq) (:1127/:1171)
     n_exps: int  # len(orch.experiment_dq) (:1127/:1206)
     n_seqs: int  # len(orch.sequence_dq) (:1127/:1215)
-    na_drivers: Tuple[str, ...]  # unknown drivers in orch.status_summary (:1141-1143)
+    na_drivers: tuple[str, ...]  # unknown drivers in orch.status_summary (:1141-1143)
     step_thru_actions: bool  # orch.step_thru_actions (:1179)
     step_thru_experiments: bool  # orch.step_thru_experiments (:1188)
     step_thru_sequences: bool  # orch.step_thru_sequences (:1199)
@@ -109,7 +110,7 @@ class ExitLoop:
 class DriverHealthWait:
     """Unknown driver states (:1140-1164) -- NON-terminal; runs once then falls through."""
 
-    na_drivers: Tuple[str, ...]
+    na_drivers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -406,7 +407,7 @@ class DispatchPolicy:
 
     # --- finalization (:1234-1261) ---
 
-    def finalization_plan(self, fsnap: FinalizationSnapshot) -> List:
+    def finalization_plan(self, fsnap: FinalizationSnapshot) -> list:
         """The fixed ordered post-loop plan; per-step guards are re-checked live by the runner."""
         return [
             CloseOutExperiment(),

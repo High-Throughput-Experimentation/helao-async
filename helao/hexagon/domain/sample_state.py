@@ -18,7 +18,7 @@ public methods verbatim, dropping only its `*args, **kwargs` catch-alls, so an
 adapter can be the shim itself. Archive is NEVER ported as a driver.
 """
 
-from typing import Any, List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Any, Optional, Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import Action, ErrorCodes
 
@@ -33,7 +33,7 @@ class SampleStateProtocol(Protocol):
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
-    ) -> Tuple[ErrorCodes, Any]: ...
+    ) -> tuple[ErrorCodes, Any]: ...
 
     async def tray_get_next_full(
         self,
@@ -56,14 +56,14 @@ class SampleStateProtocol(Protocol):
     # -- custom-position methods --
     async def custom_query_sample(
         self, custom: Optional[str] = None
-    ) -> Tuple[ErrorCodes, Any]: ...
+    ) -> tuple[ErrorCodes, Any]: ...
 
     async def custom_update_position(
         self,
         custom: Optional[str] = None,
         sample: Optional[Any] = None,
         dilute: bool = False,
-    ) -> Tuple[bool, Any]: ...
+    ) -> tuple[bool, Any]: ...
 
     async def custom_dest_allowed(self, custom: Optional[str] = None) -> bool: ...
 
@@ -74,13 +74,13 @@ class SampleStateProtocol(Protocol):
     # -- sample creation --
     async def new_ref_samples(
         self,
-        samples_in: Optional[List] = None,
+        samples_in: Optional[list] = None,
         sample_out_type: Any = "",
         sample_position: str = "",
         action: Optional[Action] = None,
         combine_liquids: bool = False,
         combine_gases: bool = False,
-    ) -> Tuple[ErrorCodes, list]: ...
+    ) -> tuple[ErrorCodes, list]: ...
 
     # -- unified sample DB sub-surface (shim's .unified_db) --
     async def get_samples(self, samples: Optional[list] = None) -> list: ...

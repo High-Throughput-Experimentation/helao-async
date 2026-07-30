@@ -27,7 +27,7 @@ import asyncio
 import socket
 import threading
 import time
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 import uvicorn
 from fastapi import Body, FastAPI
@@ -69,16 +69,16 @@ def _make_fake_sample_app() -> FastAPI:
         )
 
     @app.post("/get_samples")
-    async def get_samples(samples: List[_SampleParam] = Body([], embed=True)):
+    async def get_samples(samples: list[_SampleParam] = Body([], embed=True)):
         # echo an assembly-with-parts to exercise nested rehydration
         return [_assembly_with_parts()]
 
     @app.post("/new_samples")
-    async def new_samples(samples: List[_SampleParam] = Body([], embed=True)):
+    async def new_samples(samples: list[_SampleParam] = Body([], embed=True)):
         return [object_to_sample(s) for s in samples]
 
     @app.post("/update_samples")
-    async def update_samples(samples: List[_SampleParam] = Body([], embed=True)):
+    async def update_samples(samples: list[_SampleParam] = Body([], embed=True)):
         return None  # void endpoint -> None body on success
 
     @app.post("/tray_query_sample")
@@ -127,7 +127,7 @@ def _make_fake_sample_app() -> FastAPI:
 
     @app.post("/new_ref_samples")
     async def new_ref_samples(
-        samples_in: List[_SampleParam] = Body([], embed=True),
+        samples_in: list[_SampleParam] = Body([], embed=True),
         sample_out_type: str = "",
         sample_position: str = "",
         combine_liquids: bool = False,

@@ -18,8 +18,9 @@ from copy import copy
 from dataclasses import dataclass
 from socket import gethostname
 from collections import namedtuple
-from typing import Any, Callable, Optional
-from typing_extensions import Annotated
+from typing import Any, Optional
+from collections.abc import Callable
+from typing import Annotated
 
 from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
 from helao.helpers.eval import eval_val

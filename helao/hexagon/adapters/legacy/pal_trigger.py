@@ -20,7 +20,8 @@ import asyncio
 import logging
 import traceback
 from copy import deepcopy
-from typing import Callable, Optional, Tuple
+from typing import Optional
+from collections.abc import Callable
 
 from helao.core.error import ErrorCodes
 
@@ -143,7 +144,7 @@ class NidaqmxPalTrigger:
 
     async def wait_for_triggers(
         self,
-    ) -> Tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
+    ) -> tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
         LOGGER.info("waiting for PAL start trigger")
         try:
             start = await asyncio.wait_for(self._startq.get(), self._timeout)
@@ -193,6 +194,6 @@ class NullPalTrigger:
 
     async def wait_for_triggers(
         self,
-    ) -> Tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
+    ) -> tuple[ErrorCodes, Optional[int], Optional[int], Optional[int]]:
         LOGGER.error("No triggers configured")
         return ErrorCodes.none, None, None, None

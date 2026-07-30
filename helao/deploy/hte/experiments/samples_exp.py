@@ -12,7 +12,7 @@ __all__ = [
 ]
 
 
-from typing import Optional, List, Tuple
+from typing import Optional
 from socket import gethostname
 
 from helao.helpers.premodels import ActionPlanMaker
@@ -44,12 +44,12 @@ ORCH_server = MachineModel(server_name="ORCH", machine_name=ORCH_HOST).as_dict()
 @experiment(version=1)
 def create_liquid_sample(
     volume_ml: float = 1.0,
-    source: List[str] = ["source1", "source2"],
-    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
-    chemical: List[str] = ["chemical1", "chemical2"],
+    source: list[str] = ["source1", "source2"],
+    partial_molarity: list[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: list[str] = ["chemical1", "chemical2"],
     ph: float = 7.0,
-    supplier: List[str] = ["supplier1", "supplier2"],
-    lot_number: List[str] = ["lot1", "lot2"],
+    supplier: list[str] = ["supplier1", "supplier2"],
+    lot_number: list[str] = ["lot1", "lot2"],
     electrolyte_name: str = "name",
     prep_date: str = "2000-01-01",
     comment: str = "comment",
@@ -103,11 +103,11 @@ def create_liquid_sample(
 @experiment(version=1)
 def create_gas_sample(
     volume_ml: float = 1.0,
-    source: List[str] = ["source1", "source2"],
-    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
-    chemical: List[str] = ["chemical1", "chemical2"],
-    supplier: List[str] = ["supplier1", "supplier2"],
-    lot_number: List[str] = ["lot1", "lot2"],
+    source: list[str] = ["source1", "source2"],
+    partial_molarity: list[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: list[str] = ["chemical1", "chemical2"],
+    supplier: list[str] = ["supplier1", "supplier2"],
+    lot_number: list[str] = ["lot1", "lot2"],
     prep_date: str = "2000-01-01",
     comment: str = "comment",
 ) -> list:
@@ -155,16 +155,16 @@ def create_gas_sample(
 
 @experiment(version=1)
 def create_assembly_sample(
-    liquid_sample_nos: List[int] = [1, 2],
-    gas_sample_nos: List[int] = [1, 2],
-    solid_plate_ids: List[int] = [1, 2],
-    solid_sample_nos: List[int] = [1, 2],
+    liquid_sample_nos: list[int] = [1, 2],
+    gas_sample_nos: list[int] = [1, 2],
+    solid_plate_ids: list[int] = [1, 2],
+    solid_sample_nos: list[int] = [1, 2],
     volume_ml: float = 1.0,
-    # source: List[str] = ["source1","source2"],
-    # partial_molarity:  List[str] = ["partial_molarity1","partial_molarity2"],
-    # chemical: List[str] = ["chemical1","chemical2"],
-    # supplier: List[str] = ["supplier1","supplier2"],
-    # lot_number: List[str] = ["lot1","lot2"],
+    # source: list[str] = ["source1","source2"],
+    # partial_molarity:  list[str] = ["partial_molarity1","partial_molarity2"],
+    # chemical: list[str] = ["chemical1","chemical2"],
+    # supplier: list[str] = ["supplier1","supplier2"],
+    # lot_number: list[str] = ["lot1","lot2"],
     comment: str = "comment",
 ) -> list:
     """Build a PAL assembly sample from existing liquid/gas/solid sample numbers.
@@ -266,10 +266,10 @@ def generate_sample_no_list(
     sample_code: int = 0,
     skip_n_samples: int = 0,
     direction: Optional[str] = None,
-    sample_nos: List[int] = [],
+    sample_nos: list[int] = [],
     sample_nos_operator: str = "",
-    # platemap_xys: List[Tuple[int, int]] = [],
-    platemap_xys: List[Tuple[int, int]] = [(None, None)],
+    # platemap_xys: list[tuple[int, int]] = [],
+    platemap_xys: list[tuple[int, int]] = [(None, None)],
     platemap_xys_operator: str = "",
 ):
     """Queue a PAL ``generate_plate_sample_no_list`` action for a plate.
@@ -342,12 +342,12 @@ def load_liquid_sample(
 @experiment(version=1)
 def create_and_load_liquid_sample(
     volume_ml: float = 1.0,
-    source: List[str] = ["source1", "source2"],
-    partial_molarity: List[str] = ["partial_molarity1", "partial_molarity2"],
-    chemical: List[str] = ["chemical1", "chemical2"],
+    source: list[str] = ["source1", "source2"],
+    partial_molarity: list[str] = ["partial_molarity1", "partial_molarity2"],
+    chemical: list[str] = ["chemical1", "chemical2"],
     ph: float = 7.0,
-    supplier: List[str] = ["supplier1", "supplier2"],
-    lot_number: List[str] = ["lot1", "lot2"],
+    supplier: list[str] = ["supplier1", "supplier2"],
+    lot_number: list[str] = ["lot1", "lot2"],
     electrolyte_name: str = "name",
     prep_date: str = "2000-01-01",
     comment: str = "comment",

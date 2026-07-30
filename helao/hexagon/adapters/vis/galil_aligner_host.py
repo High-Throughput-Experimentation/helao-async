@@ -26,7 +26,7 @@ constructs the host — import without a Bokeh document context.
 """
 
 from functools import partial
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
 from helao.core.error import ErrorCodes
 
@@ -162,7 +162,7 @@ class GalilAlignerHost:
         return doc
 
     # --- orchestration verbs (relocated from the driver) ------------------
-    def run_aligner_precheck(self) -> Tuple[bool, ErrorCodes]:
+    def run_aligner_precheck(self) -> tuple[bool, ErrorCodes]:
         if self._driver.blocked or not self._driver.galil_enabled:
             return False, ErrorCodes.in_progress
         if self.bokehapp is None or self.context.aligner is None:

@@ -10,7 +10,6 @@ Usage: python openapi_diff.py <legacy_openapi.json> <candidate_openapi.json>
 
 import json
 import sys
-from typing import Dict, List, Set, Tuple
 
 
 def _load(path: str) -> dict:
@@ -18,9 +17,9 @@ def _load(path: str) -> dict:
         return json.load(fh)
 
 
-def _routes(spec: dict) -> Set[Tuple[str, str]]:
+def _routes(spec: dict) -> set[tuple[str, str]]:
     """Set of (METHOD, path) over paths.<path>.<method>."""
-    out: Set[Tuple[str, str]] = set()
+    out: set[tuple[str, str]] = set()
     for path, ops in (spec.get("paths") or {}).items():
         for method in ops:
             if method.lower() in {
@@ -37,11 +36,11 @@ def _routes(spec: dict) -> Set[Tuple[str, str]]:
     return out
 
 
-def _schemas(spec: dict) -> Dict[str, dict]:
+def _schemas(spec: dict) -> dict[str, dict]:
     return (spec.get("components") or {}).get("schemas") or {}
 
 
-def main(argv: List[str]) -> int:
+def main(argv: list[str]) -> int:
     if len(argv) != 3:
         print("usage: openapi_diff.py <legacy.json> <candidate.json>")
         return 2

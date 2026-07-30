@@ -18,7 +18,6 @@
 __all__ = ["SIM_measure_CP"]
 
 from socket import gethostname
-from typing import List
 
 from helao.helpers.premodels import ActionPlanMaker
 from helao.core.models.machine import MachineModel
@@ -39,8 +38,8 @@ PAL_server = MachineModel(server_name="PAL", machine_name=ORCH_HOST).as_dict()
 @experiment(version=1)
 def SIM_measure_CP(
     solution_ph: int = 13,
-    elements: List[str] = [],
-    element_fracs: List[float] = [],
+    elements: list[str] = [],
+    element_fracs: list[float] = [],
 ) -> list:
     """Simulate sample selection and CP measurement at 3 and 10 mA/cm^2.
 

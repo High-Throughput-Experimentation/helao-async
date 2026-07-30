@@ -21,7 +21,7 @@ import logging
 import os
 import subprocess
 import time
-from typing import List, Optional, Tuple
+from typing import Optional
 
 import aiofiles
 import psutil
@@ -112,7 +112,7 @@ class LegacyPalTransport:
                 mysshclient.close()
         return error
 
-    async def submit_joblist(self, joblist: List[Tuple[str, str]]) -> ErrorCodes:
+    async def submit_joblist(self, joblist: list[tuple[str, str]]) -> ErrorCodes:
         error = ErrorCodes.none
         if self._host == "localhost":
             tmpjob = " ".join(

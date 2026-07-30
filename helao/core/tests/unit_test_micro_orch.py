@@ -21,7 +21,7 @@ import random
 import socket
 import traceback
 from copy import deepcopy
-from typing import Any, Dict
+from typing import Any
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
@@ -149,7 +149,7 @@ class _FakeActionServer:
         """Record the detach call from the client (no-op locally)."""
         return True
 
-    async def _run_action(self, action: dict = None, **kwargs) -> Dict[str, Any]:
+    async def _run_action(self, action: dict = None, **kwargs) -> dict[str, Any]:
         """Return a finished action dump that includes the requested name.
 
         ``action`` is declared explicitly so the RPC ``_coerce_args`` pass

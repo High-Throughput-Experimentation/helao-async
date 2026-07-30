@@ -14,7 +14,7 @@ this port and stay engine-owned: starting the trigger poller (that's
 (needs the ``DataSinkPort`` handle this port never holds).
 """
 
-from typing import List, Optional, Protocol, Tuple, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 from helao.hexagon.domain.models import ErrorCodes
 
@@ -42,7 +42,7 @@ class PalTransportPort(Protocol):
         between its aux-log setup and the actual joblist dispatch)."""
         ...
 
-    async def submit_joblist(self, joblist: List[Tuple[str, str]]) -> ErrorCodes:
+    async def submit_joblist(self, joblist: list[tuple[str, str]]) -> ErrorCodes:
         """Dispatch the already-assembled ``(method, params)`` joblist
         entries to the PAL program, locally (subprocess) or over SSH/Cygwin
         (tmux)."""

@@ -18,7 +18,7 @@ import shutil
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterator, List, Tuple
+from collections.abc import Iterator
 
 from harness.classify import (
     ArtifactRow,
@@ -53,7 +53,7 @@ SEED_UUID_KEYS = ("sequence_uuid", "experiment_uuid", "action_uuid", "process_uu
 @dataclass
 class TreeSnapshot:
     root: Path
-    files: Dict[str, Tuple[Path, ArtifactRow]] = field(default_factory=dict)
+    files: dict[str, tuple[Path, ArtifactRow]] = field(default_factory=dict)
 
 
 def _iter_parity_files(root: Path) -> Iterator[Path]:
@@ -99,7 +99,7 @@ def seed_mapper(root: Path, mapper: UuidMapper) -> None:
     structure): register_derived is a checked no-op when the process uuid is
     not derived.
     """
-    buckets: Dict[ArtifactRow, List[Tuple[str, Path]]] = {
+    buckets: dict[ArtifactRow, list[tuple[str, Path]]] = {
         row: [] for row in ROW_SEED_ORDER
     }
     for f in _iter_parity_files(root):
@@ -124,7 +124,7 @@ def seed_mapper(root: Path, mapper: UuidMapper) -> None:
                     mapper.map(str(d[k]))
 
 
-def _sibling_tokens(root: Path) -> Dict[Path, str]:
+def _sibling_tokens(root: Path) -> dict[Path, str]:
     """Disambiguate directory-name collisions the §5.5 TS-strip grammar creates.
 
     ``normalize_name`` collapses every wall-clock-derived directory prefix to
@@ -145,7 +145,7 @@ def _sibling_tokens(root: Path) -> Dict[Path, str]:
     left exactly as before (no suffix) so existing single-experiment
     scenarios and unit tests are unaffected.
     """
-    children: Dict[Path, List[str]] = {}
+    children: dict[Path, list[str]] = {}
     for f in _iter_parity_files(root):
         parts = f.relative_to(root).parts
         cur = root
@@ -154,9 +154,9 @@ def _sibling_tokens(root: Path) -> Dict[Path, str]:
             if name not in names:
                 names.append(name)
             cur = cur / name
-    token_of: Dict[Path, str] = {}
+    token_of: dict[Path, str] = {}
     for parent, names in children.items():
-        groups: Dict[str, List[str]] = {}
+        groups: dict[str, list[str]] = {}
         for name in names:
             groups.setdefault(normalize_name(name), []).append(name)
         for norm_tok, siblings in groups.items():
@@ -191,8 +191,8 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
     return snap
 
 
-def diff_member_sets(golden: TreeSnapshot, candidate: TreeSnapshot) -> List[dict]:
-    diffs: List[dict] = []
+def diff_member_sets(golden: TreeSnapshot, candidate: TreeSnapshot) -> list[dict]:
+    diffs: list[dict] = []
     gset, cset = set(golden.files), set(candidate.files)
     for missing in sorted(gset - cset):
         diffs.append(

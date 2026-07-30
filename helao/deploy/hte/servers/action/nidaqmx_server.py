@@ -27,7 +27,7 @@ __all__ = ["makeApp"]
 
 
 from fastapi import Body, Query
-from typing import List, Union
+from typing import Union
 
 
 from helao.core.servers.base_api import BaseAPI
@@ -445,7 +445,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/cellIV", tags=["action"])
         async def cellIV(
-            fast_samples_in: List[
+            fast_samples_in: list[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
             Tval: float = 10.0,
@@ -538,7 +538,7 @@ def makeApp(server_key) -> BaseAPI:
         async def acquire_monitors(
             duration: float = -1,
             acquisition_rate: float = 0.2,
-            fast_samples_in: List[
+            fast_samples_in: list[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
         ):

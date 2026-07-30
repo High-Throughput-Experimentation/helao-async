@@ -59,7 +59,7 @@ import asyncio
 import pickle
 import traceback
 from time import sleep
-from typing import List, Optional
+from typing import Optional
 
 import pyzstd
 from fastapi import WebSocket
@@ -395,7 +395,7 @@ class StatusBroadcaster:
         await asyncio.sleep(1)
 
     def replace_status(
-        self, status_list: List[HloStatus], old_status: HloStatus, new_status: HloStatus
+        self, status_list: list[HloStatus], old_status: HloStatus, new_status: HloStatus
     ):
         """Swap ``old_status`` for ``new_status`` in ``status_list``, or append if missing.
 

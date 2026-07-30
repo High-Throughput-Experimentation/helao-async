@@ -44,7 +44,7 @@ Optional[datetime]`` parses the ISO string back into a ``datetime`` on the
 legacy side, so the format spec always has a real datetime to work with."""
 
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -60,7 +60,7 @@ class DispatcherStatusAdapter:
         self._server_key = server_key
         self._own_host = own_host
         self._own_port = own_port
-        self.clients: List[Tuple[str, str, int]] = []
+        self.clients: list[tuple[str, str, int]] = []
         self._publish_bridge: Optional[WsPublishBridge] = None
 
     def bind_publish_bridge(self, bridge: WsPublishBridge) -> None:

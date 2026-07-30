@@ -2,7 +2,7 @@
 
 __all__ = ["MachineModel"]
 
-from typing import Optional, Tuple
+from typing import Optional
 from pydantic import BaseModel
 
 from helao.core.helaodict import HelaoDict
@@ -23,7 +23,7 @@ class MachineModel(BaseModel, HelaoDict):
     hostname: Optional[str] = None
     port: Optional[int] = None
 
-    def as_key(self) -> Tuple[Optional[str], Optional[str]]:
+    def as_key(self) -> tuple[Optional[str], Optional[str]]:
         """Return a `(server_name, machine_name)` tuple suitable as a dict key."""
         return (self.server_name, self.machine_name)
 

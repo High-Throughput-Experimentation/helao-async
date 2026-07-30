@@ -24,7 +24,6 @@ from copy import deepcopy
 from socket import gethostname
 from typing import Optional
 from pydantic import Field
-from typing import List
 from collections import defaultdict
 from uuid import UUID
 
@@ -68,7 +67,7 @@ class Sequence(SequenceModel):
     """
 
     # not in SequenceModel:
-    dispatched_experiments: List[ExperimentModel] = (
+    dispatched_experiments: list[ExperimentModel] = (
         []
     )  # running tally of completed experiments
 
@@ -155,7 +154,7 @@ class Experiment(Sequence, ExperimentModel):
     """
 
     # not in ExperimentModel, dispatched_actions is a list of completed ActionModels:
-    dispatched_actions: List[ActionModel] = []
+    dispatched_actions: list[ActionModel] = []
 
     def __repr__(self) -> str:
         """Return ``<experiment_name:NAME>`` for log lines."""
@@ -314,7 +313,7 @@ class Action(Experiment, ActionModel):
     """
 
     # internal
-    file_conn_keys: List[UUID] = Field(default=[])
+    file_conn_keys: list[UUID] = Field(default=[])
     # flag for dataLOGGER
     # None will signal default behaviour as before
     # will be updated by data LOGGER only if it finds the status
