@@ -7,18 +7,18 @@ sample archive, and the CAM/PDU/CALC/ANA helpers.
 """
 
 __all__ = [
-    "UVIS_sub_unloadall_customs",
+    "UVIS_analysis_dry",
+    "UVIS_calc_abs",
+    "UVIS_measure_references",
     "UVIS_sub_load_solid",
-    "UVIS_sub_startup",
-    "UVIS_sub_shutdown",
+    "UVIS_sub_measure",
     "UVIS_sub_movetosample",
     "UVIS_sub_relmove",
-    "UVIS_sub_measure",
     "UVIS_sub_setup_ref",
-    "UVIS_calc_abs",
-    "UVIS_analysis_dry",
-    "UVIS_measure_references",
+    "UVIS_sub_shutdown",
     "UVIS_sub_shutoff_lamp",
+    "UVIS_sub_startup",
+    "UVIS_sub_unloadall_customs",
 ]
 
 

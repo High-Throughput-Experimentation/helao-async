@@ -5,7 +5,7 @@ Defines short experiments that combine ``wait``/``add_global_param``/
 non-blocking dispatch and conditional sequence termination.
 """
 
-__all__ = ["TEST_sub_noblocking", "TEST_sub_conditional_stop"]
+__all__ = ["TEST_sub_conditional_stop", "TEST_sub_noblocking"]
 
 
 from socket import gethostname

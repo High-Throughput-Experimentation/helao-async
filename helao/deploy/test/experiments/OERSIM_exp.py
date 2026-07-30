@@ -7,10 +7,10 @@ themselves.
 """
 
 __all__ = [
+    "OERSIM_sub_activelearn",
+    "OERSIM_sub_decision",
     "OERSIM_sub_load_plate",
     "OERSIM_sub_measure_CP",
-    "OERSIM_sub_decision",
-    "OERSIM_sub_activelearn",
 ]
 
 
