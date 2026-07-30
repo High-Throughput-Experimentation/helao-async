@@ -38,3 +38,6 @@ helao/deploy/*
 C:*
 
 .pytest_cache
+# understand-anything knowledge-graph output (regenerated on demand;
+# ~9.5 MB of generated JSON, not worth versioning)
+.understand-anything/
