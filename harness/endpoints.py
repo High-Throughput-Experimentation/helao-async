@@ -18,11 +18,27 @@ from __future__ import annotations
 import argparse
 import ast
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
 
 HTTP_METHODS = {"post", "get", "put", "delete", "head", "websocket"}
+
+#: typing aliases that PEP 585 replaced with the builtin generics. Annotations
+#: are extracted as literal source text, so a repo-wide PEP 585 sweep rewriting
+#: ``List[float]`` to ``list[float]`` changes the recorded string while the
+#: TYPE -- and therefore the FastAPI/pydantic wire schema the checklist exists
+#: to gate -- is identical. Normalizing the spelling on comparison keeps the
+#: frozen JSONs as verbatim records of the pre-migration legacy surface and
+#: makes the gate immune to future sweeps, while still failing on any real
+#: annotation change (``List[float]`` -> ``list[str]`` still diffs).
+#:
+#: FrozenSet precedes Set only for readability; \b already prevents matching
+#: the "Set" inside "FrozenSet". Optional/Union are deliberately absent -- the
+#: PEP 604 ``X | Y`` rewrite is a separate change and is not normalized here.
+_PEP585_ALIASES = ("FrozenSet", "List", "Dict", "Tuple", "Set", "Type")
+_PEP585_RE = re.compile(r"\b(" + "|".join(_PEP585_ALIASES) + r")\b")
 
 
 def _path_str(node: ast.expr) -> Optional[str]:
@@ -110,6 +126,26 @@ def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     def key(r: dict):
         return (r["path"], r["method"])
 
+    def norm(field: str, value):
+        """Compare ``params`` with PEP 585 alias spelling normalized away."""
+        if field != "params" or not isinstance(value, list):
+            return value
+        return [
+            (
+                {
+                    k: (
+                        _PEP585_RE.sub(lambda m: m.group(1).lower(), v)
+                        if k == "annotation" and isinstance(v, str)
+                        else v
+                    )
+                    for k, v in p.items()
+                }
+                if isinstance(p, dict)
+                else p
+            )
+            for p in value
+        ]
+
     fmap = {key(r): r for r in frozen}
     cmap = {key(r): r for r in current}
     diffs: list[dict] = []
@@ -120,7 +156,7 @@ def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     for k in sorted(set(fmap) & set(cmap)):
         f, c = fmap[k], cmap[k]
         for field in ("tags", "params"):
-            if f[field] != c[field]:
+            if norm(field, f[field]) != norm(field, c[field]):
                 diffs.append(
                     {
                         "path": k[0],
