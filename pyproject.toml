@@ -33,10 +33,26 @@ target-version = ["py312"]
 # the P2c sync driver (helao/core/drivers/data/sync_driver.py), pinned per-method
 # by inspect.getsource source-parity tests for byte-parity. Several legacy
 # collaborator modules are NOT black-formatted at line-length 88, so running
-# black on the copies would reformat them and break the source-parity
-# byte-identity. force-exclude protects ONLY those five re-bodies; the
-# hand-written native adapters (artifact_store, data_sink, ws_publish) are
-# black-enforced like the rest of the repo (P2b-2 D2). (No other black
-# config: line length stays the default 88.)
-# sync_driver.py is the P2c re-body of helao/core/drivers/data/sync_driver.py (D1); its hand-written NativeSyncAdapter sibling (sync_adapter.py) stays black-enforced.
-force-exclude = 'helao/hexagon/adapters/native/(meta_writer|data_file|data_stream|finalizer|sync_driver)\.py'
+# black on either side of a pinned pair would reformat it and break the
+# source-parity byte-identity. The hand-written native adapters
+# (artifact_store, data_sink, ws_publish) are black-enforced like the rest of
+# the repo (P2b-2 D2). (No other black config: line length stays the default
+# 88.) sync_driver.py is the P2c re-body of
+# helao/core/drivers/data/sync_driver.py (D1); its hand-written
+# NativeSyncAdapter sibling (sync_adapter.py) stays black-enforced.
+#
+# BOTH SIDES of every pinned pair are excluded. This used to cover only the
+# five native copies, which is half a guard: `black <changed-files>` during an
+# import-sort sweep reformatted the LEGACY originals active_data_stream.py
+# (32 lines) and active_finalizer.py (27 lines) and broke parity from the
+# other direction. Two of the five legacy twins happen to be black-clean
+# today, but they are listed anyway -- the invariant is "never reformatted",
+# not "currently matches black's output", and a future black release can
+# change its mind about any of them.
+#
+# Import SORTING is a different matter and is deliberately NOT excluded:
+# `ruff check --select I` only moves import statements, which for these ten
+# files all sit above the pinned region. Measured across all ten: every member
+# body byte-identical, 8 of 10 at zero line delta. sync_fixtures'
+# assert_region_holds_no_imports fails loud if that stops being true.
+force-exclude = 'helao/(hexagon/adapters/native/(meta_writer|data_file|data_stream|finalizer|sync_driver)|core/servers/(base_meta_writer|active_data_file|active_data_stream|active_finalizer)|core/drivers/data/sync_driver)\.py'
