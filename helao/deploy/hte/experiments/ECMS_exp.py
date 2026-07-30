@@ -9,12 +9,12 @@ Action targets are referenced by ``server_key`` strings (e.g. ``PSTAT``,
 
 # editted 111224
 __all__ = [
+    "ECMS_sub_alloff",
     "ECMS_sub_CA",
     "ECMS_sub_CA_CO2flow",
-    "ECMS_sub_CV",
-    "ECMS_sub_alloff",
     "ECMS_sub_cali",
     "ECMS_sub_clean_cell_recirculation",
+    "ECMS_sub_CV",
     "ECMS_sub_drain",
     "ECMS_sub_drain_recirculation",
     "ECMS_sub_electrolyte_fill_cell",

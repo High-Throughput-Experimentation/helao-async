@@ -8,11 +8,11 @@ Action targets are referenced by ``server_key`` strings (e.g. ``MOTOR``,
 """
 
 __all__ = [
-    "CLAD_sub_OCV_bubble_check",
     "CLAD_sub_clean_cell",
     "CLAD_sub_fill_cell",
     "CLAD_sub_load_assembly",
     "CLAD_sub_load_sample",
+    "CLAD_sub_OCV_bubble_check",
     "CLAD_sub_recirculate_alternating",
     "CLAD_sub_reference_setup",
     "CLAD_sub_refill_syringe",

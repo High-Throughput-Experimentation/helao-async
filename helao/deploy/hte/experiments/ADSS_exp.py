@@ -9,22 +9,17 @@ Action targets are referenced by ``server_key`` strings (``PSTAT``,
 """
 
 __all__ = [
-    "ADSS_sub_CA",  # latest
-    "ADSS_sub_CA_photo",
-    "ADSS_sub_CV",  # latest
-    "ADSS_sub_OCV",  # at beginning of all sequences
-    "ADSS_sub_OCV_photo",
-    "ADSS_sub_PAL_deep_clean",
-    "ADSS_sub_PAL_load_gas",
-    "ADSS_sub_PAL_tray_to_tray",
     #    "ADSS_sub_abs_move",
     "ADSS_sub_add_liquid",
+    "ADSS_sub_CA",  # latest
+    "ADSS_sub_CA_photo",
     "ADSS_sub_cell_illumination",
     "ADSS_sub_cellfill_flush",
     "ADSS_sub_cellfill_prefilled",
     "ADSS_sub_cellfill_prefilled_nosampleload",
-    "ADSS_sub_clean_PALtool",
     "ADSS_sub_clean_cell",
+    "ADSS_sub_clean_PALtool",
+    "ADSS_sub_CV",  # latest
     #    "ADSS_sub_drain",
     "ADSS_sub_drain_cell",
     #    "ADSS_sub_empty_cell",
@@ -43,6 +38,11 @@ __all__ = [
     "ADSS_sub_move_to_clean_cell",
     "ADSS_sub_move_to_ref_measurement",
     "ADSS_sub_move_to_sample",
+    "ADSS_sub_OCV",  # at beginning of all sequences
+    "ADSS_sub_OCV_photo",
+    "ADSS_sub_PAL_deep_clean",
+    "ADSS_sub_PAL_load_gas",
+    "ADSS_sub_PAL_tray_to_tray",
     "ADSS_sub_recirculate",
     "ADSS_sub_refill_syringe",
     #    "ADSS_sub_rel_move",

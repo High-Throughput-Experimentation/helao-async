@@ -8,12 +8,12 @@ purges, CO2 baselines, mass-spec calibration, and electrochemical actions
 
 __all__ = [
     "ECMS_CV_recirculation_mixedreactant",
-    "ECMS_MS_calibration",
-    "ECMS_MS_calibration_recirculation",
-    "ECMS_MS_pulsecalibration",
     "ECMS_initiation",
     "ECMS_initiation_recirculation",
     "ECMS_initiation_recirculation_mixedreactant",
+    "ECMS_MS_calibration",
+    "ECMS_MS_calibration_recirculation",
+    "ECMS_MS_pulsecalibration",
     "ECMS_repeat_CV",
     "ECMS_repeat_CV_recirculation",
     "ECMS_repeat_CV_recirculation_mixedreactant",
