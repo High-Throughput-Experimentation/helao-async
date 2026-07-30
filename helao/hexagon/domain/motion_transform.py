@@ -97,7 +97,6 @@ class TransformXY:
         if isinstance(motorxy, str):
             motorxy = [float(x.strip()) for x in motorxy.split(",")]
         motorxy = np.asarray(motorxy)
-        print(motorxy)  # TODO(P3a): stray debug print — remove after parity
         if len(motorxy) == 2:
             motorxy = np.insert(motorxy, 2, 1)
         if len(motorxy) == 3:
