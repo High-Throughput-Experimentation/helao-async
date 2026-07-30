@@ -2,16 +2,17 @@
 
 __all__ = ["HelaoDict"]
 
-from datetime import datetime, date
-from uuid import UUID
+import math
 import types
-import numpy as np
-from pydantic import BaseModel
-from typing import Any
+from copy import deepcopy
+from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from copy import deepcopy
-import math
+from typing import Any
+from uuid import UUID
+
+import numpy as np
+from pydantic import BaseModel
 
 
 # https://stackoverflow.com/a/71389334

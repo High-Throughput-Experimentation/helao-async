@@ -7,12 +7,12 @@ side), ``RPCClient`` / ``RPCSyncClient`` (client side), the on-wire
 """
 
 from helao.core.rpc.zmq_rpc import (
-    RPCDispatcher,
     RPCClient,
-    RPCSyncClient,
+    RPCDispatcher,
+    RPCError,
     RPCRequest,
     RPCResponse,
-    RPCError,
+    RPCSyncClient,
     derive_rpc_port,
 )
 

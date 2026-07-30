@@ -19,6 +19,7 @@ import os
 import tempfile
 import traceback
 
+from helao.core.tests._test_utils import TestReporter
 from helao.helpers import config_loader
 from helao.helpers.config_loader import (
     HelaoConfig,
@@ -28,7 +29,6 @@ from helao.helpers.config_loader import (
     read_config,
     read_validated_config,
 )
-from helao.core.tests._test_utils import TestReporter
 
 
 def _repo_root() -> str:

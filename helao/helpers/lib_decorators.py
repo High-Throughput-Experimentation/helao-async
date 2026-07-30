@@ -26,7 +26,7 @@ __all__ = ["experiment", "sequence"]
 import functools
 import inspect
 
-from helao.helpers.premodels import Experiment, EXPERIMENT_CTX
+from helao.helpers.premodels import EXPERIMENT_CTX, Experiment
 
 
 def _declares_experiment_param(sig: inspect.Signature) -> bool:

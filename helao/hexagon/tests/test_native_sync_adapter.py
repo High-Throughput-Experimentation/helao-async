@@ -9,8 +9,8 @@ import pytest
 
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
-from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.adapters.native.native_syncer import NativeSyncer
+from helao.hexagon.adapters.native.sync_adapter import NativeSyncAdapter
 from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED
 from helao.hexagon.ports.sync import SyncPort
 from helao.hexagon.tests.sync_fixtures import teardown_driver

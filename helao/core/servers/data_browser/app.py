@@ -13,14 +13,15 @@ from bokeh.models import (
     Select,
     Spacer,
     TableColumn,
-    Tabs,
     TabPanel,
+    Tabs,
     TextInput,
 )
 from bokeh.palettes import Category10
 from bokeh.plotting import figure
 
-from helao.core.servers.data_browser import sources, state as dbstate
+from helao.core.servers.data_browser import sources
+from helao.core.servers.data_browser import state as dbstate
 
 INDEX_TABLE_COLS = [
     "source",

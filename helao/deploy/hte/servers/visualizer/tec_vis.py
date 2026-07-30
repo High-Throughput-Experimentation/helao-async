@@ -1,22 +1,24 @@
-from functools import partial
 from datetime import datetime
+from functools import partial
 
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    ColumnDataSource,
+    DatetimeTickFormatter,
+    LinearAxis,
+    Range1d,
     TextInput,
 )
+from bokeh.models.widgets import DataTable, Div, TableColumn
 from bokeh.plotting import figure
-from bokeh.models.widgets import Div
-from bokeh.models.widgets import DataTable, TableColumn
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource, DatetimeTickFormatter
-from bokeh.models import LinearAxis, Range1d
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from ...drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
+
+from ...drivers.temperature_control.mecom_driver import DEFAULT_QUERIES
 
 
 class C_vis(LiveVisualizer):

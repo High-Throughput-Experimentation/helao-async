@@ -8,16 +8,19 @@ start and cancel CO2 ppm acquisition via the :class:`CO2MonExec` executor.
 __all__ = ["makeApp"]
 
 from typing import Union
+
 from fastapi import Body
-from helao.core.servers.base_api import BaseAPI
+
 from helao.core.models.sample import (
     AssemblySample,
-    LiquidSample,
     GasSample,
-    SolidSample,
+    LiquidSample,
     NoneSample,
+    SolidSample,
 )
-from ...drivers.sensor.sprintir_driver import SprintIR, SprintIRPoller, CO2MonExec
+from helao.core.servers.base_api import BaseAPI
+
+from ...drivers.sensor.sprintir_driver import CO2MonExec, SprintIR, SprintIRPoller
 
 
 def makeApp(server_key) -> BaseAPI:

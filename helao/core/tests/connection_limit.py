@@ -8,10 +8,11 @@ Command-line usage:
     python connection_limit.py <num_jobs> [timeout_seconds]
 """
 
-import sys
 import asyncio
-from helao.helpers.dispatcher import async_private_dispatcher
+import sys
+
 from helao.helpers import helao_logging as logging
+from helao.helpers.dispatcher import async_private_dispatcher
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 HOST = "127.0.0.1"

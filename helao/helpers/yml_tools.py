@@ -6,8 +6,8 @@ that promotes ``RUNS_ACTIVE`` directories to ``RUNS_FINISHED`` (or
 ``RUNS_DIAG`` for manual actions) and notifies the syncer server.
 """
 
-import os
 import asyncio
+import os
 import threading
 from glob import glob
 from io import StringIO

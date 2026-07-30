@@ -4,11 +4,13 @@ __all__ = ["DataModel", "DataPackageModel"]
 
 from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field
 
-from .hlostatus import HloStatus
-from helao.core.helaodict import HelaoDict
 from helao.core.error import ErrorCodes
+from helao.core.helaodict import HelaoDict
+
+from .hlostatus import HloStatus
 
 
 class DataModel(BaseModel, HelaoDict):

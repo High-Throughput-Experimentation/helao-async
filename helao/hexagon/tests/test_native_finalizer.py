@@ -16,9 +16,9 @@ from uuid import UUID
 import pytest
 
 import helao.hexagon.adapters.native.finalizer as native_finalizer_mod
-from helao.core.servers.active_finalizer import ActionFinalizer
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
+from helao.core.servers.active_finalizer import ActionFinalizer
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer

@@ -6,38 +6,38 @@ that queues simultaneous action POSTs, and the shared private/utility
 endpoints registered on every Base- or Orch-style server.
 """
 
-import os
-import json
-import time
 import asyncio
-import inspect
-import functools
 import faulthandler
+import functools
+import inspect
+import json
+import os
+import time
+from collections import namedtuple
+from collections.abc import Callable
 from contextvars import ContextVar
 from copy import copy
 from dataclasses import dataclass
 from socket import gethostname
-from collections import namedtuple
-from typing import Any, Optional
-from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any, Optional
 
-from helao.core.drivers.helao_driver import HelaoDriver, DriverPoller, DriverStatus
-from helao.helpers.eval import eval_val
-from helao.helpers.time_utils import gen_uuid
-from helao.helpers.loaded_modules import loaded_repo_modules
-from helao.core.servers.base import Base
-from helao.helpers.server_api import HelaoFastAPI
-from helao.helpers.premodels import Action
-from helao.core.models.machine import MachineModel
-from fastapi import Body, WebSocket, WebSocketDisconnect, Request
-from fastapi.routing import APIRoute
+from fastapi import Body, Request, WebSocket, WebSocketDisconnect
 from fastapi.exception_handlers import http_exception_handler
+from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from helao.core.models.action_start_condition import ActionStartCondition as ASC
 from starlette.responses import JSONResponse, Response
 from websockets.exceptions import ConnectionClosedOK
+
+from helao.core.drivers.helao_driver import DriverPoller, DriverStatus, HelaoDriver
+from helao.core.models.action_start_condition import ActionStartCondition as ASC
+from helao.core.models.machine import MachineModel
+from helao.core.servers.base import Base
 from helao.helpers import helao_logging as logging
+from helao.helpers.eval import eval_val
+from helao.helpers.loaded_modules import loaded_repo_modules
+from helao.helpers.premodels import Action
+from helao.helpers.server_api import HelaoFastAPI
+from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -180,7 +180,8 @@ def _collect_default_params(sig: inspect.Signature) -> dict:
     whose "default" is a sentinel rather than the value the endpoint sees.
     """
     try:
-        from fastapi.params import Param as _FastAPIParam, Depends as _FastAPIDepends
+        from fastapi.params import Depends as _FastAPIDepends
+        from fastapi.params import Param as _FastAPIParam
 
         marker_types: tuple = (_FastAPIParam, _FastAPIDepends)
     except ImportError:

@@ -28,8 +28,7 @@ from typing import Any
 import uvicorn
 
 from helao.core.error import ErrorCodes
-from helao.helpers import config_loader
-from helao.helpers import helao_logging
+from helao.helpers import config_loader, helao_logging
 from helao.helpers.dispatcher import aclose_all_rpc_clients, async_private_dispatcher
 from helao.helpers.helao_logging import make_logger
 from helao.helpers.premodels import ExperimentPlanMaker, Sequence
@@ -147,8 +146,8 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     if helao_logging.LOGGER is None:
         helao_logging.LOGGER = make_logger("hexlive", log_dir=log_dir)
 
-    from helao.hexagon.app.factory import makeActionApp, makeOrchApp
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
+    from helao.hexagon.app.factory import makeActionApp, makeOrchApp
 
     sim_app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
     db_app = db_makeApp("SYNC")

@@ -47,7 +47,7 @@ import asyncio
 
 from helao.core.drivers.helao_driver import DriverStatus
 from helao.core.error import ErrorCodes
-from helao.deploy.hte.drivers.robot.pal_driver import PAL, PALJob, PalCam
+from helao.deploy.hte.drivers.robot.pal_driver import PAL, PalCam, PALJob
 
 
 def _make_pal() -> PAL:

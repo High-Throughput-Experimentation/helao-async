@@ -84,7 +84,6 @@ from harness import HARNESS_VERSION
 from harness.capture import assert_fresh, wait_for_server
 from harness.manifest import ProvenanceManifest
 from harness.treepass import PARITY_TOPS
-
 from helao.hexagon.tests.smoke.golden_capture import (
     _act_status_map,
     _run_artifacts,

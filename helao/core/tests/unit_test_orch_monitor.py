@@ -30,10 +30,10 @@ __all__ = ["orch_monitor_unit_test"]
 import asyncio
 import traceback
 
-from helao.core.tests._test_utils import TestReporter
-from helao.core.servers import orch_monitor as om
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopStatus
+from helao.core.servers import orch_monitor as om
+from helao.core.tests._test_utils import TestReporter
 
 
 class _StopLoop(Exception):

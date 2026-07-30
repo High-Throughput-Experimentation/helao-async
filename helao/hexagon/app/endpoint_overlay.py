@@ -33,8 +33,8 @@ Invariants enforced at call time, not just by convention:
 from __future__ import annotations
 
 import inspect
-from typing import Optional
 from collections.abc import Awaitable, Callable
+from typing import Optional
 
 from helao.core.servers.base_api import BaseAPI
 

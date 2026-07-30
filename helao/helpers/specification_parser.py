@@ -1,10 +1,9 @@
 """Base parser scaffolding for turning external spec files into sequences."""
 
-import os
 import glob
+import os
 
 # import inspect
-
 # from .sequence_constructor import constructor
 from .premodels import Sequence
 

@@ -3,13 +3,13 @@ any unwired port — there are no default fakes)."""
 
 import pytest
 
+from helao.hexagon.adapters.fakes import FakeClock, FakeTransport
 from helao.hexagon.app.wiring import (
     ACTION_REQUIRED,
     ORCH_REQUIRED,
     PortWiring,
     UnwiredPortError,
 )
-from helao.hexagon.adapters.fakes import FakeClock, FakeTransport
 
 
 def test_require_raises_listing_every_missing_port():

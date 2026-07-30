@@ -13,9 +13,10 @@ the transport-specific pieces: how the spec is fetched and how a single
 request is dispatched (synchronously vs. via a short-lived ``AsyncClient``).
 """
 
-import httpx
 import json
-from urllib.parse import urljoin, quote
+from urllib.parse import quote, urljoin
+
+import httpx
 from tqdm import tqdm
 
 

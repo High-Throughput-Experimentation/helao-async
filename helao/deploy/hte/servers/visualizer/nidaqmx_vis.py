@@ -1,15 +1,15 @@
-from functools import partial
 from copy import deepcopy
+from functools import partial
 
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
     CheckboxButtonGroup,
+    ColumnDataSource,
     TextInput,
 )
-from bokeh.plotting import figure
-from bokeh.palettes import Category10
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
+from bokeh.palettes import Category10
+from bokeh.plotting import figure
 
 from helao.helpers import helao_logging as logging
 

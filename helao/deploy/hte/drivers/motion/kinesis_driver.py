@@ -17,17 +17,16 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from enum import Enum
 from typing import Optional
 
-from helao.helpers.make_str_enum import make_str_enum
-
 from pylablib.devices import Thorlabs
 
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
     DriverPoller,
     DriverResponse,
-    DriverStatus,
     DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
+from helao.helpers.make_str_enum import make_str_enum
 
 
 class MoveModes(str, Enum):

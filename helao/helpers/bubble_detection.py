@@ -1,8 +1,9 @@
 """Heuristic bubble detection from open-circuit potential traces."""
 
-from scipy.signal import find_peaks
 import statistics
+
 import pandas as pd
+from scipy.signal import find_peaks
 
 from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
 

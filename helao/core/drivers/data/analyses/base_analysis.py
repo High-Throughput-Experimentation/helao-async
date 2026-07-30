@@ -1,16 +1,18 @@
+from datetime import datetime
 from typing import Optional
 from uuid import UUID
-from datetime import datetime
-from helao.core.models.analysis import (
-    AnalysisOutputModel,
-    AnalysisModel,
-    AnalysisInput,
-    AnalysisOutput,
-)
-from helao.core.models.s3locator import S3Locator
-from helao.core.models.run_use import RunUse
-from helao.helpers.time_utils import set_time
+
 from pydasher.serialization import hasher
+
+from helao.core.models.analysis import (
+    AnalysisInput,
+    AnalysisModel,
+    AnalysisOutput,
+    AnalysisOutputModel,
+)
+from helao.core.models.run_use import RunUse
+from helao.core.models.s3locator import S3Locator
+from helao.helpers.time_utils import set_time
 
 
 class BaseAnalysis:

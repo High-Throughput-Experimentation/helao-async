@@ -7,14 +7,15 @@ __all__ = [
 
 from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field
 
-
-from .orchstatus import OrchStatus, LoopStatus, LoopIntent
-from .machine import MachineModel
-from helao.helpers.premodels import Action
-from .hlostatus import HloStatus
 from helao.core.helaodict import HelaoDict
+from helao.helpers.premodels import Action
+
+from .hlostatus import HloStatus
+from .machine import MachineModel
+from .orchstatus import LoopIntent, LoopStatus, OrchStatus
 
 # additional finished categories which contain one of these
 # will be added to their own categories, sequence defines priority

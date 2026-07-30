@@ -32,11 +32,12 @@ __all__ = [
     "mount_visualizers",
 ]
 
+import asyncio
 import os
 import time
-import asyncio
-from functools import partial, lru_cache
-from importlib import import_module, util as importlib_util
+from functools import lru_cache, partial
+from importlib import import_module
+from importlib import util as importlib_util
 
 from bokeh.layouts import Spacer
 
@@ -45,9 +46,9 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 from helao.core.servers.vis import Vis
-from helao.helpers.ws_utils import WsSubscriber as Wss
 from helao.helpers import config_loader
 from helao.helpers.loaded_modules import write_loaded_modules_snapshot
+from helao.helpers.ws_utils import WsSubscriber as Wss
 
 #: Common class name every ``*_vis.py`` module exposes. The generic
 #: ``action_visualizer``/``live_visualizer`` Bokeh apps look up this attribute

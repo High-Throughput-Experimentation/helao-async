@@ -10,8 +10,8 @@ its unit.
 """
 
 from dataclasses import dataclass, field
-from typing import Union
 from enum import StrEnum
+from typing import Union
 
 
 class ControlMode(StrEnum):

@@ -12,12 +12,12 @@ __all__ = [
     "zpickle",
 ]
 
+import _pickle as cPickle
 import os
 import zipfile
 from pathlib import Path
 from typing import Union
 
-import _pickle as cPickle
 import anyio
 import pyzstd
 

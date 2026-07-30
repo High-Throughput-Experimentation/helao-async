@@ -167,9 +167,9 @@ async def test_status_wire_send_carries_composed_identity(
 ):
     """send_nonblocking_status must put the COMPOSED host/port on the wire
     (params_dict server_host/server_port), not ''/0."""
+    import helao.hexagon.adapters.legacy.status as status_mod
     from helao.core.error import ErrorCodes
     from helao.hexagon.app.factory import build_wiring
-    import helao.hexagon.adapters.legacy.status as status_mod
 
     sent = []
 
@@ -236,9 +236,9 @@ async def test_action_app_startup_binds_ws_publish_bridge(
     adapter (ACTION apps only; makeOrchApp is untouched, Q1)."""
     from types import SimpleNamespace
 
+    import helao.hexagon.app.active_graft as active_graft_mod
     from helao.helpers.multisubscriber_queue import MultisubscriberQueue
     from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
-    import helao.hexagon.app.active_graft as active_graft_mod
     from helao.hexagon.app.factory import makeActionApp
 
     class _StubGraft:

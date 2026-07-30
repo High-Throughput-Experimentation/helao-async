@@ -3,7 +3,7 @@
 import pytest
 
 from harness import HARNESS_VERSION
-from harness.manifest import ManifestMissingError, ProvenanceManifest, MANIFEST_NAME
+from harness.manifest import MANIFEST_NAME, ManifestMissingError, ProvenanceManifest
 
 
 def make_manifest() -> ProvenanceManifest:
@@ -72,6 +72,7 @@ def test_old_manifest_without_masked_meta_keys_loads_default_empty(tmp_path):
     import dataclasses
 
     from ruamel.yaml import YAML
+
     from harness.manifest import MANIFEST_NAME
 
     data = dataclasses.asdict(make_manifest())

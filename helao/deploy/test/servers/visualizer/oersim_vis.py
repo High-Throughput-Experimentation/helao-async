@@ -5,16 +5,16 @@ in-flight CP trace alongside the previous trace as the action UUID
 changes.
 """
 
-from functools import partial
 from copy import deepcopy
+from functools import partial
 
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    ColumnDataSource,
     TextInput,
 )
-from bokeh.plotting import figure
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
+from bokeh.plotting import figure
 
 from helao.helpers import helao_logging as logging
 

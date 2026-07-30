@@ -3,8 +3,8 @@ __all__ = ["makeBokehApp"]
 import os
 from socket import gethostname
 
+from bokeh.layouts import Spacer, layout
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
 
 from helao.core.servers.vis import HelaoVis
 from helao.core.servers.vis_subscriber import mount_visualizers

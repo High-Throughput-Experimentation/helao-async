@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
+from harness import HARNESS_VERSION
 from harness.hlo_pass import diff_hlo, diff_hlo_body, masked_columns_for
 from harness.manifest import ProvenanceManifest
-from harness import HARNESS_VERSION
 from harness.uuidmap import UuidMapper
 
 

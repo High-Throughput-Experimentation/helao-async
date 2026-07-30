@@ -6,6 +6,7 @@ sets the appropriate event on completion or failure.
 """
 
 import threading
+
 from ..logger import script_log
 
 abort_event = threading.Event()

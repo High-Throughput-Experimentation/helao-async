@@ -7,6 +7,6 @@ to drive LEANCAT logging sessions and timestamp annotations.
 from .commands import (
     commands_queue,
     create_session,
-    terminate_session,
     create_timestamp_annotation,
+    terminate_session,
 )

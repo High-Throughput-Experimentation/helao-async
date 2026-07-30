@@ -1,11 +1,11 @@
 """Compressing :class:`collections.deque` subclass for memory-tight queues."""
 
+import pickle
 from collections import deque
 from collections.abc import Iterator
 from typing import Any
 
 import pyzstd
-import pickle
 
 
 class zdeque(deque):

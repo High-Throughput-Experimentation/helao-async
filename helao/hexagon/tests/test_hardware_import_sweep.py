@@ -1,5 +1,7 @@
 import importlib
+
 import pytest
+
 from helao.hexagon.adapters.legacy.hardware import LegacyDriverHardwareAdapter
 from helao.hexagon.ports.hardware import HardwarePort
 
@@ -57,6 +59,7 @@ def test_kinesis_constructs_without_connecting(monkeypatch):
     Currently xfails by design — kinesis is poller-backed, so connect-in-
     __init__ may be correct rather than a violation (contested; see reason)."""
     import pylablib.devices.Thorlabs as Thorlabs
+
     from helao.deploy.hte.drivers.motion import kinesis_driver
 
     calls = []

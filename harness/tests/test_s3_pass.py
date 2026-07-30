@@ -2,13 +2,13 @@
 
 import json
 
+from harness import HARNESS_VERSION
+from harness.manifest import ProvenanceManifest
 from harness.s3_pass import (
     assert_s3_meta_rules,
     diff_s3_manifest,
     diff_s3_record,
 )
-from harness.manifest import ProvenanceManifest
-from harness import HARNESS_VERSION
 from harness.uuidmap import UuidMapper
 
 U1 = "00000000-0000-0000-0000-000000000001"

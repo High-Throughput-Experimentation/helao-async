@@ -9,8 +9,9 @@ helao.helpers.gen_uuid.gen_uuid through the composition root.
 """
 
 from collections import defaultdict
+from collections.abc import Callable
+from collections.abc import Sequence as Seq
 from typing import Optional
-from collections.abc import Callable, Sequence as Seq
 from uuid import UUID
 
 from helao.hexagon.domain.models import (

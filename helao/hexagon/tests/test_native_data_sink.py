@@ -9,9 +9,9 @@ from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.sample import LiquidSample, SampleInheritance
 from helao.hexagon.adapters.errors import UnwiredPortError
+from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
-from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.ports.data_sink import DataSinkPort
 from helao.hexagon.tests.native_fixtures import make_base, mk_active

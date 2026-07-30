@@ -10,6 +10,7 @@ Pattern contract (deployment adopters copy this, not the sim internals):
 
 from enum import StrEnum
 from typing import Union
+
 from pydantic import BaseModel, ConfigDict
 
 

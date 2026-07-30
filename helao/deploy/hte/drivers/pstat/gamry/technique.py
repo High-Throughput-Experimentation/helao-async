@@ -7,27 +7,27 @@ OCV, and RCA.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 from enum import StrEnum
+from typing import Optional
 
 from .dtaq import (
-    GamryDtaq,
-    DTAQ_CPIV,
     DTAQ_CHRONOA,
     DTAQ_CHRONOP,
-    DTAQ_RCV,
+    DTAQ_CPIV,
     DTAQ_OCV,
+    DTAQ_RCV,
     DTAQ_UNIV,
+    GamryDtaq,
 )
 from .signal import (
-    GamrySignal,
-    VSIGNAL_RAMP,
-    ISIGNAL_RAMP,
-    VSIGNAL_CONST,
     ISIGNAL_CONST,
-    VSIGNAL_ARRAY,
-    VSIGNAL_RUPDN,
+    ISIGNAL_RAMP,
     OCVSIGNAL_CONST,
+    VSIGNAL_ARRAY,
+    VSIGNAL_CONST,
+    VSIGNAL_RAMP,
+    VSIGNAL_RUPDN,
+    GamrySignal,
 )
 
 # define enums to match GamryCOM

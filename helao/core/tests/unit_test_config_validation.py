@@ -11,8 +11,8 @@ __all__ = ["config_validation_unit_test"]
 import os
 from glob import glob
 
-from helao.helpers.config_loader import HelaoConfig, ServerConfig, read_config
 from helao.core.tests._test_utils import TestReporter
+from helao.helpers.config_loader import HelaoConfig, ServerConfig, read_config
 
 
 def _repo_root() -> str:

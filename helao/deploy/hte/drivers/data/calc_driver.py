@@ -7,25 +7,26 @@ appropriate, return an ``"__insert_experiment__"`` payload for the
 calling action server to dispatch to the orchestrator.
 """
 
-import time
 import os
-import numpy as np
+import time
 from collections import defaultdict
 from copy import copy
-from scipy.signal import savgol_filter
+
+import numpy as np
 from ruamel.yaml import YAML
+from scipy.signal import savgol_filter
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
     DriverResponse,
     DriverResponseType,
     DriverStatus,
+    HelaoDriver,
 )
-from helao.helpers.premodels import Experiment
 from helao.helpers.file_mapper import FileMapper
+from helao.helpers.premodels import Experiment
 
 
 def handlenan_savgol_filter(

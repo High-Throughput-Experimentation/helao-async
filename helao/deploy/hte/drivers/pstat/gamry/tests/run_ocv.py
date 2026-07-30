@@ -7,6 +7,7 @@ period using ``TECH_OCV``, prints incoming data to stdout, and disconnects.
 
 import sys
 import time
+
 from .....drivers.pstat.gamry.driver import GamryDriver
 from .....drivers.pstat.gamry.technique import TECH_OCV
 

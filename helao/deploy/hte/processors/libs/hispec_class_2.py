@@ -5,24 +5,23 @@ calibrating, splitting and plotting linear-sweep spectroelectrochemistry
 data (DeltaOD, differential spectra, co-plots of DeltaA and CV traces).
 """
 
-from typing import Optional
-from scipy.signal import sawtooth
-
-import pandas as pd
-import numpy as np
-import os
 import json
-from pathlib import Path
-from collections import defaultdict
-import ruamel.yaml
-from typing import Union
-from tkinter import filedialog
+import os
 import tkinter as tk
-import matplotlib.pyplot as plt
+from collections import defaultdict
+from pathlib import Path
+from tkinter import filedialog
+from typing import Optional, Union
+
 import cmcrameri.cm as cmc
 import matplotlib as mpl
-from scipy.interpolate import UnivariateSpline
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import ruamel.yaml
 from scipy import signal
+from scipy.interpolate import UnivariateSpline
+from scipy.signal import sawtooth
 
 
 class SpEC:

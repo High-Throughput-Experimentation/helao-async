@@ -8,15 +8,18 @@ the :class:`CM0134` driver and :class:`O2MonExec` executor.
 __all__ = ["makeApp"]
 
 from typing import Union
+
 from fastapi import Body
-from helao.core.servers.base_api import BaseAPI
+
 from helao.core.models.sample import (
     AssemblySample,
-    LiquidSample,
     GasSample,
-    SolidSample,
+    LiquidSample,
     NoneSample,
+    SolidSample,
 )
+from helao.core.servers.base_api import BaseAPI
+
 from ...drivers.sensor.cm0134_driver import CM0134, CM0134Poller, O2MonExec
 
 

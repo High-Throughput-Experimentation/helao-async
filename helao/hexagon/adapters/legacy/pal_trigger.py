@@ -19,9 +19,9 @@ returned ``ErrorCodes.none`` immediately without waiting on any queue.
 import asyncio
 import logging
 import traceback
+from collections.abc import Callable
 from copy import deepcopy
 from typing import Optional
-from collections.abc import Callable
 
 from helao.core.error import ErrorCodes
 

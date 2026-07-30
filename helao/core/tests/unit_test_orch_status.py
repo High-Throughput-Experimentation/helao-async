@@ -28,8 +28,8 @@ from helao.core.models.server import (
     EndpointModel,
     GlobalStatusModel,
 )
-from helao.helpers.premodels import Action
 from helao.core.tests._test_utils import TestReporter
+from helao.helpers.premodels import Action
 
 
 def _make_action(server_key: str, orchestrator: MachineModel) -> Action:

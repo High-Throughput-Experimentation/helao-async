@@ -16,20 +16,20 @@ __all__ = [
 ]
 
 from copy import deepcopy
-from typing import Optional, Union, Literal, ForwardRef
 from enum import Enum
+from typing import ForwardRef, Literal, Optional, Union
+
 from pydantic import BaseModel, Field, root_validator
 
+from helao.core.helaodict import HelaoDict
 from helao.core.models.sample import (
     AssemblySample,
-    LiquidSample,
     GasSample,
-    SolidSample,
+    LiquidSample,
     NoneSample,
+    SolidSample,
     object_to_sample,
 )
-from helao.core.helaodict import HelaoDict
-
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

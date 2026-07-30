@@ -10,22 +10,23 @@ collect loop) lives in ``spec_server.py``'s ``SM303Exec``
 
 __all__ = ["SM303"]
 
+import asyncio
+import ctypes
 import os
 import time
-import ctypes
-import asyncio
 import traceback
 
 import numpy as np
 
-from helao.helpers import helao_logging as logging
-from helao.core.error import ErrorCodes
 from helao.core.drivers.helao_driver import (
-    HelaoDriver,
     DriverResponse,
-    DriverStatus,
     DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
 )
+from helao.core.error import ErrorCodes
+from helao.helpers import helao_logging as logging
+
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
 

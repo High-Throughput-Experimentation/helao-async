@@ -10,20 +10,21 @@ __all__ = ["makeApp"]
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-import time
 import asyncio
+import time
 from typing import Optional
+
+from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base_api import BaseAPI
+from helao.helpers.executor import Executor
+
 from ...drivers.motion.kinesis_driver import (
+    MOTION_STATES,
     KinesisMotor,
     KinesisPoller,
     MoveModes,
-    MOTION_STATES,
 )
-
-from helao.core.error import ErrorCodes
-from helao.helpers.executor import Executor
-from helao.core.models.hlostatus import HloStatus
 
 
 class KinesisMotorExec(Executor):

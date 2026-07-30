@@ -16,10 +16,11 @@ __all__ = [
 ]
 
 import random
-from helao.helpers.premodels import ExperimentPlanMaker
-from helao.helpers.constants import SPEC_MAP
+
 from helao.core.models.electrolyte import Electrolyte
+from helao.helpers.constants import SPEC_MAP
 from helao.helpers.lib_decorators import sequence
+from helao.helpers.premodels import ExperimentPlanMaker
 
 SEQUENCES = __all__
 

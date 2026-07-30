@@ -8,15 +8,17 @@ __all__ = [
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
+
 from pydantic import BaseModel, Field
 
-from .sample import SampleUnion
+from helao.core.helaodict import HelaoDict
+from helao.core.version import get_hlo_version
+
 from .action import ShortActionModel
 from .file import FileInfo
 from .machine import MachineModel
-from helao.core.version import get_hlo_version
-from helao.core.helaodict import HelaoDict
 from .run_use import RunUse
+from .sample import SampleUnion
 
 
 class ShortProcessModel(BaseModel, HelaoDict):

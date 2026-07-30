@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from harness.hte_collisions import scan_collisions
 
 EXP = Path("helao/deploy/hte/experiments")

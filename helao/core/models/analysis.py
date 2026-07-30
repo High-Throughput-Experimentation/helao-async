@@ -8,15 +8,17 @@ __all__ = [
 ]
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
-from pydantic import BaseModel, Field
-from datetime import datetime
 
-from .run_use import RunUse
-from .file import FileInfo
-from helao.core.version import get_hlo_version
+from pydantic import BaseModel, Field
+
 from helao.core.helaodict import HelaoDict
+from helao.core.version import get_hlo_version
+
+from .file import FileInfo
+from .run_use import RunUse
 from .s3locator import S3Locator
 
 

@@ -3,11 +3,12 @@
 __all__ = ["Vis", "HelaoVis"]
 
 from socket import gethostname
+
+from helao.core.models.machine import MachineModel
 from helao.helpers import helao_logging as logging
-from helao.helpers.server_api import HelaoBokehAPI
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.helao_logging import print_message
-from helao.core.models.machine import MachineModel
+from helao.helpers.server_api import HelaoBokehAPI
 
 LOGGER = logging.LOGGER
 

@@ -12,7 +12,7 @@ __all__ = [
 import hashlib
 import uuid
 from datetime import datetime
-from time import time, ctime
+from time import ctime, time
 from typing import Optional
 
 import ntplib

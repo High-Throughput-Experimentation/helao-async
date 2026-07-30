@@ -18,8 +18,8 @@ import asyncio
 import inspect
 import itertools
 import pathlib
-from typing import Any, Optional
 from collections.abc import Awaitable, Callable
+from typing import Any, Optional
 
 import msgspec
 import zmq

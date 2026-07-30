@@ -19,11 +19,12 @@ sys.path.append(async_root)
 sys.path.append(core_root)
 
 from helao.core.error import ErrorCodes
+from helao.helpers.config_loader import read_config
+from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.premodels import Sequence
 from helao.helpers.time_utils import gen_uuid
-from helao.helpers.dispatcher import private_dispatcher
+
 from ..sequences.OERSIM_seq import OERSIM_activelearn
-from helao.helpers.config_loader import read_config
 
 cfgd = {f"demo{i}": read_config(f"demo{i}", async_root) for i in range(2)}
 

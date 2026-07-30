@@ -36,9 +36,9 @@ strategy machinery with COM stubbed. See
 import queue
 import sys
 import threading
+from collections.abc import Callable
 from concurrent.futures import Future
 from typing import Any, Optional
-from collections.abc import Callable
 
 import numpy as np
 

@@ -8,21 +8,22 @@ values for a configured duration.
 
 __all__ = ["CM0134", "CM0134Poller", "O2MonExec"]
 
-import time
 import asyncio
+import time
+
 import serial
 
-from helao.helpers import helao_logging as logging
+from helao.core.drivers.helao_driver import (
+    DriverPoller,
+    DriverResponse,
+    DriverResponseType,
+    DriverStatus,
+    HelaoDriver,
+)
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
+from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
-from helao.core.drivers.helao_driver import (
-    HelaoDriver,
-    DriverResponse,
-    DriverStatus,
-    DriverResponseType,
-    DriverPoller,
-)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

@@ -24,10 +24,8 @@ import sys
 import traceback
 
 import helao.helpers.premodels as premodels_mod
-from helao.helpers.constants import REF_TABLE
 from helao.core.tests._test_utils import TestReporter
 from helao.deploy.hte.experiments.ECHE_exp import ECHE_sub_CA
-from helao.deploy.hte.sequences.ECHE_seq import ECHE_CV
 
 # ANEC_exp.py is NOT offline-importable on Linux (it imports
 # helao.deploy.hte.drivers.motion.galil_motion_driver -> gclib, a Windows-only
@@ -36,6 +34,8 @@ from helao.deploy.hte.sequences.ECHE_seq import ECHE_CV
 # py_compile), not exercised here. ECMS_exp.py has no such import and is used
 # below to exercise the real WE_versus dispatch behavior.
 from helao.deploy.hte.experiments.ECMS_exp import ECMS_sub_CV
+from helao.deploy.hte.sequences.ECHE_seq import ECHE_CV
+from helao.helpers.constants import REF_TABLE
 
 
 def _capture_actions(fn, **kwargs):

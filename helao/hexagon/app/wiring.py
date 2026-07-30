@@ -11,7 +11,9 @@ P1b2/P2 and join the set then).
 from dataclasses import dataclass, fields
 from typing import Optional
 
+from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
 from helao.hexagon.ports.artifact_store import ArtifactStorePort
+from helao.hexagon.ports.auxiliary import HealthPort, StatePersistencePort
 from helao.hexagon.ports.clock import ClockPort
 from helao.hexagon.ports.config import ConfigPort
 from helao.hexagon.ports.data_sink import DataSinkPort
@@ -21,8 +23,6 @@ from helao.hexagon.ports.sample_state import SampleStatePort
 from helao.hexagon.ports.status import StatusPort
 from helao.hexagon.ports.sync import SyncPort
 from helao.hexagon.ports.transport import TransportPort
-from helao.hexagon.ports.auxiliary import HealthPort, StatePersistencePort
-from helao.hexagon.adapters.errors import HexagonDeferred, UnwiredPortError
 
 __all__ = [
     "ACTION_REQUIRED",

@@ -12,19 +12,19 @@ by ``run_unit_tests.py``.
 
 __all__ = ["sample_model_unit_test"]
 
-import colorama
-from colorama import Fore, Style
 import sys
 import traceback
 
+import colorama
+from colorama import Fore, Style
 
 from helao.core.models.sample import (
-    LiquidSample,
-    GasSample,
-    SolidSample,
     AssemblySample,
+    GasSample,
+    LiquidSample,
     NoneSample,
     SampleList,
+    SolidSample,
 )
 
 colorama.init(strip=not sys.stdout.isatty())  # strip colors if stdout is redirected

@@ -4,9 +4,9 @@ The active deployment wires up ``main_log`` and ``script_log`` elsewhere;
 this module exposes :func:`setup_logger` used to create those handles.
 """
 
+import logging
 import os
 import sys
-import logging
 from datetime import datetime
 
 log_level_acquired = True

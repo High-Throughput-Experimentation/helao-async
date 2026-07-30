@@ -10,19 +10,19 @@ __all__ = ["echem_params_unit_test"]
 import sys
 import traceback
 
-from helao.helpers.constants import REF_TABLE
-from helao.core.tests._test_utils import TestReporter
 from helao.core.models.echem_params import (
-    RefType,
-    PotentialVersus,
-    WEVersus,
     BubbleGas,
-    resolve_ref_type,
-    resolve_potential_versus,
-    resolve_we_versus,
-    resolve_bubble_gas,
+    PotentialVersus,
+    RefType,
+    WEVersus,
     ref_offset,
+    resolve_bubble_gas,
+    resolve_potential_versus,
+    resolve_ref_type,
+    resolve_we_versus,
 )
+from helao.core.tests._test_utils import TestReporter
+from helao.helpers.constants import REF_TABLE
 
 
 def _raises_value_error(fn):

@@ -11,8 +11,9 @@ unaffected, it just references the imported names instead of local ones.
 """
 
 from enum import Enum
+
 from helao.core.models.sample import SampleType
-from helao.hexagon.domain.models import _cam, _positiontype, Spacingmethod
+from helao.hexagon.domain.models import Spacingmethod, _cam, _positiontype
 
 __all__ = [
     "_cam",

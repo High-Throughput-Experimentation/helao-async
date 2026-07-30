@@ -2,22 +2,20 @@ from copy import deepcopy
 from datetime import datetime
 from functools import partial
 
+import matplotlib.colors as mcolors
+from bokeh.layouts import Spacer, layout
 from bokeh.models import (
+    ColumnDataSource,
     TextInput,
 )
-from bokeh.plotting import figure
 from bokeh.models.widgets import Div
-from bokeh.layouts import layout, Spacer
-from bokeh.models import ColumnDataSource
-
+from bokeh.plotting import figure
 from matplotlib import colormaps
-import matplotlib.colors as mcolors
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import private_dispatcher

@@ -32,13 +32,12 @@ unchanged via the thin ``Base`` delegators; ``base_api.py`` itself is not
 modified by this stage.
 """
 
-from helao.helpers import helao_logging as logging
-
 import asyncio
 
 from fastapi.dependencies.utils import get_flat_params
 
 from helao.core.models.server import EndpointModel
+from helao.helpers import helao_logging as logging
 from helao.helpers.zdeque import zdeque
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

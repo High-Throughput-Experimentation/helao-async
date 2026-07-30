@@ -1,10 +1,11 @@
 """ECHEUVIS-specific HELAO loader backed by PostgreSQL + S3."""
 
 import time
-from uuid import UUID
 from typing import Optional
+from uuid import UUID
 
 import pandas as pd
+
 from helao.core.drivers.data.loaders.helao_loader import HelaoLoader
 
 LOADER: HelaoLoader = None

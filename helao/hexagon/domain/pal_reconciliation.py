@@ -37,18 +37,17 @@ import logging
 from copy import deepcopy
 from typing import Optional, Union
 
-from helao.hexagon.domain.sample_volume import update_vol
 from helao.hexagon.domain.models import (
     Action,
-    ErrorCodes,
     AssemblySample,
+    ErrorCodes,
     GasSample,
     LiquidSample,
     NoneSample,
-    PalCam,
-    PALposition,
     PalAction,
+    PalCam,
     PalMicroCam,
+    PALposition,
     SampleInheritance,
     SampleStatus,
     SampleType,
@@ -56,6 +55,7 @@ from helao.hexagon.domain.models import (
     _positiontype,
 )
 from helao.hexagon.domain.sample_state import SampleStateProtocol
+from helao.hexagon.domain.sample_volume import update_vol
 
 LOGGER = logging.getLogger(__name__)
 

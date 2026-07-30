@@ -5,8 +5,8 @@ create, update, and acknowledge ``DataRequest`` objects, and the
 ``DataRequestsClient`` wrapper around ``httpx`` that exposes them.
 """
 
-import os
 import datetime
+import os
 from enum import Enum
 from typing import Optional
 from uuid import UUID

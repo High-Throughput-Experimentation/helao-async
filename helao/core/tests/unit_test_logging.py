@@ -18,10 +18,10 @@ import tempfile
 import time
 import traceback
 from datetime import datetime
+from email.message import EmailMessage
 from logging.handlers import TimedRotatingFileHandler
 
-from email.message import EmailMessage
-
+from helao.core.tests._test_utils import TestReporter
 from helao.helpers import helao_logging as helao_log
 from helao.helpers.helao_logging import (
     ALERT_LEVEL,
@@ -35,7 +35,6 @@ from helao.helpers.helao_logging import (
     print_message,
     subject_title,
 )
-from helao.core.tests._test_utils import TestReporter
 
 
 class _CaptureHandler(logging.Handler):

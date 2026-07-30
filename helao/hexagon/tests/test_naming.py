@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 
 from helao.hexagon.domain import naming
-from helao.hexagon.domain.models import Sequence, Experiment
+from helao.hexagon.domain.models import Experiment, Sequence
 
 
 def test_meta_yml_filename_grammar():

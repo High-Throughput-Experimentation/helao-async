@@ -1,8 +1,8 @@
 """Auxiliary ports (spec §4.3.12)."""
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
-from collections.abc import Callable
 
 __all__ = [
     "HealthPort",

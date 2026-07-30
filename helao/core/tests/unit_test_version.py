@@ -14,6 +14,7 @@ import tempfile
 import traceback
 
 from helao.core import version as version_mod
+from helao.core.tests._test_utils import TestReporter
 from helao.core.version import (
     get_branch_commithash,
     get_caller_filehash,
@@ -22,7 +23,6 @@ from helao.core.version import (
     get_object_filehash,
     hlo_version,
 )
-from helao.core.tests._test_utils import TestReporter
 
 
 def version_unit_test() -> bool:

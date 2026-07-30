@@ -21,8 +21,8 @@ __all__ = ["orch_unpack_unit_test"]
 
 from types import SimpleNamespace
 
-from helao.core.tests._test_utils import TestReporter
 from helao.core.servers import orch_unpack
+from helao.core.tests._test_utils import TestReporter
 
 
 def _check_unpack_sequence_name_in_lib() -> bool:

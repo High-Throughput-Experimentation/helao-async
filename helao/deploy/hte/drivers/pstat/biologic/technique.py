@@ -8,9 +8,8 @@ technique name.
 """
 
 from dataclasses import dataclass
-from typing import Optional
-
 from enum import StrEnum
+from typing import Optional
 
 # P3a-2: the easy-biologic vendor runtime is imported lazily (see
 # `resolve_easy_class`) rather than at module import, so this registry — and

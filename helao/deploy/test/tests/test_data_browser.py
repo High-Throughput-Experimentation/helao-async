@@ -12,12 +12,10 @@ import zipfile
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
-
 from bokeh.document import Document
 
 from helao.core.models.run_dir import RunDir
-from helao.core.servers.data_browser import readers
-from helao.core.servers.data_browser import sources
+from helao.core.servers.data_browser import readers, sources
 from helao.core.servers.data_browser import state as dbstate
 
 

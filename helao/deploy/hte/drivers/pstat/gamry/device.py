@@ -10,13 +10,14 @@ mask/value pairs passed to ``SetDigitalOut`` to assert or clear each TTL line.
 
 from dataclasses import dataclass
 from enum import StrEnum
+
 from .range import (
+    Gamry_IErange_dflt,
     Gamry_IErange_IFC1010,
     Gamry_IErange_PCI4G300,
     Gamry_IErange_PCI4G750,
-    Gamry_IErange_REF600,
-    Gamry_IErange_dflt,
     Gamry_IErange_REF30K,
+    Gamry_IErange_REF600,
 )
 
 TTL_OUTPUTS = {

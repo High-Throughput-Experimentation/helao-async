@@ -30,14 +30,15 @@ Usage:
 
 __all__ = []
 
-import sys
-import os
 import asyncio
+import os
+import sys
 from glob import glob
 from importlib import import_module
-from uvicorn.config import LOGGING_CONFIG
-import uvicorn
+
 import colorama
+import uvicorn
+from uvicorn.config import LOGGING_CONFIG
 
 # pyzmq's zmq.asyncio (helao.core.rpc.zmq_rpc) requires the add_reader event-loop
 # family, which the Windows Proactor loop (the default on Windows) does not
@@ -50,8 +51,8 @@ import colorama
 _LOOP_FACTORY = asyncio.SelectorEventLoop if sys.platform == "win32" else None
 
 
-from helao.helpers import helao_logging as logging
 from helao.helpers import config_loader
+from helao.helpers import helao_logging as logging
 from helao.helpers.yml_tools import yml_load
 
 if __name__ == "__main__":

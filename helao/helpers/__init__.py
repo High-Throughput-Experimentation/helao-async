@@ -5,6 +5,7 @@ produced via :func:`aiofiles.os.wrap`.
 """
 
 import shutil
+
 from aiofiles.os import wrap
 
 async_copy = wrap(shutil.copy)

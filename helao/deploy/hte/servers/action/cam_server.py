@@ -8,15 +8,18 @@ acquisition via the :class:`AxisCamExec` executor.
 __all__ = ["makeApp"]
 
 from typing import Union
+
 from fastapi import Body
+
 from helao.core.models.sample import (
     AssemblySample,
-    LiquidSample,
     GasSample,
-    SolidSample,
+    LiquidSample,
     NoneSample,
+    SolidSample,
 )
 from helao.core.servers.base_api import BaseAPI
+
 from ...drivers.sensor.axiscam_driver import AxisCam, AxisCamExec
 
 

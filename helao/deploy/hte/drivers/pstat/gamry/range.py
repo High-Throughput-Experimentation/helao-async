@@ -9,8 +9,8 @@ to ``auto``. The ``RANGES`` dict maps mode names to the integer indices
 passed to ``SetIERange``.
 """
 
-from typing import Union
 from enum import StrEnum
+from typing import Union
 
 from helao.helpers import helao_logging as logging
 

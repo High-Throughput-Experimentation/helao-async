@@ -7,7 +7,7 @@ import ``Timer`` at module top-level without forming a
 lazy in-method import).
 """
 
-from time import time_ns, perf_counter_ns
+from time import perf_counter_ns, time_ns
 
 
 class Timer:
