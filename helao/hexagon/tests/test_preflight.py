@@ -100,16 +100,45 @@ def test_checklist_module_resolves_graft_from_legacy_module():
     assert preflight._checklist_module({"fast": "gamry_server2"}) == "gamry_server2"
 
 
+#: Deployments whose checklists live centrally, and which this public repo may
+#: name because it tracks them.
+PUBLIC_DEPLOYMENTS = ("hte", "test")
+
+
+def _a_nested_deployment_with_checklists() -> str | None:
+    """Name of any nested deployment holding in-repo checklists, else ``None``.
+
+    Discovered at runtime rather than hardcoded, for the same reason
+    ``preflight._checklist_dir`` builds its path from its argument: this repo is
+    public and must not name the private deployments nested in-tree. It also
+    makes the test honest on a machine where a different set of them (or none)
+    is checked out.
+    """
+    deploy_root = preflight.REPO_ROOT / "helao" / "deploy"
+    if not deploy_root.is_dir():
+        return None
+    for candidate in sorted(deploy_root.iterdir()):
+        if not candidate.is_dir() or candidate.name in PUBLIC_DEPLOYMENTS:
+            continue
+        if (candidate / "tests" / "checklists").is_dir():
+            return candidate.name
+    return None
+
+
 def test_checklist_dir_prefers_private_in_repo_then_central():
-    """A private deployment's checklists live in its own repo
+    """A nested deployment's checklists live in its own repo
     (helao/deploy/<dep>/tests/checklists); hte/test use the central
     helao/hexagon/tests/checklists/<dep>. Unknown/None -> None."""
     hte = preflight._checklist_dir("hte")
     assert hte is not None and hte.parts[-3:] == ("tests", "checklists", "hte")
     assert "hexagon" in hte.parts  # central location
-    priv = preflight._checklist_dir("priv")
-    if priv is not None:  # present when the priv nested repo is checked out
-        assert priv.parts[-3:] == ("priv", "tests", "checklists")
-        assert "deploy" in priv.parts and "hexagon" not in priv.parts  # in-repo
+
+    nested = _a_nested_deployment_with_checklists()
+    if nested is not None:  # only when such a nested repo is checked out
+        found = preflight._checklist_dir(nested)
+        assert found is not None
+        assert found.parts[-3:] == (nested, "tests", "checklists")
+        assert "deploy" in found.parts and "hexagon" not in found.parts  # in-repo
+
     assert preflight._checklist_dir(None) is None
     assert preflight._checklist_dir("no_such_deployment") is None

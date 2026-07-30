@@ -104,8 +104,8 @@ server to call `connect()` explicitly (like `galil_dyn_endpoints`). But
 `GamryDriver` is imported+constructed by **three** servers:
 - `helao/deploy/hte/servers/action/gamry_server2.py` (`gamry_dyn_endpoints`
   waits on `app.driver.ready` then reads `app.driver.model` — set by connect()).
-- **private** `lila/servers/action/potentiostat_server.py`
-- **private** `lila_gl/servers/potentiostat_server.py`
+- **private** `Deployment-A/servers/action/potentiostat_server.py`
+- **private** `Deployment-D/servers/potentiostat_server.py`
 All three must add an explicit `app.driver.connect()` (in their dyn_endpoints /
 startup) before touching `app.driver.model`. **Do NOT change the shared
 `GamryDriver.__init__` contract without landing the matching server changes in

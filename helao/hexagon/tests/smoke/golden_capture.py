@@ -244,7 +244,7 @@ def dispatch_action(
     the config's ``['servers'][server_key]``. ``config_prefix`` may be EITHER a
     bare prefix -- resolved against ``CONFIG_DIR`` (this module's ``configs/``
     sibling, the hte canary configs) -- OR a full path to a config file, used
-    as-is. Private deployments (mea/lila) pass their own
+    as-is. The nested private deployments pass their own
     ``tests/smoke/configs/<prefix>.yml`` full path, since their relocated
     canary configs are NOT under this parent module's ``CONFIG_DIR``. A bare
     prefix is NOT sent through ``read_config``'s bare-prefix glob -- the

@@ -19,11 +19,13 @@ ntpLastSync.txt
 pyrightconfig.json
 docs/superpowers/
 
-# --- deployments out of scope (separate nested git repos) ---
-helao/deploy/lila/
-helao/deploy/lila_gl/
-helao/deploy/mea/
-helao/deploy/priv/
-helao/deploy/test/
+# --- deployments out of scope ---
+# Only hte is in scope. Everything else under helao/deploy/ is either a
+# separate nested git repo (untracked here) or simulation-only, and is excluded
+# by wildcard rather than by name so this tracked file does not enumerate the
+# nested deployments. Negation is supported (gitignore semantics), so hte is
+# re-included after the sweep.
+helao/deploy/*/
+!helao/deploy/hte/
 
 # in-scope: helao/core, helao/helpers, helao/deploy/hte, root scripts
