@@ -117,7 +117,7 @@ Every chart HELAO's Bokeh visualizers draw has a direct counterpart. In particul
 
 **The renderer, which is what makes the binding possible:**
 
-- `xy.widget.bundled_js(which="widget"|"standalone") -> str` reads a bundled client build from `<xy package dir>/static/`. Both files ship in the wheel: `index.js` (ESM, ~411 KB) and `standalone.js` (IIFE, ~411 KB). xy's docstring is explicit that this is versioned and CDN-free for airgapped use.
+- `xy.widget.bundled_js(which="widget"|"standalone") -> str` reads a bundled client build from the `static/` directory inside the installed xy package. Both files ship in the wheel: `index.js` (ESM, ~411 KB) and `standalone.js` (IIFE, ~411 KB). xy's docstring is explicit that this is versioned and CDN-free for airgapped use.
 - `Figure.build_payload_split(px_width: Optional[int] = None) -> tuple[dict, list[memoryview]]` — a data-less JSON spec plus raw per-column binary buffers. xy documents this same split layout as serving both first paint **and streaming append**.
 - `xy.channel` exposes the wire protocol: `encode_frame`, `encode_frame_parts`, `decode_frame`, `handle_message`, `FRAME_MAGIC`, `FRAME_VERSION`, `FRAME_HEADER_SIZE`, `FRAME_ALIGNMENT`, `FrameDecodeError`, `FrameEncodeError`, `FrameLimits`, `DEFAULT_FRAME_LIMITS`, `Reply`, `DecodedFrame`, `Selection`, `normalize_window`, `SELECTION_EVENT_ID_LIMIT`, `SELECTION_EVENT_ROW_LIMIT`.
 - `xy.widget.FigureWidget` (anywidget) shows the intended contract: traits `spec` (Dict, synced) and `buffers` (Any, synced as raw binary), plus callbacks `on_hover`, `on_click`, `on_brush`, `on_select`, `on_view_change`, `on_animation_start`, `on_animation_end` wired through `ChannelCallbacks` and `handle_message`.
@@ -160,6 +160,16 @@ print("chart signature:", inspect.signature(xy.chart))
 print("build_payload_split:", inspect.signature(xy._figure.Figure.build_payload_split))
 print("bundled_js:", inspect.signature(xy.widget.bundled_js))
 
+# Enumerate rather than spot-check: the note's submodule and chart-breadth
+# lists are what Tasks 4-7 call xy by, so they must be derived from real
+# output, never transcribed by hand.
+import pkgutil
+
+print("SUBMODULES:", ",".join(
+    sorted(m.name for m in pkgutil.iter_modules(xy.__path__)
+           if not m.name.startswith("_"))))
+print("EXPORTS:", ",".join(sorted(n for n in dir(xy) if not n.startswith("_"))))
+
 for name in ("line", "scatter", "bar", "hist", "heatmap", "step", "x_axis", "y_axis"):
     print(f"xy.{name}:", hasattr(xy, name))
 
@@ -183,7 +193,9 @@ The one failure with a documented fix: if `static/index.js` is missing, the inst
 
 - [ ] **Step 4: Write the API note**
 
-Write `docs/superpowers/notes/2026-08-01-xy-api-probe.md`. Start from the "Verified findings" section above — copy it in as the body — then add a `## Probe output` section containing the **complete verbatim stdout** from Step 2, and a closing section:
+Write `docs/superpowers/notes/2026-08-01-xy-api-probe.md`. Start from the "Verified findings" section above — but **regenerate the submodule and chart-breadth lists from the `SUBMODULES:` and `EXPORTS:` lines your own probe just printed**, rather than copying those two lists across. Everything a later task calls xy by must trace to output in this note, not to prose written before it ran. If a regenerated list differs from the findings above, the probe wins: record it and report the difference.
+
+Then add a `## Probe output` section containing the **complete verbatim stdout** from Step 2, and a closing section:
 
 ```markdown
 ## Consequences for the implementation
