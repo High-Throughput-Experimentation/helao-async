@@ -197,6 +197,17 @@ def normalize_data_package(messages: list) -> tuple:
             except (TypeError, ValueError):
                 # e.g. composition strings alongside the numeric traces
                 continue
+
+        # Recorded before the numeric guard: a packet may carry no samples yet
+        # and still mark an action boundary, and that is exactly the packet a
+        # panel needs in order to reset. Dropping it would lose the transition.
+        status = _get(datamodel, "status")
+        rows.append(
+            {
+                "action_uuid": str(_get(message, "action_uuid") or ""),
+                "status": str(getattr(status, "value", status) or ""),
+            }
+        )
         if not numeric:
             continue
 
@@ -209,14 +220,6 @@ def normalize_data_package(messages: list) -> tuple:
             column.extend(values)
             column.extend([float("nan")] * (row_count - len(values)))
         emitted += row_count
-
-        status = _get(datamodel, "status")
-        rows.append(
-            {
-                "action_uuid": str(_get(message, "action_uuid") or ""),
-                "status": str(getattr(status, "value", status) or ""),
-            }
-        )
     return cols, rows
 
 
