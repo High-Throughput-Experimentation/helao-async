@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-01
 **Status:** approved, awaiting implementation plan
-**Scope of this spec:** the Reflex/xy skeleton plus the `test` deployment visualizers. The operator page is explicitly out of scope and gets its own spec.
+**Scope of this spec:** the Reflex/xy skeleton plus the `test` deployment visualizers. The standalone operator is out of scope and gets its own spec, plan, and branch, running parallel to this one once the foundation lands — see "Operator split".
 
 ## Problem
 
@@ -48,10 +48,10 @@ One honest caveat on performance: today's live visualizers cap at `max_points` 1
 | 2 | **One Reflex app, multi-page routes** per orchestration group | One process, one port, one frontend build. Running one Reflex app per config entry would mean 4 Next.js builds and 4 processes per station. |
 | 3 | **Process-wide ingest with ring buffers** | One WebSocket per action server for the whole process instead of N sessions × M servers. Decouples ingest rate from render rate. |
 | 4 | **Thin plot facade over xy** | xy is alpha. All charts call a small HELAO API; xy sits behind it, version-pinned. An upstream break touches one file, not 14. |
-| 7 | **HELAO writes the Reflex binding for xy** | `xy.reflex` does not exist at 0.0.5, but xy's ESM renderer, split spec/buffer payload, and binary channel protocol all ship in the wheel. Writing the binding is the only path that keeps live streaming *at xy's speed*; the alternatives (HTML-export embedding, or Reflex-native charts) each give up the plot-performance win that motivated the project. The binding is expected to become redundant when xy ships its own adapter — it is deliberately confined to two files so it can be deleted. |
-| 8 | **Bulk column data travels over HTTP, not Reflex state** | Reflex syncs state as JSON over its WebSocket. Pushing megabyte float arrays through that channel would forfeit exactly the performance xy exists to provide. The spec (small JSON) rides Reflex state; the binary column buffers are fetched by the browser from a HELAO backend route, straight from the ring buffer's numpy memory. |
 | 5 | **Prebuilt frontend artifact, runtime fallback to build** | Stations never invoke Node. Dev machines still get a one-command local build. |
 | 6 | **First slice = `test` deployment visualizers only** | Runs on Linux, no hardware gate, exercises both `ws_live` and `ws_data`. Verifiable without a station. |
+| 7 | **HELAO writes the Reflex binding for xy** | `xy.reflex` does not exist at 0.0.5, but xy's ESM renderer, split spec/buffer payload, and binary channel protocol all ship in the wheel. Writing the binding is the only path that keeps live streaming *at xy's speed*; the alternatives (HTML-export embedding, or Reflex-native charts) each give up the plot-performance win that motivated the project. The binding is expected to become redundant when xy ships its own adapter — it is deliberately confined to two files so it can be deleted. |
+| 8 | **Bulk column data travels over HTTP, not Reflex state** | Reflex syncs state as JSON over its WebSocket. Pushing megabyte float arrays through that channel would forfeit exactly the performance xy exists to provide. The spec (small JSON) rides Reflex state; the binary column buffers are fetched by the browser from a HELAO backend route, straight from the ring buffer's numpy memory. |
 
 ## Architecture
 
