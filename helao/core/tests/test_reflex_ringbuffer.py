@@ -54,6 +54,74 @@ def test_missing_column_in_append_fills_nan():
     assert np.isnan(snap["b"][0])
 
 
+def test_incremental_appends_wrap_and_keep_the_newest_rows():
+    """The split-write path: no single append exceeds capacity here."""
+    buf = RingBuffer(["v"], capacity=3)
+    buf.append({"v": [1.0, 2.0]})
+    buf.append({"v": [3.0, 4.0]})
+    np.testing.assert_allclose(buf.snapshot()["v"], [2.0, 3.0, 4.0])
+
+
+def test_snapshot_window_spanning_the_wrap_point():
+    buf = RingBuffer(["v"], capacity=3)
+    buf.append({"v": [1.0, 2.0]})
+    buf.append({"v": [3.0, 4.0]})
+    np.testing.assert_allclose(buf.snapshot(2)["v"], [3.0, 4.0])
+
+
+def test_repeated_small_appends_wrapping_more_than_once():
+    buf = RingBuffer(["v"], capacity=3)
+    for i in range(10):
+        buf.append({"v": [float(i)]})
+    np.testing.assert_allclose(buf.snapshot()["v"], [7.0, 8.0, 9.0])
+    assert buf.length == 3
+
+
+def test_multi_column_stays_aligned_across_a_wrap():
+    buf = RingBuffer(["a", "b"], capacity=3)
+    buf.append({"a": [1.0, 2.0], "b": [10.0, 20.0]})
+    buf.append({"a": [3.0, 4.0], "b": [30.0, 40.0]})
+    snap = buf.snapshot()
+    np.testing.assert_allclose(snap["a"], [2.0, 3.0, 4.0])
+    np.testing.assert_allclose(snap["b"], [20.0, 30.0, 40.0])
+
+
+def test_column_added_after_a_wrap_aligns_with_existing_rows():
+    buf = RingBuffer(["a"], capacity=3)
+    buf.append({"a": [1.0, 2.0]})
+    buf.append({"a": [3.0, 4.0]})  # now wrapped, _start != 0
+    buf.append({"a": [5.0], "b": [50.0]})
+    snap = buf.snapshot()
+    np.testing.assert_allclose(snap["a"], [3.0, 4.0, 5.0])
+    assert np.isnan(snap["b"][0]) and np.isnan(snap["b"][1])
+    np.testing.assert_allclose(snap["b"][2:], [50.0])
+
+
+def test_a_rejected_append_leaves_the_column_set_untouched():
+    """Validation precedes mutation: no phantom column from a failed append."""
+    buf = RingBuffer(["v"], capacity=5)
+    with pytest.raises(ValueError):
+        buf.append({"v": [1.0], "bad": ["not a number"]})
+    assert buf.columns == ["v"]
+    assert buf.length == 0
+
+
+def test_a_rejected_ragged_append_leaves_the_column_set_untouched():
+    buf = RingBuffer(["v"], capacity=5)
+    with pytest.raises(ValueError):
+        buf.append({"v": [1.0, 2.0], "other": [1.0]})
+    assert buf.columns == ["v"]
+    assert buf.length == 0
+
+
+def test_rowbuffer_returns_copies_so_callers_cannot_corrupt_it():
+    rows = RowBuffer(maxlen=2)
+    rows.append({"i": 1})
+    rows.rows()[0]["i"] = 999
+    rows.latest()["i"] = 999  # type: ignore[index]
+    assert rows.rows() == [{"i": 1}]
+
+
 def test_ragged_append_raises():
     buf = RingBuffer(["a", "b"], capacity=10)
     with pytest.raises(ValueError):
