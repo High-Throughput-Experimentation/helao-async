@@ -316,6 +316,74 @@ def test_missing_column_in_append_fills_nan():
     assert np.isnan(snap["b"][0])
 
 
+def test_incremental_appends_wrap_and_keep_the_newest_rows():
+    """The split-write path: no single append exceeds capacity here."""
+    buf = RingBuffer(["v"], capacity=3)
+    buf.append({"v": [1.0, 2.0]})
+    buf.append({"v": [3.0, 4.0]})
+    np.testing.assert_allclose(buf.snapshot()["v"], [2.0, 3.0, 4.0])
+
+
+def test_snapshot_window_spanning_the_wrap_point():
+    buf = RingBuffer(["v"], capacity=3)
+    buf.append({"v": [1.0, 2.0]})
+    buf.append({"v": [3.0, 4.0]})
+    np.testing.assert_allclose(buf.snapshot(2)["v"], [3.0, 4.0])
+
+
+def test_repeated_small_appends_wrapping_more_than_once():
+    buf = RingBuffer(["v"], capacity=3)
+    for i in range(10):
+        buf.append({"v": [float(i)]})
+    np.testing.assert_allclose(buf.snapshot()["v"], [7.0, 8.0, 9.0])
+    assert buf.length == 3
+
+
+def test_multi_column_stays_aligned_across_a_wrap():
+    buf = RingBuffer(["a", "b"], capacity=3)
+    buf.append({"a": [1.0, 2.0], "b": [10.0, 20.0]})
+    buf.append({"a": [3.0, 4.0], "b": [30.0, 40.0]})
+    snap = buf.snapshot()
+    np.testing.assert_allclose(snap["a"], [2.0, 3.0, 4.0])
+    np.testing.assert_allclose(snap["b"], [20.0, 30.0, 40.0])
+
+
+def test_column_added_after_a_wrap_aligns_with_existing_rows():
+    buf = RingBuffer(["a"], capacity=3)
+    buf.append({"a": [1.0, 2.0]})
+    buf.append({"a": [3.0, 4.0]})  # now wrapped, _start != 0
+    buf.append({"a": [5.0], "b": [50.0]})
+    snap = buf.snapshot()
+    np.testing.assert_allclose(snap["a"], [3.0, 4.0, 5.0])
+    assert np.isnan(snap["b"][0]) and np.isnan(snap["b"][1])
+    np.testing.assert_allclose(snap["b"][2:], [50.0])
+
+
+def test_a_rejected_append_leaves_the_column_set_untouched():
+    """Validation precedes mutation: no phantom column from a failed append."""
+    buf = RingBuffer(["v"], capacity=5)
+    with pytest.raises(ValueError):
+        buf.append({"v": [1.0], "bad": ["not a number"]})
+    assert buf.columns == ["v"]
+    assert buf.length == 0
+
+
+def test_a_rejected_ragged_append_leaves_the_column_set_untouched():
+    buf = RingBuffer(["v"], capacity=5)
+    with pytest.raises(ValueError):
+        buf.append({"v": [1.0, 2.0], "other": [1.0]})
+    assert buf.columns == ["v"]
+    assert buf.length == 0
+
+
+def test_rowbuffer_returns_copies_so_callers_cannot_corrupt_it():
+    rows = RowBuffer(maxlen=2)
+    rows.append({"i": 1})
+    rows.rows()[0]["i"] = 999
+    rows.latest()["i"] = 999
+    assert rows.rows() == [{"i": 1}]
+
+
 def test_ragged_append_raises():
     buf = RingBuffer(["a", "b"], capacity=10)
     with pytest.raises(ValueError):
@@ -466,7 +534,9 @@ class RingBuffer:
 
         Raises:
             ValueError: If the sequences are not all the same length, or a
-                value is not coercible to float64.
+                value is not coercible to float64. Validation happens before
+                any state is touched, so a rejected append leaves the buffer
+                exactly as it was — including its column set.
         """
         if not cols:
             return
@@ -481,20 +551,23 @@ class RingBuffer:
         if n == 0:
             return
 
-        self.ensure_columns(cols)
+        # Validate and coerce everything BEFORE touching any state. A partial
+        # append is worse than a rejected one: without this ordering, a bad
+        # value leaves its column registered in the schema forever even though
+        # no row was written.
+        incoming = {}
+        for name, values in cols.items():
+            try:
+                incoming[name] = np.asarray(values, dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"column '{name}' is not numeric: {exc}") from exc
 
-        block = {}
-        for name in self._cols:
-            if name in cols:
-                try:
-                    arr = np.asarray(cols[name], dtype=np.float64)
-                except (TypeError, ValueError) as exc:
-                    raise ValueError(
-                        f"column '{name}' is not numeric: {exc}"
-                    ) from exc
-            else:
-                arr = np.full(n, np.nan, dtype=np.float64)
-            block[name] = arr
+        self.ensure_columns(incoming)
+
+        block = {
+            name: incoming.get(name, np.full(n, np.nan, dtype=np.float64))
+            for name in self._cols
+        }
 
         # An append larger than capacity can only keep its own tail.
         if n >= self.capacity:
@@ -573,12 +646,16 @@ class RowBuffer:
         self._rows.append(dict(row))
 
     def rows(self) -> list:
-        """Return retained rows, oldest first."""
-        return list(self._rows)
+        """Return copies of the retained rows, oldest first.
+
+        Copies, so a caller mutating a returned row cannot corrupt the buffer —
+        matching :meth:`append`, which copies on the way in.
+        """
+        return [dict(r) for r in self._rows]
 
     def latest(self):
-        """Return the most recent row, or ``None`` when empty."""
-        return self._rows[-1] if self._rows else None
+        """Return a copy of the most recent row, or ``None`` when empty."""
+        return dict(self._rows[-1]) if self._rows else None
 
     def clear(self) -> None:
         """Drop all rows."""
@@ -595,7 +672,7 @@ class RowBuffer:
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ringbuffer.py -v
 ```
 
-Expected: 13 passed.
+Expected: 21 passed.
 
 - [ ] **Step 5: Format and commit**
 
