@@ -2930,8 +2930,11 @@ git commit -m "feat(reflex): add the xy Reflex binding and plot facade"
 
 import pytest
 
+from types import SimpleNamespace
+
 from helao.core.servers.reflex.state import (
     ActionVisState,
+    apply_tick,
     LiveVisState,
     VisPanelState,
     make_panel_state,
@@ -2985,6 +2988,78 @@ def test_input_handlers_use_the_names_the_panels_bind():
         assert hasattr(VisPanelState, name), f"missing handler '{name}'"
     assert not hasattr(VisPanelState, "set_window_points")
     assert not hasattr(VisPanelState, "set_update_rate")
+
+
+class _StubIngest:
+    """Minimal stand-in for WsIngest: only what apply_tick touches."""
+
+    def __init__(self, state="live", error=None):
+        self.status = SimpleNamespace(state=state, error=error)
+
+
+class _StubPanel:
+    """Stand-in for a panel state; rx.State cannot be built outside an app."""
+
+    def __init__(self, pull_raises=None):
+        self.connection = ""
+        self.error = ""
+        self.pulled = []
+        self._raises = pull_raises
+
+    def pull(self, ingest):
+        if self._raises is not None:
+            raise self._raises
+        self.pulled.append(ingest)
+
+
+def test_apply_tick_reports_a_missing_ingest_without_raising():
+    panel = _StubPanel()
+    apply_tick(panel, None, server_key="SIM", ws_path="ws_live")
+    assert panel.connection == "unavailable"
+    assert "SIM" in panel.error and "ws_live" in panel.error
+    assert panel.pulled == []
+
+
+def test_apply_tick_mirrors_the_ingest_status():
+    panel = _StubPanel()
+    ingest = _StubIngest(state="live")
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    assert panel.connection == "live"
+    assert panel.error == ""
+    assert panel.pulled == [ingest]
+
+
+def test_apply_tick_surfaces_an_ingest_error_string():
+    panel = _StubPanel()
+    apply_tick(
+        panel,
+        _StubIngest(state="reconnecting", error="boom"),
+        server_key="SIM",
+        ws_path="ws_live",
+    )
+    assert panel.connection == "reconnecting"
+    assert panel.error == "boom"
+
+
+def test_apply_tick_catches_a_failing_pull_so_the_loop_survives():
+    """One bad tick must mark the panel, not kill the render loop."""
+    panel = _StubPanel(pull_raises=ValueError("bad column"))
+    apply_tick(panel, _StubIngest(), server_key="SIM", ws_path="ws_live")
+    assert "ValueError" in panel.error and "bad column" in panel.error
+
+
+def test_make_panel_state_keys_the_cache_on_the_base_class_not_its_name():
+    """Two modules may define same-named bases; a name key would collide."""
+
+    class LiveVisState(VisPanelState):  # deliberately shadows the real name
+        ws_path: str = "ws_live"
+        ws_path_default: str = "ws_live"
+
+    from helao.core.servers.reflex import state as state_mod
+
+    real = make_panel_state("dup_panel", "SIM", state_mod.LiveVisState, "ws_live")
+    impostor = make_panel_state("dup_panel", "SIM", LiveVisState, "ws_live")
+    assert real is not impostor
 
 
 def test_generated_state_class_is_constructible():
@@ -3044,6 +3119,39 @@ MIN_UPDATE_RATE = 0.01
 DEFAULT_UPDATE_RATE = 0.5
 
 
+def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
+    """Apply one poll of ``ingest`` onto ``target``.
+
+    Lifted out of :meth:`VisPanelState.render_loop` so the part that can be
+    wrong is reachable without Reflex's app machinery: ``target`` is anything
+    with ``connection`` and ``error`` attributes and a ``pull`` method, so tests
+    drive it with a stub. The loop is then only locking and cadence.
+
+    A failing ``pull`` is caught here rather than by the caller, so one bad tick
+    marks the panel and the loop keeps its cadence instead of dying.
+
+    Args:
+        target: The panel state (or a stub) being updated.
+        ingest: The panel's :class:`WsIngest`, or ``None`` when unavailable.
+        server_key: Server this panel reads, for the message.
+        ws_path: ``ws_live`` or ``ws_data``, for the message.
+    """
+    if ingest is None:
+        target.connection = "unavailable"
+        target.error = (
+            f"no ingest for '{server_key}' ({ws_path}); "
+            "is it declared in the config?"
+        )
+        return
+    target.connection = ingest.status.state
+    target.error = ingest.status.error or ""
+    try:
+        target.pull(ingest)
+    except Exception as exc:
+        target.error = f"{type(exc).__name__}: {exc}"
+        LOGGER.warning(f"reflex panel pull failed for {server_key}: {exc}")
+
+
 class VisPanelState(rx.State):
     """Base state for a visualizer panel bound to one ingest target.
 
@@ -3065,6 +3173,11 @@ class VisPanelState(rx.State):
     connection: str = "connecting"
     error: str = ""
     running: bool = False
+    #: Bumped on every loop start and every stop. A loop keeps its own token and
+    #: exits as soon as the two diverge. A single shared boolean cannot do this:
+    #: it is asked both "is a loop active" and "should THIS invocation continue",
+    #: and those answers differ during a stop-then-immediate-restart.
+    loop_generation: int = 0
 
     # Class-level defaults readable without instantiating a State. Reflex
     # manages the vars above per session; these mirror the bound values so
@@ -3143,41 +3256,37 @@ class VisPanelState(rx.State):
         cadence with it the way ``VisSubscriber.IOloop_data`` does.
         """
         async with self:
-            if self.running:
-                return
+            self.loop_generation += 1
+            token = self.loop_generation
             self.running = True
         try:
             while True:
                 async with self:
-                    if not self.running:
+                    # Not `if not self.running`: `async with self` refetches
+                    # state, so a loop that slept through a stop-then-restart
+                    # would see the *new* loop's True and both would run.
+                    if self.loop_generation != token:
                         return
                     ingest = self.ingest()
-                    if ingest is None:
-                        self.connection = "unavailable"
-                        self.error = (
-                            f"no ingest for '{self.server_key or self.server_key_default}' "
-                            f"({self.ws_path}); is it declared in the config?"
-                        )
-                    else:
-                        self.connection = ingest.status.state
-                        self.error = ingest.status.error or ""
-                        try:
-                            self.pull(ingest)
-                        except Exception as exc:
-                            self.error = f"{type(exc).__name__}: {exc}"
-                            LOGGER.warning(
-                                f"reflex panel pull failed for "
-                                f"{self.server_key_default}: {exc}"
-                            )
+                    apply_tick(
+                        self,
+                        ingest,
+                        server_key=self.server_key or self.server_key_default,
+                        ws_path=self.ws_path,
+                    )
                     interval = self.update_rate
                 await asyncio.sleep(interval)
         finally:
             async with self:
-                self.running = False
+                # Only the current loop may clear the flag; a superseded one
+                # exiting must not report the live loop as stopped.
+                if self.loop_generation == token:
+                    self.running = False
 
     @rx.event
     def stop_loop(self):
         """Ask the render loop to exit on its next tick."""
+        self.loop_generation += 1
         self.running = False
 
 
@@ -3215,7 +3324,10 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
     Returns:
         type: A ``base`` subclass with ``server_key`` and ``ws_path`` bound.
     """
-    cache_key = (module_name, server_key, base.__name__)
+    # Keyed on the base class itself, not its __name__: two panel modules
+    # can each define a same-named subclass, and a name collision would
+    # silently hand one panel another's state class.
+    cache_key = (module_name, server_key, base)
     if cache_key in _STATE_CACHE:
         return _STATE_CACHE[cache_key]
     safe = "".join(c if c.isalnum() else "_" for c in f"{module_name}_{server_key}")
@@ -3247,7 +3359,7 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 9 passed.
+Expected: 14 passed.
 
 - [ ] **Step 5: Format and commit**
 
