@@ -928,6 +928,78 @@ def test_normalize_data_package_skips_non_numeric_columns():
     assert "atfracs" not in cols
 
 
+def test_normalize_data_package_records_a_packet_with_no_numeric_data():
+    """An action boundary can arrive before any samples do.
+
+    normalize() has the equivalent guard (a row-only message still consumes a
+    row); without it here, the packet marking a new action_uuid is dropped and
+    the panel never learns the action changed.
+    """
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    action = uuid.uuid4()
+    pkg = DataPackageModel(
+        action_uuid=action,
+        action_name="measure_cp",
+        datamodel=DataModel(data={uuid.uuid4(): {"atfracs": ["Co0.5"]}}, errors=[]),
+    )
+    cols, rows = normalize_data_package([pkg])
+    assert cols == {}
+    assert rows and rows[0]["action_uuid"] == str(action)
+
+
+@pytest.mark.asyncio
+async def test_ws_data_packets_reach_the_buffer_through_a_real_subscriber():
+    """The seam both Critical defects lived in, end to end.
+
+    Every other fixture writes into .buffer/.raw by hand, which is precisely why
+    a normalizer that silently dropped every ws_data packet passed a green
+    suite. This drives a real pickled DataPackageModel over a socket, through
+    WsIngest's drain loop, into the ring buffer.
+    """
+    import pickle
+    import uuid
+
+    import numpy as np
+    import pyzstd
+    import websockets
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="measure_cp",
+        datamodel=DataModel(
+            data={uuid.uuid4(): {"t_s": [0.1, 0.2, 0.3], "erhe_v": [1.2, 1.3, 1.4]}},
+            errors=[],
+        ),
+    )
+
+    async def handler(ws):
+        await ws.send(pyzstd.compress(pickle.dumps(pkg)))
+        await asyncio.sleep(1.0)
+
+    async with websockets.serve(handler, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        ing = WsIngest("127.0.0.1", port, "")
+        # The empty path above is the test server's route; select the ws_data
+        # normalizer explicitly, since selection is keyed on ws_path.
+        ing._normalize = normalize_data_package
+        ing.start()
+        try:
+            for _ in range(200):
+                if ing.buffer.length >= 3:
+                    break
+                await asyncio.sleep(0.02)
+            snap = ing.buffer.snapshot()
+            np.testing.assert_allclose(snap["t_s"], [0.1, 0.2, 0.3])
+            np.testing.assert_allclose(snap["erhe_v"], [1.2, 1.3, 1.4])
+        finally:
+            await ing.stop()
+
+
 def test_normalize_data_package_tolerates_junk():
     assert normalize_data_package(["nope", {}, {"datamodel": None}]) == ({}, [])
 
@@ -1277,6 +1349,17 @@ def normalize_data_package(messages: list) -> tuple:
             except (TypeError, ValueError):
                 # e.g. composition strings alongside the numeric traces
                 continue
+
+        # Recorded before the numeric guard: a packet may carry no samples yet
+        # and still mark an action boundary, and that is exactly the packet a
+        # panel needs in order to reset. Dropping it would lose the transition.
+        status = _get(datamodel, "status")
+        rows.append(
+            {
+                "action_uuid": str(_get(message, "action_uuid") or ""),
+                "status": str(getattr(status, "value", status) or ""),
+            }
+        )
         if not numeric:
             continue
 
@@ -1289,14 +1372,6 @@ def normalize_data_package(messages: list) -> tuple:
             column.extend(values)
             column.extend([float("nan")] * (row_count - len(values)))
         emitted += row_count
-
-        status = _get(datamodel, "status")
-        rows.append(
-            {
-                "action_uuid": str(_get(message, "action_uuid") or ""),
-                "status": str(getattr(status, "value", status) or ""),
-            }
-        )
     return cols, rows
 
 
@@ -1522,7 +1597,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 29 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
+Expected: 31 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
