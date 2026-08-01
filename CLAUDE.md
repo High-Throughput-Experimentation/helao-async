@@ -48,7 +48,7 @@ Stations never need Node. Build the frontend bundle on a development machine and
 
 ```
 conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; copy_client_asset('helao/core/servers/reflex/_app/assets')"
-cd helao/core/servers/reflex/_app && reflex init --name helao_ui && reflex export --frontend-only
+cd helao/core/servers/reflex/_app && reflex init --name helao_ui --no-agents && reflex export --frontend-only
 # place the export at <repo_root>/.reflex-bundle/helao_ui/   (gitignored)
 ```
 

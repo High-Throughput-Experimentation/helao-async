@@ -50,5 +50,12 @@ C:*
 # Generated artifact, ~411 KB — never tracked.
 helao/core/servers/reflex/_app/assets/xy-client.js
 
-# Reflex's own build directory.
+# Reflex's own build directory and the artifacts `reflex init` generates.
+# AGENTS.md/CLAUDE.md are excluded deliberately: a nested CLAUDE.md is loaded as
+# project instructions, and a generated one would inject unrelated guidance.
 helao/core/servers/reflex/_app/.web/
+helao/core/servers/reflex/_app/.gitignore
+helao/core/servers/reflex/_app/AGENTS.md
+helao/core/servers/reflex/_app/CLAUDE.md
+helao/core/servers/reflex/_app/reflex.lock/
+helao/core/servers/reflex/_app/requirements.txt
