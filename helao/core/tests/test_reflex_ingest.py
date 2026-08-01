@@ -186,6 +186,37 @@ async def test_wsingest_recovers_after_the_server_restarts():
 
 
 @pytest.mark.asyncio
+async def test_stop_propagates_a_cancellation_of_stop_itself():
+    """Tearing down our own tasks is not a failure; being cancelled is.
+
+    Guards a subtle wrong fix: discriminating on ``task.cancelled()`` cannot
+    work here, because ``stop()`` cancels the tasks itself before awaiting them,
+    so that flag reads ``True`` no matter who cancelled the caller.
+    """
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.start()
+
+    async def stubborn():
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.3)  # slow to finish cancelling
+            raise
+
+    assert ing._task is not None
+    ing._task.cancel()
+    ing._task = asyncio.create_task(stubborn())
+    await asyncio.sleep(0.05)
+
+    stopper = asyncio.create_task(ing.stop())
+    await asyncio.sleep(0.05)  # let stop() reach its await
+    stopper.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stopper
+    assert ing._task is None and ing._wss is None
+
+
+@pytest.mark.asyncio
 async def test_wsingest_stop_is_idempotent():
     ing = WsIngest("127.0.0.1", 1, "")
     ing.start()
