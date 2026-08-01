@@ -719,6 +719,7 @@ git commit -m "feat(reflex): add RingBuffer and RowBuffer for live plot data"
 
 import asyncio
 import pickle
+import time
 
 import numpy as np
 import pyzstd
@@ -1002,6 +1003,23 @@ async def test_ws_data_packets_reach_the_buffer_through_a_real_subscriber():
 
 def test_normalize_data_package_tolerates_junk():
     assert normalize_data_package(["nope", {}, {"datamodel": None}]) == ({}, [])
+
+
+@pytest.mark.asyncio
+async def test_status_goes_reconnecting_when_the_stream_goes_stale():
+    """The spec sells this badge as the fix for Bokeh's silently-dead feed."""
+    ing = WsIngest("127.0.0.1", 1, "ws_live", stale_after=0.05, drain_interval=0.01)
+    ing.status.state = "live"
+    ing.status.last_epoch = time.time() - 1.0
+    ing.start()
+    try:
+        for _ in range(200):
+            if ing.status.state == "reconnecting":
+                break
+            await asyncio.sleep(0.02)
+        assert ing.status.state == "reconnecting"
+    finally:
+        await ing.stop()
 
 
 def test_wsingest_selects_its_normalizer_by_ws_path():
@@ -1334,6 +1352,15 @@ def normalize_data_package(messages: list) -> tuple:
         if not isinstance(data, dict):
             continue
 
+        if len(data) > 1:
+            # Columns from several file connections are merged by name below,
+            # which silently interleaves what may be unrelated timebases. Warn
+            # rather than fix: oersim publishes one connection per packet, but
+            # the hte deployment is far likelier to hit this.
+            LOGGER.warning(
+                f"ws_data packet carries {len(data)} file connections; "
+                "their columns are merged by name and may interleave"
+            )
         pending: dict = {}
         for columns in data.values():
             if not isinstance(columns, dict):
@@ -1597,7 +1624,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 31 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
+Expected: 32 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
@@ -3586,11 +3613,28 @@ class VisPanelState(rx.State):
                 if may_clear_running(self.loop_generation, token):
                     self.running = False
 
+    def panel_key(self) -> str:
+        """Buffer-store key for this panel *in this browser session*.
+
+        Subclasses override. Must include the session token: the store keeps one
+        frame per key, while the version counter is per-session state, so a
+        process-wide key lets two open tabs overwrite each other's frames and
+        404 each other into a frozen chart.
+        """
+        return ""
+
     @rx.event
     def stop_loop(self):
-        """Ask the render loop to exit on its next tick."""
+        """Ask the render loop to exit on its next tick, and release buffers."""
         self.loop_generation += 1
         self.running = False
+        key = self.panel_key()
+        if key:
+            # Local import: plots imports the xy binding, and state is imported
+            # by app before plots is needed.
+            from helao.core.servers.reflex import plots
+
+            plots.STORE.drop(key)
 
 
 class LiveVisState(VisPanelState):
@@ -3977,6 +4021,7 @@ __all__ = [
 ]
 
 import contextlib
+import os
 from dataclasses import dataclass
 
 import reflex as rx
@@ -4319,11 +4364,29 @@ def build_app(world_cfg: dict, server_key: str):
 
 
 def _build_from_global_config():
-    """Build the app from the installed global config, if there is one."""
+    """Build the app from the installed global config, loading it if needed.
+
+    ``reflex_launcher`` spawns ``reflex run --backend-only`` as a *child*
+    process, and ``reflex export`` runs in its own process too. Both import this
+    module fresh, where ``config_loader.CONFIG`` is ``None`` -- it is installed
+    only in the launcher's own process. Without reading ``HELAO_REFLEX_CONFIG``
+    here, both build a bare ``rx.App()`` with zero pages: the backend serves
+    nothing, and the exported bundle ships no routes at all while still looking
+    plausible, because assets are copied verbatim regardless of page content.
+    """
     cfg = config_loader.CONFIG
     if not cfg:
+        conf_arg = os.environ.get("HELAO_REFLEX_CONFIG")
+        if conf_arg:
+            cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
+            config_loader.install_global_config(cfg_dict)
+            cfg = config_loader.CONFIG
+    if not cfg:
+        LOGGER.warning(
+            "no HELAO config available (HELAO_REFLEX_CONFIG unset and none "
+            "installed); building an empty app with no routes"
+        )
         return rx.App()
-    import os
 
     key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "")
     if not key:
@@ -4496,11 +4559,28 @@ def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
     assert cols["series"] == {}
 
 
-def test_panel_id_is_stable_across_calls():
-    from helao.deploy.test.servers.reflex import wssim_panel
+def test_panel_id_is_stable_per_session_and_distinct_across_sessions():
+    """The earlier version of this test asserted the defect.
 
-    assert wssim_panel.panel_id("SIM") == wssim_panel.panel_id("SIM")
-    assert wssim_panel.panel_id("SIM") != wssim_panel.panel_id("OTHER")
+    It required panel_id to depend on server_key alone, which is exactly what
+    let two browser tabs share a buffer-store key: the store holds one frame per
+    key while the version counter is per-session state, so each tab 404s the
+    other into a permanently frozen chart with a "live" badge.
+    """
+    from helao.deploy.test.servers.reflex import wssim_panel as w
+
+    assert w.panel_id("SIM", "tok-a") == w.panel_id("SIM", "tok-a")
+    assert w.panel_id("SIM", "tok-a") != w.panel_id("OTHER", "tok-a")
+    assert w.panel_id("SIM", "tok-a") != w.panel_id("SIM", "tok-b")
+
+
+def test_every_panel_scopes_its_buffer_key_by_session():
+    from importlib import import_module
+
+    for name in PANEL_MODULES:
+        mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+        assert mod.panel_id("SIM", "tok-a") != mod.panel_id("SIM", "tok-b"), name
+        assert hasattr(mod.STATE_BASE, "panel_key"), name
 
 
 def test_gpsim_histograms_are_extracted_from_raw_batches():
@@ -4575,6 +4655,44 @@ def test_gpsim_table_includes_the_numeric_columns():
     assert rows[0][4] == "orch0"
 
 
+def test_gpsim_table_does_not_re_append_the_same_batch():
+    """pull() runs on a timer; the driver publishes per acquisition.
+
+    Without a watermark the newest raw batch is re-appended every tick and the
+    "Last 20 acquisitions" table collapses to one row repeated.
+    """
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.raw.append(
+        [
+            {
+                "plate_id": ([4001], 100.0),
+                "step": ([7], 100.0),
+                "frac_acquired": ([0.42], 100.0),
+                "last_acquisition": (["Co0.5-Ni0.5"], 100.0),
+                "orchestrator": (["orch0"], 100.0),
+            }
+        ]
+    )
+    ing.status.message_count = 1
+
+    class _P:
+        last_table_count = -1
+        table_rows: list = []
+
+    panel = _P()
+    for _ in range(5):  # five render ticks, one published batch
+        count = ing.status.message_count
+        if count != panel.last_table_count:
+            panel.last_table_count = count
+            panel.table_rows = (
+                panel.table_rows + gpsim_panel.extract_table_rows(ing)
+            )[-20:]
+    assert len(panel.table_rows) == 1
+
+
 def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():
     from helao.core.servers.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
@@ -4638,12 +4756,15 @@ WS_PATH = "ws_live"
 X_COLUMN = "epoch"
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel.
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
 
-    Must not vary across renders: a shifting id would orphan store entries.
+    Stable across renders -- a shifting id orphans store entries -- but scoped
+    per session, because the store holds one frame per key while the version
+    counter lives in per-session state. Two tabs sharing a key overwrite each
+    other and 404 each other into a permanently frozen chart.
     """
-    return f"wssim-{server_key}"
+    return f"wssim-{server_key}-{session_token}"
 
 
 def extract(ingest, window: int) -> dict:
@@ -4671,6 +4792,10 @@ class _State(LiveVisState):
     version: int = 0
     table_rows: list = []
 
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
+
     def pull(self, ingest) -> None:
         """Recompute the chart payload and the latest-value table."""
         cols = extract(ingest, self.window_points)
@@ -4680,7 +4805,7 @@ class _State(LiveVisState):
             cols["series"],
             x_label="Time (HH:MM:SS)",
             y_label="value",
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec
@@ -4772,9 +4897,14 @@ WS_PATH = "ws_data"
 X_COLUMN = "t_s"
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel."""
-    return f"oersim-{server_key}"
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
+
+    Scoped per session: the store holds one frame per key while the version
+    counter is per-session state, so a shared key lets two tabs 404 each other
+    into a frozen chart.
+    """
+    return f"oersim-{server_key}-{session_token}"
 
 
 def extract(ingest, window: int) -> dict:
@@ -4805,6 +4935,10 @@ class _State(ActionVisState):
     version: int = 0
     action_uuid: str = ""
 
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
+
     def pull(self, ingest) -> None:
         """Recompute the chart payload from the trailing window."""
         cols = extract(ingest, self.window_points)
@@ -4815,7 +4949,7 @@ class _State(ActionVisState):
             x_label="t (s)",
             y_label="value",
             x_is_epoch=False,
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec
@@ -4904,9 +5038,14 @@ TABLE_COLUMNS = [
 ]
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel."""
-    return f"gpsim-{server_key}"
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
+
+    Scoped per session: the store holds one frame per key while the version
+    counter is per-session state, so a shared key lets two tabs 404 each other
+    into a frozen chart.
+    """
+    return f"gpsim-{server_key}-{session_token}"
 
 
 def extract_table_rows(ingest) -> list:
@@ -4992,6 +5131,16 @@ class _State(LiveVisState):
     #: per-plate dict for the same reason; without it the chart flickers between
     #: plates instead of showing them together.
     hist_samples: dict = {}
+    #: message_count at the last table append. extract_table_rows reads the
+    #: newest raw batch, but pull() runs on a timer while the driver publishes
+    #: per acquisition — without a watermark the same batch is re-appended every
+    #: tick and "Last 20 acquisitions" collapses to one row repeated. The Bokeh
+    #: original streamed once per websocket batch, being event-driven.
+    last_table_count: int = -1
+
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
         """Recompute the histogram payload and the last 20 acquisition rows."""
@@ -5005,12 +5154,15 @@ class _State(LiveVisState):
             value_range=HIST_RANGE,
             x_label="Eta (V vs O2/H2O)",
             y_label="density",
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
-        self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
+        count = ingest.status.message_count
+        if count != self.last_table_count:
+            self.last_table_count = count
+            self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
 
 
 STATE_BASE = _State
@@ -5070,7 +5222,7 @@ def build(server_key: str, state_cls):
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 38 passed (18 from Task 5, 20 new — the three parametrized tests contribute three cases each).
+Expected: 40 passed (18 from Task 5, 22 new — the three parametrized tests contribute three cases each).
 
 - [ ] **Step 5: Format and commit**
 
