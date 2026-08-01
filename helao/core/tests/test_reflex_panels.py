@@ -255,6 +255,65 @@ def test_gpsim_histograms_are_extracted_from_raw_batches():
     assert len(hists["4001 predicted"]) == 3
 
 
+def test_oersim_plots_t_s_as_x_not_epoch():
+    """ws_data packets carry no epoch column; looking for one plots nothing."""
+    import numpy as np
+
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import oersim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_data")
+    ing.buffer.append({"t_s": [0.1, 0.2], "erhe_v": [1.2, 1.3]})
+    cols = oersim_panel.extract(ing, window=10)
+    np.testing.assert_allclose(cols["x"], [0.1, 0.2])
+    assert "erhe_v" in cols["series"]
+    assert "t_s" not in cols["series"]
+
+
+def test_oersim_surfaces_the_streamed_action_uuid():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import oersim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_data")
+    ing.rows.append({"action_uuid": "abc-123", "status": "active"})
+    assert oersim_panel.extract(ing, window=10)["action_uuid"] == "abc-123"
+
+
+def test_gpsim_table_includes_the_numeric_columns():
+    """plate_id/step/frac_acquired are numeric, so they never reach .rows.
+
+    Reading the table from .rows left three of five columns permanently blank.
+    """
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.raw.append(
+        [
+            {
+                "plate_id": ([4001], 100.0),
+                "step": ([7], 100.0),
+                "frac_acquired": ([0.42], 100.0),
+                "last_acquisition": (["Co0.5-Ni0.5"], 100.0),
+                "orchestrator": (["orch0"], 100.0),
+            }
+        ]
+    )
+    rows = gpsim_panel.extract_table_rows(ing)
+    assert rows and rows[0][0] == "4001"
+    assert rows[0][1] == "7"
+    assert rows[0][2] == "0.42"
+    assert rows[0][3] == "Co0.5-Ni0.5"
+    assert rows[0][4] == "orch0"
+
+
+def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    assert gpsim_panel.extract_table_rows(WsIngest("127.0.0.1", 1, "ws_live")) == []
+
+
 def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
     from helao.core.servers.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel

@@ -14,7 +14,10 @@ from helao.core.servers.reflex.state import ActionVisState
 
 WS_PATH = "ws_data"
 
-X_COLUMN = "epoch"
+#: The x axis is elapsed seconds from the data packet, not a wall-clock epoch:
+#: ws_data packets carry no epoch column, so looking for one would leave x empty
+#: and plot nothing. Matches the Bokeh original, which plots t_s vs erhe_v.
+X_COLUMN = "t_s"
 
 
 def panel_id(server_key: str) -> str:
@@ -30,12 +33,15 @@ def extract(ingest, window: int) -> dict:
         window: Number of trailing rows.
 
     Returns:
-        dict: ``{"x": np.ndarray, "series": {name: np.ndarray}}``.
+        dict: ``{"x": np.ndarray, "series": {name: np.ndarray},
+        "action_uuid": str}``.
     """
     snap = ingest.buffer.snapshot(window)
+    latest = ingest.rows.latest() or {}
     return {
         "x": snap.get(X_COLUMN, np.empty(0)),
         "series": {k: v for k, v in snap.items() if k != X_COLUMN},
+        "action_uuid": str(latest.get("action_uuid", "")),
     }
 
 
@@ -45,6 +51,7 @@ class _State(ActionVisState):
     chart_spec: dict = {}
     chart_url: str = ""
     version: int = 0
+    action_uuid: str = ""
 
     def pull(self, ingest) -> None:
         """Recompute the chart payload from the trailing window."""
@@ -53,13 +60,15 @@ class _State(ActionVisState):
         payload = plots.time_series(
             cols["x"],
             cols["series"],
-            x_label="Time (HH:MM:SS)",
+            x_label="t (s)",
             y_label="value",
+            x_is_epoch=False,
             panel_id=panel_id(self.server_key_default),
             version=self.version,
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
+        self.action_uuid = cols["action_uuid"]
 
 
 STATE_BASE = _State

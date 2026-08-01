@@ -19,6 +19,8 @@ __all__ = [
     "WsIngest",
     "IngestRegistry",
     "normalize",
+    "normalize_data_package",
+    "NORMALIZERS",
     "set_registry",
     "get_registry",
 ]
@@ -140,6 +142,89 @@ def normalize(messages: list) -> tuple:
     return cols, rows
 
 
+def normalize_data_package(messages: list) -> tuple:
+    """Turn ``ws_data`` packets into numeric columns and per-message rows.
+
+    ``/ws_data`` is served by ``data_publisher.broadcast``, and ``WsPublisher``
+    defaults to an identity ``xform_func`` -- so each message is a pickled
+    :class:`DataPackageModel` **object**, not a dict. Its payload lives at
+    ``.datamodel.data[file_conn_key][column]`` and is reached by attribute
+    access, which is why the Bokeh ``oersim_vis`` reads
+    ``data_package.datamodel.status`` rather than subscripting. A dict is also
+    accepted, defensively, in case a relay is configured with ``as_dict()``.
+
+    :func:`normalize` drops these outright (they are not dicts), which left an
+    action visualizer permanently empty while its status still read ``live``.
+
+    Args:
+        messages: Batches drained from a :class:`WsSubscriber` on ``ws_data``.
+
+    Returns:
+        ``(numeric_columns, rows)``. Columns are equal-length and positionally
+        aligned, filled per message exactly as :func:`normalize` does. Each row
+        carries the ``action_uuid`` and ``status`` of one packet, so a panel can
+        reset when the streamed action changes.
+    """
+
+    def _get(obj, name):
+        if isinstance(obj, dict):
+            return obj.get(name)
+        return getattr(obj, name, None)
+
+    cols: dict = {}
+    rows: list = []
+    emitted = 0
+    for message in messages:
+        datamodel = _get(message, "datamodel")
+        if datamodel is None:
+            continue
+        data = _get(datamodel, "data")
+        if not isinstance(data, dict):
+            continue
+
+        pending: dict = {}
+        for columns in data.values():
+            if not isinstance(columns, dict):
+                continue
+            for name, values in columns.items():
+                seq = values if isinstance(values, (list, tuple)) else [values]
+                pending.setdefault(name, []).extend(seq)
+
+        numeric: dict = {}
+        for name, values in pending.items():
+            try:
+                numeric[name] = [float(v) for v in values]
+            except (TypeError, ValueError):
+                # e.g. composition strings alongside the numeric traces
+                continue
+        if not numeric:
+            continue
+
+        row_count = max(len(v) for v in numeric.values())
+        for name in numeric:
+            if name not in cols:
+                cols[name] = [float("nan")] * emitted
+        for name, column in cols.items():
+            values = numeric.get(name, [])
+            column.extend(values)
+            column.extend([float("nan")] * (row_count - len(values)))
+        emitted += row_count
+
+        status = _get(datamodel, "status")
+        rows.append(
+            {
+                "action_uuid": str(_get(message, "action_uuid") or ""),
+                "status": str(getattr(status, "value", status) or ""),
+            }
+        )
+    return cols, rows
+
+
+#: Which normalizer each subscribed endpoint needs. The two carry genuinely
+#: different payloads; one normalizer silently drops the other's messages.
+NORMALIZERS = {"ws_live": normalize, "ws_data": normalize_data_package}
+
+
 @dataclass
 class IngestStatus:
     """Observable connection state for one ingest target.
@@ -207,6 +292,7 @@ class WsIngest:
         self.rows = RowBuffer(maxlen=row_maxlen)
         self.raw: collections.deque = collections.deque(maxlen=raw_maxlen)
         self.status = IngestStatus()
+        self._normalize = NORMALIZERS.get(ws_path, normalize)
         self._drain_interval = drain_interval
         self._stale_after = stale_after
         self._wss: Optional[WsSubscriber] = None
@@ -258,7 +344,7 @@ class WsIngest:
                 messages = await self._wss.read_messages()
                 if messages:
                     self.raw.append(messages)
-                    cols, rows = normalize(messages)
+                    cols, rows = self._normalize(messages)
                     if cols:
                         self.buffer.append(cols)
                     for row in rows:

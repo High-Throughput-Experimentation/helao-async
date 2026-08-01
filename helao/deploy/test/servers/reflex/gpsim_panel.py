@@ -10,7 +10,14 @@ Binning is xy's job: raw samples go straight to :func:`plots.histogram`, which
 uses xy's native ``hist`` mark.
 """
 
-__all__ = ["WS_PATH", "STATE_BASE", "build", "extract_histograms", "panel_id"]
+__all__ = [
+    "WS_PATH",
+    "STATE_BASE",
+    "build",
+    "extract_histograms",
+    "extract_table_rows",
+    "panel_id",
+]
 
 import reflex as rx
 
@@ -36,6 +43,46 @@ TABLE_COLUMNS = [
 def panel_id(server_key: str) -> str:
     """Stable buffer-store identity for this panel."""
     return f"gpsim-{server_key}"
+
+
+def extract_table_rows(ingest) -> list:
+    """Pull the acquisition-table rows from the newest raw batch.
+
+    Read from ``ingest.raw`` rather than ``ingest.rows`` because ``normalize``
+    classifies each key by float-coercibility: ``plate_id``, ``step`` and
+    ``frac_acquired`` are numeric and land in the ring buffer, so only
+    ``last_acquisition`` and ``orchestrator`` ever reach ``rows`` -- three of the
+    five columns would render permanently blank.
+
+    Args:
+        ingest: The panel's :class:`WsIngest`.
+
+    Returns:
+        list: One list-of-strings per plate in the newest batch, ordered to
+        match :data:`TABLE_COLUMNS`.
+    """
+    if not ingest.raw:
+        return []
+    out: list = []
+    for message in ingest.raw[-1]:
+        if not isinstance(message, dict):
+            continue
+        values = {}
+        for column in TABLE_COLUMNS:
+            payload = message.get(column)
+            if isinstance(payload, (tuple, list)) and len(payload) == 2:
+                values[column] = payload[0]
+        plates = values.get("plate_id") or []
+        for i in range(len(plates)):
+            row = []
+            for column in TABLE_COLUMNS:
+                seq = values.get(column) or []
+                cell = seq[i] if i < len(seq) else ""
+                if isinstance(cell, float):
+                    cell = f"{cell:.4g}"
+                row.append(str(cell))
+            out.append(row)
+    return out
 
 
 def extract_histograms(ingest) -> dict:
@@ -75,12 +122,21 @@ class _State(LiveVisState):
     chart_url: str = ""
     version: int = 0
     table_rows: list = []
+    #: Accumulated per-plate samples. The driver runs plates concurrently and
+    #: each pushes its own message, so a single drain batch holds only whichever
+    #: plates happened to land in it. The Bokeh original kept a persistent
+    #: per-plate dict for the same reason; without it the chart flickers between
+    #: plates instead of showing them together.
+    hist_samples: dict = {}
 
     def pull(self, ingest) -> None:
         """Recompute the histogram payload and the last 20 acquisition rows."""
         self.version += 1
+        merged = dict(self.hist_samples)
+        merged.update(extract_histograms(ingest))
+        self.hist_samples = merged
         payload = plots.histogram(
-            extract_histograms(ingest),
+            merged,
             bins=HIST_BINS,
             value_range=HIST_RANGE,
             x_label="Eta (V vs O2/H2O)",
@@ -90,10 +146,7 @@ class _State(LiveVisState):
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
-        self.table_rows = [
-            [str(row.get(col, "")) for col in TABLE_COLUMNS]
-            for row in ingest.rows.rows()[-20:]
-        ]
+        self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
 
 
 STATE_BASE = _State

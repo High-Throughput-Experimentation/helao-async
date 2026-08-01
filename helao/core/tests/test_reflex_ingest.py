@@ -12,6 +12,7 @@ from helao.core.servers.reflex.ingest import (
     IngestRegistry,
     WsIngest,
     normalize,
+    normalize_data_package,
 )
 
 
@@ -132,6 +133,91 @@ def test_normalize_treats_epoch_zero_as_a_real_timestamp():
     cols, _ = normalize([{"v": (1.0, 0.0)}])
     assert cols["epoch"] == [0.0]
     assert cols["v"] == [1.0]
+
+
+def test_normalize_data_package_unwraps_a_model_object():
+    """ws_data carries pickled DataPackageModel objects, not dicts.
+
+    normalize() drops them at its isinstance(message, dict) guard, which left
+    the action visualizer permanently empty while its status still read "live".
+    """
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="measure_cp",
+        datamodel=DataModel(
+            data={uuid.uuid4(): {"t_s": [0.1, 0.2, 0.3], "erhe_v": [1.2, 1.3, 1.4]}},
+            errors=[],
+        ),
+    )
+    cols, rows = normalize_data_package([pkg])
+    assert cols["t_s"] == [0.1, 0.2, 0.3]
+    assert cols["erhe_v"] == [1.2, 1.3, 1.4]
+    assert rows[0]["action_uuid"] == str(pkg.action_uuid)
+
+
+def test_normalize_would_have_dropped_the_same_packet():
+    """Pins why a second normalizer exists rather than one shared one."""
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="measure_cp",
+        datamodel=DataModel(data={uuid.uuid4(): {"t_s": [0.1]}}, errors=[]),
+    )
+    assert normalize([pkg]) == ({}, [])
+
+
+def test_normalize_data_package_keeps_columns_aligned_across_packets():
+    import math
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    def _pkg(cols):
+        return DataPackageModel(
+            action_uuid=uuid.uuid4(),
+            action_name="a",
+            datamodel=DataModel(data={uuid.uuid4(): cols}, errors=[]),
+        )
+
+    cols, _ = normalize_data_package([_pkg({"t_s": [1.0]}), _pkg({"erhe_v": [9.0]})])
+    assert len({len(c) for c in cols.values()}) == 1
+    assert cols["t_s"][0] == 1.0 and math.isnan(cols["t_s"][1])
+    assert math.isnan(cols["erhe_v"][0]) and cols["erhe_v"][1] == 9.0
+
+
+def test_normalize_data_package_skips_non_numeric_columns():
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="a",
+        datamodel=DataModel(
+            data={uuid.uuid4(): {"t_s": [1.0], "atfracs": ["Co0.5-Ni0.5"]}}, errors=[]
+        ),
+    )
+    cols, _ = normalize_data_package([pkg])
+    assert cols["t_s"] == [1.0]
+    assert "atfracs" not in cols
+
+
+def test_normalize_data_package_tolerates_junk():
+    assert normalize_data_package(["nope", {}, {"datamodel": None}]) == ({}, [])
+
+
+def test_wsingest_selects_its_normalizer_by_ws_path():
+    live = WsIngest("127.0.0.1", 1, "ws_live")
+    data = WsIngest("127.0.0.1", 1, "ws_data")
+    assert live._normalize is normalize
+    assert data._normalize is normalize_data_package
 
 
 @pytest.mark.asyncio
