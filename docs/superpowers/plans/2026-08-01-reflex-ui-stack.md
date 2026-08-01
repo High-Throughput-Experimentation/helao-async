@@ -4807,6 +4807,72 @@ def test_local_build_allowed_with_opt_in_and_runtime(monkeypatch):
     assert rl.may_build_locally() is True
 
 
+def test_resolve_bundle_rejects_a_zero_byte_index_html(tmp_path):
+    """An interrupted export leaves a truncated index.html.
+
+    Serving it yields a blank browser page and a silent log; treating it as
+    absent routes into the loud failure path instead.
+    """
+    bundle = tmp_path / ".reflex-bundle" / "helao_ui"
+    bundle.mkdir(parents=True)
+    (bundle / "index.html").write_text("")
+    assert rl.resolve_bundle(str(tmp_path)) is None
+
+
+def test_cleanup_budget_fits_inside_the_orchestrator_kill_window():
+    """launch.py SIGKILLs this launcher after Pidd.GRACEFUL_WAIT seconds.
+
+    Overrunning that window means dying mid-cleanup and orphaning a backend
+    that still holds `port + 1`, so the next launch of the config cannot bind.
+    """
+    import launch
+
+    graceful_wait = launch.Pidd.__init__.__globals__.get("_GRACEFUL_WAIT_PROBE")
+    # Read the literal from the class initializer rather than constructing a
+    # Pidd (which touches the filesystem).
+    import inspect
+    import re
+
+    src = inspect.getsource(launch.Pidd.__init__)
+    match = re.search(r"self\.GRACEFUL_WAIT\s*=\s*([0-9.]+)", src)
+    assert match, "could not read GRACEFUL_WAIT from launch.Pidd"
+    graceful_wait = float(match.group(1))
+
+    budget = rl.BACKEND_TERM_WAIT + rl.BACKEND_KILL_WAIT + rl.FRONTEND_SHUTDOWN_TIMEOUT
+    assert budget < graceful_wait, (
+        f"cleanup budget {budget}s exceeds the orchestrator's {graceful_wait}s "
+        "kill window; the backend would be orphaned"
+    )
+
+
+def test_launcher_exits_nonzero_when_no_bundle_and_no_opt_in(tmp_path):
+    """The composed fail-loud contract, not just its ingredients.
+
+    A silent multi-minute network build on an instrument PC is a worse outcome
+    than a clear error, so this drives the real __main__ path end to end.
+    """
+    import os
+    import subprocess
+    import sys
+
+    env = dict(os.environ)
+    env.pop("REFLEX_ALLOW_LOCAL_BUILD", None)
+    env["PATH"] = str(tmp_path)  # hide any node/bun so a build is impossible
+    proc = subprocess.run(
+        [sys.executable, "reflex_launcher.py", "goldenreflex", "UI"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        cwd=os.path.dirname(os.path.abspath(rl.__file__)),
+    )
+    assert proc.returncode != 0, "launcher started without a frontend bundle"
+    combined = proc.stdout + proc.stderr
+    assert "reflex export" in combined or "bundle" in combined.lower(), (
+        "failure did not name the bundle path or the build command:\n" + combined
+    )
+
+
 def test_assets_dir_sits_inside_the_reflex_project():
     """The ESM client must be inside the project so `reflex export` bundles it."""
     assert rl.ASSETS_DIR.startswith(rl.APP_DIR)
@@ -4868,6 +4934,8 @@ import shutil
 import subprocess
 import sys
 
+import colorama
+
 #: Must match ``app_name`` in ``helao/core/servers/reflex/_app/rxconfig.py``.
 APP_NAME = "helao_ui"
 
@@ -4876,6 +4944,20 @@ BUNDLE_DIRNAME = ".reflex-bundle"
 
 #: Reflex project directory the CLI is invoked from.
 APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
+
+#: Seconds allowed for the backend to exit on SIGTERM before escalating, and
+#: for the killed process to be reaped. These must add up to comfortably less
+#: than ``Pidd.GRACEFUL_WAIT`` (7.0s, launch.py) -- that is the window before
+#: the orchestrator SIGKILLs *this* launcher. Overrunning it means the launcher
+#: dies mid-cleanup and leaves an untracked backend holding ``port + 1``, so the
+#: next launch of the same config cannot bind.
+BACKEND_TERM_WAIT = 3.0
+BACKEND_KILL_WAIT = 1.0
+
+#: Bound the frontend's own graceful shutdown. uvicorn defaults to waiting
+#: indefinitely for open connections, which would blow the same budget: a single
+#: browser tab left open on the panel page is enough.
+FRONTEND_SHUTDOWN_TIMEOUT = 2
 
 #: Reflex assets directory, served from the site root. xy's ESM client is
 #: copied here before the frontend build so the bundle ships it and the browser
@@ -4900,11 +4982,15 @@ def resolve_bundle(repo_root: str):
         export must not be served.
     """
     candidate = os.path.join(repo_root, BUNDLE_DIRNAME, APP_NAME)
-    if os.path.isdir(candidate) and os.path.isfile(
-        os.path.join(candidate, "index.html")
-    ):
-        return candidate
-    return None
+    index = os.path.join(candidate, "index.html")
+    if not (os.path.isdir(candidate) and os.path.isfile(index)):
+        return None
+    # A zero-byte index.html means an interrupted export or a partial copy.
+    # Serving it silently yields a blank page in the browser with nothing in
+    # the logs; treating it as absent routes into the loud failure path.
+    if os.path.getsize(index) == 0:
+        return None
+    return candidate
 
 
 def build_env(config_path: str, server_key: str, host: str, port: int, root):
@@ -4953,10 +5039,26 @@ def _serve_frontend(bundle_dir: str, host: str, port: int):
     static_app.mount(
         "/", StaticFiles(directory=bundle_dir, html=True), name="frontend"
     )
-    uvicorn.run(static_app, host=host, port=port, log_level="warning")
+    uvicorn.run(
+        static_app,
+        host=host,
+        port=port,
+        log_level="warning",
+        timeout_graceful_shutdown=FRONTEND_SHUTDOWN_TIMEOUT,
+    )
 
 
 if __name__ == "__main__":
+    # Same handling as fast_launcher/bokeh_launcher: launch.py sets
+    # HELAO_FORCE_COLOR when it pumps our output through its own tty stdout, so
+    # emit raw ANSI and let the launcher's colorama translate it (which on
+    # Windows must happen against a real console handle, not our pipe) rather
+    # than stripping just because our own stdout is a pipe.
+    if os.environ.get("HELAO_FORCE_COLOR") == "1":
+        colorama.init(strip=False, convert=False)
+    else:
+        colorama.init(strip=not sys.stdout.isatty())
+
     if sys.platform == "win32":
         # Match bokeh_launcher.py: a selector loop, so a co-located ZMQ RPC
         # socket works without the Proactor loop's missing add_reader family.
@@ -5072,9 +5174,17 @@ if __name__ == "__main__":
     finally:
         backend.terminate()
         try:
-            backend.wait(timeout=10)
+            backend.wait(timeout=BACKEND_TERM_WAIT)
         except subprocess.TimeoutExpired:
             backend.kill()
+            try:
+                # Reap it: an unreaped child stays a zombie whose PID
+                # psutil.pid_exists() still reports as alive.
+                backend.wait(timeout=BACKEND_KILL_WAIT)
+            except subprocess.TimeoutExpired:
+                LOGGER.warning(
+                    f"reflex backend pid {backend.pid} did not exit after kill"
+                )
 ```
 
 - [ ] **Step 4: Add the `reflex` branch to `launch.py`**
@@ -5154,7 +5264,9 @@ conda run -n helao python -m pytest helao/core/tests/test_reflex_launcher.py -v
 conda run -n helao python -m pytest helao/core/tests/test_launch_pid_verify.py -v
 ```
 
-Expected: 11 passed in the first, all pass in the second.
+Expected: 14 passed in the first, all pass in the second.
+
+The end-to-end fail-loud test shells out to a real `python reflex_launcher.py` with `PATH` emptied so no JS runtime is reachable. If it cannot resolve the `goldenreflex` config (Task 9 creates it), substitute any config with a `reflex:` entry, or assert only on the non-zero exit and the message — but do not delete it: the ingredients were already covered and the composed contract was not.
 
 - [ ] **Step 7: Format and commit**
 
