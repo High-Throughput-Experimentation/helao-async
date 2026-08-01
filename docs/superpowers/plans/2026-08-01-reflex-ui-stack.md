@@ -1783,6 +1783,7 @@ wrong, so it is run rather than string-matched.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -1973,6 +1974,15 @@ const out = {};
   await st.refetch("/fail");
   out.keptFrameOnFailure = st.buffers === before;
 
+  // Selection travels back to Reflex through model.send.
+  let received = null;
+  st.onSelect = (msg) => { received = msg; };
+  st.model.send({ type: "select", rows: [1, 2] });
+  out.selectPayload = received;
+  received = null;
+  st.model.send({ type: "hover" });
+  out.nonSelectIgnored = received === null;
+
   console.log(JSON.stringify(out));
 })();
 """
@@ -2025,6 +2035,31 @@ def test_controller_fires_both_change_events_per_successful_refetch():
 def test_controller_keeps_the_last_good_frame_when_a_fetch_fails():
     out = _run_controller_harness()
     assert out["keptFrameOnFailure"] is True
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_dispatches_a_select_message_to_on_select():
+    """model.send is how the bundle reports selection back to Reflex."""
+    out = _run_controller_harness()
+    assert out["selectPayload"] == {"type": "select", "rows": [1, 2]}
+    assert out["nonSelectIgnored"] is True
+
+
+def test_component_passes_the_current_url_into_refetch():
+    """Guards the wiring the controller tests cannot reach.
+
+    The four Node tests exercise ``createController`` only. The bug that shipped
+    lived in the React wrapper, which called ``st.refetch()`` with no argument —
+    and the controller's own ``if (!url) return;`` would swallow that silently
+    while every controller test still passed. No JSX runtime is available here,
+    so this asserts the wiring textually rather than by execution.
+    """
+    component = xc._SHIM_COMPONENT_JS
+    assert "st.refetch(bufferUrl)" in component, "wrapper must pass the live URL"
+    assert re.search(r"st\.refetch\(\s*\)", component) is None, (
+        "wrapper calls refetch with no argument; the controller would no-op "
+        "silently and the chart would freeze after one paint"
+    )
 ```
 
 - [ ] **Step 2: Run the binding tests to verify they fail**
@@ -2372,7 +2407,7 @@ def xy_chart(**props) -> XYChart:
 conda run -n helao python -m pytest helao/core/tests/test_reflex_xy_component.py -v
 ```
 
-Expected: 21 passed (4 skip if no `node` is on PATH).
+Expected: 23 passed (5 skip if no `node` is on PATH).
 
 If `test_encode_buffers_roundtrips_through_xy_channel` fails on the magic-bytes assertion, read `xy.channel.encode_frame_parts`'s signature and adjust the call — the intent (encode with xy's protocol, not a HELAO one) does not change. If `XYChart` construction fails on `library = None`, consult the Task 0 API note for how Reflex 0.9.7 wants a custom-code-only component declared.
 
@@ -2412,6 +2447,12 @@ def test_time_series_accepts_multiple_series():
 def test_time_series_rejects_a_series_of_the_wrong_length():
     with pytest.raises(ValueError):
         plots.time_series(np.zeros(10), {"a": np.zeros(9)})
+
+
+def test_time_series_rejects_a_series_when_x_is_empty():
+    """Gating validation on x being non-empty would skip exactly this case."""
+    with pytest.raises(ValueError):
+        plots.time_series(np.empty(0), {"a": np.zeros(3)})
 
 
 def test_time_series_drops_all_nan_series_without_raising():
@@ -2700,7 +2741,9 @@ def time_series(
     marks = []
     for idx, (label, values) in enumerate(series.items()):
         ys = _as_float_array(values)
-        if xs.size and ys.size != xs.size:
+        # Checked unconditionally: gating on `xs.size` would skip validation
+        # exactly when x is empty, letting a non-empty series through silently.
+        if ys.size != xs.size:
             raise ValueError(
                 f"series '{label}' has length {ys.size}, expected {xs.size}"
             )
@@ -2850,7 +2893,7 @@ def histogram(
 conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
 ```
 
-Expected: 19 passed. If a test fails inside `xy.line`, `xy.scatter`, `xy.hist`, `xy.x_axis`, or `xy.chart`, the Task 0 API note's recorded signature was not transcribed correctly — fix the call, not the test. Record any signature correction back into the API note in the same commit, since Task 7 reads it.
+Expected: 20 passed. If a test fails inside `xy.line`, `xy.scatter`, `xy.hist`, `xy.x_axis`, or `xy.chart`, the Task 0 API note's recorded signature was not transcribed correctly — fix the call, not the test. Record any signature correction back into the API note in the same commit, since Task 7 reads it.
 
 - [ ] **Step 9: Format and commit**
 
