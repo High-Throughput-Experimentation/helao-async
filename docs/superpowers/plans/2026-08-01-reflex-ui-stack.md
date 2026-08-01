@@ -4708,7 +4708,7 @@ def build(server_key: str, state_cls):
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 22 passed (7 from Task 5, 15 new — the three parametrized tests contribute three cases each).
+Expected: 34 passed (18 from Task 5, 16 new — the three parametrized tests contribute three cases each).
 
 - [ ] **Step 5: Format and commit**
 
