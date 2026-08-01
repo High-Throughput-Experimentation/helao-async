@@ -3539,6 +3539,123 @@ def test_route_map_omits_a_page_not_requested_but_keeps_it_reachable_as_empty():
     assert routes["/action"] == []
 
 
+# --- build_app end-to-end -----------------------------------------------
+#
+# The helper tests above are pure. These construct the real app, because every
+# robustness defect this task shipped -- an uncaught panel import error, an
+# AttributeError on a malformed params block, a bare-string `pages` silently
+# erasing every route -- lived in build_app and none of them were reachable
+# from panel_targets/route_map alone.
+
+
+def _ui_cfg(params):
+    return {
+        "servers": {
+            "SIM": {
+                "host": "127.0.0.1",
+                "port": 8002,
+                "group": "action",
+                "live_vis": "wssim_panel",
+            },
+            "UI": {
+                "host": "127.0.0.1",
+                "port": 5010,
+                "group": "visualizer",
+                "reflex": "helao_ui",
+                "params": params,
+            },
+        }
+    }
+
+
+def test_build_app_survives_a_params_block_that_is_not_a_mapping():
+    """build_app runs at import time; an AttributeError here kills the module."""
+    from helao.core.servers.reflex.app import build_app
+
+    assert build_app(_ui_cfg(["live"]), "UI") is not None
+
+
+def test_build_app_survives_a_missing_server_entry():
+    from helao.core.servers.reflex.app import build_app
+
+    assert build_app({"servers": {}}, "NOPE") is not None
+
+
+def test_a_bare_string_pages_value_still_selects_that_page():
+    """`pages: live` is an easy YAML slip; set("live") would erase every route."""
+    from helao.core.servers.reflex.app import route_map
+
+    routes = route_map(_ui_cfg({"pages": "live"}), "live")
+    assert [t.server_key for t in routes["/live"]] == ["SIM"]
+
+
+def test_a_bare_string_limit_vis_filters_by_whole_key_not_substring():
+    from helao.core.servers.reflex.app import panel_targets
+
+    cfg = _ui_cfg({})
+    assert [t.server_key for t in panel_targets(cfg, limit_vis="SIM")] == ["SIM"]
+    assert panel_targets(cfg, limit_vis="S") == []
+
+
+def test_a_panel_module_that_fails_to_import_renders_an_error_card(monkeypatch):
+    """Isolation is the point: one bad panel must not take down the page.
+
+    Task 7 writes real panel modules against exactly this guarantee, and an
+    import-time NameError is not a ModuleNotFoundError.
+    """
+    from helao.core.servers.reflex import app as app_mod
+
+    def _boom(_name):
+        raise NameError("typo at module scope")
+
+    monkeypatch.setattr(app_mod, "resolve_panel_module", _boom)
+    card = app_mod._render_panel(
+        app_mod.PanelTarget("SIM", "wssim_panel", "ws_live", "live_vis")
+    )
+    assert card is not None
+
+
+def test_an_unknown_panel_module_renders_an_error_card():
+    from helao.core.servers.reflex.app import PanelTarget, _render_panel
+
+    card = _render_panel(PanelTarget("SIM", "no_such_panel", "ws_live", "live_vis"))
+    assert card is not None
+
+
+def test_the_buffer_route_is_reachable_through_the_built_app():
+    """Bulk column data rides this route, not Reflex state. No route, no data."""
+    import numpy as np
+    from fastapi.testclient import TestClient
+
+    from helao.core.servers.reflex import plots
+    from helao.core.servers.reflex.app import build_app
+
+    app = build_app(_ui_cfg({"pages": ["live"]}), "UI")
+    plots.STORE.put("rt", 2, [memoryview(np.arange(3, dtype=np.float64).tobytes())])
+    client = TestClient(app.api_transformer)
+    assert client.get("/xy/buffers/rt?v=2").status_code == 200
+    assert client.get("/xy/buffers/rt?v=1").status_code == 404
+    assert client.get("/xy/buffers/ghost?v=1").status_code == 404
+
+
+def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
+    """A plain coroutine is only cancelled; the drain loops would outlive the app."""
+    import contextlib
+    import inspect
+
+    from helao.core.servers.reflex.app import build_app
+
+    app = build_app(_ui_cfg({"pages": ["live"]}), "UI")
+    tasks = list(getattr(app, "lifespan_tasks", []) or [])
+    assert tasks, "no lifespan task registered"
+    assert any(
+        isinstance(task, contextlib._AsyncGeneratorContextManager)
+        or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
+        or getattr(task, "__name__", "") == "_ingest_lifespan"
+        for task in tasks
+    )
+
+
 def test_only_plots_module_imports_xy():
     """Only the facade and the binding may touch the alpha xy API."""
     import pathlib
@@ -3592,8 +3709,17 @@ A panel module must expose:
 * ``build(server_key, state_cls) -> rx.Component``
 """
 
-__all__ = ["PanelTarget", "panel_targets", "route_map", "build_app", "app"]
+__all__ = [
+    "PanelTarget",
+    "as_list",
+    "as_dict",
+    "panel_targets",
+    "route_map",
+    "build_app",
+    "app",
+]
 
+import contextlib
 from dataclasses import dataclass
 
 import reflex as rx
@@ -3638,6 +3764,36 @@ class PanelTarget:
     vis_key: str
 
 
+def as_list(value) -> list:
+    """Coerce a config value to a list, tolerating a bare scalar.
+
+    YAML makes ``pages: live`` and ``pages: [live]`` easy to confuse, and the
+    former silently degrades: ``set("live")`` is ``{"l","i","v","e"}``, so every
+    requested page vanishes with no error. Same hazard for ``limit_vis``, where
+    membership degrades to a substring test.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
+
+
+def as_dict(value, *, what: str) -> dict:
+    """Return ``value`` when it is a mapping, otherwise ``{}`` with a warning.
+
+    ``build_app`` runs at import time, so an unguarded ``.get`` on a malformed
+    block takes down the module — and with it the Reflex CLI entrypoint.
+    """
+    if isinstance(value, dict):
+        return value
+    if value is not None:
+        LOGGER.warning(f"{what} is not a mapping ({type(value).__name__}); ignoring")
+    return {}
+
+
 def panel_targets(world_cfg: dict, limit_vis=None) -> list:
     """Discover every panel declared by the config's action servers.
 
@@ -3650,18 +3806,17 @@ def panel_targets(world_cfg: dict, limit_vis=None) -> list:
         list: :class:`PanelTarget` entries, config order preserved.
     """
     targets = []
+    allowed = as_list(limit_vis)
     for server_key, server_cfg in (world_cfg.get("servers") or {}).items():
         if not isinstance(server_cfg, dict):
             continue
-        if limit_vis and server_key not in limit_vis:
+        if allowed and server_key not in allowed:
             continue
         for vis_key, ws_path in VIS_KEY_TO_WS_PATH.items():
             module_names = server_cfg.get(vis_key)
             if not module_names:
                 continue
-            if isinstance(module_names, str):
-                module_names = [module_names]
-            for module_name in module_names:
+            for module_name in as_list(module_names):
                 targets.append(
                     PanelTarget(server_key, module_name, ws_path, vis_key)
                 )
@@ -3683,7 +3838,7 @@ def route_map(world_cfg: dict, pages, limit_vis=None) -> dict:
     Returns:
         dict: ``{route_path: [PanelTarget, ...]}``.
     """
-    wanted = set(pages or [])
+    wanted = set(as_list(pages))
     all_targets = panel_targets(world_cfg, limit_vis=limit_vis)
     routes = {path: [] for path in SHELL_ROUTES}
     for page, vis_key in PAGE_TO_VIS_KEY.items():
@@ -3717,6 +3872,16 @@ def _render_panel(target: PanelTarget):
     except ModuleNotFoundError as exc:
         LOGGER.warning(f"reflex panel module missing: {exc}")
         return _error_card(f"{target.server_key}: panel module not found", str(exc))
+    except Exception as exc:
+        # A module that exists but raises while importing -- a bad transitive
+        # import, a NameError, any bug in a deployment's panel. Catching only
+        # ModuleNotFoundError here would let that escape and take down the
+        # whole page, defeating the isolation this function exists for.
+        LOGGER.exception(f"reflex panel module failed to import: {exc}")
+        return _error_card(
+            f"{target.server_key}: panel module failed to import",
+            f"{type(exc).__name__}: {exc}",
+        )
     try:
         state_cls = make_panel_state(
             target.module_name,
@@ -3726,7 +3891,9 @@ def _render_panel(target: PanelTarget):
         )
         return module.build(target.server_key, state_cls)
     except Exception as exc:
-        LOGGER.warning(f"reflex panel build failed for {target.server_key}: {exc}")
+        # .exception, not .warning: without the traceback a real bug in an
+        # otherwise-working panel is far harder to place.
+        LOGGER.exception(f"reflex panel build failed for {target.server_key}: {exc}")
         return _error_card(
             f"{target.server_key}: panel failed to build",
             f"{type(exc).__name__}: {exc}",
@@ -3813,10 +3980,12 @@ def build_app(world_cfg: dict, server_key: str):
     Returns:
         rx.App: The configured app, with ingest registered on its lifespan.
     """
-    server_cfg = (world_cfg.get("servers") or {}).get(server_key) or {}
-    params = server_cfg.get("params") or {}
-    pages = params.get("pages") or ["live", "action"]
-    limit_vis = params.get("limit_vis") or []
+    server_cfg = as_dict(
+        (world_cfg.get("servers") or {}).get(server_key), what=f"server '{server_key}'"
+    )
+    params = as_dict(server_cfg.get("params"), what=f"server '{server_key}' params")
+    pages = as_list(params.get("pages")) or ["live", "action"]
+    limit_vis = as_list(params.get("limit_vis"))
     routes = route_map(world_cfg, pages, limit_vis=limit_vis)
 
     registry = IngestRegistry(world_cfg)
@@ -3869,11 +4038,26 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO browser",
     )
 
-    async def _start_ingest():
+    @contextlib.asynccontextmanager
+    async def _ingest_lifespan():
+        """Own the ingest registry for the app's lifetime.
+
+        An asynccontextmanager, not a plain coroutine: Reflex tracks the former
+        through an ``AsyncExitStack`` and awaits its teardown, while a plain
+        coroutine is only ``create_task``-ed and cancelled. Since
+        ``registry.start()`` returns immediately after spawning the drain tasks,
+        a plain coroutine would leave nothing to cancel and every ``WsIngest``
+        loop would outlive the app.
+        """
         registry.start()
         LOGGER.info(f"reflex ingest started for targets: {registry.targets()}")
+        try:
+            yield
+        finally:
+            await registry.stop()
+            LOGGER.info("reflex ingest stopped")
 
-    application.register_lifespan_task(_start_ingest)
+    application.register_lifespan_task(_ingest_lifespan)
     return application
 
 
@@ -3947,7 +4131,7 @@ from helao.core.servers.reflex.app import app  # noqa: F401
 conda run -n helao python -m pytest helao/core/tests/test_reflex_config.py -v
 ```
 
-Expected: 18 passed (11 from Task 3, 7 new).
+Expected: 26 passed (11 from Task 3, 15 new).
 
 - [ ] **Step 6: Format and commit**
 
