@@ -36,7 +36,31 @@ Other utilities:
 - `python run_tests.py` — the full pytest sweep across this repo and every deployment (`--list` to preview, `--filter <substr>` to narrow, `--timeout` to raise the per-file cap). **Runs one file per pytest process**, because collecting the tree as a single session hangs indefinitely and ignores SIGINT while the same files pass individually — the tests start event loops, bind sockets, and spawn Bokeh servers, so cross-file interference is expected. Deliberately separate from `run_unit_tests.py`, which stays a fast pre-launch gate. Deployments opt in by having a `tests/` directory; the whole deployment is then swept for `test_*.py`, so a test filed beside its subject is not missed. Third-party import failures report as `ENV` rather than `FAIL` (a Windows-only vendor SDK cannot be collected on Linux), while a missing `helao*` module stays a failure.
 - `python -m helao.core.tests.check_queue_pcks <STATES dir>` — read-only report of which `queues*.pck` files the current build could actually restore (missing model classes, or a payload schema this build does not write). Never loads a pickle; walks the opcode stream instead. Exits 1 if any file is unrestorable, so it can gate a cleanup sweep.
 
-There is no project-wide build step. Tests are a mix of pytest modules (most of `helao/hexagon/tests/`, `harness/tests/`, and each deployment's `tests/`) and standalone `__main__` scripts under `helao/core/tests/` that `run_tests.py` reports as `NOTESTS` and which must be invoked directly.
+There is no project-wide build step for the Python side. Tests are a mix of pytest modules (most of `helao/hexagon/tests/`, `harness/tests/`, and each deployment's `tests/`) and standalone `__main__` scripts under `helao/core/tests/` that `run_tests.py` reports as `NOTESTS` and which must be invoked directly.
+
+### Reflex UI stack (coexists with Bokeh)
+
+An optional second UI stack, opt-in per config via a `reflex:` server key alongside `fast:`/`bokeh:`. The Bokeh path is untouched; a station runs either, or both in the same group. Try it with `python launch.py goldenreflex`.
+
+A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the Reflex backend. `validateConfig` reserves both, so nothing else may claim `port + 1`.
+
+Stations never need Node. Build the frontend bundle on a development machine and ship it:
+
+```
+conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; copy_client_asset('helao/core/servers/reflex/_app/assets')"
+cd helao/core/servers/reflex/_app && reflex init --name helao_ui && reflex export --frontend-only
+# place the export at <repo_root>/.reflex-bundle/helao_ui/   (gitignored)
+```
+
+`reflex_launcher.py` serves that bundle and exits non-zero if it is missing, unless `REFLEX_ALLOW_LOCAL_BUILD=1` is set *and* bun/node is on `PATH` — a silent multi-minute build on an instrument PC is worse than a clear error.
+
+Layout and the two rules worth knowing before editing it:
+
+- `helao/core/servers/reflex/` — `app.py` (routes composed from config), `ingest.py`, `ringbuffer.py`, `state.py`, `plots.py`, `xy_component.py`. Panels live in `helao/deploy/<deployment>/servers/reflex/` and are discovered through the same `live_vis:` / `action_vis:` keys the Bokeh visualizers use.
+- **The plot facade is used at two call sites.** `plots.chart(spec_var, url_var)` binds a component **once** in a panel's `build()`; `plots.time_series(...)` and friends return a `ChartPayload` **every tick** from `pull()`, which the panel assigns into its state vars. Calling a facade function from `build()` yields a chart that paints once and never updates.
+- **`ws_live` and `ws_data` carry different payloads.** `ws_live` relays a `{datalab: (value, epoch)}` dict; `ws_data` carries a pickled `DataPackageModel` object whose samples sit at `.datamodel.data[key][column]`. `ingest.NORMALIZERS` selects the right one by `ws_path` — a single normalizer silently drops the other endpoint's messages with no error.
+
+Only `plots.py` and `xy_component.py` may import `xy` (a test enforces this). `xy` is pre-1.0; `docs/superpowers/notes/2026-08-01-xy-api-probe.md` records its verified call signatures and should be re-checked after any version bump.
 
 ### Formatting
 

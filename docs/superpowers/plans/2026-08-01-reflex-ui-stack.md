@@ -5869,7 +5869,10 @@ git commit -m "test(reflex): add goldenreflex config and route-level end-to-end 
 conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; print(copy_client_asset('helao/core/servers/reflex/_app/assets'))"
 
 cd helao/core/servers/reflex/_app
-conda run -n helao reflex init --loglevel info
+# --name is required: reflex init derives the app name from the current
+# directory, and `_app` fails its ^[a-zA-Z][a-zA-Z0-9_]*$ check even though
+# rxconfig.py already declares a valid app_name.
+conda run -n helao reflex init --name helao_ui --loglevel info
 conda run -n helao reflex export --frontend-only
 ```
 
