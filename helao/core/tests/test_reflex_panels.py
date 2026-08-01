@@ -158,3 +158,116 @@ def test_make_panel_state_keys_the_cache_on_the_base_class_not_its_name():
     real = make_panel_state("dup_panel", "SIM", state_mod.LiveVisState, "ws_live")
     impostor = make_panel_state("dup_panel", "SIM", LiveVisState, "ws_live")
     assert real is not impostor
+
+
+PANEL_MODULES = ["wssim_panel", "oersim_panel", "gpsim_panel"]
+
+
+@pytest.mark.parametrize("name", PANEL_MODULES)
+def test_panel_module_satisfies_the_contract(name):
+    from importlib import import_module
+
+    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    assert mod.WS_PATH in ("ws_live", "ws_data")
+    assert issubclass(mod.STATE_BASE, VisPanelState)
+    assert callable(mod.build)
+
+
+@pytest.mark.parametrize("name", PANEL_MODULES)
+def test_panel_builds_a_component_without_an_ingest_layer(name):
+    """A panel must render before any data arrives."""
+    from importlib import import_module
+
+    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    state_cls = make_panel_state(name, "TESTKEY", mod.STATE_BASE, mod.WS_PATH)
+    assert mod.build("TESTKEY", state_cls) is not None
+
+
+@pytest.mark.parametrize("name", PANEL_MODULES)
+def test_panel_state_declares_the_chart_binding_vars(name):
+    """build() binds these; pull() drives them. Both halves are required."""
+    from importlib import import_module
+
+    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    assert hasattr(mod.STATE_BASE, "chart_spec")
+    assert hasattr(mod.STATE_BASE, "chart_url")
+
+
+def test_wssim_extract_reads_series_columns_from_the_buffer():
+    import numpy as np
+
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import wssim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.buffer.append(
+        {"epoch": [1.0, 2.0], "series_0": [10.0, 11.0], "series_1": [20.0, 21.0]}
+    )
+    cols = wssim_panel.extract(ing, window=10)
+    np.testing.assert_allclose(cols["epoch"], [1.0, 2.0])
+    np.testing.assert_allclose(cols["series"]["series_0"], [10.0, 11.0])
+    assert "series_1" in cols["series"]
+
+
+def test_wssim_extract_skips_the_epoch_column_in_the_series_set():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import wssim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.buffer.append({"epoch": [1.0], "series_0": [5.0]})
+    assert "epoch" not in wssim_panel.extract(ing, window=10)["series"]
+
+
+def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import wssim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    cols = wssim_panel.extract(ing, window=10)
+    assert cols["epoch"].size == 0
+    assert cols["series"] == {}
+
+
+def test_panel_id_is_stable_across_calls():
+    from helao.deploy.test.servers.reflex import wssim_panel
+
+    assert wssim_panel.panel_id("SIM") == wssim_panel.panel_id("SIM")
+    assert wssim_panel.panel_id("SIM") != wssim_panel.panel_id("OTHER")
+
+
+def test_gpsim_histograms_are_extracted_from_raw_batches():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.raw.append(
+        [
+            {
+                "plate_id": ([4001], 100.0),
+                "pred_avail": ([[0.3, 0.4, 0.5]], 100.0),
+                "gt_acquired": ([[0.35, 0.45]], 100.0),
+            }
+        ]
+    )
+    hists = gpsim_panel.extract_histograms(ing)
+    assert "4001 predicted" in hists
+    assert "4001 acquired" in hists
+    assert len(hists["4001 predicted"]) == 3
+
+
+def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    assert gpsim_panel.extract_histograms(WsIngest("127.0.0.1", 1, "ws_live")) == {}
+
+
+def test_gpsim_passes_raw_samples_to_the_facade_not_prebinned_data():
+    """xy has a native hist mark; binning in Python would be redundant work."""
+    import inspect
+
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    src = inspect.getsource(gpsim_panel)
+    assert "plots.histogram" in src
+    assert "np.histogram" not in src
