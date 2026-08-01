@@ -5872,7 +5872,7 @@ cd helao/core/servers/reflex/_app
 # --name is required: reflex init derives the app name from the current
 # directory, and `_app` fails its ^[a-zA-Z][a-zA-Z0-9_]*$ check even though
 # rxconfig.py already declares a valid app_name.
-conda run -n helao reflex init --name helao_ui --loglevel info
+conda run -n helao reflex init --name helao_ui --no-agents --loglevel info
 conda run -n helao reflex export --frontend-only
 ```
 
