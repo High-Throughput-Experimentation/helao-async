@@ -5118,10 +5118,11 @@ And the inline comment — replace `# bokeh server (visualizer/operator)` with `
 
 ```bash
 conda run -n helao python -c "
-import inspect, launch
-src = inspect.getsource(launch.restart_server)
+import inspect, os, launch
+# restart_server is a closure inside main(), not a module attribute, so read
+# main's source rather than the function's.
+src = inspect.getsource(launch.main)
 assert '{codeKey}_launcher.py' in src, 'restart_server no longer derives the launcher name'
-import os
 assert os.path.isfile('reflex_launcher.py'), 'reflex_launcher.py missing at repo root'
 print('CTRL-r resolves reflex -> reflex_launcher.py: OK')
 "
