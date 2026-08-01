@@ -729,6 +729,7 @@ from helao.core.servers.reflex.ingest import (
     IngestRegistry,
     WsIngest,
     normalize,
+    normalize_data_package,
 )
 
 
@@ -851,6 +852,91 @@ def test_normalize_treats_epoch_zero_as_a_real_timestamp():
     cols, _ = normalize([{"v": (1.0, 0.0)}])
     assert cols["epoch"] == [0.0]
     assert cols["v"] == [1.0]
+
+
+def test_normalize_data_package_unwraps_a_model_object():
+    """ws_data carries pickled DataPackageModel objects, not dicts.
+
+    normalize() drops them at its isinstance(message, dict) guard, which left
+    the action visualizer permanently empty while its status still read "live".
+    """
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="measure_cp",
+        datamodel=DataModel(
+            data={uuid.uuid4(): {"t_s": [0.1, 0.2, 0.3], "erhe_v": [1.2, 1.3, 1.4]}},
+            errors=[],
+        ),
+    )
+    cols, rows = normalize_data_package([pkg])
+    assert cols["t_s"] == [0.1, 0.2, 0.3]
+    assert cols["erhe_v"] == [1.2, 1.3, 1.4]
+    assert rows[0]["action_uuid"] == str(pkg.action_uuid)
+
+
+def test_normalize_would_have_dropped_the_same_packet():
+    """Pins why a second normalizer exists rather than one shared one."""
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="measure_cp",
+        datamodel=DataModel(data={uuid.uuid4(): {"t_s": [0.1]}}, errors=[]),
+    )
+    assert normalize([pkg]) == ({}, [])
+
+
+def test_normalize_data_package_keeps_columns_aligned_across_packets():
+    import math
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    def _pkg(cols):
+        return DataPackageModel(
+            action_uuid=uuid.uuid4(),
+            action_name="a",
+            datamodel=DataModel(data={uuid.uuid4(): cols}, errors=[]),
+        )
+
+    cols, _ = normalize_data_package([_pkg({"t_s": [1.0]}), _pkg({"erhe_v": [9.0]})])
+    assert len({len(c) for c in cols.values()}) == 1
+    assert cols["t_s"][0] == 1.0 and math.isnan(cols["t_s"][1])
+    assert math.isnan(cols["erhe_v"][0]) and cols["erhe_v"][1] == 9.0
+
+
+def test_normalize_data_package_skips_non_numeric_columns():
+    import uuid
+
+    from helao.core.models.data import DataModel, DataPackageModel
+
+    pkg = DataPackageModel(
+        action_uuid=uuid.uuid4(),
+        action_name="a",
+        datamodel=DataModel(
+            data={uuid.uuid4(): {"t_s": [1.0], "atfracs": ["Co0.5-Ni0.5"]}}, errors=[]
+        ),
+    )
+    cols, _ = normalize_data_package([pkg])
+    assert cols["t_s"] == [1.0]
+    assert "atfracs" not in cols
+
+
+def test_normalize_data_package_tolerates_junk():
+    assert normalize_data_package(["nope", {}, {"datamodel": None}]) == ({}, [])
+
+
+def test_wsingest_selects_its_normalizer_by_ws_path():
+    live = WsIngest("127.0.0.1", 1, "ws_live")
+    data = WsIngest("127.0.0.1", 1, "ws_data")
+    assert live._normalize is normalize
+    assert data._normalize is normalize_data_package
 
 
 @pytest.mark.asyncio
@@ -1018,6 +1104,8 @@ __all__ = [
     "WsIngest",
     "IngestRegistry",
     "normalize",
+    "normalize_data_package",
+    "NORMALIZERS",
     "set_registry",
     "get_registry",
 ]
@@ -1134,6 +1222,89 @@ def normalize(messages: list) -> tuple:
     return cols, rows
 
 
+def normalize_data_package(messages: list) -> tuple:
+    """Turn ``ws_data`` packets into numeric columns and per-message rows.
+
+    ``/ws_data`` is served by ``data_publisher.broadcast``, and ``WsPublisher``
+    defaults to an identity ``xform_func`` -- so each message is a pickled
+    :class:`DataPackageModel` **object**, not a dict. Its payload lives at
+    ``.datamodel.data[file_conn_key][column]`` and is reached by attribute
+    access, which is why the Bokeh ``oersim_vis`` reads
+    ``data_package.datamodel.status`` rather than subscripting. A dict is also
+    accepted, defensively, in case a relay is configured with ``as_dict()``.
+
+    :func:`normalize` drops these outright (they are not dicts), which left an
+    action visualizer permanently empty while its status still read ``live``.
+
+    Args:
+        messages: Batches drained from a :class:`WsSubscriber` on ``ws_data``.
+
+    Returns:
+        ``(numeric_columns, rows)``. Columns are equal-length and positionally
+        aligned, filled per message exactly as :func:`normalize` does. Each row
+        carries the ``action_uuid`` and ``status`` of one packet, so a panel can
+        reset when the streamed action changes.
+    """
+
+    def _get(obj, name):
+        if isinstance(obj, dict):
+            return obj.get(name)
+        return getattr(obj, name, None)
+
+    cols: dict = {}
+    rows: list = []
+    emitted = 0
+    for message in messages:
+        datamodel = _get(message, "datamodel")
+        if datamodel is None:
+            continue
+        data = _get(datamodel, "data")
+        if not isinstance(data, dict):
+            continue
+
+        pending: dict = {}
+        for columns in data.values():
+            if not isinstance(columns, dict):
+                continue
+            for name, values in columns.items():
+                seq = values if isinstance(values, (list, tuple)) else [values]
+                pending.setdefault(name, []).extend(seq)
+
+        numeric: dict = {}
+        for name, values in pending.items():
+            try:
+                numeric[name] = [float(v) for v in values]
+            except (TypeError, ValueError):
+                # e.g. composition strings alongside the numeric traces
+                continue
+        if not numeric:
+            continue
+
+        row_count = max(len(v) for v in numeric.values())
+        for name in numeric:
+            if name not in cols:
+                cols[name] = [float("nan")] * emitted
+        for name, column in cols.items():
+            values = numeric.get(name, [])
+            column.extend(values)
+            column.extend([float("nan")] * (row_count - len(values)))
+        emitted += row_count
+
+        status = _get(datamodel, "status")
+        rows.append(
+            {
+                "action_uuid": str(_get(message, "action_uuid") or ""),
+                "status": str(getattr(status, "value", status) or ""),
+            }
+        )
+    return cols, rows
+
+
+#: Which normalizer each subscribed endpoint needs. The two carry genuinely
+#: different payloads; one normalizer silently drops the other's messages.
+NORMALIZERS = {"ws_live": normalize, "ws_data": normalize_data_package}
+
+
 @dataclass
 class IngestStatus:
     """Observable connection state for one ingest target.
@@ -1201,6 +1372,7 @@ class WsIngest:
         self.rows = RowBuffer(maxlen=row_maxlen)
         self.raw = collections.deque(maxlen=raw_maxlen)
         self.status = IngestStatus()
+        self._normalize = NORMALIZERS.get(ws_path, normalize)
         self._drain_interval = drain_interval
         self._stale_after = stale_after
         self._wss: Optional[WsSubscriber] = None
@@ -1251,7 +1423,7 @@ class WsIngest:
                 messages = await self._wss.read_messages()
                 if messages:
                     self.raw.append(messages)
-                    cols, rows = normalize(messages)
+                    cols, rows = self._normalize(messages)
                     if cols:
                         self.buffer.append(cols)
                     for row in rows:
@@ -1350,7 +1522,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 23 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
+Expected: 29 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
