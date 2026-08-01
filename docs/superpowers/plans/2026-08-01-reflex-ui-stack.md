@@ -3540,7 +3540,7 @@ def test_route_map_omits_a_page_not_requested_but_keeps_it_reachable_as_empty():
 
 
 def test_only_plots_module_imports_xy():
-"""Only the facade and the binding may touch the alpha xy API."""
+    """Only the facade and the binding may touch the alpha xy API."""
     import pathlib
     import re
 
