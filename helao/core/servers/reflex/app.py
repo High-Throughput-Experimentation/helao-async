@@ -13,8 +13,17 @@ A panel module must expose:
 * ``build(server_key, state_cls) -> rx.Component``
 """
 
-__all__ = ["PanelTarget", "panel_targets", "route_map", "build_app", "app"]
+__all__ = [
+    "PanelTarget",
+    "as_list",
+    "as_dict",
+    "panel_targets",
+    "route_map",
+    "build_app",
+    "app",
+]
 
+import contextlib
 from dataclasses import dataclass
 
 import reflex as rx
@@ -59,6 +68,36 @@ class PanelTarget:
     vis_key: str
 
 
+def as_list(value) -> list:
+    """Coerce a config value to a list, tolerating a bare scalar.
+
+    YAML makes ``pages: live`` and ``pages: [live]`` easy to confuse, and the
+    former silently degrades: ``set("live")`` is ``{"l","i","v","e"}``, so every
+    requested page vanishes with no error. Same hazard for ``limit_vis``, where
+    membership degrades to a substring test.
+    """
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return list(value)
+    return [value]
+
+
+def as_dict(value, *, what: str) -> dict:
+    """Return ``value`` when it is a mapping, otherwise ``{}`` with a warning.
+
+    ``build_app`` runs at import time, so an unguarded ``.get`` on a malformed
+    block takes down the module — and with it the Reflex CLI entrypoint.
+    """
+    if isinstance(value, dict):
+        return value
+    if value is not None:
+        LOGGER.warning(f"{what} is not a mapping ({type(value).__name__}); ignoring")
+    return {}
+
+
 def panel_targets(world_cfg: dict, limit_vis=None) -> list:
     """Discover every panel declared by the config's action servers.
 
@@ -71,18 +110,17 @@ def panel_targets(world_cfg: dict, limit_vis=None) -> list:
         list: :class:`PanelTarget` entries, config order preserved.
     """
     targets = []
+    allowed = as_list(limit_vis)
     for server_key, server_cfg in (world_cfg.get("servers") or {}).items():
         if not isinstance(server_cfg, dict):
             continue
-        if limit_vis and server_key not in limit_vis:
+        if allowed and server_key not in allowed:
             continue
         for vis_key, ws_path in VIS_KEY_TO_WS_PATH.items():
             module_names = server_cfg.get(vis_key)
             if not module_names:
                 continue
-            if isinstance(module_names, str):
-                module_names = [module_names]
-            for module_name in module_names:
+            for module_name in as_list(module_names):
                 targets.append(PanelTarget(server_key, module_name, ws_path, vis_key))
     return targets
 
@@ -102,7 +140,7 @@ def route_map(world_cfg: dict, pages, limit_vis=None) -> dict:
     Returns:
         dict: ``{route_path: [PanelTarget, ...]}``.
     """
-    wanted = set(pages or [])
+    wanted = set(as_list(pages))
     all_targets = panel_targets(world_cfg, limit_vis=limit_vis)
     routes = {path: [] for path in SHELL_ROUTES}
     for page, vis_key in PAGE_TO_VIS_KEY.items():
@@ -136,6 +174,16 @@ def _render_panel(target: PanelTarget):
     except ModuleNotFoundError as exc:
         LOGGER.warning(f"reflex panel module missing: {exc}")
         return _error_card(f"{target.server_key}: panel module not found", str(exc))
+    except Exception as exc:
+        # A module that exists but raises while importing -- a bad transitive
+        # import, a NameError, any bug in a deployment's panel. Catching only
+        # ModuleNotFoundError here would let that escape and take down the
+        # whole page, defeating the isolation this function exists for.
+        LOGGER.exception(f"reflex panel module failed to import: {exc}")
+        return _error_card(
+            f"{target.server_key}: panel module failed to import",
+            f"{type(exc).__name__}: {exc}",
+        )
     try:
         state_cls = make_panel_state(
             target.module_name,
@@ -145,7 +193,9 @@ def _render_panel(target: PanelTarget):
         )
         return module.build(target.server_key, state_cls)
     except Exception as exc:
-        LOGGER.warning(f"reflex panel build failed for {target.server_key}: {exc}")
+        # .exception, not .warning: without the traceback a real bug in an
+        # otherwise-working panel is far harder to place.
+        LOGGER.exception(f"reflex panel build failed for {target.server_key}: {exc}")
         return _error_card(
             f"{target.server_key}: panel failed to build",
             f"{type(exc).__name__}: {exc}",
@@ -232,10 +282,12 @@ def build_app(world_cfg: dict, server_key: str):
     Returns:
         rx.App: The configured app, with ingest registered on its lifespan.
     """
-    server_cfg = (world_cfg.get("servers") or {}).get(server_key) or {}
-    params = server_cfg.get("params") or {}
-    pages = params.get("pages") or ["live", "action"]
-    limit_vis = params.get("limit_vis") or []
+    server_cfg = as_dict(
+        (world_cfg.get("servers") or {}).get(server_key), what=f"server '{server_key}'"
+    )
+    params = as_dict(server_cfg.get("params"), what=f"server '{server_key}' params")
+    pages = as_list(params.get("pages")) or ["live", "action"]
+    limit_vis = as_list(params.get("limit_vis"))
     routes = route_map(world_cfg, pages, limit_vis=limit_vis)
 
     registry = IngestRegistry(world_cfg)
@@ -288,11 +340,26 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO browser",
     )
 
-    async def _start_ingest():
+    @contextlib.asynccontextmanager
+    async def _ingest_lifespan():
+        """Own the ingest registry for the app's lifetime.
+
+        An asynccontextmanager, not a plain coroutine: Reflex tracks the former
+        through an ``AsyncExitStack`` and awaits its teardown, while a plain
+        coroutine is only ``create_task``-ed and cancelled. Since
+        ``registry.start()`` returns immediately after spawning the drain tasks,
+        a plain coroutine would leave nothing to cancel and every ``WsIngest``
+        loop would outlive the app.
+        """
         registry.start()
         LOGGER.info(f"reflex ingest started for targets: {registry.targets()}")
+        try:
+            yield
+        finally:
+            await registry.stop()
+            LOGGER.info("reflex ingest stopped")
 
-    application.register_lifespan_task(_start_ingest)
+    application.register_lifespan_task(_ingest_lifespan)
     return application
 
 

@@ -217,6 +217,138 @@ def test_route_map_omits_a_page_not_requested_but_keeps_it_reachable_as_empty():
     assert routes["/action"] == []
 
 
+# --- build_app end-to-end -----------------------------------------------
+#
+# The helper tests above are pure. These construct the real app, because every
+# robustness defect this task shipped -- an uncaught panel import error, an
+# AttributeError on a malformed params block, a bare-string `pages` silently
+# erasing every route -- lived in build_app and none of them were reachable
+# from panel_targets/route_map alone.
+
+
+def _ui_cfg(params):
+    return {
+        "servers": {
+            "SIM": {
+                "host": "127.0.0.1",
+                "port": 8002,
+                "group": "action",
+                "live_vis": "wssim_panel",
+            },
+            "UI": {
+                "host": "127.0.0.1",
+                "port": 5010,
+                "group": "visualizer",
+                "reflex": "helao_ui",
+                "params": params,
+            },
+        }
+    }
+
+
+def test_build_app_survives_a_params_block_that_is_not_a_mapping():
+    """build_app runs at import time; an AttributeError here kills the module."""
+    from helao.core.servers.reflex.app import build_app
+
+    assert build_app(_ui_cfg(["live"]), "UI") is not None
+
+
+def test_build_app_survives_a_missing_server_entry():
+    from helao.core.servers.reflex.app import build_app
+
+    assert build_app({"servers": {}}, "NOPE") is not None
+
+
+def test_a_bare_string_pages_value_still_selects_that_page():
+    """`pages: live` is an easy YAML slip; set("live") would erase every route."""
+    from helao.core.servers.reflex.app import route_map
+
+    routes = route_map(_ui_cfg({"pages": "live"}), "live")
+    assert [t.server_key for t in routes["/live"]] == ["SIM"]
+
+
+def test_a_bare_string_limit_vis_filters_by_whole_key_not_substring():
+    from helao.core.servers.reflex.app import panel_targets
+
+    cfg = _ui_cfg({})
+    assert [t.server_key for t in panel_targets(cfg, limit_vis="SIM")] == ["SIM"]
+    assert panel_targets(cfg, limit_vis="S") == []
+
+
+def test_a_panel_module_that_fails_to_import_renders_an_error_card(monkeypatch):
+    """Isolation is the point: one bad panel must not take down the page.
+
+    Task 7 writes real panel modules against exactly this guarantee, and an
+    import-time NameError is not a ModuleNotFoundError.
+    """
+    from helao.core.servers.reflex import app as app_mod
+
+    def _boom(_name):
+        raise NameError("typo at module scope")
+
+    monkeypatch.setattr(app_mod, "resolve_panel_module", _boom)
+    card = app_mod._render_panel(
+        app_mod.PanelTarget("SIM", "wssim_panel", "ws_live", "live_vis")
+    )
+    assert card is not None
+
+
+def test_an_unknown_panel_module_renders_an_error_card():
+    from helao.core.servers.reflex.app import PanelTarget, _render_panel
+
+    card = _render_panel(PanelTarget("SIM", "no_such_panel", "ws_live", "live_vis"))
+    assert card is not None
+
+
+def test_the_buffer_route_is_reachable_through_the_built_app():
+    """Bulk column data rides this route, not Reflex state. No route, no data."""
+    import numpy as np
+    from fastapi.testclient import TestClient
+    from starlette.applications import Starlette
+
+    from helao.core.servers.reflex import plots
+    from helao.core.servers.reflex.app import build_app
+
+    app = build_app(_ui_cfg({"pages": ["live"]}), "UI")
+    plots.STORE.put("rt", 2, [memoryview(np.arange(3, dtype=np.float64).tobytes())])
+    # `api_transformer` is typed as a broader union (a single transformer, a
+    # sequence of them, or None) than `TestClient` accepts; narrow it to the
+    # single Starlette/FastAPI app `build_app` actually installs.
+    assert isinstance(app.api_transformer, Starlette)
+    client = TestClient(app.api_transformer)
+    assert client.get("/xy/buffers/rt?v=2").status_code == 200
+    assert client.get("/xy/buffers/rt?v=1").status_code == 404
+    assert client.get("/xy/buffers/ghost?v=1").status_code == 404
+
+
+def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
+    """A plain coroutine is only cancelled; the drain loops would outlive the app.
+
+    Every ``rx.App`` registers other lifespan tasks by default -- notably
+    ``App._setup_event_processor``, which is itself wrapped in
+    ``contextlib.asynccontextmanager`` -- so asserting that *any* registered
+    task has that shape would pass even if the ingest task were still a plain
+    coroutine. This isolates the ingest task by name (``__name__`` survives
+    ``functools.wraps`` through the decorator) before checking its shape, so a
+    regression back to a plain coroutine actually fails this test.
+    """
+    import contextlib
+    import inspect
+
+    from helao.core.servers.reflex.app import build_app
+
+    app = build_app(_ui_cfg({"pages": ["live"]}), "UI")
+    tasks = list(getattr(app, "lifespan_tasks", []) or [])
+    ingest_tasks = [
+        task for task in tasks if getattr(task, "__name__", "") == "_ingest_lifespan"
+    ]
+    assert ingest_tasks, "no _ingest_lifespan task registered"
+    task = ingest_tasks[0]
+    assert isinstance(
+        task, contextlib._AsyncGeneratorContextManager
+    ) or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
+
+
 def test_only_plots_module_imports_xy():
     """Only the facade and the binding may touch the alpha xy API."""
     import pathlib
