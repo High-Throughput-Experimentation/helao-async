@@ -144,3 +144,21 @@ they are correctly excluded from the chart-breadth paragraph above.
 - The ESM asset ships inside the wheel. The launcher copies it to the frontend build;
   nothing fetches from a CDN, which is what airgapped lab stations need.
 - Re-run the probe after any version bump and update this note.
+
+## Exact call signatures, verified during Task 4
+
+The findings above record which names exist. These record how to *call* them —
+established by running each against the installed package while implementing
+the facade. The plan's original snippets got all five of these wrong, and the
+first would have raised on first real use rather than at import.
+
+| Call | Correct form | What was wrong before |
+|---|---|---|
+| Payload split | `xy.chart(...).figure().build_payload_split()` | `xy.chart()` returns a **`Chart`**, not a `Figure`. `Chart` has no `build_payload_split`; the data-less `Figure` is produced lazily by `.figure()`. |
+| Frame encoding | `xy.channel.encode_frame_parts(meta_mapping, buffers)` → parts | Takes a JSON-able metadata mapping as its first argument, and returns scatter/gather **parts**, not one `bytes` blob. Join them. |
+| Series label | `xy.line(..., name=...)`, `xy.scatter(..., name=...)`, `xy.hist(..., name=...)` | Not `label=`. |
+| Histogram data | `xy.hist(values=..., bins=...)` | Not `x=`. |
+| Time axis | `xy.x_axis(label=..., type_="time", format="%H:%M:%S")` | Not `scale=` / `tick_format=`. |
+
+Re-run the Task 0 probe *and* re-check these kwargs after any xy version bump;
+the names surviving does not imply the signatures did, on a 0.0.x dependency.
