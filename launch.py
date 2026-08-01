@@ -1147,6 +1147,16 @@ def launch_server_groups(
                         )
                         CONSOLE.register(server, p)
                         ppid = p.pid
+                    elif codeKey == "reflex":
+                        cmd = ["python", "-u", "reflex_launcher.py", confArg, server]
+                        p = subprocess.Popen(
+                            cmd,
+                            cwd=helao_repo_root,
+                            env=CONSOLE.child_env(),
+                            **CONSOLE.spawn_kwargs(),
+                        )
+                        CONSOLE.register(server, p)
+                        ppid = p.pid
                     else:
                         LAUNCH_LOGGER.warning(
                             f"No launch method available for code type '{codeKey}', cannot launch {group}/{servPy}.py",
@@ -1222,7 +1232,7 @@ def server_loaded_files(server_entry, server_key, root):
     """Return the set of repo files a server has loaded.
 
     FastAPI servers (``fast``) are queried live at ``/loaded_modules``; bokeh
-    servers (``bokeh``) have no HTTP route, so their startup snapshot at
+    and reflex servers have no such HTTP route, so their startup snapshot at
     ``<root>/STATES/loaded_modules_<key>.json`` is read instead. Returns an empty
     set on any failure (treated as "no known mapping", so nothing is restarted
     on a bad read rather than restarting blindly)."""
@@ -1237,7 +1247,7 @@ def server_loaded_files(server_entry, server_key, root):
         except Exception:
             return set()
         return set()
-    # bokeh server (visualizer/operator)
+    # bokeh or reflex server (visualizer/operator)
     if root is None:
         return set()
     snap = os.path.join(root, "STATES", f"loaded_modules_{server_key}.json")

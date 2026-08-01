@@ -41,3 +41,14 @@ C:*
 # understand-anything knowledge-graph output (regenerated on demand;
 # ~9.5 MB of generated JSON, not worth versioning)
 .understand-anything/
+
+# Exported Reflex frontend bundle; built per-machine, shipped as a release
+# artifact rather than tracked. See reflex_launcher.py.
+.reflex-bundle/
+
+# xy's ESM render client, copied out of the installed wheel at build time.
+# Generated artifact, ~411 KB — never tracked.
+helao/core/servers/reflex/_app/assets/xy-client.js
+
+# Reflex's own build directory.
+helao/core/servers/reflex/_app/.web/
