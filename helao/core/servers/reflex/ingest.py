@@ -46,9 +46,18 @@ def normalize(messages: list) -> tuple:
 
     A payload is ``{datalab: (dataval, epochsec)}``. ``sim_dict`` payloads are
     flattened one level. List values extend a column; scalars append one
-    element. Each message contributes exactly one ``epoch`` value -- the
-    maximum ``epochsec`` in that message -- matching the behavior of the
-    Bokeh visualizers' ``add_points``.
+    element.
+
+    Row alignment is the whole job here. Every column advances by the same
+    number of rows per message -- the longest value list in that message, or
+    one -- with ``nan`` filling any column that message did not carry, and
+    the message's epoch repeated across all of its rows. Without that
+    invariant an intermittently-published key drifts: its Nth value would
+    land on the Nth message *containing* it rather than the Nth row, and the
+    data silently plots against the wrong timestamps. A single tail-pad at
+    the end of the batch (the earlier approach) only happens to be correct
+    when a column's real values form a contiguous prefix of the batch, which
+    an intermittent publisher does not guarantee.
 
     Values that will not coerce to ``float`` (server names, sample labels,
     status strings) are collected into per-message row dicts instead, because
@@ -58,17 +67,18 @@ def normalize(messages: list) -> tuple:
         messages: Batches drained from a :class:`WsSubscriber`.
 
     Returns:
-        ``(numeric_columns, mixed_rows)``. ``numeric_columns`` maps column
-        name to a list of floats; ``mixed_rows`` is one dict per message that
-        carried at least one non-numeric value. Malformed entries are
-        skipped.
+        ``(numeric_columns, mixed_rows)``. Every list in ``numeric_columns``
+        has the same length and is positionally aligned with ``epoch``.
+        ``mixed_rows`` is one dict per message that carried at least one
+        non-numeric value. Malformed entries are skipped.
     """
     cols: dict = {}
     rows: list = []
+    emitted = 0  # rows emitted so far, so a new column can be backfilled
     for message in messages:
         if not isinstance(message, dict):
             continue
-        latest_epoch = 0.0
+        latest_epoch = None
         row: dict = {}
         pending: dict = {}
         for datalab, payload in message.items():
@@ -76,7 +86,8 @@ def normalize(messages: list) -> tuple:
                 continue
             dataval, epochsec = payload
             try:
-                latest_epoch = max(latest_epoch, float(epochsec))
+                seen = float(epochsec)
+                latest_epoch = seen if latest_epoch is None else max(latest_epoch, seen)
             except (TypeError, ValueError):
                 pass
             if datalab == "sim_dict" and isinstance(dataval, dict):
@@ -88,26 +99,44 @@ def normalize(messages: list) -> tuple:
             else:
                 pending.setdefault(datalab, []).append(dataval)
 
+        numeric: dict = {}
         for name, values in pending.items():
             try:
-                floats = [float(v) for v in values]
+                numeric[name] = [float(v) for v in values]
             except (TypeError, ValueError):
                 row[name] = values[-1] if len(values) == 1 else values
-                continue
-            cols.setdefault(name, []).extend(floats)
-
-        if latest_epoch:
-            cols.setdefault("epoch", []).append(latest_epoch)
         if row:
             rows.append(row)
+        if not numeric and latest_epoch is None:
+            continue
 
-    # Pad shorter columns so RingBuffer.append sees a rectangular block. A
-    # server that publishes some keys less often than others is normal.
-    if cols:
-        width = max(len(v) for v in cols.values())
-        for name, values in cols.items():
-            if len(values) < width:
-                values.extend([float("nan")] * (width - len(values)))
+        # Every column advances by the same number of rows for this message.
+        # Deferring the fill to a single tail-pad at the end of the batch
+        # would silently misalign any key that publishes intermittently: its
+        # Nth value would land on the Nth message *containing that key*, not
+        # the Nth row.
+        row_count = max((len(v) for v in numeric.values()), default=1) or 1
+
+        for name in numeric:
+            if name not in cols:
+                cols[name] = [float("nan")] * emitted
+        if latest_epoch is not None and "epoch" not in cols:
+            cols["epoch"] = [float("nan")] * emitted
+
+        for name, column in cols.items():
+            if name == "epoch":
+                # Every row from one message shares that message's
+                # timestamp, so a burst of N samples repeats the epoch N
+                # times rather than leaving N-1 rows with no time to plot
+                # against.
+                stamp = float("nan") if latest_epoch is None else latest_epoch
+                column.extend([stamp] * row_count)
+            else:
+                values = numeric.get(name, [])
+                column.extend(values)
+                column.extend([float("nan")] * (row_count - len(values)))
+        emitted += row_count
+
     return cols, rows
 
 
@@ -192,16 +221,38 @@ class WsIngest:
         LOGGER.info(f"reflex ingest subscribing to {self.url}")
 
     async def stop(self) -> None:
-        """Cancel the drain loop and the underlying subscriber. Idempotent."""
+        """Cancel the drain loop and the underlying subscriber. Idempotent.
+
+        ``task.cancel()`` followed by ``await task`` always raises
+        ``CancelledError`` at that ``await`` -- but the exception has two
+        unrelated causes. The common one is our own ``cancel()`` landing on
+        ``task`` and propagating out through the ``await``; ``task.cancelled()``
+        is ``True`` afterward and we swallow it, since that is exactly the
+        teardown this method is for. The rare one is something outside (for
+        example ``asyncio.wait_for(ingest.stop(), timeout=...)`` timing out)
+        cancelling *this* coroutine while it is suspended on the ``await``,
+        unrelated to whether ``task`` itself ever finishes cancelled; then
+        ``task.cancelled()`` is ``False`` and the cancellation must propagate
+        once cleanup is done, or the caller's own cancellation is silently
+        eaten. Both underlying tasks are still cancelled either way, so
+        teardown always completes before this method returns or raises.
+        """
+        outer_cancelled = False
         for task in (self._task, getattr(self._wss, "subscriber_task", None)):
-            if task is not None:
-                task.cancel()
-                try:
-                    await task
-                except (asyncio.CancelledError, Exception):
-                    pass
+            if task is None:
+                continue
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                if not task.cancelled():
+                    outer_cancelled = True
+            except Exception:
+                pass
         self._task = None
         self._wss = None
+        if outer_cancelled:
+            raise asyncio.CancelledError()
 
     async def _drain_loop(self) -> None:
         """Drain the subscriber, normalize, and append. Runs until cancelled."""
