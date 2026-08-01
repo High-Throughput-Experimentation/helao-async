@@ -9,8 +9,10 @@ show_debug: true
 run_unit_tests: true
 experiment_libraries:
   - simulatews_exp
+  - OERSIM_exp
   - helao/deploy/test/experiments/TEST_exp.py
 sequence_libraries:
+  - OERSIM_seq
   - helao/deploy/test/sequences/TEST_seq.py
 run_type: simulation
 root: /home/dan/INST_hlo_reflex
@@ -37,6 +39,26 @@ servers:
     fast: ws_simulator
     live_vis: wssim_panel
     params: {}
+  # CPSIM and GPSIM exist so the browser check actually exercises all three
+  # panels. Without CPSIM there is no `action_vis` server at all, so /action
+  # renders empty and the ws_data path -- the one that shipped two Critical
+  # defects -- is never touched by the only step that can prove rendering.
+  CPSIM:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: cpsim_server
+    action_vis: oersim_panel
+    params:
+      plate_id: 2750
+  GPSIM:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gpsim_server
+    live_vis: gpsim_panel
+    params:
+      random_seed: 9999
   UI:
     host: 127.0.0.1
     port: 5010
