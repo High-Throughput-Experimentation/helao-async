@@ -7,6 +7,8 @@ from types import SimpleNamespace
 from helao.core.servers.reflex.state import (
     ActionVisState,
     apply_tick,
+    loop_superseded,
+    may_clear_running,
     LiveVisState,
     VisPanelState,
     make_panel_state,
@@ -88,6 +90,24 @@ class _StubPanel:
         if self._raises is not None:
             raise self._raises
         self.pulled.append(ingest)
+
+
+def test_a_loop_holding_the_current_generation_keeps_running():
+    assert loop_superseded(current_generation=3, token=3) is False
+
+
+def test_a_loop_whose_generation_was_bumped_exits():
+    """The race: a newer loop started, or stop_loop fired, while we slept."""
+    assert loop_superseded(current_generation=4, token=3) is True
+
+
+def test_only_the_current_loop_may_clear_the_running_flag():
+    assert may_clear_running(current_generation=3, token=3) is True
+
+
+def test_a_superseded_loop_must_not_clear_the_running_flag():
+    """Clearing it would report the live loop as stopped."""
+    assert may_clear_running(current_generation=4, token=3) is False
 
 
 def test_apply_tick_reports_a_missing_ingest_without_raising():

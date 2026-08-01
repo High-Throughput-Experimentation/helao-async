@@ -18,6 +18,8 @@ __all__ = [
     "ActionVisState",
     "make_panel_state",
     "apply_tick",
+    "loop_superseded",
+    "may_clear_running",
 ]
 
 import asyncio
@@ -36,6 +38,40 @@ MAX_WINDOW_POINTS = 10000
 DEFAULT_WINDOW_POINTS = 500
 MIN_UPDATE_RATE = 0.01
 DEFAULT_UPDATE_RATE = 0.5
+
+
+def loop_superseded(current_generation: int, token: int) -> bool:
+    """Whether a loop holding ``token`` has been replaced and must exit.
+
+    Framework-free so the race fix is testable: ``rx.State`` cannot be built
+    outside app machinery, and the previous version of this logic -- a single
+    shared ``running`` boolean -- shipped a real double-loop bug that no test
+    could have caught.
+
+    Args:
+        current_generation: The state's current ``loop_generation``.
+        token: The generation this loop captured when it started.
+
+    Returns:
+        bool: ``True`` when a newer loop (or a stop) has bumped the generation.
+    """
+    return current_generation != token
+
+
+def may_clear_running(current_generation: int, token: int) -> bool:
+    """Whether an exiting loop owns the ``running`` flag.
+
+    A superseded loop must not clear the flag on its way out; doing so would
+    report the live loop as stopped.
+
+    Args:
+        current_generation: The state's current ``loop_generation``.
+        token: The generation of the loop that is exiting.
+
+    Returns:
+        bool: ``True`` only when the exiting loop is still the current one.
+    """
+    return current_generation == token
 
 
 def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
@@ -185,7 +221,7 @@ class VisPanelState(rx.State):
                     # Not `if not self.running`: `async with self` refetches
                     # state, so a loop that slept through a stop-then-restart
                     # would see the *new* loop's True and both would run.
-                    if self.loop_generation != token:
+                    if loop_superseded(self.loop_generation, token):
                         return
                     ingest = self.ingest()
                     apply_tick(
@@ -200,7 +236,7 @@ class VisPanelState(rx.State):
             async with self:
                 # Only the current loop may clear the flag; a superseded one
                 # exiting must not report the live loop as stopped.
-                if self.loop_generation == token:
+                if may_clear_running(self.loop_generation, token):
                     self.running = False
 
     @rx.event
