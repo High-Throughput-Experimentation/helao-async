@@ -2,6 +2,7 @@
 
 import asyncio
 import pickle
+import time
 
 import numpy as np
 import pyzstd
@@ -285,6 +286,23 @@ def test_wsingest_selects_its_normalizer_by_ws_path():
     data = WsIngest("127.0.0.1", 1, "ws_data")
     assert live._normalize is normalize
     assert data._normalize is normalize_data_package
+
+
+@pytest.mark.asyncio
+async def test_status_goes_reconnecting_when_the_stream_goes_stale():
+    """The spec sells this badge as the fix for Bokeh's silently-dead feed."""
+    ing = WsIngest("127.0.0.1", 1, "ws_live", stale_after=0.05, drain_interval=0.01)
+    ing.status.state = "live"
+    ing.status.last_epoch = time.time() - 1.0
+    ing.start()
+    try:
+        for _ in range(200):
+            if ing.status.state == "reconnecting":
+                break
+            await asyncio.sleep(0.02)
+        assert ing.status.state == "reconnecting"
+    finally:
+        await ing.stop()
 
 
 @pytest.mark.asyncio

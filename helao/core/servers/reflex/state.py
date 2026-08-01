@@ -26,6 +26,7 @@ import asyncio
 
 import reflex as rx
 
+from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.ingest import get_registry
 from helao.helpers import helao_logging as logging
 
@@ -192,6 +193,18 @@ class VisPanelState(rx.State):
             return None
         return registry.get(self.server_key or self.server_key_default, self.ws_path)
 
+    def panel_key(self) -> str:
+        """Return this panel's buffer-store key for the current session.
+
+        ``panel_id`` must be scoped per browser session, not per server: the
+        buffer store keeps one frame per key while ``version`` is per-session
+        Reflex state, so two sessions sharing a key would 404 each other into a
+        permanently frozen chart. Panel modules override this to fold in
+        ``self.router.session.client_token``; this base implementation is only
+        a fallback so :meth:`stop_loop` always has something to drop.
+        """
+        return f"{self.server_key_default}-{self.router.session.client_token}"
+
     def pull(self, ingest) -> None:
         """Copy data from ``ingest`` into this panel's state vars.
 
@@ -241,9 +254,16 @@ class VisPanelState(rx.State):
 
     @rx.event
     def stop_loop(self):
-        """Ask the render loop to exit on its next tick."""
+        """Ask the render loop to exit on its next tick, and free its buffer.
+
+        Releases this panel's entry from :data:`plots.STORE` through
+        :meth:`~helao.core.servers.reflex.xy_component.BufferStore.drop`, so a
+        closed session's frame does not linger under a key nothing will ever
+        refetch.
+        """
         self.loop_generation += 1
         self.running = False
+        plots.STORE.drop(self.panel_key())
 
 
 class LiveVisState(VisPanelState):

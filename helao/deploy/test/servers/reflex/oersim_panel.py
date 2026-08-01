@@ -20,9 +20,14 @@ WS_PATH = "ws_data"
 X_COLUMN = "t_s"
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel."""
-    return f"oersim-{server_key}"
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
+
+    Scoped per session: the store holds one frame per key while the version
+    counter is per-session state, so a shared key lets two tabs 404 each other
+    into a frozen chart.
+    """
+    return f"oersim-{server_key}-{session_token}"
 
 
 def extract(ingest, window: int) -> dict:
@@ -53,6 +58,10 @@ class _State(ActionVisState):
     version: int = 0
     action_uuid: str = ""
 
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
+
     def pull(self, ingest) -> None:
         """Recompute the chart payload from the trailing window."""
         cols = extract(ingest, self.window_points)
@@ -63,7 +72,7 @@ class _State(ActionVisState):
             x_label="t (s)",
             y_label="value",
             x_is_epoch=False,
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec

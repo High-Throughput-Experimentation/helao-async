@@ -24,6 +24,7 @@ __all__ = [
 ]
 
 import contextlib
+import os
 from dataclasses import dataclass
 
 import reflex as rx
@@ -364,11 +365,29 @@ def build_app(world_cfg: dict, server_key: str):
 
 
 def _build_from_global_config():
-    """Build the app from the installed global config, if there is one."""
+    """Build the app from the installed global config, loading it if needed.
+
+    ``reflex_launcher`` spawns ``reflex run --backend-only`` as a *child*
+    process, and ``reflex export`` runs in its own process too. Both import this
+    module fresh, where ``config_loader.CONFIG`` is ``None`` -- it is installed
+    only in the launcher's own process. Without reading ``HELAO_REFLEX_CONFIG``
+    here, both build a bare ``rx.App()`` with zero pages: the backend serves
+    nothing, and the exported bundle ships no routes at all while still looking
+    plausible, because assets are copied verbatim regardless of page content.
+    """
     cfg = config_loader.CONFIG
     if not cfg:
+        conf_arg = os.environ.get("HELAO_REFLEX_CONFIG")
+        if conf_arg:
+            cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
+            config_loader.install_global_config(cfg_dict)
+            cfg = config_loader.CONFIG
+    if not cfg:
+        LOGGER.warning(
+            "no HELAO config available (HELAO_REFLEX_CONFIG unset and none "
+            "installed); building an empty app with no routes"
+        )
         return rx.App()
-    import os
 
     key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "")
     if not key:
