@@ -1,0 +1,48 @@
+# helao/deploy/test/configs/goldenreflex.yml
+# Reflex UI stack over the `test` deployment simulators, proving coexistence:
+# the Bokeh standalone operator and the Reflex visualizer app run in the same
+# group. Reflex servers occupy two ports (frontend, then backend), so UI at
+# 5010 also claims 5011.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_reflex
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+  OPERATOR:
+    host: 127.0.0.1
+    port: 5001
+    group: operator
+    bokeh: standalone_operator
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (bokeh, unchanged)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_panel
+    params: {}
+  UI:
+    host: 127.0.0.1
+    port: 5010
+    group: visualizer
+    reflex: helao_ui
+    params:
+      pages:
+        - live
+        - action
