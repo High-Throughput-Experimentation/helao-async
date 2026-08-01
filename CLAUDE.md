@@ -49,8 +49,12 @@ Stations never need Node. Build the frontend bundle on a development machine and
 ```
 conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; copy_client_asset('helao/core/servers/reflex/_app/assets')"
 cd helao/core/servers/reflex/_app && reflex init --name helao_ui --no-agents && reflex export --frontend-only
-# place the export at <repo_root>/.reflex-bundle/helao_ui/   (gitignored)
+# then unzip frontend.zip into <repo_root>/.reflex-bundle/helao_ui/   (gitignored)
 ```
+
+**The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. Stage the `_app` directory somewhere executable (`/tmp` works), build there with `PYTHONPATH` pointed at the repo, and copy the resulting `frontend.zip` back. Only the *build* needs exec — the bundle is static files, and `StaticFiles` serves them from anywhere.
+
+`--name helao_ui` is required: `reflex init` derives the app name from the current directory and rejects `_app`'s leading underscore, ignoring the valid `app_name` already in `rxconfig.py`.
 
 `reflex_launcher.py` serves that bundle and exits non-zero if it is missing, unless `REFLEX_ALLOW_LOCAL_BUILD=1` is set *and* bun/node is on `PATH` — a silent multi-minute build on an instrument PC is worse than a clear error.
 
