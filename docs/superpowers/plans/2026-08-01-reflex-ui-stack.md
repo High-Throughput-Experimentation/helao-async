@@ -5668,8 +5668,10 @@ show_debug: true
 run_unit_tests: true
 experiment_libraries:
   - simulatews_exp
+  - OERSIM_exp
   - helao/deploy/test/experiments/TEST_exp.py
 sequence_libraries:
+  - OERSIM_seq
   - helao/deploy/test/sequences/TEST_seq.py
 run_type: simulation
 root: /home/dan/INST_hlo_reflex
@@ -5696,6 +5698,26 @@ servers:
     fast: ws_simulator
     live_vis: wssim_panel
     params: {}
+  # CPSIM and GPSIM exist so the browser check actually exercises all three
+  # panels. Without CPSIM there is no `action_vis` server at all, so /action
+  # renders empty and the ws_data path -- the one that shipped two Critical
+  # defects -- is never touched by the only step that can prove rendering.
+  CPSIM:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: cpsim_server
+    action_vis: oersim_panel
+    params:
+      plate_id: 2750
+  GPSIM:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gpsim_server
+    live_vis: gpsim_panel
+    params:
+      random_seed: 9999
   UI:
     host: 127.0.0.1
     port: 5010
@@ -5765,14 +5787,31 @@ def test_route_map_puts_the_sim_panel_on_live(reflex_cfg):
     from helao.core.servers.reflex.app import route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
-    assert [t.server_key for t in routes["/live"]] == ["SIM"]
-    assert [t.module_name for t in routes["/live"]] == ["wssim_panel"]
+    assert sorted(t.server_key for t in routes["/live"]) == ["GPSIM", "SIM"]
+    assert [t.server_key for t in routes["/action"]] == ["CPSIM"]
 
 
-def test_ingest_registry_discovers_the_sim_target(reflex_cfg):
+def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
+    """All three panels must be wired, or the browser check proves only one.
+
+    In particular CPSIM is the sole ws_data target — the path that shipped two
+    Critical defects — so without it the only step that can prove rendering
+    never touches it.
+    """
     from helao.core.servers.reflex.ingest import IngestRegistry
 
-    assert IngestRegistry(reflex_cfg).targets() == [("SIM", "ws_live")]
+    assert sorted(IngestRegistry(reflex_cfg).targets()) == [
+        ("CPSIM", "ws_data"),
+        ("GPSIM", "ws_live"),
+        ("SIM", "ws_live"),
+    ]
+
+
+def test_every_panel_module_is_reachable_from_this_config(reflex_cfg):
+    from helao.core.servers.reflex.app import panel_targets
+
+    modules = sorted(t.module_name for t in panel_targets(reflex_cfg))
+    assert modules == ["gpsim_panel", "oersim_panel", "wssim_panel"]
 
 
 def test_every_panel_on_every_route_renders(reflex_cfg):
@@ -5792,7 +5831,7 @@ conda run -n helao python -m pytest helao/core/tests/test_reflex_routes_e2e.py -
 
 If `test_app_builds_and_registers_every_shell_route` fails on the `unevaluated_pages`/`pages` attribute, consult the Task 0 API note for how the installed Reflex version exposes registered routes and fix the assertion to read that attribute. The intent — every shell route is registered — does not change.
 
-Expected once correct: 6 passed.
+Expected once correct: 7 passed.
 
 - [ ] **Step 4: Run the whole new suite together**
 
