@@ -4448,6 +4448,65 @@ def test_gpsim_histograms_are_extracted_from_raw_batches():
     assert len(hists["4001 predicted"]) == 3
 
 
+def test_oersim_plots_t_s_as_x_not_epoch():
+    """ws_data packets carry no epoch column; looking for one plots nothing."""
+    import numpy as np
+
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import oersim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_data")
+    ing.buffer.append({"t_s": [0.1, 0.2], "erhe_v": [1.2, 1.3]})
+    cols = oersim_panel.extract(ing, window=10)
+    np.testing.assert_allclose(cols["x"], [0.1, 0.2])
+    assert "erhe_v" in cols["series"]
+    assert "t_s" not in cols["series"]
+
+
+def test_oersim_surfaces_the_streamed_action_uuid():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import oersim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_data")
+    ing.rows.append({"action_uuid": "abc-123", "status": "active"})
+    assert oersim_panel.extract(ing, window=10)["action_uuid"] == "abc-123"
+
+
+def test_gpsim_table_includes_the_numeric_columns():
+    """plate_id/step/frac_acquired are numeric, so they never reach .rows.
+
+    Reading the table from .rows left three of five columns permanently blank.
+    """
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.raw.append(
+        [
+            {
+                "plate_id": ([4001], 100.0),
+                "step": ([7], 100.0),
+                "frac_acquired": ([0.42], 100.0),
+                "last_acquisition": (["Co0.5-Ni0.5"], 100.0),
+                "orchestrator": (["orch0"], 100.0),
+            }
+        ]
+    )
+    rows = gpsim_panel.extract_table_rows(ing)
+    assert rows and rows[0][0] == "4001"
+    assert rows[0][1] == "7"
+    assert rows[0][2] == "0.42"
+    assert rows[0][3] == "Co0.5-Ni0.5"
+    assert rows[0][4] == "orch0"
+
+
+def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    assert gpsim_panel.extract_table_rows(WsIngest("127.0.0.1", 1, "ws_live")) == []
+
+
 def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
     from helao.core.servers.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
@@ -4632,7 +4691,10 @@ from helao.core.servers.reflex.state import ActionVisState
 
 WS_PATH = "ws_data"
 
-X_COLUMN = "epoch"
+#: The x axis is elapsed seconds from the data packet, not a wall-clock epoch:
+#: ws_data packets carry no epoch column, so looking for one would leave x empty
+#: and plot nothing. Matches the Bokeh original, which plots t_s vs erhe_v.
+X_COLUMN = "t_s"
 
 
 def panel_id(server_key: str) -> str:
@@ -4648,12 +4710,15 @@ def extract(ingest, window: int) -> dict:
         window: Number of trailing rows.
 
     Returns:
-        dict: ``{"x": np.ndarray, "series": {name: np.ndarray}}``.
+        dict: ``{"x": np.ndarray, "series": {name: np.ndarray},
+        "action_uuid": str}``.
     """
     snap = ingest.buffer.snapshot(window)
+    latest = ingest.rows.latest() or {}
     return {
         "x": snap.get(X_COLUMN, np.empty(0)),
         "series": {k: v for k, v in snap.items() if k != X_COLUMN},
+        "action_uuid": str(latest.get("action_uuid", "")),
     }
 
 
@@ -4663,6 +4728,7 @@ class _State(ActionVisState):
     chart_spec: dict = {}
     chart_url: str = ""
     version: int = 0
+    action_uuid: str = ""
 
     def pull(self, ingest) -> None:
         """Recompute the chart payload from the trailing window."""
@@ -4671,13 +4737,15 @@ class _State(ActionVisState):
         payload = plots.time_series(
             cols["x"],
             cols["series"],
-            x_label="Time (HH:MM:SS)",
+            x_label="t (s)",
             y_label="value",
+            x_is_epoch=False,
             panel_id=panel_id(self.server_key_default),
             version=self.version,
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
+        self.action_uuid = cols["action_uuid"]
 
 
 STATE_BASE = _State
@@ -4698,6 +4766,7 @@ def build(server_key: str, state_cls):
             rx.hstack(
                 rx.heading(f"Action: {server_key}", size="4"),
                 rx.badge(state_cls.connection),
+                rx.text(state_cls.action_uuid, size="1"),
                 rx.spacer(),
                 rx.input(
                     default_value=str(state_cls.window_points),
@@ -4765,6 +4834,46 @@ def panel_id(server_key: str) -> str:
     return f"gpsim-{server_key}"
 
 
+def extract_table_rows(ingest) -> list:
+    """Pull the acquisition-table rows from the newest raw batch.
+
+    Read from ``ingest.raw`` rather than ``ingest.rows`` because ``normalize``
+    classifies each key by float-coercibility: ``plate_id``, ``step`` and
+    ``frac_acquired`` are numeric and land in the ring buffer, so only
+    ``last_acquisition`` and ``orchestrator`` ever reach ``rows`` -- three of the
+    five columns would render permanently blank.
+
+    Args:
+        ingest: The panel's :class:`WsIngest`.
+
+    Returns:
+        list: One list-of-strings per plate in the newest batch, ordered to
+        match :data:`TABLE_COLUMNS`.
+    """
+    if not ingest.raw:
+        return []
+    out: list = []
+    for message in ingest.raw[-1]:
+        if not isinstance(message, dict):
+            continue
+        values = {}
+        for column in TABLE_COLUMNS:
+            payload = message.get(column)
+            if isinstance(payload, (tuple, list)) and len(payload) == 2:
+                values[column] = payload[0]
+        plates = values.get("plate_id") or []
+        for i in range(len(plates)):
+            row = []
+            for column in TABLE_COLUMNS:
+                seq = values.get(column) or []
+                cell = seq[i] if i < len(seq) else ""
+                if isinstance(cell, float):
+                    cell = f"{cell:.4g}"
+                row.append(str(cell))
+            out.append(row)
+    return out
+
+
 def extract_histograms(ingest) -> dict:
     """Pull per-plate sample arrays out of the most recent raw batch.
 
@@ -4802,12 +4911,21 @@ class _State(LiveVisState):
     chart_url: str = ""
     version: int = 0
     table_rows: list = []
+    #: Accumulated per-plate samples. The driver runs plates concurrently and
+    #: each pushes its own message, so a single drain batch holds only whichever
+    #: plates happened to land in it. The Bokeh original kept a persistent
+    #: per-plate dict for the same reason; without it the chart flickers between
+    #: plates instead of showing them together.
+    hist_samples: dict = {}
 
     def pull(self, ingest) -> None:
         """Recompute the histogram payload and the last 20 acquisition rows."""
         self.version += 1
+        merged = dict(self.hist_samples)
+        merged.update(extract_histograms(ingest))
+        self.hist_samples = merged
         payload = plots.histogram(
-            extract_histograms(ingest),
+            merged,
             bins=HIST_BINS,
             value_range=HIST_RANGE,
             x_label="Eta (V vs O2/H2O)",
@@ -4817,10 +4935,7 @@ class _State(LiveVisState):
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
-        self.table_rows = [
-            [str(row.get(col, "")) for col in TABLE_COLUMNS]
-            for row in ingest.rows.rows()[-20:]
-        ]
+        self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
 
 
 STATE_BASE = _State
@@ -4880,7 +4995,7 @@ def build(server_key: str, state_cls):
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 34 passed (18 from Task 5, 16 new — the three parametrized tests contribute three cases each).
+Expected: 38 passed (18 from Task 5, 20 new — the three parametrized tests contribute three cases each).
 
 - [ ] **Step 5: Format and commit**
 
