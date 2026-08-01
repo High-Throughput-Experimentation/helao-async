@@ -207,6 +207,9 @@ class ServerConfig(BaseModel):
             ``operator``; selects the launcher and import path.
         fast: Module name under ``servers/<group>/`` for FastAPI servers.
         bokeh: Module name under ``servers/<group>/`` for Bokeh servers.
+        reflex: Reflex app module name for the Reflex UI stack. A Reflex
+            server occupies two ports: ``port`` serves the static frontend and
+            ``port + 1`` is the Reflex backend.
         params: Free-form parameter dict (or :class:`OrchServerParams` for
             orchestrators) passed through to the server's ``makeApp``.
         verbose: Enables debug-level logging on the server.
@@ -217,6 +220,7 @@ class ServerConfig(BaseModel):
     group: str
     fast: Optional[str] = None
     bokeh: Optional[str] = None
+    reflex: Optional[str] = None
     params: Optional[dict | OrchServerParams] = None
     verbose: Optional[bool] = False
 

@@ -52,6 +52,7 @@ import requests
 from pyfiglet import figlet_format
 from termcolor import cprint
 
+from helao.core.servers.reflex.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
 from helao.helpers.config_loader import read_config
@@ -539,7 +540,7 @@ class Pidd:
         # whose PID psutil.pid_exists() still reports as alive.
         self.procs = {}
         self.reqKeys = ("host", "port", "group")
-        self.codeKeys = ("fast", "bokeh")
+        self.codeKeys = ("fast", "bokeh", "reflex")
         self.d = {}
         try:
             self.load_global()
@@ -869,37 +870,39 @@ def validateConfig(PIDD, confDict, helao_repo_root):
     If any of these checks fail, an appropriate error message is printed and the function returns False.
     """
     if len(confDict["servers"]) != len(set(confDict["servers"])):
-        LAUNCH_LOGGER.info("Server keys are not unique.")
+        _mux_log("info", "Server keys are not unique.")
         return False
     if "servers" not in confDict:
-        LAUNCH_LOGGER.info("'servers' key not defined in config dictionary.")
+        _mux_log("info", "'servers' key not defined in config dictionary.")
         return False
     for server in confDict["servers"]:
         serverDict = confDict["servers"][server]
         hasKeys = [k in serverDict for k in PIDD.reqKeys]
         hasCode = [k for k in serverDict if k in PIDD.codeKeys]
         if not all(hasKeys):
-            LAUNCH_LOGGER.info(
-                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}."
+            _mux_log(
+                "info",
+                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}.",
             )
             return False
         if not isinstance(serverDict["host"], str):
-            LAUNCH_LOGGER.info(f"{server} server 'host' is not a string")
+            _mux_log("info", f"{server} server 'host' is not a string")
             return False
         if not isinstance(serverDict["port"], int):
-            LAUNCH_LOGGER.info(f"{server} server 'port' is not an integer")
+            _mux_log("info", f"{server} server 'port' is not an integer")
             return False
         if not isinstance(serverDict["group"], str):
-            LAUNCH_LOGGER.info(f"{server} server 'group' is not a string")
+            _mux_log("info", f"{server} server 'group' is not a string")
             return False
         if hasCode:
             if len(hasCode) != 1:
-                LAUNCH_LOGGER.info(
-                    f"{server} cannot have more than one code key {PIDD.codeKeys}"
+                _mux_log(
+                    "info",
+                    f"{server} cannot have more than one code key {PIDD.codeKeys}",
                 )
                 return False
             if not isinstance(serverDict[hasCode[0]], str):
-                LAUNCH_LOGGER.info(f"{server} server '{hasCode[0]}' is not a string")
+                _mux_log("info", f"{server} server '{hasCode[0]}' is not a string")
                 return False
             # launchPath = os.path.join(
             #     "helao",
@@ -912,9 +915,11 @@ def validateConfig(PIDD, confDict, helao_repo_root):
             #         f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
             #     )
             #     return False
-    serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
+    serverAddrs = []
+    for d in confDict["servers"].values():
+        serverAddrs.extend(reserved_addresses(d))
     if len(serverAddrs) != len(set(serverAddrs)):
-        LAUNCH_LOGGER.info("Server host:port locations are not unique.")
+        _mux_log("info", "Server host:port locations are not unique.")
         return False
     # Single-owner sample-state guardrail: at most one server may declare
     # params.positions (the SAMPLE server after the archive hoist). Two owners
@@ -925,9 +930,10 @@ def validateConfig(PIDD, confDict, helao_repo_root):
         if isinstance(d.get("params"), dict) and d["params"].get("positions")
     ]
     if len(positionsOwners) > 1:
-        LAUNCH_LOGGER.info(
+        _mux_log(
+            "info",
             f"More than one server declares 'params.positions': "
-            f"{positionsOwners}. Exactly one sample-state owner is allowed."
+            f"{positionsOwners}. Exactly one sample-state owner is allowed.",
         )
         return False
     return True
