@@ -2020,7 +2020,10 @@ def encode_buffers(buffers) -> bytes:
     Returns:
         bytes: One encoded frame carrying every column.
     """
-    return bytes(xy.channel.encode_frame_parts(list(buffers)))
+    # encode_frame_parts takes a JSON-able metadata mapping plus the buffer
+    # list, and returns scatter/gather parts rather than one blob.
+    parts = xy.channel.encode_frame_parts({}, list(buffers))
+    return b"".join(bytes(part) for part in parts)
 
 
 class BufferStore:
@@ -2340,7 +2343,7 @@ def test_facade_exposes_exactly_the_documented_surface():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
 ```
 
-Expected: `ModuleNotFoundError: No module named 'helao.core.servers.reflex.plots'`.
+Expected an import failure naming `plots`. The exact exception depends on when you run it: `ModuleNotFoundError` if the `reflex/` package does not exist yet, `ImportError: cannot import name 'plots'` once earlier tasks have created the package. Either is the expected red.
 
 - [ ] **Step 7: Write the facade**
 
@@ -2448,7 +2451,9 @@ def _publish(figure, panel_id: str, version: int) -> ChartPayload:
     Returns:
         ChartPayload: Assign this into the panel's state vars.
     """
-    spec, buffers = figure.build_payload_split()
+    # xy.chart(...) returns a Chart component; the data-less Figure that
+    # carries build_payload_split is produced lazily by .figure().
+    spec, buffers = figure.figure().build_payload_split()
     STORE.put(panel_id, version, buffers)
     return ChartPayload(
         spec=spec,
@@ -2487,10 +2492,11 @@ def _axes(x_label: str, y_label: str, x_is_epoch: bool) -> list:
     seconds are formatted ``HH:MM:SS`` to match the ``DatetimeTickFormatter``
     the Bokeh visualizers use.
     """
-    x_kwargs = {"label": x_label}
+    x_kwargs: dict = {"label": x_label}
     if x_is_epoch:
-        x_kwargs["tick_format"] = "%H:%M:%S"
-        x_kwargs["scale"] = "time"
+        # xy axis builders take type_/format; there is no scale/tick_format.
+        x_kwargs["type_"] = "time"
+        x_kwargs["format"] = "%H:%M:%S"
     return [xy.x_axis(**x_kwargs), xy.y_axis(label=y_label)]
 
 
@@ -2534,7 +2540,7 @@ def time_series(
         if fx.size == 0:
             continue
         marks.append(
-            xy.line(x=fx, y=fy, label=label, color=PALETTE[idx % len(PALETTE)])
+            xy.line(x=fx, y=fy, name=label, color=PALETTE[idx % len(PALETTE)])
         )
     figure = xy.chart(*marks, *_axes(x_label, y_label, x_is_epoch))
     return _publish(figure, panel_id, version)
@@ -2612,7 +2618,7 @@ def scatter_map(
     ys = _as_float_array(y)
     if xs.size != ys.size:
         raise ValueError(f"x has length {xs.size} but y has length {ys.size}")
-    mark_kwargs = {"x": xs, "y": ys}
+    mark_kwargs: dict = {"x": xs, "y": ys}
     if values is not None:
         vs = _as_float_array(values)
         if vs.size != xs.size:
@@ -2657,9 +2663,9 @@ def histogram(
         if arr.size == 0:
             continue
         kwargs = {
-            "x": arr,
+            "values": arr,
             "bins": bins,
-            "label": f"{label} n={arr.size:d}",
+            "name": f"{label} n={arr.size:d}",
             "color": PALETTE[idx % len(PALETTE)],
             "density": True,
         }
@@ -2676,7 +2682,7 @@ def histogram(
 conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
 ```
 
-Expected: 21 passed. If a test fails inside `xy.line`, `xy.scatter`, `xy.hist`, `xy.x_axis`, or `xy.chart`, the Task 0 API note's recorded signature was not transcribed correctly — fix the call, not the test. Record any signature correction back into the API note in the same commit, since Task 7 reads it.
+Expected: 19 passed. If a test fails inside `xy.line`, `xy.scatter`, `xy.hist`, `xy.x_axis`, or `xy.chart`, the Task 0 API note's recorded signature was not transcribed correctly — fix the call, not the test. Record any signature correction back into the API note in the same commit, since Task 7 reads it.
 
 - [ ] **Step 9: Format and commit**
 
