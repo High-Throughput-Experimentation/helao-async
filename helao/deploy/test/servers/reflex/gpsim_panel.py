@@ -40,9 +40,14 @@ TABLE_COLUMNS = [
 ]
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel."""
-    return f"gpsim-{server_key}"
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
+
+    Scoped per session: the store holds one frame per key while the version
+    counter is per-session state, so a shared key lets two tabs 404 each other
+    into a frozen chart.
+    """
+    return f"gpsim-{server_key}-{session_token}"
 
 
 def extract_table_rows(ingest) -> list:
@@ -128,6 +133,16 @@ class _State(LiveVisState):
     #: per-plate dict for the same reason; without it the chart flickers between
     #: plates instead of showing them together.
     hist_samples: dict = {}
+    #: message_count at the last table append. extract_table_rows reads the
+    #: newest raw batch, but pull() runs on a timer while the driver publishes
+    #: per acquisition -- without a watermark the same batch is re-appended
+    #: every tick and "Last 20 acquisitions" collapses to one row repeated. The
+    #: Bokeh original streamed once per websocket batch, being event-driven.
+    last_table_count: int = -1
+
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
         """Recompute the histogram payload and the last 20 acquisition rows."""
@@ -141,12 +156,15 @@ class _State(LiveVisState):
             value_range=HIST_RANGE,
             x_label="Eta (V vs O2/H2O)",
             y_label="density",
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
-        self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
+        count = ingest.status.message_count
+        if count != self.last_table_count:
+            self.last_table_count = count
+            self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
 
 
 STATE_BASE = _State

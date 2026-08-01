@@ -182,6 +182,15 @@ def normalize_data_package(messages: list) -> tuple:
         if not isinstance(data, dict):
             continue
 
+        if len(data) > 1:
+            # Columns from several file connections are merged by name below,
+            # which silently interleaves what may be unrelated timebases. Warn
+            # rather than fix: oersim publishes one connection per packet, but
+            # the hte deployment is far likelier to hit this.
+            LOGGER.warning(
+                f"ws_data packet carries {len(data)} file connections; "
+                "their columns are merged by name and may interleave"
+            )
         pending: dict = {}
         for columns in data.values():
             if not isinstance(columns, dict):

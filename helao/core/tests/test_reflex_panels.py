@@ -228,11 +228,28 @@ def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
     assert cols["series"] == {}
 
 
-def test_panel_id_is_stable_across_calls():
-    from helao.deploy.test.servers.reflex import wssim_panel
+def test_panel_id_is_stable_per_session_and_distinct_across_sessions():
+    """The earlier version of this test asserted the defect.
 
-    assert wssim_panel.panel_id("SIM") == wssim_panel.panel_id("SIM")
-    assert wssim_panel.panel_id("SIM") != wssim_panel.panel_id("OTHER")
+    It required panel_id to depend on server_key alone, which is exactly what
+    let two browser tabs share a buffer-store key: the store holds one frame per
+    key while the version counter is per-session state, so each tab 404s the
+    other into a permanently frozen chart with a "live" badge.
+    """
+    from helao.deploy.test.servers.reflex import wssim_panel as w
+
+    assert w.panel_id("SIM", "tok-a") == w.panel_id("SIM", "tok-a")
+    assert w.panel_id("SIM", "tok-a") != w.panel_id("OTHER", "tok-a")
+    assert w.panel_id("SIM", "tok-a") != w.panel_id("SIM", "tok-b")
+
+
+def test_every_panel_scopes_its_buffer_key_by_session():
+    from importlib import import_module
+
+    for name in PANEL_MODULES:
+        mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+        assert mod.panel_id("SIM", "tok-a") != mod.panel_id("SIM", "tok-b"), name
+        assert hasattr(mod.STATE_BASE, "panel_key"), name
 
 
 def test_gpsim_histograms_are_extracted_from_raw_batches():
@@ -305,6 +322,44 @@ def test_gpsim_table_includes_the_numeric_columns():
     assert rows[0][2] == "0.42"
     assert rows[0][3] == "Co0.5-Ni0.5"
     assert rows[0][4] == "orch0"
+
+
+def test_gpsim_table_does_not_re_append_the_same_batch():
+    """pull() runs on a timer; the driver publishes per acquisition.
+
+    Without a watermark the newest raw batch is re-appended every tick and the
+    "Last 20 acquisitions" table collapses to one row repeated.
+    """
+    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.raw.append(
+        [
+            {
+                "plate_id": ([4001], 100.0),
+                "step": ([7], 100.0),
+                "frac_acquired": ([0.42], 100.0),
+                "last_acquisition": (["Co0.5-Ni0.5"], 100.0),
+                "orchestrator": (["orch0"], 100.0),
+            }
+        ]
+    )
+    ing.status.message_count = 1
+
+    class _P:
+        last_table_count = -1
+        table_rows: list = []
+
+    panel = _P()
+    for _ in range(5):  # five render ticks, one published batch
+        count = ing.status.message_count
+        if count != panel.last_table_count:
+            panel.last_table_count = count
+            panel.table_rows = (panel.table_rows + gpsim_panel.extract_table_rows(ing))[
+                -20:
+            ]
+    assert len(panel.table_rows) == 1
 
 
 def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():

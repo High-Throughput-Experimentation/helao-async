@@ -19,12 +19,15 @@ WS_PATH = "ws_live"
 X_COLUMN = "epoch"
 
 
-def panel_id(server_key: str) -> str:
-    """Stable buffer-store identity for this panel.
+def panel_id(server_key: str, session_token: str) -> str:
+    """Buffer-store identity for this panel in one browser session.
 
-    Must not vary across renders: a shifting id would orphan store entries.
+    Stable across renders -- a shifting id orphans store entries -- but scoped
+    per session, because the store holds one frame per key while the version
+    counter lives in per-session state. Two tabs sharing a key overwrite each
+    other and 404 each other into a permanently frozen chart.
     """
-    return f"wssim-{server_key}"
+    return f"wssim-{server_key}-{session_token}"
 
 
 def extract(ingest, window: int) -> dict:
@@ -52,6 +55,10 @@ class _State(LiveVisState):
     version: int = 0
     table_rows: list = []
 
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key; see VisPanelState.panel_key."""
+        return panel_id(self.server_key_default, self.router.session.client_token)
+
     def pull(self, ingest) -> None:
         """Recompute the chart payload and the latest-value table."""
         cols = extract(ingest, self.window_points)
@@ -61,7 +68,7 @@ class _State(LiveVisState):
             cols["series"],
             x_label="Time (HH:MM:SS)",
             y_label="value",
-            panel_id=panel_id(self.server_key_default),
+            panel_id=self.panel_key(),
             version=self.version,
         )
         self.chart_spec = payload.spec
