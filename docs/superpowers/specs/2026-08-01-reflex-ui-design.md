@@ -152,7 +152,9 @@ The binding is deliberately confined to this one module plus its asset-copy step
 | `scatter_map(x, y, on_select=..., **opts)` | sample_vis, the operator plate map, oersim |
 | `histogram(values_by_label, **opts)` | gpsim |
 
-Functions take plain numpy arrays, not buffers, so the facade is testable with synthetic data and no ingest layer present. Each returns an `rx.Component` built through the binding above. `histogram` uses xy's native `hist` mark — the earlier plan to fake histograms with step lines was based on a mistaken reading of xy's chart breadth and is dropped.
+Functions take plain numpy arrays, not buffers, so the facade is testable with synthetic data and no ingest layer present.
+
+The facade is used at **two** call sites, and the split is load-bearing. A panel's `build` runs once, when the page is composed, and calls `plots.chart(spec_var, url_var)` to bind the component to two Reflex state vars. A panel's `pull` runs every render tick and calls `plots.time_series(...)` (or `histogram`, …) to produce a `ChartPayload` — a small spec plus a buffer URL — which it assigns into those vars. Data flows through state; the component is constructed once. Calling a facade function from `build` instead would produce a chart that paints once and never moves. `histogram` uses xy's native `hist` mark — the earlier plan to fake histograms with step lines was based on a mistaken reading of xy's chart breadth and is dropped.
 
 The xy version is pinned in `helao_dev_linux-64.yml` and `helao_dev_win-64.yml`. Swapping the plotting backend means editing this one file plus the binding.
 

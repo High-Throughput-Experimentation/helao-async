@@ -22,6 +22,7 @@
 - Never name a private deployment in a tracked parent-repo file. Refer to them as "private deployments". Only `hte` and `test` may be named.
 - Tests run **one file per pytest process** (`python run_tests.py`). Never collect the tree as a single pytest session — it hangs.
 - The Bokeh path must remain behaviorally unchanged. Every change to `launch.py`, `config_loader.py`, or `vis_subscriber.py` is additive. Existing tests must stay green.
+- xy's ESM render client (`<xy pkg>/static/index.js`, ~411 KB) ships inside the published wheel and is copied into the Reflex assets directory at build time. Nothing fetches from a CDN — lab stations may be airgapped. A source-checkout xy install lacks the asset; xy's own error names the fix.
 - Everything in this plan targets the `test` deployment and `helao/core/`. No `hte` files are touched.
 - Work on branch `feat/reflex-ui-stack` off `unstable`. Do not push or open a PR; commit locally only.
 
@@ -36,7 +37,8 @@
 | `helao/core/servers/reflex/__init__.py` | Package marker. Empty. |
 | `helao/core/servers/reflex/ringbuffer.py` | `RingBuffer` (numeric columnar) and `RowBuffer` (mixed-type rows). No IO, no Reflex, no xy. |
 | `helao/core/servers/reflex/ingest.py` | `IngestStatus`, `WsIngest`, `IngestRegistry`. Owns WebSocket lifetime and message normalization. |
-| `helao/core/servers/reflex/plots.py` | The plot facade: `time_series`, `spectra`, `scatter_map`, `histogram`. The **only** module importing `xy`. |
+| `helao/core/servers/reflex/xy_component.py` | The hand-written Reflex binding for xy: `XYChart` (NoSSR), `BufferStore`, the buffer route, and the ESM asset copy. Only module importing `xy.widget` / `xy.channel`. Deletable once xy ships `xy.reflex`. |
+| `helao/core/servers/reflex/plots.py` | The plot facade: `time_series`, `spectra`, `scatter_map`, `histogram`, `chart`. The **only** module importing xy's charting API. |
 | `helao/core/servers/reflex/state.py` | `VisPanelState` base plus `make_panel_state()`, which mints a per-`(module, server_key)` Reflex State subclass. |
 | `helao/core/servers/reflex/discovery.py` | Shared deployment search order + panel-module resolution. |
 | `helao/core/servers/reflex/app.py` | Builds the `rx.App`, registers routes from config, owns the ingest lifespan. |
@@ -53,6 +55,7 @@
 | `helao/core/tests/test_reflex_ingest.py` | Integration tests for `WsIngest` against a fake WebSocket server. |
 | `helao/core/tests/test_reflex_config.py` | Unit tests for `reflex:` config validation and route composition. |
 | `helao/core/tests/test_reflex_launcher.py` | Unit tests for bundle resolution in `reflex_launcher.py`. |
+| `helao/core/tests/test_reflex_xy_component.py` | Unit tests for the binding: buffer store, frame encoding, HTTP route, asset copy, shim contract. |
 | `helao/core/tests/test_reflex_plots.py` | Unit tests for the plot facade. |
 | `helao/core/tests/test_reflex_panels.py` | Unit tests for the `test` deployment panel modules. |
 | `helao/core/tests/test_reflex_routes_e2e.py` | End-to-end route smoke test. |
@@ -75,15 +78,20 @@
 **Deviations from the spec, deliberate:**
 
 1. The spec puts `RingBuffer`, `WsIngest`, and `IngestRegistry` in one `ingest.py`. Split: buffers are pure data structures with no IO and belong in their own file so they can be tested and reasoned about without asyncio.
-2. The spec lists three facade functions. A fourth, `histogram`, is added — `gpsim_live_vis` renders `quad` histograms, and xy 0.0.5 has no bar/quad primitive, so `histogram` renders a step line over the bin edges. This is a small visual change from the Bokeh version and is intentional.
-3. The spec's facade signatures take a buffer (`time_series(buf, ...)`). The facade takes plain numpy arrays instead, so it is testable with no ingest layer present.
-4. Reflex frontend and backend run on two ports (`port` and `port + 1`). Reflex's production model separates them, and a single-port merge depends on API surface this plan will not assume.
+2. The spec's facade signatures take a buffer (`time_series(buf, ...)`). The facade takes plain numpy arrays instead, so it is testable with no ingest layer present.
+3. The binding (`xy_component.py`) and the facade (`plots.py`) land as one task rather than two. A facade with no binding renders nothing and a binding with no caller cannot be reviewed, so a reviewer could not meaningfully accept one without the other.
+4. The facade is split across two call sites — `plots.<kind>()` returns a `ChartPayload` from a panel's `pull`, and `plots.chart()` binds the component in `build`. The spec describes the facade returning a component directly, which would produce a chart that paints once and never updates, because `build` runs only at page composition.
+5. Reflex frontend and backend run on two ports (`port` and `port + 1`). Reflex's production model separates them, and a single-port merge depends on API surface this plan will not assume.
 
 ---
 
-## Task 0: Dependency gate — verify Reflex and xy actually deliver
+## Task 0: Pin dependencies and record the verified xy API
 
-This is a **hard gate**. If any check fails, stop and report — do not work around it, do not proceed to Task 1. The rest of the plan assumes these APIs exist.
+The dependency gate has **already been run** and its outcome is recorded below — you are not re-deciding it. `xy` 0.0.5 and `reflex` 0.9.7 install cleanly into the `helao` env on Python 3.14 with no resolver conflict, and `run_unit_tests.py` still passes with both present.
+
+The gate's decisive finding: **`xy.reflex` does not exist.** xy's own source calls the Reflex adapter planned, unshipped work. HELAO writes that binding itself (spec Decision 7), which is Task 4. What xy *does* ship — and what the binding stands on — is verified below.
+
+Your job in this task is to pin the dependencies and turn the verified findings into the API note that Tasks 4-7 read as their source of truth. Re-run the probe to confirm the environment matches, and record real output.
 
 **Files:**
 - Create: `docs/superpowers/notes/2026-08-01-xy-api-probe.md`
@@ -91,7 +99,30 @@ This is a **hard gate**. If any check fails, stop and report — do not work aro
 
 **Interfaces:**
 - Consumes: nothing.
-- Produces: a recorded, verified API note that Tasks 5 and 7 read for exact xy and Reflex call signatures. Pinned versions in both env files.
+- Produces: pinned versions in both env files, and a committed API note that Tasks 4-7 read for exact xy call signatures.
+
+### Verified findings (recorded 2026-08-01, `helao` env, Python 3.14.6)
+
+**Versions:** `reflex` 0.9.7, `xy` 0.0.5. Both Apache-2.0.
+
+**`xy.reflex`:** absent. `importlib.util.find_spec("xy.reflex")` returns `None`. Not a naming difference — confirmed against xy's shipped source.
+
+**xy submodules:** `channel`, `channels`, `columns`, `components`, `config`, `dom`, `export`, `facets`, `interaction`, `kernels`, `lod`, `marks`, `plugins`, `pyplot`, `styles`, `styling`, `widget`.
+
+**xy chart breadth at 0.0.5** — wider than the README implies. Marks and chart constructors include: `line`/`line_chart`, `scatter`/`scatter_chart`, `bar`/`bar_chart`, `hist`/`histogram`/`histogram_chart`, `heatmap`/`heatmap_chart`, `contour`/`contour_chart`, `step`/`step_chart`, `stairs`/`stairs_chart`, `area`/`area_chart`, `box`/`box_chart`, `violin`/`violin_chart`, `ecdf`/`ecdf_chart`, `hexbin`/`hexbin_chart`, `errorbar`/`errorbar_chart`, `error_band`, `segments`, `stem`, `sankey`, `pie_chart`, `polar_chart`, `polar_bar_chart`, `radar_chart`, `wind_rose`, `triangle_mesh`, `contour`. Axis/annotation helpers: `x_axis`, `y_axis`, `r_axis`, `theta_axis`, `hline`, `vline`, `x_band`, `y_band`, `label`, `callout`, `legend`, `tooltip`, `colorbar`, `modebar`, `annotations`, `threshold`, `threshold_zone`.
+
+Every chart HELAO's Bokeh visualizers draw has a direct counterpart. In particular `hist` exists, so histograms are native — do **not** fake them with step lines.
+
+**Composition API:** `xy.chart(*children: Component, **props) -> Chart`. Declarative: marks and axes are child components, not method calls on a figure.
+
+**The renderer, which is what makes the binding possible:**
+
+- `xy.widget.bundled_js(which="widget"|"standalone") -> str` reads a bundled client build from `<xy package dir>/static/`. Both files ship in the wheel: `index.js` (ESM, ~411 KB) and `standalone.js` (IIFE, ~411 KB). xy's docstring is explicit that this is versioned and CDN-free for airgapped use.
+- `Figure.build_payload_split(px_width: Optional[int] = None) -> tuple[dict, list[memoryview]]` — a data-less JSON spec plus raw per-column binary buffers. xy documents this same split layout as serving both first paint **and streaming append**.
+- `xy.channel` exposes the wire protocol: `encode_frame`, `encode_frame_parts`, `decode_frame`, `handle_message`, `FRAME_MAGIC`, `FRAME_VERSION`, `FRAME_HEADER_SIZE`, `FRAME_ALIGNMENT`, `FrameDecodeError`, `FrameEncodeError`, `FrameLimits`, `DEFAULT_FRAME_LIMITS`, `Reply`, `DecodedFrame`, `Selection`, `normalize_window`, `SELECTION_EVENT_ID_LIMIT`, `SELECTION_EVENT_ROW_LIMIT`.
+- `xy.widget.FigureWidget` (anywidget) shows the intended contract: traits `spec` (Dict, synced) and `buffers` (Any, synced as raw binary), plus callbacks `on_hover`, `on_click`, `on_brush`, `on_select`, `on_view_change`, `on_animation_start`, `on_animation_end` wired through `ChannelCallbacks` and `handle_message`.
+
+**Reflex 0.9.7 capabilities Tasks 4-10 depend on** — all confirmed present: `rx.data_table`, `rx.card`, `rx.badge`, `rx.cond`, `rx.State`, `App.register_lifespan_task`, `rx.NoSSRComponent`, and `rx.Component`'s `library` / `tag` / `add_imports` / `_get_custom_code` / `is_default` / `lib_dependencies` wrapping surface.
 
 - [ ] **Step 1: Install the two dependencies into the `helao` env**
 
@@ -99,101 +130,74 @@ This is a **hard gate**. If any check fails, stop and report — do not work aro
 conda run -n helao pip install 'reflex>=0.9.7,<0.10' 'xy==0.0.5'
 ```
 
-Expected: both install without a resolver conflict against the existing env. If pip reports an incompatibility with an existing pin, **stop and report it** — do not force-install.
+Expected: both install with no resolver conflict. If pip reports an incompatibility with an existing pin, **stop and report it** — do not force-install and do not use `--no-deps`.
 
-- [ ] **Step 2: Probe the API surface**
+- [ ] **Step 2: Re-run the probe and capture its output**
 
 Write this to the scratchpad (not the repo) and run it:
 
 ```python
-# /tmp/claude-1000/-mnt-STORAGE-repos-helao-helao-async/451cc925-d50f-485b-a793-27138b66779d/scratchpad/probe_xy.py
+# scratchpad/probe_xy.py
+import importlib.util as u
 import inspect
-import numpy as np
+import pathlib
 
 import reflex as rx
 import xy
+import xy.channel
+import xy.widget
 
-print("reflex", rx.__version__ if hasattr(rx, "__version__") else "?")
+print("reflex", getattr(rx, "__version__", "?"))
 print("xy", getattr(xy, "__version__", "?"))
+print("xy.reflex spec:", u.find_spec("xy.reflex"))
 
-# 1. Chart primitives we depend on.
-for name in ("line", "scatter", "plot"):
-    print("xy has", name, ":", hasattr(xy, name))
+static = pathlib.Path(xy.widget.__file__).parent / "static"
+print("static dir exists:", static.exists())
+for f in sorted(static.iterdir()) if static.exists() else []:
+    print("  asset:", f.name, f.stat().st_size)
 
-# 2. The Reflex adapter.
-try:
-    import xy.reflex as xyrx
-    print("xy.reflex OK, exports:", [n for n in dir(xyrx) if not n.startswith("_")])
-except Exception as e:
-    print("xy.reflex IMPORT FAILED:", type(e).__name__, e)
+print("chart signature:", inspect.signature(xy.chart))
+print("build_payload_split:", inspect.signature(xy._figure.Figure.build_payload_split))
+print("bundled_js:", inspect.signature(xy.widget.bundled_js))
 
-# 3. Build one figure and hand it to the adapter.
-t = np.linspace(0.0, 10.0, 1000)
-fig = xy.figure() if hasattr(xy, "figure") else None
-print("xy.figure:", fig)
-print("top-level xy exports:", [n for n in dir(xy) if not n.startswith("_")])
+for name in ("line", "scatter", "bar", "hist", "heatmap", "step", "x_axis", "y_axis"):
+    print(f"xy.{name}:", hasattr(xy, name))
 
-# 4. Reflex APIs this plan uses.
-print("rx.App params:", list(inspect.signature(rx.App).parameters))
-print("has register_lifespan_task:", hasattr(rx.App, "register_lifespan_task"))
-print("has rx.data_table:", hasattr(rx, "data_table"))
-print("has rx.State:", hasattr(rx, "State"))
+for name in ("encode_frame_parts", "decode_frame", "handle_message", "Selection"):
+    print(f"xy.channel.{name}:", hasattr(xy.channel, name))
+
+for name in ("data_table", "card", "badge", "cond", "State", "NoSSRComponent"):
+    print(f"rx.{name}:", hasattr(rx, name))
+print("App.register_lifespan_task:", hasattr(rx.App, "register_lifespan_task"))
 ```
 
 ```bash
-conda run -n helao python /tmp/claude-1000/-mnt-STORAGE-repos-helao-helao-async/451cc925-d50f-485b-a793-27138b66779d/scratchpad/probe_xy.py
+conda run -n helao python <scratchpad>/probe_xy.py
 ```
 
-- [ ] **Step 3: Evaluate the gate**
+- [ ] **Step 3: Confirm the environment matches the recorded findings**
 
-The gate **passes** only if all of these hold:
+Every line of probe output must agree with the "Verified findings" section above. If any disagrees — a different version resolved, a missing `static/` directory, an absent mark — **stop and report the discrepancy**. Do not update the findings to match a surprise; a mismatch means the environment is not what the plan was built against.
 
-1. `import xy` succeeds.
-2. `import xy.reflex` succeeds and exports a component factory.
-3. xy exposes a line primitive and a scatter primitive.
-4. `rx.App` accepts a `state` or equivalent, and `rx.data_table` exists.
+The one failure with a documented fix: if `static/index.js` is missing, the install came from a source checkout rather than a published wheel. xy's own error message names the fix (`npm ci && node js/build.mjs`). Report it rather than running that yourself — it needs network access and is a decision, not a step.
 
-If 1–3 fail, **stop**: the spec's Decision 4 (thin facade) was chosen precisely so a failure here is contained, but the first slice cannot be built. Report which check failed and what xy 0.0.5 actually exports.
+- [ ] **Step 4: Write the API note**
 
-If 4 fails, **stop** and report — the Reflex version pin needs revisiting.
-
-- [ ] **Step 4: Record the verified API**
-
-Write `docs/superpowers/notes/2026-08-01-xy-api-probe.md` containing:
+Write `docs/superpowers/notes/2026-08-01-xy-api-probe.md`. Start from the "Verified findings" section above — copy it in as the body — then add a `## Probe output` section containing the **complete verbatim stdout** from Step 2, and a closing section:
 
 ```markdown
-# xy / Reflex API probe — 2026-08-01
+## Consequences for the implementation
 
-Recorded from a live probe in the `helao` conda env (Python 3.14.6).
-Tasks 5 and 7 use these exact signatures. Re-run the probe after any version bump.
-
-## Versions
-- reflex: <exact version printed>
-- xy: <exact version printed>
-
-## xy top-level exports
-<paste the printed list>
-
-## xy.reflex exports
-<paste the printed list>
-
-## Line chart — verified call
-<paste the exact working call, copied from the probe run>
-
-## Scatter chart — verified call
-<paste the exact working call>
-
-## Reflex APIs used
-- rx.App parameters: <paste>
-- rx.App.register_lifespan_task present: <yes/no>
-- rx.data_table present: <yes/no>
-
-## Known gaps at this version
-- No bar/quad primitive. `plots.histogram` renders a step line over bin edges instead.
-- <any other gap the probe surfaced>
+- There is no `xy.reflex`. `helao/core/servers/reflex/xy_component.py` (Task 4) is the
+  HELAO-written binding, built on `bundled_js`, `build_payload_split`, and `xy.channel`.
+  Delete it when xy ships its own adapter.
+- Histograms are native (`xy.hist`). Do not fake them with step lines.
+- The ESM asset ships inside the wheel. The launcher copies it to the frontend build;
+  nothing fetches from a CDN, which is what airgapped lab stations need.
+- Re-run the probe after any version bump and update this note.
 ```
 
-Every `<...>` placeholder must be replaced with real probe output before committing. A committed note containing an unreplaced `<...>` is a task failure.
+No `<...>` placeholders may remain. Every value must be real probe output.
 
 - [ ] **Step 5: Pin the dependencies in both env files**
 
@@ -215,14 +219,10 @@ Expected: PASS. Installing two pip packages must not disturb the sample-model un
 - [ ] **Step 7: Commit**
 
 ```bash
-conda run -n helao black helao_dev_linux-64.yml helao_dev_win-64.yml 2>/dev/null || true
 git add docs/superpowers/notes/2026-08-01-xy-api-probe.md helao_dev_linux-64.yml helao_dev_win-64.yml
 git commit -m "chore: pin reflex and xy, record verified API surface"
 ```
 
-(`black` does not format YAML; the `|| true` keeps the habit without failing the step.)
-
----
 
 ## Task 1: RingBuffer and RowBuffer
 
@@ -1488,37 +1488,488 @@ git commit -m "feat(reflex): add reflex config key and share deployment discover
 
 ---
 
-## Task 4: The plot facade
+## Task 4: The xy Reflex binding and plot facade
+
+xy ships no Reflex adapter, so HELAO writes one (spec Decision 7). The binding and the facade are one deliverable in two files — a facade with no binding renders nothing, and a binding with no facade has no callers — so they land together.
 
 **Files:**
+- Create: `helao/core/servers/reflex/xy_component.py`
 - Create: `helao/core/servers/reflex/plots.py`
+- Test: `helao/core/tests/test_reflex_xy_component.py`
 - Test: `helao/core/tests/test_reflex_plots.py`
 
 **Interfaces:**
-- Consumes: the verified xy call signatures recorded in `docs/superpowers/notes/2026-08-01-xy-api-probe.md` (Task 0).
+- Consumes: the verified xy API recorded in `docs/superpowers/notes/2026-08-01-xy-api-probe.md` (Task 0), and `RingBuffer` (Task 1).
 - Produces:
-  - `time_series(x, series, *, x_label="", y_label="", x_is_epoch=True, height=320) -> rx.Component`
-  - `spectra(x, traces, *, x_label="", y_label="", height=320) -> rx.Component`
-  - `scatter_map(x, y, *, values=None, on_select=None, x_label="", y_label="", height=420) -> rx.Component`
-  - `histogram(values_by_label, *, bins=100, value_range=None, x_label="", y_label="density", height=320) -> rx.Component`
-  - `PlotBackendError` raised at import time if xy is unusable.
+  - `xy_component.XYChart` — an `rx.NoSSRComponent` with props `spec: rx.Var[dict]`, `buffer_url: rx.Var[str]`, `height: rx.Var[str]`, and event `on_select`.
+  - `xy_component.xy_chart(**props) -> XYChart` — the create helper.
+  - `xy_component.BufferStore` — process-wide `panel_id -> (version, list[memoryview])` map, with `put(panel_id, version, buffers)`, `get(panel_id, version)`, `drop(panel_id)`.
+  - `xy_component.encode_buffers(buffers) -> bytes` — xy-native frame encoding via `xy.channel.encode_frame_parts`.
+  - `xy_component.make_buffer_router() -> fastapi.APIRouter` — serves `GET /xy/buffers/{panel_id}`.
+  - `xy_component.copy_client_asset(dest_dir) -> str` — copies xy's shipped ESM into the Reflex assets directory.
+  - `plots.ChartPayload` — frozen dataclass `(spec: dict, buffer_url: str)`.
+  - `plots.time_series`, `plots.spectra`, `plots.scatter_map`, `plots.histogram` — each `(arrays..., panel_id, version, **opts) -> ChartPayload`. Called from a panel's `pull`.
+  - `plots.chart(spec_var, url_var, *, height=320, on_select=None) -> rx.Component` — called from a panel's `build`.
+  - `plots.PlotBackendError`, `plots.STORE`.
+
+**The two-call split matters.** A panel's `build` runs once, when the page is composed; its `pull` runs on every render tick. So the facade is split: `build` calls `plots.chart(...)` to bind the component to two Reflex state vars, and `pull` calls `plots.time_series(...)` to compute a fresh `ChartPayload` and assign it into those vars. Data flows through state; the component is constructed once. Getting this backwards — calling `time_series` in `build` — produces a chart that renders once and never updates.
 
 **Design notes for the implementer:**
-- This is the **only** module in the repo permitted to `import xy`. Grep-enforced by a test in Task 8.
-- Arrays in, component out. The facade never touches a `RingBuffer`, so it is testable with synthetic numpy arrays and no ingest layer.
-- `x_is_epoch=True` means the x array holds epoch seconds and the facade formats the axis as `HH:MM:SS`, matching the `DatetimeTickFormatter(minutes="%T", hours="%T")` the Bokeh visualizers use.
-- `histogram` exists because xy 0.0.5 has no bar or quad primitive. It computes `np.histogram` and renders the result as a **step line** over the bin edges. Document that deviation in the module docstring.
-- Every function must tolerate empty arrays and return a valid empty chart rather than raising — panels render before the first message arrives.
-- Use the exact xy calls recorded in the Task 0 note. Where this plan writes `_xy_line(...)` / `_xy_scatter(...)`, substitute the verified call and keep it inside the private helper so there is still exactly one place to change.
 
-- [ ] **Step 1: Write the failing tests**
+- `plots.py` is the only module importing `xy`'s charting API; `xy_component.py` is the only module importing `xy.widget` / `xy.channel`. Nothing else in the repo may import `xy` at all — Task 6 has a test enforcing this.
+- **The ESM contract, verified from the shipped bundle.** `xy/static/index.js` exports `render({model, el}) -> cleanup`, `renderStandalone(el, spec, buffers)`, `decodeFrame`, and `MARK_KINDS`. `render` drives everything through an anywidget-style `model` requiring exactly six members: `get(name)`, `send(msg)`, `on(event, cb)`, `off(event, cb)` (optional), and it listens for `"change:spec"`, `"change:buffers"`, and `"msg:custom"`. The React shim implements that surface — it is a stub object, not a dependency on anywidget.
+- **Streaming append is a first-class path in the bundle**, not something to emulate: set `spec.append = {seq, affected}`, swap `buffers`, and fire `change:spec` / `change:buffers`. The bundle calls `_applyAppend` and updates in place instead of re-rendering. The shim must therefore fire both change events and must not tear down the view on data updates.
+- **Bulk data does not travel through Reflex state** (spec Decision 8). `spec` is small JSON and rides a Reflex var; column buffers are fetched by the browser from `GET /xy/buffers/{panel_id}?v={version}`, encoded with xy's own `encode_frame_parts` and decoded in the browser with the bundle's exported `decodeFrame`. No HELAO-invented wire format.
+- The buffer route is mounted through `rx.App(api_transformer=...)` — Reflex 0.9.7 exposes no public `app.api` before build, and `_api` is private. Task 6 does the wiring; this task supplies the router.
+- `BufferStore` keyed by `(panel_id, version)` returns 404 for an unknown panel or a stale version. A refetch racing a panel teardown must leave the last good frame on screen rather than blanking it.
+
+- [ ] **Step 1: Write the failing binding tests**
+
+```python
+# helao/core/tests/test_reflex_xy_component.py
+"""Tests for the hand-written xy Reflex binding.
+
+xy 0.0.5 ships no `xy.reflex`, so HELAO supplies the binding. These tests
+cover the Python half — buffer storage, xy-native frame encoding, the HTTP
+route, and asset copying. The JavaScript shim is proven in the browser check
+at the end of the plan; nothing here can exercise WebGL.
+"""
+
+import numpy as np
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from helao.core.servers.reflex import xy_component as xc
+
+
+def _bufs():
+    return [
+        memoryview(np.arange(4, dtype=np.float64).tobytes()),
+        memoryview(np.arange(4, dtype=np.float32).tobytes()),
+    ]
+
+
+def test_encode_buffers_roundtrips_through_xy_channel():
+    import xy.channel
+
+    payload = xc.encode_buffers(_bufs())
+    assert isinstance(payload, (bytes, bytearray))
+    assert len(payload) > 0
+    # Frames carry xy's own magic, so the browser decodes them with the
+    # bundle's exported decodeFrame rather than anything HELAO invented.
+    assert payload[: len(xy.channel.FRAME_MAGIC)] == bytes(xy.channel.FRAME_MAGIC)
+
+
+def test_encode_buffers_handles_an_empty_list():
+    assert isinstance(xc.encode_buffers([]), (bytes, bytearray))
+
+
+def test_store_returns_what_was_put():
+    store = xc.BufferStore()
+    bufs = _bufs()
+    store.put("panel-a", 3, bufs)
+    assert store.get("panel-a", 3) is not None
+
+
+def test_store_returns_none_for_a_stale_version():
+    store = xc.BufferStore()
+    store.put("panel-a", 3, _bufs())
+    assert store.get("panel-a", 2) is None
+
+
+def test_store_returns_none_for_an_unknown_panel():
+    assert xc.BufferStore().get("nope", 1) is None
+
+
+def test_store_put_replaces_the_previous_version():
+    store = xc.BufferStore()
+    store.put("panel-a", 1, _bufs())
+    store.put("panel-a", 2, _bufs())
+    assert store.get("panel-a", 1) is None
+    assert store.get("panel-a", 2) is not None
+
+
+def test_store_drop_removes_the_panel():
+    store = xc.BufferStore()
+    store.put("panel-a", 1, _bufs())
+    store.drop("panel-a")
+    assert store.get("panel-a", 1) is None
+
+
+def _client(store):
+    api = FastAPI()
+    api.include_router(xc.make_buffer_router(store))
+    return TestClient(api)
+
+
+def test_route_serves_octet_stream_for_a_live_panel():
+    store = xc.BufferStore()
+    store.put("panel-a", 7, _bufs())
+    resp = _client(store).get("/xy/buffers/panel-a?v=7")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/octet-stream"
+    assert len(resp.content) > 0
+
+
+def test_route_404s_on_an_unknown_panel():
+    assert _client(xc.BufferStore()).get("/xy/buffers/ghost?v=1").status_code == 404
+
+
+def test_route_404s_on_a_stale_version():
+    store = xc.BufferStore()
+    store.put("panel-a", 7, _bufs())
+    assert _client(store).get("/xy/buffers/panel-a?v=6").status_code == 404
+
+
+def test_route_requires_the_version_query_param():
+    store = xc.BufferStore()
+    store.put("panel-a", 7, _bufs())
+    assert _client(store).get("/xy/buffers/panel-a").status_code == 422
+
+
+def test_copy_client_asset_places_the_esm(tmp_path):
+    dest = xc.copy_client_asset(str(tmp_path))
+    assert dest.endswith(xc.CLIENT_ASSET_NAME)
+    written = tmp_path / xc.CLIENT_ASSET_NAME
+    assert written.exists()
+    # The real bundle is ~400 KB; a truncated copy is a silent disaster.
+    assert written.stat().st_size > 100_000
+
+
+def test_copy_client_asset_is_idempotent(tmp_path):
+    first = xc.copy_client_asset(str(tmp_path))
+    second = xc.copy_client_asset(str(tmp_path))
+    assert first == second
+
+
+def test_xy_chart_builds_a_component():
+    comp = xc.xy_chart(spec={}, buffer_url="/xy/buffers/x?v=0", height="320px")
+    assert comp is not None
+
+
+def test_xy_chart_is_client_only():
+    """A WebGL canvas cannot server-side render."""
+    import reflex as rx
+
+    assert issubclass(xc.XYChart, rx.NoSSRComponent)
+
+
+def test_shim_declares_the_six_model_members_the_bundle_requires():
+    """The bundle's render({model, el}) drives everything through these."""
+    code = xc.XYChart()._get_custom_code()
+    for member in ("get", "send", "on", "off", "change:spec", "change:buffers"):
+        assert member in code, f"shim is missing '{member}'"
+
+
+def test_shim_references_the_bundles_exported_entry_points():
+    code = xc.XYChart()._get_custom_code()
+    assert "render" in code
+    assert "decodeFrame" in code
+```
+
+- [ ] **Step 2: Run the binding tests to verify they fail**
+
+```bash
+conda run -n helao python -m pytest helao/core/tests/test_reflex_xy_component.py -v
+```
+
+Expected: `ModuleNotFoundError: No module named 'helao.core.servers.reflex.xy_component'`.
+
+- [ ] **Step 3: Write the binding**
+
+```python
+# helao/core/servers/reflex/xy_component.py
+"""The Reflex binding for xy that xy itself does not yet ship.
+
+``xy`` 0.0.5 has no ``xy.reflex`` module — its own source calls the Reflex
+adapter planned work. What it does ship is everything that adapter would have
+wrapped: a versioned ESM render client inside the wheel (no CDN, which is what
+airgapped lab stations need), a split payload of small JSON spec plus raw
+column buffers, and a defined binary frame protocol. This module is the ~100
+lines of glue between those and Reflex.
+
+Two design points are load-bearing:
+
+* **Bulk data never enters Reflex state.** Reflex syncs state as JSON over its
+  WebSocket; pushing megabyte float arrays through it would forfeit exactly the
+  performance xy exists to provide. The small spec rides a state var carrying a
+  version token; the browser fetches column buffers from :func:`make_buffer_router`
+  and decodes them with the bundle's own ``decodeFrame``.
+* **Updates append, they do not re-render.** The bundle exposes an explicit
+  append path — bump ``spec.append.seq``, swap buffers, fire the change events —
+  and updates the view in place. The shim fires both events and never tears the
+  view down on data change.
+
+Delete this module when xy ships its own adapter: :mod:`plots` is the only
+consumer.
+"""
+
+__all__ = [
+    "XYChart",
+    "xy_chart",
+    "BufferStore",
+    "encode_buffers",
+    "make_buffer_router",
+    "copy_client_asset",
+    "CLIENT_ASSET_NAME",
+    "BUFFER_ROUTE_PREFIX",
+]
+
+import os
+import pathlib
+import shutil
+import threading
+
+import reflex as rx
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
+
+import xy.channel
+import xy.widget
+
+#: Filename the xy ESM client is published under in the Reflex assets dir.
+#: Reflex serves ``assets/`` from the site root, so the browser sees "/<name>".
+CLIENT_ASSET_NAME = "xy-client.js"
+
+#: URL prefix for the column-buffer route.
+BUFFER_ROUTE_PREFIX = "/xy/buffers"
+
+
+def copy_client_asset(dest_dir: str) -> str:
+    """Copy xy's bundled ESM client into the Reflex assets directory.
+
+    The bundle is a generated artifact that ships inside published wheels. A
+    source-checkout install lacks it, and xy's own error names the fix
+    (``npm ci && node js/build.mjs``).
+
+    Args:
+        dest_dir: Reflex ``assets/`` directory.
+
+    Returns:
+        str: Path of the written asset.
+
+    Raises:
+        FileNotFoundError: If the wheel carries no bundled client.
+    """
+    source = pathlib.Path(xy.widget.__file__).parent / "static" / "index.js"
+    if not source.is_file():
+        raise FileNotFoundError(
+            f"xy's bundled ESM client is missing at '{source}'. A published "
+            "wheel ships it prebuilt; a source checkout must build it once "
+            "with `npm ci && node js/build.mjs`."
+        )
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, CLIENT_ASSET_NAME)
+    shutil.copyfile(source, dest)
+    return dest
+
+
+def encode_buffers(buffers) -> bytes:
+    """Encode column buffers using xy's own frame protocol.
+
+    Using ``xy.channel`` rather than an ad-hoc format means the browser decodes
+    with the bundle's exported ``decodeFrame`` and the two halves cannot drift.
+
+    Args:
+        buffers: The ``list[memoryview]`` from ``Figure.build_payload_split``.
+
+    Returns:
+        bytes: One encoded frame carrying every column.
+    """
+    return bytes(xy.channel.encode_frame_parts(list(buffers)))
+
+
+class BufferStore:
+    """Process-wide ``panel_id -> (version, buffers)`` map behind the HTTP route.
+
+    Only the newest version of a panel is retained: the browser refetches when
+    its version token changes, so an older frame can never be usefully served.
+    A stale or unknown request yields ``None`` (404 at the route), and the
+    component keeps its last good frame rather than blanking — a refetch racing
+    a panel teardown must not clear a live chart.
+    """
+
+    def __init__(self):
+        """Create an empty store."""
+        self._lock = threading.Lock()
+        self._frames: dict = {}
+
+    def put(self, panel_id: str, version: int, buffers) -> None:
+        """Store the newest frame for ``panel_id``, replacing any previous one."""
+        with self._lock:
+            self._frames[panel_id] = (int(version), encode_buffers(buffers))
+
+    def get(self, panel_id: str, version: int):
+        """Return the encoded frame, or ``None`` if unknown or stale."""
+        with self._lock:
+            entry = self._frames.get(panel_id)
+        if entry is None or entry[0] != int(version):
+            return None
+        return entry[1]
+
+    def drop(self, panel_id: str) -> None:
+        """Forget a panel, e.g. when its session ends."""
+        with self._lock:
+            self._frames.pop(panel_id, None)
+
+
+def make_buffer_router(store: BufferStore) -> APIRouter:
+    """Build the router serving column buffers for ``store``.
+
+    Mounted on the Reflex backend through ``rx.App(api_transformer=...)``;
+    Reflex 0.9.7 exposes no public ``app.api`` before build.
+
+    Args:
+        store: The :class:`BufferStore` to serve from.
+
+    Returns:
+        APIRouter: Router exposing ``GET /xy/buffers/{panel_id}?v=<version>``.
+    """
+    router = APIRouter()
+
+    @router.get(f"{BUFFER_ROUTE_PREFIX}/{{panel_id}}")
+    async def get_buffers(panel_id: str, v: int = Query(...)):
+        """Serve one encoded frame as an opaque byte stream."""
+        payload = store.get(panel_id, v)
+        if payload is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no buffers for panel '{panel_id}' at version {v}",
+            )
+        return Response(content=payload, media_type="application/octet-stream")
+
+    return router
+
+
+#: The React shim. The bundle's ``render({model, el})`` expects an
+#: anywidget-style model, so this supplies a stub with exactly the six members
+#: it touches — no anywidget dependency, just the same shape.
+_SHIM_JS = """
+import { useEffect, useRef } from "react";
+
+export function XYChart({ spec, bufferUrl, height, onSelect }) {
+  const hostRef = useRef(null);
+  const stateRef = useRef({ spec: spec, buffers: null, handlers: {}, cleanup: null });
+
+  useEffect(() => {
+    let disposed = false;
+    const st = stateRef.current;
+
+    // Minimal anywidget-shaped model: the bundle only ever touches these.
+    const model = {
+      get: (name) => (name === "spec" ? st.spec : st.buffers),
+      send: (msg) => {
+        if (msg && msg.type === "select" && onSelect) onSelect(msg);
+      },
+      on: (event, cb) => {
+        (st.handlers[event] = st.handlers[event] || []).push(cb);
+      },
+      off: (event, cb) => {
+        st.handlers[event] = (st.handlers[event] || []).filter((h) => h !== cb);
+      },
+    };
+    st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
+
+    import(/* webpackIgnore: true */ "/xy-client.js").then((mod) => {
+      if (disposed || !hostRef.current) return;
+      st.decodeFrame = mod.decodeFrame;
+      st.cleanup = mod.render({ model, el: hostRef.current });
+      st.ready = true;
+      if (st.pending) { st.pending = false; st.refetch(); }
+    });
+
+    st.refetch = async () => {
+      if (!st.ready) { st.pending = true; return; }
+      if (!bufferUrl) return;
+      try {
+        const resp = await fetch(bufferUrl);
+        if (!resp.ok) return;  // keep the last good frame
+        const raw = await resp.arrayBuffer();
+        st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
+        st.emit("change:spec");
+        st.emit("change:buffers");
+      } catch (e) {
+        // Network hiccup: keep the last good frame rather than blanking.
+      }
+    };
+
+    return () => {
+      disposed = true;
+      if (st.cleanup) st.cleanup();
+      st.ready = false;
+    };
+  }, []);
+
+  // Data updates take the bundle's in-place append path, not a re-render.
+  useEffect(() => {
+    const st = stateRef.current;
+    st.spec = spec;
+    if (st.refetch) st.refetch();
+  }, [spec, bufferUrl]);
+
+  return <div ref={hostRef} style={{ width: "100%", height: height }} />;
+}
+"""
+
+
+class XYChart(rx.NoSSRComponent):
+    """A live xy chart driven by Reflex state.
+
+    Client-only: the bundle renders to a WebGL2 canvas, which cannot be
+    server-side rendered.
+
+    Attributes:
+        spec: Data-less chart spec from ``Figure.build_payload_split``,
+            carrying an ``append.seq`` version token.
+        buffer_url: Route the browser fetches column buffers from.
+        height: CSS height for the chart host element.
+    """
+
+    tag = "XYChart"
+    library = None  # emitted inline by _get_custom_code, not an npm package
+
+    spec: rx.Var[dict]
+    buffer_url: rx.Var[str]
+    height: rx.Var[str]
+
+    on_select: rx.EventHandler[lambda payload: [payload]]
+
+    def _get_custom_code(self) -> str:
+        """Emit the React shim that bridges Reflex to xy's ESM bundle."""
+        return _SHIM_JS
+
+
+def xy_chart(**props) -> XYChart:
+    """Create an :class:`XYChart`.
+
+    Args:
+        **props: ``spec``, ``buffer_url``, ``height``, ``on_select``.
+
+    Returns:
+        XYChart: The component.
+    """
+    return XYChart.create(**props)
+```
+
+- [ ] **Step 4: Run the binding tests to verify they pass**
+
+```bash
+conda run -n helao python -m pytest helao/core/tests/test_reflex_xy_component.py -v
+```
+
+Expected: 17 passed.
+
+If `test_encode_buffers_roundtrips_through_xy_channel` fails on the magic-bytes assertion, read `xy.channel.encode_frame_parts`'s signature and adjust the call — the intent (encode with xy's protocol, not a HELAO one) does not change. If `XYChart` construction fails on `library = None`, consult the Task 0 API note for how Reflex 0.9.7 wants a custom-code-only component declared.
+
+- [ ] **Step 5: Write the failing facade tests**
 
 ```python
 # helao/core/tests/test_reflex_plots.py
 """Tests for the xy plot facade.
 
-These assert the facade's contract — accepts arrays, tolerates empties, and
-isolates xy — not xy's rendering, which is xy's own concern.
+These assert the facade's contract — accepts arrays, tolerates empties,
+validates shapes, isolates xy — not xy's rendering, which is xy's concern.
 """
 
 import numpy as np
@@ -1527,21 +1978,21 @@ import pytest
 from helao.core.servers.reflex import plots
 
 
-def test_time_series_returns_a_component():
+def test_time_series_returns_a_chart_payload():
     t = np.linspace(0.0, 10.0, 100)
-    comp = plots.time_series(t, {"a": np.sin(t)}, x_label="t", y_label="v")
-    assert comp is not None
+    out = plots.time_series(t, {"a": np.sin(t)}, x_label="t", y_label="v")
+    assert isinstance(out, plots.ChartPayload)
+    assert isinstance(out.spec, dict)
+    assert out.buffer_url.startswith("/xy/buffers/")
 
 
 def test_time_series_tolerates_empty_arrays():
-    comp = plots.time_series(np.empty(0), {"a": np.empty(0)})
-    assert comp is not None
+    assert plots.time_series(np.empty(0), {"a": np.empty(0)}) is not None
 
 
 def test_time_series_accepts_multiple_series():
     t = np.linspace(0.0, 1.0, 10)
-    comp = plots.time_series(t, {"a": t, "b": t * 2, "c": t * 3})
-    assert comp is not None
+    assert plots.time_series(t, {"a": t, "b": t * 2, "c": t * 3}) is not None
 
 
 def test_time_series_rejects_a_series_of_the_wrong_length():
@@ -1551,30 +2002,29 @@ def test_time_series_rejects_a_series_of_the_wrong_length():
 
 def test_time_series_drops_all_nan_series_without_raising():
     t = np.linspace(0.0, 1.0, 10)
-    comp = plots.time_series(t, {"a": np.full(10, np.nan), "b": t})
-    assert comp is not None
+    assert plots.time_series(t, {"a": np.full(10, np.nan), "b": t}) is not None
 
 
-def test_spectra_returns_a_component():
+def test_spectra_returns_a_chart_payload():
     w = np.linspace(400.0, 800.0, 512)
-    comp = plots.spectra(w, {"t0": np.ones(512), "t1": np.ones(512) * 2})
-    assert comp is not None
+    out = plots.spectra(w, {"t0": np.ones(512), "t1": np.ones(512) * 2})
+    assert isinstance(out, plots.ChartPayload)
 
 
 def test_spectra_tolerates_no_traces():
     assert plots.spectra(np.empty(0), {}) is not None
 
 
-def test_scatter_map_returns_a_component():
-    comp = plots.scatter_map(np.arange(10.0), np.arange(10.0))
-    assert comp is not None
+def test_scatter_map_returns_a_chart_payload():
+    assert isinstance(
+        plots.scatter_map(np.arange(10.0), np.arange(10.0)), plots.ChartPayload
+    )
 
 
 def test_scatter_map_accepts_values_for_coloring():
-    comp = plots.scatter_map(
+    assert plots.scatter_map(
         np.arange(10.0), np.arange(10.0), values=np.arange(10.0)
-    )
-    assert comp is not None
+    ) is not None
 
 
 def test_scatter_map_tolerates_empty_input():
@@ -1586,7 +2036,13 @@ def test_scatter_map_rejects_mismatched_x_and_y():
         plots.scatter_map(np.zeros(5), np.zeros(4))
 
 
-def test_histogram_returns_a_component():
+def test_scatter_map_rejects_mismatched_values():
+    with pytest.raises(ValueError):
+        plots.scatter_map(np.zeros(5), np.zeros(5), values=np.zeros(4))
+
+
+def test_histogram_uses_xys_native_hist_mark():
+    """xy 0.0.5 has `hist`; faking histograms with step lines is not needed."""
     comp = plots.histogram(
         {"pred": np.random.default_rng(0).normal(0.45, 0.05, 1000)},
         bins=50,
@@ -1603,83 +2059,39 @@ def test_histogram_tolerates_no_series():
     assert plots.histogram({}, bins=10) is not None
 
 
-def test_facade_exposes_exactly_the_documented_surface():
-    for name in (
-        "time_series",
-        "spectra",
-        "scatter_map",
-        "histogram",
-        "histogram_steps",
-    ):
-        assert callable(getattr(plots, name))
+def test_version_bump_changes_the_buffer_url_but_not_the_panel_id():
+    """The browser refetches on version change; panel identity must be stable."""
+    t = np.linspace(0.0, 1.0, 5)
+    a = plots.time_series(t, {"a": t}, panel_id="p1", version=1)
+    b = plots.time_series(t, {"a": t}, panel_id="p1", version=2)
+    assert a.buffer_url != b.buffer_url
+    assert "p1" in a.buffer_url and "p1" in b.buffer_url
 
 
-def test_histogram_steps_traces_a_flat_top_per_bin():
-    x, y = plots.histogram_steps(
-        np.array([0.25, 0.25, 0.25]), bins=2, value_range=(0.0, 1.0)
-    )
-    # Two bins produce two flat segments: 4 x points, 4 y points.
-    assert x.size == 4 and y.size == 4
-    assert y[0] == y[1]  # first bin holds its value across its width
+def test_publishing_parks_buffers_the_route_can_serve():
+    t = np.linspace(0.0, 1.0, 5)
+    plots.time_series(t, {"a": t}, panel_id="p-store", version=9)
+    assert plots.STORE.get("p-store", 9) is not None
+    assert plots.STORE.get("p-store", 8) is None
 
 
-def test_histogram_steps_drops_non_finite_samples():
-    x, y = plots.histogram_steps(
-        np.array([np.nan, np.inf, 0.5]), bins=2, value_range=(0.0, 1.0)
-    )
-    assert x.size == 4 and np.all(np.isfinite(y))
-
-
-def test_histogram_steps_on_empty_input_returns_empty_arrays():
-    x, y = plots.histogram_steps(np.empty(0), bins=10)
-    assert x.size == 0 and y.size == 0
-
-
-def test_time_series_binds_reactively_when_given_a_state_var():
-    """A panel binds vars, not arrays, so the chart updates as state changes."""
+def test_chart_binds_to_state_vars_and_returns_a_component():
+    """build() binds once; pull() then drives it through these vars."""
     import reflex as rx
 
     class _S(rx.State):
-        epoch: list = []
-        series: dict = {}
+        chart_spec: dict = {}
+        chart_url: str = ""
 
-    assert plots.time_series(_S.epoch, _S.series, x_label="t") is not None
-
-
-def test_scatter_map_binds_reactively_when_given_state_vars():
-    import reflex as rx
-
-    class _S2(rx.State):
-        px: list = []
-        py: list = []
-
-    assert plots.scatter_map(_S2.px, _S2.py) is not None
+    assert plots.chart(_S.chart_spec, _S.chart_url, height=300) is not None
 
 
-def test_spectra_binds_reactively_when_given_state_vars():
-    """gpsim bins in pull, then binds the step traces through spectra."""
-    import reflex as rx
-
-    class _S3(rx.State):
-        hist_x: list = []
-        hist_series: dict = {}
-
-    assert plots.spectra(_S3.hist_x, _S3.hist_series) is not None
-
-
-def test_reactive_path_skips_length_validation():
-    """Vars carry no length at build time, so validation must not fire."""
-    import reflex as rx
-
-    class _S4(rx.State):
-        epoch: list = []
-        series: dict = {}
-
-    # Would raise on the concrete path; must not on the reactive path.
-    assert plots.time_series(_S4.epoch, _S4.series) is not None
+def test_facade_exposes_exactly_the_documented_surface():
+    for name in ("time_series", "spectra", "scatter_map", "histogram", "chart"):
+        assert callable(getattr(plots, name))
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 6: Run the facade tests to verify they fail**
 
 ```bash
 conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
@@ -1687,38 +2099,44 @@ conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
 
 Expected: `ModuleNotFoundError: No module named 'helao.core.servers.reflex.plots'`.
 
-- [ ] **Step 3: Write the implementation**
+- [ ] **Step 7: Write the facade**
 
-Read `docs/superpowers/notes/2026-08-01-xy-api-probe.md` first and substitute the verified xy calls inside `_xy_line` and `_xy_scatter`. Everything else below is final.
+Read `docs/superpowers/notes/2026-08-01-xy-api-probe.md` first and use its recorded mark signatures. xy composes declaratively — `xy.chart(*children, **props)` with marks and axes as children — so each facade function assembles a child list.
 
 ```python
 # helao/core/servers/reflex/plots.py
 """The HELAO plot facade over the ``xy`` charting library.
 
-This is the only module in the repository that imports ``xy``. Every chart in
-the Reflex UI stack is built through one of the four functions here, so the
-alpha-stage xy API is confined to a single file: a breaking change upstream
-touches this module and nothing else.
+This is the only module in the repository that imports xy's charting API.
+Every chart in the Reflex UI stack is built through one of the four functions
+here, so an alpha-stage upstream change is confined to a single file.
 
-Functions take plain numpy arrays, never buffers, so they can be tested with
-synthetic data and no ingest layer present.
-
-Deviation worth knowing: xy 0.0.5 has no bar or quad primitive, so
-:func:`histogram` computes ``np.histogram`` and renders a **step line** over
-the bin edges. The Bokeh visualizers it replaces used filled ``quad`` glyphs.
+Functions take plain numpy arrays, never buffers, so they are testable with
+synthetic data and no ingest layer present. Each builds an ``xy`` figure,
+splits it into a small JSON spec plus raw column buffers, parks the buffers in
+the process-wide store, and returns the Reflex component bound to both.
 """
 
 __all__ = [
     "PlotBackendError",
+    "STORE",
+    "ChartPayload",
+    "chart",
     "time_series",
     "spectra",
     "scatter_map",
     "histogram",
-    "histogram_steps",
 ]
 
+from dataclasses import dataclass
+
 import numpy as np
-import reflex as rx
+
+from helao.core.servers.reflex.xy_component import (
+    BUFFER_ROUTE_PREFIX,
+    BufferStore,
+    xy_chart,
+)
 
 
 class PlotBackendError(RuntimeError):
@@ -1726,13 +2144,16 @@ class PlotBackendError(RuntimeError):
 
 
 try:
-    import xy  # noqa: F401
-    import xy.reflex as xyrx
+    import xy
 except Exception as exc:  # pragma: no cover - import-time environment failure
     raise PlotBackendError(
         "the xy charting backend is unavailable; the Reflex UI stack cannot "
         f"start. Install it with `pip install xy==0.0.5`. Underlying error: {exc}"
     ) from exc
+
+#: Process-wide store the buffer route serves from. Task 6 hands the router
+#: built over this store to ``rx.App(api_transformer=...)``.
+STORE = BufferStore()
 
 #: Reused across series so panel colors stay stable between renders.
 PALETTE = (
@@ -1745,17 +2166,6 @@ PALETTE = (
     "#e377c2",
     "#7f7f7f",
 )
-
-
-def _is_reactive(obj) -> bool:
-    """Whether ``obj`` is a Reflex var rather than concrete data.
-
-    A panel binds its chart to state vars so the chart re-renders when the
-    render loop assigns new data. Those vars are opaque at build time — they
-    carry no values yet — so every facade function has two paths: coerce and
-    validate concrete arrays, or hand a var straight to the adapter untouched.
-    """
-    return isinstance(obj, rx.Var)
 
 
 def _as_float_array(values) -> np.ndarray:
@@ -1771,108 +2181,74 @@ def _finite_pairs(x: np.ndarray, y: np.ndarray) -> tuple:
     return x[keep], y[keep]
 
 
-def _xy_line(fig, x, y, *, label, color):
-    """Draw one line on ``fig``.
+@dataclass(frozen=True)
+class ChartPayload:
+    """What a panel assigns into state to drive a chart.
 
-    Substitute the exact call verified in
-    ``docs/superpowers/notes/2026-08-01-xy-api-probe.md``. Keeping it in this
-    one helper means an xy API change is a single-line edit.
+    Attributes:
+        spec: Small data-less chart spec. Rides a Reflex var.
+        buffer_url: Route the browser fetches column buffers from.
     """
-    fig.line(x, y, label=label, color=color)
+
+    spec: dict
+    buffer_url: str
 
 
-def _xy_scatter(fig, x, y, *, label, color, values=None):
-    """Draw one scatter series on ``fig``.
-
-    Substitute the exact call verified in the Task 0 API note.
-    """
-    if values is not None:
-        fig.scatter(x, y, c=values, label=label)
-    else:
-        fig.scatter(x, y, label=label, color=color)
-
-
-def _new_figure(*, x_label: str, y_label: str, x_is_epoch: bool = False):
-    """Create a bare xy figure with axis labels applied.
-
-    Height is a component concern, not a figure concern; :func:`_component`
-    applies it.
-    """
-    fig = xy.figure()
-    fig.set_xlabel(x_label)
-    fig.set_ylabel(y_label)
-    if x_is_epoch:
-        # Epoch seconds on the x axis, formatted HH:MM:SS to match the
-        # DatetimeTickFormatter the Bokeh visualizers use.
-        fig.set_xaxis_time_format("%H:%M:%S")
-    return fig
-
-
-def _component(fig, height: int):
-    """Wrap an xy figure as a Reflex component."""
-    return xyrx.chart(fig, height=f"{height}px", width="100%")
-
-
-def _reactive_component(
-    x,
-    series,
-    *,
-    kind: str,
-    x_label: str,
-    y_label: str,
-    height: int,
-    x_is_epoch: bool = False,
-    on_select=None,
-):
-    """Bind a chart to Reflex vars so it re-renders as state changes.
-
-    Substitute the exact reactive call verified in
-    ``docs/superpowers/notes/2026-08-01-xy-api-probe.md``. Both branches below
-    are complete; pick the one the installed adapter supports and delete the
-    other, recording the choice in the API note.
-
-    Branch A — the adapter accepts vars directly (preferred)::
-
-        return xyrx.chart(
-            x=x, series=series, kind=kind,
-            x_label=x_label, y_label=y_label, x_is_epoch=x_is_epoch,
-            height=f"{height}px", width="100%", on_select=on_select,
-        )
-
-    Branch B — the adapter takes only a plain data spec. Pass a computed var
-    from the panel instead: the panel adds a ``chart_spec`` ``rx.var`` that
-    returns ``{"x": [...], "series": {...}, "kind": kind}``, and this function
-    receives that single var as ``series`` with ``x`` set to ``None``::
-
-        return xyrx.chart_from_spec(
-            series, height=f"{height}px", width="100%", on_select=on_select,
-        )
+def _publish(figure, panel_id: str, version: int) -> ChartPayload:
+    """Split a figure, park its buffers, and return the state payload.
 
     Args:
-        x: Reflex var (or ``None`` under Branch B) holding x values.
-        series: Reflex var holding ``{label: [values]}``, or the full spec var
-            under Branch B.
-        kind: ``"line"``, ``"scatter"``, or ``"step"``.
-        x_label: X axis label.
-        y_label: Y axis label.
-        height: Chart height in pixels.
-        x_is_epoch: Format the x axis as ``HH:MM:SS``.
-        on_select: Optional selection event handler.
+        figure: The assembled ``xy`` figure.
+        panel_id: Stable identity for this panel across re-renders.
+        version: Monotonic token; the browser refetches when it changes.
 
     Returns:
-        An ``rx.Component`` bound to the supplied vars.
+        ChartPayload: Assign this into the panel's state vars.
     """
-    return xyrx.chart(
-        x=x,
-        series=series,
-        kind=kind,
-        x_label=x_label,
-        y_label=y_label,
-        x_is_epoch=x_is_epoch,
+    spec, buffers = figure.build_payload_split()
+    STORE.put(panel_id, version, buffers)
+    return ChartPayload(
+        spec=spec,
+        buffer_url=f"{BUFFER_ROUTE_PREFIX}/{panel_id}?v={version}",
+    )
+
+
+def chart(spec_var, url_var, *, height: int = 320, on_select=None):
+    """Bind a chart component to two Reflex state vars.
+
+    Called once from a panel's ``build``. The panel's ``pull`` then assigns
+    fresh :class:`ChartPayload` values into ``spec_var`` and ``url_var``, and
+    the browser follows.
+
+    Args:
+        spec_var: Reflex var holding :attr:`ChartPayload.spec`.
+        url_var: Reflex var holding :attr:`ChartPayload.buffer_url`.
+        height: Chart height in pixels.
+        on_select: Optional Reflex event handler for selection.
+
+    Returns:
+        An ``rx.Component``.
+    """
+    return xy_chart(
+        spec=spec_var,
+        buffer_url=url_var,
         height=f"{height}px",
-        width="100%",
         on_select=on_select,
     )
+
+
+def _axes(x_label: str, y_label: str, x_is_epoch: bool) -> list:
+    """Build the axis child components.
+
+    Substitute the exact axis call recorded in the Task 0 API note. Epoch
+    seconds are formatted ``HH:MM:SS`` to match the ``DatetimeTickFormatter``
+    the Bokeh visualizers use.
+    """
+    x_kwargs = {"label": x_label}
+    if x_is_epoch:
+        x_kwargs["tick_format"] = "%H:%M:%S"
+        x_kwargs["scale"] = "time"
+    return [xy.x_axis(**x_kwargs), xy.y_axis(label=y_label)]
 
 
 def time_series(
@@ -1882,9 +2258,10 @@ def time_series(
     x_label: str = "",
     y_label: str = "",
     x_is_epoch: bool = True,
-    height: int = 320,
+    panel_id: str = "plot",
+    version: int = 0,
 ):
-    """Render one or more traces against a shared x axis.
+    """Render one or more line traces against a shared x axis.
 
     Args:
         x: Shared x values. Epoch seconds when ``x_is_epoch`` is ``True``.
@@ -1892,23 +2269,18 @@ def time_series(
         x_label: X axis label.
         y_label: Y axis label.
         x_is_epoch: Format the x axis as ``HH:MM:SS``.
-        height: Chart height in pixels.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version; the browser refetches when it changes.
 
     Returns:
-        An ``rx.Component``. An empty ``x`` yields a valid empty chart. When
-        ``x`` or ``series`` is a Reflex var, the chart binds reactively and
-        re-renders whenever the panel's render loop assigns new data.
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
+        An empty ``x`` yields a valid empty chart.
 
     Raises:
-        ValueError: If a concrete series length does not match ``len(x)``.
+        ValueError: If a series length does not match ``len(x)``.
     """
-    if _is_reactive(x) or _is_reactive(series):
-        return _reactive_component(
-            x, series, kind="line", x_label=x_label, y_label=y_label,
-            x_is_epoch=x_is_epoch, height=height,
-        )
     xs = _as_float_array(x)
-    fig = _new_figure(x_label=x_label, y_label=y_label, x_is_epoch=x_is_epoch)
+    marks = []
     for idx, (label, values) in enumerate(series.items()):
         ys = _as_float_array(values)
         if xs.size and ys.size != xs.size:
@@ -1918,8 +2290,11 @@ def time_series(
         fx, fy = _finite_pairs(xs, ys)
         if fx.size == 0:
             continue
-        _xy_line(fig, fx, fy, label=label, color=PALETTE[idx % len(PALETTE)])
-    return _component(fig, height)
+        marks.append(
+            xy.line(x=fx, y=fy, label=label, color=PALETTE[idx % len(PALETTE)])
+        )
+    figure = xy.chart(*marks, *_axes(x_label, y_label, x_is_epoch))
+    return _publish(figure, panel_id, version)
 
 
 def spectra(
@@ -1928,24 +2303,25 @@ def spectra(
     *,
     x_label: str = "",
     y_label: str = "",
-    height: int = 320,
+    panel_id: str = "spectra",
+    version: int = 0,
 ):
-    """Render many traces sharing one x axis (wavelength, energy, frequency).
+    """Render many traces sharing one linear x axis (wavelength, energy).
 
-    Identical in shape to :func:`time_series` but with a linear x axis and no
-    epoch formatting, kept separate so spectrometer panels read clearly and so
-    the two can diverge (downsampling, trace limits) without disturbing each
-    other.
+    Same shape as :func:`time_series` but without epoch formatting, kept
+    separate so spectrometer panels read clearly and so the two can diverge
+    (trace limits, downsampling) without disturbing each other.
 
     Args:
         x: Shared x values.
         traces: Mapping of legend label to equal-length y values.
         x_label: X axis label.
         y_label: Y axis label.
-        height: Chart height in pixels.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version.
 
     Returns:
-        An ``rx.Component``.
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
     """
     return time_series(
         x,
@@ -1953,7 +2329,8 @@ def spectra(
         x_label=x_label,
         y_label=y_label,
         x_is_epoch=False,
-        height=height,
+        panel_id=panel_id,
+        version=version,
     )
 
 
@@ -1962,10 +2339,10 @@ def scatter_map(
     y,
     *,
     values=None,
-    on_select=None,
     x_label: str = "",
     y_label: str = "",
-    height: int = 420,
+    panel_id: str = "scatter",
+    version: int = 0,
 ):
     """Render a 2-D point cloud, optionally colored and selectable.
 
@@ -1975,66 +2352,34 @@ def scatter_map(
         x: Point x coordinates.
         y: Point y coordinates.
         values: Optional per-point scalar driving color.
-        on_select: Optional Reflex event handler for point selection.
         x_label: X axis label.
         y_label: Y axis label.
         height: Chart height in pixels.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version.
 
     Returns:
-        An ``rx.Component``.
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
 
     Raises:
-        ValueError: If concrete ``x`` and ``y`` differ in length, or ``values``
-            does not match them.
+        ValueError: If ``x`` and ``y`` differ in length, or ``values`` does not
+            match them.
     """
-    if _is_reactive(x) or _is_reactive(y):
-        return _reactive_component(
-            x, y, kind="scatter", x_label=x_label, y_label=y_label,
-            height=height, on_select=on_select,
-        )
     xs = _as_float_array(x)
     ys = _as_float_array(y)
     if xs.size != ys.size:
         raise ValueError(f"x has length {xs.size} but y has length {ys.size}")
-    vs = None
+    mark_kwargs = {"x": xs, "y": ys}
     if values is not None:
         vs = _as_float_array(values)
         if vs.size != xs.size:
-            raise ValueError(
-                f"values has length {vs.size}, expected {xs.size}"
-            )
-    fig = _new_figure(x_label=x_label, y_label=y_label)
-    if xs.size:
-        _xy_scatter(fig, xs, ys, label="", color=PALETTE[0], values=vs)
-    comp = _component(fig, height)
-    if on_select is not None:
-        comp = xyrx.chart(fig, height=f"{height}px", width="100%", on_select=on_select)
-    return comp
-
-
-def histogram_steps(values, *, bins: int = 100, value_range=None) -> tuple:
-    """Bin ``values`` and return step-line coordinates.
-
-    Public because reactive panels must bin in their ``pull`` — ``np.histogram``
-    cannot run on an unevaluated Reflex var, so the panel binds the *binned*
-    result rather than the raw samples.
-
-    Args:
-        values: Raw sample values. Non-finite entries are dropped.
-        bins: Number of histogram bins.
-        value_range: Optional ``(low, high)`` passed to ``np.histogram``.
-
-    Returns:
-        tuple: ``(step_x, step_y)`` float64 arrays tracing a density histogram
-        as a step line. Both are empty when no finite samples remain.
-    """
-    arr = _as_float_array(values)
-    arr = arr[np.isfinite(arr)]
-    if arr.size == 0:
-        return np.empty(0), np.empty(0)
-    counts, edges = np.histogram(arr, bins=bins, range=value_range, density=True)
-    # Repeat each edge so the trace holds its value across the width of a bin.
-    return np.repeat(edges, 2)[1:-1], np.repeat(counts, 2)
+            raise ValueError(f"values has length {vs.size}, expected {xs.size}")
+        mark_kwargs["color"] = vs
+    else:
+        mark_kwargs["color"] = PALETTE[0]
+    marks = [xy.scatter(**mark_kwargs)] if xs.size else []
+    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    return _publish(figure, panel_id, version)
 
 
 def histogram(
@@ -2044,67 +2389,59 @@ def histogram(
     value_range=None,
     x_label: str = "",
     y_label: str = "density",
-    height: int = 320,
+    panel_id: str = "histogram",
+    version: int = 0,
 ):
-    """Render one or more density histograms as step lines.
-
-    xy 0.0.5 has no bar or quad primitive, so each histogram is computed with
-    ``np.histogram(density=True)`` and drawn as a step line over the bin edges.
-    This is a deliberate visual departure from the filled ``quad`` glyphs the
-    Bokeh GP-simulator visualizer used.
+    """Render one or more density histograms using xy's native ``hist`` mark.
 
     Args:
         values_by_label: Mapping of legend label to raw sample values.
         bins: Number of histogram bins.
-        value_range: Optional ``(low, high)`` range passed to ``np.histogram``.
+        value_range: Optional ``(low, high)`` range.
         x_label: X axis label.
         y_label: Y axis label.
-        height: Chart height in pixels.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version.
 
     Returns:
-        An ``rx.Component``. Empty or all-non-finite series are skipped.
-
-    Note:
-        This is the **concrete-data** entry point only. ``np.histogram`` cannot
-        run on an unevaluated Reflex var, so a live panel bins in its ``pull``
-        with :func:`histogram_steps` and then binds the result through
-        :func:`spectra` — a pre-binned step histogram is exactly a set of
-        traces on a shared linear x axis. See ``gpsim_panel``.
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
+        Empty or all-non-finite series are skipped.
     """
-    fig = _new_figure(x_label=x_label, y_label=y_label)
+    marks = []
     for idx, (label, values) in enumerate(values_by_label.items()):
         arr = _as_float_array(values)
         arr = arr[np.isfinite(arr)]
         if arr.size == 0:
             continue
-        step_x, step_y = histogram_steps(arr, bins=bins, value_range=value_range)
-        _xy_line(
-            fig,
-            step_x,
-            step_y,
-            label=f"{label} n={arr.size:d}",
-            color=PALETTE[idx % len(PALETTE)],
-        )
-    return _component(fig, height)
+        kwargs = {
+            "x": arr,
+            "bins": bins,
+            "label": f"{label} n={arr.size:d}",
+            "color": PALETTE[idx % len(PALETTE)],
+            "density": True,
+        }
+        if value_range is not None:
+            kwargs["range"] = value_range
+        marks.append(xy.hist(**kwargs))
+    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    return _publish(figure, panel_id, version)
 ```
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 8: Run the facade tests to verify they pass**
 
 ```bash
 conda run -n helao python -m pytest helao/core/tests/test_reflex_plots.py -v
 ```
 
-Expected: 22 passed. If a test fails inside `_xy_line`, `_xy_scatter`, `_new_figure`, `_component`, or `_reactive_component`, the Task 0 note's recorded signature was not transcribed correctly — fix the helper, not the test. The four reactive tests are the ones that decide Branch A vs Branch B in `_reactive_component`; whichever branch makes them pass is the one to keep, and record that choice in the API note.
+Expected: 21 passed. If a test fails inside `xy.line`, `xy.scatter`, `xy.hist`, `xy.x_axis`, or `xy.chart`, the Task 0 API note's recorded signature was not transcribed correctly — fix the call, not the test. Record any signature correction back into the API note in the same commit, since Task 7 reads it.
 
-- [ ] **Step 5: Format and commit**
+- [ ] **Step 9: Format and commit**
 
 ```bash
-conda run -n helao black helao/core/servers/reflex/plots.py helao/core/tests/test_reflex_plots.py
-git add helao/core/servers/reflex/plots.py helao/core/tests/test_reflex_plots.py
-git commit -m "feat(reflex): add xy plot facade with time_series, spectra, scatter_map, histogram"
+conda run -n helao black helao/core/servers/reflex/xy_component.py helao/core/servers/reflex/plots.py helao/core/tests/test_reflex_xy_component.py helao/core/tests/test_reflex_plots.py
+git add helao/core/servers/reflex/xy_component.py helao/core/servers/reflex/plots.py helao/core/tests/test_reflex_xy_component.py helao/core/tests/test_reflex_plots.py
+git commit -m "feat(reflex): add the xy Reflex binding and plot facade"
 ```
-
----
 
 ## Task 5: Panel state base classes
 
@@ -2557,7 +2894,7 @@ def test_route_map_omits_a_page_not_requested_but_keeps_it_reachable_as_empty():
 
 
 def test_only_plots_module_imports_xy():
-    """The facade is the single point of contact with the alpha xy API."""
+"""Only the facade and the binding may touch the alpha xy API."""
     import pathlib
     import re
 
@@ -2566,7 +2903,12 @@ def test_only_plots_module_imports_xy():
     for path in root.rglob("*.py"):
         if "/.git/" in str(path) or "site-packages" in str(path):
             continue
-        if path.name in ("plots.py", "test_reflex_plots.py"):
+        if path.name in (
+            "plots.py",
+            "xy_component.py",
+            "test_reflex_plots.py",
+            "test_reflex_xy_component.py",
+        ):
             continue
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
@@ -2574,7 +2916,7 @@ def test_only_plots_module_imports_xy():
             continue
         if re.search(r"^\s*(import xy\b|from xy\b)", text, re.MULTILINE):
             offenders.append(str(path.relative_to(root)))
-    assert offenders == [], f"xy imported outside the facade: {offenders}"
+    assert offenders == [], f"xy imported outside facade/binding: {offenders}"
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -2609,6 +2951,7 @@ __all__ = ["PanelTarget", "panel_targets", "route_map", "build_app", "app"]
 from dataclasses import dataclass
 
 import reflex as rx
+from fastapi import FastAPI
 
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
@@ -2616,7 +2959,9 @@ from helao.core.servers.reflex.ingest import (
     IngestRegistry,
     set_registry,
 )
+from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.state import make_panel_state
+from helao.core.servers.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 
@@ -2831,7 +3176,14 @@ def build_app(world_cfg: dict, server_key: str):
     registry = IngestRegistry(world_cfg)
     set_registry(registry)
 
-    application = rx.App()
+    # The buffer route carries bulk column data out-of-band, so megabyte float
+    # arrays never traverse Reflex's JSON state channel. `api_transformer` is
+    # the public seam for this: Reflex 0.9.7 exposes no `app.api` before build
+    # and `_api` is private.
+    backend = FastAPI()
+    backend.include_router(make_buffer_router(plots.STORE))
+
+    application = rx.App(api_transformer=backend)
 
     application.add_page(lambda: _index_page(routes), route="/", title="HELAO")
     application.add_page(
@@ -2971,14 +3323,17 @@ git commit -m "feat(reflex): build multi-page app with routes composed from conf
 - Test: extend `helao/core/tests/test_reflex_panels.py`
 
 **Interfaces:**
-- Consumes: `LiveVisState`/`ActionVisState`/`make_panel_state` (Task 5), `plots` (Task 4), `WsIngest` (Task 2).
-- Produces: three modules each exposing `WS_PATH`, `STATE_BASE`, and `build(server_key, state_cls)`.
+- Consumes: `LiveVisState` / `ActionVisState` / `make_panel_state` (Task 5), `plots` (Task 4), `WsIngest` (Task 2).
+- Produces: three modules, each exposing `WS_PATH`, `STATE_BASE`, and `build(server_key, state_cls)`.
 
 **Design notes for the implementer:**
-- `wssim_panel` is the straight port of `wssim_live_vis.py`: six `series_<i>` columns against `epoch`, plus a latest-value table. This one reads the numeric ring buffer.
-- `oersim_panel` ports `oersim_vis.py` (an `ActionVisualizer` on `ws_data`).
-- `gpsim_panel` ports `gpsim_live_vis.py` and is the awkward one: its payload carries per-plate arrays (`pred_avail`, `gt_acquired`) that do not fit a flat numeric column. It reads `ingest.raw` — the untransformed batches — and `ingest.rows` for the string table, and renders via `plots.histogram`. This is exactly why `WsIngest` keeps a raw deque.
-- Each panel's `pull` must be cheap. It runs on the render timer with the state lock held.
+
+- **The two-call split from Task 4 governs every panel.** `build` runs once when the page is composed and calls `plots.chart(state_cls.chart_spec, state_cls.chart_url, ...)` to bind the component to state. `pull` runs on every render tick and calls a facade function (`plots.time_series`, `plots.histogram`, …) to produce a fresh `ChartPayload`, then assigns `.spec` and `.buffer_url` into those vars. Calling a facade function from `build` yields a chart that paints once and then never moves.
+- Every panel needs a **stable `panel_id`** and a **monotonic `version`**. `panel_id` is `f"{module}-{server_key}"` — constant for the panel's life, because a shifting id would orphan entries in the buffer store. `version` increments on each successful `pull`; the browser refetches only when it changes.
+- `wssim_panel` ports `wssim_live_vis.py`: six `series_<i>` columns against `epoch`, plus a latest-value table. Reads the numeric ring buffer.
+- `oersim_panel` ports `oersim_vis.py`, an `ActionVisualizer` on `ws_data`.
+- `gpsim_panel` ports `gpsim_live_vis.py` and is the awkward one: its payload carries per-plate arrays (`pred_avail`, `gt_acquired`) that do not fit a flat numeric column, and string columns (`orchestrator`, `last_acquisition`) that cannot live in a float64 ring. It reads `ingest.raw` (untransformed batches) and `ingest.rows` (mixed-type rows) instead. This is exactly why `WsIngest` keeps both. Binning is xy's job — pass raw samples to `plots.histogram`, which uses xy's native `hist` mark.
+- Each panel's `pull` runs on the render timer with the state lock held, so keep it cheap.
 
 - [ ] **Step 1: Write the failing tests (append to `test_reflex_panels.py`)**
 
@@ -3009,7 +3364,17 @@ def test_panel_builds_a_component_without_an_ingest_layer(name):
     assert mod.build("TESTKEY", state_cls) is not None
 
 
-def test_wssim_pull_reads_series_columns_from_the_buffer():
+@pytest.mark.parametrize("name", PANEL_MODULES)
+def test_panel_state_declares_the_chart_binding_vars(name):
+    """build() binds these; pull() drives them. Both halves are required."""
+    from importlib import import_module
+
+    mod = import_module(f"helao.deploy.test.servers.reflex.{name}")
+    assert hasattr(mod.STATE_BASE, "chart_spec")
+    assert hasattr(mod.STATE_BASE, "chart_url")
+
+
+def test_wssim_extract_reads_series_columns_from_the_buffer():
     import numpy as np
 
     from helao.core.servers.reflex.ingest import WsIngest
@@ -3017,11 +3382,7 @@ def test_wssim_pull_reads_series_columns_from_the_buffer():
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
     ing.buffer.append(
-        {
-            "epoch": [1.0, 2.0],
-            "series_0": [10.0, 11.0],
-            "series_1": [20.0, 21.0],
-        }
+        {"epoch": [1.0, 2.0], "series_0": [10.0, 11.0], "series_1": [20.0, 21.0]}
     )
     cols = wssim_panel.extract(ing, window=10)
     np.testing.assert_allclose(cols["epoch"], [1.0, 2.0])
@@ -3046,6 +3407,13 @@ def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
     cols = wssim_panel.extract(ing, window=10)
     assert cols["epoch"].size == 0
     assert cols["series"] == {}
+
+
+def test_panel_id_is_stable_across_calls():
+    from helao.deploy.test.servers.reflex import wssim_panel
+
+    assert wssim_panel.panel_id("SIM") == wssim_panel.panel_id("SIM")
+    assert wssim_panel.panel_id("SIM") != wssim_panel.panel_id("OTHER")
 
 
 def test_gpsim_histograms_are_extracted_from_raw_batches():
@@ -3073,6 +3441,17 @@ def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     assert gpsim_panel.extract_histograms(WsIngest("127.0.0.1", 1, "ws_live")) == {}
+
+
+def test_gpsim_passes_raw_samples_to_the_facade_not_prebinned_data():
+    """xy has a native hist mark; binning in Python would be redundant work."""
+    import inspect
+
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    src = inspect.getsource(gpsim_panel)
+    assert "plots.histogram" in src
+    assert "np.histogram" not in src
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -3099,7 +3478,7 @@ columns plotted against time, plus a latest-value table. The two coexist; a
 station picks one through its config.
 """
 
-__all__ = ["WS_PATH", "STATE_BASE", "build", "extract"]
+__all__ = ["WS_PATH", "STATE_BASE", "build", "extract", "panel_id"]
 
 import numpy as np
 import reflex as rx
@@ -3113,6 +3492,14 @@ WS_PATH = "ws_live"
 X_COLUMN = "epoch"
 
 
+def panel_id(server_key: str) -> str:
+    """Stable buffer-store identity for this panel.
+
+    Must not vary across renders: a shifting id would orphan store entries.
+    """
+    return f"wssim-{server_key}"
+
+
 def extract(ingest, window: int) -> dict:
     """Pull the x column and every other numeric column from the ring buffer.
 
@@ -3124,28 +3511,42 @@ def extract(ingest, window: int) -> dict:
         dict: ``{"epoch": np.ndarray, "series": {name: np.ndarray}}``.
     """
     snap = ingest.buffer.snapshot(window)
-    x = snap.get(X_COLUMN, np.empty(0))
-    series = {k: v for k, v in snap.items() if k != X_COLUMN}
-    return {"epoch": x, "series": series}
+    return {
+        "epoch": snap.get(X_COLUMN, np.empty(0)),
+        "series": {k: v for k, v in snap.items() if k != X_COLUMN},
+    }
 
 
 class _State(LiveVisState):
-    """Panel-specific state: plot arrays and the latest-value table."""
+    """Chart binding vars plus the latest-value table."""
 
-    epoch: list = []
-    series: dict = {}
+    chart_spec: dict = {}
+    chart_url: str = ""
+    version: int = 0
     table_rows: list = []
 
     def pull(self, ingest) -> None:
-        """Copy the trailing window and latest values into state vars."""
+        """Recompute the chart payload and the latest-value table."""
         cols = extract(ingest, self.window_points)
-        self.epoch = cols["epoch"].tolist()
-        self.series = {k: v.tolist() for k, v in cols["series"].items()}
+        self.version += 1
+        payload = plots.time_series(
+            cols["epoch"],
+            cols["series"],
+            x_label="Time (HH:MM:SS)",
+            y_label="value",
+            panel_id=panel_id(self.server_key_default),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
         self.table_rows = [
             [name, f"{values[-1]:.6g}"]
             for name, values in cols["series"].items()
             if values.size
         ]
+
+
+STATE_BASE = _State
 
 
 def build(server_key: str, state_cls):
@@ -3180,13 +3581,11 @@ def build(server_key: str, state_cls):
                 align="center",
                 spacing="3",
             ),
-            rx.cond(state_cls.error != "", rx.text(state_cls.error, color_scheme="red")),
-            plots.time_series(
-                state_cls.epoch,
-                state_cls.series,
-                x_label="Time (HH:MM:SS)",
-                y_label="value",
+            rx.cond(
+                state_cls.error != "",
+                rx.text(state_cls.error, color_scheme="red"),
             ),
+            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
             rx.data_table(
                 data=state_cls.table_rows,
                 columns=["name", "value"],
@@ -3201,18 +3600,6 @@ def build(server_key: str, state_cls):
         ),
         width="100%",
     )
-
-
-STATE_BASE = _State
-```
-
-The chart binds to `state_cls.epoch` and `state_cls.series`, not to arrays: the facade's `_is_reactive` path (Task 4) hands the vars straight to the xy adapter so the chart re-renders each time `pull` assigns new data. If Task 4 settled on Branch B of `_reactive_component`, add a `chart_spec` computed var to `_State` and pass that instead:
-
-```python
-    @rx.var
-    def chart_spec(self) -> dict:
-        """Chart payload for adapters that take a single spec object."""
-        return {"x": self.epoch, "series": self.series, "kind": "line"}
 ```
 
 ```python
@@ -3220,10 +3607,10 @@ The chart binds to `state_cls.epoch` and `state_cls.series`, not to arrays: the 
 """Reflex panel for the OER simulator's per-action data stream.
 
 Reflex port of ``servers/visualizer/oersim_vis.py``. Subscribes to ``ws_data``
-and renders the action-scoped measurement scatter.
+and renders the action-scoped measurement traces.
 """
 
-__all__ = ["WS_PATH", "STATE_BASE", "build", "extract"]
+__all__ = ["WS_PATH", "STATE_BASE", "build", "extract", "panel_id"]
 
 import numpy as np
 import reflex as rx
@@ -3233,8 +3620,12 @@ from helao.core.servers.reflex.state import ActionVisState
 
 WS_PATH = "ws_data"
 
-#: Columns the OER simulator publishes on ws_data. Mirrors oersim_vis.py.
 X_COLUMN = "epoch"
+
+
+def panel_id(server_key: str) -> str:
+    """Stable buffer-store identity for this panel."""
+    return f"oersim-{server_key}"
 
 
 def extract(ingest, window: int) -> dict:
@@ -3255,16 +3646,26 @@ def extract(ingest, window: int) -> dict:
 
 
 class _State(ActionVisState):
-    """Panel-specific state for the OER simulator."""
+    """Chart binding vars for the OER simulator."""
 
-    x: list = []
-    series: dict = {}
+    chart_spec: dict = {}
+    chart_url: str = ""
+    version: int = 0
 
     def pull(self, ingest) -> None:
-        """Copy the trailing window into state vars."""
+        """Recompute the chart payload from the trailing window."""
         cols = extract(ingest, self.window_points)
-        self.x = cols["x"].tolist()
-        self.series = {k: v.tolist() for k, v in cols["series"].items()}
+        self.version += 1
+        payload = plots.time_series(
+            cols["x"],
+            cols["series"],
+            x_label="Time (HH:MM:SS)",
+            y_label="value",
+            panel_id=panel_id(self.server_key_default),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
 
 
 STATE_BASE = _State
@@ -3296,13 +3697,11 @@ def build(server_key: str, state_cls):
                 align="center",
                 spacing="3",
             ),
-            rx.cond(state_cls.error != "", rx.text(state_cls.error, color_scheme="red")),
-            plots.time_series(
-                state_cls.x,
-                state_cls.series,
-                x_label="Time (HH:MM:SS)",
-                y_label="value",
+            rx.cond(
+                state_cls.error != "",
+                rx.text(state_cls.error, color_scheme="red"),
             ),
+            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
             width="100%",
             spacing="3",
             on_mount=state_cls.render_loop,
@@ -3317,17 +3716,16 @@ def build(server_key: str, state_cls):
 """Reflex panel for the GP simulator's live acquisition stream.
 
 Reflex port of ``servers/visualizer/gpsim_live_vis.py``. This payload does not
-fit the flat numeric-column model — it carries per-plate arrays
+fit the flat numeric-column model — it carries per-plate sample arrays
 (``pred_avail``, ``gt_acquired``) and string columns (``orchestrator``,
 ``last_acquisition``) — so this panel reads the ingest layer's raw message
-deque and row buffer rather than the numeric ring.
+deque and its mixed-type row buffer rather than the numeric ring.
 
-The Bokeh version drew filled ``quad`` histograms. xy 0.0.5 has no quad
-primitive, so :func:`helao.core.servers.reflex.plots.histogram` renders step
-lines instead. The information is the same; the fill is gone.
+Binning is xy's job: raw samples go straight to :func:`plots.histogram`, which
+uses xy's native ``hist`` mark.
 """
 
-__all__ = ["WS_PATH", "STATE_BASE", "build", "extract_histograms"]
+__all__ = ["WS_PATH", "STATE_BASE", "build", "extract_histograms", "panel_id"]
 
 import reflex as rx
 
@@ -3348,6 +3746,11 @@ TABLE_COLUMNS = [
     "last_acquisition",
     "orchestrator",
 ]
+
+
+def panel_id(server_key: str) -> str:
+    """Stable buffer-store identity for this panel."""
+    return f"gpsim-{server_key}"
 
 
 def extract_histograms(ingest) -> dict:
@@ -3371,45 +3774,37 @@ def extract_histograms(ingest) -> dict:
         acq = message.get("gt_acquired")
         if not (plates and pred and acq):
             continue
-        plate_ids = plates[0]
-        pred_vals = pred[0]
-        acq_vals = acq[0]
-        for i, plate_id in enumerate(plate_ids):
+        plate_ids, pred_vals, acq_vals = plates[0], pred[0], acq[0]
+        for i, plate in enumerate(plate_ids):
             if i < len(pred_vals):
-                out[f"{plate_id} predicted"] = list(pred_vals[i])
+                out[f"{plate} predicted"] = list(pred_vals[i])
             if i < len(acq_vals):
-                out[f"{plate_id} acquired"] = list(acq_vals[i])
+                out[f"{plate} acquired"] = list(acq_vals[i])
     return out
 
 
 class _State(LiveVisState):
-    """Panel-specific state: binned histogram traces and the acquisitions table.
+    """Chart binding vars plus the acquisitions table."""
 
-    Binning happens here rather than in the chart because ``np.histogram``
-    cannot run on an unevaluated Reflex var. Every series shares the same bins
-    and range, so the result is a set of step traces on one linear x axis —
-    which is exactly what :func:`plots.spectra` renders.
-    """
-
-    hist_x: list = []
-    hist_series: dict = {}
+    chart_spec: dict = {}
+    chart_url: str = ""
+    version: int = 0
     table_rows: list = []
 
     def pull(self, ingest) -> None:
-        """Bin the latest per-plate samples and refresh the acquisitions table."""
-        shared_x: list = []
-        series: dict = {}
-        for label, values in extract_histograms(ingest).items():
-            step_x, step_y = plots.histogram_steps(
-                values, bins=HIST_BINS, value_range=HIST_RANGE
-            )
-            if step_y.size == 0:
-                continue
-            if not shared_x:
-                shared_x = step_x.tolist()
-            series[f"{label} n={len(values):d}"] = step_y.tolist()
-        self.hist_x = shared_x
-        self.hist_series = series
+        """Recompute the histogram payload and the last 20 acquisition rows."""
+        self.version += 1
+        payload = plots.histogram(
+            extract_histograms(ingest),
+            bins=HIST_BINS,
+            value_range=HIST_RANGE,
+            x_label="Eta (V vs O2/H2O)",
+            y_label="density",
+            panel_id=panel_id(self.server_key_default),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
         self.table_rows = [
             [str(row.get(col, "")) for col in TABLE_COLUMNS]
             for row in ingest.rows.rows()[-20:]
@@ -3445,13 +3840,11 @@ def build(server_key: str, state_cls):
                 align="center",
                 spacing="3",
             ),
-            rx.cond(state_cls.error != "", rx.text(state_cls.error, color_scheme="red")),
-            plots.spectra(
-                state_cls.hist_x,
-                state_cls.hist_series,
-                x_label="Eta (V vs O2/H2O)",
-                y_label="density",
+            rx.cond(
+                state_cls.error != "",
+                rx.text(state_cls.error, color_scheme="red"),
             ),
+            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
             rx.heading("Last 20 acquisitions across all orchestrators", size="3"),
             rx.data_table(
                 data=state_cls.table_rows,
@@ -3469,15 +3862,13 @@ def build(server_key: str, state_cls):
     )
 ```
 
-Note that `gpsim_panel` imports `plots` for `histogram_steps` in `pull` and `spectra` in `build` — it never calls `plots.histogram`, which exists for concrete-data callers and for the `hte` spectrometer panels a later spec will add.
-
 - [ ] **Step 4: Run the tests to verify they pass**
 
 ```bash
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 18 passed (7 from Task 5, 11 new — the two parametrized tests contribute three cases each).
+Expected: 22 passed (7 from Task 5, 15 new — the three parametrized tests contribute three cases each).
 
 - [ ] **Step 5: Format and commit**
 
@@ -3486,8 +3877,6 @@ conda run -n helao black helao/deploy/test/servers/reflex/ helao/core/tests/test
 git add helao/deploy/test/servers/reflex helao/core/tests/test_reflex_panels.py
 git commit -m "feat(reflex): add test deployment panels for wssim, oersim, and gpsim"
 ```
-
----
 
 ## Task 8: The launcher
 
@@ -3578,6 +3967,12 @@ def test_local_build_allowed_with_opt_in_and_runtime(monkeypatch):
     assert rl.may_build_locally() is True
 
 
+def test_assets_dir_sits_inside_the_reflex_project():
+    """The ESM client must be inside the project so `reflex export` bundles it."""
+    assert rl.ASSETS_DIR.startswith(rl.APP_DIR)
+    assert rl.ASSETS_DIR.endswith("assets")
+
+
 def test_launch_py_has_a_reflex_branch():
     import inspect
 
@@ -3641,6 +4036,11 @@ BUNDLE_DIRNAME = ".reflex-bundle"
 
 #: Reflex project directory the CLI is invoked from.
 APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
+
+#: Reflex assets directory, served from the site root. xy's ESM client is
+#: copied here before the frontend build so the bundle ships it and the browser
+#: never reaches for a CDN.
+ASSETS_DIR = os.path.join(APP_DIR, "assets")
 
 
 def backend_port(port: int) -> int:
@@ -3775,6 +4175,10 @@ if __name__ == "__main__":
             )
             sys.exit(1)
         LOGGER.warning(f"no bundle at '{expected}'; building locally (dev only)")
+        from helao.core.servers.reflex.xy_component import copy_client_asset
+
+        asset = copy_client_asset(os.path.join(helao_repo_root, ASSETS_DIR))
+        LOGGER.info(f"copied xy ESM client to {asset}")
         subprocess.run(
             ["reflex", "export", "--frontend-only"],
             cwd=os.path.join(helao_repo_root, APP_DIR),
@@ -3876,6 +4280,13 @@ Append to `.gitignore`:
 # Exported Reflex frontend bundle; built per-machine, shipped as a release
 # artifact rather than tracked. See reflex_launcher.py.
 .reflex-bundle/
+
+# xy's ESM render client, copied out of the installed wheel at build time.
+# Generated artifact, ~411 KB — never tracked.
+helao/core/servers/reflex/_app/assets/xy-client.js
+
+# Reflex's own build directory.
+helao/core/servers/reflex/_app/.web/
 ```
 
 - [ ] **Step 6: Run the tests to verify they pass**
@@ -3885,7 +4296,7 @@ conda run -n helao python -m pytest helao/core/tests/test_reflex_launcher.py -v
 conda run -n helao python -m pytest helao/core/tests/test_launch_pid_verify.py -v
 ```
 
-Expected: 10 passed in the first, all pass in the second.
+Expected: 11 passed in the first, all pass in the second.
 
 - [ ] **Step 7: Format and commit**
 
@@ -4082,10 +4493,16 @@ git commit -m "test(reflex): add goldenreflex config and route-level end-to-end 
 - [ ] **Step 1: Build the frontend bundle**
 
 ```bash
+# Copy xy's ESM render client into the project assets first — the export must
+# bundle it, or the browser has nothing to render with and no CDN to fall back on.
+conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; print(copy_client_asset('helao/core/servers/reflex/_app/assets'))"
+
 cd helao/core/servers/reflex/_app
 conda run -n helao reflex init --loglevel info
 conda run -n helao reflex export --frontend-only
 ```
+
+Confirm the copied asset is ~411 KB and that `assets/xy-client.js` appears in the export output. A truncated or missing asset produces a page that loads and then renders no charts at all.
 
 Move the export output to `<repo_root>/.reflex-bundle/helao_ui/` such that `index.html` sits directly in that directory. Record the exact export output path in the Task 0 API note under a new "## Bundle export" section, since it is version-dependent.
 
@@ -4105,7 +4522,7 @@ Open `http://127.0.0.1:5010/` and confirm each of these. Record the result of ev
 
 1. `/` lists all five routes with panel counts.
 2. `/live` shows the `SIM` panel with a `live` badge.
-3. The time-series chart draws and **updates** — watch it for 30 seconds and confirm new points arrive.
+3. The time-series chart draws and **updates** — watch it for 30 seconds and confirm new points arrive. This is the first and only end-to-end proof of the hand-written binding: spec through Reflex state, buffers through the HTTP route, in-place append in the bundle. If the chart paints once and then freezes, the append path is not firing — check that `pull` bumps `version` and that the browser is refetching (Network tab should show one `/xy/buffers/...` request per tick, each with a new `v=`).
 4. Pan and zoom work on the chart.
 5. The latest-value table updates alongside the chart.
 6. Changing "window points" to `50` visibly shortens the trace.
@@ -4177,12 +4594,12 @@ git commit -m "docs: document the Reflex UI stack and record bundle export path"
 
 All of the following, no exceptions:
 
-- [ ] `conda run -n helao python run_tests.py --filter reflex` reports PASS for all seven `test_reflex_*.py` files.
+- [ ] `conda run -n helao python run_tests.py --filter reflex` reports PASS for all eight `test_reflex_*.py` files.
 - [ ] `conda run -n helao python run_unit_tests.py` passes.
 - [ ] `conda run -n helao python run_tests.py` shows no new failures against the pre-branch baseline.
 - [ ] `python launch.py goldenreflex` brings up the group, and every one of Task 10 Step 3's ten browser checks passes — including check 10, the Bokeh operator still working.
 - [ ] The reconnection check in Task 10 Step 4 passes.
-- [ ] `grep -rn "^\s*\(import xy\|from xy\)" --include="*.py" .` returns only `helao/core/servers/reflex/plots.py`.
+- [ ] `grep -rn "^\s*\(import xy\|from xy\)" --include="*.py" .` returns only `helao/core/servers/reflex/plots.py` and `helao/core/servers/reflex/xy_component.py`.
 - [ ] `docs/superpowers/notes/2026-08-01-xy-api-probe.md` contains real probe output with no unreplaced `<...>` placeholders.
 - [ ] No private deployment is named in any tracked file added or modified by this plan.
 - [ ] `black` has been run on every changed Python file.
