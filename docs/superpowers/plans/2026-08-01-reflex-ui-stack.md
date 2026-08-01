@@ -1772,11 +1772,20 @@ xy ships no Reflex adapter, so HELAO writes one (spec Decision 7). The binding a
 # helao/core/tests/test_reflex_xy_component.py
 """Tests for the hand-written xy Reflex binding.
 
-xy 0.0.5 ships no `xy.reflex`, so HELAO supplies the binding. These tests
-cover the Python half — buffer storage, xy-native frame encoding, the HTTP
-route, and asset copying. The JavaScript shim is proven in the browser check
-at the end of the plan; nothing here can exercise WebGL.
+xy 0.0.5 ships no `xy.reflex`, so HELAO supplies the binding. These tests cover
+the Python half — buffer storage, xy-native frame encoding, the HTTP route, and
+asset copying — plus the JavaScript controller, executed under Node.
+
+Nothing here can exercise WebGL; rendering is proven by the browser check at the
+end of the plan. But the controller holds the shim logic that can actually be
+wrong, so it is run rather than string-matched.
 """
+
+import json
+import os
+import shutil
+import subprocess
+import tempfile
 
 import numpy as np
 import pytest
@@ -1899,16 +1908,123 @@ def test_xy_chart_is_client_only():
 
 
 def test_shim_declares_the_six_model_members_the_bundle_requires():
-    """The bundle's render({model, el}) drives everything through these."""
-    code = xc.XYChart()._get_custom_code()
+    """The bundle's render({model, el}) drives everything through these.
+
+    A substring check only proves the tokens are present, so it is a smoke test,
+    not a guarantee -- the behavioral tests below are what actually constrain the
+    controller.
+    """
+    code = xc.XYChart()._get_custom_code()  # type: ignore[reportCallIssue]
     for member in ("get", "send", "on", "off", "change:spec", "change:buffers"):
         assert member in code, f"shim is missing '{member}'"
 
 
 def test_shim_references_the_bundles_exported_entry_points():
-    code = xc.XYChart()._get_custom_code()
+    code = xc.XYChart()._get_custom_code()  # type: ignore[reportCallIssue]
     assert "render" in code
     assert "decodeFrame" in code
+
+
+# --- Behavioral tests for the shim controller -------------------------------
+#
+# The controller holds every piece of shim logic that can be wrong, with no JSX
+# and no React, precisely so a JS runtime can execute it here. Substring
+# assertions previously let a stale-closure bug ship: `refetch` captured the
+# mount-time URL, so a chart painted once and then silently froze. These run the
+# real code instead.
+
+_JS_RUNTIME = shutil.which("node")
+
+_HARNESS = """
+%(controller)s
+
+const calls = [];
+globalThis.fetch = async (url) => {
+  calls.push(url);
+  if (url === "/fail") return { ok: false };
+  return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
+};
+
+const events = [];
+const st = createController({ spec: {v: 1}, onSelect: null });
+st.model.on("change:spec", () => events.push("spec"));
+st.model.on("change:buffers", () => events.push("buffers"));
+
+const out = {};
+(async () => {
+  // Queued before the bundle is ready, then flushed on markReady.
+  await st.refetch("/xy/buffers/p?v=1");
+  out.queuedWhileNotReady = calls.length === 0 && st.pending === true;
+  st.markReady();
+  await new Promise((r) => setTimeout(r, 0));
+  out.flushedPendingUrl = calls[0];
+
+  // The bug this guards: a later call must use the URL it is given.
+  await st.refetch("/xy/buffers/p?v=2");
+  await st.refetch("/xy/buffers/p?v=3");
+  out.lastFetched = calls[calls.length - 1];
+  out.allUrls = calls.slice();
+
+  // Both change events fire per successful refetch (the in-place append path).
+  out.events = events.slice();
+
+  // A failed fetch keeps the previous frame rather than blanking it.
+  const before = st.buffers;
+  await st.refetch("/fail");
+  out.keptFrameOnFailure = st.buffers === before;
+
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+def _run_controller_harness():
+    """Execute the shim controller under Node and return its result dict."""
+    controller = xc._SHIM_CONTROLLER_JS
+    script = _HARNESS % {"controller": controller}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "harness.mjs")
+        with open(path, "w") as fh:
+            fh.write(script)
+        proc = subprocess.run(
+            [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60
+        )
+    assert proc.returncode == 0, f"harness failed:\n{proc.stderr}"
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_refetch_uses_the_url_it_is_given_not_a_captured_one():
+    """The regression guard: a captured URL freezes the chart after one paint.
+
+    `version` changes every render tick and BufferStore keeps only the newest
+    version, so a stale URL 404s, the !ok guard holds the previous frame, and
+    updates stop silently.
+    """
+    out = _run_controller_harness()
+    assert out["lastFetched"] == "/xy/buffers/p?v=3"
+    assert "/xy/buffers/p?v=2" in out["allUrls"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_queues_a_refetch_until_the_bundle_is_ready():
+    out = _run_controller_harness()
+    assert out["queuedWhileNotReady"] is True
+    assert out["flushedPendingUrl"] == "/xy/buffers/p?v=1"
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_fires_both_change_events_per_successful_refetch():
+    """The bundle's in-place append path listens for each event separately."""
+    out = _run_controller_harness()
+    assert out["events"].count("spec") == 3
+    assert out["events"].count("buffers") == 3
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_keeps_the_last_good_frame_when_a_fetch_fails():
+    out = _run_controller_harness()
+    assert out["keptFrameOnFailure"] is True
 ```
 
 - [ ] **Step 2: Run the binding tests to verify they fail**
@@ -2091,54 +2207,101 @@ def make_buffer_router(store: BufferStore) -> APIRouter:
 #: The React shim. The bundle's ``render({model, el})`` expects an
 #: anywidget-style model, so this supplies a stub with exactly the six members
 #: it touches — no anywidget dependency, just the same shape.
-_SHIM_JS = """
+#: The controller: every piece of shim logic that can be wrong, with no JSX and
+#: no React, so it can be evaluated directly by a JS runtime in the test suite.
+#: The bundle's ``render({model, el})`` only ever touches the six members
+#: assembled here, so this is a plain stub — not an anywidget dependency.
+_SHIM_CONTROLLER_JS = """
+export function createController(options) {
+  const st = {
+    spec: options.spec,
+    buffers: null,
+    handlers: {},
+    ready: false,
+    pending: false,
+    pendingUrl: null,
+    decodeFrame: null,
+    cleanup: null,
+    onSelect: options.onSelect,
+    lastUrl: null,
+  };
+
+  st.model = {
+    get: (name) => (name === "spec" ? st.spec : st.buffers),
+    send: (msg) => {
+      if (msg && msg.type === "select" && st.onSelect) st.onSelect(msg);
+    },
+    on: (event, cb) => {
+      (st.handlers[event] = st.handlers[event] || []).push(cb);
+    },
+    off: (event, cb) => {
+      st.handlers[event] = (st.handlers[event] || []).filter((h) => h !== cb);
+    },
+  };
+
+  st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
+
+  // The URL is a parameter, never a closure capture. Capturing it would bind
+  // the mount-time value forever: `version` changes every tick, BufferStore
+  // keeps only the newest version, so a stale URL 404s, the !ok guard holds the
+  // first frame, and the chart silently freezes after one paint.
+  st.refetch = async (url) => {
+    if (!st.ready) {
+      st.pending = true;
+      st.pendingUrl = url;
+      return;
+    }
+    if (!url) return;
+    st.lastUrl = url;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return;  // keep the last good frame
+      const raw = await resp.arrayBuffer();
+      st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
+      // Both events: the bundle's in-place append path listens for each.
+      st.emit("change:spec");
+      st.emit("change:buffers");
+    } catch (e) {
+      // Network hiccup: keep the last good frame rather than blanking.
+    }
+  };
+
+  st.markReady = () => {
+    st.ready = true;
+    if (st.pending) {
+      st.pending = false;
+      const url = st.pendingUrl;
+      st.pendingUrl = null;
+      st.refetch(url);
+    }
+  };
+
+  return st;
+}
+"""
+
+#: The React wrapper. Deliberately thin — it wires props and lifecycle to the
+#: controller above and holds no logic of its own.
+_SHIM_COMPONENT_JS = """
 import { useEffect, useRef } from "react";
 
 export function XYChart({ spec, bufferUrl, height, onSelect }) {
   const hostRef = useRef(null);
-  const stateRef = useRef({ spec: spec, buffers: null, handlers: {}, cleanup: null });
+  const ctrlRef = useRef(null);
+  if (ctrlRef.current === null) {
+    ctrlRef.current = createController({ spec: spec, onSelect: onSelect });
+  }
 
   useEffect(() => {
     let disposed = false;
-    const st = stateRef.current;
-
-    // Minimal anywidget-shaped model: the bundle only ever touches these.
-    const model = {
-      get: (name) => (name === "spec" ? st.spec : st.buffers),
-      send: (msg) => {
-        if (msg && msg.type === "select" && onSelect) onSelect(msg);
-      },
-      on: (event, cb) => {
-        (st.handlers[event] = st.handlers[event] || []).push(cb);
-      },
-      off: (event, cb) => {
-        st.handlers[event] = (st.handlers[event] || []).filter((h) => h !== cb);
-      },
-    };
-    st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
+    const st = ctrlRef.current;
 
     import(/* webpackIgnore: true */ "/xy-client.js").then((mod) => {
       if (disposed || !hostRef.current) return;
       st.decodeFrame = mod.decodeFrame;
-      st.cleanup = mod.render({ model, el: hostRef.current });
-      st.ready = true;
-      if (st.pending) { st.pending = false; st.refetch(); }
+      st.cleanup = mod.render({ model: st.model, el: hostRef.current });
+      st.markReady();
     });
-
-    st.refetch = async () => {
-      if (!st.ready) { st.pending = true; return; }
-      if (!bufferUrl) return;
-      try {
-        const resp = await fetch(bufferUrl);
-        if (!resp.ok) return;  // keep the last good frame
-        const raw = await resp.arrayBuffer();
-        st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
-        st.emit("change:spec");
-        st.emit("change:buffers");
-      } catch (e) {
-        // Network hiccup: keep the last good frame rather than blanking.
-      }
-    };
 
     return () => {
       disposed = true;
@@ -2147,16 +2310,21 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
     };
   }, []);
 
-  // Data updates take the bundle's in-place append path, not a re-render.
+  // Data updates take the bundle's in-place append path, not a remount. The
+  // URL is passed as an argument so this always fetches the current version.
   useEffect(() => {
-    const st = stateRef.current;
+    const st = ctrlRef.current;
     st.spec = spec;
-    if (st.refetch) st.refetch();
-  }, [spec, bufferUrl]);
+    st.onSelect = onSelect;
+    st.refetch(bufferUrl);
+  }, [spec, bufferUrl, onSelect]);
 
   return <div ref={hostRef} style={{ width: "100%", height: height }} />;
 }
 """
+
+#: What the component emits: the controller first, then the wrapper that uses it.
+_SHIM_JS = _SHIM_CONTROLLER_JS + _SHIM_COMPONENT_JS
 
 
 class XYChart(rx.NoSSRComponent):
@@ -2204,7 +2372,7 @@ def xy_chart(**props) -> XYChart:
 conda run -n helao python -m pytest helao/core/tests/test_reflex_xy_component.py -v
 ```
 
-Expected: 17 passed.
+Expected: 21 passed (4 skip if no `node` is on PATH).
 
 If `test_encode_buffers_roundtrips_through_xy_channel` fails on the magic-bytes assertion, read `xy.channel.encode_frame_parts`'s signature and adjust the call — the intent (encode with xy's protocol, not a HELAO one) does not change. If `XYChart` construction fails on `library = None`, consult the Task 0 API note for how Reflex 0.9.7 wants a custom-code-only component declared.
 
