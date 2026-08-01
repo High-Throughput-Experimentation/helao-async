@@ -49,3 +49,17 @@ def test_parse_update_rate_falls_back_to_half_a_second():
 def test_parse_update_rate_clamps_to_a_sane_floor():
     assert VisPanelState.parse_update_rate("0") >= 0.01
     assert VisPanelState.parse_update_rate("-5") >= 0.01
+
+
+def test_input_handlers_use_the_names_the_panels_bind():
+    """Task 7's panels wire these by name, so the spelling is a contract."""
+    for name in ("on_window_points", "on_update_rate", "render_loop", "stop_loop"):
+        assert hasattr(VisPanelState, name), f"missing handler '{name}'"
+    assert not hasattr(VisPanelState, "set_window_points")
+    assert not hasattr(VisPanelState, "set_update_rate")
+
+
+def test_generated_state_class_is_constructible():
+    """Regression: a type() namespace without __module__ raises inside Reflex."""
+    cls = make_panel_state("probe_panel", "PROBE", LiveVisState, "ws_live")
+    assert cls.__module__ == VisPanelState.__module__

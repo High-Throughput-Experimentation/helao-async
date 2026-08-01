@@ -100,12 +100,12 @@ class VisPanelState(rx.State):
         return max(MIN_UPDATE_RATE, parsed)
 
     @rx.event
-    def set_window_points(self, value: str):
+    def on_window_points(self, value: str):
         """Handle the window-size input."""
         self.window_points = self.clamp_window_points(value, self.window_points)
 
     @rx.event
-    def set_update_rate(self, value: str):
+    def on_update_rate(self, value: str):
         """Handle the render-interval input."""
         self.update_rate = self.parse_update_rate(value)
 
