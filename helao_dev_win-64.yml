@@ -8,6 +8,8 @@ dependencies:
     - nidaqmx
     - pydasher
     - uuid7
+    - reflex>=0.9.7,<0.10
+    - xy==0.0.5
     - https://github.com/meerstetter/pyMeCom/archive/master.zip
     - https://github.com/onepunchdan/easy-biologic/archive/main.zip
   - aioboto3
