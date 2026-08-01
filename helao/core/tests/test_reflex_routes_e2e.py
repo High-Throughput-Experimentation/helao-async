@@ -57,14 +57,31 @@ def test_route_map_puts_the_sim_panel_on_live(reflex_cfg):
     from helao.core.servers.reflex.app import route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
-    assert [t.server_key for t in routes["/live"]] == ["SIM"]
-    assert [t.module_name for t in routes["/live"]] == ["wssim_panel"]
+    assert sorted(t.server_key for t in routes["/live"]) == ["GPSIM", "SIM"]
+    assert [t.server_key for t in routes["/action"]] == ["CPSIM"]
 
 
-def test_ingest_registry_discovers_the_sim_target(reflex_cfg):
+def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
+    """All three panels must be wired, or the browser check proves only one.
+
+    In particular CPSIM is the sole ws_data target — the path that shipped two
+    Critical defects — so without it the only step that can prove rendering
+    never touches it.
+    """
     from helao.core.servers.reflex.ingest import IngestRegistry
 
-    assert IngestRegistry(reflex_cfg).targets() == [("SIM", "ws_live")]
+    assert sorted(IngestRegistry(reflex_cfg).targets()) == [
+        ("CPSIM", "ws_data"),
+        ("GPSIM", "ws_live"),
+        ("SIM", "ws_live"),
+    ]
+
+
+def test_every_panel_module_is_reachable_from_this_config(reflex_cfg):
+    from helao.core.servers.reflex.app import panel_targets
+
+    modules = sorted(t.module_name for t in panel_targets(reflex_cfg))
+    assert modules == ["gpsim_panel", "oersim_panel", "wssim_panel"]
 
 
 def test_every_panel_on_every_route_renders(reflex_cfg):
