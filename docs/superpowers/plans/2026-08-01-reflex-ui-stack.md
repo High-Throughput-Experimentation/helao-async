@@ -774,6 +774,85 @@ def test_normalize_ignores_malformed_entries():
     assert "bad" not in cols
 
 
+def test_normalize_keeps_intermittent_columns_aligned_with_epoch():
+    """The defect this guards: a key absent from a message must consume a row.
+
+    Without a per-message fill, `v`'s second value lands on the second message
+    that *contains* `v` rather than the third row, and every later sample plots
+    against the wrong timestamp.
+    """
+    import math
+
+    cols, _ = normalize(
+        [
+            {"v": (1.0, 1.0)},
+            {"a": (10.0, 2.0)},
+            {"v": (2.0, 3.0), "a": (20.0, 3.0)},
+        ]
+    )
+    assert cols["epoch"] == [1.0, 2.0, 3.0]
+    assert cols["v"][0] == 1.0 and math.isnan(cols["v"][1]) and cols["v"][2] == 2.0
+    assert math.isnan(cols["a"][0]) and cols["a"][1] == 10.0 and cols["a"][2] == 20.0
+
+
+def test_normalize_every_column_has_equal_length():
+    """RingBuffer.append rejects a ragged block, so this is a hard invariant."""
+    cols, _ = normalize(
+        [{"v": (1.0, 1.0)}, {"a": (10.0, 2.0)}, {"v": (2.0, 3.0)}]
+    )
+    assert len({len(c) for c in cols.values()}) == 1
+
+
+def test_normalize_repeats_the_epoch_across_a_burst():
+    """A burst of N samples shares one timestamp; all N rows need it.
+
+    Leaving the trailing rows with a nan epoch would put them at no x position
+    at all, since epoch is the plot's x axis.
+    """
+    cols, _ = normalize([{"burst": ([1.0, 2.0, 3.0], 5.0)}])
+    assert cols["burst"] == [1.0, 2.0, 3.0]
+    assert cols["epoch"] == [5.0, 5.0, 5.0]
+
+
+def test_normalize_pads_a_scalar_alongside_a_burst():
+    import math
+
+    cols, _ = normalize([{"burst": ([1.0, 2.0, 3.0], 5.0), "one": (9.0, 5.0)}])
+    assert cols["one"][0] == 9.0
+    assert all(math.isnan(x) for x in cols["one"][1:])
+    assert cols["epoch"] == [5.0, 5.0, 5.0]
+
+
+def test_normalize_a_row_only_message_still_consumes_a_row():
+    """A non-numeric-only message advances epoch, so numeric columns must too."""
+    import math
+
+    cols, rows = normalize(
+        [{"v": (1.0, 1.0)}, {"label": ("abc", 2.0)}, {"v": (3.0, 3.0)}]
+    )
+    assert cols["epoch"] == [1.0, 2.0, 3.0]
+    assert cols["v"][0] == 1.0 and math.isnan(cols["v"][1]) and cols["v"][2] == 3.0
+    assert rows == [{"label": "abc"}]
+
+
+def test_normalize_skips_a_non_dict_message():
+    cols, _ = normalize(["not a dict", {"v": (1.0, 1.0)}])
+    assert cols["v"] == [1.0]
+
+
+def test_normalize_skips_a_wrong_arity_payload():
+    cols, _ = normalize([{"bad": (1.0, 2.0, 3.0), "good": (4.0, 5.0)}])
+    assert "bad" not in cols
+    assert cols["good"] == [4.0]
+
+
+def test_normalize_treats_epoch_zero_as_a_real_timestamp():
+    """Truthiness would drop epoch 0.0 while still admitting its values."""
+    cols, _ = normalize([{"v": (1.0, 0.0)}])
+    assert cols["epoch"] == [0.0]
+    assert cols["v"] == [1.0]
+
+
 @pytest.mark.asyncio
 async def test_wsingest_fills_buffer_from_a_live_server():
     async def handler(ws):
@@ -936,9 +1015,15 @@ def normalize(messages: list) -> tuple:
 
     A payload is ``{datalab: (dataval, epochsec)}``. ``sim_dict`` payloads are
     flattened one level. List values extend a column; scalars append one
-    element. Each message contributes exactly one ``epoch`` value — the maximum
-    ``epochsec`` in that message — matching the behavior of the Bokeh
-    visualizers' ``add_points``.
+    element.
+
+    Row alignment is the whole job here. Every column advances by the same
+    number of rows per message — the longest value list in that message, or one
+    — with ``nan`` filling any column that message did not carry, and the
+    message's epoch repeated across all of its rows. Without that invariant an
+    intermittently-published key drifts: its Nth value lands on the Nth message
+    *containing* it rather than the Nth row, and the data silently plots against
+    the wrong timestamps.
 
     Values that will not coerce to ``float`` (server names, sample labels,
     status strings) are collected into per-message row dicts instead, because
@@ -948,16 +1033,18 @@ def normalize(messages: list) -> tuple:
         messages: Batches drained from a :class:`WsSubscriber`.
 
     Returns:
-        ``(numeric_columns, mixed_rows)``. ``numeric_columns`` maps column name
-        to a list of floats; ``mixed_rows`` is one dict per message that carried
-        at least one non-numeric value. Malformed entries are skipped.
+        ``(numeric_columns, mixed_rows)``. Every list in ``numeric_columns`` has
+        the same length and is positionally aligned with ``epoch``.
+        ``mixed_rows`` is one dict per message that carried at least one
+        non-numeric value. Malformed entries are skipped.
     """
     cols: dict = {}
     rows: list = []
+    emitted = 0  # rows emitted so far, so a new column can be backfilled
     for message in messages:
         if not isinstance(message, dict):
             continue
-        latest_epoch = 0.0
+        latest_epoch = None
         row: dict = {}
         pending: dict = {}
         for datalab, payload in message.items():
@@ -965,7 +1052,8 @@ def normalize(messages: list) -> tuple:
                 continue
             dataval, epochsec = payload
             try:
-                latest_epoch = max(latest_epoch, float(epochsec))
+                seen = float(epochsec)
+                latest_epoch = seen if latest_epoch is None else max(latest_epoch, seen)
             except (TypeError, ValueError):
                 pass
             if datalab == "sim_dict" and isinstance(dataval, dict):
@@ -977,26 +1065,42 @@ def normalize(messages: list) -> tuple:
             else:
                 pending.setdefault(datalab, []).append(dataval)
 
+        numeric: dict = {}
         for name, values in pending.items():
             try:
-                floats = [float(v) for v in values]
+                numeric[name] = [float(v) for v in values]
             except (TypeError, ValueError):
                 row[name] = values[-1] if len(values) == 1 else values
-                continue
-            cols.setdefault(name, []).extend(floats)
-
-        if latest_epoch:
-            cols.setdefault("epoch", []).append(latest_epoch)
         if row:
             rows.append(row)
+        if not numeric and latest_epoch is None:
+            continue
 
-    # Pad shorter columns so RingBuffer.append sees a rectangular block. A
-    # server that publishes some keys less often than others is normal.
-    if cols:
-        width = max(len(v) for v in cols.values())
-        for name, values in cols.items():
-            if len(values) < width:
-                values.extend([float("nan")] * (width - len(values)))
+        # Every column advances by the same number of rows for this message.
+        # Deferring the fill to a single tail-pad at the end of the batch would
+        # silently misalign any key that publishes intermittently: its Nth value
+        # would land on the Nth message *containing that key*, not the Nth row.
+        row_count = max((len(v) for v in numeric.values()), default=1) or 1
+
+        for name in numeric:
+            if name not in cols:
+                cols[name] = [float("nan")] * emitted
+        if latest_epoch is not None and "epoch" not in cols:
+            cols["epoch"] = [float("nan")] * emitted
+
+        for name, column in cols.items():
+            if name == "epoch":
+                # Every row from one message shares that message's timestamp,
+                # so a burst of N samples repeats the epoch N times rather than
+                # leaving N-1 rows with no time to plot against.
+                stamp = float("nan") if latest_epoch is None else latest_epoch
+                column.extend([stamp] * row_count)
+            else:
+                values = numeric.get(name, [])
+                column.extend(values)
+                column.extend([float("nan")] * (row_count - len(values)))
+        emitted += row_count
+
     return cols, rows
 
 
@@ -1198,7 +1302,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 14 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
+Expected: 22 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
