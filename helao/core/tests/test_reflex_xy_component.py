@@ -11,6 +11,7 @@ be wrong, so it is run rather than string-matched.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -201,6 +202,15 @@ const out = {};
   await st.refetch("/fail");
   out.keptFrameOnFailure = st.buffers === before;
 
+  // Selection travels back to Reflex through model.send.
+  let received = null;
+  st.onSelect = (msg) => { received = msg; };
+  st.model.send({ type: "select", rows: [1, 2] });
+  out.selectPayload = received;
+  received = null;
+  st.model.send({ type: "hover" });
+  out.nonSelectIgnored = received === null;
+
   console.log(JSON.stringify(out));
 })();
 """
@@ -256,3 +266,28 @@ def test_controller_fires_both_change_events_per_successful_refetch():
 def test_controller_keeps_the_last_good_frame_when_a_fetch_fails():
     out = _run_controller_harness()
     assert out["keptFrameOnFailure"] is True
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_dispatches_a_select_message_to_on_select():
+    """model.send is how the bundle reports selection back to Reflex."""
+    out = _run_controller_harness()
+    assert out["selectPayload"] == {"type": "select", "rows": [1, 2]}
+    assert out["nonSelectIgnored"] is True
+
+
+def test_component_passes_the_current_url_into_refetch():
+    """Guards the wiring the controller tests cannot reach.
+
+    The four Node tests exercise ``createController`` only. The bug that shipped
+    lived in the React wrapper, which called ``st.refetch()`` with no argument —
+    and the controller's own ``if (!url) return;`` would swallow that silently
+    while every controller test still passed. No JSX runtime is available here,
+    so this asserts the wiring textually rather than by execution.
+    """
+    component = xc._SHIM_COMPONENT_JS
+    assert "st.refetch(bufferUrl)" in component, "wrapper must pass the live URL"
+    assert re.search(r"st\.refetch\(\s*\)", component) is None, (
+        "wrapper calls refetch with no argument; the controller would no-op "
+        "silently and the chart would freeze after one paint"
+    )

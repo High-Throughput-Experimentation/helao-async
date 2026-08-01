@@ -183,7 +183,9 @@ def time_series(
     marks = []
     for idx, (label, values) in enumerate(series.items()):
         ys = _as_float_array(values)
-        if xs.size and ys.size != xs.size:
+        # Checked unconditionally: gating on `xs.size` would skip validation
+        # exactly when x is empty, letting a non-empty series through silently.
+        if ys.size != xs.size:
             raise ValueError(
                 f"series '{label}' has length {ys.size}, expected {xs.size}"
             )
