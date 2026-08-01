@@ -32,6 +32,12 @@ def test_time_series_rejects_a_series_of_the_wrong_length():
         plots.time_series(np.zeros(10), {"a": np.zeros(9)})
 
 
+def test_time_series_rejects_a_series_when_x_is_empty():
+    """Gating validation on x being non-empty would skip exactly this case."""
+    with pytest.raises(ValueError):
+        plots.time_series(np.empty(0), {"a": np.zeros(3)})
+
+
 def test_time_series_drops_all_nan_series_without_raising():
     t = np.linspace(0.0, 1.0, 10)
     assert plots.time_series(t, {"a": np.full(10, np.nan), "b": t}) is not None
