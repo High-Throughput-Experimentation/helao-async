@@ -1198,7 +1198,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 12 passed. The reconnect test takes several seconds — that is the `WsSubscriber` backoff and is expected.
+Expected: 14 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
