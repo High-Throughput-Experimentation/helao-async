@@ -57,6 +57,83 @@ def test_normalize_ignores_malformed_entries():
     assert "bad" not in cols
 
 
+def test_normalize_keeps_intermittent_columns_aligned_with_epoch():
+    """The defect this guards: a key absent from a message must consume a row.
+
+    Without a per-message fill, `v`'s second value lands on the second message
+    that *contains* `v` rather than the third row, and every later sample plots
+    against the wrong timestamp.
+    """
+    import math
+
+    cols, _ = normalize(
+        [
+            {"v": (1.0, 1.0)},
+            {"a": (10.0, 2.0)},
+            {"v": (2.0, 3.0), "a": (20.0, 3.0)},
+        ]
+    )
+    assert cols["epoch"] == [1.0, 2.0, 3.0]
+    assert cols["v"][0] == 1.0 and math.isnan(cols["v"][1]) and cols["v"][2] == 2.0
+    assert math.isnan(cols["a"][0]) and cols["a"][1] == 10.0 and cols["a"][2] == 20.0
+
+
+def test_normalize_every_column_has_equal_length():
+    """RingBuffer.append rejects a ragged block, so this is a hard invariant."""
+    cols, _ = normalize([{"v": (1.0, 1.0)}, {"a": (10.0, 2.0)}, {"v": (2.0, 3.0)}])
+    assert len({len(c) for c in cols.values()}) == 1
+
+
+def test_normalize_repeats_the_epoch_across_a_burst():
+    """A burst of N samples shares one timestamp; all N rows need it.
+
+    Leaving the trailing rows with a nan epoch would put them at no x position
+    at all, since epoch is the plot's x axis.
+    """
+    cols, _ = normalize([{"burst": ([1.0, 2.0, 3.0], 5.0)}])
+    assert cols["burst"] == [1.0, 2.0, 3.0]
+    assert cols["epoch"] == [5.0, 5.0, 5.0]
+
+
+def test_normalize_pads_a_scalar_alongside_a_burst():
+    import math
+
+    cols, _ = normalize([{"burst": ([1.0, 2.0, 3.0], 5.0), "one": (9.0, 5.0)}])
+    assert cols["one"][0] == 9.0
+    assert all(math.isnan(x) for x in cols["one"][1:])
+    assert cols["epoch"] == [5.0, 5.0, 5.0]
+
+
+def test_normalize_a_row_only_message_still_consumes_a_row():
+    """A non-numeric-only message advances epoch, so numeric columns must too."""
+    import math
+
+    cols, rows = normalize(
+        [{"v": (1.0, 1.0)}, {"label": ("abc", 2.0)}, {"v": (3.0, 3.0)}]
+    )
+    assert cols["epoch"] == [1.0, 2.0, 3.0]
+    assert cols["v"][0] == 1.0 and math.isnan(cols["v"][1]) and cols["v"][2] == 3.0
+    assert rows == [{"label": "abc"}]
+
+
+def test_normalize_skips_a_non_dict_message():
+    cols, _ = normalize(["not a dict", {"v": (1.0, 1.0)}])
+    assert cols["v"] == [1.0]
+
+
+def test_normalize_skips_a_wrong_arity_payload():
+    cols, _ = normalize([{"bad": (1.0, 2.0, 3.0), "good": (4.0, 5.0)}])
+    assert "bad" not in cols
+    assert cols["good"] == [4.0]
+
+
+def test_normalize_treats_epoch_zero_as_a_real_timestamp():
+    """Truthiness would drop epoch 0.0 while still admitting its values."""
+    cols, _ = normalize([{"v": (1.0, 0.0)}])
+    assert cols["epoch"] == [0.0]
+    assert cols["v"] == [1.0]
+
+
 @pytest.mark.asyncio
 async def test_wsingest_fills_buffer_from_a_live_server():
     async def handler(ws):
