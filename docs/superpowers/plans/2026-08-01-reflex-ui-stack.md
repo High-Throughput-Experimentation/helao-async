@@ -4515,6 +4515,23 @@ with:
 
 And the inline comment — replace `# bokeh server (visualizer/operator)` with `# bokeh or reflex server (visualizer/operator)`.
 
+- [ ] **Step 4b: Confirm CTRL-r restart resolves for a Reflex server**
+
+`restart_server` builds its command as `f"{codeKey}_launcher.py"` (`launch.py:1601`), so creating `reflex_launcher.py` at the repo root makes CTRL-r work for a `reflex:` server with no further change. That is convenient but implicit — verify it rather than assume:
+
+```bash
+conda run -n helao python -c "
+import inspect, launch
+src = inspect.getsource(launch.restart_server)
+assert '{codeKey}_launcher.py' in src, 'restart_server no longer derives the launcher name'
+import os
+assert os.path.isfile('reflex_launcher.py'), 'reflex_launcher.py missing at repo root'
+print('CTRL-r resolves reflex -> reflex_launcher.py: OK')
+"
+```
+
+Expected: `CTRL-r resolves reflex -> reflex_launcher.py: OK`. If `restart_server` has since been changed to a hardcoded mapping, add `reflex` to it and say so in your report.
+
 - [ ] **Step 5: Gitignore the bundle**
 
 Append to `.gitignore`:
