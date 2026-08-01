@@ -79,7 +79,9 @@ class RingBuffer:
 
         Raises:
             ValueError: If the sequences are not all the same length, or a
-                value is not coercible to float64.
+                value is not coercible to float64. Validation happens before
+                any state is touched, so a rejected append leaves the buffer
+                exactly as it was — including its column set.
         """
         if not cols:
             return
@@ -92,18 +94,23 @@ class RingBuffer:
         if n == 0:
             return
 
-        self.ensure_columns(cols)
+        # Validate and coerce everything BEFORE touching any state. A partial
+        # append is worse than a rejected one: without this ordering, a bad
+        # value leaves its column registered in the schema forever even though
+        # no row was written.
+        incoming = {}
+        for name, values in cols.items():
+            try:
+                incoming[name] = np.asarray(values, dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"column '{name}' is not numeric: {exc}") from exc
 
-        block = {}
-        for name in self._cols:
-            if name in cols:
-                try:
-                    arr = np.asarray(cols[name], dtype=np.float64)
-                except (TypeError, ValueError) as exc:
-                    raise ValueError(f"column '{name}' is not numeric: {exc}") from exc
-            else:
-                arr = np.full(n, np.nan, dtype=np.float64)
-            block[name] = arr
+        self.ensure_columns(incoming)
+
+        block = {
+            name: incoming.get(name, np.full(n, np.nan, dtype=np.float64))
+            for name in self._cols
+        }
 
         # An append larger than capacity can only keep its own tail.
         if n >= self.capacity:
@@ -180,12 +187,16 @@ class RowBuffer:
         self._rows.append(dict(row))
 
     def rows(self) -> list:
-        """Return retained rows, oldest first."""
-        return list(self._rows)
+        """Return copies of the retained rows, oldest first.
+
+        Copies, so a caller mutating a returned row cannot corrupt the buffer —
+        matching :meth:`append`, which copies on the way in.
+        """
+        return [dict(r) for r in self._rows]
 
     def latest(self):
-        """Return the most recent row, or ``None`` when empty."""
-        return self._rows[-1] if self._rows else None
+        """Return a copy of the most recent row, or ``None`` when empty."""
+        return dict(self._rows[-1]) if self._rows else None
 
     def clear(self) -> None:
         """Drop all rows."""
