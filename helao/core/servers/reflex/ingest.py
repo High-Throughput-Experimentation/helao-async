@@ -223,36 +223,32 @@ class WsIngest:
     async def stop(self) -> None:
         """Cancel the drain loop and the underlying subscriber. Idempotent.
 
-        ``task.cancel()`` followed by ``await task`` always raises
-        ``CancelledError`` at that ``await`` -- but the exception has two
-        unrelated causes. The common one is our own ``cancel()`` landing on
-        ``task`` and propagating out through the ``await``; ``task.cancelled()``
-        is ``True`` afterward and we swallow it, since that is exactly the
-        teardown this method is for. The rare one is something outside (for
-        example ``asyncio.wait_for(ingest.stop(), timeout=...)`` timing out)
-        cancelling *this* coroutine while it is suspended on the ``await``,
-        unrelated to whether ``task`` itself ever finishes cancelled; then
-        ``task.cancelled()`` is ``False`` and the cancellation must propagate
-        once cleanup is done, or the caller's own cancellation is silently
-        eaten. Both underlying tasks are still cancelled either way, so
-        teardown always completes before this method returns or raises.
+        ``gather(..., return_exceptions=True)`` returns each task's own
+        ``CancelledError`` as a result instead of raising it, so the teardown
+        this method exists to perform does not itself look like a failure. An
+        outer cancellation -- something cancelling *this* coroutine while it is
+        suspended, e.g. ``asyncio.wait_for(ingest.stop(), timeout=...)`` --
+        still raises at the ``await`` and propagates, which is what the caller
+        asked for. The ``finally`` clears the handles either way, so teardown
+        completes on both paths.
+
+        Inspecting ``task.cancelled()`` to tell the two cases apart does not
+        work: this method always cancels the tasks itself first, so by the time
+        the flag is readable it is ``True`` regardless of who cancelled the
+        caller.
         """
-        outer_cancelled = False
-        for task in (self._task, getattr(self._wss, "subscriber_task", None)):
-            if task is None:
-                continue
+        tasks = [
+            task
+            for task in (self._task, getattr(self._wss, "subscriber_task", None))
+            if task is not None
+        ]
+        for task in tasks:
             task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                if not task.cancelled():
-                    outer_cancelled = True
-            except Exception:
-                pass
-        self._task = None
-        self._wss = None
-        if outer_cancelled:
-            raise asyncio.CancelledError()
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            self._task = None
+            self._wss = None
 
     async def _drain_loop(self) -> None:
         """Drain the subscriber, normalize, and append. Runs until cancelled."""
