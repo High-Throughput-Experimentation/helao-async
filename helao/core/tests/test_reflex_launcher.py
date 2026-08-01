@@ -61,6 +61,90 @@ def test_local_build_allowed_with_opt_in_and_runtime(monkeypatch):
     assert rl.may_build_locally() is True
 
 
+def test_resolve_bundle_rejects_a_zero_byte_index_html(tmp_path):
+    """An interrupted export leaves a truncated index.html.
+
+    Serving it yields a blank browser page and a silent log; treating it as
+    absent routes into the loud failure path instead.
+    """
+    bundle = tmp_path / ".reflex-bundle" / "helao_ui"
+    bundle.mkdir(parents=True)
+    (bundle / "index.html").write_text("")
+    assert rl.resolve_bundle(str(tmp_path)) is None
+
+
+def test_cleanup_budget_fits_inside_the_orchestrator_kill_window():
+    """launch.py SIGKILLs this launcher after Pidd.GRACEFUL_WAIT seconds.
+
+    Overrunning that window means dying mid-cleanup and orphaning a backend
+    that still holds `port + 1`, so the next launch of the config cannot bind.
+    """
+    import inspect
+    import re
+
+    import launch
+
+    # Read the literal from the class initializer rather than constructing a
+    # Pidd (which touches the filesystem).
+    src = inspect.getsource(launch.Pidd.__init__)
+    match = re.search(r"self\.GRACEFUL_WAIT\s*=\s*([0-9.]+)", src)
+    assert match, "could not read GRACEFUL_WAIT from launch.Pidd"
+    graceful_wait = float(match.group(1))
+
+    budget = rl.BACKEND_TERM_WAIT + rl.BACKEND_KILL_WAIT + rl.FRONTEND_SHUTDOWN_TIMEOUT
+    assert budget < graceful_wait, (
+        f"cleanup budget {budget}s exceeds the orchestrator's {graceful_wait}s "
+        "kill window; the backend would be orphaned"
+    )
+
+
+def test_launcher_exits_nonzero_when_no_bundle_and_no_opt_in(tmp_path):
+    """The composed fail-loud contract, not just its ingredients.
+
+    A silent multi-minute network build on an instrument PC is a worse outcome
+    than a clear error, so this drives the real __main__ path end to end.
+
+    The brief's version of this test invokes a `goldenreflex` config that
+    Task 9 creates; that config does not exist yet, so a minimal synthetic
+    config carrying a `reflex:` server entry is written here instead (an
+    absolute path to a `.yml` file is loaded directly by config_loader,
+    bypassing the `helao/deploy/*/configs/` prefix search).
+    """
+    import os
+    import subprocess
+    import sys
+
+    root_dir = tmp_path / "root"
+    config_path = tmp_path / "reflex_e2e.yml"
+    config_path.write_text(
+        "run_type: test\n"
+        f"root: {root_dir}\n"
+        "servers:\n"
+        "  UI:\n"
+        "    host: 127.0.0.1\n"
+        "    port: 15010\n"
+        "    group: operator\n"
+        "    reflex: app\n"
+    )
+
+    env = dict(os.environ)
+    env.pop("REFLEX_ALLOW_LOCAL_BUILD", None)
+    env["PATH"] = str(tmp_path)  # hide any node/bun so a build is impossible
+    proc = subprocess.run(
+        [sys.executable, "reflex_launcher.py", str(config_path), "UI"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        cwd=os.path.dirname(os.path.abspath(rl.__file__)),
+    )
+    assert proc.returncode != 0, "launcher started without a frontend bundle"
+    combined = proc.stdout + proc.stderr
+    assert "reflex export" in combined or "bundle" in combined.lower(), (
+        "failure did not name the bundle path or the build command:\n" + combined
+    )
+
+
 def test_assets_dir_sits_inside_the_reflex_project():
     """The ESM client must be inside the project so `reflex export` bundles it."""
     assert rl.ASSETS_DIR.startswith(rl.APP_DIR)
