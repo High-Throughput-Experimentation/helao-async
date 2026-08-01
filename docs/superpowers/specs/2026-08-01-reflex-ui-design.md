@@ -197,7 +197,29 @@ Tables use native `rx.data_table`; xy is not involved in tabular display.
 
 ## Out of scope
 
-- The operator page (`bokeh_operator.py`, 3076 lines, `orch_backend` coupling, dynamic parameter forms, plate map). Separate spec once this stack is trusted.
+- The operator page (`bokeh_operator.py`, 3076 lines, `orch_backend` coupling, dynamic parameter forms, plate map). Separate spec — see "Operator split" below.
 - `hte` deployment visualizers. Separate spec; hardware-gated.
 - Removing or deprecating any Bokeh code. Decision 1 is coexistence.
 - `data_browser` beyond registering its route.
+
+## Operator split
+
+The standalone operator gets its own spec, plan, and branch, running **parallel to** this one rather than after it. The two are near-independent: `bokeh_operator.py` imports exactly one thing from the visualizer side — `Vis`, the Bokeh hosting shim — and contains no reference to `vis_subscriber`, `WsSubscriber`, `ws_live`, or `ws_data`.
+
+Two couplings that do exist, and that the operator spec must address:
+
+- `orch_backend.py` imports `WsSubscriber` directly. The operator has its own WebSocket consumer aimed at the orchestrator, not at action-server data streams. It can either adopt the `WsIngest` pattern or keep its own; the choice is the operator spec's, not this one's.
+- The operator depends on `parse_bokeh_input` (`helao/helpers/to_json.py`) to coerce widget strings. Reflex delivers typed Python from its inputs, so a Reflex operator most likely drops this rather than porting it.
+
+### Foundation gate
+
+The operator needs four of this spec's deliverables and can start once they land:
+
+| Deliverable | Why the operator needs it |
+|---|---|
+| The `reflex:` config key and `launch.py` wiring | How an operator server is launched |
+| `xy_component.py` + `plots.py` | The plate map is `scatter_map` with an `on_select` handler |
+| `app.py` route composition | `/operator` is already registered as a placeholder route |
+| `reflex_launcher.py` | Process bring-up, ESM asset copy, bundle serving |
+
+It does **not** need the ring buffers, the ingest layer, the panel state bases, or the simulator panels — those are visualizer-specific. So the operator work is unblocked well before this spec's own completion, and the two can proceed concurrently from that point.
