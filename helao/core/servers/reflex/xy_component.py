@@ -172,54 +172,101 @@ def make_buffer_router(store: BufferStore) -> APIRouter:
 #: The React shim. The bundle's ``render({model, el})`` expects an
 #: anywidget-style model, so this supplies a stub with exactly the six members
 #: it touches — no anywidget dependency, just the same shape.
-_SHIM_JS = """
+#: The controller: every piece of shim logic that can be wrong, with no JSX and
+#: no React, so it can be evaluated directly by a JS runtime in the test suite.
+#: The bundle's ``render({model, el})`` only ever touches the six members
+#: assembled here, so this is a plain stub — not an anywidget dependency.
+_SHIM_CONTROLLER_JS = """
+export function createController(options) {
+  const st = {
+    spec: options.spec,
+    buffers: null,
+    handlers: {},
+    ready: false,
+    pending: false,
+    pendingUrl: null,
+    decodeFrame: null,
+    cleanup: null,
+    onSelect: options.onSelect,
+    lastUrl: null,
+  };
+
+  st.model = {
+    get: (name) => (name === "spec" ? st.spec : st.buffers),
+    send: (msg) => {
+      if (msg && msg.type === "select" && st.onSelect) st.onSelect(msg);
+    },
+    on: (event, cb) => {
+      (st.handlers[event] = st.handlers[event] || []).push(cb);
+    },
+    off: (event, cb) => {
+      st.handlers[event] = (st.handlers[event] || []).filter((h) => h !== cb);
+    },
+  };
+
+  st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
+
+  // The URL is a parameter, never a closure capture. Capturing it would bind
+  // the mount-time value forever: `version` changes every tick, BufferStore
+  // keeps only the newest version, so a stale URL 404s, the !ok guard holds the
+  // first frame, and the chart silently freezes after one paint.
+  st.refetch = async (url) => {
+    if (!st.ready) {
+      st.pending = true;
+      st.pendingUrl = url;
+      return;
+    }
+    if (!url) return;
+    st.lastUrl = url;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) return;  // keep the last good frame
+      const raw = await resp.arrayBuffer();
+      st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
+      // Both events: the bundle's in-place append path listens for each.
+      st.emit("change:spec");
+      st.emit("change:buffers");
+    } catch (e) {
+      // Network hiccup: keep the last good frame rather than blanking.
+    }
+  };
+
+  st.markReady = () => {
+    st.ready = true;
+    if (st.pending) {
+      st.pending = false;
+      const url = st.pendingUrl;
+      st.pendingUrl = null;
+      st.refetch(url);
+    }
+  };
+
+  return st;
+}
+"""
+
+#: The React wrapper. Deliberately thin — it wires props and lifecycle to the
+#: controller above and holds no logic of its own.
+_SHIM_COMPONENT_JS = """
 import { useEffect, useRef } from "react";
 
 export function XYChart({ spec, bufferUrl, height, onSelect }) {
   const hostRef = useRef(null);
-  const stateRef = useRef({ spec: spec, buffers: null, handlers: {}, cleanup: null });
+  const ctrlRef = useRef(null);
+  if (ctrlRef.current === null) {
+    ctrlRef.current = createController({ spec: spec, onSelect: onSelect });
+  }
 
   useEffect(() => {
     let disposed = false;
-    const st = stateRef.current;
-
-    // Minimal anywidget-shaped model: the bundle only ever touches these.
-    const model = {
-      get: (name) => (name === "spec" ? st.spec : st.buffers),
-      send: (msg) => {
-        if (msg && msg.type === "select" && onSelect) onSelect(msg);
-      },
-      on: (event, cb) => {
-        (st.handlers[event] = st.handlers[event] || []).push(cb);
-      },
-      off: (event, cb) => {
-        st.handlers[event] = (st.handlers[event] || []).filter((h) => h !== cb);
-      },
-    };
-    st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
+    const st = ctrlRef.current;
 
     import(/* webpackIgnore: true */ "/xy-client.js").then((mod) => {
       if (disposed || !hostRef.current) return;
       st.decodeFrame = mod.decodeFrame;
-      st.cleanup = mod.render({ model, el: hostRef.current });
-      st.ready = true;
-      if (st.pending) { st.pending = false; st.refetch(); }
+      st.cleanup = mod.render({ model: st.model, el: hostRef.current });
+      st.markReady();
     });
-
-    st.refetch = async () => {
-      if (!st.ready) { st.pending = true; return; }
-      if (!bufferUrl) return;
-      try {
-        const resp = await fetch(bufferUrl);
-        if (!resp.ok) return;  // keep the last good frame
-        const raw = await resp.arrayBuffer();
-        st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
-        st.emit("change:spec");
-        st.emit("change:buffers");
-      } catch (e) {
-        // Network hiccup: keep the last good frame rather than blanking.
-      }
-    };
 
     return () => {
       disposed = true;
@@ -228,16 +275,21 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
     };
   }, []);
 
-  // Data updates take the bundle's in-place append path, not a re-render.
+  // Data updates take the bundle's in-place append path, not a remount. The
+  // URL is passed as an argument so this always fetches the current version.
   useEffect(() => {
-    const st = stateRef.current;
+    const st = ctrlRef.current;
     st.spec = spec;
-    if (st.refetch) st.refetch();
-  }, [spec, bufferUrl]);
+    st.onSelect = onSelect;
+    st.refetch(bufferUrl);
+  }, [spec, bufferUrl, onSelect]);
 
   return <div ref={hostRef} style={{ width: "100%", height: height }} />;
 }
 """
+
+#: What the component emits: the controller first, then the wrapper that uses it.
+_SHIM_JS = _SHIM_CONTROLLER_JS + _SHIM_COMPONENT_JS
 
 
 class XYChart(rx.NoSSRComponent):

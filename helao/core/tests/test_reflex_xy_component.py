@@ -1,10 +1,19 @@
 """Tests for the hand-written xy Reflex binding.
 
-xy 0.0.5 ships no `xy.reflex`, so HELAO supplies the binding. These tests
-cover the Python half — buffer storage, xy-native frame encoding, the HTTP
-route, and asset copying. The JavaScript shim is proven in the browser check
-at the end of the plan; nothing here can exercise WebGL.
+xy 0.0.5 ships no `xy.reflex`, so HELAO supplies the binding. These tests cover
+the Python half — buffer storage, xy-native frame encoding, the HTTP route, and
+asset copying — plus the JavaScript controller, executed under Node.
+
+Nothing here can exercise WebGL; rendering is proven by the browser check at
+the end of the plan. But the controller holds the shim logic that can actually
+be wrong, so it is run rather than string-matched.
 """
+
+import json
+import os
+import shutil
+import subprocess
+import tempfile
 
 import numpy as np
 import pytest
@@ -127,13 +136,12 @@ def test_xy_chart_is_client_only():
 
 
 def test_shim_declares_the_six_model_members_the_bundle_requires():
-    """The bundle's render({model, el}) drives everything through these."""
-    # Reflex's @dataclass_transform metaclass makes pyright treat every
-    # declared Var as a required constructor kwarg, even though the real
-    # Component.__init__ takes **kwargs and every Var is optional at
-    # runtime (confirmed: XYChart() succeeds, matching xy_chart()'s own
-    # XYChart.create() path). Bypassing .create() here is intentional --
-    # this test wants the class-level shim code, not a bound instance.
+    """The bundle's render({model, el}) drives everything through these.
+
+    A substring check only proves the tokens are present, so it is a smoke test,
+    not a guarantee -- the behavioral tests below are what actually constrain the
+    controller.
+    """
     code = xc.XYChart()._get_custom_code()  # type: ignore[reportCallIssue]
     for member in ("get", "send", "on", "off", "change:spec", "change:buffers"):
         assert member in code, f"shim is missing '{member}'"
@@ -143,3 +151,108 @@ def test_shim_references_the_bundles_exported_entry_points():
     code = xc.XYChart()._get_custom_code()  # type: ignore[reportCallIssue]
     assert "render" in code
     assert "decodeFrame" in code
+
+
+# --- Behavioral tests for the shim controller -------------------------------
+#
+# The controller holds every piece of shim logic that can be wrong, with no JSX
+# and no React, precisely so a JS runtime can execute it here. Substring
+# assertions previously let a stale-closure bug ship: `refetch` captured the
+# mount-time URL, so a chart painted once and then silently froze. These run the
+# real code instead.
+
+_JS_RUNTIME = shutil.which("node")
+
+_HARNESS = """
+%(controller)s
+
+const calls = [];
+globalThis.fetch = async (url) => {
+  calls.push(url);
+  if (url === "/fail") return { ok: false };
+  return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
+};
+
+const events = [];
+const st = createController({ spec: {v: 1}, onSelect: null });
+st.model.on("change:spec", () => events.push("spec"));
+st.model.on("change:buffers", () => events.push("buffers"));
+
+const out = {};
+(async () => {
+  // Queued before the bundle is ready, then flushed on markReady.
+  await st.refetch("/xy/buffers/p?v=1");
+  out.queuedWhileNotReady = calls.length === 0 && st.pending === true;
+  st.markReady();
+  await new Promise((r) => setTimeout(r, 0));
+  out.flushedPendingUrl = calls[0];
+
+  // The bug this guards: a later call must use the URL it is given.
+  await st.refetch("/xy/buffers/p?v=2");
+  await st.refetch("/xy/buffers/p?v=3");
+  out.lastFetched = calls[calls.length - 1];
+  out.allUrls = calls.slice();
+
+  // Both change events fire per successful refetch (the in-place append path).
+  out.events = events.slice();
+
+  // A failed fetch keeps the previous frame rather than blanking it.
+  const before = st.buffers;
+  await st.refetch("/fail");
+  out.keptFrameOnFailure = st.buffers === before;
+
+  console.log(JSON.stringify(out));
+})();
+"""
+
+
+def _run_controller_harness():
+    """Execute the shim controller under Node and return its result dict."""
+    # Only called from tests gated by skipif(_JS_RUNTIME is None), but that
+    # guard is invisible to pyright across the function boundary.
+    assert _JS_RUNTIME is not None
+    controller = xc._SHIM_CONTROLLER_JS
+    script = _HARNESS % {"controller": controller}
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "harness.mjs")
+        with open(path, "w") as fh:
+            fh.write(script)
+        proc = subprocess.run(
+            [_JS_RUNTIME, path], capture_output=True, text=True, timeout=60
+        )
+    assert proc.returncode == 0, f"harness failed:\n{proc.stderr}"
+    return json.loads(proc.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_refetch_uses_the_url_it_is_given_not_a_captured_one():
+    """The regression guard: a captured URL freezes the chart after one paint.
+
+    `version` changes every render tick and BufferStore keeps only the newest
+    version, so a stale URL 404s, the !ok guard holds the previous frame, and
+    updates stop silently.
+    """
+    out = _run_controller_harness()
+    assert out["lastFetched"] == "/xy/buffers/p?v=3"
+    assert "/xy/buffers/p?v=2" in out["allUrls"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_queues_a_refetch_until_the_bundle_is_ready():
+    out = _run_controller_harness()
+    assert out["queuedWhileNotReady"] is True
+    assert out["flushedPendingUrl"] == "/xy/buffers/p?v=1"
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_fires_both_change_events_per_successful_refetch():
+    """The bundle's in-place append path listens for each event separately."""
+    out = _run_controller_harness()
+    assert out["events"].count("spec") == 3
+    assert out["events"].count("buffers") == 3
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_keeps_the_last_good_frame_when_a_fetch_fails():
+    out = _run_controller_harness()
+    assert out["keptFrameOnFailure"] is True
