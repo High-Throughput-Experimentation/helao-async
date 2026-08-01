@@ -31,6 +31,8 @@ import shutil
 import subprocess
 import sys
 
+import colorama
+
 #: Must match ``app_name`` in ``helao/core/servers/reflex/_app/rxconfig.py``.
 APP_NAME = "helao_ui"
 
@@ -39,6 +41,20 @@ BUNDLE_DIRNAME = ".reflex-bundle"
 
 #: Reflex project directory the CLI is invoked from.
 APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
+
+#: Seconds allowed for the backend to exit on SIGTERM before escalating, and
+#: for the killed process to be reaped. These must add up to comfortably less
+#: than ``Pidd.GRACEFUL_WAIT`` (7.0s, launch.py) -- that is the window before
+#: the orchestrator SIGKILLs *this* launcher. Overrunning it means the launcher
+#: dies mid-cleanup and leaves an untracked backend holding ``port + 1``, so the
+#: next launch of the same config cannot bind.
+BACKEND_TERM_WAIT = 3.0
+BACKEND_KILL_WAIT = 1.0
+
+#: Bound the frontend's own graceful shutdown. uvicorn defaults to waiting
+#: indefinitely for open connections, which would blow the same budget: a single
+#: browser tab left open on the panel page is enough.
+FRONTEND_SHUTDOWN_TIMEOUT = 2
 
 #: Reflex assets directory, served from the site root. xy's ESM client is
 #: copied here before the frontend build so the bundle ships it and the browser
@@ -63,11 +79,15 @@ def resolve_bundle(repo_root: str):
         export must not be served.
     """
     candidate = os.path.join(repo_root, BUNDLE_DIRNAME, APP_NAME)
-    if os.path.isdir(candidate) and os.path.isfile(
-        os.path.join(candidate, "index.html")
-    ):
-        return candidate
-    return None
+    index = os.path.join(candidate, "index.html")
+    if not (os.path.isdir(candidate) and os.path.isfile(index)):
+        return None
+    # A zero-byte index.html means an interrupted export or a partial copy.
+    # Serving it silently yields a blank page in the browser with nothing in
+    # the logs; treating it as absent routes into the loud failure path.
+    if os.path.getsize(index) == 0:
+        return None
+    return candidate
 
 
 def build_env(config_path: str, server_key: str, host: str, port: int, root):
@@ -114,10 +134,26 @@ def _serve_frontend(bundle_dir: str, host: str, port: int):
 
     static_app = FastAPI()
     static_app.mount("/", StaticFiles(directory=bundle_dir, html=True), name="frontend")
-    uvicorn.run(static_app, host=host, port=port, log_level="warning")
+    uvicorn.run(
+        static_app,
+        host=host,
+        port=port,
+        log_level="warning",
+        timeout_graceful_shutdown=FRONTEND_SHUTDOWN_TIMEOUT,
+    )
 
 
 if __name__ == "__main__":
+    # Same handling as fast_launcher/bokeh_launcher: launch.py sets
+    # HELAO_FORCE_COLOR when it pumps our output through its own tty stdout, so
+    # emit raw ANSI and let the launcher's colorama translate it (which on
+    # Windows must happen against a real console handle, not our pipe) rather
+    # than stripping just because our own stdout is a pipe.
+    if os.environ.get("HELAO_FORCE_COLOR") == "1":
+        colorama.init(strip=False, convert=False)
+    else:
+        colorama.init(strip=not sys.stdout.isatty())
+
     if sys.platform == "win32":
         # Match bokeh_launcher.py: a selector loop, so a co-located ZMQ RPC
         # socket works without the Proactor loop's missing add_reader family.
@@ -233,6 +269,14 @@ if __name__ == "__main__":
     finally:
         backend.terminate()
         try:
-            backend.wait(timeout=10)
+            backend.wait(timeout=BACKEND_TERM_WAIT)
         except subprocess.TimeoutExpired:
             backend.kill()
+            try:
+                # Reap it: an unreaped child stays a zombie whose PID
+                # psutil.pid_exists() still reports as alive.
+                backend.wait(timeout=BACKEND_KILL_WAIT)
+            except subprocess.TimeoutExpired:
+                LOGGER.warning(
+                    f"reflex backend pid {backend.pid} did not exit after kill"
+                )
