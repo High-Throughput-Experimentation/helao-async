@@ -905,6 +905,36 @@ async def test_wsingest_recovers_after_the_server_restarts():
 
 
 @pytest.mark.asyncio
+async def test_stop_propagates_a_cancellation_of_stop_itself():
+    """Tearing down our own tasks is not a failure; being cancelled is.
+
+    Guards a subtle wrong fix: discriminating on ``task.cancelled()`` cannot
+    work here, because ``stop()`` cancels the tasks itself before awaiting them,
+    so that flag reads ``True`` no matter who cancelled the caller.
+    """
+    ing = WsIngest("127.0.0.1", 1, "ws_live")
+    ing.start()
+
+    async def stubborn():
+        try:
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            await asyncio.sleep(0.3)  # slow to finish cancelling
+            raise
+
+    ing._task.cancel()
+    ing._task = asyncio.create_task(stubborn())
+    await asyncio.sleep(0.05)
+
+    stopper = asyncio.create_task(ing.stop())
+    await asyncio.sleep(0.05)  # let stop() reach its await
+    stopper.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stopper
+    assert ing._task is None and ing._wss is None
+
+
+@pytest.mark.asyncio
 async def test_wsingest_stop_is_idempotent():
     ing = WsIngest("127.0.0.1", 1, "")
     ing.start()
@@ -1185,16 +1215,34 @@ class WsIngest:
         LOGGER.info(f"reflex ingest subscribing to {self.url}")
 
     async def stop(self) -> None:
-        """Cancel the drain loop and the underlying subscriber. Idempotent."""
-        for task in (self._task, getattr(self._wss, "subscriber_task", None)):
-            if task is not None:
-                task.cancel()
-                try:
-                    await task
-                except (asyncio.CancelledError, Exception):
-                    pass
-        self._task = None
-        self._wss = None
+        """Cancel the drain loop and the underlying subscriber. Idempotent.
+
+        ``gather(..., return_exceptions=True)`` returns each task's own
+        ``CancelledError`` as a result instead of raising it, so the teardown
+        this method exists to perform does not itself look like a failure. An
+        outer cancellation -- something cancelling *this* coroutine while it is
+        suspended, e.g. ``asyncio.wait_for(ingest.stop(), timeout=...)`` --
+        still raises at the ``await`` and propagates, which is what the caller
+        asked for. The ``finally`` clears the handles either way, so teardown
+        completes on both paths.
+
+        Inspecting ``task.cancelled()`` to tell the two cases apart does not
+        work: this method always cancels the tasks itself first, so by the time
+        the flag is readable it is ``True`` regardless of who cancelled the
+        caller.
+        """
+        tasks = [
+            task
+            for task in (self._task, getattr(self._wss, "subscriber_task", None))
+            if task is not None
+        ]
+        for task in tasks:
+            task.cancel()
+        try:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            self._task = None
+            self._wss = None
 
     async def _drain_loop(self) -> None:
         """Drain the subscriber, normalize, and append. Runs until cancelled."""
@@ -1302,7 +1350,7 @@ def get_registry():
 conda run -n helao python -m pytest helao/core/tests/test_reflex_ingest.py -v
 ```
 
-Expected: 22 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
+Expected: 23 passed. The reconnect test spends about a second in the `WsSubscriber` backoff before its second connection lands; that wait is the point of the test, not incidental.
 
 - [ ] **Step 5: Format and commit**
 
