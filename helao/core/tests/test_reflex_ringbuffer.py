@@ -118,7 +118,9 @@ def test_rowbuffer_returns_copies_so_callers_cannot_corrupt_it():
     rows = RowBuffer(maxlen=2)
     rows.append({"i": 1})
     rows.rows()[0]["i"] = 999
-    rows.latest()["i"] = 999  # type: ignore[index]
+    latest = rows.latest()
+    assert latest is not None  # narrows Optional for pyright; no ignore needed
+    latest["i"] = 999
     assert rows.rows() == [{"i": 1}]
 
 
