@@ -3639,7 +3639,16 @@ def test_the_buffer_route_is_reachable_through_the_built_app():
 
 
 def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
-    """A plain coroutine is only cancelled; the drain loops would outlive the app."""
+    """A plain coroutine is only cancelled; the drain loops would outlive the app.
+
+    Every ``rx.App`` registers other lifespan tasks by default -- notably
+    ``App._setup_event_processor``, which is itself wrapped in
+    ``contextlib.asynccontextmanager`` -- so asserting that *any* registered
+    task has that shape would pass even if the ingest task were still a plain
+    coroutine. This isolates the ingest task by name (``__name__`` survives
+    ``functools.wraps`` through the decorator) before checking its shape, so a
+    regression back to a plain coroutine actually fails this test.
+    """
     import contextlib
     import inspect
 
@@ -3647,13 +3656,14 @@ def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
 
     app = build_app(_ui_cfg({"pages": ["live"]}), "UI")
     tasks = list(getattr(app, "lifespan_tasks", []) or [])
-    assert tasks, "no lifespan task registered"
-    assert any(
-        isinstance(task, contextlib._AsyncGeneratorContextManager)
-        or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
-        or getattr(task, "__name__", "") == "_ingest_lifespan"
-        for task in tasks
-    )
+    ingest_tasks = [
+        task for task in tasks if getattr(task, "__name__", "") == "_ingest_lifespan"
+    ]
+    assert ingest_tasks, "no _ingest_lifespan task registered"
+    task = ingest_tasks[0]
+    assert isinstance(
+        task, contextlib._AsyncGeneratorContextManager
+    ) or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
 
 
 def test_only_plots_module_imports_xy():
