@@ -2912,7 +2912,7 @@ git commit -m "feat(reflex): add the xy Reflex binding and plot facade"
 **Interfaces:**
 - Consumes: `get_registry` from Task 2.
 - Produces:
-  - `VisPanelState(rx.State)` with vars `server_key: str`, `ws_path: str`, `window_points: int`, `update_rate: float`, `connection: str`, `error: str`, and events `set_window_points(value: str)`, `set_update_rate(value: str)`, `render_loop()`.
+  - `VisPanelState(rx.State)` with vars `server_key: str`, `ws_path: str`, `window_points: int`, `update_rate: float`, `connection: str`, `error: str`, and events `on_window_points(value: str)`, `on_update_rate(value: str)`, `render_loop()`, `stop_loop()`. (Named `on_*` rather than `set_*`: Task 7's panels bind these, and `set_<var>` is the shape Reflex reserves for auto-generated setters, so the prefix stays clear of it.)
   - `LiveVisState(VisPanelState)` — `ws_path = "ws_live"`, `update_rate = 0.5`.
   - `ActionVisState(VisPanelState)` — `ws_path = "ws_data"`, `update_rate = 0.25`.
   - `make_panel_state(module_name: str, server_key: str, base: type, ws_path: str) -> type` — mints and caches a uniquely-named subclass.
@@ -2977,6 +2977,20 @@ def test_parse_update_rate_falls_back_to_half_a_second():
 def test_parse_update_rate_clamps_to_a_sane_floor():
     assert VisPanelState.parse_update_rate("0") >= 0.01
     assert VisPanelState.parse_update_rate("-5") >= 0.01
+
+
+def test_input_handlers_use_the_names_the_panels_bind():
+    """Task 7's panels wire these by name, so the spelling is a contract."""
+    for name in ("on_window_points", "on_update_rate", "render_loop", "stop_loop"):
+        assert hasattr(VisPanelState, name), f"missing handler '{name}'"
+    assert not hasattr(VisPanelState, "set_window_points")
+    assert not hasattr(VisPanelState, "set_update_rate")
+
+
+def test_generated_state_class_is_constructible():
+    """Regression: a type() namespace without __module__ raises inside Reflex."""
+    cls = make_panel_state("probe_panel", "PROBE", LiveVisState, "ws_live")
+    assert cls.__module__ == VisPanelState.__module__
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -3209,6 +3223,10 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
         f"{safe}_State",
         (base,),
         {
+            # Required: Reflex's StateBase metaclass resolves field annotations
+            # via sys.modules[namespace["__module__"]], so a namespace without
+            # it raises KeyError before the class is even built.
+            "__module__": __name__,
             "server_key": server_key,
             "ws_path": ws_path,
             "server_key_default": server_key,
@@ -3229,7 +3247,7 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
 conda run -n helao python -m pytest helao/core/tests/test_reflex_panels.py -v
 ```
 
-Expected: 7 passed.
+Expected: 9 passed.
 
 - [ ] **Step 5: Format and commit**
 
