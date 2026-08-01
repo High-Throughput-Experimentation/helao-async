@@ -5876,7 +5876,19 @@ conda run -n helao reflex init --name helao_ui --no-agents --loglevel info
 conda run -n helao reflex export --frontend-only
 ```
 
-Confirm the copied asset is ~411 KB and that `assets/xy-client.js` appears in the export output. A truncated or missing asset produces a page that loads and then renders no charts at all.
+Confirm the copied asset is ~411 KB and that `xy-client.js` appears in the export output.
+
+**If the repo lives on a `noexec` mount** (this one does — `/mnt/STORAGE` is `rw,nosuid,nodev,noexec`), the build fails at "Creating Production Build" with `Permission denied` / exit 126 on `.web/node_modules/.bin/react-router`, regardless of permission bits. Stage and build elsewhere:
+
+```bash
+BUILD=/tmp/rxbuild
+mkdir -p $BUILD
+(cd helao/core/servers/reflex/_app && tar cf - --exclude=.web --exclude=reflex.lock .) | (cd $BUILD && tar xf -)
+cd $BUILD && PYTHONPATH=<repo_root> conda run -n helao reflex export --frontend-only
+mkdir -p <repo_root>/.reflex-bundle/helao_ui && cd <repo_root>/.reflex-bundle/helao_ui && unzip -o $BUILD/frontend.zip
+```
+
+Only the build needs exec; the bundle is static files. A truncated or missing asset produces a page that loads and then renders no charts at all.
 
 Move the export output to `<repo_root>/.reflex-bundle/helao_ui/` such that `index.html` sits directly in that directory. Record the exact export output path in the Task 0 API note under a new "## Bundle export" section, since it is version-dependent.
 
