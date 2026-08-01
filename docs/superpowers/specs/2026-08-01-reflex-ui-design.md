@@ -115,6 +115,22 @@ action server ws_live / ws_data
 
 Columnar numpy storage with `append(cols: dict[str, array])` and `snapshot(n) -> dict[str, array]`. Default capacity 1,000,000 rows, configurable per panel. Because xy renders only visible pixels, buffer depth is no longer a performance knob: the existing "max datapoints" input becomes a *display window* selector rather than a memory cap. Overflow drops oldest rows, by design.
 
+### Two payload shapes, one per endpoint
+
+The two subscribed endpoints do **not** carry the same thing, and conflating them was a real defect in an earlier draft of this spec:
+
+| Endpoint | Wire payload | Why |
+|---|---|---|
+| `ws_live` | `dict` of `{datalab: (value, epoch)}` | `_ws_relay(..., use_as_dict=False)` passes the live-queue dict through unchanged. |
+| `ws_data` | a pickled **`DataPackageModel` object** | `/ws_data` is served by `data_publisher.broadcast`, and `WsPublisher`'s default `xform_func` is the identity, so the model is pickled as-is. Its payload lives at `.datamodel.data[file_conn_key][column]`, reached by attribute access — which is why the Bokeh `oersim_vis` reads `data_package.datamodel.status` rather than subscripting. |
+
+So ingest carries two normalizers and `WsIngest` selects by `ws_path`:
+
+- `normalize(messages)` — the `ws_live` shape.
+- `normalize_data_package(messages)` — unwraps `DataPackageModel`, flattening each `datamodel.data` entry into columns and surfacing `action_uuid` so a panel can reset when the streamed action changes.
+
+A single normalizer written for the `ws_live` shape silently drops every `ws_data` message (it is not a `dict`), leaving an action visualizer permanently empty while its status still reads `live` — no error, no log.
+
 ### WsIngest
 
 Wraps the existing `helao.helpers.ws_utils.WsSubscriber`. One asyncio task per `(server_key, ws_path)`, started at app startup from the config and alive for the process lifetime. It drains messages, normalizes them into columns, and appends to the ring buffer.
