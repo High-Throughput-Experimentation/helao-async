@@ -16,6 +16,8 @@ __all__ = [
     "ChartPayload",
     "layout_token",
     "chart",
+    "traces",
+    "TRACE_KINDS",
     "time_series",
     "spectra",
     "scatter_map",
@@ -235,6 +237,76 @@ def time_series(
             continue
         marks.append(xy.line(x=fx, y=fy, name=label, color=PALETTE[idx % len(PALETTE)]))
     figure = xy.chart(*marks, *_axes(x_label, y_label, x_is_epoch))
+    return _publish(figure, panel_id, version)
+
+
+#: Mark builders the data browser's trace-type control selects between.
+#: Matches the Bokeh data browser exactly; xy also ships ``step``, but adding it
+#: here would make the port a feature change rather than a re-rendering.
+TRACE_KINDS = {"line": "line", "scatter": "scatter"}
+
+
+def traces(
+    series,
+    *,
+    kind: str = "line",
+    x_label: str = "",
+    y_label: str = "",
+    panel_id: str = "traces",
+    version: int = 0,
+):
+    """Render traces that each carry their own x values.
+
+    :func:`time_series` and :func:`spectra` both take a single ``x`` shared by
+    every series. The data browser overlays datasets read from unrelated files,
+    so each has its own x column and a shared axis would misalign them.
+
+    Args:
+        series: Sequence of ``{"label": str, "x": array, "y": array}``.
+        kind: ``"line"`` or ``"scatter"``.
+        x_label: X axis label.
+        y_label: Y axis label.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version; the browser refetches when it changes.
+
+    Returns:
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
+        Traces with no finite points are skipped; an empty ``series`` yields a
+        valid empty chart.
+
+    Raises:
+        ValueError: If ``kind`` is unknown, or a trace's x and y differ in
+            length.
+    """
+    if kind not in TRACE_KINDS:
+        raise ValueError(
+            f"unknown trace kind {kind!r}; expected one of {sorted(TRACE_KINDS)}"
+        )
+    builder = getattr(xy, TRACE_KINDS[kind])
+    marks = []
+    for idx, item in enumerate(series):
+        xs = _as_float_array(item["x"])
+        ys = _as_float_array(item["y"])
+        # Checked before the finite filter: a length mismatch is a caller bug,
+        # and quietly using the shorter of the two would hide it behind a plot
+        # that looks entirely plausible.
+        if xs.size != ys.size:
+            raise ValueError(
+                f"trace '{item['label']}' has x length {xs.size} "
+                f"and y length {ys.size}"
+            )
+        fx, fy = _finite_pairs(xs, ys)
+        if fx.size == 0:
+            continue
+        marks.append(
+            builder(
+                x=fx,
+                y=fy,
+                name=item["label"],
+                color=PALETTE[idx % len(PALETTE)],
+            )
+        )
+    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
 
 
