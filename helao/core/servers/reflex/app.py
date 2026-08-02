@@ -114,6 +114,30 @@ def as_dict(value, *, what: str) -> dict:
     return {}
 
 
+def declared_ws_path(module_name: str, key_default: str) -> str:
+    """The socket a panel module reads, falling back to the config key's.
+
+    ``live_vis`` normally implies ``ws_live``, but the key says which *page* a
+    panel belongs on and the module says which *socket* it reads -- and those
+    genuinely differ: a potentiostat panel can belong on the live page while
+    reading per-action packets. Deriving the socket from the key alone
+    subscribes the ingest to one path while the panel waits on another, and
+    the panel then reports no ingest for a path nothing is feeding.
+
+    Unresolvable modules keep the key's default: discovery must not break on a
+    module that cannot be imported, and :func:`_render_panel` already renders
+    that case as an error card.
+    """
+    try:
+        module = resolve_panel_module(module_name)
+    except Exception:
+        return key_default
+    declared = getattr(module, "WS_PATH", None)
+    if isinstance(declared, str) and declared in VIS_KEY_TO_WS_PATH.values():
+        return declared
+    return key_default
+
+
 def panel_targets(world_cfg: dict, limit_vis=None) -> list:
     """Discover every panel declared by the config's action servers.
 
@@ -137,7 +161,14 @@ def panel_targets(world_cfg: dict, limit_vis=None) -> list:
             if not module_names:
                 continue
             for module_name in as_list(module_names):
-                targets.append(PanelTarget(server_key, module_name, ws_path, vis_key))
+                targets.append(
+                    PanelTarget(
+                        server_key,
+                        module_name,
+                        declared_ws_path(module_name, ws_path),
+                        vis_key,
+                    )
+                )
     return targets
 
 
