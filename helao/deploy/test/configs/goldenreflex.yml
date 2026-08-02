@@ -51,11 +51,21 @@ servers:
     action_vis: oersim_panel
     params:
       plate_id: 2750
-  # GPSIM is deliberately absent: gpsim_driver imports gpflow, which needs
-  # tensorflow, and tensorflow has no Python 3.14 release. The server cannot
-  # import at all (ModuleNotFoundError: gpflow), so including it would abort
-  # the group at launch. That server and its driver are deprecated;
-  # gpsim_panel is retained but unreachable from any launchable config.
+  # GPSIM was absent while gpsim_driver still imported gpflow, which needs
+  # tensorflow and so has no Python 3.14 build. The surrogate now runs on
+  # gpytorch (see drivers/data/gp_backend.py), so the server imports and the
+  # OERSIM experiments -- every one of which routes through GPSIM -- are
+  # runnable again. That also restores /action's only real data source:
+  # CPSIM streams ws_data during a measurement it cannot start without a
+  # composition from GPSIM.
+  GPSIM:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gpsim_server
+    live_vis: gpsim_panel
+    params:
+      random_seed: 12345
   UI:
     host: 127.0.0.1
     port: 5010

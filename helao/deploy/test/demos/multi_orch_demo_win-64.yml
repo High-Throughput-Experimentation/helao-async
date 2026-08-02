@@ -73,6 +73,6 @@ dependencies:
   - websockets
   - zeroconf
   - zeromq
-  - tensorflow-cpu
-  - gpflow
+  - pytorch-cpu
+  - gpytorch
   - tf-keras

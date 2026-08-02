@@ -1,9 +1,10 @@
 """Gaussian-process surrogate simulator for OER active-learning demos.
 
 Provides :class:`GPSim`, a driver that loads a pickled subset of CP measurements,
-maintains per-plate ``gpflow`` models, and exposes acquisition/initialization/fit
-routines used by the GP simulator action server, plus :class:`GPSimExec`, the
-:class:`Executor` that fits the model from inside a running action.
+maintains per-plate Gaussian-process models, and exposes acquisition,
+initialization, and fit routines used by the GP simulator action server, plus
+:class:`GPSimExec`, the :class:`Executor` that fits the model from inside a
+running action.
 """
 
 import asyncio
@@ -13,11 +14,11 @@ import time
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-import gpflow
 import numpy as np
 from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
 
+from helao.deploy.test.drivers.data.gp_backend import GPRegressor
 from helao.deploy.test.drivers.data.oer_metrics import calc_eta  # noqa: F401
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
@@ -33,8 +34,8 @@ class GPSim:
     """Per-plate Gaussian-process surrogate over an OER composition library.
 
     Loads pickled CP data for every plate in ``oer13_cps.pzstd``, derives an eta
-    target per composition, and maintains a ``gpflow`` regression model per
-    plate alongside the bookkeeping (acquired/available indices, EI history,
+    target per composition, and maintains a GP regression model per plate
+    alongside the bookkeeping (acquired/available indices, EI history,
     progress) that the GP action server endpoints rely on.
 
     Attributes:
@@ -52,7 +53,8 @@ class GPSim:
         g_acq: Set of compositions acquired across all plates.
         g_avl: Set of all known compositions.
         invfeats: Mapping of composition tuple to ``(plate_id, idx)`` entries.
-        models: Per-plate ``gpflow.models.GPR`` instances.
+        models: Per-plate :class:`~helao.deploy.test.drivers.data.gp_backend.GPRegressor`
+            instances, ``None`` until the plate's first fit.
         progress: Latest acquisition record per plate.
         initialized: Per-plate flag set after prior initialization.
         global_step: Counter of acquisitions across all plates.
@@ -119,13 +121,10 @@ class GPSim:
             for feat in self.g_avl
         }
 
-        # gpflow model
-        self.kernel_func = (
-            lambda: gpflow.kernels.Constant()
-            + gpflow.kernels.Matern32(lengthscales=50.0)
-            + gpflow.kernels.White(variance=1e-4)
-        )
-        self.models = {k: None for k in self.all_data}
+        # Surrogate model per plate. The kernel structure lives in
+        # gp_backend.GPRegressor, which documents how it maps onto the gpflow
+        # model it replaced.
+        self.models: dict = {k: None for k in self.all_data}
         self.opt_logs = {k: {} for k in self.all_data}
         self.total_step = {k: {} for k in self.all_data}
         self.ei_step = {k: {} for k in self.all_data}
@@ -200,10 +199,8 @@ class GPSim:
         ].astype(float)
         X_sample = self.features[plate_id][acqinds].astype(float).round(2)
         Y_sample = self.targets[plate_id][acqinds]
-        mu, variance = (r.numpy() for r in self.models[plate_id].predict_f(X))
-        mu_sample, variance_sample = (
-            r.numpy() for r in self.models[plate_id].predict_f(X_sample)
-        )
+        mu, variance = self.models[plate_id].predict_f(X)
+        mu_sample, variance_sample = self.models[plate_id].predict_f(X_sample)
 
         sigma = variance**0.5
 
@@ -249,8 +246,14 @@ class GPSim:
             current_avail_inds = self.available[plate_id]
 
             filtered_inds = [i for i in ei_avail_inds if i in current_avail_inds]
+            # Flattened first: the EI column is (N, 1), so iterating it yields
+            # 1-element arrays, and `float()` on one of those raises under
+            # NumPy 2 ("only 0-dimensional arrays can be converted"). Selection
+            # wants scalars; ``ei_step`` keeps the column shape.
             filtered_ei = [
-                ei for i, ei in zip(ei_avail_inds, latest_ei) if i in current_avail_inds
+                ei
+                for i, ei in zip(ei_avail_inds, np.asarray(latest_ei).reshape(-1))
+                if i in current_avail_inds
             ]
 
             best_idx, best_ei = [
@@ -381,24 +384,16 @@ class GPSim:
         y = self.targets[plate_id][acq_inds]
         LOGGER.info(f"features {X.shape}: {X}")
         LOGGER.info(f"targets {y.shape}: {y}")
-        opt = gpflow.optimizers.Scipy()
-        kernel = self.kernel_func()
-        try:
-            self.models[plate_id] = gpflow.models.GPR(
-                data=(X, y), kernel=kernel, mean_function=None
-            )
-        except Exception as e:
-            LOGGER.info(e)
-        self.opt_logs[plate_id][plate_step] = opt.minimize(
-            self.models[plate_id].training_loss,
-            self.models[plate_id].trainable_variables,
-            options={"maxiter": 100},
-        )
-        total_pred, total_var = (
-            r.numpy()
-            for r in self.models[plate_id].predict_f(
-                self.features[plate_id].astype(float).round(2)
-            )
+        model = GPRegressor()
+        model.fit(X, y)
+        self.models[plate_id] = model
+        self.opt_logs[plate_id][plate_step] = {
+            "final_loss": model.final_loss,
+            "iters": model.train_iters,
+            "n_points": int(X.shape[0]),
+        }
+        total_pred, total_var = model.predict_f(
+            self.features[plate_id].astype(float).round(2)
         )
         LOGGER.info(f"prediction min: {total_pred.min()}")
         LOGGER.info(f"prediction mean: {total_pred.mean()}")
@@ -439,7 +434,7 @@ class GPSim:
         self.available = {
             k: list(range(arr.shape[0])) for k, arr in self.features.items()
         }
-        self.models = {k: None for k in self.all_data}
+        self.models: dict = {k: None for k in self.all_data}
 
     def clear_plate(self, plate_id):
         """Reset state for one plate, retaining globally acquired compositions.

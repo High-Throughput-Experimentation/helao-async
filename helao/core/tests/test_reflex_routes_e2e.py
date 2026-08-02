@@ -75,18 +75,22 @@ def test_build_app_registers_panel_handlers_without_compiling_pages(reflex_cfg):
 
     build_app(reflex_cfg, "UI")
     registered = set(RegistrationContext.get().event_handlers)
-    for panel, server in (("wssim_panel", "sim"), ("oersim_panel", "cpsim")):
+    for panel, server in (
+        ("wssim_panel", "sim"),
+        ("oersim_panel", "cpsim"),
+        ("gpsim_panel", "gpsim"),
+    ):
         for handler in ("render_loop", "stop_loop", "on_window_points"):
             assert any(
                 f"{panel}_{server}__state.{handler}" in name for name in registered
             ), f"{panel}/{server}.{handler} not registered without page compilation"
 
 
-def test_route_map_puts_the_sim_panel_on_live(reflex_cfg):
+def test_route_map_splits_live_and_action_panels(reflex_cfg):
     from helao.core.servers.reflex.app import route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
-    assert sorted(t.server_key for t in routes["/live"]) == ["SIM"]
+    assert sorted(t.server_key for t in routes["/live"]) == ["GPSIM", "SIM"]
     assert [t.server_key for t in routes["/action"]] == ["CPSIM"]
 
 
@@ -95,14 +99,14 @@ def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
 
     CPSIM is the sole ws_data target — the path that shipped two Critical
     defects — so without it the only step that can prove rendering never
-    touches it. GPSIM is excluded on purpose: gpsim_driver imports gpflow,
-    which needs tensorflow, and tensorflow has no Python 3.14 release, so that
-    server cannot import at all.
+    touches it. GPSIM is what lets CPSIM produce any data at all: every OERSIM
+    experiment routes through it, and measure_cp needs a composition it picks.
     """
     from helao.core.servers.reflex.ingest import IngestRegistry
 
     assert sorted(IngestRegistry(reflex_cfg).targets()) == [
         ("CPSIM", "ws_data"),
+        ("GPSIM", "ws_live"),
         ("SIM", "ws_live"),
     ]
 
@@ -110,9 +114,10 @@ def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
 def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
     """A config naming a server that cannot import aborts the group at launch.
 
-    This is not hypothetical: GPSIM was wired in here until its driver's
-    module-level ``import gpflow`` (which needs tensorflow, unavailable on
-    Python 3.14) made the server unimportable. Route composition and
+    This is not hypothetical: GPSIM had to be pulled from this config when its
+    driver's module-level ``import gpflow`` (which needs tensorflow, with no
+    Python 3.14 build) made the server unimportable, and it is back only
+    because the surrogate now runs on gpytorch. Route composition and
     ``validateConfig`` both pass for such a config -- only launching it fails --
     so nothing else in this suite would notice.
     """
@@ -160,12 +165,14 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
     assert not failures, "unimportable servers in goldenreflex:\n" + "\n".join(failures)
 
 
-def test_calc_eta_does_not_drag_in_the_deprecated_gp_simulator():
-    """cpsim must not transitively import gpflow for four lines of arithmetic.
+def test_calc_eta_does_not_drag_in_the_gp_stack():
+    """cpsim must not transitively import a GP stack for four lines of maths.
 
-    calc_eta lived in gpsim_driver, whose module-level ``import gpflow`` made
-    every consumer depend on tensorflow. Keeping it in a dependency-free module
-    is what lets CPSIM -- the config's only ws_data server -- launch at all.
+    calc_eta lived in gpsim_driver, whose module-level GP import made every
+    consumer carry it. That stack is gpytorch now rather than gpflow, so this
+    is no longer a launch-blocker for CPSIM -- but importing torch to average
+    six floats is still wrong, and the coupling is what made a single
+    unavailable dependency take down an unrelated server.
     """
     import ast
     import inspect
@@ -184,8 +191,8 @@ def test_calc_eta_does_not_drag_in_the_deprecated_gp_simulator():
         return roots
 
     # Substring-matching the source would trip on this module's own docstring,
-    # which names gpflow to explain why the extraction exists.
-    heavy = {"gpflow", "tensorflow"}
+    # which names these to explain why the extraction exists.
+    heavy = {"gpflow", "tensorflow", "gpytorch", "torch"}
     assert not (_imported_roots(oer_metrics) & heavy)
 
     assert oer_metrics.calc_eta({"t_s": [0, 1, 2, 3, 4, 5], "erhe_v": [1.5] * 6}) == (
@@ -200,7 +207,7 @@ def test_every_panel_module_is_reachable_from_this_config(reflex_cfg):
     from helao.core.servers.reflex.app import panel_targets
 
     modules = sorted(t.module_name for t in panel_targets(reflex_cfg))
-    assert modules == ["oersim_panel", "wssim_panel"]
+    assert modules == ["gpsim_panel", "oersim_panel", "wssim_panel"]
 
 
 def test_every_panel_on_every_route_renders(reflex_cfg):
