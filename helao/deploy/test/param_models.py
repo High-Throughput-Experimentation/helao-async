@@ -5,7 +5,8 @@ Pattern contract (deployment adopters copy this, not the sim internals):
 - model_config: extra="forbid" (kills authored-key typos), use_enum_values=True (dumps plain str)
 - .model_dump() feeds apm.add / epm.add UNCHANGED — wire shape is byte-identical to the
   literal dict it replaces (proven by unit_test_oersim_params + the e2e gate)
-- import cost: pydantic only; NEVER house these in a driver module (gpflow import trap)
+- import cost: pydantic only; NEVER house these in a driver module (a driver can pull in
+  a heavy optional stack -- gpsim_driver drags in gpytorch/torch)
 """
 
 from enum import StrEnum

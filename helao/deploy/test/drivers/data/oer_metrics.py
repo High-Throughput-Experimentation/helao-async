@@ -1,11 +1,13 @@
 """Pure OER metrics shared by the simulator drivers.
 
-``calc_eta`` used to live in ``gpsim_driver``, which imports ``gpflow`` at
-module scope. That made every consumer transitively depend on gpflow (and so on
-tensorflow, which has no Python 3.14 release) for four lines of arithmetic that
-need neither -- taking ``cpsim_driver`` down with the deprecated GP simulator.
+``calc_eta`` used to live in ``gpsim_driver``, which imports a GP stack at
+module scope. That made every consumer transitively depend on it for four lines
+of arithmetic that need none of it -- and when that stack was gpflow, whose
+TensorFlow dependency has no Python 3.14 build, it took ``cpsim_driver`` down
+with the GP simulator. The backend is gpytorch now, but the coupling would be
+just as wrong.
 
-Nothing here may import gpflow, tensorflow, or any optional heavy dependency.
+Nothing here may import gpytorch, torch, or any optional heavy dependency.
 """
 
 __all__ = ["calc_eta"]
