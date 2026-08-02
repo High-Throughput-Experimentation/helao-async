@@ -18,6 +18,7 @@ Build the frontend bundle on a development machine before deploying::
 
 __all__ = [
     "APP_NAME",
+    "wait_for_backend",
     "BUNDLE_DIRNAME",
     "backend_port",
     "resolve_bundle",
@@ -28,8 +29,10 @@ __all__ = [
 import asyncio
 import os
 import shutil
+import socket
 import subprocess
 import sys
+import time
 
 import colorama
 
@@ -50,6 +53,11 @@ APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
 #: next launch of the same config cannot bind.
 BACKEND_TERM_WAIT = 3.0
 BACKEND_KILL_WAIT = 1.0
+
+#: Seconds to wait for the backend to begin listening before giving up. A
+#: backend that dies at startup leaves the frontend serving a page that can only
+#: report "websocket error", with nothing in the logs to say why.
+BACKEND_START_TIMEOUT = 30.0
 
 #: Bound the frontend's own graceful shutdown. uvicorn defaults to waiting
 #: indefinitely for open connections, which would blow the same budget: a single
@@ -124,6 +132,36 @@ def may_build_locally() -> bool:
     if os.environ.get("REFLEX_ALLOW_LOCAL_BUILD") != "1":
         return False
     return bool(shutil.which("bun") or shutil.which("node"))
+
+
+def wait_for_backend(process, host: str, port: int, timeout: float) -> str:
+    """Wait for the backend to listen, or explain why it will not.
+
+    Args:
+        process: The spawned backend ``Popen``.
+        host: Host it should bind.
+        port: Port it should bind.
+        timeout: Seconds to wait before giving up.
+
+    Returns:
+        str: ``""`` once the port accepts a connection, otherwise a message
+        naming the reason -- the process exited, or it never bound in time.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return (
+                f"the Reflex backend exited immediately with code "
+                f"{process.returncode} and never bound {host}:{port}"
+            )
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+            probe.settimeout(0.5)
+            if probe.connect_ex((host, port)) == 0:
+                return ""
+        time.sleep(0.25)
+    return (
+        f"the Reflex backend did not begin listening on {host}:{port} in {timeout:.0f}s"
+    )
 
 
 def _serve_frontend(bundle_dir: str, host: str, port: int):
@@ -260,6 +298,21 @@ if __name__ == "__main__":
         cwd=os.path.join(helao_repo_root, APP_DIR),
         env=build_env(confArg, server_key, servHost, servPort, root),
     )
+    problem = wait_for_backend(
+        backend, servHost, backend_port(servPort), BACKEND_START_TIMEOUT
+    )
+    if problem:
+        # Serving the frontend anyway would produce a page whose only symptom is
+        # a websocket error, with the real cause absent from every log.
+        LOGGER.error(
+            f"{problem}. The frontend will not be served. Run the same command "
+            f"by hand from {APP_DIR} to see its output: "
+            f"reflex run --env prod --backend-only --backend-port "
+            f"{backend_port(servPort)}"
+        )
+        backend.terminate()
+        sys.exit(1)
+
     LOGGER.info(
         f"started {server_key}: frontend {servHost}:{servPort}, "
         f"backend {servHost}:{backend_port(servPort)}"

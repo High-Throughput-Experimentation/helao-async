@@ -145,6 +145,73 @@ def test_launcher_exits_nonzero_when_no_bundle_and_no_opt_in(tmp_path):
     )
 
 
+def test_wait_for_backend_reports_a_backend_that_died():
+    """A dead backend must be named, not ignored.
+
+    The launcher used to Popen the backend and go straight to serving the
+    frontend. When the backend aborted at startup the only symptom was a
+    "websocket error" popup in the browser, with nothing in any log.
+    """
+    import subprocess
+    import sys
+
+    dead = subprocess.Popen([sys.executable, "-c", "raise SystemExit(3)"])
+    problem = rl.wait_for_backend(dead, "127.0.0.1", 5099, timeout=5.0)
+    assert "exited immediately with code 3" in problem
+
+
+def test_wait_for_backend_reports_a_backend_that_never_binds():
+    import subprocess
+    import sys
+
+    idle = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        problem = rl.wait_for_backend(idle, "127.0.0.1", 5098, timeout=1.0)
+        assert "did not begin listening" in problem
+    finally:
+        idle.terminate()
+        idle.wait(timeout=5)
+
+
+def test_wait_for_backend_returns_empty_once_the_port_is_open():
+    import socket
+    import subprocess
+    import sys
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as srv:
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        port = srv.getsockname()[1]
+        alive = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            assert rl.wait_for_backend(alive, "127.0.0.1", port, timeout=5.0) == ""
+        finally:
+            alive.terminate()
+            alive.wait(timeout=5)
+
+
+def test_rxconfig_does_not_set_frontend_port():
+    """Reflex aborts `run --backend-only` if frontend_port is configured.
+
+    We never let reflex serve the frontend -- the launcher serves the exported
+    bundle itself -- so setting it only breaks the backend.
+    """
+    import ast
+    import pathlib as _p
+
+    tree = ast.parse(_p.Path(rl.APP_DIR, "rxconfig.py").read_text())
+    kwargs = [
+        kw.arg
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        for kw in node.keywords
+    ]
+    # Parsed, not substring-matched: the file's own comment explains why the
+    # kwarg is absent and therefore contains the word.
+    assert "backend_port" in kwargs, "rxconfig no longer configures the backend"
+    assert "frontend_port" not in kwargs
+
+
 def test_assets_dir_sits_inside_the_reflex_project():
     """The ESM client must be inside the project so `reflex export` bundles it."""
     assert rl.ASSETS_DIR.startswith(rl.APP_DIR)
