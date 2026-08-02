@@ -1,7 +1,10 @@
 """Unit tests for reflex_launcher's pure helpers."""
 
 import os
+import signal
 import socket
+import subprocess
+import sys
 import tempfile
 import time
 
@@ -356,3 +359,164 @@ def test_buffer_proxy_reports_a_dead_backend_as_502():
     resp = TestClient(front).get(f"{BUFFER_ROUTE_PREFIX}/panel-x?v=1")
     assert resp.status_code == 502
     assert "unreachable" in resp.text
+
+
+# --- Dying with the group ---------------------------------------------------
+
+
+def test_parent_watch_target_is_none_when_started_from_a_shell():
+    """A launcher run by hand has no group to die with, and shutting itself
+    down because 'the parent went away' would be wrong."""
+    assert rl.parent_watch_target(1) is None
+    assert rl.parent_watch_target(0) is None
+    assert rl.parent_watch_target(None) is None
+
+
+def test_parent_watch_target_is_none_when_the_parent_already_exited():
+    assert rl.parent_watch_target(4242, probe=lambda pid: None) is None
+
+
+def test_parent_watch_target_records_the_creation_time():
+    assert rl.parent_watch_target(4242, probe=lambda pid: 111.0) == (4242, 111.0)
+
+
+def test_parent_is_gone_is_false_while_the_parent_lives():
+    assert rl.parent_is_gone((4242, 111.0), probe=lambda pid: 111.0) is False
+
+
+def test_parent_is_gone_is_true_once_the_parent_exits():
+    assert rl.parent_is_gone((4242, 111.0), probe=lambda pid: None) is True
+
+
+def test_parent_is_gone_survives_pid_reuse():
+    """The reason the creation time is carried at all: pids are recycled, and
+    an unrelated process landing on launch.py's old pid must not read as 'my
+    group is still alive' -- that is the orphan this exists to prevent."""
+    assert rl.parent_is_gone((4242, 111.0), probe=lambda pid: 999.0) is True
+
+
+def test_parent_is_gone_is_false_with_nothing_to_watch():
+    assert rl.parent_is_gone(None, probe=lambda pid: None) is False
+
+
+def test_watch_parent_does_nothing_without_a_parent():
+    fired = []
+    rl.watch_parent(None, lambda: fired.append(1), sleep=lambda s: None)
+    assert fired == []
+
+
+def test_watch_parent_fires_once_the_parent_disappears():
+    states = [111.0, 111.0, None]
+    fired = []
+    slept = []
+    rl.watch_parent(
+        (4242, 111.0),
+        lambda: fired.append(1),
+        poll=0.5,
+        sleep=slept.append,
+        probe=lambda pid: states.pop(0),
+    )
+    assert fired == [1]
+    assert slept == [0.5, 0.5]
+
+
+def test_terminate_tree_is_a_noop_for_a_pid_that_is_gone():
+    assert rl.terminate_tree(2**22 - 1, 0.5, 0.5) is True
+
+
+def test_terminate_tree_kills_grandchildren_too():
+    """`reflex run` is a supervisor whose worker holds the backend port, so
+    signalling only the direct child leaves the port bound."""
+    import psutil
+
+    parent = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys, time\n"
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
+            "time.sleep(300)\n",
+        ]
+    )
+    try:
+        deadline = time.time() + 10
+        kids = []
+        while time.time() < deadline:
+            kids = psutil.Process(parent.pid).children(recursive=True)
+            if kids:
+                break
+            time.sleep(0.1)
+        assert kids, "test grandchild never started"
+        grandchild = kids[0].pid
+
+        assert rl.terminate_tree(parent.pid, 3.0, 1.0) is True
+        parent.poll()
+        assert (
+            not psutil.pid_exists(grandchild)
+            or not psutil.Process(grandchild).is_running()
+        )
+    finally:
+        if parent.poll() is None:
+            parent.kill()
+            parent.wait(timeout=5)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process groups are POSIX-only")
+def test_terminate_tree_reaches_a_reparented_process_through_its_group():
+    """The leak this guards, reproduced against a live launcher: `reflex run`
+    starts its server through multiprocessing, and the instant the CLI dies
+    those workers are reparented to init -- invisible to any tree walk, still
+    holding the backend port. The process group is the only handle left."""
+    import psutil
+
+    # A session leader whose grandchild outlives it, like reflex's worker.
+    leader = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import subprocess, sys, time\n"
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
+            "time.sleep(0.5)\n",  # exits, orphaning the grandchild
+        ],
+        start_new_session=True,
+    )
+    pgid = leader.pid
+    try:
+        deadline = time.time() + 10
+        grandchild = None
+        while time.time() < deadline:
+            kids = psutil.Process(leader.pid).children(recursive=True)
+            if kids:
+                grandchild = kids[0].pid
+                break
+            time.sleep(0.1)
+        assert grandchild is not None, "test grandchild never started"
+
+        leader.wait(timeout=10)  # now the grandchild is reparented
+        assert psutil.Process(grandchild).is_running()
+        assert grandchild not in [
+            p.pid for p in psutil.Process(os.getpid()).children(recursive=True)
+        ], "grandchild should no longer be reachable by walking our tree"
+
+        rl.signal_group(pgid, signal.SIGKILL)
+        gone = False
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if (
+                not psutil.pid_exists(grandchild)
+                or psutil.Process(grandchild).status() == psutil.STATUS_ZOMBIE
+            ):
+                gone = True
+                break
+            time.sleep(0.1)
+        assert gone, "reparented process survived the group kill"
+    finally:
+        if leader.poll() is None:
+            leader.kill()
+        rl.signal_group(pgid, signal.SIGKILL)
+
+
+def test_signal_group_ignores_a_group_that_is_already_gone():
+    """Shutdown runs the group kill unconditionally; a vanished group is the
+    normal case, not an error."""
+    rl.signal_group(2**22 - 1, signal.SIGTERM)
