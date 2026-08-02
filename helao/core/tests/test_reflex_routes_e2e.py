@@ -251,3 +251,58 @@ def test_browser_state_handlers_are_registered_without_compiling_pages(reflex_cf
         assert (
             f"{prefix}.{handler}" in registered
         ), f"BrowserState.{handler} not registered without page compilation"
+
+
+def test_operator_route_is_the_real_page_not_a_stub(reflex_cfg):
+    """The stub said the operator was unimplemented. A passing route test that
+    still renders the stub is worse than no test."""
+    from helao.core.servers.operator import app_reflex
+
+    from helao.core.servers.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    assert callable(app_reflex.build_page)
+    assert app_reflex.build_page() is not None
+
+
+def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_cfg):
+    """The operator has four states, and every one of them owns controls that
+    would silently do nothing if its class were first touched inside the lazy
+    add_page callable."""
+    from reflex_base.registry import RegistrationContext
+
+    from helao.core.servers.operator.app_reflex import (
+        OperatorLibState,
+        OperatorPlanState,
+        OperatorPlateState,
+        OperatorQueueState,
+    )
+    from helao.core.servers.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    registered = set(RegistrationContext.get().event_handlers)
+    expected = {
+        OperatorQueueState: ("poll_loop", "control", "move", "remove"),
+        OperatorLibState: ("load_libraries", "select_item", "set_param", "enqueue"),
+        OperatorPlanState: ("append_selection", "flush", "move_row", "remove_row"),
+        OperatorPlateState: ("load_plate", "on_select", "set_sample"),
+    }
+    for state, handlers in expected.items():
+        prefix = state.get_full_name()
+        for handler in handlers:
+            assert (
+                f"{prefix}.{handler}" in registered
+            ), f"{state.__name__}.{handler} not registered without page compilation"
+
+
+def test_operator_backend_is_configured_at_build(reflex_cfg):
+    """Without this the page renders but can never reach an orchestrator: the
+    per-session backend is built from the config recorded here."""
+    from helao.core.servers.operator import app_reflex
+
+    from helao.core.servers.reflex.app import build_app
+
+    app_reflex.reset_settings()
+    build_app(reflex_cfg, "UI")
+    assert app_reflex.session_backend.__name__ == "session_backend"
+    assert app_reflex._SETTINGS.get("server_key") == "UI"
