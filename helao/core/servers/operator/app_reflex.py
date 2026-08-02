@@ -54,9 +54,15 @@ __all__ = [
     "dispatch_plan",
     "history_rows",
     "HIST_COLS",
+    "plate_api_for",
+    "platemap_points",
+    "nearest_sample",
+    "composition_text",
+    "sample_summary",
     "OperatorQueueState",
     "OperatorLibState",
     "OperatorPlanState",
+    "OperatorPlateState",
     "SEQ_COLS",
     "EXP_COLS",
     "ACT_COLS",
@@ -68,6 +74,7 @@ from typing import Optional
 
 import reflex as rx
 
+from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
 
@@ -1431,3 +1438,248 @@ class OperatorPlanState(rx.State):
             self.action_history = history_rows(histories, "action")
             self.experiment_history = history_rows(histories, "experiment")
             self.sequence_history = history_rows(histories, "sequence")
+
+
+# -- plate map ---------------------------------------------------------------
+
+#: Composition fraction keys on a platemap entry, in display order.
+FRACTION_KEYS = ("A", "B", "C", "D", "E", "F", "G", "H")
+
+#: Plate APIs the operator knows how to build, by config value.
+PLATE_APIS = ("HTEPlateAPI",)
+
+_PLATE_API_CACHE: dict = {}
+
+
+def plate_api_for(server_cfg: dict):
+    """Build the configured plate API, or ``None`` when there is none.
+
+    Opt-in, as in the Bokeh operator: most stations have no plate API, and an
+    unknown name is ignored rather than imported, so a typo cannot pull in
+    something arbitrary.
+    """
+    name = ((server_cfg or {}).get("params") or {}).get("plate_api")
+    if name not in PLATE_APIS:
+        if name:
+            LOGGER.warning(f"operator ignoring unknown plate_api '{name}'")
+        return None
+    cached = _PLATE_API_CACHE.get(name)
+    if cached is not None:
+        return cached
+    try:
+        from helao.helpers.plate_api import HTEPlateAPI
+
+        cached = HTEPlateAPI()
+    except Exception as exc:
+        LOGGER.warning(f"operator could not build plate API '{name}': {exc}")
+        return None
+    _PLATE_API_CACHE[name] = cached
+    return cached
+
+
+def _as_number(value):
+    """Read one coordinate, or ``None`` when it is not a number."""
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def platemap_points(pmdata: Optional[list]) -> tuple:
+    """Split a platemap into plottable coordinates and sample numbers.
+
+    A row whose coordinates will not convert is dropped whole. Handing a
+    non-numeric value to ``plots`` raises from inside the render and takes the
+    entire chart down, and dropping only one of the pair would leave x and y
+    at different lengths, which ``scatter_map`` rejects.
+
+    Returns:
+        tuple: ``(xs, ys, sample_nos)``, all the same length. Sample numbers
+        are 1-based, matching the plate's own numbering.
+    """
+    xs, ys, samples = [], [], []
+    for index, entry in enumerate(pmdata or []):
+        x = _as_number((entry or {}).get("x"))
+        y = _as_number((entry or {}).get("y"))
+        if x is None or y is None:
+            continue
+        xs.append(x)
+        ys.append(y)
+        samples.append(index + 1)
+    return xs, ys, samples
+
+
+def nearest_sample(pmdata: Optional[list], x: float, y: float):
+    """Sample number nearest a clicked point, or ``None`` on an empty map.
+
+    Matched against the plottable rows only: a click lands on the rendered
+    map, which does not contain the rows that were dropped, so matching
+    against them could return a sample the operator cannot see.
+    """
+    xs, ys, samples = platemap_points(pmdata)
+    if not xs:
+        return None
+    best = min(range(len(xs)), key=lambda i: (xs[i] - x) ** 2 + (ys[i] - y) ** 2)
+    return samples[best]
+
+
+def composition_text(entry: Optional[dict]) -> str:
+    """Composition fractions of one platemap entry, as one line.
+
+    A dash when there are none: an empty readout reads as a failure to load
+    rather than a plate with no composition.
+    """
+    entry = entry or {}
+    parts = [
+        f"{key}_{entry[key]}" for key in FRACTION_KEYS if entry.get(key) is not None
+    ]
+    return " ".join(parts) if parts else "-"
+
+
+def sample_summary(pmdata: Optional[list], sample_no: int) -> dict:
+    """Code and composition for one sample number.
+
+    Args:
+        pmdata: The platemap.
+        sample_no: 1-based sample number. ``0`` is rejected rather than
+            treated as an index, which would silently return the last sample
+            on the plate.
+
+    Returns:
+        dict: ``sample_no``, ``code``, ``composition``, and ``error``.
+    """
+    blank = {"sample_no": str(sample_no), "code": "", "composition": ""}
+    entries = pmdata or []
+    if sample_no < 1 or sample_no > len(entries):
+        return {**blank, "error": f"sample {sample_no} is not on this plate"}
+    entry = entries[sample_no - 1] or {}
+    return {
+        "sample_no": str(sample_no),
+        "code": "" if entry.get("code") is None else str(entry["code"]),
+        "composition": composition_text(entry),
+        "error": "",
+    }
+
+
+class OperatorPlateState(rx.State):
+    """The plate map: a scatter of a plate's samples, selectable by click.
+
+    Opt-in. Without ``plate_api`` in the server params there is no plate data
+    to draw, and the tab says so rather than rendering an empty chart that
+    looks broken -- the same gate the Bokeh operator applies, which its suite
+    covers in ``test_plate_api_disabled_by_default``.
+    """
+
+    plate_id: str = ""
+    sample_no: str = ""
+    code: str = ""
+    composition: str = ""
+    enabled: bool = False
+    status: str = ""
+    error: str = ""
+
+    chart_spec: dict = {}
+    chart_url: str = ""
+    chart_layout: str = ""
+    version: int = 0
+
+    #: The loaded platemap. A backend var: it is a list of dicts per sample and
+    #: the browser needs only the rendered points.
+    _pmdata: list = []
+
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key.
+
+        The store holds one frame per key while ``version`` is per-session
+        state, so a shared key would 404 two tabs into frozen charts.
+        """
+        return f"plate-{self.router.session.client_token}"
+
+    def _plate_api(self):
+        with _SETTINGS_LOCK:
+            world_cfg = _SETTINGS.get("world_cfg") or {}
+            server_key = _SETTINGS.get("server_key", "")
+        server_cfg = (world_cfg.get("servers") or {}).get(server_key) or {}
+        return plate_api_for(server_cfg)
+
+    @rx.event
+    def on_mount(self):
+        """Report whether this station has a plate API at all."""
+        self.enabled = self._plate_api() is not None
+        if not self.enabled:
+            self.status = "no plate API is configured for this station"
+
+    def _redraw(self) -> None:
+        xs, ys, samples = platemap_points(self._pmdata)
+        self.version += 1
+        payload = plots.scatter_map(
+            xs,
+            ys,
+            values=samples or None,
+            x_label="x (mm)",
+            y_label="y (mm)",
+            panel_id=self.panel_key(),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
+
+    @rx.event(background=True)
+    async def load_plate(self):
+        """Fetch and draw the platemap for the entered plate id."""
+        async with self:
+            api = self._plate_api()
+            raw = self.plate_id.strip()
+            self.error = ""
+        if api is None:
+            async with self:
+                self.error = "no plate API is configured for this station"
+            return
+        try:
+            plateid = int(raw)
+        except ValueError:
+            async with self:
+                self.error = f"'{raw}' is not a plate id"
+            return
+        try:
+            pmdata = api.get_platemap_plateid(plateid)
+        except Exception as exc:
+            LOGGER.warning(f"operator could not load plate {plateid}: {exc}")
+            async with self:
+                self.error = f"plate {plateid} could not be loaded: {exc}"
+            return
+        async with self:
+            self._pmdata = list(pmdata or [])
+            if not self._pmdata:
+                self.status = f"plate {plateid} has no platemap"
+                return
+            self.status = f"plate {plateid}: {len(self._pmdata)} samples"
+            self._redraw()
+
+    @rx.event
+    def on_select(self, payload: dict):
+        """Snap to the sample nearest a click on the map."""
+        x = _as_number((payload or {}).get("x"))
+        y = _as_number((payload or {}).get("y"))
+        if x is None or y is None:
+            return
+        sample = nearest_sample(self._pmdata, x, y)
+        if sample is None:
+            return
+        self.set_sample(str(sample))
+
+    @rx.event
+    def set_sample(self, value: str):
+        """Set the sample number and refresh its readouts."""
+        self.sample_no = value
+        try:
+            sample = int(value)
+        except (TypeError, ValueError):
+            self.code = ""
+            self.composition = ""
+            return
+        summary = sample_summary(self._pmdata, sample)
+        self.code = summary["code"]
+        self.composition = summary["composition"]
+        self.error = summary["error"]

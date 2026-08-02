@@ -1110,3 +1110,109 @@ def test_history_rows_every_row_has_every_column():
     render a short row with missing cells instead."""
     rows = opx.history_rows(_hist("experiment", "u1", {}), "experiment")
     assert len(rows[0]) == len(opx.HIST_COLS["experiment"])
+
+
+# -- plate map ---------------------------------------------------------------
+
+
+def _pm(n=3):
+    """A platemap the way HTEPlateAPI returns one."""
+    return [
+        {
+            "x": float(i),
+            "y": float(i * 2),
+            "code": i,
+            "A": 1.0 - i / 10,
+            "B": i / 10,
+        }
+        for i in range(n)
+    ]
+
+
+def test_plate_api_is_off_without_the_config_key():
+    """Opt-in, as in the Bokeh operator: most stations have no plate API, and
+    the tab must say so rather than render a broken map."""
+    assert opx.plate_api_for({}) is None
+    assert opx.plate_api_for({"params": {}}) is None
+
+
+def test_plate_api_ignores_an_unknown_name():
+    """A typo'd plate_api value must not import something arbitrary."""
+    assert opx.plate_api_for({"params": {"plate_api": "NotARealAPI"}}) is None
+
+
+def test_platemap_points_splits_the_coordinates():
+    xs, ys, samples = opx.platemap_points(_pm(3))
+    assert xs == [0.0, 1.0, 2.0]
+    assert ys == [0.0, 2.0, 4.0]
+    assert samples == [1, 2, 3]
+
+
+def test_platemap_points_numbers_samples_from_one():
+    """A plate's sample numbers are 1-based; the map index is 0-based."""
+    _, _, samples = opx.platemap_points(_pm(2))
+    assert samples == [1, 2]
+
+
+def test_platemap_points_skips_a_non_numeric_coordinate():
+    """A coordinate that will not convert takes down the whole chart from
+    inside the render, so it is dropped here with the rest of the row."""
+    pmdata = _pm(2) + [{"x": "n/a", "y": 3.0}]
+    xs, ys, samples = opx.platemap_points(pmdata)
+    assert len(xs) == 2 and len(ys) == 2 and len(samples) == 2
+
+
+def test_platemap_points_keeps_x_y_and_samples_the_same_length():
+    """plots.scatter_map raises when x and y differ in length."""
+    pmdata = [{"x": 1.0, "y": "bad"}, {"x": 2.0, "y": 2.0}]
+    xs, ys, samples = opx.platemap_points(pmdata)
+    assert len(xs) == len(ys) == len(samples) == 1
+
+
+def test_platemap_points_on_an_empty_map():
+    assert opx.platemap_points([]) == ([], [], [])
+    assert opx.platemap_points(None) == ([], [], [])
+
+
+def test_nearest_sample_snaps_to_the_closest_point():
+    assert opx.nearest_sample(_pm(3), 0.9, 1.9) == 2
+
+
+def test_nearest_sample_on_an_empty_map_is_none():
+    assert opx.nearest_sample([], 0.0, 0.0) is None
+
+
+def test_nearest_sample_ignores_unplottable_points():
+    """The click lands on the rendered map, which does not include the rows
+    that were dropped; matching against them would return a sample the
+    operator cannot see."""
+    pmdata = [{"x": "n/a", "y": "n/a"}, {"x": 5.0, "y": 5.0}]
+    assert opx.nearest_sample(pmdata, 5.1, 5.1) == 2
+
+
+def test_composition_text_lists_the_fractions():
+    assert opx.composition_text({"A": 0.6, "B": 0.4}) == "A_0.6 B_0.4"
+
+
+def test_composition_text_without_fractions():
+    """A dash, not an empty string: an empty readout looks like a failure to
+    load rather than a plate with no composition."""
+    assert opx.composition_text({"x": 1.0}) == "-"
+
+
+def test_sample_summary_reports_code_and_composition():
+    summary = opx.sample_summary(_pm(3), 2)
+    assert summary["code"] == "1"
+    assert "A_0.9" in summary["composition"]
+
+
+def test_sample_summary_for_a_sample_not_on_the_plate():
+    summary = opx.sample_summary(_pm(3), 99)
+    assert summary["error"]
+    assert summary["composition"] == ""
+
+
+def test_sample_summary_rejects_a_zero_sample_number():
+    """Sample numbers are 1-based, so 0 is not merely absent -- taking it as
+    an index would silently return the last sample on the plate."""
+    assert opx.sample_summary(_pm(3), 0)["error"]
