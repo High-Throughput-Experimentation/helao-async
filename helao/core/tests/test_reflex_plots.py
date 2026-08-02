@@ -161,3 +161,62 @@ def test_layout_token_changes_when_a_series_appears():
 def test_facade_exposes_exactly_the_documented_surface():
     for name in ("time_series", "spectra", "scatter_map", "histogram", "chart"):
         assert callable(getattr(plots, name))
+
+
+def test_traces_accepts_a_different_x_per_trace():
+    """The gap this fills: time_series and spectra share one x across every
+    series, but each selected dataset carries its own x column."""
+    out = plots.traces(
+        [
+            {"label": "a", "x": np.linspace(0.0, 1.0, 5), "y": np.zeros(5)},
+            {"label": "b", "x": np.linspace(0.0, 9.0, 30), "y": np.ones(30)},
+        ]
+    )
+    assert isinstance(out, plots.ChartPayload)
+    assert len(out.spec["traces"]) == 2
+
+
+def test_traces_labels_each_trace():
+    out = plots.traces([{"label": "only", "x": np.arange(3.0), "y": np.arange(3.0)}])
+    assert out.spec["traces"][0]["name"] == "only"
+
+
+def test_traces_supports_scatter():
+    out = plots.traces(
+        [{"label": "a", "x": np.arange(3.0), "y": np.arange(3.0)}], kind="scatter"
+    )
+    assert out.spec["traces"][0]["kind"] == "scatter"
+
+
+def test_traces_rejects_an_unknown_kind():
+    with pytest.raises(ValueError, match="kind"):
+        plots.traces(
+            [{"label": "a", "x": np.arange(3.0), "y": np.arange(3.0)}], kind="bogus"
+        )
+
+
+def test_traces_rejects_mismatched_x_and_y():
+    with pytest.raises(ValueError, match="length"):
+        plots.traces([{"label": "a", "x": np.zeros(5), "y": np.zeros(4)}])
+
+
+def test_traces_tolerates_no_series():
+    assert plots.traces([]) is not None
+
+
+def test_traces_skips_an_all_non_finite_trace_without_raising():
+    out = plots.traces(
+        [
+            {"label": "bad", "x": np.arange(3.0), "y": np.full(3, np.nan)},
+            {"label": "good", "x": np.arange(3.0), "y": np.arange(3.0)},
+        ]
+    )
+    assert len(out.spec["traces"]) == 1
+
+
+def test_traces_carries_an_append_token_like_every_other_facade_entry():
+    """Without spec.append the chart paints one frame and freezes."""
+    out = plots.traces(
+        [{"label": "a", "x": np.arange(3.0), "y": np.arange(3.0)}], version=4
+    )
+    assert out.spec["append"]["seq"] == 4
