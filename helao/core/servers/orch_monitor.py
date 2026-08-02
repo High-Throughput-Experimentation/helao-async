@@ -31,6 +31,7 @@ import aiohttp
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopStatus
 from helao.helpers import helao_logging as logging
+from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers.dispatcher import async_private_dispatcher, endpoints_available
 from helao.helpers.server_keys import SYNC_SERVER_KEY
 
@@ -56,7 +57,7 @@ class ServerMonitor:
         orch = self.orch
         fails = []
         for serv_key, serv_dict in orch.world_cfg["servers"].items():
-            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
+            if not is_ui_only_server(serv_dict):
                 LOGGER.info(f"trying to subscribe to {serv_key} status")
 
                 success = False
@@ -144,7 +145,7 @@ class ServerMonitor:
                 continue
             if "ignore_heartbeats" in serv_dict.get("params", {}):
                 continue
-            if "bokeh" not in serv_dict and "demovis" not in serv_dict:
+            if not is_ui_only_server(serv_dict):
                 serv_addr = serv_dict["host"]
                 serv_port = serv_dict["port"]
                 try:

@@ -382,6 +382,21 @@ def _build_from_global_config():
             cfg_dict, _validated = config_loader.read_validated_config(conf_arg)
             config_loader.install_global_config(cfg_dict)
             cfg = config_loader.CONFIG
+            # bokeh_launcher sets this in its own process; the Reflex backend is
+            # a child that loads the config itself, so it must too. Without it
+            # deployment_search_order never tries the config's own deployment
+            # and every panel resolves to "module not found".
+            if cfg is not None:
+                key = os.environ.get("HELAO_REFLEX_SERVER_KEY", "")
+                entry = (cfg.get("servers") or {}).get(key) or {}
+                cfg["deployment"] = entry.get(
+                    "deployment",
+                    os.path.basename(
+                        os.path.dirname(
+                            os.path.dirname(cfg.get("loaded_config_path", ""))
+                        )
+                    ),
+                )
     if not cfg:
         LOGGER.warning(
             "no HELAO config available (HELAO_REFLEX_CONFIG unset and none "

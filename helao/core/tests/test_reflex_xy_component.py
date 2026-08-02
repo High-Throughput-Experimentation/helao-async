@@ -129,11 +129,23 @@ def test_xy_chart_builds_a_component():
     assert comp is not None
 
 
-def test_xy_chart_is_client_only():
-    """A WebGL canvas cannot server-side render."""
-    import reflex as rx
+def test_xy_chart_touches_the_bundle_only_on_the_client():
+    """A WebGL canvas cannot be server-rendered.
 
-    assert issubclass(xc.XYChart, rx.NoSSRComponent)
+    Asserts the property rather than the base class. NoSSRComponent was the
+    original vehicle, but it exists to emit `import('<library>')` for an npm
+    package and raises "Undefined library" without one -- which broke the
+    frontend export the moment panels actually resolved and the component was
+    first constructed. What guarantees client-only execution is that the shim
+    imports the bundle and calls render() inside a useEffect; server rendering
+    emits an empty div.
+    """
+    code = xc.XYChart()._get_custom_code()  # type: ignore[reportCallIssue]
+    before_effect, _, after_effect = code.partition("useEffect")
+    assert "import(" not in before_effect, "bundle imported outside useEffect"
+    assert "import(" in after_effect and "clientUrl" in after_effect
+    assert "xy-client" in after_effect
+    assert "mod.render(" in after_effect
 
 
 def test_shim_declares_the_six_model_members_the_bundle_requires():

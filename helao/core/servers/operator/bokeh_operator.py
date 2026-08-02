@@ -49,6 +49,7 @@ from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.servers.vis import Vis
+from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Experiment, Sequence
 from helao.helpers.time_utils import md5_string
@@ -201,7 +202,7 @@ class BokehOperator:
             [
                 k
                 for k, v in self.vis.world_cfg["servers"].items()
-                if "bokeh" not in v and "demovis" not in v
+                if not is_ui_only_server(v)
             ]
         )
         # find pal server if configured in world config
