@@ -26,6 +26,7 @@ __all__ = [
     "may_edit_queue",
     "moved_index",
     "poll_interval_for",
+    "poll_ms_for",
     "refresh_tables",
     "dispatch_control",
     "dispatch_move",
@@ -70,7 +71,6 @@ __all__ = [
     "ACT_COLS",
 ]
 
-import asyncio
 import os
 import threading
 from typing import Optional
@@ -317,6 +317,11 @@ def poll_interval_for(world_cfg: dict, server_key: str) -> float:
     except (TypeError, ValueError):
         return DEFAULT_POLL_INTERVAL
     return interval if interval > 0 else DEFAULT_POLL_INTERVAL
+
+
+def poll_ms_for(interval: float) -> int:
+    """Poll cadence in milliseconds, for a client-side interval component."""
+    return int(max(interval, 0.0) * 1000) or int(DEFAULT_POLL_INTERVAL * 1000)
 
 
 async def refresh_tables(backend) -> dict:
@@ -596,6 +601,9 @@ class OperatorQueueState(rx.State):
     server_rows: list[list[str]] = []
 
     orch_state: str = ""
+    #: Tick cadence in milliseconds, read from the config on mount rather than
+    #: baked into the exported bundle.
+    poll_ms: int = int(DEFAULT_POLL_INTERVAL * 1000)
     status: str = "connecting to the orchestrator..."
     reachable: bool = False
     error: str = ""
@@ -616,32 +624,53 @@ class OperatorQueueState(rx.State):
             setattr(self, key, value)
 
     @rx.event(background=True)
-    async def poll_loop(self):
-        """Refresh every table until the page goes away.
+    async def poll_once(self, _tick: str = ""):
+        """Refresh every table once.
 
-        Background because it sleeps: a foreground handler holding the state
-        lock for the poll interval would freeze every control on the page.
+        Driven by a client-side interval, **not** a server-side loop. A
+        ``while True`` in a background event keeps running after the browser
+        tab closes -- ``on_unmount`` fires on in-app navigation but not on a
+        closed tab -- so every abandoned tab left a loop polling the
+        orchestrator forever and logging "Attempting to send delta to
+        disconnected client". A ticking component simply stops existing.
+
+        Background because the refresh is five HTTP round trips: a foreground
+        handler would hold the state lock for all of them and freeze every
+        control on the page.
+
+        Args:
+            _tick: The interval component's value. Unused; present because
+                ``on_change`` passes one.
         """
         async with self:
             if self.polling:
-                # A remount must not start a second loop against the same
-                # session; two loops would double the orchestrator's load and
-                # interleave their writes.
+                # A tick that lands while the previous refresh is still in
+                # flight is dropped rather than queued: a slow orchestrator
+                # would otherwise accumulate overlapping polls that interleave
+                # their writes.
                 return
             self.polling = True
             token = self.router.session.client_token
-        while True:
-            backend = session_backend(token)
-            updates = await refresh_tables(backend)
+        try:
+            updates = await refresh_tables(session_backend(token))
+        finally:
             async with self:
-                if not self.polling:
-                    return
-                self._apply(updates)
-            await asyncio.sleep(session_poll_interval())
+                self.polling = False
+        async with self:
+            self._apply(updates)
+
+    @rx.event
+    def on_mount(self):
+        """Set the tick cadence from the config, before the first tick."""
+        self.poll_ms = poll_ms_for(session_poll_interval())
 
     @rx.event
     def stop_polling(self):
-        """End the poll loop and drop this session's backend."""
+        """Drop this session's backend.
+
+        The tick stops on its own with the component; this only releases the
+        sockets the backend holds.
+        """
         self.polling = False
         BACKENDS.drop(self.router.session.client_token)
 
@@ -2192,11 +2221,20 @@ def build_page():
             default_value="build",
             width="100%",
         ),
+        # The tick lives in the tree, so it stops existing when the tab does.
+        # A server-side poll loop would outlive the browser: on_unmount fires
+        # on in-app navigation, never on a closed tab.
+        rx.moment(
+            interval=OperatorQueueState.poll_ms,
+            on_change=OperatorQueueState.poll_once,
+            display="none",
+        ),
         width="100%",
         spacing="4",
         padding_x="1em",
         on_mount=[
-            OperatorQueueState.poll_loop,
+            OperatorQueueState.on_mount,
+            OperatorQueueState.poll_once(""),
             OperatorLibState.load_libraries,
             OperatorPlateState.on_mount,
         ],
