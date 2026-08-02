@@ -190,6 +190,37 @@ def test_wait_for_backend_returns_empty_once_the_port_is_open():
             alive.wait(timeout=5)
 
 
+def test_port_holder_names_the_process_squatting_on_a_port():
+    """A stale launcher from an earlier run is the usual cause of a dead UI.
+
+    Without the preflight, the backend starts, uvicorn fails to bind the
+    frontend deep in its own startup, the finally tears the backend down, and
+    the browser sits on "connecting" with the real cause buried in a traceback.
+    """
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    sock.listen(1)
+    port = sock.getsockname()[1]
+    try:
+        message = rl.port_holder("127.0.0.1", port)
+        assert "already in use" in message
+        assert str(port) in message
+    finally:
+        sock.close()
+
+
+def test_port_holder_is_silent_on_a_free_port():
+    import socket
+
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    assert rl.port_holder("127.0.0.1", port) == ""
+
+
 def test_rxconfig_does_not_set_frontend_port():
     """Reflex aborts `run --backend-only` if frontend_port is configured.
 

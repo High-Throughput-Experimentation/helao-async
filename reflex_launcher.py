@@ -19,6 +19,7 @@ Build the frontend bundle on a development machine before deploying::
 __all__ = [
     "APP_NAME",
     "wait_for_backend",
+    "port_holder",
     "BUNDLE_DIRNAME",
     "backend_port",
     "resolve_bundle",
@@ -132,6 +133,38 @@ def may_build_locally() -> bool:
     if os.environ.get("REFLEX_ALLOW_LOCAL_BUILD") != "1":
         return False
     return bool(shutil.which("bun") or shutil.which("node"))
+
+
+def port_holder(host: str, port: int) -> str:
+    """Describe what already listens on ``host:port``, if anything.
+
+    Args:
+        host: Host to probe.
+        port: Port to probe.
+
+    Returns:
+        str: ``""`` when the port is free, otherwise a message naming the
+        holding process where it can be identified.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.5)
+        if probe.connect_ex((host, port)) != 0:
+            return ""
+    holder = ""
+    try:
+        import psutil
+
+        for conn in psutil.net_connections(kind="inet"):
+            laddr = getattr(conn, "laddr", None)
+            if not laddr or laddr.port != port or conn.status != "LISTEN":
+                continue
+            if conn.pid:
+                proc = psutil.Process(conn.pid)
+                holder = f" (pid {conn.pid}: {' '.join(proc.cmdline())[:90]})"
+            break
+    except Exception:  # psutil optional/racy; the address is the useful part
+        pass
+    return f"{host}:{port} is already in use{holder}"
 
 
 def wait_for_backend(process, host: str, port: int, timeout: float) -> str:
@@ -282,6 +315,24 @@ if __name__ == "__main__":
             LOGGER.info(f"wrote loaded-modules snapshot: {snap_path}")
         else:
             LOGGER.warning("failed to write loaded-modules snapshot")
+
+    # Preflight both ports before spawning anything. Without this the backend
+    # starts, uvicorn then fails to bind the frontend deep in its own startup,
+    # and the finally tears the backend down again -- leaving a browser stuck on
+    # "connecting" and the real cause buried in a uvicorn traceback. A stale
+    # launcher from a previous run is the usual culprit.
+    for label, probe_port in (
+        ("frontend", servPort),
+        ("backend", backend_port(servPort)),
+    ):
+        conflict = port_holder(servHost, probe_port)
+        if conflict:
+            LOGGER.error(
+                f"cannot start {server_key}: {label} port {conflict}. Stop that "
+                "process first (a launcher left over from an earlier run holds "
+                "the port even after the rest of the group exits)."
+            )
+            sys.exit(1)
 
     LOGGER.info(f" ---- starting  {server_key} ----")
 
