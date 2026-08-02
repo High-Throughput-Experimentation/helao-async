@@ -248,8 +248,6 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-import { useEffect, useRef } from "react";
-
 export function XYChart({ spec, bufferUrl, height, onSelect }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
@@ -261,7 +259,11 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
     let disposed = false;
     const st = ctrlRef.current;
 
-    import(/* webpackIgnore: true */ "/xy-client.js").then((mod) => {
+    // Built at runtime and marked ignore for both bundlers: the asset is served
+    // from the site root at request time and is not a module the build can
+    // resolve. A bare literal fails the export with UNRESOLVED_IMPORT.
+    const clientUrl = "/" + "xy-client" + ".js";
+    import(/* webpackIgnore: true */ /* @vite-ignore */ clientUrl).then((mod) => {
       if (disposed || !hostRef.current) return;
       st.decodeFrame = mod.decodeFrame;
       st.cleanup = mod.render({ model: st.model, el: hostRef.current });
@@ -292,11 +294,16 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
 _SHIM_JS = _SHIM_CONTROLLER_JS + _SHIM_COMPONENT_JS
 
 
-class XYChart(rx.NoSSRComponent):
+class XYChart(rx.Component):
     """A live xy chart driven by Reflex state.
 
-    Client-only: the bundle renders to a WebGL2 canvas, which cannot be
-    server-side rendered.
+    A plain ``Component``, not ``NoSSRComponent``: NoSSR exists to emit
+    ``import('<library>')`` for a package that cannot be server-rendered, and
+    raises ``Undefined library for NoSSRComponent`` without one. This component
+    has no npm package -- the shim below is emitted as custom code and performs
+    its own dynamic ``import("/xy-client.js")`` inside a ``useEffect``, which is
+    client-only by construction. Server rendering emits an empty ``div``; the
+    WebGL canvas is attached on mount.
 
     Attributes:
         spec: Data-less chart spec from ``Figure.build_payload_split``,
@@ -306,13 +313,23 @@ class XYChart(rx.NoSSRComponent):
     """
 
     tag = "XYChart"
-    library = None  # emitted inline by _get_custom_code, not an npm package
+    library = None  # no npm package; the shim is emitted by _get_custom_code
 
     spec: rx.Var[dict]
     buffer_url: rx.Var[str]
     height: rx.Var[str]
 
     on_select: rx.EventHandler[lambda payload: [payload]]
+
+    def add_imports(self):
+        """Declare the React hooks the shim uses.
+
+        The shim must not emit its own ``import ... from "react"``: Reflex's
+        generated page already imports these, and a duplicate literal import in
+        custom code fails the frontend build with "Identifier `useEffect` has
+        already been declared". Declaring them here lets Reflex dedupe.
+        """
+        return {"react": ["useEffect", "useRef"]}
 
     def _get_custom_code(self) -> str:
         """Emit the React shim that bridges Reflex to xy's ESM bundle."""

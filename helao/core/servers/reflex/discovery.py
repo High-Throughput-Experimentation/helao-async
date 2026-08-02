@@ -17,10 +17,24 @@ from functools import lru_cache
 from importlib import import_module
 from importlib import util as importlib_util
 
+import helao
 from helao.helpers import config_loader
 
 #: Subpackage under ``helao/deploy/<deployment>/servers/`` holding Reflex panels.
 PANEL_SUBPACKAGE = "reflex"
+
+
+def _deploy_root() -> str:
+    """Absolute path of ``helao/deploy``.
+
+    Derived from the package location rather than by counting ``dirname`` calls
+    up from this file. The counted form was correct in ``vis_subscriber`` and
+    silently wrong here -- this module sits one directory deeper, so it resolved
+    to ``helao/core/deploy``, which does not exist. The fallback scan then found
+    no deployments at all and only the configured one (or ``hte``) was ever
+    searched.
+    """
+    return os.path.join(os.path.dirname(os.path.abspath(helao.__file__)), "deploy")
 
 
 def deployment_search_order() -> list:
@@ -41,10 +55,7 @@ def deployment_search_order() -> list:
         order.append(current)
     if "hte" not in order:
         order.append("hte")
-    deploy_root = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "deploy",
-    )
+    deploy_root = _deploy_root()
     if os.path.isdir(deploy_root):
         for name in sorted(os.listdir(deploy_root)):
             if name in order:

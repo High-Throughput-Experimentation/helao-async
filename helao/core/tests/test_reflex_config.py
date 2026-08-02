@@ -349,6 +349,95 @@ def test_ingest_lifespan_is_an_async_context_manager_so_teardown_is_awaited():
     ) or inspect.isasyncgenfunction(getattr(task, "__wrapped__", task))
 
 
+def test_deployment_search_order_finds_every_deployment():
+    """The scan was silently finding none.
+
+    discovery.py sits one directory deeper than the vis_subscriber it was lifted
+    from, so the copied dirname-counting resolved to helao/core/deploy, which
+    does not exist. Only the configured deployment (or hte) was ever searched,
+    and every Reflex panel resolved to "module not found" at runtime.
+    """
+    from helao.helpers import config_loader
+    from helao.core.servers.reflex.discovery import deployment_search_order
+
+    saved = config_loader.CONFIG
+    try:
+        config_loader.CONFIG = {"deployment": "test"}
+        order = deployment_search_order()
+        assert order[0] == "test"
+        assert "hte" in order
+        assert len(order) > 2, f"fallback scan found nothing: {order}"
+    finally:
+        config_loader.CONFIG = saved
+
+
+def test_ui_only_servers_are_excluded_from_orchestrator_polling():
+    """An orchestrator dispatching at a UI server yields a stream of 405s.
+
+    reflex was added after bokeh/demovis and missed at all three call sites,
+    which is why this predicate is shared rather than inlined.
+    """
+    from helao.helpers.config_loader import is_ui_only_server
+
+    assert is_ui_only_server({"reflex": "helao_ui"})
+    assert is_ui_only_server({"bokeh": "live_visualizer"})
+    assert is_ui_only_server({"demovis": "x"})
+    assert not is_ui_only_server({"fast": "ws_simulator"})
+    assert not is_ui_only_server({})
+    assert not is_ui_only_server(None)
+
+
+def test_no_caller_still_inlines_the_ui_server_skip_list():
+    """Guards the next UI kind against being missed the way reflex was."""
+    import pathlib
+    import re
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    offenders = []
+    for path in (root / "helao" / "core").rglob("*.py"):
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if re.search(r'"bokeh"\s+not\s+in\s+\w+\s+and\s+"demovis"', text):
+            offenders.append(str(path.relative_to(root)))
+    assert offenders == [], f"inlined UI skip list: {offenders}"
+
+
+def test_the_backend_child_process_resolves_its_panels():
+    """The failure the browser surfaced: every panel showed "module not found".
+
+    The backend is a child process that loads the config itself, so it must also
+    set CONFIG["deployment"] -- bokeh_launcher does this in its own process.
+    Without it the config's own deployment is never searched.
+    """
+    import os
+    import subprocess
+    import sys
+
+    root = os.getcwd()
+    env = dict(os.environ)
+    env["PYTHONPATH"] = root
+    env["HELAO_REFLEX_CONFIG"] = "goldenreflex"
+    env["HELAO_REFLEX_SERVER_KEY"] = "UI"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from helao.core.servers.reflex.app import app\n"
+            "from helao.core.servers.reflex.discovery import resolve_panel_module\n"
+            "resolve_panel_module('wssim_panel')\n"
+            "resolve_panel_module('oersim_panel')\n"
+            "print('RESOLVED')",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        cwd=root,
+        timeout=180,
+    )
+    assert (
+        "RESOLVED" in proc.stdout
+    ), f"panels unresolvable in the backend child:\n{proc.stdout}\n{proc.stderr}"
+
+
 def test_only_plots_module_imports_xy():
     """Only the facade and the binding may touch the alpha xy API."""
     import pathlib
