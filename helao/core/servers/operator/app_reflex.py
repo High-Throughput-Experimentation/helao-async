@@ -284,6 +284,23 @@ def server_rows(summary: Optional[dict]) -> list:
     return rows
 
 
+def _server_params(world_cfg: dict, server_key: str) -> dict:
+    """One server's ``params`` block, or ``{}`` when it is malformed.
+
+    ``build_app`` runs at import time, so a config whose ``params`` is a list
+    rather than a mapping would take down the module -- the same hazard
+    ``app.as_dict`` guards for the rest of the config.
+    """
+    servers = (world_cfg or {}).get("servers")
+    if not isinstance(servers, dict):
+        return {}
+    server = servers.get(server_key)
+    if not isinstance(server, dict):
+        return {}
+    params = server.get("params")
+    return params if isinstance(params, dict) else {}
+
+
 def poll_interval_for(world_cfg: dict, server_key: str) -> float:
     """Poll cadence for this server, in seconds.
 
@@ -291,8 +308,7 @@ def poll_interval_for(world_cfg: dict, server_key: str) -> float:
     being honoured: a typo'd YAML value must not turn into a zero-delay loop
     hammering the orchestrator.
     """
-    servers = (world_cfg or {}).get("servers") or {}
-    params = (servers.get(server_key) or {}).get("params") or {}
+    params = _server_params(world_cfg, server_key)
     try:
         interval = float(params.get("poll_interval", DEFAULT_POLL_INTERVAL))
     except (TypeError, ValueError):
@@ -1082,13 +1098,8 @@ class OperatorLibState(rx.State):
             self.selected_experiment = name
         self._select(self.mode, name)
 
-    @rx.event
-    def set_param(self, name: str, value: str):
-        """Record one edited parameter.
-
-        Kept in ``_values`` as well as the rendered row so the entry survives
-        switching items or tabs and switching back.
-        """
+    def _record_param(self, name: str, value: str) -> None:
+        """Store one edited parameter and update its rendered row."""
         key = (self.mode, self.selected_name)
         entered = dict(self._values.get(key, {}))
         entered[name] = value
@@ -1097,6 +1108,35 @@ class OperatorLibState(rx.State):
             [row[0], row[1], value, row[3]] if row[0] == name else row
             for row in self.param_rows
         ]
+
+    @rx.event
+    def set_label(self, value: str):
+        """Set the label applied to sequences built from this selection."""
+        self.sequence_label = value
+
+    @rx.event
+    def set_campaign(self, value: str):
+        """Set the campaign name applied to sequences built from this selection."""
+        self.campaign_name = value
+
+    @rx.event
+    def set_param(self, name: str, value: str):
+        """Record one edited parameter.
+
+        Kept in ``_values`` as well as the rendered row so the entry survives
+        switching items or tabs and switching back.
+        """
+        self._record_param(name, value)
+
+    @rx.event
+    def set_param_bool(self, name: str, value: bool):
+        """Record one edited checkbox.
+
+        Separate from ``set_param`` because a checkbox sends a JSON bool while
+        the rendered rows are all strings, and a str-annotated handler would
+        reject it.
+        """
+        self._record_param(name, str(value))
 
     @rx.event
     def reset_params(self):
@@ -1306,7 +1346,6 @@ class OperatorPlanState(rx.State):
     """
 
     plan_view: list[list[str]] = []
-    selected_row: int = -1
     status: str = ""
     error: str = ""
 
@@ -1326,8 +1365,6 @@ class OperatorPlanState(rx.State):
     def _set_plan(self, plan: list) -> None:
         self._plan = plan
         self.plan_view = plan_rows(plan)
-        if self.selected_row >= len(plan):
-            self.selected_row = -1
 
     async def _add(self, prepend: bool):
         """Build a sequence from the library tab's selection and buffer it."""
@@ -1366,32 +1403,25 @@ class OperatorPlanState(rx.State):
         await self._add(prepend=True)
 
     @rx.event
-    def select_row(self, index: int):
-        """Select one buffered row, or deselect it when clicked again."""
-        self.selected_row = -1 if index == self.selected_row else index
+    def move_row(self, index: int, direction: str):
+        """Move one buffered row.
 
-    @rx.event
-    def move_row(self, direction: str):
-        """Move the selected row within the buffer.
-
-        The selection follows the row it was on, so holding a button moves one
-        sequence rather than walking the selection down the table.
+        Per-row buttons rather than a table selection: every row carries its
+        own index, so there is no selection to keep in step with a buffer that
+        changes under it.
         """
-        target = moved_index(self.selected_row, direction, len(self._plan))
-        moved = plan_moved(self._plan, self.selected_row, direction)
-        if target is None or moved is None:
+        moved = plan_moved(self._plan, index, direction)
+        if moved is None:
             return
         self._set_plan(moved)
-        self.selected_row = target
 
     @rx.event
-    def remove_row(self):
-        """Drop the selected row from the buffer."""
-        remaining = plan_removed(self._plan, self.selected_row)
+    def remove_row(self, index: int):
+        """Drop one row from the buffer."""
+        remaining = plan_removed(self._plan, index)
         if remaining is None:
             return
         self._set_plan(remaining)
-        self.selected_row = -1
 
     @rx.event
     def clear_plan(self):
@@ -1458,7 +1488,8 @@ def plate_api_for(server_cfg: dict):
     unknown name is ignored rather than imported, so a typo cannot pull in
     something arbitrary.
     """
-    name = ((server_cfg or {}).get("params") or {}).get("plate_api")
+    params = (server_cfg or {}).get("params")
+    name = params.get("plate_api") if isinstance(params, dict) else None
     if name not in PLATE_APIS:
         if name:
             LOGGER.warning(f"operator ignoring unknown plate_api '{name}'")
@@ -1670,6 +1701,11 @@ class OperatorPlateState(rx.State):
         self.set_sample(str(sample))
 
     @rx.event
+    def set_plate_id(self, value: str):
+        """Set the plate id to load."""
+        self.plate_id = value
+
+    @rx.event
     def set_sample(self, value: str):
         """Set the sample number and refresh its readouts."""
         self.sample_no = value
@@ -1683,3 +1719,430 @@ class OperatorPlateState(rx.State):
         self.code = summary["code"]
         self.composition = summary["composition"]
         self.error = summary["error"]
+
+
+# -- page --------------------------------------------------------------------
+
+
+def _error_text(var):
+    """Render an error line only when there is one."""
+    return rx.cond(var != "", rx.text(var, color_scheme="red", size="2"))
+
+
+def _table(columns: list, rows_var, *, height: str = "14em", row_actions=None):
+    """A scrolling table over ``list[list[str]]`` rows.
+
+    Args:
+        columns: Header labels.
+        rows_var: State var holding the rows.
+        height: Scroll-area height.
+        row_actions: Optional ``(row, index) -> rx.Component`` for a trailing
+            per-row control cell.
+    """
+
+    def render(row, index):
+        cells: list = [rx.foreach(row, lambda cell: rx.table.cell(cell))]
+        if row_actions is not None:
+            cells.append(rx.table.cell(row_actions(row, index)))
+        return rx.table.row(*cells)
+
+    headers = [rx.table.column_header_cell(col) for col in columns]
+    if row_actions is not None:
+        headers.append(rx.table.column_header_cell(""))
+    return rx.scroll_area(
+        rx.table.root(
+            rx.table.header(rx.table.row(*headers)),
+            rx.table.body(rx.foreach(rows_var, render)),
+            width="100%",
+            size="1",
+        ),
+        type="auto",
+        scrollbars="vertical",
+        height=height,
+    )
+
+
+def _queue_tab(columns: list, rows_var, kind: str):
+    """One queue table with per-row reorder and remove controls."""
+    return _table(
+        columns,
+        rows_var,
+        row_actions=lambda row, index: rx.hstack(
+            rx.button(
+                "^",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.move(kind, index, "up"),
+            ),
+            rx.button(
+                "v",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.move(kind, index, "down"),
+            ),
+            rx.button(
+                "x",
+                size="1",
+                color_scheme="red",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.remove(kind, index),
+            ),
+            spacing="1",
+        ),
+    )
+
+
+def _param_field(row):
+    """One parameter input, by kind.
+
+    ``row`` is ``[name, kind, value, help]``. The kinds are compared on the
+    var rather than resolved in Python: the row is only known in the browser.
+    """
+    return rx.vstack(
+        rx.hstack(
+            rx.text(row[0], size="2", weight="medium"),
+            rx.spacer(),
+            rx.text(row[3], size="1", color_scheme="gray"),
+            width="100%",
+        ),
+        rx.cond(
+            row[1] == "bool",
+            rx.checkbox(
+                checked=row[2].lower() == "true",
+                on_change=lambda value: OperatorLibState.set_param_bool(row[0], value),
+            ),
+            rx.cond(
+                row[1] == "select",
+                rx.select(
+                    OperatorLibState.position_options,
+                    value=row[2],
+                    on_change=lambda value: OperatorLibState.set_param(row[0], value),
+                    width="100%",
+                    size="2",
+                ),
+                rx.input(
+                    value=row[2],
+                    on_change=lambda value: OperatorLibState.set_param(row[0], value),
+                    width="100%",
+                    size="2",
+                ),
+            ),
+        ),
+        width="100%",
+        spacing="1",
+    )
+
+
+def _library_panel():
+    """Selector, parameter form, and the buttons that act on the selection."""
+    return rx.vstack(
+        rx.hstack(
+            rx.select(
+                ["sequence", "experiment"],
+                value=OperatorLibState.mode,
+                on_change=OperatorLibState.set_mode,
+                width="10em",
+            ),
+            rx.select(
+                OperatorLibState.item_names,
+                value=OperatorLibState.selected_name,
+                on_change=OperatorLibState.select_item,
+                width="20em",
+            ),
+            rx.text(OperatorLibState.version_hint, size="1", color_scheme="gray"),
+            rx.button(
+                "Reload libraries", size="1", on_click=OperatorLibState.load_libraries
+            ),
+            spacing="3",
+            align="center",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.input(
+                placeholder="sequence label",
+                value=OperatorLibState.sequence_label,
+                on_change=OperatorLibState.set_label,
+                width="14em",
+            ),
+            rx.input(
+                placeholder="campaign name",
+                value=OperatorLibState.campaign_name,
+                on_change=OperatorLibState.set_campaign,
+                width="14em",
+            ),
+            spacing="3",
+        ),
+        rx.scroll_area(
+            rx.vstack(
+                rx.foreach(OperatorLibState.param_rows, _param_field),
+                width="100%",
+                spacing="2",
+            ),
+            type="auto",
+            scrollbars="vertical",
+            height="18em",
+        ),
+        rx.hstack(
+            rx.button("Add to plan", on_click=OperatorPlanState.append_selection),
+            rx.button(
+                "Prepend to plan",
+                variant="soft",
+                on_click=OperatorPlanState.prepend_selection,
+            ),
+            rx.button("Enqueue now", variant="soft", on_click=OperatorLibState.enqueue),
+            rx.button(
+                "Reset parameters",
+                variant="soft",
+                on_click=OperatorLibState.reset_params,
+            ),
+            spacing="3",
+        ),
+        _error_text(OperatorLibState.error),
+        rx.text(OperatorLibState.status, size="2"),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _plan_panel():
+    """The client-side plan buffer and the three ways to flush it."""
+    return rx.vstack(
+        _table(
+            PLAN_COLS,
+            OperatorPlanState.plan_view,
+            row_actions=lambda row, index: rx.hstack(
+                rx.button(
+                    "^",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorPlanState.move_row(index, "up"),
+                ),
+                rx.button(
+                    "v",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorPlanState.move_row(index, "down"),
+                ),
+                rx.button(
+                    "x",
+                    size="1",
+                    color_scheme="red",
+                    variant="soft",
+                    on_click=OperatorPlanState.remove_row(index),
+                ),
+                spacing="1",
+            ),
+        ),
+        rx.hstack(
+            rx.button(
+                "Add plan [",
+                OperatorPlanState.plan_count,
+                "]",
+                on_click=OperatorPlanState.flush("append"),
+            ),
+            rx.button(
+                "Add split",
+                variant="soft",
+                on_click=OperatorPlanState.flush("split"),
+            ),
+            rx.button(
+                "Prepend plan",
+                variant="soft",
+                on_click=OperatorPlanState.flush("prepend"),
+            ),
+            rx.button(
+                "Clear plan",
+                variant="soft",
+                color_scheme="red",
+                on_click=OperatorPlanState.clear_plan,
+            ),
+            spacing="3",
+        ),
+        _error_text(OperatorPlanState.error),
+        rx.text(OperatorPlanState.status, size="2"),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _plate_panel():
+    """The plate map, or a note when this station has no plate API."""
+    return rx.cond(
+        OperatorPlateState.enabled,
+        rx.vstack(
+            rx.hstack(
+                rx.input(
+                    placeholder="plate id",
+                    value=OperatorPlateState.plate_id,
+                    on_change=OperatorPlateState.set_plate_id,
+                    width="10em",
+                ),
+                rx.button("Load plate", on_click=OperatorPlateState.load_plate),
+                rx.input(
+                    placeholder="sample no",
+                    value=OperatorPlateState.sample_no,
+                    on_change=OperatorPlateState.set_sample,
+                    width="8em",
+                ),
+                rx.text("code ", OperatorPlateState.code, size="2"),
+                rx.text(OperatorPlateState.composition, size="1"),
+                spacing="3",
+                align="center",
+            ),
+            plots.chart(
+                OperatorPlateState.chart_spec,
+                OperatorPlateState.chart_url,
+                OperatorPlateState.chart_layout,
+                height=420,
+                on_select=OperatorPlateState.on_select,
+            ),
+            _error_text(OperatorPlateState.error),
+            rx.text(OperatorPlateState.status, size="2"),
+            width="100%",
+            spacing="3",
+        ),
+        rx.text(OperatorPlateState.status, size="2", color_scheme="gray"),
+    )
+
+
+def _queue_panel():
+    """The three orchestrator queues and the action-server status table."""
+    return rx.vstack(
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Sequences", value="sequence"),
+                rx.tabs.trigger("Experiments", value="experiment"),
+                rx.tabs.trigger("Actions", value="action"),
+                rx.tabs.trigger("Servers", value="servers"),
+            ),
+            rx.tabs.content(
+                _queue_tab(SEQ_COLS, OperatorQueueState.seq_rows, "sequence"),
+                value="sequence",
+            ),
+            rx.tabs.content(
+                _queue_tab(EXP_COLS, OperatorQueueState.exp_rows, "experiment"),
+                value="experiment",
+            ),
+            rx.tabs.content(
+                _queue_tab(ACT_COLS, OperatorQueueState.act_rows, "action"),
+                value="action",
+            ),
+            rx.tabs.content(
+                _table(["server", "status", "driver"], OperatorQueueState.server_rows),
+                value="servers",
+            ),
+            default_value="sequence",
+            width="100%",
+        ),
+        rx.hstack(
+            rx.button(
+                "Clear sequences",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_sequences"),
+            ),
+            rx.button(
+                "Clear experiments",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_experiments"),
+            ),
+            rx.button(
+                "Clear actions",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_actions"),
+            ),
+            spacing="3",
+        ),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _history_panel():
+    """The three history tables."""
+    return rx.vstack(
+        rx.button(
+            "Refresh history", size="1", on_click=OperatorPlanState.refresh_history
+        ),
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Actions", value="action"),
+                rx.tabs.trigger("Experiments", value="experiment"),
+                rx.tabs.trigger("Sequences", value="sequence"),
+            ),
+            rx.tabs.content(
+                _table(HIST_COLS["action"], OperatorPlanState.action_history),
+                value="action",
+            ),
+            rx.tabs.content(
+                _table(HIST_COLS["experiment"], OperatorPlanState.experiment_history),
+                value="experiment",
+            ),
+            rx.tabs.content(
+                _table(HIST_COLS["sequence"], OperatorPlanState.sequence_history),
+                value="sequence",
+            ),
+            default_value="action",
+            width="100%",
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
+def build_page():
+    """Render the operator page.
+
+    Returns:
+        rx.Component: The page body.
+    """
+    controls = rx.hstack(
+        rx.text(OperatorQueueState.status, size="2", weight="medium"),
+        rx.spacer(),
+        rx.button("Start", on_click=OperatorQueueState.control("start")),
+        rx.button("Stop", variant="soft", on_click=OperatorQueueState.control("stop")),
+        rx.button("Skip", variant="soft", on_click=OperatorQueueState.control("skip")),
+        rx.button(
+            "E-STOP", color_scheme="red", on_click=OperatorQueueState.control("estop")
+        ),
+        spacing="3",
+        align="center",
+        width="100%",
+    )
+    return rx.vstack(
+        controls,
+        _error_text(OperatorQueueState.error),
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Build", value="build"),
+                rx.tabs.trigger("Plan", value="plan"),
+                rx.tabs.trigger("Queues", value="queues"),
+                rx.tabs.trigger("History", value="history"),
+                rx.tabs.trigger("Plate", value="plate"),
+            ),
+            rx.tabs.content(_library_panel(), value="build"),
+            rx.tabs.content(_plan_panel(), value="plan"),
+            rx.tabs.content(_queue_panel(), value="queues"),
+            rx.tabs.content(_history_panel(), value="history"),
+            rx.tabs.content(_plate_panel(), value="plate"),
+            default_value="build",
+            width="100%",
+        ),
+        width="100%",
+        spacing="4",
+        padding_x="1em",
+        on_mount=[
+            OperatorQueueState.poll_loop,
+            OperatorLibState.load_libraries,
+            OperatorPlateState.on_mount,
+        ],
+        on_unmount=OperatorQueueState.stop_polling,
+    )

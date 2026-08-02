@@ -36,6 +36,14 @@ from fastapi import FastAPI
 # `plots`, which knows nothing about this module.
 from helao.core.servers.data_browser.app_reflex import BrowserState
 from helao.core.servers.data_browser.app_reflex import build_page as browser_page
+from helao.core.servers.operator.app_reflex import (
+    OperatorLibState,
+    OperatorPlanState,
+    OperatorPlateState,
+    OperatorQueueState,
+)
+from helao.core.servers.operator.app_reflex import build_page as operator_page
+from helao.core.servers.operator.app_reflex import configure as configure_operator
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
@@ -350,6 +358,16 @@ def build_app(world_cfg: dict, server_key: str):
     # what creates it; this reference is what keeps that import from looking
     # unused and being removed.
     assert BrowserState is not None
+    # Same for the operator's four states.
+    assert None not in (
+        OperatorQueueState,
+        OperatorLibState,
+        OperatorPlanState,
+        OperatorPlateState,
+    )
+    # The operator's backend is built per session from this config; without
+    # this the page renders but can never reach an orchestrator.
+    configure_operator(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -380,11 +398,7 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO action",
     )
     application.add_page(
-        lambda: _stub_page(
-            "Operator",
-            "The Reflex operator is not implemented yet. Use the Bokeh "
-            "standalone operator; a follow-up spec covers this page.",
-        ),
+        lambda: _page("Operator", operator_page()),
         route="/operator",
         title="HELAO operator",
     )

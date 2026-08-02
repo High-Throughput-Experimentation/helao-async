@@ -1216,3 +1216,19 @@ def test_sample_summary_rejects_a_zero_sample_number():
     """Sample numbers are 1-based, so 0 is not merely absent -- taking it as
     an index would silently return the last sample on the plate."""
     assert opx.sample_summary(_pm(3), 0)["error"]
+
+
+def test_poll_interval_survives_a_params_block_that_is_not_a_mapping():
+    """build_app runs at import time, so a malformed config here takes down
+    the whole module rather than one page."""
+    assert opx.poll_interval_for({"servers": {"ui": {"params": []}}}, "ui") == (
+        opx.DEFAULT_POLL_INTERVAL
+    )
+    assert opx.poll_interval_for({"servers": []}, "ui") == opx.DEFAULT_POLL_INTERVAL
+    assert opx.poll_interval_for({"servers": {"ui": "nope"}}, "ui") == (
+        opx.DEFAULT_POLL_INTERVAL
+    )
+
+
+def test_plate_api_survives_a_params_block_that_is_not_a_mapping():
+    assert opx.plate_api_for({"params": []}) is None
