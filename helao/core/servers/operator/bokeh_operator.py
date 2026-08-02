@@ -10,7 +10,6 @@ Also exposes two small pydantic models (:class:`return_sequence_lib`,
 sequence and experiment libraries.
 """
 
-import builtins
 import html as _html
 import importlib
 import inspect
@@ -49,6 +48,7 @@ from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.servers.operator.param_forms import (
+    BUILTIN_TYPES,
     build_lib,
     parse_arg_docs,
     version_hint_parts,
@@ -62,11 +62,6 @@ from helao.helpers.to_json import parse_bokeh_input
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-BUILTIN_TYPES = [
-    getattr(builtins, d)
-    for d in dir(builtins)
-    if isinstance(getattr(builtins, d), type)
-]
 
 # Bokeh re-runs makeBokehApp (and thus BokehOperator.__init__) on every client
 # connection. The following process-level caches hold the session-invariant
