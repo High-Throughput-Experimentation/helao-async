@@ -126,11 +126,12 @@ def extract_histograms(ingest) -> dict:
     return out
 
 
-class _State(LiveVisState):
+class _State(LiveVisState, mixin=True):
     """Chart binding vars plus the acquisitions table."""
 
     chart_spec: dict = {}
     chart_url: str = ""
+    chart_layout: str = ""
     version: int = 0
     table_rows: list = []
     #: Accumulated per-plate samples. The driver runs plates concurrently and
@@ -148,7 +149,7 @@ class _State(LiveVisState):
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see VisPanelState.panel_key."""
-        return panel_id(self.server_key_default, self.router.session.client_token)
+        return panel_id(self.server_key, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
         """Recompute the histogram payload and the last 20 acquisition rows."""
@@ -167,6 +168,7 @@ class _State(LiveVisState):
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
         count = ingest.status.message_count
         if count != self.last_table_count:
             self.last_table_count = count
@@ -206,7 +208,12 @@ def build(server_key: str, state_cls):
                 state_cls.error != "",
                 rx.text(state_cls.error, color_scheme="red"),
             ),
-            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
+            plots.chart(
+                state_cls.chart_spec,
+                state_cls.chart_url,
+                state_cls.chart_layout,
+                height=320,
+            ),
             rx.heading("Last 20 acquisitions across all orchestrators", size="3"),
             rx.data_table(
                 data=state_cls.table_rows,

@@ -181,11 +181,13 @@ export function createController(options) {
   const st = {
     spec: options.spec,
     buffers: null,
+    layout: null,
     handlers: {},
-    ready: false,
-    pending: false,
+    module: null,
+    el: null,
+    mounted: false,
+    disposed: false,
     pendingUrl: null,
-    decodeFrame: null,
     cleanup: null,
     onSelect: options.onSelect,
     lastUrl: null,
@@ -206,23 +208,59 @@ export function createController(options) {
 
   st.emit = (event) => (st.handlers[event] || []).forEach((cb) => cb());
 
+  // render() decodes model.get("buffers") synchronously and throws
+  // TypeError("chart payload must be an ArrayBuffer or ArrayBuffer view") on
+  // null, so the first frame has to be in hand BEFORE the view is built --
+  // not fetched after it. Mounting is therefore deferred until the bundle,
+  // the host element, and a payload are all present.
+  st.maybeMount = () => {
+    if (st.mounted || st.disposed) return;
+    if (!st.module || !st.el || !st.buffers) return;
+    st.cleanup = st.module.render({ model: st.model, el: st.el });
+    st.mounted = true;
+  };
+
+  st.teardown = () => {
+    if (st.cleanup) st.cleanup();
+    st.cleanup = null;
+    st.mounted = false;
+    st.handlers = {};
+  };
+
+  st.attach = (mod, el) => {
+    st.module = mod;
+    st.el = el;
+    const url = st.pendingUrl;
+    st.pendingUrl = null;
+    if (url) st.refetch(url);
+    else st.maybeMount();
+  };
+
   // The URL is a parameter, never a closure capture. Capturing it would bind
   // the mount-time value forever: `version` changes every tick, BufferStore
   // keeps only the newest version, so a stale URL 404s, the !ok guard holds the
   // first frame, and the chart silently freezes after one paint.
   st.refetch = async (url) => {
-    if (!st.ready) {
-      st.pending = true;
+    if (!url || st.disposed) return;
+    if (!st.module) {
+      // decodeFrame lives in the bundle; hold the URL until it lands.
       st.pendingUrl = url;
       return;
     }
-    if (!url) return;
     st.lastUrl = url;
     try {
       const resp = await fetch(url);
       if (!resp.ok) return;  // keep the last good frame
       const raw = await resp.arrayBuffer();
-      st.buffers = st.decodeFrame ? st.decodeFrame(raw) : raw;
+      // decodeFrame returns {message, buffers, version, byteLength}; the
+      // renderer wants the buffer LIST, because a split-layout spec indexes
+      // columns into it. Handing it the wrapper object fails the split check.
+      const frame = st.module.decodeFrame(raw);
+      st.buffers = frame.buffers;
+      if (!st.mounted) {
+        st.maybeMount();
+        return;
+      }
       // Both events: the bundle's in-place append path listens for each.
       st.emit("change:spec");
       st.emit("change:buffers");
@@ -231,14 +269,22 @@ export function createController(options) {
     }
   };
 
-  st.markReady = () => {
-    st.ready = true;
-    if (st.pending) {
-      st.pending = false;
-      const url = st.pendingUrl;
-      st.pendingUrl = null;
-      st.refetch(url);
+  // A trace added or removed cannot be applied in place -- the update path
+  // only swaps columns for traces the view already has. Rebuild instead.
+  st.applyLayout = (layout) => {
+    if (st.layout === null) {
+      st.layout = layout;
+      return;
     }
+    if (st.layout === layout) return;
+    st.layout = layout;
+    st.teardown();
+    st.buffers = null;
+  };
+
+  st.dispose = () => {
+    st.disposed = true;
+    st.teardown();
   };
 
   return st;
@@ -248,7 +294,7 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, height, onSelect }) {
+export function XYChart({ spec, bufferUrl, layout, height, onSelect }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
@@ -256,7 +302,6 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
   }
 
   useEffect(() => {
-    let disposed = false;
     const st = ctrlRef.current;
 
     // Built at runtime and marked ignore for both bundlers: the asset is served
@@ -264,17 +309,11 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
     // resolve. A bare literal fails the export with UNRESOLVED_IMPORT.
     const clientUrl = "/" + "xy-client" + ".js";
     import(/* webpackIgnore: true */ /* @vite-ignore */ clientUrl).then((mod) => {
-      if (disposed || !hostRef.current) return;
-      st.decodeFrame = mod.decodeFrame;
-      st.cleanup = mod.render({ model: st.model, el: hostRef.current });
-      st.markReady();
+      if (st.disposed || !hostRef.current) return;
+      st.attach(mod, hostRef.current);
     });
 
-    return () => {
-      disposed = true;
-      if (st.cleanup) st.cleanup();
-      st.ready = false;
-    };
+    return () => st.dispose();
   }, []);
 
   // Data updates take the bundle's in-place append path, not a remount. The
@@ -283,8 +322,9 @@ export function XYChart({ spec, bufferUrl, height, onSelect }) {
     const st = ctrlRef.current;
     st.spec = spec;
     st.onSelect = onSelect;
+    st.applyLayout(layout);
     st.refetch(bufferUrl);
-  }, [spec, bufferUrl, onSelect]);
+  }, [spec, bufferUrl, layout, onSelect]);
 
   return <div ref={hostRef} style={{ width: "100%", height: height }} />;
 }
@@ -309,6 +349,8 @@ class XYChart(rx.Component):
         spec: Data-less chart spec from ``Figure.build_payload_split``,
             carrying an ``append.seq`` version token.
         buffer_url: Route the browser fetches column buffers from.
+        layout: Trace-set token; a change rebuilds the chart rather than
+            updating it in place.
         height: CSS height for the chart host element.
     """
 
@@ -317,6 +359,7 @@ class XYChart(rx.Component):
 
     spec: rx.Var[dict]
     buffer_url: rx.Var[str]
+    layout: rx.Var[str]
     height: rx.Var[str]
 
     on_select: rx.EventHandler[lambda payload: [payload]]

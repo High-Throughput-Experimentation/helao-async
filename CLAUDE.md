@@ -42,7 +42,7 @@ There is no project-wide build step for the Python side. Tests are a mix of pyte
 
 An optional second UI stack, opt-in per config via a `reflex:` server key alongside `fast:`/`bokeh:`. The Bokeh path is untouched; a station runs either, or both in the same group. Try it with `python launch.py goldenreflex`.
 
-A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the Reflex backend. `validateConfig` reserves both, so nothing else may claim `port + 1`.
+A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the Reflex backend. `validateConfig` reserves both, so nothing else may claim `port + 1`. The frontend server proxies `/xy/buffers/*` through to the backend, because the chart-buffer route is registered on the backend while the browser resolves the payload's relative URL against the page origin.
 
 Stations never need Node. Build the frontend bundle on a development machine and ship it:
 
@@ -61,7 +61,9 @@ cd helao/core/servers/reflex/_app && reflex init --name helao_ui --no-agents && 
 Layout and the two rules worth knowing before editing it:
 
 - `helao/core/servers/reflex/` — `app.py` (routes composed from config), `ingest.py`, `ringbuffer.py`, `state.py`, `plots.py`, `xy_component.py`. Panels live in `helao/deploy/<deployment>/servers/reflex/` and are discovered through the same `live_vis:` / `action_vis:` keys the Bokeh visualizers use.
-- **The plot facade is used at two call sites.** `plots.chart(spec_var, url_var)` binds a component **once** in a panel's `build()`; `plots.time_series(...)` and friends return a `ChartPayload` **every tick** from `pull()`, which the panel assigns into its state vars. Calling a facade function from `build()` yields a chart that paints once and never updates.
+- **The plot facade is used at two call sites.** `plots.chart(spec_var, url_var, layout_var)` binds a component **once** in a panel's `build()`; `plots.time_series(...)` and friends return a `ChartPayload` **every tick** from `pull()`, which the panel assigns into its state vars. Calling a facade function from `build()` yields a chart that paints once and never updates.
+- **Panel state bases are Reflex mixins, and must stay that way.** A var declared on a concrete `rx.State` is owned by that class and *shared* by every substate under it; a subclass re-declaring it does not shadow it. Written as plain inheritance, `make_panel_state`'s `server_key` binding read back as `""` at runtime and every panel on a page shared one `chart_spec`. `make_panel_state` raises if handed a non-mixin base.
+- **`add_page` takes a lazy callable that `--backend-only` never runs.** Anything the serving process needs — above all the panel state classes, since Reflex registers event handlers at class creation — must be created *before* `add_page`, or the browser calls handlers the backend has never heard of and every panel sits at "connecting".
 - **`ws_live` and `ws_data` carry different payloads.** `ws_live` relays a `{datalab: (value, epoch)}` dict; `ws_data` carries a pickled `DataPackageModel` object whose samples sit at `.datamodel.data[key][column]`. `ingest.NORMALIZERS` selects the right one by `ws_path` — a single normalizer silently drops the other endpoint's messages with no error.
 
 Only `plots.py` and `xy_component.py` may import `xy` (a test enforces this). `xy` is pre-1.0; `docs/superpowers/notes/2026-08-01-xy-api-probe.md` records its verified call signatures and should be re-checked after any version bump.

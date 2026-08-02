@@ -50,17 +50,18 @@ def extract(ingest, window: int) -> dict:
     }
 
 
-class _State(ActionVisState):
+class _State(ActionVisState, mixin=True):
     """Chart binding vars for the OER simulator."""
 
     chart_spec: dict = {}
     chart_url: str = ""
+    chart_layout: str = ""
     version: int = 0
     action_uuid: str = ""
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see VisPanelState.panel_key."""
-        return panel_id(self.server_key_default, self.router.session.client_token)
+        return panel_id(self.server_key, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
         """Recompute the chart payload from the trailing window."""
@@ -77,6 +78,7 @@ class _State(ActionVisState):
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
         self.action_uuid = cols["action_uuid"]
 
 
@@ -113,7 +115,12 @@ def build(server_key: str, state_cls):
                 state_cls.error != "",
                 rx.text(state_cls.error, color_scheme="red"),
             ),
-            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
+            plots.chart(
+                state_cls.chart_spec,
+                state_cls.chart_url,
+                state_cls.chart_layout,
+                height=320,
+            ),
             width="100%",
             spacing="3",
             on_mount=state_cls.render_loop,

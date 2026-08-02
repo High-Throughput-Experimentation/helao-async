@@ -273,6 +273,46 @@ def _stub_page(title: str, spec_note: str):
     return _page(title, rx.text(spec_note, padding_x="1em"))
 
 
+def _ensure_panel_states(routes: dict) -> None:
+    """Mint every panel's state class at build time.
+
+    ``add_page`` takes a *callable*, which Reflex evaluates only when it
+    compiles the frontend. ``reflex run --backend-only`` never compiles, so a
+    state class created inside that callable is never created in the serving
+    process at all. Reflex registers a state's event handlers when the class is
+    created, and the browser runs a bundle built by a separate ``reflex export``
+    process where the pages *were* compiled -- so it calls handlers the backend
+    has never heard of, and every panel sits at "connecting" forever::
+
+        KeyError: No registered handler found for event:
+        ...wssim_panel_sim__state.render_loop
+
+    Minting the classes here, before any page is added, keeps the two processes
+    in agreement; :func:`_render_panel` then reuses the cached classes.
+
+    Import and build failures stay silent beyond a log line: ``_render_panel``
+    is what turns them into a visible error card, and it runs per panel.
+
+    Args:
+        routes: The mapping from :func:`route_map`.
+    """
+    for targets in routes.values():
+        for target in targets:
+            try:
+                module = resolve_panel_module(target.module_name)
+                make_panel_state(
+                    target.module_name,
+                    target.server_key,
+                    module.STATE_BASE,
+                    module.WS_PATH,
+                )
+            except Exception as exc:
+                LOGGER.warning(
+                    f"reflex panel state not created for {target.server_key} "
+                    f"({target.module_name}): {type(exc).__name__}: {exc}"
+                )
+
+
 def build_app(world_cfg: dict, server_key: str):
     """Build the Reflex app for one orchestration group.
 
@@ -293,6 +333,10 @@ def build_app(world_cfg: dict, server_key: str):
 
     registry = IngestRegistry(world_cfg)
     set_registry(registry)
+
+    # Before add_page: the page callables are lazy, and the backend-only
+    # process never runs them.
+    _ensure_panel_states(routes)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is

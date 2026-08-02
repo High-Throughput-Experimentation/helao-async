@@ -47,17 +47,18 @@ def extract(ingest, window: int) -> dict:
     }
 
 
-class _State(LiveVisState):
+class _State(LiveVisState, mixin=True):
     """Chart binding vars plus the latest-value table."""
 
     chart_spec: dict = {}
     chart_url: str = ""
+    chart_layout: str = ""
     version: int = 0
     table_rows: list = []
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see VisPanelState.panel_key."""
-        return panel_id(self.server_key_default, self.router.session.client_token)
+        return panel_id(self.server_key, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
         """Recompute the chart payload and the latest-value table."""
@@ -73,6 +74,7 @@ class _State(LiveVisState):
         )
         self.chart_spec = payload.spec
         self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
         self.table_rows = [
             [name, f"{values[-1]:.6g}"]
             for name, values in cols["series"].items()
@@ -119,7 +121,12 @@ def build(server_key: str, state_cls):
                 state_cls.error != "",
                 rx.text(state_cls.error, color_scheme="red"),
             ),
-            plots.chart(state_cls.chart_spec, state_cls.chart_url, height=320),
+            plots.chart(
+                state_cls.chart_spec,
+                state_cls.chart_url,
+                state_cls.chart_layout,
+                height=320,
+            ),
             rx.data_table(
                 data=state_cls.table_rows,
                 columns=["name", "value"],
