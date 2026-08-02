@@ -54,6 +54,12 @@ cd helao/core/servers/reflex/_app && reflex init --name helao_ui --no-agents && 
 
 **The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. Stage the `_app` directory somewhere executable (`/tmp` works), build there with `PYTHONPATH` pointed at the repo, and copy the resulting `frontend.zip` back. Only the *build* needs exec — the bundle is static files, and `StaticFiles` serves them from anywhere.
 
+**The exported bundle bakes the backend URL**, from `HELAO_REFLEX_API_URL` (default `http://127.0.0.1:5011`). A bundle built for one config's port serves a *blank, silently disconnected* page under a config on any other port — the panels render and then every WebSocket attempt is refused. Export with the port the target config uses:
+
+```
+HELAO_REFLEX_API_URL=http://127.0.0.1:<port+1> reflex export --frontend-only
+```
+
 `--name helao_ui` is required: `reflex init` derives the app name from the current directory and rejects `_app`'s leading underscore, ignoring the valid `app_name` already in `rxconfig.py`.
 
 `reflex_launcher.py` serves that bundle and exits non-zero if it is missing, unless `REFLEX_ALLOW_LOCAL_BUILD=1` is set *and* bun/node is on `PATH` — a silent multi-minute build on an instrument PC is worse than a clear error.
