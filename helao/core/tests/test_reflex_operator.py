@@ -1456,3 +1456,65 @@ def test_a_spec_parameter_left_empty_is_reported():
     params, errors = opx.coerce_params(fields, {})
     assert "plate_id" not in params
     assert errors
+
+
+def test_history_rows_on_a_payload_that_is_not_uuid_pairs():
+    """get_histories is contracted to return (uuid, payload) pairs. A backend
+    that returns bare dicts must not take the handler down."""
+    import pytest as _pytest
+
+    with _pytest.raises(Exception):
+        # Documents the shape the handler now guards against, rather than
+        # pretending history_rows tolerates it.
+        opx.history_rows({"action": [{"action_name": "a"}]}, "action")
+
+
+def test_a_campaign_gets_a_uuid_stamped_on_the_sequence():
+    """The campaign-uuid field must reach the sequence. An input the enqueue
+    ignores is worse than no input at all."""
+    from uuid import UUID
+
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, error = opx.build_sequence(
+        backend, items[0], fields, {}, campaign="camp-1"
+    )
+    assert error == ""
+    assert sequence.campaign_name == "camp-1"
+    assert isinstance(sequence.campaign_uuid, UUID)
+
+
+def test_an_entered_campaign_uuid_is_used_verbatim():
+    from uuid import UUID
+
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    entered = "12345678-1234-5678-1234-567812345678"
+    sequence, _ = opx.build_sequence(
+        backend, items[0], fields, {}, campaign="c", campaign_uuid=entered
+    )
+    assert sequence.campaign_uuid == UUID(entered)
+
+
+def test_no_campaign_means_no_campaign_stamp():
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, _ = opx.build_sequence(backend, items[0], fields, {})
+    assert not sequence.campaign_name
+
+
+def test_a_manual_sequence_also_carries_the_campaign():
+    from uuid import UUID
+
+    _fresh_libs()
+    items, _ = opx.library_items(LibBackend(), "experiment", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, _ = opx.build_manual_sequence(items[0], fields, {}, campaign="camp-2")
+    assert sequence.campaign_name == "camp-2"
+    assert isinstance(sequence.campaign_uuid, UUID)

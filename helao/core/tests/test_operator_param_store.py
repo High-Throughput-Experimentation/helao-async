@@ -142,3 +142,16 @@ def test_params_are_stringified_for_the_form(tmp_path):
 def test_form_values_on_nothing_is_empty():
     assert ps.form_values({}) == {}
     assert ps.form_values(None) == {}
+
+
+def test_a_key_this_version_does_not_know_survives_a_write(tmp_path):
+    """The file is shared with the Bokeh operator and with future versions.
+    Rebuilding it from only the known keys would silently erase the rest."""
+    root = _root(tmp_path)
+    path = ps.params_path(root)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf8") as handle:
+        json.dump({"seq": {}, "exp": {}, "last_meta": {}, "future": {"x": 1}}, handle)
+    ps.write_params(root, "seq", "seq_a", {"alpha": 1})
+    with open(path, "r", encoding="utf8") as handle:
+        assert json.load(handle)["future"] == {"x": 1}

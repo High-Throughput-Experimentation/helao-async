@@ -21,7 +21,6 @@ from enum import Enum
 from functools import partial
 from socket import gethostname
 from typing import Optional
-from uuid import UUID
 
 import numpy as np
 from bokeh.events import ButtonClick, DoubleTap
@@ -50,13 +49,13 @@ from helao.core.servers.operator.param_forms import (
     BUILTIN_TYPES,
     build_lib,
     parse_arg_docs,
+    resolve_campaign_uuid,
     version_hint_parts,
 )
 from helao.core.servers.vis import Vis
 from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Experiment, Sequence
-from helao.helpers.time_utils import md5_string
 from helao.helpers.to_json import parse_bokeh_input
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -1167,22 +1166,10 @@ class BokehOperator:
     def _resolve_campaign_uuid(self, campaign_name: str):
         """Resolve the campaign UUID from operator input.
 
-        Empty input hashes ``campaign_name`` into a deterministic UUID. A
-        non-empty value is parsed as a UUID; a malformed entry is logged and
-        falls back to hashing the typed string so the operator never crashes
-        on a typo (the model now validates on assignment).
+        The rule is shared with the Reflex operator through ``param_forms``;
+        only reading the widget belongs here.
         """
-        entered = self.input_campaign_uuid.value.strip()
-        if entered == "":
-            return md5_string(campaign_name)
-        try:
-            return UUID(entered)
-        except ValueError:
-            LOGGER.warning(
-                f"campaign_uuid input '{entered}' is not a valid UUID; "
-                "hashing it into a deterministic UUID instead"
-            )
-            return md5_string(entered)
+        return resolve_campaign_uuid(campaign_name, self.input_campaign_uuid.value)
 
     def _capture_metadata(self, seq: Sequence) -> None:
         """Stamp label / campaign / comment from the current inputs onto ``seq``."""
