@@ -64,7 +64,7 @@ Nothing is dropped. Two things change shape, both deliberately:
 | 4 | Add one facade function, `plots.traces`, for independently-x'd traces | Every existing facade entry (`time_series`, `spectra`) assumes one shared x. Selected datasets each carry their own x column. This is a real gap, not a workaround. |
 | 5 | Filtering and selection are server-side over the index DataFrame | The index can run to thousands of rows. Shipping it all into Reflex state to filter in the browser would push exactly the bulk data Decision 8 of the parent spec keeps out of the state channel. |
 | 6 | Buffer-store key is `browser-{session_token}` | Same session-scoping rule the panels learned the hard way: the store holds one frame per key while the version counter is per-session state, so a shared key would 404 two tabs into frozen charts. |
-| 7 | Trace type (`line`/`scatter`/`step`) maps onto xy marks, not onto separate facade calls | `plots.traces` takes the mark kind as an argument. Three near-identical facade functions would be the step-line workaround all over again. |
+| 7 | Trace type maps onto xy marks via an argument, not onto separate facade calls | `plots.traces` takes the mark kind. Near-identical facade functions per kind would be the step-line workaround all over again. The kinds are exactly the Bokeh original's `line` and `scatter`; xy also ships `step`, but adding it here would make this a feature, not a re-rendering. |
 
 ## Architecture
 
