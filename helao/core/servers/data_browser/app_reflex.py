@@ -18,11 +18,17 @@ __all__ = [
     "filter_index",
     "index_rows",
     "cap_rows",
+    "load_positions",
+    "axis_options",
+    "chart_series",
+    "summary_rows",
+    "dataset_rows",
 ]
 
 import threading
 
 from helao.core.servers.data_browser import sources
+from helao.core.servers.data_browser import state as dbstate
 from helao.core.servers.data_browser.app import FILTER_COLS, INDEX_TABLE_COLS
 from helao.helpers import helao_logging as logging
 
@@ -163,3 +169,77 @@ def cap_rows(rows: list, cap: int):
         result set.
     """
     return rows[:cap], len(rows), len(rows) > cap
+
+
+def load_positions(index_df, positions):
+    """Read the chosen index rows into datasets.
+
+    Args:
+        index_df: A scanned (and possibly filtered) index, or ``None``.
+        positions: Integer positions into ``index_df``.
+
+    Returns:
+        tuple: ``(datasets, skipped)``, where ``skipped`` is
+        ``[(label, reason)]``. Unreadable and unavailable files are reported,
+        never silently dropped.
+    """
+    if index_df is None:
+        return [], []
+    return dbstate.load_selected(index_df.reset_index(drop=True), positions)
+
+
+def axis_options(selected) -> list:
+    """Column names available across the selected datasets."""
+    return dbstate.available_columns(selected)
+
+
+def chart_series(selected, xcol: str, ycol: str, max_points: int) -> list:
+    """Build :func:`plots.traces` input from the selected datasets.
+
+    Args:
+        selected: ``SelectedDataset`` list.
+        xcol: Chosen x column.
+        ycol: Chosen y column.
+        max_points: Downsampling cap per trace.
+
+    Returns:
+        list: ``{"label", "x", "y"}`` per dataset that has both columns.
+        Datasets missing either are skipped -- overlaying files from unrelated
+        runs means some will not share columns, which is normal.
+    """
+    if not xcol or not ycol:
+        return []
+    series = []
+    for ds in selected:
+        trace = dbstate.build_trace(ds, xcol, ycol)
+        if trace is None:
+            continue
+        trace = dbstate.downsample(trace, max_points)
+        series.append({"label": ds.label, "x": trace["x"], "y": trace["y"]})
+    return series
+
+
+def summary_rows(selected, xcol: str, ycol: str) -> list:
+    """One summary-table row per selected dataset, as strings."""
+    return [
+        [str(dbstate.summary_row(ds, xcol, ycol)[col]) for col in dbstate.SUMMARY_COLS]
+        for ds in selected
+    ]
+
+
+def dataset_rows(ds):
+    """Render one dataset's raw columns as a table.
+
+    Args:
+        ds: A ``SelectedDataset``, or ``None``.
+
+    Returns:
+        tuple: ``(headers, rows)``, both empty when ``ds`` is ``None``.
+    """
+    if ds is None:
+        return [], []
+    headers = list(ds.data.keys())
+    if not headers:
+        return [], []
+    length = min(len(ds.data[h]) for h in headers)
+    return headers, [[str(ds.data[h][i]) for h in headers] for i in range(length)]
