@@ -276,6 +276,7 @@ def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_c
         OperatorPlanState,
         OperatorPlateState,
         OperatorQueueState,
+        OperatorSpecState,
     )
     from helao.core.servers.reflex.app import build_app
 
@@ -286,6 +287,7 @@ def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_c
         OperatorLibState: ("load_libraries", "select_item", "set_param", "enqueue"),
         OperatorPlanState: ("append_selection", "flush", "move_row", "remove_row"),
         OperatorPlateState: ("load_plate", "on_select", "set_sample"),
+        OperatorSpecState: ("reload_specs", "select_spec", "set_param", "enqueue"),
     }
     for state, handlers in expected.items():
         prefix = state.get_full_name()

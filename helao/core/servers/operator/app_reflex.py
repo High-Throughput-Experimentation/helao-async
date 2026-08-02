@@ -70,6 +70,10 @@ __all__ = [
     "OperatorLibState",
     "OperatorPlanState",
     "OperatorPlateState",
+    "OperatorSpecState",
+    "spec_parser_path",
+    "spec_folder_path",
+    "parser_kwargs",
     "SEQ_COLS",
     "EXP_COLS",
     "ACT_COLS",
@@ -489,6 +493,32 @@ def save_values(root: str, kind: str, name: str, params: dict, meta=None) -> boo
     if not key:
         return False
     return param_store.write_params(root, key, name, params, meta=meta)
+
+
+def spec_parser_path(server_cfg: dict) -> str:
+    """Path of the deployment's spec parser, or ``""``."""
+    params = (server_cfg or {}).get("params")
+    return (params.get("seqspec_parser_path") or "") if isinstance(params, dict) else ""
+
+
+def spec_folder_path(server_cfg: dict) -> str:
+    """Folder holding the specification files, or ``""``."""
+    params = (server_cfg or {}).get("params")
+    return (params.get("seqspec_folder_path") or "") if isinstance(params, dict) else ""
+
+
+def parser_kwargs(server_cfg: dict) -> dict:
+    """Extra keyword arguments the config passes to the spec parser."""
+    params = (server_cfg or {}).get("params")
+    kwargs = params.get("parser_kwargs") if isinstance(params, dict) else None
+    return kwargs if isinstance(kwargs, dict) else {}
+
+
+def _build_spec(parser, path, backend, params, kwargs):
+    """Parse one spec file. Split out so the state handler stays assignment."""
+    from helao.core.servers.operator import spec_parser
+
+    return spec_parser.build_spec_sequence(parser, path, backend, params, kwargs)
 
 
 def repo_root() -> str:
@@ -1997,12 +2027,18 @@ def _queue_tab(columns: list, rows_var, kind: str):
     )
 
 
-def _param_field(row):
+def _param_field(row, state, options):
     """One parameter input, by kind.
 
     ``row`` is ``[name, kind, value, help]``. The kinds are compared on the
     var rather than resolved in Python: the row is only known in the browser.
+
+    Args:
+        row: The flattened field row.
+        state: State owning ``set_param``. Defaults to the library form.
+        options: Var holding the select options, when the form has any.
     """
+
     return rx.vstack(
         rx.hstack(
             rx.text(row[0], size="2", weight="medium"),
@@ -2019,15 +2055,15 @@ def _param_field(row):
             rx.cond(
                 row[1] == "select",
                 rx.select(
-                    OperatorLibState.position_options,
+                    options,
                     value=row[2],
-                    on_change=lambda value: OperatorLibState.set_param(row[0], value),
+                    on_change=lambda value: state.set_param(row[0], value),
                     width="100%",
                     size="2",
                 ),
                 rx.input(
                     value=row[2],
-                    on_change=lambda value: OperatorLibState.set_param(row[0], value),
+                    on_change=lambda value: state.set_param(row[0], value),
                     width="100%",
                     size="2",
                 ),
@@ -2100,7 +2136,12 @@ def _library_panel():
         ),
         rx.scroll_area(
             rx.vstack(
-                rx.foreach(OperatorLibState.param_rows, _param_field),
+                rx.foreach(
+                    OperatorLibState.param_rows,
+                    lambda row: _param_field(
+                        row, OperatorLibState, OperatorLibState.position_options
+                    ),
+                ),
                 width="100%",
                 spacing="2",
             ),
@@ -2236,6 +2277,54 @@ def _plate_panel():
     )
 
 
+def _spec_panel():
+    """The spec-file tab, or a note when this station has no parser."""
+    return rx.cond(
+        OperatorSpecState.enabled,
+        rx.vstack(
+            rx.hstack(
+                rx.select(
+                    OperatorSpecState.spec_names,
+                    value=OperatorSpecState.selected_spec,
+                    on_change=OperatorSpecState.select_spec,
+                    width="22em",
+                ),
+                rx.button(
+                    "Reload specs",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorSpecState.reload_specs,
+                ),
+                spacing="3",
+                align="center",
+            ),
+            rx.text(OperatorSpecState.parser_note, size="1", color_scheme="gray"),
+            rx.text("Required sequence parameters:", size="2", weight="medium"),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.foreach(
+                        OperatorSpecState.param_rows,
+                        # The spec form has no dropdown params, so it binds an
+                        # empty options list rather than the PAL's positions.
+                        lambda row: _param_field(row, OperatorSpecState, []),
+                    ),
+                    width="100%",
+                    spacing="2",
+                ),
+                type="auto",
+                scrollbars="vertical",
+                height="16em",
+            ),
+            rx.button("Enqueue spec sequence", on_click=OperatorSpecState.enqueue),
+            _error_text(OperatorSpecState.error),
+            rx.text(OperatorSpecState.status, size="2"),
+            width="100%",
+            spacing="3",
+        ),
+        rx.text(OperatorSpecState.status, size="2", color_scheme="gray"),
+    )
+
+
 def _queue_panel():
     """The three orchestrator queues and the action-server status table."""
     return rx.vstack(
@@ -2354,12 +2443,14 @@ def build_page():
                 rx.tabs.trigger("Plan", value="plan"),
                 rx.tabs.trigger("Queues", value="queues"),
                 rx.tabs.trigger("History", value="history"),
+                rx.tabs.trigger("Specs", value="specs"),
                 rx.tabs.trigger("Plate", value="plate"),
             ),
             rx.tabs.content(_library_panel(), value="build"),
             rx.tabs.content(_plan_panel(), value="plan"),
             rx.tabs.content(_queue_panel(), value="queues"),
             rx.tabs.content(_history_panel(), value="history"),
+            rx.tabs.content(_spec_panel(), value="specs"),
             rx.tabs.content(_plate_panel(), value="plate"),
             default_value="build",
             width="100%",
@@ -2380,6 +2471,157 @@ def build_page():
             OperatorQueueState.poll_once(""),
             OperatorLibState.load_libraries,
             OperatorPlateState.on_mount,
+            OperatorSpecState.on_mount,
         ],
         on_unmount=OperatorQueueState.stop_polling,
     )
+
+
+class OperatorSpecState(rx.State):
+    """The spec-file tab: enqueue a sequence described by a deployment file.
+
+    Opt-in, like the plate map. Without ``seqspec_parser_path`` and
+    ``seqspec_folder_path`` in the server params there is nothing to read, and
+    the tab says so rather than rendering an empty selector. The parser is
+    deployment code loaded at runtime, so every failure here disables the tab
+    instead of taking the page down.
+    """
+
+    spec_names: list[str] = []
+    selected_spec: str = ""
+    #: ``[name, kind, current value, help]``, the same shape the library form
+    #: binds, so one renderer serves both.
+    param_rows: list[list[str]] = []
+    enabled: bool = False
+    parser_note: str = ""
+    status: str = ""
+    error: str = ""
+
+    #: Full spec paths by base name, the typed field descriptors, and the
+    #: entered values. Server-side: the browser needs only the rendered rows.
+    _paths: dict = {}
+    _fields: list = []
+    _values: dict = {}
+
+    def _server_cfg(self) -> dict:
+        with _SETTINGS_LOCK:
+            world_cfg = _SETTINGS.get("world_cfg") or {}
+            server_key = _SETTINGS.get("server_key", "")
+        return (world_cfg.get("servers") or {}).get(server_key) or {}
+
+    def _parser(self):
+        from helao.core.servers.operator import spec_parser
+
+        return spec_parser.load_parser(spec_parser_path(self._server_cfg()))
+
+    @rx.event
+    def on_mount(self):
+        """Report whether this station has a spec parser, and list the specs."""
+        parser = self._parser()
+        self.enabled = parser is not None
+        if not self.enabled:
+            self.status = "no spec parser is configured for this station"
+            return
+        self.parser_note = spec_parser_path(self._server_cfg())
+        self._refresh(parser)
+
+    def _refresh(self, parser) -> None:
+        """Re-read the spec folder."""
+        from helao.core.servers.operator import spec_parser
+
+        folder = spec_folder_path(self._server_cfg())
+        paths = spec_parser.spec_files(parser, folder)
+        self._paths = {os.path.basename(p): p for p in paths}
+        self.spec_names = list(self._paths)
+        if self.spec_names and self.selected_spec not in self.spec_names:
+            self.selected_spec = self.spec_names[0]
+        self.status = (
+            f"{len(self.spec_names)} specification file(s) in {folder}"
+            if self.spec_names
+            else f"no specification files in {folder}"
+        )
+        self._select(parser, self.selected_spec)
+
+    def _select(self, parser, name: str) -> None:
+        """Rebuild the parameter form for one spec file."""
+        from helao.core.servers.operator import spec_parser
+
+        path = self._paths.get(name, "")
+        if not path:
+            self._fields = []
+            self.param_rows = []
+            return
+        backend = session_backend(self.router.session.client_token)
+        self._fields = spec_parser.spec_fields(parser, path, backend)
+        entered = self._values.get(name, {})
+        self.param_rows = [
+            [f["name"], f["kind"], entered.get(f["name"], f["default"]), f["help"]]
+            for f in self._fields
+        ]
+
+    @rx.event
+    def reload_specs(self):
+        """Re-read the folder, picking up files added since the page loaded."""
+        parser = self._parser()
+        if parser is None:
+            return
+        self._refresh(parser)
+
+    @rx.event
+    def select_spec(self, name: str):
+        """Choose a specification file."""
+        self.selected_spec = name
+        parser = self._parser()
+        if parser is not None:
+            self._select(parser, name)
+
+    @rx.event
+    def set_param(self, name: str, value: str):
+        """Record one edited spec parameter."""
+        entered = dict(self._values.get(self.selected_spec, {}))
+        entered[name] = value
+        self._values = {**self._values, self.selected_spec: entered}
+        self.param_rows = [
+            [row[0], row[1], value, row[3]] if row[0] == name else row
+            for row in self.param_rows
+        ]
+
+    @rx.event(background=True)
+    async def enqueue(self):
+        """Parse the selected spec file and enqueue the sequence it describes."""
+        async with self:
+            token = self.router.session.client_token
+            name = self.selected_spec
+            path = self._paths.get(name, "")
+            fields = list(self._fields)
+            values = dict(self._values.get(name, {}))
+            kwargs = parser_kwargs(self._server_cfg())
+            self.status = ""
+            self.error = ""
+        params, errors = coerce_params(fields, values)
+        if errors:
+            async with self:
+                self.error = "; ".join(errors)
+            return
+        parser = self._parser()
+        sequence, error = _build_spec(
+            parser, path, session_backend(token), params, kwargs
+        )
+        if error:
+            async with self:
+                self.error = error
+            return
+        backend = session_backend(token)
+        if backend is None:
+            async with self:
+                self.error = "no orchestrator connection"
+            return
+        try:
+            await backend.add_sequence(sequence)
+        except Exception as exc:
+            LOGGER.warning(f"operator could not enqueue spec '{name}': {exc}")
+            async with self:
+                self.error = f"{name} could not be enqueued: {exc}"
+            return
+        async with self:
+            self.status = f"enqueued {name}"

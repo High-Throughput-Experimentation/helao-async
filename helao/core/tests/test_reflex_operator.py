@@ -1389,3 +1389,70 @@ def test_saved_values_for_a_name_with_nothing_saved(tmp_path):
 
 def test_saved_values_refuses_an_unknown_kind(tmp_path):
     assert opx.saved_values(str(tmp_path), "nonsense", "seq_a") == {}
+
+
+# -- spec files --------------------------------------------------------------
+
+
+def test_spec_config_keys_are_read_from_the_server_params():
+    cfg = {
+        "params": {
+            "seqspec_parser_path": "/d/parser.py",
+            "seqspec_folder_path": "/d/specs",
+            "parser_kwargs": {"k": 1},
+        }
+    }
+    assert opx.spec_parser_path(cfg) == "/d/parser.py"
+    assert opx.spec_folder_path(cfg) == "/d/specs"
+    assert opx.parser_kwargs(cfg) == {"k": 1}
+
+
+def test_spec_config_is_empty_when_unconfigured():
+    """Opt-in: without these keys the tab renders a note, not a selector."""
+    assert opx.spec_parser_path({}) == ""
+    assert opx.spec_folder_path({"params": {}}) == ""
+    assert opx.parser_kwargs({"params": {}}) == {}
+
+
+def test_spec_config_survives_a_params_block_that_is_not_a_mapping():
+    """Same hazard as poll_interval_for: build_app runs at import time."""
+    assert opx.spec_parser_path({"params": []}) == ""
+    assert opx.spec_folder_path({"params": "no"}) == ""
+    assert opx.parser_kwargs({"params": []}) == {}
+
+
+def test_parser_kwargs_ignores_a_non_mapping_value():
+    assert opx.parser_kwargs({"params": {"parser_kwargs": ["a"]}}) == {}
+
+
+def test_spec_fields_coerce_through_the_same_path_as_library_params():
+    """spec_fields returns the same field shape, so one coercion serves both."""
+    from helao.core.servers.operator import spec_parser as sp
+
+    class Parser:
+        PARAM_TYPES = {"plate_id": int}
+
+        def list_params(self, path, backend):
+            return {"plate_id": None}
+
+    fields = sp.spec_fields(Parser(), "a.txt", backend=None)
+    params, errors = opx.coerce_params(fields, {"plate_id": "6284"})
+    assert params == {"plate_id": 6284}
+    assert errors == []
+
+
+def test_a_spec_parameter_left_empty_is_reported():
+    """Spec parameters are required and start empty, so an untouched one must
+    fail loudly rather than reaching the parser as an empty string."""
+    from helao.core.servers.operator import spec_parser as sp
+
+    class Parser:
+        PARAM_TYPES = {"plate_id": int}
+
+        def list_params(self, path, backend):
+            return {"plate_id": None}
+
+    fields = sp.spec_fields(Parser(), "a.txt", backend=None)
+    params, errors = opx.coerce_params(fields, {})
+    assert "plate_id" not in params
+    assert errors
