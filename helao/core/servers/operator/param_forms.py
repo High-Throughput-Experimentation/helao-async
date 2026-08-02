@@ -10,17 +10,57 @@ Nothing here imports a UI toolkit, so it is testable directly rather than
 through UI callbacks, which is how ``bokeh_operator`` reached it before.
 """
 
-__all__ = ["build_lib", "parse_arg_docs", "version_hint_parts", "clear_lib_cache"]
+__all__ = [
+    "build_lib",
+    "parse_arg_docs",
+    "version_hint_parts",
+    "clear_lib_cache",
+    "BUILTIN_TYPES",
+    "LibItem",
+]
 
+import builtins
 import inspect
 import json
 import re
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel
+
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Every builtin that is a type. A parameter annotated with one of these has
+#: its entered text cast through it; anything else is left as parsed. Lives
+#: here rather than in either UI because both apply the same rule.
+BUILTIN_TYPES = [
+    getattr(builtins, d)
+    for d in dir(builtins)
+    if isinstance(getattr(builtins, d), type)
+]
+
+
+class LibItem(BaseModel):
+    """One entry of a sequence or experiment library.
+
+    Both names are optional and only the one matching ``build_lib``'s
+    ``name_field`` is populated, so a single model serves both libraries. The
+    Bokeh operator keeps its own pair of models; this exists for callers that
+    do not already have one.
+    """
+
+    index: int
+    sequence_name: str = ""
+    experiment_name: str = ""
+    doc: str
+    args: list
+    defaults: list
+    argtypes: list
+    version: Optional[int] = None
+    codehash: Optional[str] = None
+
 
 #: Introspected sequence/experiment dropdown data, keyed by the inputs that can
 #: change it. The table is a pure function of the library callables, their file

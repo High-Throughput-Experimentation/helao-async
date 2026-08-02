@@ -9,6 +9,7 @@ outside a running app.
 import asyncio
 
 import pytest
+from pydantic import BaseModel
 
 from helao.core.servers.operator import app_reflex as opx
 
@@ -458,3 +459,423 @@ def test_session_backend_without_configuration_is_none():
     and a poll that fires first must degrade to 'cannot reach', not raise."""
     opx.reset_settings()
     assert opx.session_backend("tok") is None
+
+
+# -- parameter fields --------------------------------------------------------
+
+
+class _ItemModel(BaseModel):
+    """Minimal stand-in for the operator's return_sequence_lib model."""
+
+    index: int
+    experiment_name: str
+    doc: str
+    args: tuple
+    defaults: tuple
+    argtypes: tuple
+    version: object = None
+    codehash: object = None
+
+
+def _item(args, defaults, argtypes, doc="", **extra):
+    """A build_lib-shaped item without running introspection."""
+    base = {
+        "index": 0,
+        "sequence_name": "seq_a",
+        "doc": doc,
+        "args": tuple(args),
+        "defaults": tuple(defaults),
+        "argtypes": tuple(argtypes),
+        "version": None,
+        "codehash": None,
+    }
+    base.update(extra)
+    return base
+
+
+def test_align_defaults_pads_positional_args_first():
+    """Args without defaults are the leading ones. The Bokeh operator pads the
+    front of the defaults list for exactly this reason; padding the end would
+    hand every field the wrong neighbour's default."""
+    assert opx.align_defaults(["a", "b", "c"], [1]) == ["", "", 1]
+
+
+def test_align_defaults_leaves_a_matched_list_alone():
+    assert opx.align_defaults(["a", "b"], [1, 2]) == [1, 2]
+
+
+def test_fields_for_item_types_each_field_from_its_annotation():
+    fields = opx.fields_for_item(
+        _item(["n", "f", "b", "s"], [1, 1.5, True, "x"], [int, float, bool, str])
+    )
+    assert [f["kind"] for f in fields] == ["number", "number", "bool", "text"]
+
+
+def test_fields_for_item_falls_back_to_text_without_an_annotation():
+    fields = opx.fields_for_item(_item(["a"], ["x"], ["unspecified"]))
+    assert fields[0]["kind"] == "text"
+
+
+def test_fields_for_item_renders_a_container_default_as_text():
+    """A list or dict default has no typed input; the Bokeh operator shows its
+    repr in a text box and parses it back on enqueue."""
+    fields = opx.fields_for_item(_item(["a"], [[1, 2]], [list]))
+    assert fields[0]["kind"] == "text"
+    assert fields[0]["default"] == "[1, 2]"
+
+
+def test_fields_for_item_takes_help_text_from_the_docstring():
+    doc = "Summary.\n\nArgs:\n    alpha: how many times\n"
+    fields = opx.fields_for_item(_item(["alpha"], [1], [int], doc=doc))
+    assert fields[0]["help"] == "how many times"
+
+
+def test_fields_for_item_help_is_empty_when_undocumented():
+    fields = opx.fields_for_item(_item(["alpha"], [1], [int]))
+    assert fields[0]["help"] == ""
+
+
+def test_fields_for_item_uses_an_options_map_to_make_a_select():
+    """Custom-position params are a dropdown of the station's configured
+    positions, matching the Bokeh operator's Select for those two args."""
+    fields = opx.fields_for_item(
+        _item(["solid_custom_position"], ["cell1"], [str]),
+        options_map={"solid_custom_position": ["cell1", "cell2"]},
+    )
+    assert fields[0]["kind"] == "select"
+    assert fields[0]["options"] == ["cell1", "cell2"]
+
+
+def test_fields_for_item_select_default_falls_back_to_the_first_option():
+    """Bokeh picks the first option when the default is not among them, rather
+    than leaving a Select showing a value it cannot offer."""
+    fields = opx.fields_for_item(
+        _item(["solid_custom_position"], ["gone"], [str]),
+        options_map={"solid_custom_position": ["cell1"]},
+    )
+    assert fields[0]["default"] == "cell1"
+
+
+def test_fields_for_item_drops_the_framework_injected_argument():
+    """Experiment functions take an Experiment the operator must not prompt
+    for. build_lib filters it; this asserts the pair works end to end."""
+    from helao.core.servers.operator import param_forms as pf
+
+    class Marker:
+        pass
+
+    def exp_a(experiment: Marker, alpha: int = 1):
+        """d"""
+
+    pf.clear_lib_cache()
+    items, _ = pf.build_lib(
+        {"exp_a": exp_a},
+        filter_type=Marker,
+        config_key="experiment_params",
+        world_cfg={},
+        loaded_config_path="/cfg/fields.yml",
+        model_class=_ItemModel,
+        name_field="experiment_name",
+    )
+    names = [f["name"] for f in opx.fields_for_item(items[0])]
+    assert names == ["alpha"]
+
+
+def test_flatten_fields_is_all_strings_for_foreach():
+    """rx.foreach needs a concrete element type, and Reflex cannot iterate a
+    list of heterogeneous dicts."""
+    fields = opx.fields_for_item(_item(["a", "b"], [1, True], [int, bool]))
+    rows = opx.flatten_fields(fields)
+    assert rows == [["a", "number", "1", ""], ["b", "bool", "True", ""]]
+
+
+def test_field_options_is_parallel_to_the_rows():
+    fields = opx.fields_for_item(
+        _item(["a", "p"], [1, "cell1"], [int, str]),
+        options_map={"p": ["cell1", "cell2"]},
+    )
+    assert opx.field_options(fields) == [[], ["cell1", "cell2"]]
+
+
+# -- parameter coercion ------------------------------------------------------
+
+
+def test_coerce_params_applies_the_annotated_builtin_type():
+    fields = opx.fields_for_item(_item(["n"], [1], [int]))
+    params, errors = opx.coerce_params(fields, {"n": "7"})
+    assert params == {"n": 7}
+    assert isinstance(params["n"], int)
+    assert errors == []
+
+
+def test_coerce_params_falls_back_to_the_default_for_an_untouched_field():
+    fields = opx.fields_for_item(_item(["n"], [3], [int]))
+    params, errors = opx.coerce_params(fields, {})
+    assert params == {"n": 3}
+    assert errors == []
+
+
+def test_coerce_params_parses_a_container_from_text():
+    fields = opx.fields_for_item(_item(["a"], [[1, 2]], [list]))
+    params, _ = opx.coerce_params(fields, {"a": "[3, 4]"})
+    assert params["a"] == [3, 4]
+
+
+def test_coerce_params_accepts_single_quoted_json():
+    """parse_bokeh_input rewrites single quotes, so a repr pasted back into
+    the field round-trips."""
+    fields = opx.fields_for_item(_item(["a"], [{}], [dict]))
+    params, _ = opx.coerce_params(fields, {"a": "{'k': 1}"})
+    assert params["a"] == {"k": 1}
+
+
+def test_coerce_params_reports_a_value_that_will_not_convert():
+    """Reported, not dropped: silently omitting the parameter would run the
+    sequence with a default the operator never chose."""
+    fields = opx.fields_for_item(_item(["n"], [1], [int]))
+    params, errors = opx.coerce_params(fields, {"n": "twelve"})
+    assert "n" not in params
+    assert errors and "n" in errors[0]
+
+
+def test_coerce_params_reads_false_as_false():
+    """str(False) is 'False', and bool('False') is True. Routing checkbox text
+    through the plain builtin cast would invert every unchecked box."""
+    fields = opx.fields_for_item(_item(["b"], [True], [bool]))
+    params, errors = opx.coerce_params(fields, {"b": "False"})
+    assert params == {"b": False}
+    assert errors == []
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [("true", True), ("False", False), ("0", False), ("1", True), (True, True)],
+)
+def test_coerce_params_accepts_the_forms_a_checkbox_can_send(raw, expected):
+    fields = opx.fields_for_item(_item(["b"], [False], [bool]))
+    params, _ = opx.coerce_params(fields, {"b": raw})
+    assert params["b"] is expected
+
+
+def test_coerce_params_rejects_nonsense_in_a_bool_field():
+    fields = opx.fields_for_item(_item(["b"], [False], [bool]))
+    params, errors = opx.coerce_params(fields, {"b": "maybe"})
+    assert "b" not in params
+    assert errors
+
+
+def test_coerce_params_leaves_an_unannotated_field_as_parsed():
+    fields = opx.fields_for_item(_item(["a"], ["x"], ["unspecified"]))
+    params, errors = opx.coerce_params(fields, {"a": "7"})
+    assert params["a"] == 7
+    assert errors == []
+
+
+# -- version hint ------------------------------------------------------------
+
+
+def test_version_text_joins_the_parts():
+    assert opx.version_text({"version": 2, "codehash": "abc"}) == "v2 · abc"
+
+
+def test_version_text_is_empty_without_either_part():
+    assert opx.version_text({}) == ""
+
+
+# -- library loading and enqueue ---------------------------------------------
+
+
+class LibBackend(FakeBackend):
+    """A backend carrying libraries, as RemoteBackend does."""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+
+        def seq_a(alpha: int = 1, beta: str = "x"):
+            """A sequence.
+
+            Args:
+                alpha: how many
+            """
+
+        def exp_a(gamma: float = 2.5):
+            """An experiment."""
+
+        self.sequence_lib = {"seq_a": seq_a}
+        self.experiment_lib = {"exp_a": exp_a}
+        self.sequence_codehash = {"seq_a": "abcdef1234"}
+        self.experiment_codehash = {}
+        self.unpacked = None
+
+    def unpack_sequence(self, sequence_name, sequence_params):
+        self.unpacked = (sequence_name, sequence_params)
+        return [{"experiment_name": "e1"}]
+
+    async def add_sequence(self, sequence):
+        self._boom()
+        self.calls.append(("add_sequence", sequence))
+        return {"ok": True}
+
+
+def _fresh_libs():
+    from helao.core.servers.operator import param_forms as pf
+
+    pf.clear_lib_cache()
+
+
+def test_library_items_come_from_the_backend_libraries():
+    _fresh_libs()
+    items, names = opx.library_items(LibBackend(), "sequence", {})
+    assert names == ["seq_a"]
+    assert items[0]["sequence_name"] == "seq_a"
+
+
+def test_library_items_carry_the_codehash_for_the_version_hint():
+    _fresh_libs()
+    items, _ = opx.library_items(LibBackend(), "sequence", {})
+    assert items[0]["codehash"] == "abcdef12"
+
+
+def test_library_items_for_experiments_drop_the_injected_experiment():
+    _fresh_libs()
+    items, names = opx.library_items(LibBackend(), "experiment", {})
+    assert names == ["exp_a"]
+    assert "experiment" not in items[0]["args"]
+
+
+def test_library_items_without_a_backend_is_empty():
+    assert opx.library_items(None, "sequence", {}) == ([], [])
+
+
+def test_library_items_refuses_an_unknown_kind():
+    _fresh_libs()
+    assert opx.library_items(LibBackend(), "nonsense", {}) == ([], [])
+
+
+def test_item_by_name_finds_the_selection():
+    _fresh_libs()
+    items, _ = opx.library_items(LibBackend(), "sequence", {})
+    assert opx.item_by_name(items, "sequence", "seq_a")["sequence_name"] == "seq_a"
+
+
+def test_item_by_name_returns_none_for_a_stale_selection():
+    """The library can be reloaded under a selection that no longer exists."""
+    assert opx.item_by_name([], "sequence", "gone") is None
+
+
+def test_enqueue_sequence_unpacks_and_adds():
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    message, error = asyncio.run(
+        opx.enqueue_sequence(backend, items[0], fields, {"alpha": "9"}, label="run1")
+    )
+    assert error == ""
+    assert backend.unpacked == ("seq_a", {"alpha": 9, "beta": "x"})
+    assert backend.calls[0][0] == "add_sequence"
+    assert "seq_a" in message
+
+
+def test_enqueue_sequence_carries_the_label_and_planned_experiments():
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    asyncio.run(opx.enqueue_sequence(backend, items[0], fields, {}, label="run1"))
+    sequence = backend.calls[0][1]
+    assert sequence.sequence_label == "run1"
+    assert len(sequence.planned_experiments) == 1
+
+
+def test_enqueue_sequence_refuses_when_a_parameter_will_not_convert():
+    """Nothing reaches the orchestrator: running with a silently defaulted
+    parameter is worse than not running."""
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    _, error = asyncio.run(
+        opx.enqueue_sequence(backend, items[0], fields, {"alpha": "nine"})
+    )
+    assert "alpha" in error
+    assert backend.calls == []
+    assert backend.unpacked is None
+
+
+def test_enqueue_sequence_reports_an_unpack_failure():
+    """A library sequence that raises while unpacking must name itself; the
+    operator otherwise sees a button that does nothing."""
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+
+    def boom(sequence_name, sequence_params):
+        raise ValueError("bad plate id")
+
+    backend.unpack_sequence = boom
+    _, error = asyncio.run(opx.enqueue_sequence(backend, items[0], fields, {}))
+    assert "bad plate id" in error
+    assert backend.calls == []
+
+
+def test_enqueue_sequence_reports_a_backend_failure():
+    _fresh_libs()
+    backend = LibBackend(fail=True)
+    backend._fail = False
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    backend._fail = True
+    _, error = asyncio.run(opx.enqueue_sequence(backend, items[0], fields, {}))
+    assert error
+
+
+def test_enqueue_sequence_without_a_selection():
+    _, error = asyncio.run(opx.enqueue_sequence(LibBackend(), None, [], {}))
+    assert "no sequence" in error.lower()
+
+
+# -- custom positions --------------------------------------------------------
+
+
+def _pal_cfg(positions):
+    return {
+        "servers": {
+            "MOTOR": {"fast": "galil_motion"},
+            "PAL": {"fast": "pal_server", "params": {"positions": positions}},
+        }
+    }
+
+
+def test_custom_positions_come_from_the_pal_server():
+    cfg = _pal_cfg({"custom": {"cell1": {}, "cell2": {}}})
+    assert opx.custom_positions(cfg) == ["cell1", "cell2"]
+
+
+def test_custom_positions_is_empty_without_a_pal_server():
+    """Most stations have no PAL. The params then render as plain text, which
+    is what the Bokeh operator does with an empty custom-item list."""
+    assert opx.custom_positions({"servers": {"MOTOR": {"fast": "galil_motion"}}}) == []
+
+
+def test_custom_positions_tolerates_a_pal_without_positions():
+    assert opx.custom_positions(_pal_cfg({})) == []
+    assert opx.custom_positions({"servers": {"PAL": {"fast": "pal_server"}}}) == []
+
+
+def test_custom_positions_on_an_empty_config():
+    assert opx.custom_positions({}) == []
+
+
+def test_options_map_names_both_custom_position_params():
+    """Bokeh turns both solid_ and liquid_custom_position into dropdowns off
+    the same list."""
+    mapping = opx.options_map_for(_pal_cfg({"custom": {"cell1": {}}}))
+    assert set(mapping) == {"solid_custom_position", "liquid_custom_position"}
+    assert mapping["solid_custom_position"] == ["cell1"]
+
+
+def test_options_map_is_empty_when_there_are_no_positions():
+    """An empty map is what makes those params fall back to text inputs."""
+    assert opx.options_map_for({"servers": {}}) == {}

@@ -34,7 +34,20 @@ __all__ = [
     "reset_settings",
     "make_backend",
     "session_backend",
+    "align_defaults",
+    "field_kind",
+    "fields_for_item",
+    "flatten_fields",
+    "field_options",
+    "coerce_params",
+    "version_text",
+    "library_items",
+    "item_by_name",
+    "enqueue_sequence",
+    "custom_positions",
+    "options_map_for",
     "OperatorQueueState",
+    "OperatorLibState",
     "SEQ_COLS",
     "EXP_COLS",
     "ACT_COLS",
@@ -587,3 +600,464 @@ class OperatorQueueState(rx.State):
             "experiment": self.exp_rows,
             "action": self.act_rows,
         }.get(kind, [])
+
+
+# -- parameter forms ---------------------------------------------------------
+
+
+def align_defaults(args: list, defaults: list) -> list:
+    """Pad ``defaults`` at the front so it lines up with ``args``.
+
+    Python puts parameters without defaults first, so the shorter defaults
+    list belongs at the *end*. Padding the other end would hand every field
+    its neighbour's default -- which the Bokeh operator avoids the same way.
+    """
+    padded = list(defaults)
+    for _ in range(len(args) - len(padded)):
+        padded.insert(0, "")
+    return padded
+
+
+def field_kind(argtype, options: list) -> str:
+    """Input kind for one parameter: ``select``, ``bool``, ``number``, ``text``.
+
+    ``text`` is the fallback for anything without a usable annotation, and for
+    containers -- a list or dict has no typed input, so it is edited as its
+    repr and parsed back on enqueue, exactly as the Bokeh operator does.
+    """
+    if options:
+        return "select"
+    # bool before int: bool is a subclass of int, so the number test would
+    # claim every checkbox.
+    if argtype is bool:
+        return "bool"
+    if argtype in (int, float):
+        return "number"
+    return "text"
+
+
+def fields_for_item(item: dict, options_map: Optional[dict] = None) -> list:
+    """Describe every input the selected library item needs.
+
+    Args:
+        item: One entry from :func:`param_forms.build_lib`. The framework-
+            injected ``Experiment`` argument is already filtered out there.
+        options_map: Optional ``arg name -> options`` for the parameters that
+            render as a dropdown (the station's custom positions).
+
+    Returns:
+        list[dict]: ``name``, ``kind``, ``default`` (a string, as shown),
+        ``help``, ``options``, and ``argtype`` (kept for coercion, and the
+        reason these are dicts rather than the flattened rows the UI binds).
+    """
+    from helao.core.servers.operator.param_forms import parse_arg_docs
+
+    options_map = options_map or {}
+    args = list(item.get("args") or [])
+    defaults = align_defaults(args, list(item.get("defaults") or []))
+    argtypes = list(item.get("argtypes") or [])
+    descriptions = parse_arg_docs(item.get("doc", ""))
+
+    fields = []
+    for idx, name in enumerate(args):
+        argtype = argtypes[idx] if idx < len(argtypes) else "unspecified"
+        options = [str(o) for o in (options_map.get(name) or [])]
+        shown = str(defaults[idx])
+        kind = field_kind(argtype, options)
+        if kind == "select" and shown not in options:
+            # Bokeh picks the first option rather than leaving a dropdown
+            # displaying a value it cannot offer.
+            shown = options[0]
+        fields.append(
+            {
+                "name": name,
+                "kind": kind,
+                "default": shown,
+                "help": descriptions.get(name, ""),
+                "options": options,
+                "argtype": argtype,
+            }
+        )
+    return fields
+
+
+def flatten_fields(fields: list) -> list:
+    """Flatten field descriptors to the rows the UI iterates.
+
+    ``rx.foreach`` needs a concrete element type and cannot iterate dicts with
+    heterogeneous value types, so the rendered form binds
+    ``list[list[str]]`` -- ``[name, kind, default, help]`` -- while the typed
+    descriptors stay server-side for coercion.
+    """
+    return [[f["name"], f["kind"], f["default"], f["help"]] for f in fields]
+
+
+def field_options(fields: list) -> list:
+    """Dropdown options per field, index-parallel to :func:`flatten_fields`."""
+    return [list(f["options"]) for f in fields]
+
+
+def _to_bool(raw):
+    """Read a checkbox value.
+
+    ``str(False)`` is ``"False"`` and ``bool("False")`` is ``True``, so routing
+    a checkbox through the plain builtin cast inverts every unchecked box.
+    """
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw).strip().lower()
+    if text in ("true", "1", "yes", "on"):
+        return True
+    if text in ("false", "0", "no", "off"):
+        return False
+    raise ValueError(f"'{raw}' is not a yes/no value")
+
+
+def coerce_params(fields: list, values: dict) -> tuple:
+    """Turn entered text into typed parameters.
+
+    Args:
+        fields: Descriptors from :func:`fields_for_item`.
+        values: ``name -> entered value``. A field the operator did not touch
+            falls back to its default.
+
+    Returns:
+        tuple: ``(params, errors)``. A value that will not convert is
+        **reported and omitted from params**, never silently dropped: running
+        a sequence with a default the operator did not choose is worse than
+        not running it, and the caller refuses to enqueue while errors exist.
+    """
+    from helao.core.servers.operator.param_forms import BUILTIN_TYPES
+    from helao.helpers.to_json import parse_bokeh_input
+
+    params = {}
+    errors = []
+    for field in fields:
+        name = field["name"]
+        raw = values.get(name, field["default"])
+        try:
+            if field["kind"] == "bool":
+                params[name] = _to_bool(raw)
+                continue
+            value = parse_bokeh_input(raw) if isinstance(raw, str) else raw
+            argtype = field["argtype"]
+            params[name] = argtype(value) if argtype in BUILTIN_TYPES else value
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+    return params, errors
+
+
+def version_text(item: dict) -> str:
+    """Version and codehash of a library item, as one line of plain text."""
+    from helao.core.servers.operator.param_forms import version_hint_parts
+
+    return " · ".join(version_hint_parts(item))
+
+
+# -- libraries ---------------------------------------------------------------
+
+#: Library kind -> (backend lib attribute, codehash attribute, config section,
+#: name field). The experiment library additionally filters out the framework's
+#: injected ``Experiment`` argument, which is resolved in `library_items`
+#: because importing the model at module scope is not worth the load cost.
+LIBRARY_KINDS = {
+    "sequence": ("sequence_lib", "sequence_codehash", "sequence_params"),
+    "experiment": ("experiment_lib", "experiment_codehash", "experiment_params"),
+}
+
+
+def library_items(backend, kind: str, world_cfg: dict) -> tuple:
+    """Introspect one of the backend's libraries into selectable items.
+
+    Returns:
+        tuple: ``(items, names)``, both empty when there is no backend or the
+        kind is unknown -- the page renders an empty selector rather than
+        failing, since a backend can be absent for a whole poll cycle.
+    """
+    from helao.core.servers.operator.param_forms import LibItem, build_lib
+
+    spec = LIBRARY_KINDS.get(kind)
+    if backend is None or spec is None:
+        if spec is None:
+            LOGGER.warning(f"operator asked for unknown library kind '{kind}'")
+        return [], []
+    lib_attr, hash_attr, config_key = spec
+    filter_type = None
+    if kind == "experiment":
+        from helao.helpers.premodels import Experiment
+
+        filter_type = Experiment
+    try:
+        return build_lib(
+            getattr(backend, lib_attr, {}) or {},
+            filter_type,
+            config_key,
+            world_cfg or {},
+            (world_cfg or {}).get("loaded_config_path", ""),
+            LibItem,
+            f"{kind}_name",
+            codehash_map=getattr(backend, hash_attr, {}) or {},
+        )
+    except Exception as exc:
+        LOGGER.exception(f"operator could not build the {kind} library: {exc}")
+        return [], []
+
+
+def item_by_name(items: list, kind: str, name: str):
+    """Find a library item by its name, or ``None``.
+
+    ``None`` is a real case, not a guard: a library reload can drop the item
+    the selector is still showing.
+    """
+    field = f"{kind}_name"
+    for item in items or []:
+        if item.get(field) == name:
+            return item
+    return None
+
+
+async def enqueue_sequence(
+    backend, item, fields: list, values: dict, label: str = "", campaign: str = ""
+) -> tuple:
+    """Unpack the selected sequence with the entered parameters and enqueue it.
+
+    Returns:
+        tuple: ``(message, error)``. Exactly one is non-empty. Nothing reaches
+        the orchestrator while a parameter will not convert.
+    """
+    from helao.helpers.premodels import Sequence
+
+    if item is None:
+        return "", "no sequence is selected"
+    if backend is None:
+        return "", "no orchestrator connection"
+    name = item.get("sequence_name", "")
+    params, errors = coerce_params(fields, values)
+    if errors:
+        return "", "; ".join(errors)
+    try:
+        planned = backend.unpack_sequence(sequence_name=name, sequence_params=params)
+    except Exception as exc:
+        # Named, because the alternative the operator sees is a button that
+        # does nothing.
+        LOGGER.exception(f"operator could not unpack sequence '{name}': {exc}")
+        return "", f"{name} could not be unpacked: {exc}"
+    sequence = Sequence(
+        sequence_name=name,
+        sequence_params=params,
+        sequence_label=label or None,
+        planned_experiments=planned,
+    )
+    if campaign:
+        sequence.campaign_name = campaign
+    try:
+        await backend.add_sequence(sequence)
+    except Exception as exc:
+        LOGGER.warning(f"operator could not enqueue sequence '{name}': {exc}")
+        return "", f"{name} could not be enqueued: {exc}"
+    return f"enqueued {name} ({len(planned)} experiment(s))", ""
+
+
+#: Parameters the Bokeh operator renders as a dropdown of the PAL's configured
+#: custom positions. Both read the same list.
+CUSTOM_POSITION_PARAMS = ("solid_custom_position", "liquid_custom_position")
+
+
+def custom_positions(world_cfg: dict) -> list:
+    """Names of the PAL server's configured custom positions.
+
+    Empty for a station with no PAL, which is most of them -- those params
+    then render as plain text, exactly as they do in the Bokeh operator when
+    its custom-item list is empty.
+    """
+    servers = (world_cfg or {}).get("servers") or {}
+    for config in servers.values():
+        if (config or {}).get("fast", "") != "pal_server":
+            continue
+        positions = ((config.get("params") or {}).get("positions") or {}).get(
+            "custom", {}
+        )
+        return list(positions)
+    return []
+
+
+def options_map_for(world_cfg: dict) -> dict:
+    """Dropdown options keyed by parameter name, for :func:`fields_for_item`."""
+    positions = custom_positions(world_cfg)
+    if not positions:
+        return {}
+    return {name: list(positions) for name in CUSTOM_POSITION_PARAMS}
+
+
+class OperatorLibState(rx.State):
+    """Library selection and the dynamic parameter form.
+
+    Separate from :class:`OperatorQueueState` on purpose: Reflex re-renders
+    every component bound to a state when any of its vars change, and a
+    keystroke in a parameter field would otherwise re-push all four queue
+    tables.
+
+    Entered values live in ``_values``, keyed by ``(kind, item name)``, so
+    switching tabs or items and coming back does not silently discard what was
+    typed.
+    """
+
+    mode: str = "sequence"
+    seq_names: list[str] = []
+    exp_names: list[str] = []
+    selected_sequence: str = ""
+    selected_experiment: str = ""
+
+    #: ``[name, kind, current value, help]`` per field. Flattened to strings
+    #: because rx.foreach needs a concrete element type and cannot iterate
+    #: heterogeneous dicts.
+    param_rows: list[list[str]] = []
+    #: Options for every ``select`` field. One list serves them all: the only
+    #: dropdown params are the two custom positions, and both read the PAL's
+    #: single list.
+    position_options: list[str] = []
+
+    doc: str = ""
+    version_hint: str = ""
+    sequence_label: str = ""
+    campaign_name: str = ""
+    status: str = ""
+    error: str = ""
+
+    #: Typed field descriptors and entered values, server-side only.
+    _fields: list = []
+    _values: dict = {}
+    _items: dict = {}
+
+    @rx.var
+    def selected_name(self) -> str:
+        """Name selected in the active tab."""
+        return (
+            self.selected_sequence
+            if self.mode == "sequence"
+            else self.selected_experiment
+        )
+
+    @rx.var
+    def item_names(self) -> list[str]:
+        """Selectable names for the active tab."""
+        return self.seq_names if self.mode == "sequence" else self.exp_names
+
+    def _world_cfg(self) -> dict:
+        with _SETTINGS_LOCK:
+            return _SETTINGS.get("world_cfg") or {}
+
+    def _select(self, kind: str, name: str) -> None:
+        """Rebuild the form for one library item."""
+        item = item_by_name(self._items.get(kind, []), kind, name)
+        if item is None:
+            self._fields = []
+            self.param_rows = []
+            self.doc = ""
+            self.version_hint = ""
+            return
+        world_cfg = self._world_cfg()
+        self._fields = fields_for_item(item, options_map_for(world_cfg))
+        entered = self._values.get((kind, name), {})
+        self.param_rows = [
+            [f["name"], f["kind"], entered.get(f["name"], f["default"]), f["help"]]
+            for f in self._fields
+        ]
+        self.doc = item.get("doc", "")
+        self.version_hint = version_text(item)
+
+    @rx.event(background=True)
+    async def load_libraries(self):
+        """Introspect both libraries off the backend.
+
+        Background because the first call imports every experiment and
+        sequence module the config names, which on a station takes seconds.
+        """
+        async with self:
+            token = self.router.session.client_token
+            world_cfg = self._world_cfg()
+        backend = session_backend(token)
+        libraries = {
+            kind: library_items(backend, kind, world_cfg)
+            for kind in ("sequence", "experiment")
+        }
+        async with self:
+            self._items = {kind: items for kind, (items, _) in libraries.items()}
+            self.seq_names = libraries["sequence"][1]
+            self.exp_names = libraries["experiment"][1]
+            self.position_options = custom_positions(world_cfg)
+            if self.seq_names and self.selected_sequence not in self.seq_names:
+                self.selected_sequence = self.seq_names[0]
+            if self.exp_names and self.selected_experiment not in self.exp_names:
+                self.selected_experiment = self.exp_names[0]
+            self._select(self.mode, self.selected_name)
+            if not self.seq_names and not self.exp_names:
+                self.error = "no sequence or experiment library is loaded"
+
+    @rx.event
+    def set_mode(self, mode: str):
+        """Switch between the sequence and experiment tabs."""
+        if mode not in LIBRARY_KINDS:
+            return
+        self.mode = mode
+        self._select(mode, self.selected_name)
+
+    @rx.event
+    def select_item(self, name: str):
+        """Choose a library item in the active tab."""
+        if self.mode == "sequence":
+            self.selected_sequence = name
+        else:
+            self.selected_experiment = name
+        self._select(self.mode, name)
+
+    @rx.event
+    def set_param(self, name: str, value: str):
+        """Record one edited parameter.
+
+        Kept in ``_values`` as well as the rendered row so the entry survives
+        switching items or tabs and switching back.
+        """
+        key = (self.mode, self.selected_name)
+        entered = dict(self._values.get(key, {}))
+        entered[name] = value
+        self._values = {**self._values, key: entered}
+        self.param_rows = [
+            [row[0], row[1], value, row[3]] if row[0] == name else row
+            for row in self.param_rows
+        ]
+
+    @rx.event
+    def reset_params(self):
+        """Drop every edit and return the form to the library defaults."""
+        self._values = {
+            k: v
+            for k, v in self._values.items()
+            if k != (self.mode, self.selected_name)
+        }
+        self._select(self.mode, self.selected_name)
+
+    @rx.event(background=True)
+    async def enqueue(self):
+        """Enqueue the selected sequence with the entered parameters."""
+        async with self:
+            token = self.router.session.client_token
+            kind, name = self.mode, self.selected_name
+            item = item_by_name(self._items.get(kind, []), kind, name)
+            fields = list(self._fields)
+            values = dict(self._values.get((kind, name), {}))
+            label, campaign = self.sequence_label, self.campaign_name
+            self.status = ""
+            self.error = ""
+        if kind != "sequence":
+            # Experiments reach the orchestrator inside a sequence; the plan
+            # tab builds that, so enqueueing one directly is not offered.
+            async with self:
+                self.error = "select a sequence to enqueue"
+            return
+        message, error = await enqueue_sequence(
+            session_backend(token), item, fields, values, label=label, campaign=campaign
+        )
+        async with self:
+            self.status = message
+            self.error = error
