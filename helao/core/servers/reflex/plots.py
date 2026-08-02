@@ -14,6 +14,7 @@ __all__ = [
     "PlotBackendError",
     "STORE",
     "ChartPayload",
+    "layout_token",
     "chart",
     "time_series",
     "spectra",
@@ -82,10 +83,32 @@ class ChartPayload:
     Attributes:
         spec: Small data-less chart spec. Rides a Reflex var.
         buffer_url: Route the browser fetches column buffers from.
+        layout: Token identifying the trace set. A change means the chart must
+            be rebuilt rather than updated in place.
     """
 
     spec: dict
     buffer_url: str
+    layout: str
+
+
+def layout_token(spec: dict) -> str:
+    """Summarize a spec's trace set as a short stable string.
+
+    xy's in-place update path swaps column buffers for existing traces; it
+    cannot add or remove one. A live HELAO stream does exactly that -- a
+    simulator starts publishing ``series_4`` and the panel gains a line -- so
+    the browser needs to know when an update is no longer applicable and the
+    view has to be rebuilt from scratch.
+
+    Args:
+        spec: A spec from ``Figure.build_payload_split``.
+
+    Returns:
+        str: Equal for two specs with the same traces in the same order.
+    """
+    traces = spec.get("traces") or []
+    return "|".join(f"{t.get('id')}:{t.get('kind')}:{t.get('name')}" for t in traces)
 
 
 def _publish(figure, panel_id: str, version: int) -> ChartPayload:
@@ -104,23 +127,40 @@ def _publish(figure, panel_id: str, version: int) -> ChartPayload:
         ChartPayload: Assign this into the panel's state vars.
     """
     spec, buffers = figure.figure().build_payload_split()
+    # The browser applies an update only when ``spec.append.seq`` advances:
+    # xy's change handler starts with `if (!spec.append) return`, and
+    # ``build_payload_split`` leaves ``append`` unset. Without this the chart
+    # paints its first frame and then never moves again, however often the
+    # buffers change.
+    #
+    # Declaring every trace affected is correct here because these payloads
+    # carry full canonical columns, exactly like the ones ``Figure.append``
+    # emits -- xy's own streaming path re-sends whole columns rather than
+    # deltas, and the client replaces the affected traces' data with them.
+    spec["append"] = {
+        "seq": int(version),
+        "affected": [t.get("id") for t in (spec.get("traces") or [])],
+    }
     STORE.put(panel_id, version, buffers)
     return ChartPayload(
         spec=spec,
         buffer_url=f"{BUFFER_ROUTE_PREFIX}/{panel_id}?v={version}",
+        layout=layout_token(spec),
     )
 
 
-def chart(spec_var, url_var, *, height: int = 320, on_select=None):
-    """Bind a chart component to two Reflex state vars.
+def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
+    """Bind a chart component to three Reflex state vars.
 
     Called once from a panel's ``build``. The panel's ``pull`` then assigns
-    fresh :class:`ChartPayload` values into ``spec_var`` and ``url_var``, and
-    the browser follows.
+    fresh :class:`ChartPayload` values into the three vars, and the browser
+    follows.
 
     Args:
         spec_var: Reflex var holding :attr:`ChartPayload.spec`.
         url_var: Reflex var holding :attr:`ChartPayload.buffer_url`.
+        layout_var: Reflex var holding :attr:`ChartPayload.layout`. When it
+            changes the browser rebuilds the chart instead of updating it.
         height: Chart height in pixels.
         on_select: Optional Reflex event handler for selection.
 
@@ -130,6 +170,7 @@ def chart(spec_var, url_var, *, height: int = 320, on_select=None):
     return xy_chart(
         spec=spec_var,
         buffer_url=url_var,
+        layout=layout_var,
         height=f"{height}px",
         on_select=on_select,
     )

@@ -16,14 +16,52 @@ from helao.core.servers.reflex.state import (
 
 
 def test_live_and_action_bases_carry_the_right_ws_path():
-    assert LiveVisState.ws_path_default == "ws_live"
-    assert ActionVisState.ws_path_default == "ws_data"
+    assert LiveVisState.__fields__["ws_path"].default == "ws_live"
+    assert ActionVisState.__fields__["ws_path"].default == "ws_data"
+
+
+def test_panel_bases_are_mixins_so_their_vars_are_not_shared():
+    """The bug this guards: a var declared on a concrete rx.State is owned by
+    that class and shared by every substate under it. Reads route to the
+    ancestor's single copy, so make_panel_state's server_key binding was
+    ignored at runtime (every panel saw "") and two panels on one page shared
+    one connection/window_points/chart_spec."""
+    for base in (VisPanelState, LiveVisState, ActionVisState):
+        assert getattr(base, "_mixin", False), f"{base.__name__} must be a mixin"
+
+
+def test_make_panel_state_rejects_a_concrete_base():
+    import reflex as rx
+
+    class Concrete(rx.State):
+        server_key: str = ""
+
+    with pytest.raises(TypeError, match="mixin=True"):
+        make_panel_state("bad_panel", "SIM", Concrete, "ws_live")
 
 
 def test_make_panel_state_bakes_in_the_server_key():
     cls = make_panel_state("wssim_panel", "SIM", LiveVisState, "ws_live")
-    assert cls.server_key_default == "SIM"
-    assert cls.ws_path_default == "ws_live"
+    assert cls.__fields__["server_key"].default == "SIM"
+    assert cls.__fields__["ws_path"].default == "ws_live"
+
+
+def test_generated_state_owns_its_vars_rather_than_inheriting_them():
+    """The decisive check: an inherited var reads the ancestor's single value,
+    so the bound server_key would come back "" no matter what default the leaf
+    declares. Owning the var is what makes the binding take effect."""
+    cls = make_panel_state("wssim_panel", "SIM_OWN", LiveVisState, "ws_live")
+    for name in ("server_key", "ws_path", "connection", "window_points"):
+        assert name in cls.vars
+        assert name not in cls.inherited_vars, f"'{name}' is shared across panels"
+
+
+def test_two_generated_states_do_not_share_var_storage():
+    a = make_panel_state("wssim_panel", "SIM_X", LiveVisState, "ws_live")
+    b = make_panel_state("wssim_panel", "SIM_Y", LiveVisState, "ws_live")
+    assert a.get_full_name() != b.get_full_name()
+    assert a.__fields__["server_key"].default == "SIM_X"
+    assert b.__fields__["server_key"].default == "SIM_Y"
 
 
 def test_make_panel_state_names_classes_uniquely():
@@ -149,9 +187,8 @@ def test_apply_tick_catches_a_failing_pull_so_the_loop_survives():
 def test_make_panel_state_keys_the_cache_on_the_base_class_not_its_name():
     """Two modules may define same-named bases; a name key would collide."""
 
-    class LiveVisState(VisPanelState):  # deliberately shadows the real name
+    class LiveVisState(VisPanelState, mixin=True):  # type: ignore[call-arg]  # shadows
         ws_path: str = "ws_live"
-        ws_path_default: str = "ws_live"
 
     from helao.core.servers.reflex import state as state_mod
 
@@ -385,3 +422,17 @@ def test_gpsim_passes_raw_samples_to_the_facade_not_prebinned_data():
     src = inspect.getsource(gpsim_panel)
     assert "plots.histogram" in src
     assert "np.histogram" not in src
+
+
+def test_generated_state_class_is_picklable():
+    """Reflex serializes state for persistence. A type()-built class that is
+    not published under its own name is unreachable to pickle, and the backend
+    logged a StateSerializationError per panel per tick -- harmless under the
+    in-memory state manager, fatal to a disk- or Redis-backed one, and enough
+    noise to bury real errors either way."""
+    import pickle
+    import sys
+
+    cls = make_panel_state("wssim_panel", "SIM_PICKLE", LiveVisState, "ws_live")
+    assert getattr(sys.modules[cls.__module__], cls.__name__, None) is cls
+    assert pickle.loads(pickle.dumps(cls)) is cls

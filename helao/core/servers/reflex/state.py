@@ -10,6 +10,17 @@ assigns the panel's own state vars.
 Reflex requires ``State`` subclasses to be real classes, so a panel cannot be
 bound to a runtime ``server_key`` by instantiation. :func:`make_panel_state`
 mints one cached subclass per ``(module_name, server_key)`` instead.
+
+**Everything here is a Reflex mixin, and that is load-bearing.** A var declared
+on a real ``rx.State`` is owned by that class and *shared* by every substate
+below it: a subclass that re-declares it does not shadow it, and reads route to
+the ancestor's single stored value. Written as plain inheritance, this module
+shipped two bugs at once -- ``server_key`` bound by :func:`make_panel_state`
+read back as ``""`` at runtime (so no panel could find its ingest), and two
+panels on one page shared one ``connection``, ``window_points``, ``chart_spec``.
+Declaring these classes with ``mixin=True`` makes Reflex *copy* the vars and
+event handlers into each generated leaf state, which is the per-panel isolation
+the design assumes.
 """
 
 __all__ = [
@@ -23,6 +34,7 @@ __all__ = [
 ]
 
 import asyncio
+import sys
 
 import reflex as rx
 
@@ -108,8 +120,12 @@ def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
         LOGGER.warning(f"reflex panel pull failed for {server_key}: {exc}")
 
 
-class VisPanelState(rx.State):
+class VisPanelState(rx.State, mixin=True):
     """Base state for a visualizer panel bound to one ingest target.
+
+    A mixin, not a state: see this module's docstring. Panels subclass it with
+    ``mixin=True`` too, and :func:`make_panel_state` turns the chain into a
+    real state exactly once, at the leaf.
 
     Attributes:
         server_key: Action server this panel reads.
@@ -135,12 +151,6 @@ class VisPanelState(rx.State):
     #: invocation continue", and those answers differ during a
     #: stop-then-immediate-restart.
     loop_generation: int = 0
-
-    # Class-level defaults readable without instantiating a State. Reflex
-    # manages the vars above per session; these mirror the bound values so
-    # app-build code and tests can introspect them.
-    server_key_default: str = ""
-    ws_path_default: str = "ws_live"
 
     @staticmethod
     def clamp_window_points(value, fallback=None) -> int:
@@ -191,7 +201,7 @@ class VisPanelState(rx.State):
         registry = get_registry()
         if registry is None:
             return None
-        return registry.get(self.server_key or self.server_key_default, self.ws_path)
+        return registry.get(self.server_key, self.ws_path)
 
     def panel_key(self) -> str:
         """Return this panel's buffer-store key for the current session.
@@ -203,7 +213,7 @@ class VisPanelState(rx.State):
         ``self.router.session.client_token``; this base implementation is only
         a fallback so :meth:`stop_loop` always has something to drop.
         """
-        return f"{self.server_key_default}-{self.router.session.client_token}"
+        return f"{self.server_key}-{self.router.session.client_token}"
 
     def pull(self, ingest) -> None:
         """Copy data from ``ingest`` into this panel's state vars.
@@ -240,7 +250,7 @@ class VisPanelState(rx.State):
                     apply_tick(
                         self,
                         ingest,
-                        server_key=self.server_key or self.server_key_default,
+                        server_key=self.server_key,
                         ws_path=self.ws_path,
                     )
                     interval = self.update_rate
@@ -266,27 +276,37 @@ class VisPanelState(rx.State):
         plots.STORE.drop(self.panel_key())
 
 
-class LiveVisState(VisPanelState):
+class LiveVisState(VisPanelState, mixin=True):
     """Panel state for continuous sensor telemetry (``ws_live``)."""
 
     ws_path: str = "ws_live"
-    ws_path_default: str = "ws_live"
     update_rate: float = 0.5
 
 
-class ActionVisState(VisPanelState):
+class ActionVisState(VisPanelState, mixin=True):
     """Panel state for per-action measurement packages (``ws_data``)."""
 
     ws_path: str = "ws_data"
-    ws_path_default: str = "ws_data"
     update_rate: float = 0.25
 
 
 _STATE_CACHE: dict = {}
 
+#: Generated class-name occupancy, so two distinct cache keys cannot mint two
+#: Reflex substates under the same name.
+_NAME_SEQ: dict = {}
+
 
 def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str):
-    """Mint (or return the cached) State subclass bound to one ingest target.
+    """Mint (or return the cached) State class bound to one ingest target.
+
+    ``base`` must be a Reflex *mixin* (``class ...(LiveVisState, mixin=True)``).
+    This is the one place the mixin chain becomes a real ``rx.State``, and it
+    has to stay that way: Reflex vars are owned by the class that declares them
+    and shared by every substate beneath it, so a panel whose vars came from a
+    concrete ancestor would read that ancestor's single copy -- ``server_key``
+    would come back ``""`` and every panel on the page would share one
+    ``chart_spec``. Mixin vars are copied into each leaf instead.
 
     Reflex rejects duplicate State class names, so results are cached by
     ``(module_name, server_key, base)`` and a re-render reuses the same class.
@@ -294,12 +314,22 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
     Args:
         module_name: Panel module short name, e.g. ``"wssim_panel"``.
         server_key: Action server this panel reads.
-        base: The :class:`VisPanelState` subclass to extend.
+        base: The :class:`VisPanelState` mixin subclass to build from.
         ws_path: ``ws_live`` or ``ws_data``.
 
     Returns:
-        type: A ``base`` subclass with ``server_key`` and ``ws_path`` bound.
+        type: An ``rx.State`` subclass with ``server_key`` and ``ws_path`` bound.
+
+    Raises:
+        TypeError: If ``base`` is a concrete state rather than a mixin, which
+            would silently produce shared vars.
     """
+    if not getattr(base, "_mixin", False):
+        raise TypeError(
+            f"panel state base '{base.__name__}' must be declared with "
+            "mixin=True; a concrete rx.State base makes every panel share one "
+            "copy of each var, so server_key reads back empty."
+        )
     # Keyed on the base class itself, not its __name__: two panel modules can
     # each define a same-named subclass, and a name collision would silently
     # hand one panel another's state class.
@@ -307,9 +337,19 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
     if cache_key in _STATE_CACHE:
         return _STATE_CACHE[cache_key]
     safe = "".join(c if c.isalnum() else "_" for c in f"{module_name}_{server_key}")
+    # Every generated state is a direct substate of rx.State, and Reflex
+    # rejects two substates sharing a name ("Shadowing substate classes is not
+    # allowed") -- a hard error at class creation, not a subtle one. Distinct
+    # cache keys can still reduce to the same safe name (same module and server
+    # key, different base), so uniqueness is enforced here rather than assumed.
+    _NAME_SEQ[safe] = _NAME_SEQ.get(safe, 0) + 1
+    if _NAME_SEQ[safe] > 1:
+        safe = f"{safe}_{_NAME_SEQ[safe]}"
     cls = type(
         f"{safe}_State",
-        (base,),
+        # rx.State last: `base` is a mixin, so this is where the chain first
+        # becomes a real state and where every mixin var is materialized.
+        (base, rx.State),
         {
             # Reflex's ``StateBase`` metaclass resolves field annotations via
             # ``sys.modules[namespace["__module__"]]``, so the key must exist
@@ -318,15 +358,24 @@ def make_panel_state(module_name: str, server_key: str, base: type, ws_path: str
             # any future string/forward-ref annotation resolves against real
             # globals instead of failing a lookup against a made-up name.
             "__module__": __name__,
+            # Plain overrides of mixin var defaults. This works only because
+            # the vars land on *this* class; against a concrete base they would
+            # be inherited vars and the assignment would be ignored at runtime.
             "server_key": server_key,
             "ws_path": ws_path,
-            "server_key_default": server_key,
-            "ws_path_default": ws_path,
             "__doc__": (
                 f"Generated panel state binding '{module_name}' to server "
                 f"'{server_key}' on '{ws_path}'."
             ),
         },
     )
+    # Publish the class as a module attribute under its own name. It is built
+    # by type() and claims this module, so without this pickle cannot find it:
+    # Reflex serializes state for persistence and logged a wall of
+    #   StateSerializationError: ... due to unpicklable object.
+    #   This state will not be persisted.
+    # per tick, one per panel. Harmless with the in-memory state manager, fatal
+    # to any disk- or Redis-backed one -- and the noise buries real errors.
+    setattr(sys.modules[__name__], cls.__name__, cls)
     _STATE_CACHE[cache_key] = cls
     return cls

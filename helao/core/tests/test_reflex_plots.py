@@ -121,8 +121,41 @@ def test_chart_binds_to_state_vars_and_returns_a_component():
     class _S(rx.State):
         chart_spec: dict = {}
         chart_url: str = ""
+        chart_layout: str = ""
 
-    assert plots.chart(_S.chart_spec, _S.chart_url, height=300) is not None
+    component = plots.chart(_S.chart_spec, _S.chart_url, _S.chart_layout, height=300)
+    assert component is not None
+
+
+def test_published_specs_carry_an_advancing_append_token():
+    """The freeze this guards: xy's update handler bails on `if (!spec.append)`,
+    and build_payload_split leaves append unset. Without it the chart paints one
+    frame and never moves again, however often the buffers change."""
+    t = np.linspace(0.0, 1.0, 5)
+    first = plots.time_series(t, {"a": t}, panel_id="p-seq", version=1)
+    second = plots.time_series(t, {"a": t}, panel_id="p-seq", version=2)
+    assert first.spec["append"]["seq"] == 1
+    assert second.spec["append"]["seq"] == 2
+
+
+def test_append_marks_every_trace_affected():
+    """These payloads carry full canonical columns for all traces, exactly like
+    the ones xy's own Figure.append emits, so all of them are replaceable."""
+    t = np.linspace(0.0, 1.0, 5)
+    payload = plots.time_series(t, {"a": t, "b": t * 2}, panel_id="p-aff", version=1)
+    trace_ids = [trace["id"] for trace in payload.spec["traces"]]
+    assert payload.spec["append"]["affected"] == trace_ids
+    assert len(trace_ids) == 2
+
+
+def test_layout_token_changes_when_a_series_appears():
+    """A trace added cannot be applied in place; the browser must rebuild."""
+    t = np.linspace(0.0, 1.0, 5)
+    one = plots.time_series(t, {"a": t}, panel_id="p-lay", version=1)
+    two = plots.time_series(t, {"a": t, "b": t}, panel_id="p-lay", version=2)
+    again = plots.time_series(t, {"a": t}, panel_id="p-lay", version=3)
+    assert one.layout != two.layout
+    assert one.layout == again.layout
 
 
 def test_facade_exposes_exactly_the_documented_surface():

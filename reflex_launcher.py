@@ -197,13 +197,64 @@ def wait_for_backend(process, host: str, port: int, timeout: float) -> str:
     )
 
 
+def _buffer_proxy(backend_host: str, target_port: int):
+    """Build the handler that relays chart-buffer requests to the backend.
+
+    The chart buffer route is registered on the Reflex *backend*, but the page
+    is served from the frontend port, and the browser resolves the relative
+    URL in the chart payload against the page's own origin. Every fetch
+    therefore landed on the static server and 404'd, leaving a mounted-but-
+    never-painted chart while the state stream itself looked perfectly healthy.
+
+    Proxying rather than emitting an absolute backend URL keeps the request
+    same-origin (no CORS on a route that carries raw binary) and keeps the
+    payload free of any build-time host baking. The hop is loopback.
+
+    Args:
+        backend_host: Host the Reflex backend listens on.
+        target_port: The backend's port.
+
+    Returns:
+        An ASGI endpoint suitable for ``add_route``.
+    """
+    import httpx
+    from starlette.responses import Response as StarletteResponse
+
+    base = f"http://{backend_host}:{target_port}"
+
+    async def relay(request):
+        url = f"{base}{request.url.path}"
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                upstream = await client.get(url, params=dict(request.query_params))
+        except httpx.HTTPError as exc:
+            # The chart keeps its last good frame on a non-200, so a backend
+            # blip degrades to a stale chart rather than a blank one.
+            return StarletteResponse(f"buffer backend unreachable: {exc}", 502)
+        return StarletteResponse(
+            content=upstream.content,
+            status_code=upstream.status_code,
+            media_type=upstream.headers.get("content-type"),
+        )
+
+    return relay
+
+
 def _serve_frontend(bundle_dir: str, host: str, port: int):
     """Serve the exported static frontend. Blocks until interrupted."""
     import uvicorn
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles
 
+    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+
     static_app = FastAPI()
+    static_app.add_route(
+        f"{BUFFER_ROUTE_PREFIX}/{{panel_id}}",
+        _buffer_proxy(host, backend_port(port)),
+        methods=["GET"],
+    )
+    # Mounted last: StaticFiles at "/" swallows every path below it.
     static_app.mount("/", StaticFiles(directory=bundle_dir, html=True), name="frontend")
     uvicorn.run(
         static_app,

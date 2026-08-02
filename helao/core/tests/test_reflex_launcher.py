@@ -1,6 +1,9 @@
 """Unit tests for reflex_launcher's pure helpers."""
 
 import os
+import socket
+import tempfile
+import time
 
 import pytest
 
@@ -257,3 +260,99 @@ def test_launch_py_has_a_reflex_branch():
     src = inspect.getsource(launch.launch_server_groups)
     assert 'codeKey == "reflex"' in src
     assert "reflex_launcher.py" in src
+
+
+def test_frontend_proxies_the_buffer_route_to_the_backend():
+    """The blank-chart bug this guards, seen in a live browser.
+
+    The chart-buffer route lives on the Reflex backend (port + 1), but pages
+    are served from the frontend port, and the browser resolves the payload's
+    relative URL against the page origin. Every fetch hit the static server and
+    404'd, so the chart mounted and never painted -- while the state stream
+    looked entirely healthy, latest-value table and all.
+    """
+    import threading
+
+    import uvicorn
+    from fastapi import FastAPI
+    from fastapi.responses import Response
+    from fastapi.testclient import TestClient
+    from fastapi.staticfiles import StaticFiles
+
+    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+
+    backend = FastAPI()
+
+    @backend.get(f"{BUFFER_ROUTE_PREFIX}/{{panel_id}}")
+    async def buffers(panel_id: str, v: int):
+        if v != 7:
+            return Response(status_code=404)
+        return Response(
+            content=b"FRAME" + panel_id.encode(),
+            media_type="application/octet-stream",
+        )
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        backend_free = probe.getsockname()[1]
+
+    server = uvicorn.Server(
+        uvicorn.Config(backend, host="127.0.0.1", port=backend_free, log_level="error")
+    )
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    try:
+        for _ in range(100):
+            if server.started:
+                break
+            time.sleep(0.05)
+        assert server.started, "test backend never started"
+
+        # _serve_frontend blocks on uvicorn.run, so its route wiring is
+        # reproduced here against the same _buffer_proxy the launcher installs.
+        front = FastAPI()
+        front.add_route(
+            f"{BUFFER_ROUTE_PREFIX}/{{panel_id}}",
+            rl._buffer_proxy("127.0.0.1", backend_free),
+            methods=["GET"],
+        )
+        with tempfile.TemporaryDirectory() as bundle:
+            with open(os.path.join(bundle, "index.html"), "w") as fh:
+                fh.write("<html></html>")
+            front.mount("/", StaticFiles(directory=bundle, html=True), name="frontend")
+
+            client = TestClient(front)
+            ok = client.get(f"{BUFFER_ROUTE_PREFIX}/panel-x?v=7")
+            assert ok.status_code == 200, "buffer route did not reach the backend"
+            assert ok.content == b"FRAMEpanel-x"
+            assert ok.headers["content-type"] == "application/octet-stream"
+            # A stale version must still 404 through, not become a 200.
+            assert client.get(f"{BUFFER_ROUTE_PREFIX}/panel-x?v=6").status_code == 404
+            # The static mount still serves the app.
+            assert client.get("/").status_code == 200
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+
+
+def test_buffer_proxy_reports_a_dead_backend_as_502():
+    """A 502 keeps the chart on its last good frame; a raised exception would
+    surface as an opaque 500 and tell nobody which side failed."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        dead_port = probe.getsockname()[1]
+
+    front = FastAPI()
+    front.add_route(
+        f"{BUFFER_ROUTE_PREFIX}/{{panel_id}}",
+        rl._buffer_proxy("127.0.0.1", dead_port),
+        methods=["GET"],
+    )
+    resp = TestClient(front).get(f"{BUFFER_ROUTE_PREFIX}/panel-x?v=1")
+    assert resp.status_code == 502
+    assert "unreachable" in resp.text

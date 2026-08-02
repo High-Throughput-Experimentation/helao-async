@@ -125,7 +125,9 @@ def test_copy_client_asset_is_idempotent(tmp_path):
 
 
 def test_xy_chart_builds_a_component():
-    comp = xc.xy_chart(spec={}, buffer_url="/xy/buffers/x?v=0", height="320px")
+    comp = xc.xy_chart(
+        spec={}, buffer_url="/xy/buffers/x?v=0", layout="", height="320px"
+    )
     assert comp is not None
 
 
@@ -145,7 +147,7 @@ def test_xy_chart_touches_the_bundle_only_on_the_client():
     assert "import(" not in before_effect, "bundle imported outside useEffect"
     assert "import(" in after_effect and "clientUrl" in after_effect
     assert "xy-client" in after_effect
-    assert "mod.render(" in after_effect
+    assert "st.attach(mod" in after_effect
 
 
 def test_shim_declares_the_six_model_members_the_bundle_requires():
@@ -186,6 +188,18 @@ globalThis.fetch = async (url) => {
   return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
 };
 
+// Stand-in for the xy bundle. `render` records the buffers it was handed at
+// mount time, which is what the null-payload crash was about.
+const renders = [];
+let destroyed = 0;
+const fakeModule = {
+  decodeFrame: (raw) => ({ message: {}, buffers: ["colX", "colY"], byteLength: 8 }),
+  render: ({ model, el }) => {
+    renders.push(model.get("buffers"));
+    return () => { destroyed += 1; };
+  },
+};
+
 const events = [];
 const st = createController({ spec: {v: 1}, onSelect: null });
 st.model.on("change:spec", () => events.push("spec"));
@@ -193,12 +207,20 @@ st.model.on("change:buffers", () => events.push("buffers"));
 
 const out = {};
 (async () => {
-  // Queued before the bundle is ready, then flushed on markReady.
+  // Queued before the bundle lands: decodeFrame lives in it, so nothing can
+  // be fetched yet.
   await st.refetch("/xy/buffers/p?v=1");
-  out.queuedWhileNotReady = calls.length === 0 && st.pending === true;
-  st.markReady();
+  out.queuedBeforeAttach = calls.length === 0 && st.pendingUrl === "/xy/buffers/p?v=1";
+  out.notMountedBeforeAttach = renders.length === 0;
+
+  st.attach(fakeModule, {});
   await new Promise((r) => setTimeout(r, 0));
   out.flushedPendingUrl = calls[0];
+
+  // render() must not have run until a payload existed: it decodes
+  // model.get("buffers") synchronously and throws TypeError on null.
+  out.renderCount = renders.length;
+  out.mountedWithBuffers = renders[0];
 
   // The bug this guards: a later call must use the URL it is given.
   await st.refetch("/xy/buffers/p?v=2");
@@ -206,7 +228,7 @@ const out = {};
   out.lastFetched = calls[calls.length - 1];
   out.allUrls = calls.slice();
 
-  // Both change events fire per successful refetch (the in-place append path).
+  // Both change events fire per post-mount refetch (the in-place append path).
   out.events = events.slice();
 
   // A failed fetch keeps the previous frame rather than blanking it.
@@ -222,6 +244,14 @@ const out = {};
   received = null;
   st.model.send({ type: "hover" });
   out.nonSelectIgnored = received === null;
+
+  // A trace added or removed cannot be applied in place; the view is rebuilt.
+  st.applyLayout("0:line:a");
+  out.sameLayoutKeepsView = destroyed === 0 && st.mounted === true;
+  st.applyLayout("0:line:a|1:line:b");
+  out.layoutChangeTearsDown = destroyed === 1 && st.mounted === false;
+  await st.refetch("/xy/buffers/p?v=4");
+  out.remountedAfterLayoutChange = renders.length === 2;
 
   console.log(JSON.stringify(out));
 })();
@@ -262,16 +292,55 @@ def test_controller_refetch_uses_the_url_it_is_given_not_a_captured_one():
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
 def test_controller_queues_a_refetch_until_the_bundle_is_ready():
     out = _run_controller_harness()
-    assert out["queuedWhileNotReady"] is True
+    assert out["queuedBeforeAttach"] is True
     assert out["flushedPendingUrl"] == "/xy/buffers/p?v=1"
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_does_not_render_before_a_payload_exists():
+    """The crash this guards, reported from a live browser:
+
+        TypeError: chart payload must be an ArrayBuffer or ArrayBuffer view
+
+    xy's render() decodes model.get("buffers") synchronously, so mounting it
+    with a null payload throws and the panel never appears. Mounting has to
+    wait for the first frame rather than fetch after the fact.
+    """
+    out = _run_controller_harness()
+    assert out["notMountedBeforeAttach"] is True
+    assert out["renderCount"] == 1
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_hands_the_renderer_the_buffer_list_not_the_frame_wrapper():
+    """decodeFrame returns {message, buffers, version, byteLength}.
+
+    A split-layout spec indexes columns into a buffer LIST, so passing the
+    wrapper object fails xy's split check outright.
+    """
+    out = _run_controller_harness()
+    assert out["mountedWithBuffers"] == ["colX", "colY"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_rebuilds_the_view_when_the_trace_set_changes():
+    """xy's update path swaps columns for traces the view already has; it
+    cannot add or remove one. A live stream gaining a series must therefore
+    rebuild, not update."""
+    out = _run_controller_harness()
+    assert out["sameLayoutKeepsView"] is True
+    assert out["layoutChangeTearsDown"] is True
+    assert out["remountedAfterLayoutChange"] is True
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
 def test_controller_fires_both_change_events_per_successful_refetch():
     """The bundle's in-place append path listens for each event separately."""
     out = _run_controller_harness()
-    assert out["events"].count("spec") == 3
-    assert out["events"].count("buffers") == 3
+    # Three fetches follow the mount; the mounting fetch itself paints
+    # through render() rather than through the change events.
+    assert out["events"].count("spec") == 2
+    assert out["events"].count("buffers") == 2
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")

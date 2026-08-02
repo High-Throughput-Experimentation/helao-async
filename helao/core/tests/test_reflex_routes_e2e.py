@@ -53,6 +53,35 @@ def test_app_builds_and_registers_every_shell_route(reflex_cfg):
         ), f"route {path} not registered; registered={registered}"
 
 
+def test_build_app_registers_panel_handlers_without_compiling_pages(reflex_cfg):
+    """The freeze this guards, seen in a live browser: every panel stuck at
+    "connecting", with the backend logging
+
+        KeyError: No registered handler found for event:
+        ...wssim_panel_sim__state.render_loop
+
+    ``add_page`` takes a lazy callable, and ``reflex run --backend-only`` never
+    compiles pages -- so panel state classes built inside that callable were
+    never created in the serving process, and Reflex registers a state's event
+    handlers at class creation. The frontend bundle, built by a separate
+    ``reflex export`` that *did* compile, then called handlers the backend had
+    never heard of.
+
+    This test deliberately does not compile: that is the condition under test.
+    """
+    from reflex_base.registry import RegistrationContext
+
+    from helao.core.servers.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    registered = set(RegistrationContext.get().event_handlers)
+    for panel, server in (("wssim_panel", "sim"), ("oersim_panel", "cpsim")):
+        for handler in ("render_loop", "stop_loop", "on_window_points"):
+            assert any(
+                f"{panel}_{server}__state.{handler}" in name for name in registered
+            ), f"{panel}/{server}.{handler} not registered without page compilation"
+
+
 def test_route_map_puts_the_sim_panel_on_live(reflex_cfg):
     from helao.core.servers.reflex.app import route_map
 
