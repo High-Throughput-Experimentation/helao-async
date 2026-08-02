@@ -37,6 +37,10 @@ __all__ = [
     "session_backend",
     "repo_root",
     "rooted_config",
+    "store_kind",
+    "config_root",
+    "saved_values",
+    "save_values",
     "align_defaults",
     "field_kind",
     "fields_for_item",
@@ -441,6 +445,50 @@ async def dispatch_remove(backend, kind: str, position: int, length: int) -> str
         LOGGER.warning(f"operator remove {kind} failed: {exc}")
         return f"remove failed: {exc}"
     return ""
+
+
+#: Library kind -> the key the shared parameter store uses. The file is
+#: written by both operators, so this mapping cannot drift from
+#: ``param_store.PARAM_KINDS``.
+STORE_KINDS = {"sequence": "seq", "experiment": "exp"}
+
+
+def store_kind(kind: str) -> str:
+    """The saved-parameter store's key for a library kind, or ``""``."""
+    return STORE_KINDS.get(kind, "")
+
+
+def config_root() -> str:
+    """The configured output root, or ``""`` before the app is configured."""
+    with _SETTINGS_LOCK:
+        return (_SETTINGS.get("world_cfg") or {}).get("root", "")
+
+
+def _last_meta() -> dict:
+    """The label/campaign block last saved by either operator."""
+    from helao.core.servers.operator import param_store
+
+    return param_store.read_last_meta(config_root())
+
+
+def saved_values(root: str, kind: str, name: str) -> dict:
+    """Parameters last saved for one library item, as form strings."""
+    from helao.core.servers.operator import param_store
+
+    key = store_kind(kind)
+    if not key:
+        return {}
+    return param_store.form_values(param_store.read_params(root, key, name))
+
+
+def save_values(root: str, kind: str, name: str, params: dict, meta=None) -> bool:
+    """Remember the parameters used for one library item."""
+    from helao.core.servers.operator import param_store
+
+    key = store_kind(kind)
+    if not key:
+        return False
+    return param_store.write_params(root, key, name, params, meta=meta)
 
 
 def repo_root() -> str:
@@ -1088,6 +1136,10 @@ class OperatorLibState(rx.State):
     version_hint: str = ""
     sequence_label: str = ""
     campaign_name: str = ""
+    campaign_uuid: str = ""
+    #: Whether an enqueue also remembers its parameters. Mirrors the Bokeh
+    #: operator's "save seq params" checkbox, on by default as it is there.
+    save_params: bool = True
     status: str = ""
     error: str = ""
 
@@ -1113,6 +1165,32 @@ class OperatorLibState(rx.State):
     def _world_cfg(self) -> dict:
         with _SETTINGS_LOCK:
             return _SETTINGS.get("world_cfg") or {}
+
+    def _remember(self, kind: str, name: str) -> None:
+        """Save the parameters that were just used, if saving is enabled.
+
+        Coerces once more rather than reading them back off the built model,
+        so both the plan path and the direct-enqueue path save the same thing.
+        Coercion is pure, and what is stored is the typed values -- matching
+        what the Bokeh operator writes into the same file.
+        """
+        if not self.save_params:
+            return
+        values = dict(self._values.get((kind, name), {}))
+        params, errors = coerce_params(self._fields, values)
+        if errors:
+            return
+        save_values(
+            config_root(),
+            kind,
+            name,
+            params,
+            meta={
+                "sequence_label": self.sequence_label,
+                "campaign_name": self.campaign_name,
+                "campaign_uuid": self.campaign_uuid,
+            },
+        )
 
     def _select(self, kind: str, name: str) -> None:
         """Rebuild the form for one library item."""
@@ -1219,6 +1297,45 @@ class OperatorLibState(rx.State):
         self._record_param(name, str(value))
 
     @rx.event
+    def set_campaign_uuid(self, value: str):
+        """Set the campaign uuid applied to sequences built from this selection."""
+        self.campaign_uuid = value
+
+    @rx.event
+    def set_save_params(self, value: bool):
+        """Toggle whether an enqueue remembers its parameters."""
+        self.save_params = value
+
+    @rx.event
+    def load_last_params(self):
+        """Fill the form from the parameters last saved for this selection.
+
+        Shared with the Bokeh operator through ``param_store``: values saved
+        from one UI load in the other. Only fields the current library item
+        still declares are filled -- a saved parameter the function no longer
+        takes would be passed straight through to it.
+        """
+        kind, name = self.mode, self.selected_name
+        saved = saved_values(config_root(), kind, name)
+        if not saved:
+            self.status = f"nothing saved for {name}"
+            return
+        known = {f["name"] for f in self._fields}
+        for field_name, value in saved.items():
+            if field_name in known:
+                self._record_param(field_name, value)
+        meta = _last_meta()
+        self.sequence_label = meta.get("sequence_label", self.sequence_label)
+        self.campaign_name = meta.get("campaign_name", self.campaign_name)
+        self.campaign_uuid = meta.get("campaign_uuid", self.campaign_uuid)
+        skipped = sorted(set(saved) - known)
+        self.status = f"loaded last parameters for {name}"
+        if skipped:
+            # Named rather than dropped: a parameter that no longer exists is
+            # usually a renamed one, and silence makes it look like it loaded.
+            self.status += f" (ignored {', '.join(skipped)}: no longer a parameter)"
+
+    @rx.event
     def reset_params(self):
         """Drop every edit and return the form to the library defaults."""
         self._values = {
@@ -1252,6 +1369,8 @@ class OperatorLibState(rx.State):
         async with self:
             self.status = message
             self.error = error
+            if not error:
+                self._remember(kind, name)
 
 
 # -- plan buffer -------------------------------------------------------------
@@ -1467,6 +1586,9 @@ class OperatorPlanState(rx.State):
             self.error = error
             return
         self.error = ""
+        # The Bokeh operator saves in populate_sequence -- i.e. when the item
+        # is buffered, not only when it is enqueued -- so this does too.
+        lib._remember(kind, name)
         plan = list(self._plan)
         plan.insert(0, sequence) if prepend else plan.append(sequence)
         self._set_plan(plan)
@@ -1953,7 +2075,28 @@ def _library_panel():
                 on_change=OperatorLibState.set_campaign,
                 width="14em",
             ),
+            rx.input(
+                placeholder="campaign uuid",
+                value=OperatorLibState.campaign_uuid,
+                on_change=OperatorLibState.set_campaign_uuid,
+                width="14em",
+            ),
             spacing="3",
+        ),
+        rx.hstack(
+            rx.button(
+                "Load last parameters",
+                size="1",
+                variant="soft",
+                on_click=OperatorLibState.load_last_params,
+            ),
+            rx.checkbox(
+                "save parameters",
+                checked=OperatorLibState.save_params,
+                on_change=OperatorLibState.set_save_params,
+            ),
+            spacing="3",
+            align="center",
         ),
         rx.scroll_area(
             rx.vstack(

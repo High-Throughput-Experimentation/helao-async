@@ -47,6 +47,7 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
+from helao.core.servers.operator import param_store
 from helao.core.servers.operator.param_forms import (
     BUILTIN_TYPES,
     build_lib,
@@ -1978,51 +1979,35 @@ class BokehOperator:
         self.plan.insert(0, seq)
 
     def write_params(self, ptype: str, name: str, pars: dict):
-        """Persist the most recent sequence/experiment parameters to ``previous_params.json``."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
-        else:
-            with open(param_file_path, "r", encoding="utf8") as f:
-                pdict = json.load(f)
-        if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
-            ptype == "exp" and self.save_last_exp_pars.active == [0]
+        """Persist the most recent sequence/experiment parameters, if enabled.
+
+        The checkbox gate stays here because it reads a widget; the file is
+        shared with the Reflex operator through ``param_store``.
+        """
+        if not (
+            (ptype == "seq" and self.save_last_seq_pars.active == [0])
+            or (ptype == "exp" and self.save_last_exp_pars.active == [0])
         ):
-            pdict[ptype].update({name: pars})
-            pdict["last_meta"] = {
+            return
+        param_store.write_params(
+            self.vis.world_cfg.get("root", ""),
+            ptype,
+            name,
+            pars,
+            meta={
                 "sequence_label": self.input_sequence_label.value,
                 "campaign_name": self.input_campaign_name.value,
                 "campaign_uuid": self.input_campaign_uuid.value,
-            }
-            with open(param_file_path, "w", encoding="utf8") as f:
-                json.dump(pdict, f)
+            },
+        )
 
     def read_params(self, ptype: str, name: str) -> dict:
-        """Return the most recently saved parameters for ``name`` of type ``ptype`` (``seq``/``exp``)."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
-        else:
-            with open(param_file_path, "r", encoding="utf8") as f:
-                pdict = json.load(f)
-        return pdict.get(ptype, {}).get(name, {})
+        """Return the most recently saved parameters for ``name`` of type ``ptype``."""
+        return param_store.read_params(self.vis.world_cfg.get("root", ""), ptype, name)
 
     def read_last_meta(self) -> dict:
-        """Return the saved global label/campaign block, or ``{}`` if none/older file."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            return {}
-        with open(param_file_path, "r", encoding="utf8") as f:
-            pdict = json.load(f)
-        return pdict.get("last_meta", {})
+        """Return the saved global label/campaign block, or ``{}`` if none."""
+        return param_store.read_last_meta(self.vis.world_cfg.get("root", ""))
 
     def populate_sequence(self, prepend: bool = False):
         """Unpack the selected sequence with current params and add it to the plan buffer."""
