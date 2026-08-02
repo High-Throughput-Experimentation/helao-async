@@ -140,3 +140,89 @@ def test_cache_drop_frees_a_session():
     cache.put("tok", "df")
     cache.drop("tok")
     assert cache.get("tok") is None
+
+
+def _one_dataset(run_tree):
+    df, _ = dbx.scan_index(run_tree, "RUNS_FINISHED", None, None)
+    return dbx.load_positions(df, [0])
+
+
+def test_load_positions_reads_the_chosen_rows(run_tree):
+    selected, skipped = _one_dataset(run_tree)
+    assert len(selected) == 1
+    assert skipped == []
+    assert "t_s" in selected[0].data
+
+
+def test_load_positions_reports_skips_rather_than_dropping_them(run_tree):
+    """A file that is missing or unreadable is the most common thing a user
+    hits; silently omitting it from the plot is the worst presentation."""
+    df, _ = dbx.scan_index(run_tree, "RUNS_FINISHED", None, None)
+    df = df.copy()
+    df.loc[0, "available"] = False
+    selected, skipped = dbx.load_positions(df, [0])
+    assert selected == []
+    assert len(skipped) == 1 and "not available" in skipped[0][1]
+
+
+def test_load_positions_with_no_index_is_empty():
+    assert dbx.load_positions(None, [0]) == ([], [])
+
+
+def test_axis_options_are_the_union_of_dataset_columns(run_tree):
+    selected, _ = _one_dataset(run_tree)
+    assert dbx.axis_options(selected) == ["Ewe_V", "t_s"]
+
+
+def test_axis_options_with_nothing_selected_is_empty():
+    assert dbx.axis_options([]) == []
+
+
+def test_chart_series_builds_one_entry_per_dataset(run_tree):
+    selected, _ = _one_dataset(run_tree)
+    series = dbx.chart_series(selected, "t_s", "Ewe_V", 50000)
+    assert len(series) == 1
+    assert series[0]["label"] == selected[0].label
+    assert len(series[0]["x"]) == 2
+
+
+def test_chart_series_skips_a_dataset_missing_the_chosen_column(run_tree):
+    """Overlaying datasets from unrelated files means some will not share
+    columns; that is normal, not an error."""
+    selected, _ = _one_dataset(run_tree)
+    assert dbx.chart_series(selected, "t_s", "not_a_column", 50000) == []
+
+
+def test_chart_series_downsamples_to_max_points(run_tree):
+    selected, _ = _one_dataset(run_tree)
+    ds = selected[0]
+    ds.data["t_s"] = list(range(1000))
+    ds.data["Ewe_V"] = list(range(1000))
+    series = dbx.chart_series([ds], "t_s", "Ewe_V", 10)
+    assert len(series[0]["x"]) <= 11
+
+
+def test_chart_series_with_no_axes_chosen_is_empty(run_tree):
+    selected, _ = _one_dataset(run_tree)
+    assert dbx.chart_series(selected, "", "", 50000) == []
+
+
+def test_summary_rows_match_the_shared_summary_columns(run_tree):
+    from helao.core.servers.data_browser import state as dbstate
+
+    selected, _ = _one_dataset(run_tree)
+    rows = dbx.summary_rows(selected, "t_s", "Ewe_V")
+    assert len(rows) == 1
+    assert len(rows[0]) == len(dbstate.SUMMARY_COLS)
+    assert all(isinstance(c, str) for c in rows[0])
+
+
+def test_dataset_rows_returns_headers_and_string_cells(run_tree):
+    selected, _ = _one_dataset(run_tree)
+    headers, rows = dbx.dataset_rows(selected[0])
+    assert sorted(headers) == ["Ewe_V", "t_s"]
+    assert rows and all(isinstance(c, str) for c in rows[0])
+
+
+def test_dataset_rows_on_nothing_is_empty():
+    assert dbx.dataset_rows(None) == ([], [])
