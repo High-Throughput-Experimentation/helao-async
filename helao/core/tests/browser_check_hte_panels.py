@@ -12,7 +12,10 @@ Run it after ``python launch.py htereflex``::
         helao/core/tests/browser_check_hte_panels.py [base_url]
 """
 
+import json
 import sys
+import urllib.error
+import urllib.request
 
 from playwright.sync_api import sync_playwright
 
@@ -41,6 +44,41 @@ SETTLE_MS = 12000
 #: Action panels the dev config declares, by their heading.
 EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:"]
 
+#: ws_data is silent unless an action is streaming, so the check starts one on
+#: each simulator. Two things about doing that, both learned the hard way:
+#:
+#: * The parameters go in the JSON **body**. Sent as a query string with a `{}`
+#:   body, HELAO reads the body as a malformed `action` kwarg, logs "using
+#:   blank Action", and the executor dies on the resulting empty `comp_vec`.
+#: * That failure does not just lose one action. The crashed executor leaves
+#:   the endpoint marked busy, so every later action queues behind it forever
+#:   and the panel stays empty until the server restarts.
+ACTION_SERVERS = [
+    ("http://127.0.0.1:8106", "NIDAQMX"),
+    ("http://127.0.0.1:8107", "POWERSUPPLY"),
+]
+
+#: A composition present in the simulator's stored dataset for plate 2750.
+COMP_VEC = [0, 10, 0, 0, 10, 0, 0, 0, 20, 0, 0, 60, 0]
+
+
+def start_actions(problems) -> None:
+    """Start a simulated CP on each ws_data server."""
+    body = json.dumps({"comp_vec": COMP_VEC, "acquisition_rate": 0.2}).encode()
+    for base, key in ACTION_SERVERS:
+        request = urllib.request.Request(
+            f"{base}/{key}/measure_cp",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                if response.status != 200:
+                    problems.append(f"{key}: measure_cp returned {response.status}")
+        except urllib.error.URLError as exc:
+            problems.append(f"{key}: measure_cp failed ({exc})")
+
 
 def check_action_page(page, problems) -> None:
     """Assert the ws_data panels rendered and offer their cell selector.
@@ -50,6 +88,7 @@ def check_action_page(page, problems) -> None:
     which renders as four blank charts and no error -- exactly the kind of
     failure a unit suite cannot see.
     """
+    start_actions(problems)
     page.goto(f"{BASE}/action", wait_until="load", timeout=60000)
     page.wait_for_timeout(SETTLE_MS)
     body = page.inner_text("body")
@@ -65,6 +104,27 @@ def check_action_page(page, problems) -> None:
     checkboxes = page.get_by_role("checkbox").count()
     if checkboxes == 0:
         problems.append("the cell selector offered no cells")
+    # The selector is populated from column names discovered in the stream, so
+    # a cell being offered at all proves ws_data packets arrived and were
+    # decoded -- which no unit test can show.
+    #
+    # Assert on the *voltage of the running action* specifically. Three of the
+    # four figures are legitimately empty here: both previous-action figures
+    # (there is no previous action on a first run) and the current figure (the
+    # simulator's stored trace carries no current column). Requiring every
+    # chart to have data would fail on correct behaviour.
+    voltage_charts = [
+        line
+        for line in body.splitlines()
+        if "data series" in line and "Ecell (V)" in line
+    ]
+    if not voltage_charts:
+        problems.append("no voltage chart rendered a description")
+    elif all(
+        line.strip().startswith("Interactive chart. 0 data series")
+        for line in voltage_charts
+    ):
+        problems.append("every voltage chart is empty: no ws_data reached the panel")
 
 
 def main() -> int:
