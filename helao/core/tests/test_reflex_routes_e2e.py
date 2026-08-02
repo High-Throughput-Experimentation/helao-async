@@ -217,3 +217,37 @@ def test_every_panel_on_every_route_renders(reflex_cfg):
     for path, targets in routes.items():
         for target in targets:
             assert _render_panel(target) is not None, f"{path}:{target.server_key}"
+
+
+def test_browser_route_is_the_real_page_not_a_stub(reflex_cfg):
+    """The stub said the browser was unimplemented. Once it is implemented, a
+    passing route test that still renders the stub is worse than no test."""
+    from helao.core.servers.data_browser import app_reflex
+
+    from helao.core.servers.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    assert app_reflex.BrowserState.__name__ == "BrowserState"
+    assert callable(app_reflex.build_page)
+
+
+def test_browser_state_handlers_are_registered_without_compiling_pages(reflex_cfg):
+    """Same failure mode the panels hit: handlers created inside the lazy
+    add_page callable never exist in a --backend-only process, so every
+    control on the page silently does nothing."""
+    from reflex_base.registry import RegistrationContext
+
+    from helao.core.servers.data_browser.app_reflex import BrowserState
+    from helao.core.servers.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    registered = set(RegistrationContext.get().event_handlers)
+    # Derived from the class, never hand-spelled: Reflex builds a state's full
+    # name from its module path and a snake_cased class name, so a guessed
+    # literal would be a test that passes for the wrong reason or fails for no
+    # reason.
+    prefix = BrowserState.get_full_name()
+    for handler in ("scan", "on_filter", "add_selected", "clear_plot"):
+        assert (
+            f"{prefix}.{handler}" in registered
+        ), f"BrowserState.{handler} not registered without page compilation"

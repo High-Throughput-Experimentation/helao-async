@@ -23,13 +23,18 @@ __all__ = [
     "chart_series",
     "summary_rows",
     "dataset_rows",
+    "BrowserState",
+    "build_page",
 ]
 
 import threading
 
+import reflex as rx
+
 from helao.core.servers.data_browser import sources
 from helao.core.servers.data_browser import state as dbstate
 from helao.core.servers.data_browser.app import FILTER_COLS, INDEX_TABLE_COLS
+from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -243,3 +248,409 @@ def dataset_rows(ds):
         return [], []
     length = min(len(ds.data[h]) for h in headers)
     return headers, [[str(ds.data[h][i]) for h in headers] for i in range(length)]
+
+
+def _config_root() -> str:
+    """HELAO output root from the installed global config."""
+    from helao.helpers import config_loader
+
+    cfg = config_loader.CONFIG or {}
+    return str(cfg.get("root", ""))
+
+
+class BrowserState(rx.State):
+    """Page state for the data browser.
+
+    A plain state, not a mixin: mixins exist for ``make_panel_state``, which
+    mints one class per action server so their vars cannot be shared. This is
+    one page with one state.
+    """
+
+    #: Selected datasets. The leading underscore makes this a Reflex *backend*
+    #: var: it stays server-side and is never serialised to the client. That is
+    #: required, not cosmetic -- these hold whole data files, and an ordinary
+    #: annotated attribute would become a client var and fail to encode.
+    _datasets: list = []
+
+    group: str = "RUNS"
+    source: str = ""
+    source_options: list = []
+    date_start: str = ""
+    date_end: str = ""
+    index_filter: str = ""
+    index_rows_view: list = []
+    selected_positions: list = []
+    index_total: int = 0
+    index_truncated: bool = False
+    status: str = ""
+    error: str = ""
+    scanning: bool = False
+    xcol: str = ""
+    ycol: str = ""
+    axis_choices: list = []
+    trace_kind: str = "line"
+    chart_spec: dict = {}
+    chart_url: str = ""
+    chart_layout: str = ""
+    version: int = 0
+    summary_view: list = []
+
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key.
+
+        The store holds one frame per key while ``version`` is per-session
+        state, so a shared key would 404 two tabs into frozen charts.
+        """
+        return f"browser-{self.router.session.client_token}"
+
+    @rx.event
+    def on_mount(self):
+        """Seed the source options from the default group."""
+        self.source_options = options_for_group(self.group)
+        if self.source_options and self.source not in self.source_options:
+            self.source = self.source_options[0]
+
+    @rx.event
+    def on_group(self, value: str):
+        """Switch group and reset the source to that group's first entry."""
+        self.group = value
+        self.source_options = options_for_group(value)
+        self.source = self.source_options[0] if self.source_options else ""
+
+    @rx.event
+    def on_source(self, value: str):
+        """Select the source to scan."""
+        self.source = value
+
+    @rx.event
+    def on_date_start(self, value: str):
+        """Set the lower date bound."""
+        self.date_start = value
+
+    @rx.event
+    def on_date_end(self, value: str):
+        """Set the upper date bound."""
+        self.date_end = value
+
+    @rx.event
+    def on_trace_kind(self, value: str):
+        """Switch between line and scatter."""
+        self.trace_kind = value
+        self._rebuild()
+
+    @rx.event
+    def on_xcol(self, value: str):
+        """Choose the x column."""
+        self.xcol = value
+        self._rebuild()
+
+    @rx.event
+    def on_ycol(self, value: str):
+        """Choose the y column."""
+        self.ycol = value
+        self._rebuild()
+
+    @rx.event
+    def on_filter(self, value: str):
+        """Filter the index table."""
+        self.index_filter = value
+        self._refresh_index()
+
+    @rx.event
+    def toggle_position(self, position: int):
+        """Check or uncheck one index row.
+
+        Reflex's data_table has no row-selection callback, so selection is an
+        explicit checkbox column rather than a table feature. Positions index
+        into the *filtered* frame, which is what ``load_positions`` takes.
+        """
+        if position in self.selected_positions:
+            self.selected_positions = [
+                p for p in self.selected_positions if p != position
+            ]
+        else:
+            self.selected_positions = self.selected_positions + [position]
+
+    @rx.event(background=True)
+    async def scan(self):
+        """Index the selected source.
+
+        Background because ``sources.get_index`` walks the run tree, which on a
+        station's output root takes long enough to freeze a synchronous handler
+        outright.
+        """
+        async with self:
+            self.scanning = True
+            self.error = ""
+            self.status = f"scanning {self.source}..."
+            root = _config_root()
+            source, start, end = self.source, self.date_start, self.date_end
+            token = self.router.session.client_token
+
+        df, error = scan_index(root, source, start.strip() or None, end.strip() or None)
+
+        async with self:
+            self.scanning = False
+            if error:
+                self.error = error
+                self.status = ""
+                INDEX_CACHE.drop(token)
+                self.index_rows_view = []
+                self.index_total = 0
+                self.index_truncated = False
+                return
+            INDEX_CACHE.put(token, df)
+            self.status = f"indexed {len(df)} dataset(s) from {source}"
+            self._refresh_index()
+
+    @rx.event(background=True)
+    async def add_selected(self):
+        """Load the checked index rows and add them to the plot.
+
+        Background because each dataset is a file read.
+        """
+        async with self:
+            token = self.router.session.client_token
+            positions = list(self.selected_positions)
+            query = self.index_filter
+        df = filter_index(INDEX_CACHE.get(token), query)
+        datasets, skipped = load_positions(df, positions)
+
+        async with self:
+            self._datasets = self._datasets + datasets
+            # Named, not silently dropped: an omitted trace with no explanation
+            # is the worst way to present an unreadable file.
+            self.error = (
+                "; ".join(f"skipped {lbl}: {why}" for lbl, why in skipped)
+                if skipped
+                else ""
+            )
+            self._refresh_axes()
+            self._rebuild()
+
+    @rx.event
+    def clear_plot(self):
+        """Drop every selected dataset."""
+        self._datasets = []
+        self.error = ""
+        self._refresh_axes()
+        self._rebuild()
+
+    @rx.event
+    def on_unmount(self):
+        """Release this session's index and chart frame."""
+        token = self.router.session.client_token
+        INDEX_CACHE.drop(token)
+        plots.STORE.drop(f"browser-{token}")
+
+    # -- internals -------------------------------------------------------
+
+    def _refresh_index(self):
+        """Re-render the index table under the current filter."""
+        token = self.router.session.client_token
+        filtered = filter_index(INDEX_CACHE.get(token), self.index_filter)
+        view, total, truncated = cap_rows(index_rows(filtered), MAX_INDEX_ROWS)
+        self.index_rows_view = view
+        self.index_total = total
+        self.index_truncated = truncated
+        # Positions index into the filtered frame, so a changed filter
+        # invalidates every one of them; keeping them would add whichever rows
+        # now happen to sit at those offsets.
+        self.selected_positions = []
+
+    def _refresh_axes(self):
+        """Recompute axis choices, keeping the current pick when still valid."""
+        self.axis_choices = axis_options(self._datasets)
+        if not self.axis_choices:
+            self.xcol, self.ycol = "", ""
+            return
+        if self.xcol not in self.axis_choices:
+            self.xcol = self.axis_choices[0]
+        if self.ycol not in self.axis_choices:
+            self.ycol = (
+                self.axis_choices[1]
+                if len(self.axis_choices) > 1
+                else self.axis_choices[0]
+            )
+
+    def _rebuild(self):
+        """Recompute the chart payload and the summary table."""
+        series = chart_series(self._datasets, self.xcol, self.ycol, DEFAULT_MAX_POINTS)
+        self.version += 1
+        payload = plots.traces(
+            series,
+            kind=self.trace_kind,
+            x_label=self.xcol,
+            y_label=self.ycol,
+            panel_id=self.panel_key(),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
+        self.summary_view = summary_rows(self._datasets, self.xcol, self.ycol)
+        self.status = f"{len(self._datasets)} dataset(s) selected"
+
+
+def build_page():
+    """Render the data browser page.
+
+    Returns:
+        rx.Component: The page body.
+    """
+    controls = rx.hstack(
+        rx.select(
+            list(sources.GROUPS.keys()),
+            value=BrowserState.group,
+            on_change=BrowserState.on_group,
+            width="9em",
+        ),
+        rx.select(
+            BrowserState.source_options,
+            value=BrowserState.source,
+            on_change=BrowserState.on_source,
+            width="12em",
+        ),
+        rx.input(
+            placeholder="From (YY.WW/MMDD)",
+            value=BrowserState.date_start,
+            on_change=BrowserState.on_date_start,
+            width="11em",
+        ),
+        rx.input(
+            placeholder="To (YY.WW/MMDD)",
+            value=BrowserState.date_end,
+            on_change=BrowserState.on_date_end,
+            width="11em",
+        ),
+        rx.button("Scan", on_click=BrowserState.scan, loading=BrowserState.scanning),
+        spacing="3",
+        align="end",
+        width="100%",
+    )
+
+    # An explicit checkbox column, not rx.data_table: gridjs exposes no
+    # row-selection callback, and the Bokeh browser's whole workflow is
+    # "tick several rows, then Add to plot". A read-only table would strand it.
+    index_box = rx.vstack(
+        rx.input(
+            placeholder="Filter index",
+            value=BrowserState.index_filter,
+            on_change=BrowserState.on_filter,
+            width="100%",
+        ),
+        rx.cond(
+            BrowserState.index_truncated,
+            rx.text(
+                f"showing the first {MAX_INDEX_ROWS} of ",
+                BrowserState.index_total,
+                " matches -- narrow the filter to reach the rest",
+                size="2",
+                color_scheme="amber",
+            ),
+        ),
+        rx.scroll_area(
+            rx.table.root(
+                rx.table.header(
+                    rx.table.row(
+                        rx.table.column_header_cell(""),
+                        *[rx.table.column_header_cell(col) for col in INDEX_TABLE_COLS],
+                    )
+                ),
+                rx.table.body(
+                    rx.foreach(
+                        BrowserState.index_rows_view,
+                        lambda row, idx: rx.table.row(
+                            rx.table.cell(
+                                rx.checkbox(
+                                    checked=BrowserState.selected_positions.contains(
+                                        idx
+                                    ),
+                                    on_change=BrowserState.toggle_position(idx),
+                                )
+                            ),
+                            rx.foreach(row, lambda cell: rx.table.cell(cell)),
+                        ),
+                    )
+                ),
+                width="100%",
+                size="1",
+            ),
+            type="auto",
+            scrollbars="vertical",
+            height="20em",
+        ),
+        rx.hstack(
+            rx.button("Add to plot", on_click=BrowserState.add_selected),
+            rx.button("Clear plot", on_click=BrowserState.clear_plot),
+            spacing="3",
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+    plot_tab = rx.vstack(
+        rx.hstack(
+            rx.select(
+                BrowserState.axis_choices,
+                value=BrowserState.xcol,
+                on_change=BrowserState.on_xcol,
+                width="12em",
+            ),
+            rx.select(
+                BrowserState.axis_choices,
+                value=BrowserState.ycol,
+                on_change=BrowserState.on_ycol,
+                width="12em",
+            ),
+            rx.select(
+                list(plots.TRACE_KINDS),
+                value=BrowserState.trace_kind,
+                on_change=BrowserState.on_trace_kind,
+                width="9em",
+            ),
+            spacing="3",
+        ),
+        # Bound once. The payload is produced in _rebuild, per interaction.
+        plots.chart(
+            BrowserState.chart_spec,
+            BrowserState.chart_url,
+            BrowserState.chart_layout,
+            height=420,
+        ),
+        width="100%",
+        spacing="3",
+    )
+
+    table_tab = rx.data_table(
+        data=BrowserState.summary_view,
+        columns=list(dbstate.SUMMARY_COLS),
+        pagination=True,
+        search=False,
+        sort=True,
+    )
+
+    return rx.vstack(
+        controls,
+        rx.cond(
+            BrowserState.error != "",
+            rx.text(BrowserState.error, color_scheme="red"),
+        ),
+        rx.text(BrowserState.status, size="2"),
+        index_box,
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Plot", value="plot"),
+                rx.tabs.trigger("Table", value="table"),
+            ),
+            rx.tabs.content(plot_tab, value="plot"),
+            rx.tabs.content(table_tab, value="table"),
+            default_value="plot",
+            width="100%",
+        ),
+        width="100%",
+        spacing="4",
+        padding_x="1em",
+        on_mount=BrowserState.on_mount,
+        on_unmount=BrowserState.on_unmount,
+    )

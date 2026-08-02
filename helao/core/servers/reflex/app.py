@@ -30,6 +30,12 @@ from dataclasses import dataclass
 import reflex as rx
 from fastapi import FastAPI
 
+# Imported at module scope, not inside the page callable: creating the state
+# class is what registers its event handlers, and `--backend-only` never
+# evaluates a page callable. No cycle -- app_reflex reaches back only as far as
+# `plots`, which knows nothing about this module.
+from helao.core.servers.data_browser.app_reflex import BrowserState
+from helao.core.servers.data_browser.app_reflex import build_page as browser_page
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
@@ -337,6 +343,13 @@ def build_app(world_cfg: dict, server_key: str):
     # Before add_page: the page callables are lazy, and the backend-only
     # process never runs them.
     _ensure_panel_states(routes)
+    # Same reason, for the browser: Reflex registers a state's event handlers
+    # when the class is created, and a class first touched inside add_page's
+    # callable is never created in a `--backend-only` process -- leaving every
+    # control on the page silently doing nothing. Importing at module scope is
+    # what creates it; this reference is what keeps that import from looking
+    # unused and being removed.
+    assert BrowserState is not None
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -376,11 +389,7 @@ def build_app(world_cfg: dict, server_key: str):
         title="HELAO operator",
     )
     application.add_page(
-        lambda: _stub_page(
-            "Data browser",
-            "The Reflex data browser is not implemented yet. Use the Bokeh "
-            "data_browser; a follow-up spec covers this page.",
-        ),
+        lambda: _page("Data browser", browser_page()),
         route="/browser",
         title="HELAO browser",
     )
