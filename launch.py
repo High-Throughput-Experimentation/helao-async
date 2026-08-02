@@ -939,6 +939,21 @@ def validateConfig(PIDD, confDict, helao_repo_root):
     return True
 
 
+def stdin_is_interactive() -> bool:
+    """Whether stdin can be put in cbreak mode for the hotkey reader.
+
+    False when the launcher is scripted, piped, or run from a harness: there
+    is no terminal to read keys from. Checked rather than discovered by
+    exception because ``termios.tcgetattr`` raises from inside the reader
+    thread, which killed the thread with a traceback and no explanation.
+    """
+    try:
+        return bool(sys.stdin) and sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        # A closed or replaced stdin. Either way there is no terminal.
+        return False
+
+
 def _posix_getchar():
     """Read one character in cbreak mode (POSIX).
 
@@ -978,6 +993,11 @@ def wait_key():
     Returns:
         str: The character of the key pressed or a specific character based on the exception.
     """
+    if not stdin_is_interactive():
+        # Same character EOF yields: the caller treats it as "disconnect the
+        # monitor", which leaves the servers running. Anything else would tear
+        # down a group merely because nobody is at a terminal.
+        return "\x1a" if os.name == "nt" else "\x04"
     try:
         if os.name == "nt":
             keypress = click.getchar()
@@ -990,6 +1010,19 @@ def wait_key():
             keypress = "\x1a"
         else:
             keypress = "\x04"
+    except Exception:
+        # termios.error when stdin turns out not to be a terminal after all
+        # (redirected between the check and the read). Uncaught, this killed
+        # the reader thread with a bare traceback.
+        #
+        # LAUNCH_LOGGER is None until the launcher builds it, and this can run
+        # before that: logging unconditionally would raise AttributeError from
+        # inside the handler, replacing one crash with another.
+        if LAUNCH_LOGGER is not None:
+            LAUNCH_LOGGER.warning(
+                "hotkey reader could not read from stdin; disconnecting the monitor"
+            )
+        keypress = "\x1a" if os.name == "nt" else "\x04"
     return keypress
 
 
@@ -1882,6 +1915,30 @@ def main():
         - The function uses `print_message` to log messages and `wait_key` to capture keypresses.
         - The function interacts with the `pidd` object to manage server processes and orchestrators.
         """
+        if not stdin_is_interactive():
+            # A scripted launch previously died here with `termios.error:
+            # Inappropriate ioctl for device` from inside this thread, taking
+            # the launcher with it and leaving a half-torn-down group: servers
+            # launched detached survived, while any server holding a
+            # parent-death signal (the Reflex UI) went with it.
+            #
+            # Block instead of returning. The group then behaves as one unit
+            # under a script or a service manager, exactly as it does
+            # interactively, and SIGINT/SIGTERM tears it down.
+            LAUNCH_LOGGER.info(
+                "stdin is not a terminal, so the CTRL-r/x/t/d hotkeys are "
+                "unavailable. The group is running and this launcher will stay "
+                f"up to hold it; PIDs are in {pidd.pidFilePath}. "
+                "Stop it with SIGINT/SIGTERM."
+            )
+            try:
+                threading.Event().wait()
+            except KeyboardInterrupt:
+                LAUNCH_LOGGER.info("Interrupted, terminating orchestration group.")
+                graceful_shutdown_all()
+                with pidd_lock:
+                    pidd.close()
+            return
         result = None
         while result not in ["\x18", "\x04"]:
             if result == "\x12":
