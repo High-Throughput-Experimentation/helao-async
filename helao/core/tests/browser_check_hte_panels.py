@@ -42,7 +42,7 @@ SETTLE_MS = 12000
 
 
 #: Action panels the dev config declares, by their heading.
-EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:"]
+EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:", "Gamry:", "BioLogic:"]
 
 #: ws_data is silent unless an action is streaming, so the check starts one on
 #: each simulator. Two things about doing that, both learned the hard way:
@@ -56,6 +56,8 @@ EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:"]
 ACTION_SERVERS = [
     ("http://127.0.0.1:8106", "NIDAQMX"),
     ("http://127.0.0.1:8107", "POWERSUPPLY"),
+    ("http://127.0.0.1:8108", "GAMRY"),
+    ("http://127.0.0.1:8109", "BIOLOGIC"),
 ]
 
 #: A composition present in the simulator's stored dataset for plate 2750.
@@ -95,10 +97,16 @@ def check_action_page(page, problems) -> None:
     for heading in EXPECTED_ACTION_PANELS:
         if heading not in body:
             problems.append(f"action panel '{heading}' did not render")
-    # Four figures for NI-DAQmx plus one for the power supply.
+    # Four for NI-DAQmx, one for the power supply, two each for the two
+    # potentiostats (this action + previous action).
     canvases = page.locator("canvas").count()
-    if canvases < 5:
-        problems.append(f"{canvases} canvases on /action, expected at least 5")
+    if canvases < 9:
+        problems.append(f"{canvases} canvases on /action, expected at least 9")
+    # The potentiostat panels pick their axes from the technique. Seeing the
+    # column names in their selectors proves the action name reached the panel
+    # through the ingest row store, which is the part that had to be added.
+    if "Ewe_V" not in body:
+        problems.append("the potentiostat axis selectors are empty")
     if "voltage (previous action)" not in body:
         problems.append("the previous-action figures did not render")
     checkboxes = page.get_by_role("checkbox").count()

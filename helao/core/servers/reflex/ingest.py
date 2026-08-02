@@ -162,8 +162,9 @@ def normalize_data_package(messages: list) -> tuple:
     Returns:
         ``(numeric_columns, rows)``. Columns are equal-length and positionally
         aligned, filled per message exactly as :func:`normalize` does. Each row
-        carries the ``action_uuid`` and ``status`` of one packet, so a panel can
-        reset when the streamed action changes.
+        carries the ``action_uuid``, ``action_name`` and ``status`` of one
+        packet, so a panel can reset when the streamed action changes and can
+        choose axes to suit the technique that produced the data.
     """
 
     def _get(obj, name):
@@ -214,6 +215,7 @@ def normalize_data_package(messages: list) -> tuple:
         rows.append(
             {
                 "action_uuid": str(_get(message, "action_uuid") or ""),
+                "action_name": str(_get(message, "action_name") or ""),
                 "status": str(getattr(status, "value", status) or ""),
             }
         )
