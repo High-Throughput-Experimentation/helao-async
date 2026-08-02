@@ -7,6 +7,7 @@ outside a running app.
 """
 
 import asyncio
+import os
 
 import pytest
 from pydantic import BaseModel
@@ -1232,3 +1233,81 @@ def test_poll_interval_survives_a_params_block_that_is_not_a_mapping():
 
 def test_plate_api_survives_a_params_block_that_is_not_a_mapping():
     assert opx.plate_api_for({"params": []}) is None
+
+
+# -- library paths from a foreign working directory ---------------------------
+
+
+def test_repo_root_contains_the_helao_package():
+    import os
+
+    assert os.path.isdir(os.path.join(opx.repo_root(), "helao"))
+
+
+def test_rooted_config_makes_the_library_paths_absolute():
+    """The Reflex backend runs with its cwd inside the app directory, not the
+    repo root, and import_autolibs resolves every library path relative to the
+    cwd -- so the libraries silently come back empty."""
+    import os
+
+    cfg = {
+        "experiment_libraries": ["simulatews_exp", "helao/deploy/test/x_exp.py"],
+        "sequence_libraries": ["OERSIM_seq"],
+        "loaded_config_path": "/repo/helao/deploy/test/configs/c.yml",
+    }
+    rooted = opx.rooted_config(cfg)
+    assert os.path.isabs(rooted["experiment_path"])
+    assert os.path.isabs(rooted["sequence_path"])
+    assert os.path.isabs(rooted["experiment_libraries"][1])
+    # A bare module name is not a path and must stay a name: it is resolved
+    # against the library directory, which is now absolute.
+    assert rooted["experiment_libraries"][0] == "simulatews_exp"
+    assert rooted["sequence_libraries"] == ["OERSIM_seq"]
+
+
+def test_rooted_config_derives_the_library_dir_from_the_deployment():
+    cfg = {"loaded_config_path": "/repo/helao/deploy/test/configs/c.yml"}
+    rooted = opx.rooted_config(cfg)
+    assert rooted["experiment_path"].endswith(
+        os.path.join("helao", "deploy", "test", "experiments")
+    )
+    assert rooted["sequence_path"].endswith(
+        os.path.join("helao", "deploy", "test", "sequences")
+    )
+
+
+def test_rooted_config_keeps_an_explicit_path_but_makes_it_absolute():
+    cfg = {
+        "experiment_path": "helao/deploy/other/experiments",
+        "loaded_config_path": "/repo/helao/deploy/test/configs/c.yml",
+    }
+    rooted = opx.rooted_config(cfg)
+    assert os.path.isabs(rooted["experiment_path"])
+    assert rooted["experiment_path"].endswith(
+        os.path.join("helao", "deploy", "other", "experiments")
+    )
+
+
+def test_rooted_config_leaves_an_already_absolute_path_alone():
+    cfg = {
+        "experiment_path": "/somewhere/experiments",
+        "loaded_config_path": "/repo/helao/deploy/test/configs/c.yml",
+    }
+    assert opx.rooted_config(cfg)["experiment_path"] == "/somewhere/experiments"
+
+
+def test_rooted_config_does_not_mutate_the_caller_config():
+    """The same world config is shared with every other server in the process."""
+    cfg = {
+        "experiment_libraries": ["helao/deploy/test/x_exp.py"],
+        "loaded_config_path": "/repo/helao/deploy/test/configs/c.yml",
+    }
+    opx.rooted_config(cfg)
+    assert cfg["experiment_libraries"] == ["helao/deploy/test/x_exp.py"]
+    assert "experiment_path" not in cfg
+
+
+def test_rooted_config_without_a_loaded_config_path():
+    """No deployment to derive: leave the paths alone rather than inventing one."""
+    rooted = opx.rooted_config({})
+    assert "experiment_path" not in rooted
