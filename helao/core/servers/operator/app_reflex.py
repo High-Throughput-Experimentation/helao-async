@@ -44,10 +44,19 @@ __all__ = [
     "library_items",
     "item_by_name",
     "enqueue_sequence",
+    "build_sequence",
+    "build_manual_sequence",
     "custom_positions",
     "options_map_for",
+    "plan_rows",
+    "plan_moved",
+    "plan_removed",
+    "dispatch_plan",
+    "history_rows",
+    "HIST_COLS",
     "OperatorQueueState",
     "OperatorLibState",
+    "OperatorPlanState",
     "SEQ_COLS",
     "EXP_COLS",
     "ACT_COLS",
@@ -816,32 +825,33 @@ def item_by_name(items: list, kind: str, name: str):
     return None
 
 
-async def enqueue_sequence(
+def build_sequence(
     backend, item, fields: list, values: dict, label: str = "", campaign: str = ""
 ) -> tuple:
-    """Unpack the selected sequence with the entered parameters and enqueue it.
+    """Unpack the selected sequence with the entered parameters.
 
     Returns:
-        tuple: ``(message, error)``. Exactly one is non-empty. Nothing reaches
-        the orchestrator while a parameter will not convert.
+        tuple: ``(sequence, error)``. Exactly one is meaningful. Building is
+        separate from dispatching because the plan tab buffers sequences
+        client-side before any of them reach the orchestrator.
     """
     from helao.helpers.premodels import Sequence
 
     if item is None:
-        return "", "no sequence is selected"
+        return None, "no sequence is selected"
     if backend is None:
-        return "", "no orchestrator connection"
+        return None, "no orchestrator connection"
     name = item.get("sequence_name", "")
     params, errors = coerce_params(fields, values)
     if errors:
-        return "", "; ".join(errors)
+        return None, "; ".join(errors)
     try:
         planned = backend.unpack_sequence(sequence_name=name, sequence_params=params)
     except Exception as exc:
         # Named, because the alternative the operator sees is a button that
         # does nothing.
         LOGGER.exception(f"operator could not unpack sequence '{name}': {exc}")
-        return "", f"{name} could not be unpacked: {exc}"
+        return None, f"{name} could not be unpacked: {exc}"
     sequence = Sequence(
         sequence_name=name,
         sequence_params=params,
@@ -850,12 +860,66 @@ async def enqueue_sequence(
     )
     if campaign:
         sequence.campaign_name = campaign
+    return sequence, ""
+
+
+def build_manual_sequence(
+    item, fields: list, values: dict, label: str = "", campaign: str = ""
+) -> tuple:
+    """Wrap one experiment as a single-experiment ``manual_orch_seq``.
+
+    The orchestrator's queue takes sequences, so this is how a bare experiment
+    reaches it -- the same wrapper the Bokeh operator's "append experiment"
+    builds, ``manual_action`` included.
+
+    Returns:
+        tuple: ``(sequence, error)``.
+    """
+    from helao.helpers.premodels import Experiment, Sequence
+
+    if item is None:
+        return None, "no experiment is selected"
+    name = item.get("experiment_name", "")
+    params, errors = coerce_params(fields, values)
+    if errors:
+        return None, "; ".join(errors)
+    sequence = Sequence(
+        sequence_name="manual_orch_seq",
+        sequence_label=label or None,
+        planned_experiments=[
+            Experiment(experiment_name=name, experiment_params=params)
+        ],
+        manual_action=True,
+    )
+    if campaign:
+        sequence.campaign_name = campaign
+    return sequence, ""
+
+
+async def enqueue_sequence(
+    backend, item, fields: list, values: dict, label: str = "", campaign: str = ""
+) -> tuple:
+    """Unpack the selected sequence and enqueue it directly.
+
+    Returns:
+        tuple: ``(message, error)``. Exactly one is non-empty. Nothing reaches
+        the orchestrator while a parameter will not convert.
+    """
+    sequence, error = build_sequence(
+        backend, item, fields, values, label=label, campaign=campaign
+    )
+    if error:
+        return "", error
+    name = sequence.sequence_name
     try:
         await backend.add_sequence(sequence)
     except Exception as exc:
         LOGGER.warning(f"operator could not enqueue sequence '{name}': {exc}")
         return "", f"{name} could not be enqueued: {exc}"
-    return f"enqueued {name} ({len(planned)} experiment(s))", ""
+    return (
+        f"enqueued {name} ({len(sequence.planned_experiments)} experiment(s))",
+        "",
+    )
 
 
 #: Parameters the Bokeh operator renders as a dropdown of the PAL's configured
@@ -1061,3 +1125,309 @@ class OperatorLibState(rx.State):
         async with self:
             self.status = message
             self.error = error
+
+
+# -- plan buffer -------------------------------------------------------------
+
+#: Columns of the plan table, matching the Bokeh operator's.
+PLAN_COLS = ["sequence_name", "sequence_label", "num_experiments"]
+
+#: How a buffered plan reaches the orchestrator.
+PLAN_MODES = ("append", "split", "prepend")
+
+
+def plan_rows(plan: list) -> list:
+    """Render the buffered sequences as table rows."""
+    return [
+        [
+            str(sequence.sequence_name or ""),
+            str(sequence.sequence_label or ""),
+            str(len(sequence.planned_experiments or [])),
+        ]
+        for sequence in plan or []
+    ]
+
+
+def plan_moved(plan: list, index: int, direction: str):
+    """Plan buffer with one entry moved, or ``None`` when the move cannot happen.
+
+    Returns a new list rather than mutating: the handler assigns it to a state
+    var, and mutating the existing list in place would change what Reflex is
+    holding without telling it.
+    """
+    target = moved_index(index, direction, len(plan or []))
+    if target is None:
+        return None
+    moved = list(plan)
+    moved[index], moved[target] = moved[target], moved[index]
+    return moved
+
+
+def plan_removed(plan: list, index: int):
+    """Plan buffer without one entry, or ``None`` when the index is not in it."""
+    if index < 0 or index >= len(plan or []):
+        return None
+    remaining = list(plan)
+    remaining.pop(index)
+    return remaining
+
+
+async def dispatch_plan(backend, plan: list, mode: str) -> str:
+    """Send the buffered plan to the orchestrator.
+
+    ``prepend`` hands over the whole list in one call. Prepending one sequence
+    at a time would reverse the buffer's order at the head of the queue.
+
+    Returns:
+        str: Empty on success, else a message naming the sequence that failed.
+        A partial flush is the dangerous case -- some queued, some not -- so
+        the message says where it stopped rather than that "something" failed.
+    """
+    if mode not in PLAN_MODES:
+        LOGGER.warning(f"operator refused plan mode '{mode}'")
+        return f"unknown plan mode '{mode}'"
+    if not plan:
+        return ""
+    if backend is None:
+        return "no orchestrator connection"
+    if mode == "prepend":
+        try:
+            await backend.prepend_sequences(list(plan))
+        except Exception as exc:
+            LOGGER.warning(f"operator could not prepend the plan: {exc}")
+            return f"the plan could not be prepended: {exc}"
+        return ""
+    method = backend.add_sequence if mode == "append" else backend.add_split_sequences
+    for sequence in plan:
+        try:
+            await method(sequence)
+        except Exception as exc:
+            name = sequence.sequence_name
+            LOGGER.warning(f"operator could not enqueue '{name}': {exc}")
+            return f"stopped at {name}: {exc}"
+    return ""
+
+
+# -- history -----------------------------------------------------------------
+
+#: Columns per history table, in the Bokeh operator's order.
+HIST_COLS = {
+    "action": [
+        "action_endpoint",
+        "action_status",
+        "action_uuid",
+        "experiment_name",
+        "sequence_label",
+        "start",
+        "finish",
+    ],
+    "experiment": [
+        "experiment_name",
+        "experiment_uuid",
+        "experiment_status",
+        "sequence_label",
+        "campaign_name",
+        "start",
+        "finish",
+    ],
+    "sequence": [
+        "sequence_name",
+        "sequence_uuid",
+        "sequence_status",
+        "sequence_label",
+        "campaign_name",
+        "start",
+        "finish",
+    ],
+}
+
+#: Per kind, the payload keys holding the start and finish timestamps.
+_HIST_TIMES = {
+    "action": ("action_timestamp", "action_finished_timestamp"),
+    "experiment": ("experiment_timestamp", "experiment_finished_timestamp"),
+    "sequence": ("sequence_timestamp", "sequence_finished_timestamp"),
+}
+
+
+def _last_of(value):
+    """Status fields arrive as a list of transitions; the current one is last."""
+    if isinstance(value, list):
+        return value[-1] if value else ""
+    return "" if value is None else value
+
+
+def history_rows(histories: Optional[dict], kind: str) -> list:
+    """Render one history table.
+
+    Args:
+        histories: ``get_histories`` payload -- ``kind -> [(uuid, payload)]``.
+        kind: ``action``, ``experiment``, or ``sequence``.
+
+    Returns:
+        list[list[str]]: Most recent first, one cell per column. Every row
+        carries every column even when the payload lacks the key: ragged rows
+        are what made the Bokeh table refuse to render, and here they would
+        silently shift cells under the wrong headers.
+    """
+    columns = HIST_COLS.get(kind)
+    if columns is None:
+        return []
+    entries = ((histories or {}).get(kind)) or []
+    start_key, finish_key = _HIST_TIMES[kind]
+    rows = []
+    for uuid, payload in sorted(entries, key=lambda x: x[0])[::-1]:
+        payload = payload or {}
+        derived = dict(payload)
+        derived[f"{kind}_uuid"] = str(uuid)[-8:]
+        derived["start"] = payload.get(start_key)
+        derived["finish"] = payload.get(finish_key)
+        if kind == "action":
+            derived["action_endpoint"] = (
+                f"{payload.get('action_server', '')}/{payload.get('action_name', '')}"
+            )
+        rows.append([str(_last_of(derived.get(col))) for col in columns])
+    return rows
+
+
+class OperatorPlanState(rx.State):
+    """The client-side plan buffer and the history tables.
+
+    The buffer is the one piece of operator state the orchestrator does not
+    own: sequences are assembled and reordered here, and only reach the
+    orchestrator when the operator flushes them. That is why these rows are
+    edited locally, unlike the queue tables.
+    """
+
+    plan_view: list[list[str]] = []
+    selected_row: int = -1
+    status: str = ""
+    error: str = ""
+
+    action_history: list[list[str]] = []
+    experiment_history: list[list[str]] = []
+    sequence_history: list[list[str]] = []
+
+    #: Buffered Sequence models. A backend var: these are pydantic models, not
+    #: JSON, and the browser only ever needs `plan_view`.
+    _plan: list = []
+
+    @rx.var
+    def plan_count(self) -> int:
+        """How many sequences are buffered, for the flush button's label."""
+        return len(self.plan_view)
+
+    def _set_plan(self, plan: list) -> None:
+        self._plan = plan
+        self.plan_view = plan_rows(plan)
+        if self.selected_row >= len(plan):
+            self.selected_row = -1
+
+    async def _add(self, prepend: bool):
+        """Build a sequence from the library tab's selection and buffer it."""
+        lib = await self.get_state(OperatorLibState)
+        kind, name = lib.mode, lib.selected_name
+        item = item_by_name(lib._items.get(kind, []), kind, name)
+        fields = list(lib._fields)
+        values = dict(lib._values.get((kind, name), {}))
+        label, campaign = lib.sequence_label, lib.campaign_name
+        if kind == "sequence":
+            backend = session_backend(self.router.session.client_token)
+            sequence, error = build_sequence(
+                backend, item, fields, values, label=label, campaign=campaign
+            )
+        else:
+            sequence, error = build_manual_sequence(
+                item, fields, values, label=label, campaign=campaign
+            )
+        if error:
+            self.error = error
+            return
+        self.error = ""
+        plan = list(self._plan)
+        plan.insert(0, sequence) if prepend else plan.append(sequence)
+        self._set_plan(plan)
+        self.status = f"buffered {sequence.sequence_name}"
+
+    @rx.event
+    async def append_selection(self):
+        """Add the current selection to the end of the buffer."""
+        await self._add(prepend=False)
+
+    @rx.event
+    async def prepend_selection(self):
+        """Add the current selection to the front of the buffer."""
+        await self._add(prepend=True)
+
+    @rx.event
+    def select_row(self, index: int):
+        """Select one buffered row, or deselect it when clicked again."""
+        self.selected_row = -1 if index == self.selected_row else index
+
+    @rx.event
+    def move_row(self, direction: str):
+        """Move the selected row within the buffer.
+
+        The selection follows the row it was on, so holding a button moves one
+        sequence rather than walking the selection down the table.
+        """
+        target = moved_index(self.selected_row, direction, len(self._plan))
+        moved = plan_moved(self._plan, self.selected_row, direction)
+        if target is None or moved is None:
+            return
+        self._set_plan(moved)
+        self.selected_row = target
+
+    @rx.event
+    def remove_row(self):
+        """Drop the selected row from the buffer."""
+        remaining = plan_removed(self._plan, self.selected_row)
+        if remaining is None:
+            return
+        self._set_plan(remaining)
+        self.selected_row = -1
+
+    @rx.event
+    def clear_plan(self):
+        """Empty the buffer without sending anything."""
+        self._set_plan([])
+        self.status = ""
+
+    @rx.event(background=True)
+    async def flush(self, mode: str):
+        """Send the buffer to the orchestrator.
+
+        The buffer is emptied *before* the first await. A flush that cleared
+        afterwards would let a second click dispatch the same sequences again
+        while the first was still in flight -- the same reason the Bokeh
+        operator clears synchronously and dispatches on the next tick.
+        """
+        async with self:
+            plan = list(self._plan)
+            token = self.router.session.client_token
+            self._set_plan([])
+            self.error = ""
+            self.status = f"sending {len(plan)} sequence(s)..." if plan else ""
+        error = await dispatch_plan(session_backend(token), plan, mode)
+        async with self:
+            self.error = error
+            self.status = "" if error else f"sent {len(plan)} sequence(s)"
+
+    @rx.event(background=True)
+    async def refresh_history(self):
+        """Reload all three history tables."""
+        async with self:
+            token = self.router.session.client_token
+        backend = session_backend(token)
+        if backend is None:
+            return
+        try:
+            histories = await backend.get_histories()
+        except Exception as exc:
+            LOGGER.warning(f"operator history refresh failed: {exc}")
+            async with self:
+                self.error = f"history unavailable: {exc}"
+            return
+        async with self:
+            self.action_history = history_rows(histories, "action")
+            self.experiment_history = history_rows(histories, "experiment")
+            self.sequence_history = history_rows(histories, "sequence")

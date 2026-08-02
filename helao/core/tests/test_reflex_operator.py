@@ -716,6 +716,16 @@ class LibBackend(FakeBackend):
         self.calls.append(("add_sequence", sequence))
         return {"ok": True}
 
+    async def add_split_sequences(self, sequence):
+        self._boom()
+        self.calls.append(("add_split_sequences", sequence))
+        return {"ok": True}
+
+    async def prepend_sequences(self, sequences):
+        self._boom()
+        self.calls.append(("prepend_sequences", list(sequences)))
+        return {"ok": True}
+
 
 def _fresh_libs():
     from helao.core.servers.operator import param_forms as pf
@@ -879,3 +889,224 @@ def test_options_map_names_both_custom_position_params():
 def test_options_map_is_empty_when_there_are_no_positions():
     """An empty map is what makes those params fall back to text inputs."""
     assert opx.options_map_for({"servers": {}}) == {}
+
+
+# -- plan buffer -------------------------------------------------------------
+#
+# These mirror the Bokeh operator's six plan tests, which are the
+# specification for this tab: test_plan_buffer_append_and_wrap,
+# test_plan_buffer_order, test_plan_table_rows, test_plan_reorder_and_remove,
+# test_flush_add_dispatches_per_sequence, and
+# test_prepend_plan_callback_clears_and_dispatches.
+
+
+def _seq(name, label="", experiments=0):
+    from helao.helpers.premodels import Experiment, Sequence
+
+    sequence = Sequence(sequence_name=name)
+    if label:
+        sequence.sequence_label = label
+    sequence.planned_experiments = [
+        Experiment(experiment_name="exp0") for _ in range(experiments)
+    ]
+    return sequence
+
+
+def test_build_sequence_makes_a_sequence_from_the_selection():
+    _fresh_libs()
+    backend = LibBackend()
+    items, _ = opx.library_items(backend, "sequence", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, error = opx.build_sequence(backend, items[0], fields, {"alpha": "4"})
+    assert error == ""
+    assert sequence.sequence_name == "seq_a"
+    assert sequence.sequence_params["alpha"] == 4
+
+
+def test_build_manual_sequence_wraps_an_experiment():
+    """Appending an experiment wraps it in a one-experiment 'manual_orch_seq',
+    which is how the Bokeh operator gets a bare experiment into a queue that
+    only accepts sequences."""
+    _fresh_libs()
+    items, _ = opx.library_items(LibBackend(), "experiment", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, error = opx.build_manual_sequence(items[0], fields, {"gamma": "3.5"})
+    assert error == ""
+    assert sequence.sequence_name == "manual_orch_seq"
+    assert sequence.manual_action is True
+    assert len(sequence.planned_experiments) == 1
+    assert sequence.planned_experiments[0].experiment_params["gamma"] == 3.5
+
+
+def test_build_manual_sequence_refuses_a_bad_parameter():
+    _fresh_libs()
+    items, _ = opx.library_items(LibBackend(), "experiment", {})
+    fields = opx.fields_for_item(items[0])
+    sequence, error = opx.build_manual_sequence(items[0], fields, {"gamma": "soon"})
+    assert sequence is None
+    assert "gamma" in error
+
+
+def test_plan_rows_shows_name_label_and_experiment_count():
+    rows = opx.plan_rows([_seq("m", "L1", 1), _seq("big", "L2", 2)])
+    assert [r[0] for r in rows] == ["m", "big"]
+    assert [r[1] for r in rows] == ["L1", "L2"]
+    assert [r[2] for r in rows] == ["1", "2"]
+
+
+def test_plan_rows_on_an_empty_buffer():
+    assert opx.plan_rows([]) == []
+
+
+def test_plan_moved_swaps_the_selected_row():
+    plan = [_seq(n) for n in ("A", "B", "C")]
+    assert [s.sequence_name for s in opx.plan_moved(plan, 2, "up")] == ["A", "C", "B"]
+    assert [s.sequence_name for s in opx.plan_moved(plan, 0, "down")] == ["B", "A", "C"]
+
+
+def test_plan_moved_at_an_end_is_none():
+    plan = [_seq(n) for n in ("A", "B")]
+    assert opx.plan_moved(plan, 0, "up") is None
+    assert opx.plan_moved(plan, 1, "down") is None
+
+
+def test_plan_moved_with_nothing_selected():
+    assert opx.plan_moved([_seq("A")], -1, "up") is None
+
+
+def test_plan_removed_drops_the_selected_row():
+    plan = [_seq(n) for n in ("C", "A", "B")]
+    assert [s.sequence_name for s in opx.plan_removed(plan, 1)] == ["C", "B"]
+
+
+def test_plan_removed_out_of_range_is_none():
+    assert opx.plan_removed([_seq("A")], 4) is None
+    assert opx.plan_removed([_seq("A")], -1) is None
+
+
+def test_plan_edits_do_not_mutate_the_original_buffer():
+    """The handler assigns the returned list, so returning a new one keeps the
+    state var assignment explicit rather than mutating behind Reflex's back."""
+    plan = [_seq(n) for n in ("A", "B")]
+    opx.plan_moved(plan, 1, "up")
+    opx.plan_removed(plan, 0)
+    assert [s.sequence_name for s in plan] == ["A", "B"]
+
+
+def test_dispatch_plan_appends_each_sequence_in_order():
+    backend = LibBackend()
+    plan = [_seq("A"), _seq("B")]
+    assert asyncio.run(opx.dispatch_plan(backend, plan, "append")) == ""
+    added = [c[1].sequence_name for c in backend.calls if c[0] == "add_sequence"]
+    assert added == ["A", "B"]
+
+
+def test_dispatch_plan_prepends_the_whole_buffer_at_once():
+    """prepend_sequences takes the list: prepending one at a time would
+    reverse the buffer's order at the head of the queue."""
+    backend = LibBackend()
+    plan = [_seq("A"), _seq("B")]
+    assert asyncio.run(opx.dispatch_plan(backend, plan, "prepend")) == ""
+    call = [c for c in backend.calls if c[0] == "prepend_sequences"][0]
+    assert [s.sequence_name for s in call[1]] == ["A", "B"]
+
+
+def test_dispatch_plan_routes_the_split_variant():
+    backend = LibBackend()
+    assert asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "split")) == ""
+    assert [c[0] for c in backend.calls] == ["add_split_sequences"]
+
+
+def test_dispatch_plan_refuses_an_unknown_mode():
+    backend = LibBackend()
+    error = asyncio.run(opx.dispatch_plan(backend, [_seq("A")], "sideways"))
+    assert "unknown" in error
+    assert backend.calls == []
+
+
+def test_dispatch_plan_on_an_empty_buffer_does_nothing():
+    backend = LibBackend()
+    assert asyncio.run(opx.dispatch_plan(backend, [], "append")) == ""
+    assert backend.calls == []
+
+
+def test_dispatch_plan_reports_which_sequence_failed():
+    """A partial flush is the dangerous case: some sequences are queued and
+    some are not, and the operator must know where it stopped."""
+    backend = LibBackend()
+    plan = [_seq("A"), _seq("B")]
+
+    async def fail_on_b(sequence):
+        if sequence.sequence_name == "B":
+            raise RuntimeError("queue full")
+        backend.calls.append(("add_sequence", sequence))
+
+    backend.add_sequence = fail_on_b
+    error = asyncio.run(opx.dispatch_plan(backend, plan, "append"))
+    assert "B" in error
+    assert [c[1].sequence_name for c in backend.calls] == ["A"]
+
+
+def test_dispatch_plan_without_a_backend():
+    assert "no orchestrator" in asyncio.run(
+        opx.dispatch_plan(None, [_seq("A")], "append")
+    )
+
+
+# -- history -----------------------------------------------------------------
+
+
+def _hist(kind, uuid, payload):
+    return {"action": [], "experiment": [], "sequence": [], kind: [(uuid, payload)]}
+
+
+def test_history_rows_builds_the_action_endpoint():
+    rows = opx.history_rows(
+        _hist("action", "u1", {"action_server": "MOTOR", "action_name": "move"}),
+        "action",
+    )
+    assert rows[0][0] == "MOTOR/move"
+
+
+def test_history_rows_shortens_the_uuid():
+    """Full UUIDs make the table unreadable; Bokeh shows the last 8 characters."""
+    rows = opx.history_rows(
+        _hist("sequence", "0123456789abcdef", {"sequence_name": "s"}), "sequence"
+    )
+    assert "89abcdef" in rows[0]
+
+
+def test_history_rows_takes_the_last_element_of_a_status_list():
+    """Status arrives as a list of transitions; the current one is the last."""
+    rows = opx.history_rows(
+        _hist("action", "u1", {"action_status": ["active", "finished"]}), "action"
+    )
+    assert "finished" in rows[0]
+    assert "active" not in rows[0]
+
+
+def test_history_rows_renders_an_empty_status_list_as_blank():
+    rows = opx.history_rows(_hist("action", "u1", {"action_status": []}), "action")
+    assert rows[0][1] == ""
+
+
+def test_history_rows_is_most_recent_first():
+    hist = {
+        "action": [("u1", {"action_name": "a"}), ("u2", {"action_name": "b"})],
+        "experiment": [],
+        "sequence": [],
+    }
+    rows = opx.history_rows(hist, "action")
+    assert rows[0][0].endswith("b")
+
+
+def test_history_rows_on_a_missing_kind_is_empty():
+    assert opx.history_rows({}, "action") == []
+    assert opx.history_rows(None, "sequence") == []
+
+
+def test_history_rows_every_row_has_every_column():
+    """Ragged rows are what broke the Bokeh table; the Reflex table would
+    render a short row with missing cells instead."""
+    rows = opx.history_rows(_hist("experiment", "u1", {}), "experiment")
+    assert len(rows[0]) == len(opx.HIST_COLS["experiment"])
