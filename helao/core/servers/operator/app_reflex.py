@@ -34,6 +34,8 @@ __all__ = [
     "reset_settings",
     "make_backend",
     "session_backend",
+    "repo_root",
+    "rooted_config",
     "align_defaults",
     "field_kind",
     "fields_for_item",
@@ -69,6 +71,7 @@ __all__ = [
 ]
 
 import asyncio
+import os
 import threading
 from typing import Optional
 
@@ -435,6 +438,54 @@ async def dispatch_remove(backend, kind: str, position: int, length: int) -> str
     return ""
 
 
+def repo_root() -> str:
+    """Absolute path of the repo root, derived from the installed package."""
+    import helao
+
+    return os.path.dirname(os.path.dirname(os.path.abspath(helao.__file__)))
+
+
+def _rooted(path: str) -> str:
+    """Resolve one config path against the repo root."""
+    return path if os.path.isabs(path) else os.path.join(repo_root(), path)
+
+
+def rooted_config(world_cfg: dict) -> dict:
+    """A copy of the config whose library paths do not depend on the cwd.
+
+    ``import_autolibs`` resolves every library path relative to the working
+    directory, and the Reflex process runs from its app directory rather than
+    the repo root -- so the libraries come back **empty with only an ERROR in
+    the log**, and the operator renders with nothing to select. The Bokeh
+    operator never hits this because its launcher runs from the repo root.
+
+    Bare module names are left alone: they are names, not paths, and are
+    resolved against the library directory, which this makes absolute.
+
+    Returns:
+        dict: A shallow copy. The world config is shared with every other
+        server in the process and must not be mutated.
+    """
+    rooted = dict(world_cfg or {})
+    loaded = rooted.get("loaded_config_path")
+    if not loaded:
+        return rooted
+    deployment = os.path.basename(os.path.dirname(os.path.dirname(loaded)))
+    for lib_type in ("experiment", "sequence"):
+        key = f"{lib_type}_path"
+        rooted[key] = _rooted(
+            rooted.get(key)
+            or os.path.join("helao", "deploy", deployment, f"{lib_type}s")
+        )
+        libraries = rooted.get(f"{lib_type}_libraries")
+        if libraries:
+            rooted[f"{lib_type}_libraries"] = [
+                _rooted(entry) if entry.endswith(".py") else entry
+                for entry in libraries
+            ]
+    return rooted
+
+
 class _VisShim:
     """The two attributes ``RemoteBackend`` reads off a Bokeh ``Vis``.
 
@@ -445,7 +496,7 @@ class _VisShim:
     """
 
     def __init__(self, world_cfg: dict, server_key: str):
-        self.world_cfg = world_cfg
+        self.world_cfg = rooted_config(world_cfg)
         self.helaodirs = helao_dirs(world_cfg, server_key)
 
 
@@ -1902,6 +1953,11 @@ def _library_panel():
         ),
         _error_text(OperatorLibState.error),
         rx.text(OperatorLibState.status, size="2"),
+        # The plan state's feedback is repeated here because "Add to plan"
+        # lives on this tab: an operator who buffers a sequence and sees
+        # nothing has no way to tell it worked without changing tabs.
+        _error_text(OperatorPlanState.error),
+        rx.text(OperatorPlanState.status, size="2"),
         width="100%",
         spacing="3",
     )
