@@ -64,11 +64,13 @@ def _load(root: str) -> dict:
     if not isinstance(loaded, dict):
         LOGGER.warning("previous_params.json does not hold an object; ignoring it")
         return _empty()
-    store = _empty()
-    for key in store:
-        value = loaded.get(key)
-        if isinstance(value, dict):
-            store[key] = value
+    # Start from what was read, so a key written by another version of the
+    # store survives a write from this one. Only the three keys this module
+    # owns are normalised.
+    store = dict(loaded)
+    for key, blank in _empty().items():
+        if not isinstance(store.get(key), dict):
+            store[key] = blank
     return store
 
 

@@ -184,3 +184,35 @@ def test_build_lib_returns_copies_so_a_caller_cannot_poison_the_cache():
     second, names2 = pf.build_lib(_lib(seq_a=seq_a), **args)
     assert second[0]["doc"] != "MUTATED"
     assert names2 == ["seq_a"]
+
+
+def test_campaign_uuid_is_hashed_from_the_name_when_not_entered():
+    """A campaign with no uuid still gets a stable one, so two runs of the
+    same campaign group together."""
+    from uuid import UUID
+
+    first = pf.resolve_campaign_uuid("my-campaign", "")
+    second = pf.resolve_campaign_uuid("my-campaign", "   ")
+    assert isinstance(first, UUID)
+    assert first == second
+
+
+def test_campaign_uuid_uses_what_was_entered():
+    from uuid import UUID
+
+    entered = "12345678-1234-5678-1234-567812345678"
+    assert pf.resolve_campaign_uuid("c", entered) == UUID(entered)
+
+
+def test_a_malformed_campaign_uuid_is_hashed_rather_than_raising():
+    """The model validates on assignment, so a typo would otherwise crash the
+    enqueue instead of the operator seeing their own mistake."""
+    from uuid import UUID
+
+    result = pf.resolve_campaign_uuid("c", "not-a-uuid")
+    assert isinstance(result, UUID)
+    assert result != pf.resolve_campaign_uuid("c", "")
+
+
+def test_campaign_uuid_hashing_differs_by_campaign():
+    assert pf.resolve_campaign_uuid("a", "") != pf.resolve_campaign_uuid("b", "")

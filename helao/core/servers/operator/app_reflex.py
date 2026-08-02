@@ -731,11 +731,14 @@ class OperatorQueueState(rx.State):
             token = self.router.session.client_token
         try:
             updates = await refresh_tables(session_backend(token))
+            async with self:
+                self._apply(updates)
         finally:
+            # Cleared only after the updates are applied. Clearing first opens
+            # a window where the next tick starts, fetches fresher data, and
+            # applies it -- and then this tick writes its older data on top.
             async with self:
                 self.polling = False
-        async with self:
-            self._apply(updates)
 
     @rx.event
     def on_mount(self):
@@ -1006,8 +1009,29 @@ def item_by_name(items: list, kind: str, name: str):
     return None
 
 
+def _stamp_campaign(sequence, campaign: str, campaign_uuid: str) -> None:
+    """Stamp the campaign onto a sequence, resolving its UUID.
+
+    The UUID rule is shared with the Bokeh operator: an empty entry hashes the
+    campaign name into a deterministic UUID so two runs of one campaign group
+    together, and a malformed entry is hashed rather than raising.
+    """
+    from helao.core.servers.operator.param_forms import resolve_campaign_uuid
+
+    if not campaign:
+        return
+    sequence.campaign_name = campaign
+    sequence.campaign_uuid = resolve_campaign_uuid(campaign, campaign_uuid)
+
+
 def build_sequence(
-    backend, item, fields: list, values: dict, label: str = "", campaign: str = ""
+    backend,
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
 ) -> tuple:
     """Unpack the selected sequence with the entered parameters.
 
@@ -1039,13 +1063,17 @@ def build_sequence(
         sequence_label=label or None,
         planned_experiments=planned,
     )
-    if campaign:
-        sequence.campaign_name = campaign
+    _stamp_campaign(sequence, campaign, campaign_uuid)
     return sequence, ""
 
 
 def build_manual_sequence(
-    item, fields: list, values: dict, label: str = "", campaign: str = ""
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
 ) -> tuple:
     """Wrap one experiment as a single-experiment ``manual_orch_seq``.
 
@@ -1072,13 +1100,18 @@ def build_manual_sequence(
         ],
         manual_action=True,
     )
-    if campaign:
-        sequence.campaign_name = campaign
+    _stamp_campaign(sequence, campaign, campaign_uuid)
     return sequence, ""
 
 
 async def enqueue_sequence(
-    backend, item, fields: list, values: dict, label: str = "", campaign: str = ""
+    backend,
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
 ) -> tuple:
     """Unpack the selected sequence and enqueue it directly.
 
@@ -1087,7 +1120,13 @@ async def enqueue_sequence(
         the orchestrator while a parameter will not convert.
     """
     sequence, error = build_sequence(
-        backend, item, fields, values, label=label, campaign=campaign
+        backend,
+        item,
+        fields,
+        values,
+        label=label,
+        campaign=campaign,
+        campaign_uuid=campaign_uuid,
     )
     if error:
         return "", error
@@ -1196,18 +1235,29 @@ class OperatorLibState(rx.State):
         with _SETTINGS_LOCK:
             return _SETTINGS.get("world_cfg") or {}
 
-    def _remember(self, kind: str, name: str) -> None:
+    def _remember(self, kind: str, name: str, fields=None) -> None:
         """Save the parameters that were just used, if saving is enabled.
 
         Coerces once more rather than reading them back off the built model,
         so both the plan path and the direct-enqueue path save the same thing.
         Coercion is pure, and what is stored is the typed values -- matching
         what the Bokeh operator writes into the same file.
+
+        Args:
+            kind: Library kind the parameters belong to.
+            name: Library item the parameters belong to.
+            fields: The descriptors captured with ``name``. Passed explicitly
+                because an enqueue is a background event: by the time it
+                returns, ``self._fields`` may describe a different item the
+                operator selected meanwhile, and those fields would be saved
+                under this name.
         """
         if not self.save_params:
             return
         values = dict(self._values.get((kind, name), {}))
-        params, errors = coerce_params(self._fields, values)
+        params, errors = coerce_params(
+            self._fields if fields is None else fields, values
+        )
         if errors:
             return
         save_values(
@@ -1385,6 +1435,7 @@ class OperatorLibState(rx.State):
             fields = list(self._fields)
             values = dict(self._values.get((kind, name), {}))
             label, campaign = self.sequence_label, self.campaign_name
+            campaign_uuid = self.campaign_uuid
             self.status = ""
             self.error = ""
         if kind != "sequence":
@@ -1394,13 +1445,19 @@ class OperatorLibState(rx.State):
                 self.error = "select a sequence to enqueue"
             return
         message, error = await enqueue_sequence(
-            session_backend(token), item, fields, values, label=label, campaign=campaign
+            session_backend(token),
+            item,
+            fields,
+            values,
+            label=label,
+            campaign=campaign,
+            campaign_uuid=campaign_uuid,
         )
         async with self:
             self.status = message
             self.error = error
             if not error:
-                self._remember(kind, name)
+                self._remember(kind, name, fields)
 
 
 # -- plan buffer -------------------------------------------------------------
@@ -1603,14 +1660,26 @@ class OperatorPlanState(rx.State):
         fields = list(lib._fields)
         values = dict(lib._values.get((kind, name), {}))
         label, campaign = lib.sequence_label, lib.campaign_name
+        campaign_uuid = lib.campaign_uuid
         if kind == "sequence":
             backend = session_backend(self.router.session.client_token)
             sequence, error = build_sequence(
-                backend, item, fields, values, label=label, campaign=campaign
+                backend,
+                item,
+                fields,
+                values,
+                label=label,
+                campaign=campaign,
+                campaign_uuid=campaign_uuid,
             )
         else:
             sequence, error = build_manual_sequence(
-                item, fields, values, label=label, campaign=campaign
+                item,
+                fields,
+                values,
+                label=label,
+                campaign=campaign,
+                campaign_uuid=campaign_uuid,
             )
         if error:
             self.error = error
@@ -1618,9 +1687,12 @@ class OperatorPlanState(rx.State):
         self.error = ""
         # The Bokeh operator saves in populate_sequence -- i.e. when the item
         # is buffered, not only when it is enqueued -- so this does too.
-        lib._remember(kind, name)
+        lib._remember(kind, name, fields)
         plan = list(self._plan)
-        plan.insert(0, sequence) if prepend else plan.append(sequence)
+        if prepend:
+            plan.insert(0, sequence)
+        else:
+            plan.append(sequence)
         self._set_plan(plan)
         self.status = f"buffered {sequence.sequence_name}"
 
@@ -1696,10 +1768,22 @@ class OperatorPlanState(rx.State):
             async with self:
                 self.error = f"history unavailable: {exc}"
             return
+        try:
+            rendered = {
+                kind: history_rows(histories, kind)
+                for kind in ("action", "experiment", "sequence")
+            }
+        except Exception as exc:
+            # Rendering is outside the fetch's guard, and a payload shaped
+            # unlike (uuid, dict) pairs would otherwise escape the handler.
+            LOGGER.warning(f"operator could not render the histories: {exc}")
+            async with self:
+                self.error = f"history could not be read: {exc}"
+            return
         async with self:
-            self.action_history = history_rows(histories, "action")
-            self.experiment_history = history_rows(histories, "experiment")
-            self.sequence_history = history_rows(histories, "sequence")
+            self.action_history = rendered["action"]
+            self.experiment_history = rendered["experiment"]
+            self.sequence_history = rendered["sequence"]
 
 
 # -- plate map ---------------------------------------------------------------

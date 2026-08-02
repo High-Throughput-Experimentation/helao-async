@@ -14,6 +14,7 @@ __all__ = [
     "build_lib",
     "parse_arg_docs",
     "version_hint_parts",
+    "resolve_campaign_uuid",
     "clear_lib_cache",
     "BUILTIN_TYPES",
     "LibItem",
@@ -178,6 +179,31 @@ def build_lib(
         list(select_list),
     )
     return items, select_list
+
+
+def resolve_campaign_uuid(campaign_name: str, entered: str):
+    """Resolve the campaign UUID from the operator's input.
+
+    Empty input hashes ``campaign_name`` into a deterministic UUID, so two
+    runs of the same campaign group together. A non-empty value is parsed as a
+    UUID; a malformed entry is logged and hashed instead, because the model
+    validates on assignment and a typo would otherwise crash the enqueue.
+    """
+    from uuid import UUID
+
+    from helao.helpers.time_utils import md5_string
+
+    entered = (entered or "").strip()
+    if entered == "":
+        return md5_string(campaign_name)
+    try:
+        return UUID(entered)
+    except ValueError:
+        LOGGER.warning(
+            f"campaign_uuid input '{entered}' is not a valid UUID; "
+            "hashing it into a deterministic UUID instead"
+        )
+        return md5_string(entered)
 
 
 def parse_arg_docs(doc: str) -> dict:
