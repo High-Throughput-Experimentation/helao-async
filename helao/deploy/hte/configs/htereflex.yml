@@ -12,7 +12,9 @@
 dummy: true
 simulation: true
 run_type: simulation
-root: ~/INST_hlo_htereflex
+# HELAO does not expand `~`; a tilde here creates a literal '~' directory
+# in the working directory, which for a dev launch is the repo itself.
+root: /tmp/helao-htereflex
 experiment_libraries: []
 sequence_libraries: []
 servers:
