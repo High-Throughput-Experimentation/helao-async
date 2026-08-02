@@ -1,5 +1,11 @@
 """Reflex panel for the GP simulator's live acquisition stream.
 
+DEPRECATED, and unreachable from any launchable config. ``gpsim_driver``
+imports ``gpflow``, which requires ``tensorflow``, and tensorflow has no
+Python 3.14 release -- so ``gpsim_server`` cannot import. The panel itself has
+no such dependency and is retained against the simulator returning; nothing
+here is exercised by ``goldenreflex``.
+
 Reflex port of ``servers/visualizer/gpsim_live_vis.py``. This payload does not
 fit the flat numeric-column model — it carries per-plate sample arrays
 (``pred_avail``, ``gt_acquired``) and string columns (``orchestrator``,

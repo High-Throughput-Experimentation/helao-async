@@ -18,6 +18,7 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.metrics import mean_absolute_error
 
+from helao.deploy.test.drivers.data.oer_metrics import calc_eta  # noqa: F401
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base import Active, Base
@@ -26,23 +27,6 @@ from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.executor import Executor
 from helao.helpers.file_utils import unzpickle
 from helao.helpers.premodels import Experiment
-
-
-def calc_eta(cp_dict) -> float:
-    """Compute the OER overpotential from the last four seconds of a CP trace.
-
-    Args:
-        cp_dict: Dict with parallel ``"t_s"`` and ``"erhe_v"`` lists from a CP
-            measurement.
-
-    Returns:
-        Mean potential (in V vs RHE) over the final 4 s of the trace minus the
-        thermodynamic OER potential (1.23 V).
-    """
-    thresh_ts = max(cp_dict["t_s"]) - 4
-    thresh_idx = min([i for i, v in enumerate(cp_dict["t_s"]) if v > thresh_ts])
-    erhes = cp_dict["erhe_v"][thresh_idx:]
-    return sum(erhes) / len(erhes) - 1.23
 
 
 class GPSim:
