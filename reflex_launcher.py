@@ -25,17 +25,27 @@ __all__ = [
     "resolve_bundle",
     "build_env",
     "may_build_locally",
+    "parent_watch_target",
+    "parent_is_gone",
+    "process_start_time",
+    "install_pdeathsig",
+    "watch_parent",
+    "terminate_tree",
+    "signal_group",
 ]
 
 import asyncio
 import os
 import shutil
+import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 
 import colorama
+import psutil
 
 #: Must match ``app_name`` in ``helao/core/servers/reflex/_app/rxconfig.py``.
 APP_NAME = "helao_ui"
@@ -54,6 +64,11 @@ APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
 #: next launch of the same config cannot bind.
 BACKEND_TERM_WAIT = 3.0
 BACKEND_KILL_WAIT = 1.0
+
+#: How often the parent-liveness watchdog checks that ``launch.py`` is still
+#: there. Short enough that the next launch of the same config is not blocked
+#: for long, long enough to be free.
+PARENT_POLL_SECONDS = 2.0
 
 #: Seconds to wait for the backend to begin listening before giving up. A
 #: backend that dies at startup leaves the frontend serving a page that can only
@@ -74,6 +89,210 @@ ASSETS_DIR = os.path.join(APP_DIR, "assets")
 def backend_port(port: int) -> int:
     """Return the Reflex backend port for a server whose frontend is on ``port``."""
     return int(port) + 1
+
+
+# --- Dying with the group ---------------------------------------------------
+#
+# `launch.py` tears a group down by signalling each server's own pid. Nothing
+# covers the two cases where that signal is never sent or never reaches the
+# whole tree, and both were observed repeatedly:
+#
+#   * `launch.py` itself dies without cleaning up -- SIGKILL, a closed
+#     terminal, a crash -- and this launcher just keeps running, holding
+#     `port` and `port + 1` until someone finds it by hand.
+#   * this launcher is SIGKILLed (launch.py escalates after GRACEFUL_WAIT),
+#     so the `finally` never runs and the Reflex backend it spawned survives
+#     holding `port + 1`.
+#
+# Either way the next launch of the same config cannot bind. The preflight
+# added earlier names the squatter; these functions stop it existing.
+
+
+def process_start_time(pid: int):
+    """Return a process's creation time, or ``None`` if it is not running.
+
+    The creation time is what makes a pid safe to compare against later: pids
+    are recycled, so "a process with this pid exists" is not the same question
+    as "my parent is still alive".
+
+    Args:
+        pid: Process id to probe.
+
+    Returns:
+        float | None: Creation timestamp, or ``None`` when no such process.
+    """
+    try:
+        return psutil.Process(pid).create_time()
+    except (psutil.NoSuchProcess, psutil.AccessDenied, ValueError):
+        return None
+
+
+def parent_watch_target(ppid: int, probe=process_start_time):
+    """Identify the parent to watch, or ``None`` when there is nothing to watch.
+
+    Args:
+        ppid: This process's parent pid at startup.
+        probe: Callable returning a pid's creation time.
+
+    Returns:
+        tuple[int, float] | None: ``(pid, create_time)``, or ``None`` when the
+        launcher was started directly from a shell rather than by ``launch.py``
+        (pid 1 or already reparented), where dying with the parent is wrong.
+    """
+    if ppid is None or ppid <= 1:
+        return None
+    created = probe(ppid)
+    if created is None:
+        return None
+    return (ppid, created)
+
+
+def parent_is_gone(watch, probe=process_start_time) -> bool:
+    """Whether the watched parent has exited.
+
+    Pure apart from ``probe``, so the pid-reuse case is testable without
+    orchestrating real process deaths.
+
+    Args:
+        watch: The :func:`parent_watch_target` result, or ``None``.
+        probe: Callable returning a pid's creation time.
+
+    Returns:
+        bool: ``True`` when the parent is gone, including when its pid has been
+        recycled by an unrelated process. ``False`` when there is no parent to
+        watch -- a launcher run by hand must not shut itself down.
+    """
+    if watch is None:
+        return False
+    pid, created = watch
+    return probe(pid) != created
+
+
+def install_pdeathsig(sig=signal.SIGTERM) -> bool:
+    """Ask the kernel to signal this process when its parent dies.
+
+    Linux-only (``prctl(PR_SET_PDEATHSIG)``). Instant and immune to a parent
+    that dies uncatchably, which polling cannot match -- but it is a
+    best-effort optimization, not the mechanism: :func:`watch_parent` is what
+    every platform relies on, and it also covers the race where the parent dies
+    before this call lands.
+
+    Args:
+        sig: Signal the kernel should deliver on parent death.
+
+    Returns:
+        bool: ``True`` if installed.
+    """
+    if not sys.platform.startswith("linux"):
+        return False
+    try:
+        import ctypes
+
+        pr_set_pdeathsig = 1
+        libc = ctypes.CDLL("libc.so.6", use_errno=True)
+        return libc.prctl(pr_set_pdeathsig, int(sig), 0, 0, 0) == 0
+    except Exception:
+        return False
+
+
+def watch_parent(
+    watch,
+    on_gone,
+    poll: float = PARENT_POLL_SECONDS,
+    sleep=time.sleep,
+    probe=process_start_time,
+):
+    """Block until the watched parent exits, then call ``on_gone``.
+
+    Returns immediately when there is nothing to watch.
+
+    ``probe`` is threaded through to :func:`parent_is_gone` rather than left to
+    that function's own default: a default argument binds at definition time,
+    so a test replacing the module-level probe would have no effect here and
+    would silently exercise the real one.
+
+    Args:
+        watch: The :func:`parent_watch_target` result, or ``None``.
+        on_gone: Called once, when the parent is gone.
+        poll: Seconds between checks.
+        sleep: Injected for tests.
+        probe: Callable returning a pid's creation time.
+    """
+    if watch is None:
+        return
+    while not parent_is_gone(watch, probe=probe):
+        sleep(poll)
+    on_gone()
+
+
+def signal_group(pgid: int, sig) -> None:
+    """Signal a whole process group, ignoring one that is already gone.
+
+    A tree walk finds only processes that are still descendants. ``reflex run``
+    starts its server through ``multiprocessing``, and the moment the CLI dies
+    those workers are reparented to init -- at which point no walk can reach
+    them, while they still hold the backend port. They keep their process
+    group, so the group is the only handle that survives.
+
+    Args:
+        pgid: Process group id.
+        sig: Signal to deliver.
+    """
+    if os.name != "posix":
+        return
+    try:
+        os.killpg(pgid, sig)
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+
+
+def terminate_tree(
+    pid: int, term_wait: float, kill_wait: float, logger=None, pgid=None
+) -> bool:
+    """Terminate a process, every descendant, and its process group.
+
+    Signalling only the direct child is not enough: ``reflex run`` is a
+    supervisor whose worker is what actually holds the backend port, and that
+    worker outlives the CLI as a reparented orphan.
+
+    Args:
+        pid: Root of the tree to terminate.
+        term_wait: Seconds to allow for cooperative exit before SIGKILL.
+        kill_wait: Seconds to wait after SIGKILL, so nothing is left unreaped.
+        logger: Optional logger for survivors.
+        pgid: Process group to sweep as well. POSIX only.
+
+    Returns:
+        bool: ``True`` if the whole tree is gone.
+    """
+    try:
+        root = psutil.Process(pid)
+        procs = root.children(recursive=True) + [root]
+    except psutil.NoSuchProcess:
+        procs = []
+
+    for proc in procs:
+        try:
+            proc.terminate()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    if pgid is not None:
+        signal_group(pgid, signal.SIGTERM)
+
+    _, alive = psutil.wait_procs(procs, timeout=term_wait)
+    for proc in alive:
+        try:
+            proc.kill()
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            pass
+    if pgid is not None:
+        signal_group(pgid, signal.SIGKILL)
+
+    _, still_alive = psutil.wait_procs(alive, timeout=kill_wait)
+    if still_alive and logger is not None:
+        pids = ", ".join(str(p.pid) for p in still_alive)
+        logger.warning(f"reflex backend pids {pids} did not exit after kill")
+    return not still_alive
 
 
 def resolve_bundle(repo_root: str):
@@ -387,6 +606,16 @@ if __name__ == "__main__":
 
     LOGGER.info(f" ---- starting  {server_key} ----")
 
+    # Two mechanisms, because one alone leaks:
+    #
+    #   start_new_session gives the backend its own process group, which is the
+    #   only handle that still reaches `reflex run`'s multiprocessing workers
+    #   once the CLI dies and they are reparented to init.
+    #
+    #   pdeathsig fires when this launcher is SIGKILLed and the `finally` below
+    #   never runs. It must be SIGTERM, not SIGKILL: SIGKILL gives the CLI no
+    #   chance to stop its workers, which then survive holding `port + 1` --
+    #   the exact orphan this is meant to prevent, observed in testing.
     backend = subprocess.Popen(
         [
             "reflex",
@@ -399,7 +628,15 @@ if __name__ == "__main__":
         ],
         cwd=os.path.join(helao_repo_root, APP_DIR),
         env=build_env(confArg, server_key, servHost, servPort, root),
+        start_new_session=(os.name == "posix"),
+        preexec_fn=(
+            (lambda: install_pdeathsig(signal.SIGTERM))
+            if sys.platform.startswith("linux")
+            else None
+        ),
     )
+    # With start_new_session the child leads its own group, so pgid == pid.
+    backend_pgid = backend.pid if os.name == "posix" else None
     problem = wait_for_backend(
         backend, servHost, backend_port(servPort), BACKEND_START_TIMEOUT
     )
@@ -412,26 +649,54 @@ if __name__ == "__main__":
             f"reflex run --env prod --backend-only --backend-port "
             f"{backend_port(servPort)}"
         )
-        backend.terminate()
+        terminate_tree(
+            backend.pid, BACKEND_TERM_WAIT, BACKEND_KILL_WAIT, LOGGER, backend_pgid
+        )
+        backend.poll()  # reap, so no zombie is left behind
         sys.exit(1)
 
     LOGGER.info(
         f"started {server_key}: frontend {servHost}:{servPort}, "
         f"backend {servHost}:{backend_port(servPort)}"
     )
+
+    def _shutdown_backend():
+        """Take the whole backend tree down and reap it."""
+        terminate_tree(
+            backend.pid, BACKEND_TERM_WAIT, BACKEND_KILL_WAIT, LOGGER, backend_pgid
+        )
+        backend.poll()
+
+    # Die with launch.py. prctl reacts instantly on Linux; the watchdog is what
+    # every platform actually depends on, and it also covers the race where the
+    # parent dies before prctl lands. Both run: neither alone is sufficient.
+    install_pdeathsig(signal.SIGTERM)
+    watch = parent_watch_target(os.getppid())
+    if watch is None:
+        LOGGER.info(f"no parent to watch; {server_key} will run until stopped directly")
+    else:
+        parent_pid = watch[0]
+
+        def _parent_died():
+            LOGGER.warning(
+                f"launch.py (pid {parent_pid}) is gone; shutting {server_key} down "
+                f"so it does not hold {servHost}:{servPort} and "
+                f"{servHost}:{backend_port(servPort)}"
+            )
+            _shutdown_backend()
+            # os._exit, not sys.exit: this runs on a watchdog thread, where
+            # SystemExit would only unwind that thread and leave uvicorn
+            # serving on the main one -- exactly the orphan being fixed.
+            os._exit(0)
+
+        threading.Thread(
+            target=watch_parent,
+            args=(watch, _parent_died),
+            name="parent-watchdog",
+            daemon=True,
+        ).start()
+
     try:
         _serve_frontend(bundle, servHost, servPort)
     finally:
-        backend.terminate()
-        try:
-            backend.wait(timeout=BACKEND_TERM_WAIT)
-        except subprocess.TimeoutExpired:
-            backend.kill()
-            try:
-                # Reap it: an unreaped child stays a zombie whose PID
-                # psutil.pid_exists() still reports as alive.
-                backend.wait(timeout=BACKEND_KILL_WAIT)
-            except subprocess.TimeoutExpired:
-                LOGGER.warning(
-                    f"reflex backend pid {backend.pid} did not exit after kill"
-                )
+        _shutdown_backend()
