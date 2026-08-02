@@ -48,6 +48,11 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
+from helao.core.servers.operator.param_forms import (
+    build_lib,
+    parse_arg_docs,
+    version_hint_parts,
+)
 from helao.core.servers.vis import Vis
 from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers import helao_logging as logging
@@ -71,11 +76,11 @@ BUILTIN_TYPES = [
 #     session in case it carries per-parse state.
 #   * _PLATE_API_CACHE: shared read-only plate-data API instances (keyed by class
 #     name) whose construction loads static plate data.
-#   * _LIB_TABLE_CACHE: introspected sequence/experiment dropdown data (plain
-#     dicts + name lists) produced by BokehOperator._build_lib.
+# The introspected sequence/experiment dropdown table is cached too, but in
+# param_forms alongside the logic that fills it, since the Reflex operator
+# shares both.
 _SEQSPEC_MODULE_CACHE: dict = {}
 _PLATE_API_CACHE: dict = {}
-_LIB_TABLE_CACHE: dict = {}
 
 
 def _render_node(key, val, top=False, open_keys=()):
@@ -1150,139 +1155,33 @@ class BokehOperator:
         name_field: str,
         codehash_map: dict = None,
     ) -> tuple:
-        """Inspect ``lib`` and return ``(items, select_list)`` for sequence/experiment dropdowns.
+        """Inspect ``lib`` and return ``(items, select_list)`` for the dropdowns.
 
-        Drops parameters whose annotation matches ``filter_type`` (e.g. the
-        ``Experiment`` arg of experiment functions) and overlays defaults
-        from the world config under ``config_key``.
+        Thin wrapper: the logic lives in
+        :func:`~helao.core.servers.operator.param_forms.build_lib`, shared with
+        the Reflex operator.
         """
-        items = []
-        select_list = []
-        codehash_map = codehash_map or {}
-        version_attr = name_field.replace("_name", "_version")
-
-        # The introspected table is a pure function of the library callables,
-        # their file hashes, and the config-level default overlay; all are fixed
-        # for a running process, so cache across Bokeh sessions. Only plain data
-        # is cached (dicts + name list), never Bokeh models.
-        cache_key = (
-            self.loaded_config_path,
+        return build_lib(
+            lib,
+            filter_type,
             config_key,
+            self.vis.world_cfg,
+            self.loaded_config_path,
+            model_class,
             name_field,
-            tuple(lib),
-            tuple(sorted(codehash_map.items())),
+            codehash_map,
         )
-        cached = _LIB_TABLE_CACHE.get(cache_key)
-        if cached is not None:
-            cached_items, cached_select = cached
-            return [dict(it) for it in cached_items], list(cached_select)
 
-        LOGGER.info(f"found {name_field.replace('_name', '')}s: {list(lib)}")
-        for i, name in enumerate(lib):
-            func = lib[name]
-            tmpdoc = func.__doc__ or ""
-            argspec = inspect.getfullargspec(func)
-            tmpargs = list(argspec.args)
-            tmpdefs = list(argspec.defaults or [])
-            tmpdefs = [x.value if isinstance(x, Enum) else x for x in tmpdefs]
-            tmptypes = [argspec.annotations.get(k, "unspecified") for k in tmpargs]
-
-            if filter_type is not None:
-                idxlist = [
-                    idx
-                    for idx, arg in enumerate(tmpargs)
-                    if argspec.annotations.get(arg) == filter_type
-                ]
-                for j, idx in enumerate(idxlist):
-                    if len(tmpargs) == len(tmpdefs):
-                        tmpargs.pop(idx - j)
-                        tmpdefs.pop(idx - j)
-                        tmptypes.pop(idx - j)
-                    else:
-                        tmpargs.pop(idx - j)
-                        tmptypes.pop(idx - j)
-
-            cfg_defs = self.vis.world_cfg.get(config_key, {})
-            tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
-            for t in tmpdefs:
-                try:
-                    if isinstance(t, Enum):
-                        t = json.dumps(t.value)
-                    else:
-                        t = json.dumps(t)
-                except Exception:
-                    t = ""
-            codehash = codehash_map.get(name)
-            items.append(
-                model_class(
-                    index=i,
-                    **{name_field: name},
-                    doc=tmpdoc,
-                    args=tuple(tmpargs),
-                    defaults=tuple(tmpdefs),
-                    argtypes=tuple(tmptypes),
-                    version=getattr(func, version_attr, None),
-                    codehash=str(codehash)[:8] if codehash else None,
-                ).model_dump()
-            )
-            select_list.append(name)
-        _LIB_TABLE_CACHE[cache_key] = (
-            [dict(it) for it in items],
-            list(select_list),
-        )
-        return items, select_list
-
-    @staticmethod
-    def _parse_arg_docs(doc: str) -> dict:
-        """Parse a Google-style ``Args:`` section into ``{arg_name: description}``.
-
-        Recognises ``name: text`` and ``name (type): text`` entries, folds
-        indented continuation lines into the preceding entry, and stops at the
-        next section header or a blank line. ``*args``/``**kwargs`` are skipped.
-        """
-        if not doc:
-            return {}
-        header_re = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)
-        section_re = re.compile(
-            r"^\s*(Returns?|Raises|Yields?|Examples?|Notes?|Attributes|"
-            r"Args|Arguments|Parameters)\s*:\s*$",
-            re.I,
-        )
-        arg_re = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:\s*(.*)$")
-        descs = {}
-        in_args = False
-        cur = None
-        for line in doc.splitlines():
-            if not in_args:
-                if header_re.match(line):
-                    in_args = True
-                continue
-            if line.strip() == "":
-                break
-            if section_re.match(line):
-                break
-            if re.match(r"^\s*\*", line):  # *args / **kwargs: skip, end current
-                cur = None
-                continue
-            m = arg_re.match(line)
-            if m:
-                cur = m.group(1)
-                descs[cur] = m.group(2).strip()
-            elif cur is not None:
-                descs[cur] = f"{descs[cur]} {line.strip()}".strip()
-        return descs
+    _parse_arg_docs = staticmethod(parse_arg_docs)
 
     @staticmethod
     def _version_hint(item: dict) -> str:
-        """Format the 'version · codehash' hint shown beside a selector dropdown."""
-        parts = []
-        version = item.get("version")
-        if version is not None:
-            parts.append(f"v{version}")
-        codehash = item.get("codehash")
-        if codehash:
-            parts.append(_html.escape(str(codehash)))
-        return f"<i>{' · '.join(parts)}</i>" if parts else ""
+        """Format the 'version \u00b7 codehash' hint shown beside a selector dropdown."""
+        # Every part is escaped now, not just the codehash: the version part is
+        # "v" plus a number, so escaping it is a no-op and the output is
+        # identical -- while removing the question of which part was safe.
+        parts = [_html.escape(p) for p in version_hint_parts(item)]
+        return f"<i>{' \u00b7 '.join(parts)}</i>" if parts else ""
 
     def _resolve_campaign_uuid(self, campaign_name: str):
         """Resolve the campaign UUID from operator input.
