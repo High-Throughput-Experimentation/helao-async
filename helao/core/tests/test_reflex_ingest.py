@@ -428,3 +428,33 @@ def test_registry_skips_servers_missing_host_or_port():
 def test_registry_get_returns_none_for_unknown_target():
     reg = IngestRegistry({"servers": {}})
     assert reg.get("NOPE", "ws_live") is None
+
+
+def test_a_data_package_row_carries_the_action_name():
+    """Panels choose their axes from the technique: a CV is read as current
+    against potential, a CA against time. Without the name they cannot."""
+
+    class _Model:
+        status = "active"
+        data = {"conn": {"t_s": [0.0, 1.0]}}
+
+    class _Package:
+        action_uuid = "u-1"
+        action_name = "run_CV"
+        datamodel = _Model()
+
+    _, rows = normalize_data_package([_Package()])
+    assert rows[0]["action_name"] == "run_CV"
+
+
+def test_a_data_package_without_an_action_name_reads_as_empty():
+    class _Model:
+        status = "active"
+        data = {}
+
+    class _Package:
+        action_uuid = "u-2"
+        datamodel = _Model()
+
+    _, rows = normalize_data_package([_Package()])
+    assert rows[0]["action_name"] == ""
