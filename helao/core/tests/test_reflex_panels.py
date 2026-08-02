@@ -7,8 +7,6 @@ from types import SimpleNamespace
 from helao.core.servers.reflex.state import (
     ActionVisState,
     apply_tick,
-    loop_superseded,
-    may_clear_running,
     LiveVisState,
     VisPanelState,
     make_panel_state,
@@ -128,24 +126,6 @@ class _StubPanel:
         if self._raises is not None:
             raise self._raises
         self.pulled.append(ingest)
-
-
-def test_a_loop_holding_the_current_generation_keeps_running():
-    assert loop_superseded(current_generation=3, token=3) is False
-
-
-def test_a_loop_whose_generation_was_bumped_exits():
-    """The race: a newer loop started, or stop_loop fired, while we slept."""
-    assert loop_superseded(current_generation=4, token=3) is True
-
-
-def test_only_the_current_loop_may_clear_the_running_flag():
-    assert may_clear_running(current_generation=3, token=3) is True
-
-
-def test_a_superseded_loop_must_not_clear_the_running_flag():
-    """Clearing it would report the live loop as stopped."""
-    assert may_clear_running(current_generation=4, token=3) is False
 
 
 def test_apply_tick_reports_a_missing_ingest_without_raising():
@@ -436,3 +416,40 @@ def test_generated_state_class_is_picklable():
     cls = make_panel_state("wssim_panel", "SIM_PICKLE", LiveVisState, "ws_live")
     assert getattr(sys.modules[cls.__module__], cls.__name__, None) is cls
     assert pickle.loads(pickle.dumps(cls)) is cls
+
+
+def test_panels_tick_from_a_component_not_a_server_loop():
+    """A server-side `while True` outlives the browser tab: on_unmount fires on
+    in-app navigation but never on a closed tab, so every abandoned tab left
+    one loop per panel sampling forever."""
+    import ast
+    import inspect
+
+    from helao.core.servers.reflex.state import VisPanelState
+
+    # The AST, not the text: the docstring explaining this says "while True".
+    tree = ast.parse(inspect.getsource(VisPanelState))
+    assert not [n for n in ast.walk(tree) if isinstance(n, ast.While)]
+
+
+def test_render_loop_still_exists_for_panels_outside_this_repo():
+    """Panel modules in private deployments bind on_mount=render_loop. The
+    name is kept so they keep working; it now primes one frame."""
+    from helao.core.servers.reflex.state import VisPanelState
+
+    assert hasattr(VisPanelState, "render_loop")
+    assert hasattr(VisPanelState, "render_tick")
+
+
+def test_priming_sets_the_tick_cadence_from_the_update_rate():
+    """LiveVisState overrides update_rate, so a class-level tick_ms default
+    would disagree with it."""
+    from helao.core.servers.reflex.state import LiveVisState, VisPanelState
+
+    assert LiveVisState.__fields__["update_rate"].default == 0.5
+    # The prime step derives tick_ms rather than trusting the default.
+    import inspect
+
+    assert "tick_ms = int(self.update_rate" in inspect.getsource(
+        VisPanelState.render_loop
+    )

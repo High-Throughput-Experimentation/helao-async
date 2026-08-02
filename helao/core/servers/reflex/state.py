@@ -29,11 +29,8 @@ __all__ = [
     "ActionVisState",
     "make_panel_state",
     "apply_tick",
-    "loop_superseded",
-    "may_clear_running",
 ]
 
-import asyncio
 import sys
 
 import reflex as rx
@@ -51,40 +48,6 @@ MAX_WINDOW_POINTS = 10000
 DEFAULT_WINDOW_POINTS = 500
 MIN_UPDATE_RATE = 0.01
 DEFAULT_UPDATE_RATE = 0.5
-
-
-def loop_superseded(current_generation: int, token: int) -> bool:
-    """Whether a loop holding ``token`` has been replaced and must exit.
-
-    Framework-free so the race fix is testable: ``rx.State`` cannot be built
-    outside app machinery, and the previous version of this logic -- a single
-    shared ``running`` boolean -- shipped a real double-loop bug that no test
-    could have caught.
-
-    Args:
-        current_generation: The state's current ``loop_generation``.
-        token: The generation this loop captured when it started.
-
-    Returns:
-        bool: ``True`` when a newer loop (or a stop) has bumped the generation.
-    """
-    return current_generation != token
-
-
-def may_clear_running(current_generation: int, token: int) -> bool:
-    """Whether an exiting loop owns the ``running`` flag.
-
-    A superseded loop must not clear the flag on its way out; doing so would
-    report the live loop as stopped.
-
-    Args:
-        current_generation: The state's current ``loop_generation``.
-        token: The generation of the loop that is exiting.
-
-    Returns:
-        bool: ``True`` only when the exiting loop is still the current one.
-    """
-    return current_generation == token
 
 
 def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
@@ -144,13 +107,13 @@ class VisPanelState(rx.State, mixin=True):
     update_rate: float = DEFAULT_UPDATE_RATE
     connection: str = "connecting"
     error: str = ""
+    #: True while a tick is in flight, so a tick landing on a slow render is
+    #: dropped rather than interleaved with it.
     running: bool = False
-    #: Bumped on every loop start and every stop. A loop keeps its own token
-    #: and exits as soon as the two diverge. A single shared boolean cannot
-    #: do this: it is asked both "is a loop active" and "should THIS
-    #: invocation continue", and those answers differ during a
-    #: stop-then-immediate-restart.
-    loop_generation: int = 0
+    #: Render cadence in milliseconds, for the page's ticking component. Kept
+    #: beside `update_rate` rather than computed, because the component binds
+    #: it as a Var and must see the change when the input is edited.
+    tick_ms: int = int(DEFAULT_UPDATE_RATE * 1000)
 
     @staticmethod
     def clamp_window_points(value, fallback=None) -> int:
@@ -195,6 +158,7 @@ class VisPanelState(rx.State, mixin=True):
     def on_update_rate(self, value: str):
         """Handle the render-interval input."""
         self.update_rate = self.parse_update_rate(value)
+        self.tick_ms = int(self.update_rate * 1000)
 
     def ingest(self):
         """Return this panel's :class:`WsIngest`, or ``None`` if unavailable."""
@@ -226,52 +190,72 @@ class VisPanelState(rx.State, mixin=True):
         """
         raise NotImplementedError
 
-    @rx.event(background=True)
-    async def render_loop(self):
-        """Poll the ingest buffer at ``update_rate`` until the session ends.
-
-        Ingest runs independently at WebSocket speed; this loop only samples it.
-        That decoupling is the point -- a fast stream cannot drag the render
-        cadence with it the way ``VisSubscriber.IOloop_data`` does.
-        """
+    async def _tick(self):
+        """Sample the ingest buffer once."""
         async with self:
-            self.loop_generation += 1
-            token = self.loop_generation
+            if self.running:
+                # A tick landing while the previous render is still in flight
+                # is dropped, not queued: a slow pull would otherwise stack
+                # renders that interleave their writes.
+                return
             self.running = True
         try:
-            while True:
-                async with self:
-                    # Not `if not self.running`: `async with self` refetches
-                    # state, so a loop that slept through a stop-then-restart
-                    # would see the *new* loop's True and both would run.
-                    if loop_superseded(self.loop_generation, token):
-                        return
-                    ingest = self.ingest()
-                    apply_tick(
-                        self,
-                        ingest,
-                        server_key=self.server_key,
-                        ws_path=self.ws_path,
-                    )
-                    interval = self.update_rate
-                await asyncio.sleep(interval)
+            async with self:
+                apply_tick(
+                    self,
+                    self.ingest(),
+                    server_key=self.server_key,
+                    ws_path=self.ws_path,
+                )
         finally:
             async with self:
-                # Only the current loop may clear the flag; a superseded one
-                # exiting must not report the live loop as stopped.
-                if may_clear_running(self.loop_generation, token):
-                    self.running = False
+                self.running = False
+
+    @rx.event(background=True)
+    async def render_tick(self, _tick: str = ""):
+        """Sample the ingest buffer once, driven by the page's interval.
+
+        Ingest runs independently at WebSocket speed; this only samples it.
+        That decoupling is the point -- a fast stream cannot drag the render
+        cadence with it the way ``VisSubscriber.IOloop_data`` does.
+
+        The cadence comes from a component in the page, **not** from a
+        server-side loop. A ``while True`` in a background event outlives the
+        browser tab: ``on_unmount`` fires on in-app navigation but never on a
+        closed tab, so every abandoned tab left one loop per panel sampling
+        forever and pushing deltas to a client that had gone.
+
+        Args:
+            _tick: The interval component's value. Unused; present because
+                ``on_change`` passes one.
+        """
+        await self._tick()
+
+    @rx.event(background=True)
+    async def render_loop(self):
+        """Prime the panel on mount, and set the tick cadence.
+
+        Named for the loop it replaces: panel modules -- including ones in
+        deployments outside this repo -- bind ``on_mount=state_cls.render_loop``,
+        and they keep working unchanged. It now renders one frame; the page's
+        interval component drives every frame after it.
+        """
+        async with self:
+            # Set here rather than as a class default so a subclass that
+            # overrides `update_rate` (LiveVisState does) cannot leave the two
+            # disagreeing.
+            self.tick_ms = int(self.update_rate * 1000)
+        await self._tick()
 
     @rx.event
     def stop_loop(self):
-        """Ask the render loop to exit on its next tick, and free its buffer.
+        """Free this panel's buffer.
 
         Releases this panel's entry from :data:`plots.STORE` through
         :meth:`~helao.core.servers.reflex.xy_component.BufferStore.drop`, so a
         closed session's frame does not linger under a key nothing will ever
-        refetch.
+        refetch. The tick itself stops with the component that drives it.
         """
-        self.loop_generation += 1
         self.running = False
         plots.STORE.drop(self.panel_key())
 

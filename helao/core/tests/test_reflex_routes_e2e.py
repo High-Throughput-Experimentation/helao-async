@@ -282,7 +282,7 @@ def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_c
     build_app(reflex_cfg, "UI")
     registered = set(RegistrationContext.get().event_handlers)
     expected = {
-        OperatorQueueState: ("poll_loop", "control", "move", "remove"),
+        OperatorQueueState: ("poll_once", "control", "move", "remove"),
         OperatorLibState: ("load_libraries", "select_item", "set_param", "enqueue"),
         OperatorPlanState: ("append_selection", "flush", "move_row", "remove_row"),
         OperatorPlateState: ("load_plate", "on_select", "set_sample"),

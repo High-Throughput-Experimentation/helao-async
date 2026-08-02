@@ -206,7 +206,18 @@ def _render_panel(target: PanelTarget):
             module.STATE_BASE,
             module.WS_PATH,
         )
-        return module.build(target.server_key, state_cls)
+        # The tick is added here, not by the panel module: it must exist in
+        # the tree so it stops when the tab closes, and adding it here means
+        # panel modules -- including ones in deployments outside this repo --
+        # need no change to stop leaking a render loop per abandoned tab.
+        return rx.fragment(
+            module.build(target.server_key, state_cls),
+            rx.moment(
+                interval=state_cls.tick_ms,
+                on_change=state_cls.render_tick,
+                display="none",
+            ),
+        )
     except Exception as exc:
         # .exception, not .warning: without the traceback a real bug in an
         # otherwise-working panel is far harder to place.

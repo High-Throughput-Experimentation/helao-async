@@ -1311,3 +1311,32 @@ def test_rooted_config_without_a_loaded_config_path():
     """No deployment to derive: leave the paths alone rather than inventing one."""
     rooted = opx.rooted_config({})
     assert "experiment_path" not in rooted
+
+
+# -- tick cadence ------------------------------------------------------------
+
+
+def test_poll_ms_converts_the_configured_interval():
+    assert opx.poll_ms_for(2.5) == 2500
+
+
+def test_poll_ms_never_returns_zero():
+    """A zero interval on a ticking component is a busy loop against the
+    orchestrator, so it falls back to the default."""
+    assert opx.poll_ms_for(0) == int(opx.DEFAULT_POLL_INTERVAL * 1000)
+    assert opx.poll_ms_for(-1) == int(opx.DEFAULT_POLL_INTERVAL * 1000)
+
+
+def test_the_page_ticks_from_a_component_not_a_server_loop():
+    """A server-side `while True` outlives the browser tab: on_unmount fires on
+    in-app navigation but never on a closed tab, so every abandoned tab left a
+    loop polling the orchestrator forever."""
+    import ast
+    import inspect
+
+    # The AST, not the text: the docstring that explains this fix says
+    # "while True", and a substring check would match its own explanation.
+    tree = ast.parse(inspect.getsource(opx.OperatorQueueState))
+    assert not [n for n in ast.walk(tree) if isinstance(n, (ast.While, ast.AsyncFor))]
+    assert hasattr(opx.OperatorQueueState, "poll_once")
+    assert not hasattr(opx.OperatorQueueState, "poll_loop")
