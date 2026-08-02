@@ -21,6 +21,7 @@ __all__ = [
     "load_positions",
     "axis_options",
     "chart_series",
+    "is_numeric",
     "summary_rows",
     "dataset_rows",
     "BrowserState",
@@ -29,6 +30,7 @@ __all__ = [
 
 import threading
 
+import numpy as np
 import reflex as rx
 
 from helao.core.servers.data_browser import sources
@@ -198,7 +200,28 @@ def axis_options(selected) -> list:
     return dbstate.available_columns(selected)
 
 
-def chart_series(selected, xcol: str, ycol: str, max_points: int) -> list:
+def is_numeric(values) -> bool:
+    """Whether a column can be plotted.
+
+    HELAO datasets carry string columns freely -- an orchestrator host, a
+    status message, a sample label sit beside the numeric traces. Handing one
+    to the plot facade raises ``could not convert string to float`` from inside
+    the render, which takes down the whole chart rather than one trace.
+
+    Args:
+        values: A dataset column.
+
+    Returns:
+        bool: ``True`` when every value coerces to float.
+    """
+    try:
+        np.asarray(values, dtype=np.float64)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def chart_series(selected, xcol: str, ycol: str, max_points: int):
     """Build :func:`plots.traces` input from the selected datasets.
 
     Args:
@@ -208,20 +231,26 @@ def chart_series(selected, xcol: str, ycol: str, max_points: int) -> list:
         max_points: Downsampling cap per trace.
 
     Returns:
-        list: ``{"label", "x", "y"}`` per dataset that has both columns.
-        Datasets missing either are skipped -- overlaying files from unrelated
-        runs means some will not share columns, which is normal.
+        tuple: ``(series, skipped)``. ``series`` is ``{"label", "x", "y"}`` per
+        plottable dataset; ``skipped`` is ``[(label, reason)]``. Datasets are
+        skipped for missing the chosen columns -- normal when overlaying files
+        from unrelated runs -- or for holding non-numeric values there, which
+        would otherwise abort the entire chart.
     """
     if not xcol or not ycol:
-        return []
-    series = []
+        return [], []
+    series, skipped = [], []
     for ds in selected:
         trace = dbstate.build_trace(ds, xcol, ycol)
         if trace is None:
+            skipped.append((ds.label, f"has no {xcol}/{ycol} columns"))
+            continue
+        if not is_numeric(trace["x"]) or not is_numeric(trace["y"]):
+            skipped.append((ds.label, f"{xcol}/{ycol} are not numeric"))
             continue
         trace = dbstate.downsample(trace, max_points)
         series.append({"label": ds.label, "x": trace["x"], "y": trace["y"]})
-    return series
+    return series, skipped
 
 
 def summary_rows(selected, xcol: str, ycol: str) -> list:
@@ -266,6 +295,10 @@ class BrowserState(rx.State):
     one page with one state.
     """
 
+    # Element types are annotated, not bare `list`: rx.foreach cannot iterate
+    # a var whose element type is unknown, and the frontend build fails with
+    # ForeachVarError rather than anything visible at import time.
+
     #: Selected datasets. The leading underscore makes this a Reflex *backend*
     #: var: it stays server-side and is never serialised to the client. That is
     #: required, not cosmetic -- these hold whole data files, and an ordinary
@@ -274,12 +307,12 @@ class BrowserState(rx.State):
 
     group: str = "RUNS"
     source: str = ""
-    source_options: list = []
+    source_options: list[str] = []
     date_start: str = ""
     date_end: str = ""
     index_filter: str = ""
-    index_rows_view: list = []
-    selected_positions: list = []
+    index_rows_view: list[list[str]] = []
+    selected_positions: list[int] = []
     index_total: int = 0
     index_truncated: bool = False
     status: str = ""
@@ -287,13 +320,13 @@ class BrowserState(rx.State):
     scanning: bool = False
     xcol: str = ""
     ycol: str = ""
-    axis_choices: list = []
+    axis_choices: list[str] = []
     trace_kind: str = "line"
     chart_spec: dict = {}
     chart_url: str = ""
     chart_layout: str = ""
     version: int = 0
-    summary_view: list = []
+    summary_view: list[list[str]] = []
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key.
@@ -475,7 +508,9 @@ class BrowserState(rx.State):
 
     def _rebuild(self):
         """Recompute the chart payload and the summary table."""
-        series = chart_series(self._datasets, self.xcol, self.ycol, DEFAULT_MAX_POINTS)
+        series, unplottable = chart_series(
+            self._datasets, self.xcol, self.ycol, DEFAULT_MAX_POINTS
+        )
         self.version += 1
         payload = plots.traces(
             series,
@@ -490,6 +525,10 @@ class BrowserState(rx.State):
         self.chart_layout = payload.layout
         self.summary_view = summary_rows(self._datasets, self.xcol, self.ycol)
         self.status = f"{len(self._datasets)} dataset(s) selected"
+        # Said out loud: a dataset that silently never appears on the chart is
+        # indistinguishable from a broken plot.
+        if unplottable:
+            self.error = "; ".join(f"{lbl}: {why}" for lbl, why in unplottable)
 
 
 def build_page():

@@ -180,7 +180,8 @@ def test_axis_options_with_nothing_selected_is_empty():
 
 def test_chart_series_builds_one_entry_per_dataset(run_tree):
     selected, _ = _one_dataset(run_tree)
-    series = dbx.chart_series(selected, "t_s", "Ewe_V", 50000)
+    series, skipped = dbx.chart_series(selected, "t_s", "Ewe_V", 50000)
+    assert skipped == []
     assert len(series) == 1
     assert series[0]["label"] == selected[0].label
     assert len(series[0]["x"]) == 2
@@ -190,7 +191,9 @@ def test_chart_series_skips_a_dataset_missing_the_chosen_column(run_tree):
     """Overlaying datasets from unrelated files means some will not share
     columns; that is normal, not an error."""
     selected, _ = _one_dataset(run_tree)
-    assert dbx.chart_series(selected, "t_s", "not_a_column", 50000) == []
+    series, skipped = dbx.chart_series(selected, "t_s", "not_a_column", 50000)
+    assert series == []
+    assert len(skipped) == 1 and "columns" in skipped[0][1]
 
 
 def test_chart_series_downsamples_to_max_points(run_tree):
@@ -198,13 +201,13 @@ def test_chart_series_downsamples_to_max_points(run_tree):
     ds = selected[0]
     ds.data["t_s"] = list(range(1000))
     ds.data["Ewe_V"] = list(range(1000))
-    series = dbx.chart_series([ds], "t_s", "Ewe_V", 10)
+    series, _ = dbx.chart_series([ds], "t_s", "Ewe_V", 10)
     assert len(series[0]["x"]) <= 11
 
 
 def test_chart_series_with_no_axes_chosen_is_empty(run_tree):
     selected, _ = _one_dataset(run_tree)
-    assert dbx.chart_series(selected, "", "", 50000) == []
+    assert dbx.chart_series(selected, "", "", 50000) == ([], [])
 
 
 def test_summary_rows_match_the_shared_summary_columns(run_tree):
@@ -226,3 +229,24 @@ def test_dataset_rows_returns_headers_and_string_cells(run_tree):
 
 def test_dataset_rows_on_nothing_is_empty():
     assert dbx.dataset_rows(None) == ([], [])
+
+
+def test_is_numeric_accepts_numbers_and_rejects_strings():
+    assert dbx.is_numeric([1, 2.5, 3]) is True
+    assert dbx.is_numeric(["127.0.0.1", "x"]) is False
+
+
+def test_chart_series_skips_a_non_numeric_column_instead_of_aborting_the_chart(
+    run_tree,
+):
+    """The crash this guards, hit against a real OERSIM run: HELAO datasets
+    carry string columns (an orchestrator host, a status message) beside the
+    numeric ones. Handing one to the plot facade raised 'could not convert
+    string to float' from inside the render and took down the whole chart --
+    no plot at all, and no message saying why."""
+    selected, _ = _one_dataset(run_tree)
+    ds = selected[0]
+    ds.data["orchestrator"] = ["127.0.0.1", "127.0.0.1"]
+    series, skipped = dbx.chart_series([ds], "t_s", "orchestrator", 50000)
+    assert series == []
+    assert len(skipped) == 1 and "not numeric" in skipped[0][1]
