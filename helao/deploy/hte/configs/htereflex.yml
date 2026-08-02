@@ -115,6 +115,27 @@ servers:
       plate_id: 2750
       column_aliases:
         erhe_v: Ewe_V
+  SPEC:
+    host: 127.0.0.1
+    port: 8110
+    group: action
+    fast: cpsim_server
+    action_vis: spec_vis
+    params:
+      plate_id: 2750
+      # The spectrometer panel reads ch_<n> columns, one per detector channel.
+      # The stored trace has one measurement column, so this stands in as a
+      # single-channel detector -- enough to prove the spectrum path renders.
+      column_aliases:
+        erhe_v: ch_0
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8111
+    group: action
+    fast: cpsim_server
+    action_vis: sample_vis
+    params:
+      plate_id: 2750
   UI:
     host: 127.0.0.1
     port: 5110

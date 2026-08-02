@@ -42,7 +42,14 @@ SETTLE_MS = 12000
 
 
 #: Action panels the dev config declares, by their heading.
-EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:", "Gamry:", "BioLogic:"]
+EXPECTED_ACTION_PANELS = [
+    "Cells:",
+    "Power supply:",
+    "Gamry:",
+    "BioLogic:",
+    "Spectra:",
+    "Samples:",
+]
 
 #: ws_data is silent unless an action is streaming, so the check starts one on
 #: each simulator. Two things about doing that, both learned the hard way:
@@ -58,6 +65,7 @@ ACTION_SERVERS = [
     ("http://127.0.0.1:8107", "POWERSUPPLY"),
     ("http://127.0.0.1:8108", "GAMRY"),
     ("http://127.0.0.1:8109", "BIOLOGIC"),
+    ("http://127.0.0.1:8110", "SPEC"),
 ]
 
 #: A composition present in the simulator's stored dataset for plate 2750.
@@ -100,8 +108,11 @@ def check_action_page(page, problems) -> None:
     # Four for NI-DAQmx, one for the power supply, two each for the two
     # potentiostats (this action + previous action).
     canvases = page.locator("canvas").count()
-    if canvases < 9:
-        problems.append(f"{canvases} canvases on /action, expected at least 9")
+    if canvases < 10:
+        problems.append(f"{canvases} canvases on /action, expected at least 10")
+    # The sample panel draws no chart; its tables are the evidence it rendered.
+    if "Newest solid samples:" not in body:
+        problems.append("the sample tables did not render")
     # The potentiostat panels pick their axes from the technique. Seeing the
     # column names in their selectors proves the action name reached the panel
     # through the ingest row store, which is the part that had to be added.
