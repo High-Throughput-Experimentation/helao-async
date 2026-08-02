@@ -11,13 +11,11 @@ sequence and experiment libraries.
 """
 
 import html as _html
-import importlib
 import inspect
 import io
 import json
 import os
 import re
-import sys
 import time
 from enum import Enum
 from functools import partial
@@ -47,7 +45,7 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.operator import param_store
+from helao.core.servers.operator import param_store, spec_parser
 from helao.core.servers.operator.param_forms import (
     BUILTIN_TYPES,
     build_lib,
@@ -65,17 +63,13 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 # Bokeh re-runs makeBokehApp (and thus BokehOperator.__init__) on every client
-# connection. The following process-level caches hold the session-invariant
+# connection. The following process-level cache holds the session-invariant
 # results of expensive per-config work so only the first connection pays for it:
-#   * _SEQSPEC_MODULE_CACHE: parser module loaded from a file via exec_module
-#     (keyed by parser file path); the SpecParser instance is still created per
-#     session in case it carries per-parse state.
 #   * _PLATE_API_CACHE: shared read-only plate-data API instances (keyed by class
 #     name) whose construction loads static plate data.
-# The introspected sequence/experiment dropdown table is cached too, but in
-# param_forms alongside the logic that fills it, since the Reflex operator
-# shares both.
-_SEQSPEC_MODULE_CACHE: dict = {}
+# The spec-parser module cache moved to spec_parser alongside the loader, and
+# the introspected sequence/experiment dropdown table to param_forms, both
+# because the Reflex operator shares them.
 _PLATE_API_CACHE: dict = {}
 
 
@@ -314,24 +308,15 @@ class BokehOperator:
 
         self.seqspec_select_list = []
         self.seqspecs = []
-        self.seqspec_parser_module = None
         self.seqspec_parser = None
         self.seqspec_folder = None
         self.parser_path = self.config_dict.get("seqspec_parser_path", None)
         specs_folder = self.config_dict.get("seqspec_folder_path", None)
-        if self.parser_path is not None:
-            if os.path.exists(self.parser_path) and os.path.isfile(self.parser_path):
-                self.seqspec_parser_module = _SEQSPEC_MODULE_CACHE.get(self.parser_path)
-                if self.seqspec_parser_module is None:
-                    module_name = os.path.basename(self.parser_path).replace(".py", "")
-                    spec = importlib.util.spec_from_file_location(
-                        module_name, self.parser_path
-                    )
-                    self.seqspec_parser_module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = self.seqspec_parser_module
-                    spec.loader.exec_module(self.seqspec_parser_module)
-                    _SEQSPEC_MODULE_CACHE[self.parser_path] = self.seqspec_parser_module
-                self.seqspec_parser = self.seqspec_parser_module.SpecParser()
+        # Loading goes through the shared layer so the Reflex operator reads
+        # the same parser, from the same cache, with the same failure
+        # behaviour: a broken parser disables the tab rather than taking down
+        # the page.
+        self.seqspec_parser = spec_parser.load_parser(self.parser_path)
         if specs_folder is not None:
             if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
                 self.seqspec_folder = specs_folder

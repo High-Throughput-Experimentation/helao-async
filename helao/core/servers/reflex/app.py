@@ -41,6 +41,7 @@ from helao.core.servers.operator.app_reflex import (
     OperatorPlanState,
     OperatorPlateState,
     OperatorQueueState,
+    OperatorSpecState,
 )
 from helao.core.servers.operator.app_reflex import build_page as operator_page
 from helao.core.servers.operator.app_reflex import configure as configure_operator
@@ -375,6 +376,7 @@ def build_app(world_cfg: dict, server_key: str):
         OperatorLibState,
         OperatorPlanState,
         OperatorPlateState,
+        OperatorSpecState,
     )
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
