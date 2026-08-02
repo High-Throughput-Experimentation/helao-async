@@ -462,3 +462,48 @@ def test_only_plots_module_imports_xy():
         if re.search(r"^\s*(import xy\b|from xy\b)", text, re.MULTILINE):
             offenders.append(str(path.relative_to(root)))
     assert offenders == [], f"xy imported outside facade/binding: {offenders}"
+
+
+def test_a_panel_module_may_declare_a_socket_the_config_key_does_not_imply():
+    """`live_vis` normally means ws_live, but a panel is free to read ws_data
+    while still belonging on the live page -- one real deployment has a
+    potentiostat panel shaped exactly that way. Deriving the socket from the
+    key alone subscribes to the wrong one, and the panel then reports no
+    ingest for a path nothing is feeding."""
+    from helao.core.servers.reflex.app import panel_targets
+
+    # nidaqmx_vis declares WS_PATH = "ws_data" but is placed under live_vis
+    # here, which is the shape that matters.
+    cfg = {
+        "servers": {
+            "PSTAT": {
+                "host": "h",
+                "port": 1,
+                "group": "action",
+                "live_vis": "nidaqmx_vis",
+            }
+        }
+    }
+    target = panel_targets(cfg)[0]
+    assert target.ws_path == "ws_data", "the module's own WS_PATH must win"
+    # The key still decides which page the panel appears on.
+    assert target.vis_key == "live_vis"
+
+
+def test_an_unresolvable_panel_module_keeps_the_key_derived_socket():
+    """Discovery must not break on a module that cannot be imported --
+    _render_panel already renders that case as an error card."""
+    from helao.core.servers.reflex.app import panel_targets
+
+    cfg = {
+        "servers": {
+            "X": {
+                "host": "h",
+                "port": 1,
+                "group": "action",
+                "action_vis": "no_such_panel",
+            }
+        }
+    }
+    target = panel_targets(cfg)[0]
+    assert target.ws_path == "ws_data"
