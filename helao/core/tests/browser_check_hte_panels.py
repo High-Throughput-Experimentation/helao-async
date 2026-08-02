@@ -38,8 +38,37 @@ UNEXPECTED_MEAN_ROWS = ["cell_temp_0_mean", "CO2__temperature_mean"]
 SETTLE_MS = 12000
 
 
+#: Action panels the dev config declares, by their heading.
+EXPECTED_ACTION_PANELS = ["Cells:", "Power supply:"]
+
+
+def check_action_page(page, problems) -> None:
+    """Assert the ws_data panels rendered and offer their cell selector.
+
+    The NI-DAQmx panel draws four figures and a per-cell selector. An empty
+    selector means the cell columns were never discovered from the stream,
+    which renders as four blank charts and no error -- exactly the kind of
+    failure a unit suite cannot see.
+    """
+    page.goto(f"{BASE}/action", wait_until="load", timeout=60000)
+    page.wait_for_timeout(SETTLE_MS)
+    body = page.inner_text("body")
+    for heading in EXPECTED_ACTION_PANELS:
+        if heading not in body:
+            problems.append(f"action panel '{heading}' did not render")
+    # Four figures for NI-DAQmx plus one for the power supply.
+    canvases = page.locator("canvas").count()
+    if canvases < 5:
+        problems.append(f"{canvases} canvases on /action, expected at least 5")
+    if "voltage (previous action)" not in body:
+        problems.append("the previous-action figures did not render")
+    checkboxes = page.get_by_role("checkbox").count()
+    if checkboxes == 0:
+        problems.append("the cell selector offered no cells")
+
+
 def main() -> int:
-    """Load /live, assert every panel rendered, painted, and is updating."""
+    """Load /live and /action, asserting every panel rendered and is updating."""
     problems = []
     with sync_playwright() as pw:
         browser = pw.chromium.launch()
@@ -81,6 +110,8 @@ def main() -> int:
         if page.inner_text("body") == before:
             problems.append("the panels did not update between samples")
 
+        check_action_page(page, problems)
+
         real_errors = [e for e in errors if "favicon" not in e]
         if real_errors:
             problems.append(f"browser errors: {real_errors[:3]}")
@@ -91,7 +122,8 @@ def main() -> int:
         for problem in problems:
             print(f"FAIL: {problem}")
         return 1
-    print(f"PASS: {len(EXPECTED_PANELS)} hte panels rendered, painted and updated")
+    total = len(EXPECTED_PANELS) + len(EXPECTED_ACTION_PANELS)
+    print(f"PASS: {total} hte panels rendered, painted and updated")
     return 0
 
 

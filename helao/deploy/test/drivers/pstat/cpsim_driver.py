@@ -49,6 +49,12 @@ class CPSim:
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.loaded_plate = self.config_dict["plate_id"]
+        # Optional `{stored_name: emitted_name}` rename applied to every
+        # emitted column. The stored trace is a real OER measurement, so this
+        # is how a config points this simulator at a panel written for other
+        # hardware -- panels key their behaviour off column names.
+        aliases = self.config_dict.get("column_aliases")
+        self.column_aliases = aliases if isinstance(aliases, dict) else {}
         self.data_file = os.path.join(
             os.path.dirname(
                 os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -173,7 +179,10 @@ class CPSimExec(Executor):
         live_dict = {}
         if new_idxs:
             newest_idx = max(new_idxs)
-            live_dict = {k: v[self.last_idx : newest_idx] for k, v in self.cp.items()}
+            live_dict = {
+                self.column_aliases.get(k, k): v[self.last_idx : newest_idx]
+                for k, v in self.cp.items()
+            }
             self.last_idx = newest_idx
             if newest_idx == len(self.cp["t_s"]) - 1:
                 status = HloStatus.finished

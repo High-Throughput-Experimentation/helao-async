@@ -68,6 +68,31 @@ servers:
       columns:
         cell_temp_0: 25
         cell_temp_1: 40
+  NIDAQMX:
+    host: 127.0.0.1
+    port: 8106
+    group: action
+    fast: cpsim_server
+    action_vis: nidaqmx_vis
+    params:
+      plate_id: 2750
+      # The stored OER trace renamed to a column the NI-DAQmx server streams,
+      # so the panel's cell selector has a cell to offer and its per-action
+      # split runs on real measurement data. The trace carries only t_s and
+      # erhe_v, so this exercises the voltage figures; the current ones render
+      # empty, which is itself the "no columns for this pattern" path.
+      column_aliases:
+        erhe_v: Ecell1_V
+  POWERSUPPLY:
+    host: 127.0.0.1
+    port: 8107
+    group: action
+    fast: cpsim_server
+    action_vis: power_supply_vis
+    params:
+      plate_id: 2750
+      column_aliases:
+        erhe_v: current_a
   UI:
     host: 127.0.0.1
     port: 5110
