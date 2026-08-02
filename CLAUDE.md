@@ -47,10 +47,15 @@ A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt s
 Stations never need Node. Build the frontend bundle on a development machine and ship it:
 
 ```
-conda run -n helao python -c "from helao.core.servers.reflex.xy_component import copy_client_asset; copy_client_asset('helao/core/servers/reflex/_app/assets')"
-cd helao/core/servers/reflex/_app && reflex init --name helao_ui --no-agents && reflex export --frontend-only
-# then unzip frontend.zip into <repo_root>/.reflex-bundle/helao_ui/   (gitignored)
+python build_reflex_bundle.py <config_prefix_or_path> [--server KEY]
 ```
+
+`build_reflex_bundle.py` does the whole sequence: reads the config's Reflex
+server, bakes that server's backend URL in, stages the build off a `noexec`
+filesystem when it has to, and only replaces the installed bundle once the
+export has actually produced one. It needs `bun` or `node` on `PATH`, which is
+why `nodejs` is in the *development* environment files and not the station
+ones.
 
 **The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. Stage the `_app` directory somewhere executable (`/tmp` works), build there with `PYTHONPATH` pointed at the repo, and copy the resulting `frontend.zip` back. Only the *build* needs exec — the bundle is static files, and `StaticFiles` serves them from anywhere.
 
