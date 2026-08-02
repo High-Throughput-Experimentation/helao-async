@@ -20,7 +20,7 @@ from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.helpers.file_utils import unzpickle
 
-from ...drivers.data.gpsim_driver import calc_eta
+from ...drivers.data.oer_metrics import calc_eta
 
 
 class CPSim:

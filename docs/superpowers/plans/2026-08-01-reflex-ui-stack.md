@@ -5850,10 +5850,16 @@ servers:
     fast: ws_simulator
     live_vis: wssim_panel
     params: {}
-  # CPSIM and GPSIM exist so the browser check actually exercises all three
-  # panels. Without CPSIM there is no `action_vis` server at all, so /action
-  # renders empty and the ws_data path -- the one that shipped two Critical
-  # defects -- is never touched by the only step that can prove rendering.
+  # CPSIM exists so the browser check actually exercises the ws_data path --
+  # the one that shipped two Critical defects. Without an `action_vis` server
+  # /action renders empty and that path is never touched by the only step that
+  # can prove rendering.
+  #
+  # GPSIM is deliberately absent: gpsim_driver imports gpflow, which needs
+  # tensorflow, which has no Python 3.14 release. The server cannot import at
+  # all (ModuleNotFoundError: gpflow), so launching it would abort the group.
+  # That server and its driver are deprecated; gpsim_panel is retained but
+  # unreachable from any launchable config.
   CPSIM:
     host: 127.0.0.1
     port: 8003
@@ -5862,14 +5868,6 @@ servers:
     action_vis: oersim_panel
     params:
       plate_id: 2750
-  GPSIM:
-    host: 127.0.0.1
-    port: 8004
-    group: action
-    fast: gpsim_server
-    live_vis: gpsim_panel
-    params:
-      random_seed: 9999
   UI:
     host: 127.0.0.1
     port: 5010
@@ -5939,22 +5937,22 @@ def test_route_map_puts_the_sim_panel_on_live(reflex_cfg):
     from helao.core.servers.reflex.app import route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
-    assert sorted(t.server_key for t in routes["/live"]) == ["GPSIM", "SIM"]
+    assert sorted(t.server_key for t in routes["/live"]) == ["SIM"]
     assert [t.server_key for t in routes["/action"]] == ["CPSIM"]
 
 
 def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
-    """All three panels must be wired, or the browser check proves only one.
+    """Every launchable panel must be wired, or the browser check proves less.
 
-    In particular CPSIM is the sole ws_data target — the path that shipped two
-    Critical defects — so without it the only step that can prove rendering
-    never touches it.
+    CPSIM is the sole ws_data target — the path that shipped two Critical
+    defects — so without it the only step that can prove rendering never
+    touches it. GPSIM is excluded on purpose: its driver needs gpflow/tensorflow,
+    which has no Python 3.14 release, so the server cannot import.
     """
     from helao.core.servers.reflex.ingest import IngestRegistry
 
     assert sorted(IngestRegistry(reflex_cfg).targets()) == [
         ("CPSIM", "ws_data"),
-        ("GPSIM", "ws_live"),
         ("SIM", "ws_live"),
     ]
 
@@ -5963,7 +5961,7 @@ def test_every_panel_module_is_reachable_from_this_config(reflex_cfg):
     from helao.core.servers.reflex.app import panel_targets
 
     modules = sorted(t.module_name for t in panel_targets(reflex_cfg))
-    assert modules == ["gpsim_panel", "oersim_panel", "wssim_panel"]
+    assert modules == ["oersim_panel", "wssim_panel"]
 
 
 def test_every_panel_on_every_route_renders(reflex_cfg):
