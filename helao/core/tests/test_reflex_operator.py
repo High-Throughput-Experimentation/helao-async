@@ -1340,3 +1340,52 @@ def test_the_page_ticks_from_a_component_not_a_server_loop():
     assert not [n for n in ast.walk(tree) if isinstance(n, (ast.While, ast.AsyncFor))]
     assert hasattr(opx.OperatorQueueState, "poll_once")
     assert not hasattr(opx.OperatorQueueState, "poll_loop")
+
+
+# -- saved parameters --------------------------------------------------------
+
+
+def test_store_kind_maps_the_library_kind_to_the_file_key():
+    """The store's keys are the Bokeh operator's 'seq'/'exp', and the file is
+    shared between the two UIs, so the mapping cannot drift."""
+    from helao.core.servers.operator import param_store as ps
+
+    assert opx.store_kind("sequence") == "seq"
+    assert opx.store_kind("experiment") == "exp"
+    assert set(ps.PARAM_KINDS) == {"seq", "exp"}
+
+
+def test_store_kind_refuses_an_unknown_library_kind():
+    assert opx.store_kind("nonsense") == ""
+
+
+def test_config_root_comes_from_the_configured_world_config():
+    opx.reset_settings()
+    opx.configure({"servers": {"UI": {}}, "root": "/inst"}, "UI")
+    assert opx.config_root() == "/inst"
+    opx.reset_settings()
+
+
+def test_config_root_without_configuration_is_empty():
+    """A read before configure() must return "" rather than raising: the state
+    class exists before any config is loaded."""
+    opx.reset_settings()
+    assert opx.config_root() == ""
+
+
+def test_saved_values_round_trip_through_the_shared_store(tmp_path):
+    """What the Reflex form saves is what the Bokeh operator would read, and
+    comes back as strings the form's inputs can hold."""
+    from helao.core.servers.operator import param_store as ps
+
+    root = str(tmp_path)
+    ps.write_params(root, "seq", "seq_a", {"alpha": 4})
+    assert opx.saved_values(root, "sequence", "seq_a") == {"alpha": "4"}
+
+
+def test_saved_values_for_a_name_with_nothing_saved(tmp_path):
+    assert opx.saved_values(str(tmp_path), "sequence", "seq_a") == {}
+
+
+def test_saved_values_refuses_an_unknown_kind(tmp_path):
+    assert opx.saved_values(str(tmp_path), "nonsense", "seq_a") == {}
