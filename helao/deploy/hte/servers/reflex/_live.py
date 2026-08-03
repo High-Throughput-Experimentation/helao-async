@@ -201,13 +201,13 @@ def make_live_panel(prefix: str, y_label: str, wants_mean=no_column):
                     rx.badge(state_cls.connection),
                     rx.spacer(),
                     rx.input(
-                        default_value=str(state_cls.window_points),
+                        default_value=state_cls.window_points.to_string(),
                         on_blur=state_cls.on_window_points,
                         placeholder="window points",
                         width="10em",
                     ),
                     rx.input(
-                        default_value=str(state_cls.update_rate),
+                        default_value=state_cls.update_rate.to_string(),
                         on_blur=state_cls.on_update_rate,
                         placeholder="update sec",
                         width="8em",

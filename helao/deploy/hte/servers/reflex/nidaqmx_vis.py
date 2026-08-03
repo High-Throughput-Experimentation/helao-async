@@ -30,7 +30,7 @@ WS_PATH = "ws_data"
 def panel_id(server_key: str, session_token: str) -> str:
     """Buffer-store identity for this panel in one browser session.
 
-    Four charts share this session but each takes its own suffix: the store
+    Both charts share this session but each takes its own suffix: the store
     holds one frame per key, so two charts under one key would overwrite each
     other into a frozen render.
     """
@@ -159,7 +159,7 @@ def build(server_key: str, state_cls):
                 rx.spacer(),
                 rx.text(state_cls.action_uuid, size="1", color_scheme="gray"),
                 rx.input(
-                    default_value=str(state_cls.window_points),
+                    default_value=state_cls.window_points.to_string(),
                     on_blur=state_cls.on_window_points,
                     placeholder="window points",
                     width="10em",
