@@ -20,7 +20,7 @@ invoked directly or via ``run_unit_tests.py``. Exits non-zero on any failure.
 
 Import cost: this module (and everything it imports — ``param_models``,
 ``OERSIM_exp``, ``OERSIM_seq``, ``helao.helpers.yml_tools``) MUST NOT import
-``gpsim_driver`` — that module drags in gpflow/TensorFlow, and this suite
+``gpsim_driver`` — that module drags in gpytorch/torch, and this suite
 runs before every ``launch.py`` invocation on every station.
 """
 

@@ -10,21 +10,17 @@ Also exposes two small pydantic models (:class:`return_sequence_lib`,
 sequence and experiment libraries.
 """
 
-import builtins
 import html as _html
-import importlib
 import inspect
 import io
 import json
 import os
 import re
-import sys
 import time
 from enum import Enum
 from functools import partial
 from socket import gethostname
 from typing import Optional
-from uuid import UUID
 
 import numpy as np
 from bokeh.events import ButtonClick, DoubleTap
@@ -48,33 +44,32 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
+from helao.core.servers.operator import param_store, spec_parser
+from helao.core.servers.operator.param_forms import (
+    BUILTIN_TYPES,
+    build_lib,
+    parse_arg_docs,
+    resolve_campaign_uuid,
+    version_hint_parts,
+)
 from helao.core.servers.vis import Vis
+from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Experiment, Sequence
-from helao.helpers.time_utils import md5_string
 from helao.helpers.to_json import parse_bokeh_input
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-BUILTIN_TYPES = [
-    getattr(builtins, d)
-    for d in dir(builtins)
-    if isinstance(getattr(builtins, d), type)
-]
 
 # Bokeh re-runs makeBokehApp (and thus BokehOperator.__init__) on every client
-# connection. The following process-level caches hold the session-invariant
+# connection. The following process-level cache holds the session-invariant
 # results of expensive per-config work so only the first connection pays for it:
-#   * _SEQSPEC_MODULE_CACHE: parser module loaded from a file via exec_module
-#     (keyed by parser file path); the SpecParser instance is still created per
-#     session in case it carries per-parse state.
 #   * _PLATE_API_CACHE: shared read-only plate-data API instances (keyed by class
 #     name) whose construction loads static plate data.
-#   * _LIB_TABLE_CACHE: introspected sequence/experiment dropdown data (plain
-#     dicts + name lists) produced by BokehOperator._build_lib.
-_SEQSPEC_MODULE_CACHE: dict = {}
+# The spec-parser module cache moved to spec_parser alongside the loader, and
+# the introspected sequence/experiment dropdown table to param_forms, both
+# because the Reflex operator shares them.
 _PLATE_API_CACHE: dict = {}
-_LIB_TABLE_CACHE: dict = {}
 
 
 def _render_node(key, val, top=False, open_keys=()):
@@ -201,7 +196,7 @@ class BokehOperator:
             [
                 k
                 for k, v in self.vis.world_cfg["servers"].items()
-                if "bokeh" not in v and "demovis" not in v
+                if not is_ui_only_server(v)
             ]
         )
         # find pal server if configured in world config
@@ -312,24 +307,15 @@ class BokehOperator:
 
         self.seqspec_select_list = []
         self.seqspecs = []
-        self.seqspec_parser_module = None
         self.seqspec_parser = None
         self.seqspec_folder = None
         self.parser_path = self.config_dict.get("seqspec_parser_path", None)
         specs_folder = self.config_dict.get("seqspec_folder_path", None)
-        if self.parser_path is not None:
-            if os.path.exists(self.parser_path) and os.path.isfile(self.parser_path):
-                self.seqspec_parser_module = _SEQSPEC_MODULE_CACHE.get(self.parser_path)
-                if self.seqspec_parser_module is None:
-                    module_name = os.path.basename(self.parser_path).replace(".py", "")
-                    spec = importlib.util.spec_from_file_location(
-                        module_name, self.parser_path
-                    )
-                    self.seqspec_parser_module = importlib.util.module_from_spec(spec)
-                    sys.modules[module_name] = self.seqspec_parser_module
-                    spec.loader.exec_module(self.seqspec_parser_module)
-                    _SEQSPEC_MODULE_CACHE[self.parser_path] = self.seqspec_parser_module
-                self.seqspec_parser = self.seqspec_parser_module.SpecParser()
+        # Loading goes through the shared layer so the Reflex operator reads
+        # the same parser, from the same cache, with the same failure
+        # behaviour: a broken parser disables the tab rather than taking down
+        # the page.
+        self.seqspec_parser = spec_parser.load_parser(self.parser_path)
         if specs_folder is not None:
             if os.path.exists(specs_folder) and os.path.isdir(specs_folder):
                 self.seqspec_folder = specs_folder
@@ -1149,159 +1135,41 @@ class BokehOperator:
         name_field: str,
         codehash_map: dict = None,
     ) -> tuple:
-        """Inspect ``lib`` and return ``(items, select_list)`` for sequence/experiment dropdowns.
+        """Inspect ``lib`` and return ``(items, select_list)`` for the dropdowns.
 
-        Drops parameters whose annotation matches ``filter_type`` (e.g. the
-        ``Experiment`` arg of experiment functions) and overlays defaults
-        from the world config under ``config_key``.
+        Thin wrapper: the logic lives in
+        :func:`~helao.core.servers.operator.param_forms.build_lib`, shared with
+        the Reflex operator.
         """
-        items = []
-        select_list = []
-        codehash_map = codehash_map or {}
-        version_attr = name_field.replace("_name", "_version")
-
-        # The introspected table is a pure function of the library callables,
-        # their file hashes, and the config-level default overlay; all are fixed
-        # for a running process, so cache across Bokeh sessions. Only plain data
-        # is cached (dicts + name list), never Bokeh models.
-        cache_key = (
-            self.loaded_config_path,
+        return build_lib(
+            lib,
+            filter_type,
             config_key,
+            self.vis.world_cfg,
+            self.loaded_config_path,
+            model_class,
             name_field,
-            tuple(lib),
-            tuple(sorted(codehash_map.items())),
+            codehash_map,
         )
-        cached = _LIB_TABLE_CACHE.get(cache_key)
-        if cached is not None:
-            cached_items, cached_select = cached
-            return [dict(it) for it in cached_items], list(cached_select)
 
-        LOGGER.info(f"found {name_field.replace('_name', '')}s: {list(lib)}")
-        for i, name in enumerate(lib):
-            func = lib[name]
-            tmpdoc = func.__doc__ or ""
-            argspec = inspect.getfullargspec(func)
-            tmpargs = list(argspec.args)
-            tmpdefs = list(argspec.defaults or [])
-            tmpdefs = [x.value if isinstance(x, Enum) else x for x in tmpdefs]
-            tmptypes = [argspec.annotations.get(k, "unspecified") for k in tmpargs]
-
-            if filter_type is not None:
-                idxlist = [
-                    idx
-                    for idx, arg in enumerate(tmpargs)
-                    if argspec.annotations.get(arg) == filter_type
-                ]
-                for j, idx in enumerate(idxlist):
-                    if len(tmpargs) == len(tmpdefs):
-                        tmpargs.pop(idx - j)
-                        tmpdefs.pop(idx - j)
-                        tmptypes.pop(idx - j)
-                    else:
-                        tmpargs.pop(idx - j)
-                        tmptypes.pop(idx - j)
-
-            cfg_defs = self.vis.world_cfg.get(config_key, {})
-            tmpdefs = [cfg_defs.get(ta, td) for ta, td in zip(tmpargs, tmpdefs)]
-            for t in tmpdefs:
-                try:
-                    if isinstance(t, Enum):
-                        t = json.dumps(t.value)
-                    else:
-                        t = json.dumps(t)
-                except Exception:
-                    t = ""
-            codehash = codehash_map.get(name)
-            items.append(
-                model_class(
-                    index=i,
-                    **{name_field: name},
-                    doc=tmpdoc,
-                    args=tuple(tmpargs),
-                    defaults=tuple(tmpdefs),
-                    argtypes=tuple(tmptypes),
-                    version=getattr(func, version_attr, None),
-                    codehash=str(codehash)[:8] if codehash else None,
-                ).model_dump()
-            )
-            select_list.append(name)
-        _LIB_TABLE_CACHE[cache_key] = (
-            [dict(it) for it in items],
-            list(select_list),
-        )
-        return items, select_list
-
-    @staticmethod
-    def _parse_arg_docs(doc: str) -> dict:
-        """Parse a Google-style ``Args:`` section into ``{arg_name: description}``.
-
-        Recognises ``name: text`` and ``name (type): text`` entries, folds
-        indented continuation lines into the preceding entry, and stops at the
-        next section header or a blank line. ``*args``/``**kwargs`` are skipped.
-        """
-        if not doc:
-            return {}
-        header_re = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)
-        section_re = re.compile(
-            r"^\s*(Returns?|Raises|Yields?|Examples?|Notes?|Attributes|"
-            r"Args|Arguments|Parameters)\s*:\s*$",
-            re.I,
-        )
-        arg_re = re.compile(r"^\s*([A-Za-z_]\w*)\s*(?:\([^)]*\))?\s*:\s*(.*)$")
-        descs = {}
-        in_args = False
-        cur = None
-        for line in doc.splitlines():
-            if not in_args:
-                if header_re.match(line):
-                    in_args = True
-                continue
-            if line.strip() == "":
-                break
-            if section_re.match(line):
-                break
-            if re.match(r"^\s*\*", line):  # *args / **kwargs: skip, end current
-                cur = None
-                continue
-            m = arg_re.match(line)
-            if m:
-                cur = m.group(1)
-                descs[cur] = m.group(2).strip()
-            elif cur is not None:
-                descs[cur] = f"{descs[cur]} {line.strip()}".strip()
-        return descs
+    _parse_arg_docs = staticmethod(parse_arg_docs)
 
     @staticmethod
     def _version_hint(item: dict) -> str:
-        """Format the 'version · codehash' hint shown beside a selector dropdown."""
-        parts = []
-        version = item.get("version")
-        if version is not None:
-            parts.append(f"v{version}")
-        codehash = item.get("codehash")
-        if codehash:
-            parts.append(_html.escape(str(codehash)))
-        return f"<i>{' · '.join(parts)}</i>" if parts else ""
+        """Format the 'version \u00b7 codehash' hint shown beside a selector dropdown."""
+        # Every part is escaped now, not just the codehash: the version part is
+        # "v" plus a number, so escaping it is a no-op and the output is
+        # identical -- while removing the question of which part was safe.
+        parts = [_html.escape(p) for p in version_hint_parts(item)]
+        return f"<i>{' \u00b7 '.join(parts)}</i>" if parts else ""
 
     def _resolve_campaign_uuid(self, campaign_name: str):
         """Resolve the campaign UUID from operator input.
 
-        Empty input hashes ``campaign_name`` into a deterministic UUID. A
-        non-empty value is parsed as a UUID; a malformed entry is logged and
-        falls back to hashing the typed string so the operator never crashes
-        on a typo (the model now validates on assignment).
+        The rule is shared with the Reflex operator through ``param_forms``;
+        only reading the widget belongs here.
         """
-        entered = self.input_campaign_uuid.value.strip()
-        if entered == "":
-            return md5_string(campaign_name)
-        try:
-            return UUID(entered)
-        except ValueError:
-            LOGGER.warning(
-                f"campaign_uuid input '{entered}' is not a valid UUID; "
-                "hashing it into a deterministic UUID instead"
-            )
-            return md5_string(entered)
+        return resolve_campaign_uuid(campaign_name, self.input_campaign_uuid.value)
 
     def _capture_metadata(self, seq: Sequence) -> None:
         """Stamp label / campaign / comment from the current inputs onto ``seq``."""
@@ -2083,51 +1951,35 @@ class BokehOperator:
         self.plan.insert(0, seq)
 
     def write_params(self, ptype: str, name: str, pars: dict):
-        """Persist the most recent sequence/experiment parameters to ``previous_params.json``."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
-        else:
-            with open(param_file_path, "r", encoding="utf8") as f:
-                pdict = json.load(f)
-        if (ptype == "seq" and self.save_last_seq_pars.active == [0]) or (
-            ptype == "exp" and self.save_last_exp_pars.active == [0]
+        """Persist the most recent sequence/experiment parameters, if enabled.
+
+        The checkbox gate stays here because it reads a widget; the file is
+        shared with the Reflex operator through ``param_store``.
+        """
+        if not (
+            (ptype == "seq" and self.save_last_seq_pars.active == [0])
+            or (ptype == "exp" and self.save_last_exp_pars.active == [0])
         ):
-            pdict[ptype].update({name: pars})
-            pdict["last_meta"] = {
+            return
+        param_store.write_params(
+            self.vis.world_cfg.get("root", ""),
+            ptype,
+            name,
+            pars,
+            meta={
                 "sequence_label": self.input_sequence_label.value,
                 "campaign_name": self.input_campaign_name.value,
                 "campaign_uuid": self.input_campaign_uuid.value,
-            }
-            with open(param_file_path, "w", encoding="utf8") as f:
-                json.dump(pdict, f)
+            },
+        )
 
     def read_params(self, ptype: str, name: str) -> dict:
-        """Return the most recently saved parameters for ``name`` of type ``ptype`` (``seq``/``exp``)."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            os.makedirs(os.path.dirname(param_file_path), exist_ok=True)
-            pdict = {"seq": {}, "exp": {}, "last_meta": {}}
-        else:
-            with open(param_file_path, "r", encoding="utf8") as f:
-                pdict = json.load(f)
-        return pdict.get(ptype, {}).get(name, {})
+        """Return the most recently saved parameters for ``name`` of type ``ptype``."""
+        return param_store.read_params(self.vis.world_cfg.get("root", ""), ptype, name)
 
     def read_last_meta(self) -> dict:
-        """Return the saved global label/campaign block, or ``{}`` if none/older file."""
-        param_file_path = os.path.join(
-            self.vis.world_cfg["root"], "STATES", "previous_params.json"
-        )
-        if not os.path.exists(param_file_path):
-            return {}
-        with open(param_file_path, "r", encoding="utf8") as f:
-            pdict = json.load(f)
-        return pdict.get("last_meta", {})
+        """Return the saved global label/campaign block, or ``{}`` if none."""
+        return param_store.read_last_meta(self.vis.world_cfg.get("root", ""))
 
     def populate_sequence(self, prepend: bool = False):
         """Unpack the selected sequence with current params and add it to the plan buffer."""

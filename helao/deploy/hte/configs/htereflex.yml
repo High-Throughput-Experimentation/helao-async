@@ -1,0 +1,149 @@
+# Development config for the hte deployment's Reflex panels.
+#
+# Not a station config and not meant to become one: the action servers here are
+# the test deployment's websocket simulator, pointed at the column names the
+# real hte drivers publish so each panel's rolling-mean rules actually fire.
+# The hte sensors have no simulator, so this is how the panels are exercised on
+# a machine with no hardware.
+#
+# A real station gains these panels by adding a `reflex:` server to its own
+# config and changing nothing else -- the panels resolve from the same
+# `live_vis` values the Bokeh visualizers already use.
+dummy: true
+simulation: true
+run_type: simulation
+# HELAO does not expand `~`; a tilde here creates a literal '~' directory
+# in the working directory, which for a dev launch is the repo itself.
+root: /tmp/helao-htereflex
+experiment_libraries: []
+sequence_libraries: []
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8101
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: false
+  CO2SENSOR:
+    host: 127.0.0.1
+    port: 8102
+    group: action
+    fast: ws_simulator
+    live_vis: co2_vis
+    params:
+      # The column the real SprintIR driver publishes; co2_vis means it.
+      columns:
+        co2_ppm: 400
+  MFC:
+    host: 127.0.0.1
+    port: 8103
+    group: action
+    fast: ws_simulator
+    live_vis: mfc_vis
+    params:
+      # `{device}__{field}`, as the mfc driver publishes. mfc_vis means the
+      # flow and pressure fields and leaves temperature alone.
+      columns:
+        CO2__mass_flow: 50
+        CO2__pressure: 15
+        CO2__temperature: 25
+  PRESSURE:
+    host: 127.0.0.1
+    port: 8104
+    group: action
+    fast: ws_simulator
+    live_vis: pressure_vis
+    params:
+      # Every analog input gets a mean, so both of these do.
+      columns:
+        pressure_psi_0: 15
+        pressure_psi_1: 30
+  TEMPERATURE:
+    host: 127.0.0.1
+    port: 8105
+    group: action
+    fast: ws_simulator
+    live_vis: temp_vis
+    params:
+      # temp_vis plots its channels raw; no means are computed.
+      columns:
+        cell_temp_0: 25
+        cell_temp_1: 40
+  NIDAQMX:
+    host: 127.0.0.1
+    port: 8106
+    group: action
+    fast: cpsim_server
+    action_vis: nidaqmx_vis
+    params:
+      plate_id: 2750
+      # The stored OER trace renamed to a column the NI-DAQmx server streams,
+      # so the panel's cell selector has a cell to offer and its per-action
+      # split runs on real measurement data. The trace carries only t_s and
+      # erhe_v, so this exercises the voltage figures; the current ones render
+      # empty, which is itself the "no columns for this pattern" path.
+      column_aliases:
+        erhe_v: Ecell1_V
+  POWERSUPPLY:
+    host: 127.0.0.1
+    port: 8107
+    group: action
+    fast: cpsim_server
+    action_vis: power_supply_vis
+    params:
+      plate_id: 2750
+      column_aliases:
+        erhe_v: current_a
+  GAMRY:
+    host: 127.0.0.1
+    port: 8108
+    group: action
+    fast: cpsim_server
+    action_vis: gamry_vis
+    params:
+      plate_id: 2750
+      # The stored trace under the Gamry server's own column names, so the
+      # panel's technique-driven axis defaults have something to select.
+      column_aliases:
+        erhe_v: Ewe_V
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8109
+    group: action
+    fast: cpsim_server
+    action_vis: biologic_vis
+    params:
+      plate_id: 2750
+      column_aliases:
+        erhe_v: Ewe_V
+  SPEC:
+    host: 127.0.0.1
+    port: 8110
+    group: action
+    fast: cpsim_server
+    action_vis: spec_vis
+    params:
+      plate_id: 2750
+      # The spectrometer panel reads ch_<n> columns, one per detector channel.
+      # The stored trace has one measurement column, so this stands in as a
+      # single-channel detector -- enough to prove the spectrum path renders.
+      column_aliases:
+        erhe_v: ch_0
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8111
+    group: action
+    fast: cpsim_server
+    action_vis: sample_vis
+    params:
+      plate_id: 2750
+  UI:
+    host: 127.0.0.1
+    port: 5110
+    group: visualizer
+    reflex: helao_ui
+    params:
+      pages:
+        - live
+        - action

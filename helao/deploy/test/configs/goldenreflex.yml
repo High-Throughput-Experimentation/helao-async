@@ -1,0 +1,77 @@
+# helao/deploy/test/configs/goldenreflex.yml
+# Reflex UI stack over the `test` deployment simulators, proving coexistence:
+# the Bokeh standalone operator and the Reflex visualizer app run in the same
+# group. Reflex servers occupy two ports (frontend, then backend), so UI at
+# 5010 also claims 5011.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - OERSIM_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - OERSIM_seq
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_reflex
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+  OPERATOR:
+    host: 127.0.0.1
+    port: 5001
+    group: operator
+    bokeh: standalone_operator
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (bokeh, unchanged)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_panel
+    params: {}
+  # CPSIM and GPSIM exist so the browser check actually exercises all three
+  # panels. Without CPSIM there is no `action_vis` server at all, so /action
+  # renders empty and the ws_data path -- the one that shipped two Critical
+  # defects -- is never touched by the only step that can prove rendering.
+  CPSIM:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: cpsim_server
+    action_vis: oersim_panel
+    params:
+      plate_id: 2750
+  # GPSIM was absent while gpsim_driver still imported gpflow, which needs
+  # tensorflow and so has no Python 3.14 build. The surrogate now runs on
+  # gpytorch (see drivers/data/gp_backend.py), so the server imports and the
+  # OERSIM experiments -- every one of which routes through GPSIM -- are
+  # runnable again. That also restores /action's only real data source:
+  # CPSIM streams ws_data during a measurement it cannot start without a
+  # composition from GPSIM.
+  GPSIM:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gpsim_server
+    live_vis: gpsim_panel
+    params:
+      random_seed: 12345
+  UI:
+    host: 127.0.0.1
+    port: 5010
+    group: visualizer
+    reflex: helao_ui
+    params:
+      pages:
+        - live
+        - action
