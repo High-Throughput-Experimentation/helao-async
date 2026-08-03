@@ -11,7 +11,7 @@ import numpy as np
 import reflex as rx
 
 from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import ActionVisState
+from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import (
     X_COLUMN,
     latest_action_uuid,
@@ -84,12 +84,14 @@ def make_pstat_panel(
             """Choose the x column."""
             self._axes_chosen = True
             self.x_column = value
+            self.request_pull()
 
         @rx.event
         def set_y(self, value: str):
             """Choose the y column."""
             self._axes_chosen = True
             self.y_column = value
+            self.request_pull()
 
         def _figures(self, snapshot: dict) -> list:
             """Build ``(title, x, series)`` for every chart this panel draws."""
@@ -122,9 +124,16 @@ def make_pstat_panel(
         def pull(self, ingest) -> None:
             """Recompute every chart from the trailing window."""
             snapshot = ingest.buffer.snapshot(self.window_points)
-            self.action_uuid = latest_action_uuid(ingest)
+            # Written only on change; see state.assign. These are constant for
+            # the whole of an action, so an unconditional write published a
+            # delta on every tick with nothing new in it.
+            assign(self, "action_uuid", latest_action_uuid(ingest))
             latest = ingest.rows.latest() or {}
-            self.action_name = str(latest.get("action_name", "") or self.action_name)
+            assign(
+                self,
+                "action_name",
+                str(latest.get("action_name", "") or self.action_name),
+            )
 
             present = plottable_columns(snapshot, columns)
             if present and not set(present) & set(columns):
@@ -133,19 +142,23 @@ def make_pstat_panel(
                 # nothing on screen to explain it -- the failure this panel is
                 # least able to afford, since a blank chart is also what "no
                 # data yet" looks like. Draw what did arrive, and say so.
-                self.error = (
+                assign(
+                    self,
+                    "error",
                     "stream carries none of the declared columns "
-                    f"({', '.join(columns)}); plotting {', '.join(present)}"
+                    f"({', '.join(columns)}); plotting {', '.join(present)}",
                 )
             if present:
                 # The selectors offer what the stream actually carries, so an
                 # operator overriding the default is not choosing from a list
                 # of columns that are not there.
-                self.axis_options = present
+                assign(self, "axis_options", present)
             if not self._axes_chosen or self.x_column not in snapshot:
-                self.x_column, self.y_column = axis_defaults(
+                default_x, default_y = axis_defaults(
                     axis_map, self.action_name, present
                 )
+                assign(self, "x_column", default_x)
+                assign(self, "y_column", default_y)
 
             self.version += 1
             specs, urls, layouts, titles = [], [], [], []
