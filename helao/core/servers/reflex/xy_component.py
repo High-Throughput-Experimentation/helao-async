@@ -499,7 +499,23 @@ export function XYChart({ spec, bufferUrl, layout, height, onSelect }) {
     st.refetch(bufferUrl);
   }, [spec, bufferUrl, layout, onSelect]);
 
-  return <div ref={hostRef} style={{ width: "100%", height: height }} />;
+  // minHeight and flexShrink belong here, on the element xy observes and
+  // draws into -- not on a wrapper. `height` alone collapses to nothing when
+  // this div is a flex item, because flex-shrink applies to it, and the next
+  // chart in a wrapping row is then drawn over it. A wrapper box reserving the
+  // height fixed the overlap but cost the y axis: the gutter xy draws its
+  // ticks, labels and title in ended up outside the box.
+  return (
+    <div
+      ref={hostRef}
+      style={{
+        width: "100%",
+        height: height,
+        minHeight: height,
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 """
 
