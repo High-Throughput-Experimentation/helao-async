@@ -1307,6 +1307,28 @@ def test_rooted_config_does_not_mutate_the_caller_config():
     assert "experiment_path" not in cfg
 
 
+def test_rooted_config_invents_no_library_dir_for_an_out_of_tree_config():
+    """A config copied to USER_CONFIG names no deployment. Reading one out of
+    the path anyway gave `DATA`, and every lookup then pointed into
+    helao/deploy/DATA. With none, import_autolibs runs its own cascade."""
+    cfg = {"loaded_config_path": "/INST_hlo/DATA/USER_CONFIG/eche10.yml"}
+    rooted = opx.rooted_config(cfg)
+    assert "experiment_path" not in rooted
+    assert "sequence_path" not in rooted
+
+
+def test_rooted_config_still_roots_library_entries_for_an_out_of_tree_config():
+    """No deployment to derive, but a `.py` entry is still a path and still
+    must not depend on the cwd."""
+    cfg = {
+        "experiment_libraries": ["helao/deploy/test/x_exp.py", "simulatews_exp"],
+        "loaded_config_path": "/INST_hlo/DATA/USER_CONFIG/eche10.yml",
+    }
+    rooted = opx.rooted_config(cfg)
+    assert os.path.isabs(rooted["experiment_libraries"][0])
+    assert rooted["experiment_libraries"][1] == "simulatews_exp"
+
+
 def test_rooted_config_without_a_loaded_config_path():
     """No deployment to derive: leave the paths alone rather than inventing one."""
     rooted = opx.rooted_config({})
