@@ -15,7 +15,7 @@ from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import (
     X_COLUMN,
     latest_action_uuid,
-    split_on_restart,
+    segment_traces,
 )
 from helao.deploy.hte.servers.reflex._pstat import (
     axis_defaults,
@@ -94,7 +94,12 @@ def make_pstat_panel(
             self.request_pull()
 
         def _figures(self, snapshot: dict) -> list:
-            """Build ``(title, x, series)`` for every chart this panel draws."""
+            """Build ``(title, traces)`` for every chart this panel draws.
+
+            One chart per source rather than one per segment: both actions are
+            traces in the same chart. See :func:`segment_traces` for why the
+            canvas count matters.
+            """
             if per_channel:
                 channels = channels_in(snapshot)[:MAX_CHANNELS]
                 sources = (
@@ -105,20 +110,17 @@ def make_pstat_panel(
             else:
                 sources = [("", snapshot)]
 
+            def pick(segment_x, segment):
+                # split_on_restart hands x back separately; xy_pair looks
+                # columns up by name, so put it back under its own.
+                merged = {**segment, X_COLUMN: segment_x}
+                return xy_pair(merged, self.x_column, self.y_column)
+
             figures = []
             for label, source in sources:
                 x_all = source.get(X_COLUMN, np.empty(0))
                 series_all = {k: v for k, v in source.items() if k != X_COLUMN}
-                previous, current = split_on_restart(x_all, series_all)
-                for suffix, (segment_x, segment) in (
-                    ("this action", current),
-                    ("previous action", previous),
-                ):
-                    # split_on_restart hands x back separately; xy_pair looks
-                    # columns up by name, so put it back under its own.
-                    merged = {**segment, X_COLUMN: segment_x}
-                    x, series = xy_pair(merged, self.x_column, self.y_column)
-                    figures.append((f"{label} {suffix}".strip(), x, series))
+                figures.append((label, segment_traces(x_all, series_all, pick)))
             return figures
 
         def pull(self, ingest) -> None:
@@ -162,13 +164,14 @@ def make_pstat_panel(
 
             self.version += 1
             specs, urls, layouts, titles = [], [], [], []
-            for index, (heading, x, series) in enumerate(self._figures(snapshot)):
-                payload = plots.time_series(
-                    x,
+            for index, (heading, series) in enumerate(self._figures(snapshot)):
+                # plots.traces, not time_series: the two action segments have
+                # different lengths and so cannot share one x column.
+                payload = plots.traces(
                     series,
+                    kind="line",
                     x_label=self.x_column,
                     y_label=self.y_column,
-                    x_is_epoch=False,
                     panel_id=f"{self.panel_key()}-{index}",
                     version=self.version,
                 )
