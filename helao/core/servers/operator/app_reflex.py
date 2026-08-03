@@ -2517,6 +2517,11 @@ def _plan_panel():
             ),
             spacing="3",
         ),
+        # The same pane the history tables use, reading the same two vars: the
+        # Bokeh operator has one tree serving its plan and history tabs, and
+        # selecting in either shows here. Without it the plan rows were wired to
+        # select_plan_row and had nowhere to render.
+        _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
         _error_text(OperatorPlanState.error),
         rx.text(OperatorPlanState.status, size="2"),
         width="100%",
