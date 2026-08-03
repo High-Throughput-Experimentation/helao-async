@@ -24,6 +24,7 @@ __all__ = [
     "histogram",
 ]
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -68,6 +69,48 @@ PALETTE = (
 def _as_float_array(values) -> np.ndarray:
     """Coerce ``values`` to a 1-D float64 array."""
     return np.asarray(values, dtype=np.float64).ravel()
+
+
+#: Below this, an "epoch" column is not an epoch (1973), and rebasing it would
+#: wreck it. Guards a panel that declares x_is_epoch but streams elapsed time.
+_EPOCH_FLOOR = 1e8
+
+
+def _rebase_epoch(xs: np.ndarray) -> np.ndarray:
+    """Rebase epoch seconds to seconds since local midnight.
+
+    xy encodes every column as f32, and f32 spacing near 1.75e9 is **128
+    seconds**: a minute of 10 Hz telemetry collapsed onto two distinct x
+    positions, which draws as a blank chart whose axis keeps widening. Under
+    ~1e5 the spacing is ~8 ms instead.
+
+    Local midnight specifically, and taken from the window's first sample. xy
+    formats time axes with ``getUTC*`` and epoch 0 *is* midnight, so seconds
+    since local midnight render as local clock time -- what a wall clock in the
+    lab reads. Values past 86400 keep formatting correctly (86400 is 00:00:00
+    the next day), so a window spanning midnight stays continuous instead of
+    wrapping to zero.
+
+    The one inaccuracy left: a window spanning a DST transition keeps the offset
+    from its first sample, so labels after the change are an hour out. Twice a
+    year, only while such a window is on screen.
+
+    Args:
+        xs: The x column, epoch seconds.
+
+    Returns:
+        np.ndarray: Rebased, or ``xs`` unchanged when it holds no finite value
+        that looks like an epoch.
+    """
+    finite = xs[np.isfinite(xs)]
+    if finite.size == 0 or float(finite[0]) < _EPOCH_FLOOR:
+        return xs
+    stamp = time.localtime(float(finite[0]))
+    midnight = time.mktime(
+        # -1 for isdst: let mktime resolve which offset applied on that date.
+        (stamp.tm_year, stamp.tm_mon, stamp.tm_mday, 0, 0, 0, 0, 0, -1)
+    )
+    return xs - midnight
 
 
 def _finite_pairs(x: np.ndarray, y: np.ndarray) -> tuple:
@@ -244,6 +287,9 @@ def time_series(
         ValueError: If a series length does not match ``len(x)``.
     """
     xs = _as_float_array(x)
+    if x_is_epoch:
+        # Must happen before the marks are built: f32 cannot carry an epoch.
+        xs = _rebase_epoch(xs)
     marks = []
     for idx, (label, values) in enumerate(series.items()):
         ys = _as_float_array(values)
