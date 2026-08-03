@@ -391,16 +391,27 @@ def scatter_map(
     """
     xs = _as_float_array(x)
     ys = _as_float_array(y)
+    # Checked before the finite filter, as in `traces`: a length mismatch is a
+    # caller bug and must not be hidden by dropping points.
     if xs.size != ys.size:
         raise ValueError(f"x has length {xs.size} but y has length {ys.size}")
-    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
+    vs = None
     if values is not None:
         vs = _as_float_array(values)
         if vs.size != xs.size:
             raise ValueError(f"values has length {vs.size}, expected {xs.size}")
-        mark_kwargs["color"] = vs
-    else:
-        mark_kwargs["color"] = PALETTE[0]
+    # Non-finite points are dropped here, as `time_series` and `traces` already
+    # do. This function skipped it, and a NaN in `values` reaches the renderer
+    # as a color: the browser reports "Expected color but found 'NaN'" and the
+    # chart is left in a state a plain blank canvas does not explain. The mask
+    # spans all three arrays, because color is per point and filtering them
+    # independently would shift colors onto the wrong points.
+    keep = np.isfinite(xs) & np.isfinite(ys)
+    if vs is not None:
+        keep &= np.isfinite(vs)
+    xs, ys = xs[keep], ys[keep]
+    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
+    mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
     marks = [xy.scatter(**mark_kwargs)] if xs.size else []
     figure = xy.chart(*marks, *_axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
