@@ -121,7 +121,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
-    action_vis: nidaqmx_vis
+    # action_vis: nidaqmx_vis
     params:
       allow_no_sample: true
       dev_liquidvalve:
@@ -227,13 +227,13 @@ servers:
         one:
           address: 2
           diameter: 26.7
-  LIVE:
-    host: hte-adss-03.htejcap.caltech.edu
-    port: 5004
-    group: visualizer
-    bokeh: live_visualizer
-    params:
-      doc_name: Sensor Visualizer
+  # LIVE:
+  #   host: hte-adss-03.htejcap.caltech.edu
+  #   port: 5004
+  #   group: visualizer
+  #   bokeh: live_visualizer
+  #   params:
+  #     doc_name: Sensor Visualizer
   SYNC:
     host: hte-adss-03.htejcap.caltech.edu
     port: 8010
@@ -243,3 +243,11 @@ servers:
       aws_profile: default
       testing: false
     verbose: true
+  UI:
+    host: hte-adss-03.htejcap.caltech.edu
+    port: 5110          # frontend; 5111 is the backend
+    group: visualizer
+    deployment: hte
+    reflex: helao_ui
+    params:
+      pages: [live, action, operator, browser]
