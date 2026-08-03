@@ -176,6 +176,12 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
     # over it -- the "this action"/"previous action" pair of a potentiostat
     # panel overlapped vertically. Reserving here fixes every panel at once,
     # since this is the only way a panel mounts a chart.
+    #
+    # No `overflow: hidden`. It was belt-and-braces against that overlap, but
+    # min_height is what actually prevents it -- the collapse was the flex item
+    # having no height, not the canvas spilling. Clipping instead truncated the
+    # chart, taking the y axis with it whenever xy drew its chrome outside the
+    # reserved box.
     return rx.box(
         xy_chart(
             spec=spec_var,
@@ -186,7 +192,6 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
         ),
         min_height=f"{height}px",
         width="100%",
-        overflow="hidden",
     )
 
 

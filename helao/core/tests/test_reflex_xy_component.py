@@ -318,11 +318,14 @@ const out = {};
       return () => {};
     },
   };
-  const st2 = createController({ spec: { seq: 1 }, onSelect: null });
+  // `append.seq` is what _publish stamps on every real spec, and what the
+  // monotonic guard reads; a spec without it would leave the guard inert.
+  const specAt = (n) => ({ seq: n, append: { seq: n, affected: [0] } });
+  const st2 = createController({ spec: specAt(1), onSelect: null });
   st2.attach(slowModule, {});
-  st2.spec = { seq: 1 };
+  st2.spec = specAt(1);
   const p1 = st2.refetch("/b?v=1");
-  st2.spec = { seq: 2 };            // the panel ticks while v=1 is in flight
+  st2.spec = specAt(2);             // the panel ticks while v=1 is in flight
   const p2 = st2.refetch("/b?v=2");
   resolvers[1]();                   // v=2 lands first...
   resolvers[0]();                   // ...v=1 second, and must be discarded
@@ -332,6 +335,40 @@ const out = {};
   out.mountBufTag = renderedPairs.length ? renderedPairs[0].bufTag : null;
   out.mountCount = renderedPairs.length;
   out.pairedSpecSeq = st2.pairedSpec && st2.pairedSpec.seq;
+
+  // --- in-order completions must ALL be applied ---------------------------
+  //
+  // Rejecting every response whose request is no longer the newest starves the
+  // chart: a refetch is issued every tick, so once a fetch outlasts one tick
+  // nothing is ever the newest by the time it lands and the version advances
+  // only every few seconds. The test is monotonic on version instead.
+  // Decodes are the count that matters, not the final version: the last
+  // request always applies, so `appliedSeq` reaches 4 even when the three
+  // before it were thrown away. decodeFrame runs only for applied frames.
+  let burstDecodes = 0;
+  globalThis.fetch = async (url) =>
+    new Promise((res) => resolvers.push(() => res({
+      ok: true, arrayBuffer: async () => new ArrayBuffer(8),
+    })));
+  const countingModule = {
+    decodeFrame: (raw) => {
+      burstDecodes += 1;
+      return { message: {}, buffers: ["b"], byteLength: 8 };
+    },
+    render: () => () => {},
+  };
+  const st3 = createController({ spec: { append: { seq: 0 } }, onSelect: null });
+  st3.attach(countingModule, {});
+  const pending = [];
+  for (let seq = 1; seq <= 4; seq += 1) {
+    st3.spec = { append: { seq: seq } };
+    pending.push(st3.refetch("/c?v=" + seq));   // all four in flight at once
+  }
+  const base = resolvers.length - 4;
+  for (let i = 0; i < 4; i += 1) resolvers[base + i]();   // resolve in order
+  for (const p of pending) await p;
+  out.appliedSeqAfterBurst = st3.appliedSeq;
+  out.burstDecodes = burstDecodes;
 
   console.log(JSON.stringify(out));
 })();
@@ -386,19 +423,44 @@ def test_controller_renders_the_spec_that_matches_the_buffers_it_fetched():
     """
     out = _run_controller_harness()
     assert out["mountCount"] == 1
-    assert (out["mountSpecSeq"], out["mountBufTag"]) == (2, "v2")
+    # The invariant is that the two halves AGREE -- not which version wins.
+    # Whichever response lands first is fine to mount on, because it is
+    # internally consistent and the next one supersedes it. Before the fix the
+    # mount paired spec seq 2 with v1's buffers, which is neither.
+    pair = (out["mountSpecSeq"], out["mountBufTag"])
+    assert pair in {(1, "v1"), (2, "v2")}, f"mismatched pair at mount: {pair}"
+    # And the newest frame is the one left applied.
+    assert out["pairedSpecSeq"] == 2
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
-def test_controller_discards_a_response_superseded_while_in_flight():
-    """Out-of-order completions must not resurrect an older frame.
+def test_controller_never_regresses_to_an_older_frame():
+    """A late response must not overwrite a newer one already applied.
 
-    ``st.lastUrl`` was recorded but never checked, so whichever response
-    resolved last won regardless of which was newest.
+    The guard is monotonic on ``spec.append.seq``: an older frame is dropped
+    however late it lands, while anything newer than what is drawn is applied.
     """
     out = _run_controller_harness()
-    assert out["mountCount"] == 1, "the superseded response also built a view"
+    assert out["mountCount"] == 1, "a second view was built for the same chart"
     assert out["pairedSpecSeq"] == 2
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_does_not_starve_when_fetches_outlast_the_tick():
+    """Slow fetches must not stop the chart advancing.
+
+    A refetch is issued every tick, so "reject anything no longer newest"
+    rejects nearly everything once a fetch outlasts one tick -- which it does
+    through the frontend's proxy to the backend. A station showed the version
+    advancing 43 -> 52 -> 66 across ~23 ticks, which reads as a frozen chart.
+
+    Four requests are issued before any resolves, then all four complete in
+    order. Every one must be applied. The final version alone proves nothing --
+    the last request is always the newest, so it applies either way.
+    """
+    out = _run_controller_harness()
+    assert out["burstDecodes"] == 4
+    assert out["appliedSeqAfterBurst"] == 4
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
