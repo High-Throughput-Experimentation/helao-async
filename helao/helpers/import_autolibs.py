@@ -8,7 +8,7 @@ collects the public callables advertised by the module's ``EXPERIMENTS`` or
 ``SEQUENCES`` list alongside their file hashes and source paths.
 """
 
-__all__ = ["import_autolibs"]
+__all__ = ["import_autolibs", "deployment_from_config_path"]
 
 import os
 from glob import glob
@@ -32,6 +32,39 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 _AUTOLIB_CACHE: dict = {}
 
 
+def deployment_from_config_path(config_path: str) -> Optional[str]:
+    """Deployment name owning a config, or ``None`` if it lives outside the tree.
+
+    Only a config at ``.../helao/deploy/<deployment>/configs/<name>.yml`` names
+    its deployment by position. This used to be read as "two directories up",
+    which returns *something* for any path at all: a config copied to
+    ``C:\\INST_hlo\\DATA\\USER_CONFIG\\eche10.yml`` yielded the deployment
+    ``DATA``, and every library lookup then pointed at
+    ``helao/deploy/DATA/experiments``. Anchoring on the literal ``helao/deploy``
+    segment makes the out-of-tree case answerable -- ``None`` -- instead of
+    confidently wrong.
+
+    Args:
+        config_path: Path a config was loaded from.
+
+    Returns:
+        The deployment directory name, or ``None`` when the path is not under
+        ``helao/deploy/<deployment>/``.
+    """
+    if not config_path:
+        return None
+    parts = os.path.normpath(config_path).split(os.sep)
+    for index, part in enumerate(parts):
+        if (
+            part == "deploy"
+            and index > 0
+            and parts[index - 1] == "helao"
+            and index + 1 < len(parts)
+        ):
+            return parts[index + 1]
+    return None
+
+
 def import_autolibs(
     world_config_dict: dict,
     lib_dir: Optional[str] = None,
@@ -49,9 +82,12 @@ def import_autolibs(
     Args:
         world_config_dict: World config; ``<lib_type>_libraries`` lists the
             modules to load, and ``<lib_type>_path`` may override ``lib_dir``.
-        lib_dir: Directory containing the library modules. Defaults to the
-            deployment's ``<lib_type>s`` folder, derived from
-            ``CONFIG['loaded_config_path']``.
+        lib_dir: Directory containing the library modules. When omitted it is
+            resolved in order from the config's ``<lib_type>_path``, the
+            deployment named by the config's own path, and the deployment the
+            launcher resolved (``CONFIG['deployment']``). If none of those
+            yields a real directory, each library is resolved individually
+            against the deployment tree instead.
         user_lib_dir: Optional additional directory whose ``.py`` files are
             all imported.
         lib_type: ``"sequence"`` or ``"experiment"``.
@@ -130,25 +166,48 @@ def import_autolibs(
                 )
 
     if lib_dir is None:
-        config_deployment = os.path.basename(
-            os.path.dirname(os.path.dirname(config_loader.CONFIG["loaded_config_path"]))
+        lib_dir = world_config_dict.get(f"{lib_type}_path")
+    if lib_dir is None:
+        # The config's own path first, then the deployment the launcher
+        # resolved. A config launched by full path from outside the repo
+        # (e.g. one copied into USER_CONFIG and edited) names no deployment
+        # positionally, and only the launcher knows which one its servers
+        # came from.
+        global_cfg = config_loader.CONFIG or {}
+        deployment = deployment_from_config_path(
+            world_config_dict.get("loaded_config_path")
+            or global_cfg.get("loaded_config_path")
+            or ""
+        ) or global_cfg.get("deployment")
+        if deployment:
+            lib_dir = os.path.join("helao", "deploy", deployment, f"{lib_type}s")
+    if not lib_dir or not os.path.isdir(lib_dir):
+        # Not fatal, and NOT an early return. get_libs already falls back per
+        # entry -- 'hte', then a glob across every deployment -- and returning
+        # here skipped all of it, handing the orchestrator an empty library and
+        # the operator nothing to select. Blanking lib_dir routes each entry
+        # straight into that fallback; entries written as explicit .py paths
+        # never needed lib_dir at all.
+        LOGGER.warning(
+            f"{lib_type} path {lib_dir!r} is not a valid directory; resolving "
+            f"each {lib_type} library against the deployment tree instead",
         )
-        lib_dir = world_config_dict.get(
-            f"{lib_type}_path",
-            os.path.join("helao", "deploy", config_deployment, f"{lib_type}s"),
-        )
-    if not os.path.isdir(lib_dir):
-        LOGGER.error(
-            f"{lib_type} path {lib_dir} was specified but is not a valid directory",
-        )
-        return lib, codehash_lib, codepath_lib
+        lib_dir = ""
 
     libs = world_config_dict.get(f"{lib_type}_libraries", [])
     for library in libs:
         get_libs(lib_dir=lib_dir, lib_file=library)
 
     # now add all user_seq
-    if user_lib_dir is not None:
+    if user_lib_dir is not None and not os.path.isdir(user_lib_dir):
+        # Previously unreachable when the dir was missing, because the invalid
+        # lib_dir check returned first. It no longer does, so an absent user
+        # dir would raise from os.listdir instead of being skipped.
+        LOGGER.warning(
+            f"user {lib_type} path {user_lib_dir!r} is not a valid directory; "
+            f"no custom {lib_type}s were imported",
+        )
+    elif user_lib_dir is not None:
         userfiles = [
             os.path.splitext(userfile)[0]
             for userfile in os.listdir(user_lib_dir)
