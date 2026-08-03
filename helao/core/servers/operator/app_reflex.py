@@ -88,6 +88,9 @@ import reflex as rx
 from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.import_autolibs import deployment_from_config_path
+from helao.helpers.import_autolibs import repo_path as _autolib_repo_path
+from helao.helpers.import_autolibs import repo_root as _autolib_repo_root
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -521,16 +524,10 @@ def _build_spec(parser, path, backend, params, kwargs):
     return spec_parser.build_spec_sequence(parser, path, backend, params, kwargs)
 
 
-def repo_root() -> str:
-    """Absolute path of the repo root, derived from the installed package."""
-    import helao
-
-    return os.path.dirname(os.path.dirname(os.path.abspath(helao.__file__)))
-
-
-def _rooted(path: str) -> str:
-    """Resolve one config path against the repo root."""
-    return path if os.path.isabs(path) else os.path.join(repo_root(), path)
+#: Re-exported so this page and ``import_autolibs`` cannot disagree about
+#: where the repo root is; both need it for the same reason.
+repo_root = _autolib_repo_root
+_rooted = _autolib_repo_path
 
 
 def rooted_config(world_cfg: dict) -> dict:
@@ -553,13 +550,22 @@ def rooted_config(world_cfg: dict) -> dict:
     loaded = rooted.get("loaded_config_path")
     if not loaded:
         return rooted
-    deployment = os.path.basename(os.path.dirname(os.path.dirname(loaded)))
+    # Only a config under helao/deploy/<deployment>/configs/ names a deployment
+    # by position. Reading it as "two directories up" answered `DATA` for a
+    # config copied into USER_CONFIG, and every library path then pointed into
+    # a deployment that has never existed. With no deployment, set no library
+    # directory at all and let import_autolibs run its own cascade -- it
+    # resolves against the repo root now, not the cwd.
+    deployment = deployment_from_config_path(loaded)
     for lib_type in ("experiment", "sequence"):
         key = f"{lib_type}_path"
-        rooted[key] = _rooted(
-            rooted.get(key)
-            or os.path.join("helao", "deploy", deployment, f"{lib_type}s")
-        )
+        configured = rooted.get(key)
+        if configured:
+            rooted[key] = _rooted(configured)
+        elif deployment:
+            rooted[key] = _rooted(
+                os.path.join("helao", "deploy", deployment, f"{lib_type}s")
+            )
         libraries = rooted.get(f"{lib_type}_libraries")
         if libraries:
             rooted[f"{lib_type}_libraries"] = [

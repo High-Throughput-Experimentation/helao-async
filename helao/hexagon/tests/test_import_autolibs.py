@@ -160,6 +160,57 @@ def test_a_forward_slash_library_path_resolves_on_any_platform():
     assert lib
 
 
+# -- working directory -------------------------------------------------------
+#
+# The Reflex process runs from its app directory, not the repo root. Every path
+# here used to be resolved against the cwd, so the same config that worked
+# under the FastAPI and Bokeh launchers found nothing under Reflex.
+
+
+def test_a_bare_library_name_resolves_from_any_working_directory(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    lib, _, _ = import_autolibs(_config(IN_TREE), lib_type="experiment")
+    assert "SIM_websocket_data" in lib
+
+
+def test_a_relative_library_path_resolves_from_any_working_directory(
+    monkeypatch, tmp_path
+):
+    monkeypatch.chdir(tmp_path)
+    lib, _, _ = import_autolibs(
+        _config(
+            COPIED_OUT,
+            experiment_libraries=["helao/deploy/test/experiments/TEST_exp.py"],
+        ),
+        lib_type="experiment",
+    )
+    assert lib
+
+
+def test_the_deployment_fallbacks_resolve_from_any_working_directory(
+    monkeypatch, tmp_path
+):
+    """The 'hte' fallback and the cross-deployment glob, reached only when the
+    library directory is unresolvable -- exactly the Reflex case."""
+    monkeypatch.chdir(tmp_path)
+    lib, _, _ = import_autolibs(_config(COPIED_OUT), lib_type="experiment")
+    assert "SIM_websocket_data" in lib
+
+
+def test_a_relative_library_directory_resolves_from_any_working_directory(
+    monkeypatch, tmp_path
+):
+    monkeypatch.chdir(tmp_path)
+    lib, _, _ = import_autolibs(
+        _config(
+            COPIED_OUT,
+            experiment_path=os.path.join("helao", "deploy", "test", "experiments"),
+        ),
+        lib_type="experiment",
+    )
+    assert "SIM_websocket_data" in lib
+
+
 def test_a_library_no_deployment_has_is_still_an_error():
     """The fallbacks must not turn a typo into a silently empty library."""
     with pytest.raises(FileNotFoundError):
