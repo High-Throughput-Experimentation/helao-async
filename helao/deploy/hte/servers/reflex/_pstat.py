@@ -17,6 +17,7 @@ __all__ = [
     "CHANNEL_COLUMN",
     "NEGATED",
     "axis_defaults",
+    "plottable_columns",
     "xy_pair",
     "channels_in",
     "select_channel",
@@ -52,6 +53,27 @@ def axis_defaults(axis_map: dict, action_name: str, columns) -> tuple:
     if x not in available or y not in available:
         return fallback_x, fallback_y
     return x, y
+
+
+def plottable_columns(snapshot: dict, declared) -> list:
+    """Columns worth offering as axes, declared ones first.
+
+    A panel declares the columns its server streams, but the stream is the
+    authority: a technique that reports something else entirely would
+    otherwise leave the panel choosing axes that are not there, which draws a
+    blank chart. Anything the stream carries beyond the declared set is
+    appended rather than dropped, so the panel can still plot -- and the
+    caller can tell the operator that is what happened.
+
+    The channel column is excluded: it routes rows, it is not a measurement.
+    """
+    declared_present = [c for c in declared if c in snapshot]
+    extra = [
+        c
+        for c in snapshot
+        if c != CHANNEL_COLUMN and c not in declared_present and c not in declared
+    ]
+    return declared_present + extra
 
 
 def xy_pair(snapshot: dict, x_column: str, y_column: str) -> tuple:

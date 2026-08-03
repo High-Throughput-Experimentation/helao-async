@@ -453,3 +453,25 @@ def test_priming_sets_the_tick_cadence_from_the_update_rate():
     assert "tick_ms = int(self.update_rate" in inspect.getsource(
         VisPanelState.render_loop
     )
+
+
+# -- the tick must not push a delta of its own -------------------------------
+
+
+def test_the_in_flight_flag_is_backend_only():
+    """It flips true then false on every tick. As a client-visible var that
+    is a state delta per tick per panel, forever, whether or not anything
+    changed -- which a table-based panel redraws on, so it flashes with no
+    action running. Nothing renders it."""
+    from helao.core.servers.reflex.state import VisPanelState
+
+    assert "running" not in VisPanelState.get_fields()
+    assert "_running" in VisPanelState.get_fields()
+
+
+def test_the_flag_is_not_a_client_var():
+    from helao.core.servers.reflex.state import VisPanelState
+
+    client_vars = set(VisPanelState.vars)
+    assert "running" not in client_vars
+    assert "_running" not in client_vars
