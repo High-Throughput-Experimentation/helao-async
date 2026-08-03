@@ -6,6 +6,10 @@ from types import SimpleNamespace
 
 from helao.core.servers.reflex.state import (
     ActionVisState,
+    DEFAULT_UPDATE_RATE,
+    DEFAULT_WINDOW_POINTS,
+    MAX_WINDOW_POINTS,
+    MIN_WINDOW_POINTS,
     apply_tick,
     LiveVisState,
     VisPanelState,
@@ -74,17 +78,23 @@ def test_make_panel_state_is_cached_so_rerender_reuses_the_class():
     assert a is b
 
 
-def test_clamp_window_points_matches_the_bokeh_behavior():
-    assert VisPanelState.clamp_window_points("1", 500) == 2
-    assert VisPanelState.clamp_window_points("999999", 500) == 10000
+def test_clamp_window_points_bounds_the_window_by_the_ring_buffer():
+    """The ceiling is the buffer's capacity, not the Bokeh input's 10000.
+
+    xy reduces a window to roughly pixel resolution before publishing, so a
+    large window costs numpy time rather than payload size.
+    """
+    assert VisPanelState.clamp_window_points("1", 500) == MIN_WINDOW_POINTS
+    assert VisPanelState.clamp_window_points("999999", 500) == 999999
+    assert VisPanelState.clamp_window_points("99999999", 500) == MAX_WINDOW_POINTS
     assert VisPanelState.clamp_window_points("garbage", 700) == 700
-    assert VisPanelState.clamp_window_points("garbage", None) == 500
+    assert VisPanelState.clamp_window_points("garbage", None) == DEFAULT_WINDOW_POINTS
     assert VisPanelState.clamp_window_points("1234", 500) == 1234
 
 
-def test_parse_update_rate_falls_back_to_half_a_second():
+def test_parse_update_rate_falls_back_to_the_default():
     assert VisPanelState.parse_update_rate("0.25") == 0.25
-    assert VisPanelState.parse_update_rate("nope") == 0.5
+    assert VisPanelState.parse_update_rate("nope") == DEFAULT_UPDATE_RATE
 
 
 def test_parse_update_rate_clamps_to_a_sane_floor():
@@ -442,17 +452,33 @@ def test_render_loop_still_exists_for_panels_outside_this_repo():
 
 
 def test_priming_sets_the_tick_cadence_from_the_update_rate():
-    """LiveVisState overrides update_rate, so a class-level tick_ms default
-    would disagree with it."""
-    from helao.core.servers.reflex.state import LiveVisState, VisPanelState
-
-    assert LiveVisState.__fields__["update_rate"].default == 0.5
-    # The prime step derives tick_ms rather than trusting the default.
+    """The prime step derives tick_ms rather than trusting the class default."""
+    from helao.core.servers.reflex.state import VisPanelState
     import inspect
 
     assert "tick_ms = int(self.update_rate" in inspect.getsource(
         VisPanelState.render_loop
     )
+
+
+def test_concrete_panel_bases_do_not_shadow_the_default_update_rate():
+    """A per-class override silently defeats DEFAULT_UPDATE_RATE.
+
+    These two classes used to declare 0.5 and 0.25, so raising the module
+    default changed the cadence of exactly nothing. Either they inherit it, or
+    an override is a deliberate, visible choice -- not a stale leftover.
+    """
+    from helao.core.servers.reflex.state import (
+        ActionVisState,
+        DEFAULT_UPDATE_RATE,
+        LiveVisState,
+    )
+
+    for base in (LiveVisState, ActionVisState):
+        assert base.__fields__["update_rate"].default == DEFAULT_UPDATE_RATE, (
+            f"{base.__name__} shadows DEFAULT_UPDATE_RATE; raising the module "
+            "default will not affect any panel built on it"
+        )
 
 
 # -- the tick must not push a delta of its own -------------------------------
