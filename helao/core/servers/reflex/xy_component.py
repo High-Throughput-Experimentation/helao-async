@@ -248,17 +248,6 @@ export function createController(options) {
     cleanup: null,
     onSelect: options.onSelect,
     lastUrl: null,
-    tag: "?",
-  };
-
-  // TEMPORARY DIAGNOSTIC. Every silent path in this controller and in xy's
-  // append handler produces the same blank chart, so each decision point
-  // announces itself. Filter the console on "[xy]". Remove once the
-  // this-action/previous-action asymmetry is understood.
-  st.log = (...args) => {
-    try {
-      console.log("[xy]", st.tag, ...args);
-    } catch (e) {}
   };
 
   st.model = {
@@ -290,57 +279,9 @@ export function createController(options) {
   // the host element, and a payload are all present.
   st.maybeMount = () => {
     if (st.mounted || st.disposed) return;
-    if (!st.module || !st.el || !st.buffers) {
-      st.log("mount deferred", {
-        module: !!st.module,
-        el: !!st.el,
-        buffers: st.buffers ? st.buffers.length : null,
-      });
-      return;
-    }
-    st.log("mounting", {
-      traces: (st.spec && st.spec.traces || []).length,
-      columns: (st.spec && st.spec.columns || []).length,
-      buffers: st.buffers.length,
-      seq: st.spec && st.spec.append && st.spec.append.seq,
-    });
-    try {
-      st.cleanup = st.module.render({ model: st.model, el: st.el });
-    } catch (e) {
-      // Logged, then rethrown: behaviour is unchanged, but a render that
-      // throws is otherwise swallowed whole by refetch's catch.
-      st.log("RENDER THREW", e && e.message, e);
-      throw e;
-    }
+    if (!st.module || !st.el || !st.buffers) return;
+    st.cleanup = st.module.render({ model: st.model, el: st.el });
     st.mounted = true;
-    // The browser's own "WebGL context was lost" names no chart, and a lost
-    // context is indistinguishable from a working one in every other log
-    // line: xy keeps delivering appends to a live listener and _applyAppend
-    // returns before drawing. Tag the event with the panel id, and count the
-    // live canvases, since exceeding the browser's context cap is what
-    // provokes the eviction in the first place.
-    // Wrapped: this is diagnostics, and the controller is also executed by the
-    // test suite in a runtime with a stub element and no document. A throw
-    // here would surface as a bogus REFETCH THREW, or an unhandled rejection
-    // on the attach path.
-    try {
-      const canvas = st.el.querySelector("canvas");
-      if (canvas && !canvas.__xyLossHooked) {
-        canvas.__xyLossHooked = true;
-        canvas.addEventListener("webglcontextlost", () =>
-          st.log("WEBGL CONTEXT LOST", {
-            canvases: document.querySelectorAll("canvas").length,
-          })
-        );
-        canvas.addEventListener("webglcontextrestored", () =>
-          st.log("WEBGL CONTEXT RESTORED")
-        );
-      }
-      st.log("mounted", {
-        canvas: !!canvas,
-        canvases: document.querySelectorAll("canvas").length,
-      });
-    } catch (e) {}
   };
 
   st.teardown = () => {
@@ -355,7 +296,6 @@ export function createController(options) {
     st.el = el;
     const url = st.pendingUrl;
     st.pendingUrl = null;
-    st.log("bundle attached", { pendingUrl: url });
     if (url) st.refetch(url);
     else st.maybeMount();
   };
@@ -366,13 +306,9 @@ export function createController(options) {
   // first frame, and the chart silently freezes after one paint.
   st.refetch = async (url) => {
     if (!url || st.disposed) return;
-    // The panel id is the last path segment; it is the only thing that tells
-    // one chart of a pair from the other in the console.
-    if (url) st.tag = String(url).split("/").pop().split("?")[0];
     if (!st.module) {
       // decodeFrame lives in the bundle; hold the URL until it lands.
       st.pendingUrl = url;
-      st.log("refetch queued (no bundle yet)", url);
       return;
     }
     st.lastUrl = url;
@@ -386,10 +322,7 @@ export function createController(options) {
     try {
       const resp = await fetch(url);
       if (st.disposed) return;
-      if (!resp.ok) {
-        st.log("FETCH NOT OK", resp.status, url);
-        return;  // keep the last good frame
-      }
+      if (!resp.ok) return;  // keep the last good frame
       const raw = await resp.arrayBuffer();
       if (st.disposed) return;
       // Reject only frames OLDER than what is already drawn. "Is my request
@@ -415,20 +348,6 @@ export function createController(options) {
       st.buffers = frame.buffers;
       st.pairedSpec = specForUrl;
       st.appliedSeq = seqForUrl;
-      const spec = specForUrl || {};
-      const cols = spec.columns || [];
-      st.log("frame", {
-        bytes: raw.byteLength,
-        buffers: frame.buffers ? frame.buffers.length : null,
-        bufferBytes: (frame.buffers || []).map((b) => b && b.byteLength),
-        traces: (spec.traces || []).length,
-        columns: cols.length,
-        colLens: cols.map((c) => c && c.len),
-        layout: spec.buffer_layout,
-        seq: spec.append && spec.append.seq,
-        affected: spec.append && spec.append.affected,
-        mounted: st.mounted,
-      });
       if (!st.mounted) {
         st.maybeMount();
         return;
@@ -436,12 +355,8 @@ export function createController(options) {
       // Both events: the bundle's in-place append path listens for each.
       st.emit("change:spec");
       st.emit("change:buffers");
-      st.log("append emitted", {
-        listeners: (st.handlers["change:spec"] || []).length,
-      });
     } catch (e) {
       // Network hiccup: keep the last good frame rather than blanking.
-      st.log("REFETCH THREW", e && e.message, e);
     }
   };
 
@@ -450,15 +365,9 @@ export function createController(options) {
   st.applyLayout = (layout) => {
     if (st.layout === null) {
       st.layout = layout;
-      st.log("layout first seen", JSON.stringify(layout));
       return;
     }
     if (st.layout === layout) return;
-    st.log("LAYOUT CHANGED, rebuilding", {
-      from: JSON.stringify(st.layout),
-      to: JSON.stringify(layout),
-      wasMounted: st.mounted,
-    });
     st.layout = layout;
     st.teardown();
     // Cleared together with the buffers they describe. appliedSeq too, so the
