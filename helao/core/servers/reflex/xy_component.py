@@ -289,6 +289,28 @@ export function createController(options) {
       throw e;
     }
     st.mounted = true;
+    // The browser's own "WebGL context was lost" names no chart, and a lost
+    // context is indistinguishable from a working one in every other log
+    // line: xy keeps delivering appends to a live listener and _applyAppend
+    // returns before drawing. Tag the event with the panel id, and count the
+    // live canvases, since exceeding the browser's context cap is what
+    // provokes the eviction in the first place.
+    const canvas = st.el.querySelector("canvas");
+    if (canvas && !canvas.__xyLossHooked) {
+      canvas.__xyLossHooked = true;
+      canvas.addEventListener("webglcontextlost", () =>
+        st.log("WEBGL CONTEXT LOST", {
+          canvases: document.querySelectorAll("canvas").length,
+        })
+      );
+      canvas.addEventListener("webglcontextrestored", () =>
+        st.log("WEBGL CONTEXT RESTORED")
+      );
+    }
+    st.log("mounted", {
+      canvas: !!canvas,
+      canvases: document.querySelectorAll("canvas").length,
+    });
   };
 
   st.teardown = () => {
