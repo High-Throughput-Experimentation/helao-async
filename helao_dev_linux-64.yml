@@ -25,6 +25,7 @@ dependencies:
   - botocore
   - colorama
   - colorlog
+  - docformatter
   - fastapi
   - filelock
   - fsspec

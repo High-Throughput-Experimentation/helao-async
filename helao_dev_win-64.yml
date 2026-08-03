@@ -25,6 +25,7 @@ dependencies:
   - colorama
   - colorlog
   - comtypes
+  - docformatter
   - fastapi
   - filelock
   - fsspec
