@@ -21,7 +21,7 @@ import json
 import os
 import sqlite3
 from socket import gethostname
-from typing import Union
+from typing import Any, Union
 from uuid import UUID
 
 import aiofiles
@@ -44,6 +44,17 @@ from helao.core.models.sample import (
 
 from .file_utils import file_in_use
 from .plate_api import HTEPlateAPI
+
+
+def _is_null(val: Any) -> bool:
+    """Whether a DataFrame cell is a pandas/numpy null (``None``, ``NaN``, ``NaT``).
+
+    Container cells are never null: ``pd.isna`` on a list returns an elementwise
+    array whose truth value is ambiguous.
+    """
+    if isinstance(val, (list, dict, tuple, set, str, bytes)):
+        return False
+    return bool(pd.isna(val))
 
 
 class SampleModelAPI:
@@ -156,6 +167,32 @@ class SampleModelAPI:
             self._con = None
             self._cur = None
 
+    def _row_to_sampledict(self, row) -> dict:
+        """Materialize one query row as a sample dict with SQL NULLs as ``None``.
+
+        ``pd.read_sql_query`` renders a NULL as ``NaN`` -- not ``None`` -- for
+        every column that is NULL in *all* returned rows, because pandas infers
+        ``float64`` for an all-null object column. Pydantic rejects ``NaN`` for
+        ``Optional[str]`` and ``Optional[date]`` (and would silently accept it
+        for ``Optional[float]``, poisoning later JSON serialization), so the
+        nulls are normalized here, at the DataFrame boundary. A NULL json
+        column decodes to an empty list; ``json.loads`` would raise on it.
+
+        Args:
+            row: One row of a query result (a pandas ``Series``).
+
+        Returns:
+            The row as a dict ready for :func:`object_to_sample`.
+        """
+        sampledict = {}
+        for key, val in dict(row).items():
+            if _is_null(val):
+                val = None
+            if key in self._jsonkeys:
+                val = [] if val is None else json.loads(val)
+            sampledict[key] = val
+        return sampledict
+
     def _df_to_sample(self, df):
         """Convert the last row of a query DataFrame to a sample model.
 
@@ -171,10 +208,7 @@ class SampleModelAPI:
 
         if df.size == 0:
             return NoneSample()
-        sampledict = dict(df.iloc[-1, :])
-
-        for key in self._jsonkeys:
-            sampledict.update({key: json.loads(sampledict[key])})
+        sampledict = self._row_to_sampledict(df.iloc[-1, :])
 
         if sampledict["idx"] != sampledict["sample_no"]:  # integrity check
             raise ValueError(
@@ -202,10 +236,7 @@ class SampleModelAPI:
         else:
             sample_list = []
             for i in range(df.shape[0]):
-                sampledict = dict(df.iloc[i, :])
-
-                for key in self._jsonkeys:
-                    sampledict.update({key: json.loads(sampledict[key])})
+                sampledict = self._row_to_sampledict(df.iloc[i, :])
 
                 if sampledict["idx"] != sampledict["sample_no"]:  # integrity check
                     raise ValueError(
@@ -484,7 +515,6 @@ class SampleModelAPI:
                 """,
                 con=self._con,
             )
-            retdf.fillna("")
             retsample_list = self._df_to_samples(retdf)
             for retsample in retsample_list:
                 if retsample.sample_type is not None:
