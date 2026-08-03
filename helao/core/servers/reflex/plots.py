@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+import reflex as rx
 
 from helao.core.servers.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
@@ -169,12 +170,23 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
     Returns:
         An ``rx.Component``.
     """
-    return xy_chart(
-        spec=spec_var,
-        buffer_url=url_var,
-        layout=layout_var,
-        height=f"{height}px",
-        on_select=on_select,
+    # Wrapped in a box that reserves the height. The chart renders into a
+    # canvas the browser does not size from content, so the surrounding flex
+    # item collapsed to nothing and the next chart in a wrapping row was drawn
+    # over it -- the "this action"/"previous action" pair of a potentiostat
+    # panel overlapped vertically. Reserving here fixes every panel at once,
+    # since this is the only way a panel mounts a chart.
+    return rx.box(
+        xy_chart(
+            spec=spec_var,
+            buffer_url=url_var,
+            layout=layout_var,
+            height=f"{height}px",
+            on_select=on_select,
+        ),
+        min_height=f"{height}px",
+        width="100%",
+        overflow="hidden",
     )
 
 
