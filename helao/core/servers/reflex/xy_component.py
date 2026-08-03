@@ -221,6 +221,8 @@ export function createController(options) {
   const st = {
     spec: options.spec,
     buffers: null,
+    // The spec that describes `buffers`. See model.get.
+    pairedSpec: null,
     layout: null,
     handlers: {},
     module: null,
@@ -245,7 +247,14 @@ export function createController(options) {
   };
 
   st.model = {
-    get: (name) => (name === "spec" ? st.spec : st.buffers),
+    // The PAIRED spec, not the newest one. st.spec advances on every tick
+    // while a fetch is in flight, so handing the renderer the newest spec
+    // alongside buffers that arrived for an earlier version describes more
+    // points than the buffers hold. xy then either throws "column extends
+    // past chart payload" from _columnView at mount -- which has no
+    // validator -- or, on the append path, fails c(spec, buffers) and drops
+    // the frame without a word. Either way the chart never draws.
+    get: (name) => (name === "spec" ? st.pairedSpec || st.spec : st.buffers),
     send: (msg) => {
       if (msg && msg.type === "select" && st.onSelect) st.onSelect(msg);
     },
@@ -295,22 +304,28 @@ export function createController(options) {
     // returns before drawing. Tag the event with the panel id, and count the
     // live canvases, since exceeding the browser's context cap is what
     // provokes the eviction in the first place.
-    const canvas = st.el.querySelector("canvas");
-    if (canvas && !canvas.__xyLossHooked) {
-      canvas.__xyLossHooked = true;
-      canvas.addEventListener("webglcontextlost", () =>
-        st.log("WEBGL CONTEXT LOST", {
-          canvases: document.querySelectorAll("canvas").length,
-        })
-      );
-      canvas.addEventListener("webglcontextrestored", () =>
-        st.log("WEBGL CONTEXT RESTORED")
-      );
-    }
-    st.log("mounted", {
-      canvas: !!canvas,
-      canvases: document.querySelectorAll("canvas").length,
-    });
+    // Wrapped: this is diagnostics, and the controller is also executed by the
+    // test suite in a runtime with a stub element and no document. A throw
+    // here would surface as a bogus REFETCH THREW, or an unhandled rejection
+    // on the attach path.
+    try {
+      const canvas = st.el.querySelector("canvas");
+      if (canvas && !canvas.__xyLossHooked) {
+        canvas.__xyLossHooked = true;
+        canvas.addEventListener("webglcontextlost", () =>
+          st.log("WEBGL CONTEXT LOST", {
+            canvases: document.querySelectorAll("canvas").length,
+          })
+        );
+        canvas.addEventListener("webglcontextrestored", () =>
+          st.log("WEBGL CONTEXT RESTORED")
+        );
+      }
+      st.log("mounted", {
+        canvas: !!canvas,
+        canvases: document.querySelectorAll("canvas").length,
+      });
+    } catch (e) {}
   };
 
   st.teardown = () => {
@@ -346,19 +361,31 @@ export function createController(options) {
       return;
     }
     st.lastUrl = url;
+    // The spec describing THIS url's frame, captured before the await. The
+    // panel republishes a larger spec every tick, so by the time the response
+    // lands st.spec may already describe more points than these buffers hold.
+    const specForUrl = st.spec;
     try {
       const resp = await fetch(url);
+      // Superseded while in flight: a newer refetch has been issued, and its
+      // response is the one that should win. Applying this one would pair old
+      // buffers with a newer spec -- and out-of-order completions mean "last
+      // to resolve" is not "newest".
+      if (st.disposed || st.lastUrl !== url) return;
       if (!resp.ok) {
         st.log("FETCH NOT OK", resp.status, url);
         return;  // keep the last good frame
       }
       const raw = await resp.arrayBuffer();
+      if (st.disposed || st.lastUrl !== url) return;
       // decodeFrame returns {message, buffers, version, byteLength}; the
       // renderer wants the buffer LIST, because a split-layout spec indexes
       // columns into it. Handing it the wrapper object fails the split check.
       const frame = st.module.decodeFrame(raw);
+      // Assigned together: these two must never be read apart.
       st.buffers = frame.buffers;
-      const spec = st.spec || {};
+      st.pairedSpec = specForUrl;
+      const spec = specForUrl || {};
       const cols = spec.columns || [];
       st.log("frame", {
         bytes: raw.byteLength,
@@ -404,7 +431,9 @@ export function createController(options) {
     });
     st.layout = layout;
     st.teardown();
+    // Cleared together with the buffers they describe.
     st.buffers = null;
+    st.pairedSpec = null;
   };
 
   st.dispose = () => {
