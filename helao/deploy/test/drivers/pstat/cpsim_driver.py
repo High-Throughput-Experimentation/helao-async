@@ -151,9 +151,22 @@ class CPSimExec(Executor):
         self.column_aliases = getattr(self.active.driver, "column_aliases", {})
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
-        self.sample_data = self.active.driver.data[
-            tuple(self.active.action.action_params["comp_vec"])
-        ]
+        comp_vec = tuple(self.active.action.action_params["comp_vec"])
+        try:
+            self.sample_data = self.active.driver.data[comp_vec]
+        except KeyError:
+            # Named explicitly, because the bare KeyError this replaced was a
+            # dead end: the tuple in the message says nothing about where a
+            # valid one comes from, and `comp_vec` defaults to `[]` whenever a
+            # caller puts it in the query string -- FastAPI routes a non-scalar
+            # to the body, so the default silently wins and `data[()]` raises.
+            raise KeyError(
+                f"comp_vec {list(comp_vec)} is not addressable on plate "
+                f"{self.active.driver.loaded_plate}. Valid compositions come "
+                "from the /list_addressable endpoint, and comp_vec must be "
+                "sent in the JSON request body -- a query-string comp_vec is "
+                "ignored and leaves it empty."
+            ) from None
         self.cp = self.sample_data["CP3"]
         self.els = self.sample_data["el_str"].split("-")
         self.fracs = [self.sample_data[el] for el in self.els]
