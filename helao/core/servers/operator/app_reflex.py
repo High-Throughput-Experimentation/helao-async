@@ -85,6 +85,13 @@ from typing import Optional
 
 import reflex as rx
 
+from helao.core.servers.operator.object_tree import (
+    doc_to_html,
+    object_to_html,
+    open_keys_for,
+    server_header_text,
+    tree_header_text,
+)
 from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
@@ -633,6 +640,27 @@ def make_backend(world_cfg: dict, server_key: str, orch_key: Optional[str] = Non
     )
 
 
+#: Shown by both tree panes until a row is clicked, matching the Bokeh operator.
+TREE_EMPTY_HEADER = "select a row"
+
+
+def tree_for(kind: str, obj) -> tuple:
+    """Header and HTML for one selected object, or the empty state.
+
+    Args:
+        kind: ``sequence``, ``experiment`` or ``action`` -- picks which
+            ``<kind>_name``/``<kind>_uuid`` pair titles the tree.
+        obj: The object, or anything falsy for "nothing selected".
+
+    Returns:
+        tuple: ``(header, html)``.
+    """
+    if not obj:
+        return TREE_EMPTY_HEADER, ""
+    header = tree_header_text(kind, obj).strip()
+    return (header or "—"), object_to_html(obj, open_keys=open_keys_for(obj))
+
+
 def session_backend(token: str):
     """Return this session's backend, building it on first use.
 
@@ -693,10 +721,59 @@ class OperatorQueueState(rx.State):
     error: str = ""
     polling: bool = False
 
+    #: Attribute tree for the queue row the operator last clicked.
+    tree_header: str = TREE_EMPTY_HEADER
+    tree_html: str = ""
+
     @rx.var
     def can_edit_queue(self) -> bool:
         """Whether the queue-editing controls are enabled."""
         return self.reachable and may_edit_queue(self.orch_state)
+
+    @rx.event(background=True)
+    async def select_queue_row(self, kind: str, index: int):
+        """Show the attribute tree for a clicked queue row.
+
+        Queue objects are fetched on demand through ``get_queue_object`` rather
+        than cached, exactly as the Bokeh operator does: the queue changes under
+        the operator as the orchestrator drains it, and a cache would show a row
+        that has already run. Rapid clicks race and the last response wins,
+        which is acceptable for a single-operator UI.
+
+        Args:
+            kind: ``sequence``, ``experiment`` or ``action``.
+            index: Row index within that queue.
+        """
+        async with self:
+            token = self.router.session.client_token
+        backend = session_backend(token)
+        if backend is None:
+            return
+        try:
+            obj = await backend.get_queue_object(kind, index)
+        except Exception as exc:
+            LOGGER.warning(f"operator could not read {kind} queue row {index}: {exc}")
+            obj = None
+        async with self:
+            self.tree_header, self.tree_html = tree_for(kind, obj)
+
+    @rx.event
+    def select_server_row(self, name: str):
+        """Show the config tree for a clicked action-server row.
+
+        Keyed by server name rather than row index: the server table is local
+        config, not orchestrator state, and the name is already in the row --
+        so this cannot drift out of step with the table's sort order the way an
+        index would.
+        """
+        with _SETTINGS_LOCK:
+            servers = ((_SETTINGS.get("world_cfg") or {}).get("servers")) or {}
+        cfg = servers.get(name)
+        if cfg is None:
+            self.tree_header, self.tree_html = TREE_EMPTY_HEADER, ""
+            return
+        self.tree_header = server_header_text(name, cfg)
+        self.tree_html = object_to_html(cfg, open_keys=["params"])
 
     def _apply(self, updates: dict) -> None:
         """Assign a :func:`refresh_tables` result.
@@ -1233,6 +1310,16 @@ class OperatorLibState(rx.State):
         )
 
     @rx.var
+    def doc_html(self) -> str:
+        """The selected item's docstring, ``Args:`` block collapsed.
+
+        Rendered here rather than stored, so the raw docstring stays the single
+        piece of state. See :mod:`object_tree` -- the Bokeh operator renders the
+        same string into a ``Div``.
+        """
+        return doc_to_html(self.doc)
+
+    @rx.var
     def item_names(self) -> list[str]:
         """Selectable names for the active tab."""
         return self.seq_names if self.mode == "sequence" else self.exp_names
@@ -1595,17 +1682,22 @@ def _last_of(value):
     return "" if value is None else value
 
 
-def history_rows(histories: Optional[dict], kind: str) -> list:
-    """Render one history table.
+def history_entries(histories: Optional[dict], kind: str) -> list:
+    """Render one history table, keeping each row's source payload beside it.
+
+    Rows and payloads come from one pass so their order cannot drift. They are
+    indexed together -- the operator clicks row *n* and expects object *n* -- and
+    two separately-sorted lists would put the wrong object in the tree without
+    anything looking wrong.
 
     Args:
         histories: ``get_histories`` payload -- ``kind -> [(uuid, payload)]``.
         kind: ``action``, ``experiment``, or ``sequence``.
 
     Returns:
-        list[list[str]]: Most recent first, one cell per column. Every row
-        carries every column even when the payload lacks the key: ragged rows
-        are what made the Bokeh table refuse to render, and here they would
+        list[tuple[list[str], dict]]: ``(row, payload)`` most recent first. Every
+        row carries every column even when the payload lacks the key: ragged
+        rows are what made the Bokeh table refuse to render, and here they would
         silently shift cells under the wrong headers.
     """
     columns = HIST_COLS.get(kind)
@@ -1613,7 +1705,7 @@ def history_rows(histories: Optional[dict], kind: str) -> list:
         return []
     entries = ((histories or {}).get(kind)) or []
     start_key, finish_key = _HIST_TIMES[kind]
-    rows = []
+    out = []
     for uuid, payload in sorted(entries, key=lambda x: x[0])[::-1]:
         payload = payload or {}
         derived = dict(payload)
@@ -1624,8 +1716,16 @@ def history_rows(histories: Optional[dict], kind: str) -> list:
             derived["action_endpoint"] = (
                 f"{payload.get('action_server', '')}/{payload.get('action_name', '')}"
             )
-        rows.append([str(_last_of(derived.get(col))) for col in columns])
-    return rows
+        row = [str(_last_of(derived.get(col))) for col in columns]
+        # The full payload, not the derived copy: the tree should show what the
+        # orchestrator actually holds, with the uuid unabbreviated.
+        out.append((row, payload))
+    return out
+
+
+def history_rows(histories: Optional[dict], kind: str) -> list:
+    """The table rows from :func:`history_entries`, without the payloads."""
+    return [row for row, _ in history_entries(histories, kind)]
 
 
 class OperatorPlanState(rx.State):
@@ -1644,6 +1744,17 @@ class OperatorPlanState(rx.State):
     action_history: list[list[str]] = []
     experiment_history: list[list[str]] = []
     sequence_history: list[list[str]] = []
+
+    #: Attribute tree for the row the operator last clicked, as the Bokeh
+    #: operator shows beside these tables. Rendered HTML rather than the object,
+    #: because the tree is markup either way and the raw payloads have no other
+    #: use in the browser.
+    tree_header: str = TREE_EMPTY_HEADER
+    tree_html: str = ""
+
+    #: Payloads behind the history rows, index-aligned with them by
+    #: `history_entries`. A backend var: only the rendered tree crosses the wire.
+    _hist_objs: dict = {}
 
     #: Buffered Sequence models. A backend var: these are pydantic models, not
     #: JSON, and the browser only ever needs `plan_view`.
@@ -1775,10 +1886,12 @@ class OperatorPlanState(rx.State):
                 self.error = f"history unavailable: {exc}"
             return
         try:
-            rendered = {
-                kind: history_rows(histories, kind)
+            entries = {
+                kind: history_entries(histories, kind)
                 for kind in ("action", "experiment", "sequence")
             }
+            rendered = {k: [row for row, _ in v] for k, v in entries.items()}
+            objects = {k: [obj for _, obj in v] for k, v in entries.items()}
         except Exception as exc:
             # Rendering is outside the fetch's guard, and a payload shaped
             # unlike (uuid, dict) pairs would otherwise escape the handler.
@@ -1790,6 +1903,35 @@ class OperatorPlanState(rx.State):
             self.action_history = rendered["action"]
             self.experiment_history = rendered["experiment"]
             self.sequence_history = rendered["sequence"]
+            self._hist_objs = objects
+
+    @rx.event
+    def select_history_row(self, kind: str, index: int):
+        """Show the attribute tree for a clicked history row.
+
+        Args:
+            kind: ``action``, ``experiment`` or ``sequence``.
+            index: Row index, aligned with the payloads cached by
+                :meth:`refresh_history`.
+        """
+        objs = self._hist_objs.get(kind) or []
+        obj = objs[index] if 0 <= index < len(objs) else None
+        self.tree_header, self.tree_html = tree_for(kind, obj)
+
+    @rx.event
+    def select_plan_row(self, index: int):
+        """Show the attribute tree for a clicked row of the plan buffer.
+
+        The plan holds pydantic Sequences rather than payload dicts, so this
+        dumps the model. A history refresh replacing the cache cannot affect it.
+        """
+        obj = None
+        if 0 <= index < len(self._plan):
+            try:
+                obj = self._plan[index].as_dict()
+            except Exception as exc:
+                LOGGER.warning(f"operator could not read plan row {index}: {exc}")
+        self.tree_header, self.tree_html = tree_for("sequence", obj)
 
 
 # -- plate map ---------------------------------------------------------------
@@ -2051,7 +2193,14 @@ def _error_text(var):
     return rx.cond(var != "", rx.text(var, color_scheme="red", size="2"))
 
 
-def _table(columns: list, rows_var, *, height: str = "14em", row_actions=None):
+def _table(
+    columns: list,
+    rows_var,
+    *,
+    height: str = "14em",
+    row_actions=None,
+    on_row_click=None,
+):
     """A scrolling table over ``list[list[str]]`` rows.
 
     Args:
@@ -2060,13 +2209,23 @@ def _table(columns: list, rows_var, *, height: str = "14em", row_actions=None):
         height: Scroll-area height.
         row_actions: Optional ``(row, index) -> rx.Component`` for a trailing
             per-row control cell.
+        on_row_click: Optional ``(row, index) -> EventSpec`` fired when a row is
+            clicked, which is how the attribute tree is selected. Bokeh gets row
+            selection from its ``ColumnDataSource``; an ``rx.table`` has none, so
+            the click goes on the row itself.
     """
 
     def render(row, index):
         cells: list = [rx.foreach(row, lambda cell: rx.table.cell(cell))]
         if row_actions is not None:
             cells.append(rx.table.cell(row_actions(row, index)))
-        return rx.table.row(*cells)
+        if on_row_click is None:
+            return rx.table.row(*cells)
+        return rx.table.row(
+            *cells,
+            on_click=on_row_click(row, index),
+            cursor="pointer",
+        )
 
     headers = [rx.table.column_header_cell(col) for col in columns]
     if row_actions is not None:
@@ -2084,11 +2243,34 @@ def _table(columns: list, rows_var, *, height: str = "14em", row_actions=None):
     )
 
 
+def _tree_pane(header_var, html_var):
+    """The attribute tree beside a set of tables.
+
+    Mirrors the Bokeh operator's header Div plus tree Div. The HTML is nested
+    ``<details>``, so expanding a node needs no round trip.
+    """
+    return rx.vstack(
+        rx.text(header_var, weight="bold", size="2"),
+        rx.scroll_area(
+            rx.html(html_var),
+            type="auto",
+            scrollbars="vertical",
+            height="14em",
+        ),
+        width="100%",
+        spacing="1",
+        font_size="0.8em",
+    )
+
+
 def _queue_tab(columns: list, rows_var, kind: str):
     """One queue table with per-row reorder and remove controls."""
     return _table(
         columns,
         rows_var,
+        on_row_click=lambda row, index: OperatorQueueState.select_queue_row(
+            kind, index
+        ),
         row_actions=lambda row, index: rx.hstack(
             rx.button(
                 "^",
@@ -2188,6 +2370,20 @@ def _library_panel():
             align="center",
             width="100%",
         ),
+        # The selected item's docstring, as the Bokeh operator shows it: prose
+        # verbatim, the Args: block collapsed behind a disclosure so a long
+        # parameter list does not push the form off screen.
+        rx.cond(
+            OperatorLibState.doc_html != "",
+            rx.box(
+                rx.html(OperatorLibState.doc_html),
+                width="100%",
+                padding="0.5em 0.75em",
+                border_radius="var(--radius-2)",
+                background_color="var(--gray-2)",
+                font_size="0.8em",
+            ),
+        ),
         rx.hstack(
             rx.input(
                 placeholder="sequence label",
@@ -2272,6 +2468,7 @@ def _plan_panel():
         _table(
             PLAN_COLS,
             OperatorPlanState.plan_view,
+            on_row_click=lambda row, index: OperatorPlanState.select_plan_row(index),
             row_actions=lambda row, index: rx.hstack(
                 rx.button(
                     "^",
@@ -2438,12 +2635,20 @@ def _queue_panel():
                 value="action",
             ),
             rx.tabs.content(
-                _table(["server", "status", "driver"], OperatorQueueState.server_rows),
+                _table(
+                    ["server", "status", "driver"],
+                    OperatorQueueState.server_rows,
+                    # By name, not index: the row already carries it.
+                    on_row_click=lambda row, index: (
+                        OperatorQueueState.select_server_row(row[0])
+                    ),
+                ),
                 value="servers",
             ),
             default_value="sequence",
             width="100%",
         ),
+        _tree_pane(OperatorQueueState.tree_header, OperatorQueueState.tree_html),
         rx.hstack(
             rx.button(
                 "Clear sequences",
@@ -2486,20 +2691,39 @@ def _history_panel():
                 rx.tabs.trigger("Sequences", value="sequence"),
             ),
             rx.tabs.content(
-                _table(HIST_COLS["action"], OperatorPlanState.action_history),
+                _table(
+                    HIST_COLS["action"],
+                    OperatorPlanState.action_history,
+                    on_row_click=lambda row, index: (
+                        OperatorPlanState.select_history_row("action", index)
+                    ),
+                ),
                 value="action",
             ),
             rx.tabs.content(
-                _table(HIST_COLS["experiment"], OperatorPlanState.experiment_history),
+                _table(
+                    HIST_COLS["experiment"],
+                    OperatorPlanState.experiment_history,
+                    on_row_click=lambda row, index: (
+                        OperatorPlanState.select_history_row("experiment", index)
+                    ),
+                ),
                 value="experiment",
             ),
             rx.tabs.content(
-                _table(HIST_COLS["sequence"], OperatorPlanState.sequence_history),
+                _table(
+                    HIST_COLS["sequence"],
+                    OperatorPlanState.sequence_history,
+                    on_row_click=lambda row, index: (
+                        OperatorPlanState.select_history_row("sequence", index)
+                    ),
+                ),
                 value="sequence",
             ),
             default_value="action",
             width="100%",
         ),
+        _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
         width="100%",
         spacing="2",
     )
