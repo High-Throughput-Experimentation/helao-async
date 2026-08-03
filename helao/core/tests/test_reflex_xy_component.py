@@ -284,6 +284,55 @@ const out = {};
   await st.refetch("/xy/buffers/p?v=4");
   out.remountedAfterLayoutChange = renders.length === 2;
 
+  // --- the spec/buffers pairing race --------------------------------------
+  //
+  // A fetch slower than the render tick means the response for v=N arrives
+  // when the panel has already published the spec for v=N+1. Reading the
+  // newest spec beside those buffers describes more points than they hold,
+  // and xy throws "column extends past chart payload" at mount or silently
+  // drops the append. Responses can also complete out of order, so "last to
+  // resolve" is not "newest".
+  const resolvers = [];
+  // Frame size stands in for the version, so the decoded buffers say which
+  // response produced them.
+  globalThis.fetch = async (url) => {
+    const bytes = url === "/b?v=1" ? 8 : 16;
+    return new Promise((res) => resolvers.push(() => res({
+      ok: true, arrayBuffer: async () => new ArrayBuffer(bytes),
+    })));
+  };
+  // Both halves of what render() reads, recorded together: the defect is not
+  // a wrong spec or wrong buffers, it is a mismatched *pair*.
+  const renderedPairs = [];
+  const slowModule = {
+    decodeFrame: (raw) => ({
+      message: {},
+      buffers: [raw.byteLength === 16 ? "v2" : "v1"],
+      byteLength: raw.byteLength,
+    }),
+    render: ({ model }) => {
+      renderedPairs.push({
+        specSeq: (model.get("spec") || {}).seq,
+        bufTag: (model.get("buffers") || [])[0],
+      });
+      return () => {};
+    },
+  };
+  const st2 = createController({ spec: { seq: 1 }, onSelect: null });
+  st2.attach(slowModule, {});
+  st2.spec = { seq: 1 };
+  const p1 = st2.refetch("/b?v=1");
+  st2.spec = { seq: 2 };            // the panel ticks while v=1 is in flight
+  const p2 = st2.refetch("/b?v=2");
+  resolvers[1]();                   // v=2 lands first...
+  resolvers[0]();                   // ...v=1 second, and must be discarded
+  await p2;
+  await p1;
+  out.mountSpecSeq = renderedPairs.length ? renderedPairs[0].specSeq : null;
+  out.mountBufTag = renderedPairs.length ? renderedPairs[0].bufTag : null;
+  out.mountCount = renderedPairs.length;
+  out.pairedSpecSeq = st2.pairedSpec && st2.pairedSpec.seq;
+
   console.log(JSON.stringify(out));
 })();
 """
@@ -318,6 +367,38 @@ def test_controller_refetch_uses_the_url_it_is_given_not_a_captured_one():
     out = _run_controller_harness()
     assert out["lastFetched"] == "/xy/buffers/p?v=3"
     assert "/xy/buffers/p?v=2" in out["allUrls"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_renders_the_spec_that_matches_the_buffers_it_fetched():
+    """The regression guard for "column extends past chart payload".
+
+    On a station the buffer route is proxied frontend->backend, so a fetch can
+    outlast the render tick. The panel has published a larger spec by the time
+    the response lands, and pairing them describes more points than the buffers
+    hold -- xy throws from ``_columnView`` at mount, which has no validator, or
+    fails ``c(spec, buffers)`` on the append path and drops the frame silently.
+    Either way the chart never draws and the server logs stay clean.
+
+    The assertion is that the two halves *agree*: spec ``seq: 2`` must be
+    rendered against the buffers tagged ``v2``. Before the fix the mount paired
+    ``seq: 2`` with ``v1``.
+    """
+    out = _run_controller_harness()
+    assert out["mountCount"] == 1
+    assert (out["mountSpecSeq"], out["mountBufTag"]) == (2, "v2")
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_discards_a_response_superseded_while_in_flight():
+    """Out-of-order completions must not resurrect an older frame.
+
+    ``st.lastUrl`` was recorded but never checked, so whichever response
+    resolved last won regardless of which was newest.
+    """
+    out = _run_controller_harness()
+    assert out["mountCount"] == 1, "the superseded response also built a view"
+    assert out["pairedSpecSeq"] == 2
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
