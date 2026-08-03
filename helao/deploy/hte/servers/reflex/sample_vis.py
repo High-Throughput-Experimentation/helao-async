@@ -13,7 +13,7 @@ __all__ = ["WS_PATH", "STATE_BASE", "build", "panel_id"]
 
 import reflex as rx
 
-from helao.core.servers.reflex.state import ActionVisState
+from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import latest_action_uuid
 from helao.deploy.hte.servers.reflex._samples import (
     SAMPLE_COLUMNS,
@@ -54,8 +54,13 @@ class _State(ActionVisState, mixin=True):
 
         The tables come from `refresh`, not from the packets: this panel reads
         the server's sample registry, which the data stream does not carry.
+
+        Written only on change. This panel's body is four ``rx.data_table``s,
+        which rebuild on any state delta -- so an unconditional write here made
+        them rebuild at the render cadence forever, bouncing every panel below
+        them as the tables changed height.
         """
-        self.action_uuid = latest_action_uuid(ingest)
+        assign(self, "action_uuid", latest_action_uuid(ingest))
 
     @rx.event
     def set_max_samples(self, value: str):

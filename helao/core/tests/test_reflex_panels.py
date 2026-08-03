@@ -475,3 +475,125 @@ def test_the_flag_is_not_a_client_var():
     client_vars = set(VisPanelState.vars)
     assert "running" not in client_vars
     assert "_running" not in client_vars
+
+
+# -- only write, and only draw, when something changed ------------------------
+#
+# Reflex marks a var dirty on assignment, not on change, and every dirty var is
+# a delta pushed to the browser. Panels tick several times a second, so an
+# unconditional write is a redraw per tick per panel with nothing new in it.
+
+
+class _CountingIngest:
+    """Stub whose message_count the caller advances."""
+
+    def __init__(self, count=1):
+        self.status = SimpleNamespace(state="live", error=None, message_count=count)
+
+
+class _TickPanel(_StubPanel):
+    """Panel stub carrying the two bookkeeping attributes apply_tick uses."""
+
+    def __init__(self, pull_raises=None):
+        super().__init__(pull_raises=pull_raises)
+        self._last_seen = -1
+        self._force_pull = False
+
+
+def test_assign_writes_only_when_the_value_differs():
+    from helao.core.servers.reflex.state import assign
+
+    panel = _StubPanel()
+    assert assign(panel, "connection", "live") is True
+    assert assign(panel, "connection", "live") is False
+    assert assign(panel, "connection", "reconnecting") is True
+
+
+def test_assign_writes_a_first_falsy_value():
+    """An empty string is a real value, not a no-op, when nothing was set."""
+    from helao.core.servers.reflex.state import assign
+
+    panel = SimpleNamespace()
+    assert assign(panel, "error", "") is True
+    assert panel.error == ""
+
+
+def test_a_tick_with_no_new_messages_does_not_pull():
+    panel = _TickPanel()
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+
+    assert len(panel.pulled) == 1
+
+
+def test_a_tick_pulls_again_once_a_message_arrives():
+    panel = _TickPanel()
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    ingest.status.message_count = 8
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+
+    assert len(panel.pulled) == 2
+
+
+def test_a_requested_pull_rerenders_without_new_data():
+    """Changing an axis or the window size must not look dead on an idle
+    panel while it waits for the next packet."""
+    panel = _TickPanel()
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    panel._force_pull = True
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+
+    assert len(panel.pulled) == 2
+    assert panel._force_pull is False
+
+
+def test_a_failed_pull_is_retried_on_the_next_tick():
+    """The skip must not record progress a failed pull never made."""
+    panel = _TickPanel(pull_raises=RuntimeError("boom"))
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    assert panel._last_seen == -1
+
+    panel._raises = None
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    assert len(panel.pulled) == 1
+
+
+def test_the_status_mirror_still_updates_on_a_skipped_tick():
+    """The skip is about drawing, not about connection state."""
+    panel = _TickPanel()
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    ingest.status.state = "reconnecting"
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+
+    assert panel.connection == "reconnecting"
+    assert len(panel.pulled) == 1
+
+
+def test_a_panel_stub_without_the_bookkeeping_still_pulls():
+    """apply_tick takes any object with pull/connection/error; a panel that
+    does not carry the counters must not be skipped forever."""
+    panel = _StubPanel()
+    ingest = _CountingIngest(count=7)
+
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+    apply_tick(panel, ingest, server_key="SIM", ws_path="ws_live")
+
+    assert len(panel.pulled) == 2
+
+
+def test_the_bookkeeping_vars_are_backend_only():
+    from helao.core.servers.reflex.state import VisPanelState
+
+    client_vars = set(VisPanelState.vars)
+    assert "_last_seen" not in client_vars
+    assert "_force_pull" not in client_vars

@@ -29,6 +29,7 @@ __all__ = [
     "ActionVisState",
     "make_panel_state",
     "apply_tick",
+    "assign",
 ]
 
 import sys
@@ -50,6 +51,31 @@ MIN_UPDATE_RATE = 0.01
 DEFAULT_UPDATE_RATE = 0.5
 
 
+#: Sentinel so a first assignment of a falsy value is not mistaken for a no-op.
+_MISSING = object()
+
+
+def assign(target, name: str, value) -> bool:
+    """Set ``target.name`` only when the value actually differs.
+
+    Reflex marks a var dirty on **assignment**, not on change, and a dirty var
+    is a delta pushed to the browser. Panels tick several times a second, so
+    unconditional writes meant every panel published a delta every tick with
+    nothing new in it. Charts absorbed that; a panel built from
+    ``rx.data_table`` rebuilt all of its tables each time, which read at the
+    bench as continuous flashing -- and as the panels below it bouncing, since
+    a rebuilt table changes height. It also spent the browser's main thread on
+    redraws that the live charts needed.
+
+    Returns:
+        bool: ``True`` if the value changed and was written.
+    """
+    if getattr(target, name, _MISSING) == value:
+        return False
+    setattr(target, name, value)
+    return True
+
+
 def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
     """Apply one poll of ``ingest`` onto ``target``.
 
@@ -68,19 +94,43 @@ def apply_tick(target, ingest, *, server_key: str, ws_path: str) -> None:
         ws_path: ``ws_live`` or ``ws_data``, for the message.
     """
     if ingest is None:
-        target.connection = "unavailable"
-        target.error = (
+        assign(target, "connection", "unavailable")
+        assign(
+            target,
+            "error",
             f"no ingest for '{server_key}' ({ws_path}); "
-            "is it declared in the config?"
+            "is it declared in the config?",
         )
         return
-    target.connection = ingest.status.state
-    target.error = ingest.status.error or ""
+    assign(target, "connection", ingest.status.state)
+    assign(target, "error", ingest.status.error or "")
+
+    # Nothing new on the wire means nothing new to draw. Without this every
+    # panel rebuilt and republished its whole payload on every tick -- a fresh
+    # buffer URL, a fresh spec, a state delta -- for data identical to the
+    # frame already on screen. On a page of ten panels that is the browser's
+    # main thread spent on redraws the live charts needed, and it is why a
+    # running trace could crawl while an idle table flashed beside it.
+    seen = getattr(ingest.status, "message_count", None)
+    if (
+        seen is not None
+        and seen == getattr(target, "_last_seen", None)
+        and not getattr(target, "_force_pull", False)
+    ):
+        return
+
     try:
         target.pull(ingest)
     except Exception as exc:
-        target.error = f"{type(exc).__name__}: {exc}"
+        assign(target, "error", f"{type(exc).__name__}: {exc}")
         LOGGER.warning(f"reflex panel pull failed for {server_key}: {exc}")
+    # Recorded after the pull, so a failed one is retried on the next tick
+    # rather than being treated as done.
+    else:
+        if hasattr(target, "_last_seen"):
+            target._last_seen = seen
+        if getattr(target, "_force_pull", False):
+            target._force_pull = False
 
 
 class VisPanelState(rx.State, mixin=True):
@@ -117,6 +167,19 @@ class VisPanelState(rx.State, mixin=True):
     #: continuous flashing with no action running. Nothing renders this, so it
     #: has no business crossing the wire.
     _running: bool = False
+    #: Ingest message count at the last completed pull, so a tick with nothing
+    #: new on the wire costs nothing. Backend-only, like ``_running``.
+    _last_seen: int = -1
+    #: Set by anything that changes what a render should look like without new
+    #: data arriving -- a new window size, a different axis. Without it those
+    #: controls would appear dead on an idle panel, since the skip above would
+    #: keep the stale frame until the next packet.
+    _force_pull: bool = False
+
+    def request_pull(self) -> None:
+        """Force the next tick to re-render even with no new data."""
+        self._force_pull = True
+
     #: Render cadence in milliseconds, for the page's ticking component. Kept
     #: beside `update_rate` rather than computed, because the component binds
     #: it as a Var and must see the change when the input is edited.
@@ -160,6 +223,7 @@ class VisPanelState(rx.State, mixin=True):
     def on_window_points(self, value: str):
         """Handle the window-size input."""
         self.window_points = self.clamp_window_points(value, self.window_points)
+        self.request_pull()
 
     @rx.event
     def on_update_rate(self, value: str):
