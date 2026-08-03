@@ -32,17 +32,18 @@ from helao.core.servers.base_api import BaseAPI
 
 
 class WsSim:
-    """Synthetic 6-series data generator feeding the action server live buffer.
+    """Synthetic multi-series data generator feeding the action server live buffer.
 
-    Spawns a background polling task that emits a dict of ``series_<i>``
-    values scaled by ``self.scale_map`` and a random ``[0, 1)`` factor at
-    10 Hz.
+    Spawns a background polling task that emits a dict of series values scaled
+    by ``self.scale_map`` and a random ``[0, 1)`` factor at 10 Hz. The series
+    are ``series_<i>`` unless the config's ``columns`` block names others.
 
     Attributes:
         base: Hosting action server.
         config_dict: ``params`` block from the server config.
         world_config: Full world configuration.
-        scale_map: Per-series multiplier (1, 2, 5, 10, 50, 100).
+        scale_map: Per-series multiplier, from the config's ``columns`` block
+            or the default six (1, 2, 5, 10, 50, 100).
         event_loop: Reference to the running asyncio loop.
         polling_task: Background task running :meth:`poll_data_loop`.
     """
@@ -56,9 +57,17 @@ class WsSim:
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
-        self.scale_map = {
-            f"series_{i}": v for i, v in enumerate([1, 2, 5, 10, 50, 100])
-        }
+        # Column names are configurable so a config can point this simulator at
+        # a panel written for real hardware -- the hte live panels key their
+        # rolling means off column names, and `series_0` would exercise none of
+        # that. `columns` maps name -> scale; omitted, the original six stand.
+        configured = self.config_dict.get("columns")
+        if isinstance(configured, dict) and configured:
+            self.scale_map = {str(k): float(v) for k, v in configured.items()}
+        else:
+            self.scale_map = {
+                f"series_{i}": v for i, v in enumerate([1, 2, 5, 10, 50, 100])
+            }
 
         self.event_loop = asyncio.get_event_loop()
         self.polling_task = self.event_loop.create_task(self.poll_data_loop())

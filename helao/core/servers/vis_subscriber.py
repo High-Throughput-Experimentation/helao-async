@@ -33,7 +33,6 @@ __all__ = [
 ]
 
 import asyncio
-import os
 import time
 from functools import lru_cache, partial
 from importlib import import_module
@@ -47,6 +46,9 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 from helao.core.servers.vis import Vis
 from helao.helpers import config_loader
+from helao.core.servers.reflex.discovery import (
+    deployment_search_order as _deployment_search_order,
+)
 from helao.helpers.loaded_modules import write_loaded_modules_snapshot
 from helao.helpers.ws_utils import WsSubscriber as Wss
 
@@ -55,37 +57,6 @@ from helao.helpers.ws_utils import WsSubscriber as Wss
 #: after importing a vis module named in an action server's ``action_vis`` /
 #: ``live_vis`` config key, so all per-instrument visualizer classes share it.
 VIS_CLASS_NAME = "C_vis"
-
-
-def _deployment_search_order() -> list:
-    """Return the deployment names to search when resolving a vis module.
-
-    The configured deployment (``CONFIG["deployment"]``) is tried first so a
-    deployment can override a shared module, then ``hte`` as the canonical home
-    of the generic visualizers, then any remaining deployment that ships a
-    ``servers/visualizer`` package (sorted for determinism).
-
-    Returns:
-        list: Ordered, de-duplicated deployment directory names.
-    """
-    order = []
-    cfg = config_loader.CONFIG or {}
-    current = cfg.get("deployment")
-    if current:
-        order.append(current)
-    if "hte" not in order:
-        order.append("hte")
-    deploy_root = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "deploy",
-    )
-    if os.path.isdir(deploy_root):
-        for name in sorted(os.listdir(deploy_root)):
-            if name in order:
-                continue
-            if os.path.isdir(os.path.join(deploy_root, name, "servers", "visualizer")):
-                order.append(name)
-    return order
 
 
 @lru_cache(maxsize=None)

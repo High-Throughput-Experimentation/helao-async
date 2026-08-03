@@ -12,6 +12,7 @@ optionally publishes the result as the module-level :data:`CONFIG` dict.
 __all__ = [
     "read_config",
     "read_validated_config",
+    "is_ui_only_server",
     "install_global_config",
     "load_global_config",
     "CONFIG",
@@ -197,6 +198,25 @@ class OrchServerParams(BaseModel):
     verify_plates: Optional[bool] = True
 
 
+def is_ui_only_server(server_cfg) -> bool:
+    """Whether a ``servers:`` entry is a browser UI with no HELAO private API.
+
+    Orchestrators subscribe to every server's ``attach_client``/``get_status``
+    endpoints; a UI server has none, so dispatching at it yields a stream of
+    405s. Kept in one place because the set of UI kinds grows -- ``reflex`` was
+    added after ``bokeh``/``demovis`` and was missed at all three call sites.
+
+    Args:
+        server_cfg: One entry of the config's ``servers:`` mapping.
+
+    Returns:
+        bool: ``True`` for Bokeh, Reflex, and demo-vis servers.
+    """
+    if not isinstance(server_cfg, dict):
+        return False
+    return any(key in server_cfg for key in ("bokeh", "reflex", "demovis"))
+
+
 class ServerConfig(BaseModel):
     """One entry of the ``servers:`` mapping in a HELAO config.
 
@@ -207,6 +227,9 @@ class ServerConfig(BaseModel):
             ``operator``; selects the launcher and import path.
         fast: Module name under ``servers/<group>/`` for FastAPI servers.
         bokeh: Module name under ``servers/<group>/`` for Bokeh servers.
+        reflex: Reflex app module name for the Reflex UI stack. A Reflex
+            server occupies two ports: ``port`` serves the static frontend and
+            ``port + 1`` is the Reflex backend.
         params: Free-form parameter dict (or :class:`OrchServerParams` for
             orchestrators) passed through to the server's ``makeApp``.
         verbose: Enables debug-level logging on the server.
@@ -217,6 +240,7 @@ class ServerConfig(BaseModel):
     group: str
     fast: Optional[str] = None
     bokeh: Optional[str] = None
+    reflex: Optional[str] = None
     params: Optional[dict | OrchServerParams] = None
     verbose: Optional[bool] = False
 

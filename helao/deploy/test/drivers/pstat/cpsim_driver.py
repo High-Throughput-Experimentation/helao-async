@@ -20,7 +20,7 @@ from helao.core.servers.base import Base
 from helao.helpers.executor import Executor
 from helao.helpers.file_utils import unzpickle
 
-from ...drivers.data.gpsim_driver import calc_eta
+from ...drivers.data.oer_metrics import calc_eta
 
 
 class CPSim:
@@ -49,6 +49,12 @@ class CPSim:
         self.config_dict = action_serv.server_cfg.get("params", {})
         self.world_config = action_serv.world_cfg
         self.loaded_plate = self.config_dict["plate_id"]
+        # Optional `{stored_name: emitted_name}` rename applied to every
+        # emitted column. The stored trace is a real OER measurement, so this
+        # is how a config points this simulator at a panel written for other
+        # hardware -- panels key their behaviour off column names.
+        aliases = self.config_dict.get("column_aliases")
+        self.column_aliases = aliases if isinstance(aliases, dict) else {}
         self.data_file = os.path.join(
             os.path.dirname(
                 os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -139,6 +145,10 @@ class CPSimExec(Executor):
         super().__init__(*args, **kwargs)
         LOGGER.info("EcheSimExec initialized.")
         self.last_idx = 0
+        # Read off the driver: `_exec` and `_poll` run on the executor, and
+        # reaching for a driver attribute from here raised AttributeError,
+        # which the executor loop swallowed into "no samples ever streamed".
+        self.column_aliases = getattr(self.active.driver, "column_aliases", {})
         self.start_time = time.time()  # instantiation time
         self.duration = self.active.action.action_params.get("duration", -1)
         self.sample_data = self.active.driver.data[
@@ -156,7 +166,9 @@ class CPSimExec(Executor):
         """
         self.start_time = time.time()  # pre-polling iteration time
         data = {"elements": self.els, "atfracs": self.fracs}
-        data.update({k: [] for k in self.cp})
+        # Header column names must match what _poll emits, or a panel keying
+        # off names sees one set announced and another delivered.
+        data.update({self.column_aliases.get(k, k): [] for k in self.cp})
         return {"data": data, "error": ErrorCodes.none}
 
     async def _poll(self) -> dict:
@@ -173,7 +185,10 @@ class CPSimExec(Executor):
         live_dict = {}
         if new_idxs:
             newest_idx = max(new_idxs)
-            live_dict = {k: v[self.last_idx : newest_idx] for k, v in self.cp.items()}
+            live_dict = {
+                self.column_aliases.get(k, k): v[self.last_idx : newest_idx]
+                for k, v in self.cp.items()
+            }
             self.last_idx = newest_idx
             if newest_idx == len(self.cp["t_s"]) - 1:
                 status = HloStatus.finished

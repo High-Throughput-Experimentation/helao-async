@@ -52,6 +52,7 @@ import requests
 from pyfiglet import figlet_format
 from termcolor import cprint
 
+from helao.core.servers.reflex.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
 from helao.helpers.config_loader import read_config
@@ -539,7 +540,7 @@ class Pidd:
         # whose PID psutil.pid_exists() still reports as alive.
         self.procs = {}
         self.reqKeys = ("host", "port", "group")
-        self.codeKeys = ("fast", "bokeh")
+        self.codeKeys = ("fast", "bokeh", "reflex")
         self.d = {}
         try:
             self.load_global()
@@ -869,37 +870,39 @@ def validateConfig(PIDD, confDict, helao_repo_root):
     If any of these checks fail, an appropriate error message is printed and the function returns False.
     """
     if len(confDict["servers"]) != len(set(confDict["servers"])):
-        LAUNCH_LOGGER.info("Server keys are not unique.")
+        _mux_log("info", "Server keys are not unique.")
         return False
     if "servers" not in confDict:
-        LAUNCH_LOGGER.info("'servers' key not defined in config dictionary.")
+        _mux_log("info", "'servers' key not defined in config dictionary.")
         return False
     for server in confDict["servers"]:
         serverDict = confDict["servers"][server]
         hasKeys = [k in serverDict for k in PIDD.reqKeys]
         hasCode = [k for k in serverDict if k in PIDD.codeKeys]
         if not all(hasKeys):
-            LAUNCH_LOGGER.info(
-                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}."
+            _mux_log(
+                "info",
+                f"{server} config is missing {[k for k,b in zip(PIDD.reqKeys, hasKeys) if b]}.",
             )
             return False
         if not isinstance(serverDict["host"], str):
-            LAUNCH_LOGGER.info(f"{server} server 'host' is not a string")
+            _mux_log("info", f"{server} server 'host' is not a string")
             return False
         if not isinstance(serverDict["port"], int):
-            LAUNCH_LOGGER.info(f"{server} server 'port' is not an integer")
+            _mux_log("info", f"{server} server 'port' is not an integer")
             return False
         if not isinstance(serverDict["group"], str):
-            LAUNCH_LOGGER.info(f"{server} server 'group' is not a string")
+            _mux_log("info", f"{server} server 'group' is not a string")
             return False
         if hasCode:
             if len(hasCode) != 1:
-                LAUNCH_LOGGER.info(
-                    f"{server} cannot have more than one code key {PIDD.codeKeys}"
+                _mux_log(
+                    "info",
+                    f"{server} cannot have more than one code key {PIDD.codeKeys}",
                 )
                 return False
             if not isinstance(serverDict[hasCode[0]], str):
-                LAUNCH_LOGGER.info(f"{server} server '{hasCode[0]}' is not a string")
+                _mux_log("info", f"{server} server '{hasCode[0]}' is not a string")
                 return False
             # launchPath = os.path.join(
             #     "helao",
@@ -912,9 +915,11 @@ def validateConfig(PIDD, confDict, helao_repo_root):
             #         f"{server} server code helao/servers/{serverDict['group']}/{serverDict[hasCode[0]]+'.py'} does not exist."
             #     )
             #     return False
-    serverAddrs = [f"{d['host']}:{d['port']}" for d in confDict["servers"].values()]
+    serverAddrs = []
+    for d in confDict["servers"].values():
+        serverAddrs.extend(reserved_addresses(d))
     if len(serverAddrs) != len(set(serverAddrs)):
-        LAUNCH_LOGGER.info("Server host:port locations are not unique.")
+        _mux_log("info", "Server host:port locations are not unique.")
         return False
     # Single-owner sample-state guardrail: at most one server may declare
     # params.positions (the SAMPLE server after the archive hoist). Two owners
@@ -925,12 +930,28 @@ def validateConfig(PIDD, confDict, helao_repo_root):
         if isinstance(d.get("params"), dict) and d["params"].get("positions")
     ]
     if len(positionsOwners) > 1:
-        LAUNCH_LOGGER.info(
+        _mux_log(
+            "info",
             f"More than one server declares 'params.positions': "
-            f"{positionsOwners}. Exactly one sample-state owner is allowed."
+            f"{positionsOwners}. Exactly one sample-state owner is allowed.",
         )
         return False
     return True
+
+
+def stdin_is_interactive() -> bool:
+    """Whether stdin can be put in cbreak mode for the hotkey reader.
+
+    False when the launcher is scripted, piped, or run from a harness: there
+    is no terminal to read keys from. Checked rather than discovered by
+    exception because ``termios.tcgetattr`` raises from inside the reader
+    thread, which killed the thread with a traceback and no explanation.
+    """
+    try:
+        return bool(sys.stdin) and sys.stdin.isatty()
+    except (AttributeError, ValueError):
+        # A closed or replaced stdin. Either way there is no terminal.
+        return False
 
 
 def _posix_getchar():
@@ -972,6 +993,11 @@ def wait_key():
     Returns:
         str: The character of the key pressed or a specific character based on the exception.
     """
+    if not stdin_is_interactive():
+        # Same character EOF yields: the caller treats it as "disconnect the
+        # monitor", which leaves the servers running. Anything else would tear
+        # down a group merely because nobody is at a terminal.
+        return "\x1a" if os.name == "nt" else "\x04"
     try:
         if os.name == "nt":
             keypress = click.getchar()
@@ -984,6 +1010,19 @@ def wait_key():
             keypress = "\x1a"
         else:
             keypress = "\x04"
+    except Exception:
+        # termios.error when stdin turns out not to be a terminal after all
+        # (redirected between the check and the read). Uncaught, this killed
+        # the reader thread with a bare traceback.
+        #
+        # LAUNCH_LOGGER is None until the launcher builds it, and this can run
+        # before that: logging unconditionally would raise AttributeError from
+        # inside the handler, replacing one crash with another.
+        if LAUNCH_LOGGER is not None:
+            LAUNCH_LOGGER.warning(
+                "hotkey reader could not read from stdin; disconnecting the monitor"
+            )
+        keypress = "\x1a" if os.name == "nt" else "\x04"
     return keypress
 
 
@@ -1141,6 +1180,16 @@ def launch_server_groups(
                         )
                         CONSOLE.register(server, p)
                         ppid = p.pid
+                    elif codeKey == "reflex":
+                        cmd = ["python", "-u", "reflex_launcher.py", confArg, server]
+                        p = subprocess.Popen(
+                            cmd,
+                            cwd=helao_repo_root,
+                            env=CONSOLE.child_env(),
+                            **CONSOLE.spawn_kwargs(),
+                        )
+                        CONSOLE.register(server, p)
+                        ppid = p.pid
                     else:
                         LAUNCH_LOGGER.warning(
                             f"No launch method available for code type '{codeKey}', cannot launch {group}/{servPy}.py",
@@ -1216,7 +1265,7 @@ def server_loaded_files(server_entry, server_key, root):
     """Return the set of repo files a server has loaded.
 
     FastAPI servers (``fast``) are queried live at ``/loaded_modules``; bokeh
-    servers (``bokeh``) have no HTTP route, so their startup snapshot at
+    and reflex servers have no such HTTP route, so their startup snapshot at
     ``<root>/STATES/loaded_modules_<key>.json`` is read instead. Returns an empty
     set on any failure (treated as "no known mapping", so nothing is restarted
     on a bad read rather than restarting blindly)."""
@@ -1231,7 +1280,7 @@ def server_loaded_files(server_entry, server_key, root):
         except Exception:
             return set()
         return set()
-    # bokeh server (visualizer/operator)
+    # bokeh or reflex server (visualizer/operator)
     if root is None:
         return set()
     snap = os.path.join(root, "STATES", f"loaded_modules_{server_key}.json")
@@ -1866,6 +1915,30 @@ def main():
         - The function uses `print_message` to log messages and `wait_key` to capture keypresses.
         - The function interacts with the `pidd` object to manage server processes and orchestrators.
         """
+        if not stdin_is_interactive():
+            # A scripted launch previously died here with `termios.error:
+            # Inappropriate ioctl for device` from inside this thread, taking
+            # the launcher with it and leaving a half-torn-down group: servers
+            # launched detached survived, while any server holding a
+            # parent-death signal (the Reflex UI) went with it.
+            #
+            # Block instead of returning. The group then behaves as one unit
+            # under a script or a service manager, exactly as it does
+            # interactively, and SIGINT/SIGTERM tears it down.
+            LAUNCH_LOGGER.info(
+                "stdin is not a terminal, so the CTRL-r/x/t/d hotkeys are "
+                "unavailable. The group is running and this launcher will stay "
+                f"up to hold it; PIDs are in {pidd.pidFilePath}. "
+                "Stop it with SIGINT/SIGTERM."
+            )
+            try:
+                threading.Event().wait()
+            except KeyboardInterrupt:
+                LAUNCH_LOGGER.info("Interrupted, terminating orchestration group.")
+                graceful_shutdown_all()
+                with pidd_lock:
+                    pidd.close()
+            return
         result = None
         while result not in ["\x18", "\x04"]:
             if result == "\x12":
