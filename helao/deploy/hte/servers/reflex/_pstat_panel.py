@@ -20,6 +20,7 @@ from helao.deploy.hte.servers.reflex._action import (
 from helao.deploy.hte.servers.reflex._pstat import (
     axis_defaults,
     channels_in,
+    plottable_columns,
     select_channel,
     xy_pair,
 )
@@ -125,7 +126,22 @@ def make_pstat_panel(
             latest = ingest.rows.latest() or {}
             self.action_name = str(latest.get("action_name", "") or self.action_name)
 
-            present = [c for c in columns if c in snapshot] or columns
+            present = plottable_columns(snapshot, columns)
+            if present and not set(present) & set(columns):
+                # The stream carries none of the columns this panel declares.
+                # Falling back to the declared list plots a blank chart with
+                # nothing on screen to explain it -- the failure this panel is
+                # least able to afford, since a blank chart is also what "no
+                # data yet" looks like. Draw what did arrive, and say so.
+                self.error = (
+                    "stream carries none of the declared columns "
+                    f"({', '.join(columns)}); plotting {', '.join(present)}"
+                )
+            if present:
+                # The selectors offer what the stream actually carries, so an
+                # operator overriding the default is not choosing from a list
+                # of columns that are not there.
+                self.axis_options = present
             if not self._axes_chosen or self.x_column not in snapshot:
                 self.x_column, self.y_column = axis_defaults(
                     axis_map, self.action_name, present

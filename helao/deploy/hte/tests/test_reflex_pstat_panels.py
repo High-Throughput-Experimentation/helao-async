@@ -174,3 +174,60 @@ def test_pstat_panel_ids_are_distinct():
     from helao.deploy.hte.servers.reflex import biologic_vis, gamry_vis
 
     assert gamry_vis.panel_id("PSTAT", "t") != biologic_vis.panel_id("PSTAT", "t")
+
+
+# -- columns the stream actually carries -------------------------------------
+#
+# A blank chart is also what "no data yet" looks like, so a panel that quietly
+# chooses axes the stream does not have is indistinguishable from an idle one.
+
+
+def test_declared_columns_come_first_and_in_declared_order():
+    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+
+    snapshot = {"Ewe_V": [1.0], "t_s": [0.0]}
+    assert plottable_columns(snapshot, ["t_s", "Ewe_V", "I_A"]) == ["t_s", "Ewe_V"]
+
+
+def test_a_column_the_panel_never_declared_is_still_offered():
+    """A technique reporting something the panel does not know about should be
+    plottable rather than invisible."""
+    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+
+    snapshot = {"t_s": [0.0], "Vm": [1.0]}
+    assert plottable_columns(snapshot, ["t_s", "Ewe_V"]) == ["t_s", "Vm"]
+
+
+def test_the_routing_column_is_not_offered_as_an_axis():
+    from helao.deploy.hte.servers.reflex._pstat import CHANNEL_COLUMN, plottable_columns
+
+    snapshot = {"t_s": [0.0], CHANNEL_COLUMN: [0.0]}
+    assert plottable_columns(snapshot, ["t_s"]) == ["t_s"]
+
+
+def test_an_empty_snapshot_offers_nothing():
+    """Distinct from a mismatch: there is simply no data yet."""
+    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+
+    assert plottable_columns({}, ["t_s", "Ewe_V"]) == []
+
+
+def test_a_stream_sharing_no_column_with_the_panel_still_plots():
+    from helao.deploy.hte.servers.reflex._pstat import plottable_columns
+
+    present = plottable_columns({"Vm": [1.0], "Ach_V": [2.0]}, ["t_s", "Ewe_V"])
+    assert present == ["Vm", "Ach_V"]
+    assert not set(present) & {"t_s", "Ewe_V"}
+
+
+def test_the_ocv_columns_the_gamry_driver_streams_resolve_to_its_default_axes():
+    """The reported case: run_OCV against a real Gamry, whose dtaq emits eight
+    columns beyond the two this panel plots."""
+    from helao.deploy.hte.drivers.pstat.gamry.dtaq import DTAQ_OCV
+    from helao.deploy.hte.servers.reflex import gamry_vis
+    from helao.deploy.hte.servers.reflex._pstat import axis_defaults, plottable_columns
+
+    snapshot = {key: [0.0] for key in DTAQ_OCV.output_keys}
+    present = plottable_columns(snapshot, gamry_vis.COLUMNS)
+    assert present[:2] == ["t_s", "Ewe_V"]
+    assert axis_defaults(gamry_vis.AXIS_MAP, "run_OCV", present) == ("t_s", "Ewe_V")

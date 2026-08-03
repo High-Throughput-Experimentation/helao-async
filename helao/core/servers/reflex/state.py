@@ -98,7 +98,6 @@ class VisPanelState(rx.State, mixin=True):
         connection: Mirror of the ingest status: ``connecting``, ``live``,
             ``reconnecting``, or ``unavailable``.
         error: Most recent error string, empty when healthy.
-        running: Whether the render loop is active.
     """
 
     server_key: str = ""
@@ -109,7 +108,15 @@ class VisPanelState(rx.State, mixin=True):
     error: str = ""
     #: True while a tick is in flight, so a tick landing on a slow render is
     #: dropped rather than interleaved with it.
-    running: bool = False
+    #:
+    #: Backend-only (leading underscore), and it must stay that way. As a
+    #: normal var it flipped True then False on *every* tick, so every panel
+    #: pushed a state delta to the browser at its render cadence whether or not
+    #: anything had changed. A chart panel absorbs that invisibly; a panel made
+    #: of ``rx.data_table`` rebuilds its tables on any delta, which reads as
+    #: continuous flashing with no action running. Nothing renders this, so it
+    #: has no business crossing the wire.
+    _running: bool = False
     #: Render cadence in milliseconds, for the page's ticking component. Kept
     #: beside `update_rate` rather than computed, because the component binds
     #: it as a Var and must see the change when the input is edited.
@@ -193,12 +200,12 @@ class VisPanelState(rx.State, mixin=True):
     async def _tick(self):
         """Sample the ingest buffer once."""
         async with self:
-            if self.running:
+            if self._running:
                 # A tick landing while the previous render is still in flight
                 # is dropped, not queued: a slow pull would otherwise stack
                 # renders that interleave their writes.
                 return
-            self.running = True
+            self._running = True
         try:
             async with self:
                 apply_tick(
@@ -209,7 +216,7 @@ class VisPanelState(rx.State, mixin=True):
                 )
         finally:
             async with self:
-                self.running = False
+                self._running = False
 
     @rx.event(background=True)
     async def render_tick(self, _tick: str = ""):
@@ -256,7 +263,7 @@ class VisPanelState(rx.State, mixin=True):
         closed session's frame does not linger under a key nothing will ever
         refetch. The tick itself stops with the component that drives it.
         """
-        self.running = False
+        self._running = False
         plots.STORE.drop(self.panel_key())
 
 
