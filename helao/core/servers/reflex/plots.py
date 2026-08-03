@@ -254,8 +254,12 @@ def time_series(
                 f"series '{label}' has length {ys.size}, expected {xs.size}"
             )
         fx, fy = _finite_pairs(xs, ys)
-        if fx.size == 0:
-            continue
+        # Kept even with nothing finite in this window. Dropping it changed the
+        # trace set, so `layout_token` changed, so the browser tore the view down
+        # and rebuilt it -- and a sensor that goes briefly non-finite did that on
+        # alternating ticks, which is a line that appears and disappears as you
+        # watch. xy is happy with a zero-length trace: the column is empty and
+        # the axis range comes from the traces that do have points.
         marks.append(xy.line(x=fx, y=fy, name=label, color=PALETTE[idx % len(PALETTE)]))
     figure = _chart(marks, _axes(x_label, y_label, x_is_epoch))
     return _publish(figure, panel_id, version)
@@ -292,8 +296,10 @@ def traces(
 
     Returns:
         ChartPayload: Assign into the panel state vars bound by :func:`chart`.
-        Traces with no finite points are skipped; an empty ``series`` yields a
-        valid empty chart.
+        A trace with no finite points is kept as an empty trace rather than
+        dropped, so the trace set -- and with it ``layout_token`` -- does not
+        change from tick to tick. An empty ``series`` yields a valid empty
+        chart.
 
     Raises:
         ValueError: If ``kind`` is unknown, or a trace's x and y differ in
@@ -317,8 +323,7 @@ def traces(
                 f"and y length {ys.size}"
             )
         fx, fy = _finite_pairs(xs, ys)
-        if fx.size == 0:
-            continue
+        # Kept even when empty, so the trace set stays put; see time_series.
         marks.append(
             builder(
                 x=fx,

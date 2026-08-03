@@ -461,24 +461,27 @@ def test_priming_sets_the_tick_cadence_from_the_update_rate():
     )
 
 
-def test_concrete_panel_bases_do_not_shadow_the_default_update_rate():
-    """A per-class override silently defeats DEFAULT_UPDATE_RATE.
+def test_panel_bases_take_their_cadence_from_a_named_constant():
+    """A stale literal here silently defeats the module default.
 
-    These two classes used to declare 0.5 and 0.25, so raising the module
-    default changed the cadence of exactly nothing. Either they inherit it, or
-    an override is a deliberate, visible choice -- not a stale leftover.
+    These classes used to declare 0.5 and 0.25 inline, so raising
+    DEFAULT_UPDATE_RATE changed the cadence of exactly nothing. An override is
+    allowed -- live telemetry deliberately runs slower than action data -- but it
+    has to come from a named constant, so raising either one takes effect.
     """
     from helao.core.servers.reflex.state import (
         ActionVisState,
+        DEFAULT_LIVE_UPDATE_RATE,
         DEFAULT_UPDATE_RATE,
         LiveVisState,
     )
 
-    for base in (LiveVisState, ActionVisState):
-        assert base.__fields__["update_rate"].default == DEFAULT_UPDATE_RATE, (
-            f"{base.__name__} shadows DEFAULT_UPDATE_RATE; raising the module "
-            "default will not affect any panel built on it"
-        )
+    assert ActionVisState.__fields__["update_rate"].default == DEFAULT_UPDATE_RATE
+    assert (
+        LiveVisState.__fields__["update_rate"].default == DEFAULT_LIVE_UPDATE_RATE
+    ), "LiveVisState shadows the live constant; raising it would change nothing"
+    # And the two are genuinely distinct settings, not the same number twice.
+    assert DEFAULT_LIVE_UPDATE_RATE > DEFAULT_UPDATE_RATE
 
 
 # -- the tick must not push a delta of its own -------------------------------
