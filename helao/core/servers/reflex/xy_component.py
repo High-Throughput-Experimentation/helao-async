@@ -258,6 +258,10 @@ export function createController(options) {
     cleanup: null,
     onSelect: options.onSelect,
     lastUrl: null,
+    // One fetch outstanding per chart; the newest URL to arrive meanwhile waits
+    // here and everything between it and the one in flight is dropped.
+    inFlight: false,
+    queuedUrl: null,
   };
 
   st.model = {
@@ -321,6 +325,20 @@ export function createController(options) {
       st.pendingUrl = url;
       return;
     }
+    // One request at a time, and only the newest is worth making. A fetch per
+    // tick outruns the browser's ~6 connections per origin once the round trip
+    // exceeds the tick -- which it does through the frontend's proxy -- so
+    // requests queue, each carrying the version that was current when it was
+    // queued, and the version asked for falls further behind without bound. A
+    // station showed it plainly: the requested version sat ~35 below the
+    // retained window whether the window held 64 frames or 512, so every fetch
+    // missed and the charts scrolled with no line. Superseded URLs are simply
+    // dropped: catching up matters, the intermediate frames do not.
+    if (st.inFlight) {
+      st.queuedUrl = url;
+      return;
+    }
+    st.inFlight = true;
     st.lastUrl = url;
     // The spec describing THIS url's frame, captured before the await. The
     // panel republishes a larger spec every tick, so by the time the response
@@ -367,6 +385,13 @@ export function createController(options) {
       st.emit("change:buffers");
     } catch (e) {
       // Network hiccup: keep the last good frame rather than blanking.
+    } finally {
+      // Drains whichever URL arrived while this one was outstanding, so the
+      // chart converges on the newest frame instead of walking a backlog.
+      st.inFlight = false;
+      const next = st.queuedUrl;
+      st.queuedUrl = null;
+      if (next && next !== url && !st.disposed) st.refetch(next);
     }
   };
 
