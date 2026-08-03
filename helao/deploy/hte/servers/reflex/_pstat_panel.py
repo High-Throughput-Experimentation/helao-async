@@ -222,7 +222,7 @@ def make_pstat_panel(
                         width="9em",
                     ),
                     rx.input(
-                        default_value=str(state_cls.window_points),
+                        default_value=state_cls.window_points.to_string(),
                         on_blur=state_cls.on_window_points,
                         placeholder="window points",
                         width="10em",
