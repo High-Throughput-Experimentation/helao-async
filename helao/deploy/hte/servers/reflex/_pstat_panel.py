@@ -15,7 +15,7 @@ from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import (
     X_COLUMN,
     latest_action_uuid,
-    segment_traces,
+    segment_trace_groups,
 )
 from helao.deploy.hte.servers.reflex._pstat import (
     axis_defaults,
@@ -96,9 +96,12 @@ def make_pstat_panel(
         def _figures(self, snapshot: dict) -> list:
             """Build ``(title, traces)`` for every chart this panel draws.
 
-            One chart per source rather than one per segment: both actions are
-            traces in the same chart. See :func:`segment_traces` for why the
-            canvas count matters.
+            Two charts per source, as the Bokeh panel had: the running action
+            and the one before it, each with its own axes so a short action is
+            not squashed by a long predecessor. That costs a WebGL context per
+            chart and browsers cap how many are live -- see
+            :func:`segment_trace_groups` -- so a page carrying many of these
+            panels is the thing to watch, not the panel itself.
             """
             if per_channel:
                 channels = channels_in(snapshot)[:MAX_CHANNELS]
@@ -120,7 +123,12 @@ def make_pstat_panel(
             for label, source in sources:
                 x_all = source.get(X_COLUMN, np.empty(0))
                 series_all = {k: v for k, v in source.items() if k != X_COLUMN}
-                figures.append((label, segment_traces(x_all, series_all, pick)))
+                # suffix_names=False: the chart title already names the
+                # segment, so repeating it in every legend entry is noise.
+                for suffix, traces in segment_trace_groups(
+                    x_all, series_all, pick, suffix_names=False
+                ):
+                    figures.append((f"{label} {suffix}".strip(), traces))
             return figures
 
         def pull(self, ingest) -> None:
