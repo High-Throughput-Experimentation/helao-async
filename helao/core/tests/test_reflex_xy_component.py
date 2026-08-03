@@ -284,25 +284,30 @@ const out = {};
   await st.refetch("/xy/buffers/p?v=4");
   out.remountedAfterLayoutChange = renders.length === 2;
 
-  // --- the spec/buffers pairing race --------------------------------------
+  // --- spec/buffers pairing, and coalescing a tick faster than the fetch ---
   //
-  // A fetch slower than the render tick means the response for v=N arrives
-  // when the panel has already published the spec for v=N+1. Reading the
-  // newest spec beside those buffers describes more points than they hold,
-  // and xy throws "column extends past chart payload" at mount or silently
-  // drops the append. Responses can also complete out of order, so "last to
-  // resolve" is not "newest".
-  const resolvers = [];
-  // Frame size stands in for the version, so the decoded buffers say which
-  // response produced them.
+  // Only one request is outstanding per chart: a fetch per tick outruns the
+  // browser's ~6 connections per origin once the round trip exceeds the tick --
+  // which it does through the frontend's proxy -- and each queued request
+  // carries the version current when it was queued, so the version asked for
+  // falls behind without bound and every fetch misses the retained window.
+  //
+  // The spec must also be the one that describes the buffers that arrived, not
+  // whatever the panel has published since: mismatched, xy throws "column
+  // extends past chart payload" from _columnView at mount, which has no
+  // validator, or silently fails c(spec, buffers) on the append path.
+  const specAt = (n) => ({ seq: n, append: { seq: n, affected: [0] } });
+  let issued = 0;
+  const pend = [];
   globalThis.fetch = async (url) => {
+    issued += 1;
     const bytes = url === "/b?v=1" ? 8 : 16;
-    return new Promise((res) => resolvers.push(() => res({
+    return new Promise((res) => pend.push(() => res({
       ok: true, arrayBuffer: async () => new ArrayBuffer(bytes),
     })));
   };
-  // Both halves of what render() reads, recorded together: the defect is not
-  // a wrong spec or wrong buffers, it is a mismatched *pair*.
+  // Both halves of what render() reads, recorded together: the defect is not a
+  // wrong spec or wrong buffers, it is a mismatched *pair*.
   const renderedPairs = [];
   const slowModule = {
     decodeFrame: (raw) => ({
@@ -318,57 +323,30 @@ const out = {};
       return () => {};
     },
   };
-  // `append.seq` is what _publish stamps on every real spec, and what the
-  // monotonic guard reads; a spec without it would leave the guard inert.
-  const specAt = (n) => ({ seq: n, append: { seq: n, affected: [0] } });
   const st2 = createController({ spec: specAt(1), onSelect: null });
   st2.attach(slowModule, {});
   st2.spec = specAt(1);
-  const p1 = st2.refetch("/b?v=1");
-  st2.spec = specAt(2);             // the panel ticks while v=1 is in flight
-  const p2 = st2.refetch("/b?v=2");
-  resolvers[1]();                   // v=2 lands first...
-  resolvers[0]();                   // ...v=1 second, and must be discarded
-  await p2;
+  const p1 = st2.refetch("/b?v=1");   // issued
+  // Nine more ticks while it is outstanding; every one must coalesce.
+  for (let seq = 2; seq <= 10; seq += 1) {
+    st2.spec = specAt(seq);
+    st2.refetch("/b?v=" + seq);
+  }
+  out.issuedWhileBusy = issued;
+  out.queuedUrlWhileBusy = st2.queuedUrl;
+
+  pend[0]();                          // v=1 lands: mounts, then drains
   await p1;
+  await new Promise((r) => setTimeout(r, 0));
   out.mountSpecSeq = renderedPairs.length ? renderedPairs[0].specSeq : null;
   out.mountBufTag = renderedPairs.length ? renderedPairs[0].bufTag : null;
   out.mountCount = renderedPairs.length;
-  out.pairedSpecSeq = st2.pairedSpec && st2.pairedSpec.seq;
+  out.issuedAfterDrain = issued;
+  out.drainedUrl = st2.lastUrl;
 
-  // --- in-order completions must ALL be applied ---------------------------
-  //
-  // Rejecting every response whose request is no longer the newest starves the
-  // chart: a refetch is issued every tick, so once a fetch outlasts one tick
-  // nothing is ever the newest by the time it lands and the version advances
-  // only every few seconds. The test is monotonic on version instead.
-  // Decodes are the count that matters, not the final version: the last
-  // request always applies, so `appliedSeq` reaches 4 even when the three
-  // before it were thrown away. decodeFrame runs only for applied frames.
-  let burstDecodes = 0;
-  globalThis.fetch = async (url) =>
-    new Promise((res) => resolvers.push(() => res({
-      ok: true, arrayBuffer: async () => new ArrayBuffer(8),
-    })));
-  const countingModule = {
-    decodeFrame: (raw) => {
-      burstDecodes += 1;
-      return { message: {}, buffers: ["b"], byteLength: 8 };
-    },
-    render: () => () => {},
-  };
-  const st3 = createController({ spec: { append: { seq: 0 } }, onSelect: null });
-  st3.attach(countingModule, {});
-  const pending = [];
-  for (let seq = 1; seq <= 4; seq += 1) {
-    st3.spec = { append: { seq: seq } };
-    pending.push(st3.refetch("/c?v=" + seq));   // all four in flight at once
-  }
-  const base = resolvers.length - 4;
-  for (let i = 0; i < 4; i += 1) resolvers[base + i]();   // resolve in order
-  for (const p of pending) await p;
-  out.appliedSeqAfterBurst = st3.appliedSeq;
-  out.burstDecodes = burstDecodes;
+  if (pend[1]) pend[1]();             // the drained request completes
+  await new Promise((r) => setTimeout(r, 0));
+  out.appliedSeqAtEnd = st2.appliedSeq;
 
   console.log(JSON.stringify(out));
 })();
@@ -429,8 +407,9 @@ def test_controller_renders_the_spec_that_matches_the_buffers_it_fetched():
     # mount paired spec seq 2 with v1's buffers, which is neither.
     pair = (out["mountSpecSeq"], out["mountBufTag"])
     assert pair in {(1, "v1"), (2, "v2")}, f"mismatched pair at mount: {pair}"
-    # And the newest frame is the one left applied.
-    assert out["pairedSpecSeq"] == 2
+    # Nine ticks landed while v=1 was outstanding, so without the fix the mount
+    # would pair spec seq 10 with v1's buffers.
+    assert pair == (1, "v1")
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
@@ -442,25 +421,28 @@ def test_controller_never_regresses_to_an_older_frame():
     """
     out = _run_controller_harness()
     assert out["mountCount"] == 1, "a second view was built for the same chart"
-    assert out["pairedSpecSeq"] == 2
+    # Applied v=1 at mount, then the drained v=10 -- never back down.
+    assert out["appliedSeqAtEnd"] == 10
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
-def test_controller_does_not_starve_when_fetches_outlast_the_tick():
-    """Slow fetches must not stop the chart advancing.
+def test_controller_keeps_one_fetch_outstanding_per_chart():
+    """Ticking faster than the round trip must not build a request backlog.
 
-    A refetch is issued every tick, so "reject anything no longer newest"
-    rejects nearly everything once a fetch outlasts one tick -- which it does
-    through the frontend's proxy to the backend. A station showed the version
-    advancing 43 -> 52 -> 66 across ~23 ticks, which reads as a frozen chart.
-
-    Four requests are issued before any resolves, then all four complete in
-    order. Every one must be applied. The final version alone proves nothing --
-    the last request is always the newest, so it applies either way.
+    A fetch per tick outruns the browser's ~6 connections per origin, and each
+    queued request carries the version current when it was queued -- so the
+    version asked for falls behind without bound. A station sat ~35 versions
+    below the retained window whether that window held 64 frames or 512, every
+    fetch missing, charts scrolling with no line.
     """
     out = _run_controller_harness()
-    assert out["burstDecodes"] == 4
-    assert out["appliedSeqAfterBurst"] == 4
+    assert out["issuedWhileBusy"] == 1, "ten ticks issued more than one request"
+    assert out["queuedUrlWhileBusy"] == "/b?v=10", "the newest URL was not held"
+    # Draining issues exactly one more, for the newest URL rather than the next.
+    assert out["issuedAfterDrain"] == 2
+    assert out["drainedUrl"] == "/b?v=10"
+    # And it converges on that newest version rather than walking the backlog.
+    assert out["appliedSeqAtEnd"] == 10
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
