@@ -1540,3 +1540,64 @@ def test_a_manual_sequence_also_carries_the_campaign():
     sequence, _ = opx.build_manual_sequence(items[0], fields, {}, campaign="camp-2")
     assert sequence.campaign_name == "camp-2"
     assert isinstance(sequence.campaign_uuid, UUID)
+
+
+# -- the attribute tree ------------------------------------------------------
+
+
+def test_history_entries_keeps_each_row_beside_its_payload():
+    """The alignment the tree depends on: row n must be object n.
+
+    Rows and payloads are built in one pass precisely so a second sort cannot
+    put a different object under the clicked row.
+    """
+    histories = {
+        "sequence": [
+            ("aaaa1111", {"sequence_name": "first", "sequence_status": ["done"]}),
+            ("bbbb2222", {"sequence_name": "second", "sequence_status": ["done"]}),
+        ]
+    }
+    entries = opx.history_entries(histories, "sequence")
+    # Most recent first, so 'second' leads -- and its payload comes with it.
+    assert [obj["sequence_name"] for _, obj in entries] == ["second", "first"]
+    assert opx.history_rows(histories, "sequence") == [row for row, _ in entries]
+
+
+def test_history_entries_carries_the_full_payload_not_the_display_copy():
+    """The tree shows what the orchestrator holds, uuid unabbreviated."""
+    histories = {"sequence": [("abcdef1234567890", {"sequence_name": "cv"})]}
+    ((_row, obj),) = opx.history_entries(histories, "sequence")
+    assert obj == {"sequence_name": "cv"}, "the derived display fields leaked in"
+
+
+def test_tree_for_reports_the_empty_state():
+    assert opx.tree_for("sequence", None) == (opx.TREE_EMPTY_HEADER, "")
+    assert opx.tree_for("sequence", {}) == (opx.TREE_EMPTY_HEADER, "")
+
+
+def test_tree_for_titles_the_object_and_opens_its_params():
+    header, html = opx.tree_for(
+        "sequence",
+        {
+            "sequence_name": "CV",
+            "sequence_uuid": "abcdef1234567890",
+            "sequence_params": {"rate": 0.1},
+            "other": 1,
+        },
+    )
+    assert "CV" in header and "34567890" in header
+    # Params expanded, everything else collapsed.
+    assert "<details open><summary>sequence_params" in html
+    assert "<details><summary>other" not in html  # a scalar is not a disclosure
+    assert "rate" in html
+
+
+def test_tree_for_falls_back_to_a_dash_when_there_is_no_name():
+    header, html = opx.tree_for("sequence", {"unrelated": 1})
+    assert header == "—"
+    assert "unrelated" in html
+
+
+def test_tree_for_escapes_object_values():
+    _header, html = opx.tree_for("sequence", {"sequence_name": "<b>x</b>"})
+    assert "&lt;b&gt;" in html

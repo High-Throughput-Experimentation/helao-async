@@ -42,13 +42,33 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-#: Window bounds carried over from ``VisSubscriber.callback_input_max_points``
-#: so operators see the same clamping they are used to.
+#: Window bounds. The minimum is carried over from
+#: ``VisSubscriber.callback_input_max_points``; the maximum is no longer the
+#: Bokeh visualizer's 10000 but the ring buffer's own capacity, because xy
+#: reduces a window to roughly pixel resolution before it is published --
+#: 1e6 points ship as ~3200, about 25 KB, in ~1 ms -- so the payload is bounded
+#: by the chart's width rather than by the point count.
 MIN_WINDOW_POINTS = 2
-MAX_WINDOW_POINTS = 10000
-DEFAULT_WINDOW_POINTS = 500
+MAX_WINDOW_POINTS = 1_000_000
+DEFAULT_WINDOW_POINTS = 1_000_000
 MIN_UPDATE_RATE = 0.01
-DEFAULT_UPDATE_RATE = 0.5
+#: 60 Hz. What this costs is set by the window, not the rate: the reduction is
+#: cheap but the numpy work ahead of it is not, and it runs per chart per tick.
+#: Measured, one chart, one tick: 2.2 ms at a 500-point window, 3.0 ms at
+#: 100k, 18.1 ms at 1e6 -- against the 16.7 ms a 60 Hz frame allows. A page of
+#: six charts at a full window therefore settles near 9 Hz rather than 60. That
+#: is a ceiling, not a fault: `_tick` drops a tick whose predecessor is still
+#: rendering rather than queueing it, so the panel runs as fast as the backend
+#: can and no faster.
+DEFAULT_UPDATE_RATE = 1 / 60
+
+#: Continuous sensor telemetry renders at 10 Hz, not 60. `ws_live` panels carry
+#: several figures each and their sensors change on a human timescale, so the
+#: extra 50 frames a second buy nothing and cost real work -- each tick rebuilds
+#: every figure and publishes a frame per chart. A deliberate override of
+#: :data:`DEFAULT_UPDATE_RATE`, which stays at 60 Hz for the per-action
+#: measurement panels where a fast trace is the point.
+DEFAULT_LIVE_UPDATE_RATE = 0.1
 
 
 #: Sentinel so a first assignment of a falsy value is not mistaken for a no-op.
@@ -332,17 +352,22 @@ class VisPanelState(rx.State, mixin=True):
 
 
 class LiveVisState(VisPanelState, mixin=True):
-    """Panel state for continuous sensor telemetry (``ws_live``)."""
+    """Panel state for continuous sensor telemetry (``ws_live``).
+
+    Renders at :data:`DEFAULT_LIVE_UPDATE_RATE`. This is the one deliberate
+    override of the module default, named rather than hardcoded -- the 0.5 s and
+    0.25 s these classes used to carry were stale literals that silently
+    shadowed the default, so raising it changed nothing for any real panel.
+    """
 
     ws_path: str = "ws_live"
-    update_rate: float = 0.5
+    update_rate: float = DEFAULT_LIVE_UPDATE_RATE
 
 
 class ActionVisState(VisPanelState, mixin=True):
     """Panel state for per-action measurement packages (``ws_data``)."""
 
     ws_path: str = "ws_data"
-    update_rate: float = 0.25
 
 
 _STATE_CACHE: dict = {}

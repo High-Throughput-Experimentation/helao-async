@@ -10,9 +10,13 @@ the requesting orchestrator's coordinates (``get_loaded_plate``).
 __all__ = ["makeApp"]
 
 
+from helao.core.error import ErrorCodes
 from helao.core.servers.base_api import BaseAPI
+from helao.helpers import helao_logging as logging
 
 from ...drivers.pstat.cpsim_driver import CPSim, CPSimExec
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def makeApp(server_key):
@@ -42,14 +46,31 @@ def makeApp(server_key):
         comp_vec: list[int] = [],
         acquisition_rate: float = 0.2,
     ):
-        """Start a :class:`CPSimExec` that streams the stored CP for ``comp_vec``."""
+        """Start a :class:`CPSimExec` that streams the stored CP for ``comp_vec``.
+
+        ``comp_vec`` is a body parameter, not a query one: FastAPI routes a
+        non-scalar annotation to the request body, so a query-string comp_vec
+        is dropped and the ``[]`` default is used instead.
+        """
         active = await app.base.setup_and_contain_action()
         active.action.action_abbr = "CPSIM"
-        executor = CPSimExec(
-            active=active,
-            oneoff=False,
-            poll_rate=active.action.action_params["acquisition_rate"],
-        )
+        try:
+            executor = CPSimExec(
+                active=active,
+                oneoff=False,
+                poll_rate=active.action.action_params["acquisition_rate"],
+            )
+        except Exception as exc:
+            # The action is already registered in the endpoint's active_dict by
+            # setup_and_contain_action, so an executor that fails to construct
+            # leaves it there with nothing that will ever clear it: the
+            # endpoint reads as busy forever and every later request queues
+            # behind a measurement that is not running. Finish it here so a bad
+            # comp_vec costs one action rather than the server.
+            LOGGER.error(f"could not build CPSimExec: {exc}", exc_info=True)
+            active.action.error_code = ErrorCodes.critical
+            finished_action = await active.finish()
+            return finished_action.as_dict()
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 

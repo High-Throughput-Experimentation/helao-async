@@ -284,6 +284,70 @@ const out = {};
   await st.refetch("/xy/buffers/p?v=4");
   out.remountedAfterLayoutChange = renders.length === 2;
 
+  // --- spec/buffers pairing, and coalescing a tick faster than the fetch ---
+  //
+  // Only one request is outstanding per chart: a fetch per tick outruns the
+  // browser's ~6 connections per origin once the round trip exceeds the tick --
+  // which it does through the frontend's proxy -- and each queued request
+  // carries the version current when it was queued, so the version asked for
+  // falls behind without bound and every fetch misses the retained window.
+  //
+  // The spec must also be the one that describes the buffers that arrived, not
+  // whatever the panel has published since: mismatched, xy throws "column
+  // extends past chart payload" from _columnView at mount, which has no
+  // validator, or silently fails c(spec, buffers) on the append path.
+  const specAt = (n) => ({ seq: n, append: { seq: n, affected: [0] } });
+  let issued = 0;
+  const pend = [];
+  globalThis.fetch = async (url) => {
+    issued += 1;
+    const bytes = url === "/b?v=1" ? 8 : 16;
+    return new Promise((res) => pend.push(() => res({
+      ok: true, arrayBuffer: async () => new ArrayBuffer(bytes),
+    })));
+  };
+  // Both halves of what render() reads, recorded together: the defect is not a
+  // wrong spec or wrong buffers, it is a mismatched *pair*.
+  const renderedPairs = [];
+  const slowModule = {
+    decodeFrame: (raw) => ({
+      message: {},
+      buffers: [raw.byteLength === 16 ? "v2" : "v1"],
+      byteLength: raw.byteLength,
+    }),
+    render: ({ model }) => {
+      renderedPairs.push({
+        specSeq: (model.get("spec") || {}).seq,
+        bufTag: (model.get("buffers") || [])[0],
+      });
+      return () => {};
+    },
+  };
+  const st2 = createController({ spec: specAt(1), onSelect: null });
+  st2.attach(slowModule, {});
+  st2.spec = specAt(1);
+  const p1 = st2.refetch("/b?v=1");   // issued
+  // Nine more ticks while it is outstanding; every one must coalesce.
+  for (let seq = 2; seq <= 10; seq += 1) {
+    st2.spec = specAt(seq);
+    st2.refetch("/b?v=" + seq);
+  }
+  out.issuedWhileBusy = issued;
+  out.queuedUrlWhileBusy = st2.queuedUrl;
+
+  pend[0]();                          // v=1 lands: mounts, then drains
+  await p1;
+  await new Promise((r) => setTimeout(r, 0));
+  out.mountSpecSeq = renderedPairs.length ? renderedPairs[0].specSeq : null;
+  out.mountBufTag = renderedPairs.length ? renderedPairs[0].bufTag : null;
+  out.mountCount = renderedPairs.length;
+  out.issuedAfterDrain = issued;
+  out.drainedUrl = st2.lastUrl;
+
+  if (pend[1]) pend[1]();             // the drained request completes
+  await new Promise((r) => setTimeout(r, 0));
+  out.appliedSeqAtEnd = st2.appliedSeq;
+
   console.log(JSON.stringify(out));
 })();
 """
@@ -318,6 +382,67 @@ def test_controller_refetch_uses_the_url_it_is_given_not_a_captured_one():
     out = _run_controller_harness()
     assert out["lastFetched"] == "/xy/buffers/p?v=3"
     assert "/xy/buffers/p?v=2" in out["allUrls"]
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_renders_the_spec_that_matches_the_buffers_it_fetched():
+    """The regression guard for "column extends past chart payload".
+
+    On a station the buffer route is proxied frontend->backend, so a fetch can
+    outlast the render tick. The panel has published a larger spec by the time
+    the response lands, and pairing them describes more points than the buffers
+    hold -- xy throws from ``_columnView`` at mount, which has no validator, or
+    fails ``c(spec, buffers)`` on the append path and drops the frame silently.
+    Either way the chart never draws and the server logs stay clean.
+
+    The assertion is that the two halves *agree*: spec ``seq: 2`` must be
+    rendered against the buffers tagged ``v2``. Before the fix the mount paired
+    ``seq: 2`` with ``v1``.
+    """
+    out = _run_controller_harness()
+    assert out["mountCount"] == 1
+    # The invariant is that the two halves AGREE -- not which version wins.
+    # Whichever response lands first is fine to mount on, because it is
+    # internally consistent and the next one supersedes it. Before the fix the
+    # mount paired spec seq 2 with v1's buffers, which is neither.
+    pair = (out["mountSpecSeq"], out["mountBufTag"])
+    assert pair in {(1, "v1"), (2, "v2")}, f"mismatched pair at mount: {pair}"
+    # Nine ticks landed while v=1 was outstanding, so without the fix the mount
+    # would pair spec seq 10 with v1's buffers.
+    assert pair == (1, "v1")
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_never_regresses_to_an_older_frame():
+    """A late response must not overwrite a newer one already applied.
+
+    The guard is monotonic on ``spec.append.seq``: an older frame is dropped
+    however late it lands, while anything newer than what is drawn is applied.
+    """
+    out = _run_controller_harness()
+    assert out["mountCount"] == 1, "a second view was built for the same chart"
+    # Applied v=1 at mount, then the drained v=10 -- never back down.
+    assert out["appliedSeqAtEnd"] == 10
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_keeps_one_fetch_outstanding_per_chart():
+    """Ticking faster than the round trip must not build a request backlog.
+
+    A fetch per tick outruns the browser's ~6 connections per origin, and each
+    queued request carries the version current when it was queued -- so the
+    version asked for falls behind without bound. A station sat ~35 versions
+    below the retained window whether that window held 64 frames or 512, every
+    fetch missing, charts scrolling with no line.
+    """
+    out = _run_controller_harness()
+    assert out["issuedWhileBusy"] == 1, "ten ticks issued more than one request"
+    assert out["queuedUrlWhileBusy"] == "/b?v=10", "the newest URL was not held"
+    # Draining issues exactly one more, for the newest URL rather than the next.
+    assert out["issuedAfterDrain"] == 2
+    assert out["drainedUrl"] == "/b?v=10"
+    # And it converges on that newest version rather than walking the backlog.
+    assert out["appliedSeqAtEnd"] == 10
 
 
 @pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")

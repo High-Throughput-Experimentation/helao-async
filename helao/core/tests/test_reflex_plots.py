@@ -204,14 +204,29 @@ def test_traces_tolerates_no_series():
     assert plots.traces([]) is not None
 
 
-def test_traces_skips_an_all_non_finite_trace_without_raising():
+def test_traces_keeps_an_all_non_finite_trace_so_the_layout_holds_still():
+    """A dropped trace changes `layout_token`, which rebuilds the whole view.
+
+    A sensor that goes briefly non-finite did that on alternating ticks, so the
+    line appeared and disappeared as the operator watched. The trace is kept as
+    an empty one instead: same trace set, same token, an in-place update.
+    """
     out = plots.traces(
         [
             {"label": "bad", "x": np.arange(3.0), "y": np.full(3, np.nan)},
             {"label": "good", "x": np.arange(3.0), "y": np.arange(3.0)},
         ]
     )
-    assert len(out.spec["traces"]) == 1
+    assert len(out.spec["traces"]) == 2
+    # The empty one contributes zero-length columns, not missing ones.
+    assert 0 in [c.get("len") for c in out.spec["columns"]]
+
+
+def test_a_trace_going_non_finite_does_not_change_the_layout_token():
+    x = np.arange(3.0)
+    finite = plots.traces([{"label": "a", "x": x, "y": x}], version=1)
+    blanked = plots.traces([{"label": "a", "x": x, "y": np.full(3, np.nan)}], version=2)
+    assert finite.layout == blanked.layout
 
 
 def test_traces_carries_an_append_token_like_every_other_facade_entry():
@@ -220,3 +235,78 @@ def test_traces_carries_an_append_token_like_every_other_facade_entry():
         [{"label": "a", "x": np.arange(3.0), "y": np.arange(3.0)}], version=4
     )
     assert out.spec["append"]["seq"] == 4
+
+
+# -- epoch x axes ------------------------------------------------------------
+
+
+def test_epoch_x_survives_the_f32_column_encoding():
+    """The blank-live-chart bug: f32 spacing near 1.75e9 is 128 seconds.
+
+    xy encodes every column as f32, so a minute of 10 Hz telemetry collapsed
+    onto two distinct x positions -- nothing to draw a line between, on a chart
+    whose axis kept widening. Rebasing brings the values under ~1e5, where the
+    spacing is milliseconds.
+    """
+    import time
+
+    t = time.time() + np.arange(600) * 0.1
+    xs = plots._rebase_epoch(plots._as_float_array(t))
+    assert len(np.unique(xs.astype(np.float32))) == 600
+    assert np.spacing(np.float32(xs[-1])) < 0.01
+
+
+def test_rebased_epoch_renders_as_local_clock_time():
+    """xy formats time axes with getUTC*, and epoch 0 is midnight.
+
+    So seconds since *local* midnight format as local clock time -- what a wall
+    clock in the lab reads.
+    """
+    import time
+
+    now = time.time()
+    xs = plots._rebase_epoch(np.array([now]))
+    assert time.strftime("%H:%M:%S", time.gmtime(xs[0])) == time.strftime(
+        "%H:%M:%S", time.localtime(now)
+    )
+
+
+def test_rebasing_past_midnight_stays_continuous():
+    """A window spanning midnight must not wrap back to zero.
+
+    Values past 86400 keep formatting correctly -- 86400 is 00:00:00 the next
+    day -- so the offset stays fixed to the window's first sample.
+    """
+    import time
+
+    stamp = time.localtime()
+    midnight = time.mktime(
+        (stamp.tm_year, stamp.tm_mon, stamp.tm_mday, 0, 0, 0, 0, 0, -1)
+    )
+    # ten seconds either side of the following midnight
+    t = midnight + 86400 + np.arange(-10.0, 10.0)
+    xs = plots._rebase_epoch(t)
+    assert np.all(np.diff(xs) > 0), "the trace jumped backwards at midnight"
+    assert xs.max() > 86400
+
+
+def test_a_non_epoch_x_is_left_alone_even_when_declared_epoch():
+    """A panel streaming elapsed seconds must not be shifted into 1970."""
+    x = np.arange(5.0)
+    assert np.array_equal(plots._rebase_epoch(x), x)
+
+
+def test_rebasing_tolerates_empty_and_non_finite_columns():
+    assert plots._rebase_epoch(np.empty(0)).size == 0
+    assert np.all(np.isnan(plots._rebase_epoch(np.full(3, np.nan))))
+
+
+def test_time_series_rebases_only_when_x_is_epoch():
+    import time
+
+    t = time.time() + np.arange(10) * 0.1
+    epoch = plots.time_series(t, {"a": np.arange(10.0)}, x_is_epoch=True)
+    plain = plots.time_series(t, {"a": np.arange(10.0)}, x_is_epoch=False)
+    # The rebased axis sits in seconds-of-day; the untouched one is still epoch.
+    assert epoch.spec["x_axis"]["range"][1] < 90000
+    assert plain.spec["x_axis"]["range"][1] > 1e9

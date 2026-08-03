@@ -24,11 +24,11 @@ __all__ = [
     "histogram",
 ]
 
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
-import reflex as rx
 
 from helao.core.servers.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
@@ -69,6 +69,48 @@ PALETTE = (
 def _as_float_array(values) -> np.ndarray:
     """Coerce ``values`` to a 1-D float64 array."""
     return np.asarray(values, dtype=np.float64).ravel()
+
+
+#: Below this, an "epoch" column is not an epoch (1973), and rebasing it would
+#: wreck it. Guards a panel that declares x_is_epoch but streams elapsed time.
+_EPOCH_FLOOR = 1e8
+
+
+def _rebase_epoch(xs: np.ndarray) -> np.ndarray:
+    """Rebase epoch seconds to seconds since local midnight.
+
+    xy encodes every column as f32, and f32 spacing near 1.75e9 is **128
+    seconds**: a minute of 10 Hz telemetry collapsed onto two distinct x
+    positions, which draws as a blank chart whose axis keeps widening. Under
+    ~1e5 the spacing is ~8 ms instead.
+
+    Local midnight specifically, and taken from the window's first sample. xy
+    formats time axes with ``getUTC*`` and epoch 0 *is* midnight, so seconds
+    since local midnight render as local clock time -- what a wall clock in the
+    lab reads. Values past 86400 keep formatting correctly (86400 is 00:00:00
+    the next day), so a window spanning midnight stays continuous instead of
+    wrapping to zero.
+
+    The one inaccuracy left: a window spanning a DST transition keeps the offset
+    from its first sample, so labels after the change are an hour out. Twice a
+    year, only while such a window is on screen.
+
+    Args:
+        xs: The x column, epoch seconds.
+
+    Returns:
+        np.ndarray: Rebased, or ``xs`` unchanged when it holds no finite value
+        that looks like an epoch.
+    """
+    finite = xs[np.isfinite(xs)]
+    if finite.size == 0 or float(finite[0]) < _EPOCH_FLOOR:
+        return xs
+    stamp = time.localtime(float(finite[0]))
+    midnight = time.mktime(
+        # -1 for isdst: let mktime resolve which offset applied on that date.
+        (stamp.tm_year, stamp.tm_mon, stamp.tm_mday, 0, 0, 0, 0, 0, -1)
+    )
+    return xs - midnight
 
 
 def _finite_pairs(x: np.ndarray, y: np.ndarray) -> tuple:
@@ -170,24 +212,34 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
     Returns:
         An ``rx.Component``.
     """
-    # Wrapped in a box that reserves the height. The chart renders into a
-    # canvas the browser does not size from content, so the surrounding flex
-    # item collapsed to nothing and the next chart in a wrapping row was drawn
-    # over it -- the "this action"/"previous action" pair of a potentiostat
-    # panel overlapped vertically. Reserving here fixes every panel at once,
-    # since this is the only way a panel mounts a chart.
-    return rx.box(
-        xy_chart(
-            spec=spec_var,
-            buffer_url=url_var,
-            layout=layout_var,
-            height=f"{height}px",
-            on_select=on_select,
-        ),
-        min_height=f"{height}px",
-        width="100%",
-        overflow="hidden",
+    # Returned unwrapped. A box around this reserving the same height did stop
+    # charts overlapping, but it also truncated them -- the y axis gutter fell
+    # outside it, so ticks, labels and the axis title went missing. The height
+    # reservation now lives on the host div itself (minHeight plus
+    # flex-shrink: 0 in the shim's JSX), which is both the element that
+    # collapsed and the element xy draws into.
+    return xy_chart(
+        spec=spec_var,
+        buffer_url=url_var,
+        layout=layout_var,
+        height=f"{height}px",
+        on_select=on_select,
     )
+
+
+def _chart(marks, axes) -> Any:
+    """Assemble a chart that sizes itself from its container.
+
+    ``xy.chart`` defaults to a fixed 900x420 spec, and the renderer uses those
+    numbers literally: it built a 420px-tall root inside whatever div it was
+    given, overflowed it, and the card's ``overflow: hidden`` clipped the
+    bottom -- so the x axis simply vanished, while nothing about the data path
+    looked wrong. ``"100%"`` selects xy's fluid path, where it measures the
+    element it is mounted into. That element already carries an explicit height
+    from :func:`chart`, which makes the host div the single place a chart's size
+    is decided rather than a figure spec and a CSS rule that can disagree.
+    """
+    return xy.chart(*marks, *axes, width="100%", height="100%")
 
 
 def _axes(x_label: str, y_label: str, x_is_epoch: bool) -> list:
@@ -235,6 +287,9 @@ def time_series(
         ValueError: If a series length does not match ``len(x)``.
     """
     xs = _as_float_array(x)
+    if x_is_epoch:
+        # Must happen before the marks are built: f32 cannot carry an epoch.
+        xs = _rebase_epoch(xs)
     marks = []
     for idx, (label, values) in enumerate(series.items()):
         ys = _as_float_array(values)
@@ -245,10 +300,14 @@ def time_series(
                 f"series '{label}' has length {ys.size}, expected {xs.size}"
             )
         fx, fy = _finite_pairs(xs, ys)
-        if fx.size == 0:
-            continue
+        # Kept even with nothing finite in this window. Dropping it changed the
+        # trace set, so `layout_token` changed, so the browser tore the view down
+        # and rebuilt it -- and a sensor that goes briefly non-finite did that on
+        # alternating ticks, which is a line that appears and disappears as you
+        # watch. xy is happy with a zero-length trace: the column is empty and
+        # the axis range comes from the traces that do have points.
         marks.append(xy.line(x=fx, y=fy, name=label, color=PALETTE[idx % len(PALETTE)]))
-    figure = xy.chart(*marks, *_axes(x_label, y_label, x_is_epoch))
+    figure = _chart(marks, _axes(x_label, y_label, x_is_epoch))
     return _publish(figure, panel_id, version)
 
 
@@ -283,8 +342,10 @@ def traces(
 
     Returns:
         ChartPayload: Assign into the panel state vars bound by :func:`chart`.
-        Traces with no finite points are skipped; an empty ``series`` yields a
-        valid empty chart.
+        A trace with no finite points is kept as an empty trace rather than
+        dropped, so the trace set -- and with it ``layout_token`` -- does not
+        change from tick to tick. An empty ``series`` yields a valid empty
+        chart.
 
     Raises:
         ValueError: If ``kind`` is unknown, or a trace's x and y differ in
@@ -308,8 +369,7 @@ def traces(
                 f"and y length {ys.size}"
             )
         fx, fy = _finite_pairs(xs, ys)
-        if fx.size == 0:
-            continue
+        # Kept even when empty, so the trace set stays put; see time_series.
         marks.append(
             builder(
                 x=fx,
@@ -318,7 +378,7 @@ def traces(
                 color=PALETTE[idx % len(PALETTE)],
             )
         )
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
 
 
@@ -391,18 +451,29 @@ def scatter_map(
     """
     xs = _as_float_array(x)
     ys = _as_float_array(y)
+    # Checked before the finite filter, as in `traces`: a length mismatch is a
+    # caller bug and must not be hidden by dropping points.
     if xs.size != ys.size:
         raise ValueError(f"x has length {xs.size} but y has length {ys.size}")
-    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
+    vs = None
     if values is not None:
         vs = _as_float_array(values)
         if vs.size != xs.size:
             raise ValueError(f"values has length {vs.size}, expected {xs.size}")
-        mark_kwargs["color"] = vs
-    else:
-        mark_kwargs["color"] = PALETTE[0]
+    # Non-finite points are dropped here, as `time_series` and `traces` already
+    # do. This function skipped it, and a NaN in `values` reaches the renderer
+    # as a color: the browser reports "Expected color but found 'NaN'" and the
+    # chart is left in a state a plain blank canvas does not explain. The mask
+    # spans all three arrays, because color is per point and filtering them
+    # independently would shift colors onto the wrong points.
+    keep = np.isfinite(xs) & np.isfinite(ys)
+    if vs is not None:
+        keep &= np.isfinite(vs)
+    xs, ys = xs[keep], ys[keep]
+    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
+    mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
     marks = [xy.scatter(**mark_kwargs)] if xs.size else []
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
 
 
@@ -447,5 +518,5 @@ def histogram(
         if value_range is not None:
             kwargs["range"] = value_range
         marks.append(xy.hist(**kwargs))
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
