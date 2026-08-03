@@ -63,12 +63,43 @@ def test_store_returns_none_for_an_unknown_panel():
     assert xc.BufferStore().get("nope", 1) is None
 
 
-def test_store_put_replaces_the_previous_version():
+def test_store_keeps_the_frame_a_fetch_is_still_asking_for():
+    """The browser is told version N+1 in the same delta that replaces the
+    buffers, so a fetch of N is in flight exactly while N+1 is published.
+    Retaining only the newest 404'd that fetch whenever the round trip
+    outlasted a tick, and the chart silently held its last frame."""
     store = xc.BufferStore()
     store.put("panel-a", 1, _bufs())
     store.put("panel-a", 2, _bufs())
-    assert store.get("panel-a", 1) is None
+    assert store.get("panel-a", 1) is not None
     assert store.get("panel-a", 2) is not None
+
+
+def test_store_evicts_beyond_the_retained_window():
+    store = xc.BufferStore(history=2)
+    for version in (1, 2, 3):
+        store.put("panel-a", version, _bufs())
+    assert store.get("panel-a", 1) is None
+    assert store.versions("panel-a") == [2, 3]
+
+
+def test_store_retains_several_frames_by_default():
+    store = xc.BufferStore()
+    for version in range(1, xc.FRAME_HISTORY + 1):
+        store.put("panel-a", version, _bufs())
+    assert store.get("panel-a", 1) is not None
+
+
+def test_store_history_is_per_panel():
+    store = xc.BufferStore(history=1)
+    store.put("panel-a", 1, _bufs())
+    store.put("panel-b", 1, _bufs())
+    assert store.get("panel-a", 1) is not None
+    assert store.get("panel-b", 1) is not None
+
+
+def test_store_reports_no_versions_for_an_unknown_panel():
+    assert xc.BufferStore().versions("nope") == []
 
 
 def test_store_drop_removes_the_panel():

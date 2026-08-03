@@ -34,6 +34,7 @@ __all__ = [
     "BUFFER_ROUTE_PREFIX",
 ]
 
+import collections
 import os
 import pathlib
 import shutil
@@ -45,6 +46,10 @@ from fastapi.responses import Response
 
 import xy.channel
 import xy.widget
+
+from helao.helpers import helao_logging as logging
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 #: Filename the xy ESM client is published under in the Reflex assets dir.
 #: Reflex serves ``assets/`` from the site root, so the browser sees "/<name>".
@@ -107,33 +112,58 @@ def encode_buffers(buffers) -> bytes:
     return b"".join(bytes(part) for part in parts)
 
 
-class BufferStore:
-    """Process-wide ``panel_id -> (version, buffers)`` map behind the HTTP route.
+#: Frames retained per panel. One is not enough: the browser is told a new
+#: version in the same state delta that replaces the buffers, so a fetch of
+#: version N is in flight exactly while the panel is publishing N+1. Keeping
+#: only the newest meant that fetch 404'd whenever the round trip outlasted
+#: one tick -- which, with the frontend proxying the route through to the
+#: backend, it reliably did while data was streaming. The chart then held its
+#: last good frame with nothing logged, and the whole trace appeared at once
+#: when the action ended and publishing stopped.
+FRAME_HISTORY = 4
 
-    Only the newest version of a panel is retained: the browser refetches when
-    its version token changes, so an older frame can never be usefully served.
-    A stale or unknown request yields ``None`` (404 at the route), and the
-    component keeps its last good frame rather than blanking — a refetch racing
-    a panel teardown must not clear a live chart.
+
+class BufferStore:
+    """Process-wide ``panel_id -> recent (version, buffers)`` map behind the route.
+
+    A few recent versions are retained per panel, newest last; see
+    :data:`FRAME_HISTORY`. An unknown panel or a version older than the
+    retained window yields ``None`` (404 at the route), and the component keeps
+    its last good frame rather than blanking — a refetch racing a panel
+    teardown must not clear a live chart.
     """
 
-    def __init__(self):
-        """Create an empty store."""
+    def __init__(self, history: int = FRAME_HISTORY):
+        """Create an empty store retaining ``history`` frames per panel."""
         self._lock = threading.Lock()
+        self._history = max(1, int(history))
         self._frames: dict = {}
 
     def put(self, panel_id: str, version: int, buffers) -> None:
-        """Store the newest frame for ``panel_id``, replacing any previous one."""
+        """Store a frame for ``panel_id``, dropping the oldest beyond the window."""
+        encoded = encode_buffers(buffers)
         with self._lock:
-            self._frames[panel_id] = (int(version), encode_buffers(buffers))
+            frames = self._frames.setdefault(panel_id, collections.deque())
+            frames.append((int(version), encoded))
+            while len(frames) > self._history:
+                frames.popleft()
 
     def get(self, panel_id: str, version: int):
-        """Return the encoded frame, or ``None`` if unknown or stale."""
+        """Return the encoded frame, or ``None`` if unknown or evicted."""
+        wanted = int(version)
         with self._lock:
-            entry = self._frames.get(panel_id)
-        if entry is None or entry[0] != int(version):
-            return None
-        return entry[1]
+            frames = self._frames.get(panel_id)
+            if not frames:
+                return None
+            for stored, payload in frames:
+                if stored == wanted:
+                    return payload
+        return None
+
+    def versions(self, panel_id: str) -> list:
+        """Versions currently retained for ``panel_id``, oldest first."""
+        with self._lock:
+            return [v for v, _ in self._frames.get(panel_id, ())]
 
     def drop(self, panel_id: str) -> None:
         """Forget a panel, e.g. when its session ends."""
@@ -160,6 +190,16 @@ def make_buffer_router(store: BufferStore) -> APIRouter:
         """Serve one encoded frame as an opaque byte stream."""
         payload = store.get(panel_id, v)
         if payload is None:
+            # Logged, not just 404'd. A miss means a chart silently keeps a
+            # stale frame -- the component cannot blank on a failed refetch
+            # without clearing live charts during teardown -- so without a line
+            # here a chart that stops updating leaves no trace anywhere.
+            retained = store.versions(panel_id)
+            LOGGER.warning(
+                f"buffer miss for panel '{panel_id}' at version {v}; "
+                f"retained: {retained or 'none'}. The chart will hold its "
+                f"previous frame."
+            )
             raise HTTPException(
                 status_code=404,
                 detail=f"no buffers for panel '{panel_id}' at version {v}",
