@@ -132,8 +132,18 @@ def encode_buffers(buffers) -> bytes:
 #:
 #: The memory this costs is bounded by the *reduced* payload, not the window: xy
 #: downsamples to roughly pixel resolution before publishing, so a frame is tens
-#: of KB even for a million-point window -- order 1-2 MB per chart here.
-FRAME_HISTORY = 64
+#: of KB even for a million-point window.
+#:
+#: What has to be covered is how far a client may fall behind, and at the 60 Hz
+#: of ``state.DEFAULT_UPDATE_RATE`` 64 frames is barely one second: a station
+#: logged a chart asking for version 118 while 152-215 were retained, 34
+#: versions past the window, and a client that far behind misses *every* fetch
+#: and holds its last frame -- a chart whose axes scroll with no line on it.
+#: 512 frames is ~8.5 s at 60 Hz, generous for a hiccup and still bounded at
+#: order 10 MB per chart. Not derived from DEFAULT_UPDATE_RATE, which lives in
+#: state -- state imports plots imports this module, so reading it back would
+#: close an import cycle.
+FRAME_HISTORY = 512
 
 
 class BufferStore:
