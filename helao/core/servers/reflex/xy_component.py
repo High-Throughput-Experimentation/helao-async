@@ -223,6 +223,8 @@ export function createController(options) {
     buffers: null,
     // The spec that describes `buffers`. See model.get.
     pairedSpec: null,
+    // Version of the newest frame applied, so a late response cannot regress.
+    appliedSeq: null,
     layout: null,
     handlers: {},
     module: null,
@@ -365,26 +367,41 @@ export function createController(options) {
     // panel republishes a larger spec every tick, so by the time the response
     // lands st.spec may already describe more points than these buffers hold.
     const specForUrl = st.spec;
+    // Version of this request, used to reject only genuinely older frames.
+    const seqForUrl =
+      specForUrl && specForUrl.append ? specForUrl.append.seq : null;
     try {
       const resp = await fetch(url);
-      // Superseded while in flight: a newer refetch has been issued, and its
-      // response is the one that should win. Applying this one would pair old
-      // buffers with a newer spec -- and out-of-order completions mean "last
-      // to resolve" is not "newest".
-      if (st.disposed || st.lastUrl !== url) return;
+      if (st.disposed) return;
       if (!resp.ok) {
         st.log("FETCH NOT OK", resp.status, url);
         return;  // keep the last good frame
       }
       const raw = await resp.arrayBuffer();
-      if (st.disposed || st.lastUrl !== url) return;
+      if (st.disposed) return;
+      // Reject only frames OLDER than what is already drawn. "Is my request
+      // still the newest?" was the wrong question: a new refetch is issued
+      // every tick, so once a fetch outlasts one tick -- which it does through
+      // the frontend's proxy to the backend -- every response finds itself
+      // superseded and the chart starves, advancing a version every few
+      // seconds instead of every tick. Out-of-order completions still cannot
+      // regress the view, because the test is monotonic on the version rather
+      // than on request order.
+      if (
+        seqForUrl !== null &&
+        st.appliedSeq !== null &&
+        seqForUrl <= st.appliedSeq
+      ) {
+        return;
+      }
       // decodeFrame returns {message, buffers, version, byteLength}; the
       // renderer wants the buffer LIST, because a split-layout spec indexes
       // columns into it. Handing it the wrapper object fails the split check.
       const frame = st.module.decodeFrame(raw);
-      // Assigned together: these two must never be read apart.
+      // Assigned together: these three must never be read apart.
       st.buffers = frame.buffers;
       st.pairedSpec = specForUrl;
+      st.appliedSeq = seqForUrl;
       const spec = specForUrl || {};
       const cols = spec.columns || [];
       st.log("frame", {
@@ -431,9 +448,11 @@ export function createController(options) {
     });
     st.layout = layout;
     st.teardown();
-    // Cleared together with the buffers they describe.
+    // Cleared together with the buffers they describe. appliedSeq too, so the
+    // rebuild can accept the next frame whatever its version.
     st.buffers = null;
     st.pairedSpec = null;
+    st.appliedSeq = null;
   };
 
   st.dispose = () => {
