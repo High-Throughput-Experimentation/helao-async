@@ -20,6 +20,7 @@ __all__ = [
     "CURRENT_PATTERN",
     "VOLTAGE_PATTERN",
     "split_on_restart",
+    "segment_trace_groups",
     "segment_traces",
     "cell_numbers",
     "select_cells",
@@ -79,6 +80,48 @@ def split_on_restart(x: np.ndarray, series: dict) -> tuple:
     return previous, current
 
 
+def segment_trace_groups(
+    x, series: dict, pick, labels=SEGMENT_LABELS, suffix_names: bool = True
+) -> list:
+    """Group traces by action segment, current first.
+
+    The primitive behind :func:`segment_traces`. A panel drawing both segments
+    in one chart flattens these groups; a panel drawing a chart per segment
+    keeps them apart and titles each chart with the segment's label, in which
+    case the suffix on each trace name is redundant -- pass
+    ``suffix_names=False``.
+
+    Args:
+        x: The ``t_s`` column for the whole window.
+        series: ``{name: np.ndarray}``, each the same length as ``x``.
+        pick: ``(segment_x, segment_series) -> (x, {label: y})``, applied per
+            segment. Column selection has to run after the split.
+        labels: Segment labels, current first.
+        suffix_names: Append ``" (<label>)"`` to each trace name.
+
+    Returns:
+        list: ``[(label, [{"label", "x", "y"}, ...]), ...]``.
+    """
+    previous, current = split_on_restart(x, series)
+    groups = []
+    for suffix, (segment_x, segment) in zip(labels, (current, previous)):
+        picked_x, picked = pick(segment_x, segment)
+        groups.append(
+            (
+                suffix,
+                [
+                    {
+                        "label": f"{name} ({suffix})" if suffix_names else name,
+                        "x": picked_x,
+                        "y": values,
+                    }
+                    for name, values in picked.items()
+                ],
+            )
+        )
+    return groups
+
+
 def segment_traces(x, series: dict, pick, labels=SEGMENT_LABELS) -> list:
     """Build one chart's traces covering both the current action and the last.
 
@@ -109,13 +152,11 @@ def segment_traces(x, series: dict, pick, labels=SEGMENT_LABELS) -> list:
         list: ``[{"label", "x", "y"}]``. Current first, so it takes the first
         palette color and stays the dominant trace.
     """
-    previous, current = split_on_restart(x, series)
-    drawn = []
-    for suffix, (segment_x, segment) in zip(labels, (current, previous)):
-        picked_x, picked = pick(segment_x, segment)
-        for name, values in picked.items():
-            drawn.append({"label": f"{name} ({suffix})", "x": picked_x, "y": values})
-    return drawn
+    return [
+        trace
+        for _, traces in segment_trace_groups(x, series, pick, labels)
+        for trace in traces
+    ]
 
 
 def cell_numbers(series: dict, pattern: re.Pattern) -> list:
