@@ -120,7 +120,30 @@ def encode_buffers(buffers) -> bytes:
 #: backend, it reliably did while data was streaming. The chart then held its
 #: last good frame with nothing logged, and the whole trace appeared at once
 #: when the action ended and publishing stopped.
-FRAME_HISTORY = 4
+#:
+#: The count has to cover the round trip measured in *ticks*, so it is a
+#: function of the render cadence. Four sufficed at the 2-4 Hz panels used to
+#: run at. At the 60 Hz of ``DEFAULT_UPDATE_RATE`` a version is published every
+#: ~16 ms, so four frames is ~64 ms of history and an ordinary proxied fetch
+#: outlives it: a station logged "buffer miss ... at version 168; retained:
+#: [169, 170, 171, 172]", missing by one, and the chart went blank because even
+#: the first mount could not land a frame. 64 frames covers about a second of
+#: publishing at 60 Hz.
+#:
+#: The memory this costs is bounded by the *reduced* payload, not the window: xy
+#: downsamples to roughly pixel resolution before publishing, so a frame is tens
+#: of KB even for a million-point window.
+#:
+#: What has to be covered is how far a client may fall behind, and at the 60 Hz
+#: of ``state.DEFAULT_UPDATE_RATE`` 64 frames is barely one second: a station
+#: logged a chart asking for version 118 while 152-215 were retained, 34
+#: versions past the window, and a client that far behind misses *every* fetch
+#: and holds its last frame -- a chart whose axes scroll with no line on it.
+#: 512 frames is ~8.5 s at 60 Hz, generous for a hiccup and still bounded at
+#: order 10 MB per chart. Not derived from DEFAULT_UPDATE_RATE, which lives in
+#: state -- state imports plots imports this module, so reading it back would
+#: close an import cycle.
+FRAME_HISTORY = 512
 
 
 class BufferStore:
@@ -221,6 +244,10 @@ export function createController(options) {
   const st = {
     spec: options.spec,
     buffers: null,
+    // The spec that describes `buffers`. See model.get.
+    pairedSpec: null,
+    // Version of the newest frame applied, so a late response cannot regress.
+    appliedSeq: null,
     layout: null,
     handlers: {},
     module: null,
@@ -231,10 +258,21 @@ export function createController(options) {
     cleanup: null,
     onSelect: options.onSelect,
     lastUrl: null,
+    // One fetch outstanding per chart; the newest URL to arrive meanwhile waits
+    // here and everything between it and the one in flight is dropped.
+    inFlight: false,
+    queuedUrl: null,
   };
 
   st.model = {
-    get: (name) => (name === "spec" ? st.spec : st.buffers),
+    // The PAIRED spec, not the newest one. st.spec advances on every tick
+    // while a fetch is in flight, so handing the renderer the newest spec
+    // alongside buffers that arrived for an earlier version describes more
+    // points than the buffers hold. xy then either throws "column extends
+    // past chart payload" from _columnView at mount -- which has no
+    // validator -- or, on the append path, fails c(spec, buffers) and drops
+    // the frame without a word. Either way the chart never draws.
+    get: (name) => (name === "spec" ? st.pairedSpec || st.spec : st.buffers),
     send: (msg) => {
       if (msg && msg.type === "select" && st.onSelect) st.onSelect(msg);
     },
@@ -287,16 +325,57 @@ export function createController(options) {
       st.pendingUrl = url;
       return;
     }
+    // One request at a time, and only the newest is worth making. A fetch per
+    // tick outruns the browser's ~6 connections per origin once the round trip
+    // exceeds the tick -- which it does through the frontend's proxy -- so
+    // requests queue, each carrying the version that was current when it was
+    // queued, and the version asked for falls further behind without bound. A
+    // station showed it plainly: the requested version sat ~35 below the
+    // retained window whether the window held 64 frames or 512, so every fetch
+    // missed and the charts scrolled with no line. Superseded URLs are simply
+    // dropped: catching up matters, the intermediate frames do not.
+    if (st.inFlight) {
+      st.queuedUrl = url;
+      return;
+    }
+    st.inFlight = true;
     st.lastUrl = url;
+    // The spec describing THIS url's frame, captured before the await. The
+    // panel republishes a larger spec every tick, so by the time the response
+    // lands st.spec may already describe more points than these buffers hold.
+    const specForUrl = st.spec;
+    // Version of this request, used to reject only genuinely older frames.
+    const seqForUrl =
+      specForUrl && specForUrl.append ? specForUrl.append.seq : null;
     try {
       const resp = await fetch(url);
+      if (st.disposed) return;
       if (!resp.ok) return;  // keep the last good frame
       const raw = await resp.arrayBuffer();
+      if (st.disposed) return;
+      // Reject only frames OLDER than what is already drawn. "Is my request
+      // still the newest?" was the wrong question: a new refetch is issued
+      // every tick, so once a fetch outlasts one tick -- which it does through
+      // the frontend's proxy to the backend -- every response finds itself
+      // superseded and the chart starves, advancing a version every few
+      // seconds instead of every tick. Out-of-order completions still cannot
+      // regress the view, because the test is monotonic on the version rather
+      // than on request order.
+      if (
+        seqForUrl !== null &&
+        st.appliedSeq !== null &&
+        seqForUrl <= st.appliedSeq
+      ) {
+        return;
+      }
       // decodeFrame returns {message, buffers, version, byteLength}; the
       // renderer wants the buffer LIST, because a split-layout spec indexes
       // columns into it. Handing it the wrapper object fails the split check.
       const frame = st.module.decodeFrame(raw);
+      // Assigned together: these three must never be read apart.
       st.buffers = frame.buffers;
+      st.pairedSpec = specForUrl;
+      st.appliedSeq = seqForUrl;
       if (!st.mounted) {
         st.maybeMount();
         return;
@@ -306,6 +385,13 @@ export function createController(options) {
       st.emit("change:buffers");
     } catch (e) {
       // Network hiccup: keep the last good frame rather than blanking.
+    } finally {
+      // Drains whichever URL arrived while this one was outstanding, so the
+      // chart converges on the newest frame instead of walking a backlog.
+      st.inFlight = false;
+      const next = st.queuedUrl;
+      st.queuedUrl = null;
+      if (next && next !== url && !st.disposed) st.refetch(next);
     }
   };
 
@@ -319,7 +405,11 @@ export function createController(options) {
     if (st.layout === layout) return;
     st.layout = layout;
     st.teardown();
+    // Cleared together with the buffers they describe. appliedSeq too, so the
+    // rebuild can accept the next frame whatever its version.
     st.buffers = null;
+    st.pairedSpec = null;
+    st.appliedSeq = null;
   };
 
   st.dispose = () => {
@@ -366,7 +456,23 @@ export function XYChart({ spec, bufferUrl, layout, height, onSelect }) {
     st.refetch(bufferUrl);
   }, [spec, bufferUrl, layout, onSelect]);
 
-  return <div ref={hostRef} style={{ width: "100%", height: height }} />;
+  // minHeight and flexShrink belong here, on the element xy observes and
+  // draws into -- not on a wrapper. `height` alone collapses to nothing when
+  // this div is a flex item, because flex-shrink applies to it, and the next
+  // chart in a wrapping row is then drawn over it. A wrapper box reserving the
+  // height fixed the overlap but cost the y axis: the gutter xy draws its
+  // ticks, labels and title in ended up outside the box.
+  return (
+    <div
+      ref={hostRef}
+      style={{
+        width: "100%",
+        height: height,
+        minHeight: height,
+        flexShrink: 0,
+      }}
+    />
+  );
 }
 """
 

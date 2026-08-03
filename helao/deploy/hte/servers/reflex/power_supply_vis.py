@@ -86,7 +86,7 @@ def build(server_key: str, state_cls):
                 rx.spacer(),
                 rx.text(state_cls.action_uuid, size="1", color_scheme="gray"),
                 rx.input(
-                    default_value=str(state_cls.window_points),
+                    default_value=state_cls.window_points.to_string(),
                     on_blur=state_cls.on_window_points,
                     placeholder="window points",
                     width="10em",

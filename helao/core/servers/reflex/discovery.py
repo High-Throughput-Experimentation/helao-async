@@ -79,20 +79,28 @@ def resolve_panel_module(module_name: str):
     Raises:
         ModuleNotFoundError: If no deployment provides ``module_name``.
     """
-    tried = []
+    tried = {}
     for deployment in deployment_search_order():
         modpath = f"helao.deploy.{deployment}.servers.{PANEL_SUBPACKAGE}.{module_name}"
-        tried.append(modpath)
         try:
             spec = importlib_util.find_spec(modpath)
-        except ModuleNotFoundError:
-            spec = None
+        except ModuleNotFoundError as exc:
+            # An absent module and one whose *parent package* fails to import
+            # both land here, and the two mean opposite things: pull the
+            # deployment, versus fix an import inside it. Reporting only the
+            # paths tried sent a station chasing a missing module that was
+            # sitting on disk. Anything other than ModuleNotFoundError is left
+            # to propagate -- that is a bug in the deployment, not a miss.
+            tried[modpath] = f"{type(exc).__name__}: {exc}"
+            continue
         if spec is None:
+            tried[modpath] = "no module of that name"
             continue
         return import_module(modpath)
+    detail = "\n".join(f"  {path}: {why}" for path, why in tried.items())
     raise ModuleNotFoundError(
         f"could not locate Reflex panel module '{module_name}' in any "
-        f"deployment; tried: {tried}"
+        f"deployment:\n{detail}"
     )
 
 

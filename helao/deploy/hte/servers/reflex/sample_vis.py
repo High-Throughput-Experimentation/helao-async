@@ -159,7 +159,7 @@ def build(server_key: str, state_cls):
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.input(
-                    default_value=str(state_cls.max_samples),
+                    default_value=state_cls.max_samples.to_string(),
                     on_blur=state_cls.set_max_samples,
                     placeholder="latest N",
                     width="8em",

@@ -189,7 +189,7 @@ def build(server_key: str, state_cls):
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.input(
-                    default_value=str(state_cls.update_rate),
+                    default_value=state_cls.update_rate.to_string(),
                     on_blur=state_cls.on_update_rate,
                     placeholder="update sec",
                     width="8em",
