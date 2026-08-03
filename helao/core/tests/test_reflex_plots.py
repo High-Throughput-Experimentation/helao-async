@@ -204,14 +204,29 @@ def test_traces_tolerates_no_series():
     assert plots.traces([]) is not None
 
 
-def test_traces_skips_an_all_non_finite_trace_without_raising():
+def test_traces_keeps_an_all_non_finite_trace_so_the_layout_holds_still():
+    """A dropped trace changes `layout_token`, which rebuilds the whole view.
+
+    A sensor that goes briefly non-finite did that on alternating ticks, so the
+    line appeared and disappeared as the operator watched. The trace is kept as
+    an empty one instead: same trace set, same token, an in-place update.
+    """
     out = plots.traces(
         [
             {"label": "bad", "x": np.arange(3.0), "y": np.full(3, np.nan)},
             {"label": "good", "x": np.arange(3.0), "y": np.arange(3.0)},
         ]
     )
-    assert len(out.spec["traces"]) == 1
+    assert len(out.spec["traces"]) == 2
+    # The empty one contributes zero-length columns, not missing ones.
+    assert 0 in [c.get("len") for c in out.spec["columns"]]
+
+
+def test_a_trace_going_non_finite_does_not_change_the_layout_token():
+    x = np.arange(3.0)
+    finite = plots.traces([{"label": "a", "x": x, "y": x}], version=1)
+    blanked = plots.traces([{"label": "a", "x": x, "y": np.full(3, np.nan)}], version=2)
+    assert finite.layout == blanked.layout
 
 
 def test_traces_carries_an_append_token_like_every_other_facade_entry():

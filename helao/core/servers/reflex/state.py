@@ -62,6 +62,14 @@ MIN_UPDATE_RATE = 0.01
 #: can and no faster.
 DEFAULT_UPDATE_RATE = 1 / 60
 
+#: Continuous sensor telemetry renders at 10 Hz, not 60. `ws_live` panels carry
+#: several figures each and their sensors change on a human timescale, so the
+#: extra 50 frames a second buy nothing and cost real work -- each tick rebuilds
+#: every figure and publishes a frame per chart. A deliberate override of
+#: :data:`DEFAULT_UPDATE_RATE`, which stays at 60 Hz for the per-action
+#: measurement panels where a fast trace is the point.
+DEFAULT_LIVE_UPDATE_RATE = 0.1
+
 
 #: Sentinel so a first assignment of a falsy value is not mistaken for a no-op.
 _MISSING = object()
@@ -346,12 +354,14 @@ class VisPanelState(rx.State, mixin=True):
 class LiveVisState(VisPanelState, mixin=True):
     """Panel state for continuous sensor telemetry (``ws_live``).
 
-    Takes :data:`DEFAULT_UPDATE_RATE` rather than declaring its own. The 0.5 s
-    and 0.25 s these two classes used to set silently overrode the module
-    default, so raising it changed nothing for any real panel.
+    Renders at :data:`DEFAULT_LIVE_UPDATE_RATE`. This is the one deliberate
+    override of the module default, named rather than hardcoded -- the 0.5 s and
+    0.25 s these classes used to carry were stale literals that silently
+    shadowed the default, so raising it changed nothing for any real panel.
     """
 
     ws_path: str = "ws_live"
+    update_rate: float = DEFAULT_LIVE_UPDATE_RATE
 
 
 class ActionVisState(VisPanelState, mixin=True):
