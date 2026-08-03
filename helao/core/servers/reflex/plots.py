@@ -184,6 +184,21 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
     )
 
 
+def _chart(marks, axes) -> Any:
+    """Assemble a chart that sizes itself from its container.
+
+    ``xy.chart`` defaults to a fixed 900x420 spec, and the renderer uses those
+    numbers literally: it built a 420px-tall root inside whatever div it was
+    given, overflowed it, and the card's ``overflow: hidden`` clipped the
+    bottom -- so the x axis simply vanished, while nothing about the data path
+    looked wrong. ``"100%"`` selects xy's fluid path, where it measures the
+    element it is mounted into. That element already carries an explicit height
+    from :func:`chart`, which makes the host div the single place a chart's size
+    is decided rather than a figure spec and a CSS rule that can disagree.
+    """
+    return xy.chart(*marks, *axes, width="100%", height="100%")
+
+
 def _axes(x_label: str, y_label: str, x_is_epoch: bool) -> list:
     """Build the axis child components.
 
@@ -242,7 +257,7 @@ def time_series(
         if fx.size == 0:
             continue
         marks.append(xy.line(x=fx, y=fy, name=label, color=PALETTE[idx % len(PALETTE)]))
-    figure = xy.chart(*marks, *_axes(x_label, y_label, x_is_epoch))
+    figure = _chart(marks, _axes(x_label, y_label, x_is_epoch))
     return _publish(figure, panel_id, version)
 
 
@@ -312,7 +327,7 @@ def traces(
                 color=PALETTE[idx % len(PALETTE)],
             )
         )
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
 
 
@@ -407,7 +422,7 @@ def scatter_map(
     mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
     mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
     marks = [xy.scatter(**mark_kwargs)] if xs.size else []
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)
 
 
@@ -452,5 +467,5 @@ def histogram(
         if value_range is not None:
             kwargs["range"] = value_range
         marks.append(xy.hist(**kwargs))
-    figure = xy.chart(*marks, *_axes(x_label, y_label, False))
+    figure = _chart(marks, _axes(x_label, y_label, False))
     return _publish(figure, panel_id, version)

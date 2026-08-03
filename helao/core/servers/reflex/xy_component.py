@@ -120,7 +120,20 @@ def encode_buffers(buffers) -> bytes:
 #: backend, it reliably did while data was streaming. The chart then held its
 #: last good frame with nothing logged, and the whole trace appeared at once
 #: when the action ended and publishing stopped.
-FRAME_HISTORY = 4
+#:
+#: The count has to cover the round trip measured in *ticks*, so it is a
+#: function of the render cadence. Four sufficed at the 2-4 Hz panels used to
+#: run at. At the 60 Hz of ``DEFAULT_UPDATE_RATE`` a version is published every
+#: ~16 ms, so four frames is ~64 ms of history and an ordinary proxied fetch
+#: outlives it: a station logged "buffer miss ... at version 168; retained:
+#: [169, 170, 171, 172]", missing by one, and the chart went blank because even
+#: the first mount could not land a frame. 64 frames covers about a second of
+#: publishing at 60 Hz.
+#:
+#: The memory this costs is bounded by the *reduced* payload, not the window: xy
+#: downsamples to roughly pixel resolution before publishing, so a frame is tens
+#: of KB even for a million-point window -- order 1-2 MB per chart here.
+FRAME_HISTORY = 64
 
 
 class BufferStore:
