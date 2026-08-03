@@ -45,6 +45,15 @@ from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.servers.operator import param_store, spec_parser
+from helao.core.servers.operator.object_tree import (
+    doc_to_html,
+    open_keys_for,
+    object_to_html,
+    render_node,
+    server_header_text,
+    tree_header_text,
+    truncate_uuid,
+)
 from helao.core.servers.operator.param_forms import (
     BUILTIN_TYPES,
     build_lib,
@@ -72,65 +81,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 _PLATE_API_CACHE: dict = {}
 
 
-def _render_node(key, val, top=False, open_keys=()):
-    """Render one object node as collapsible HTML. Top-level nodes whose key is
-    in ``open_keys`` start expanded; everything else starts collapsed."""
-    open_attr = " open" if (top and key in open_keys) else ""
-    label = _html.escape(str(key))
-    if isinstance(val, dict):
-        inner = "".join(
-            _render_node(k, v, top=False, open_keys=open_keys) for k, v in val.items()
-        )
-        return f"<details{open_attr}><summary>{label}</summary>{inner}</details>"
-    if isinstance(val, (list, tuple)):
-        inner = "".join(
-            _render_node(f"[{i}]", v, top=False, open_keys=open_keys)
-            for i, v in enumerate(val)
-        )
-        return f"<details{open_attr}><summary>{label} [{len(val)}]</summary>{inner}</details>"
-    return f"<div style='margin-left:1em'>{label}: {_html.escape(str(val))}</div>"
-
-
-def _object_to_html(obj, open_keys=()):
-    """Render a dict (or scalar) as a nested ``<details>`` tree string."""
-    if not isinstance(obj, dict):
-        return f"<div>{_html.escape(str(obj))}</div>"
-    if not obj:
-        return "<div><i>empty</i></div>"
-    return "".join(
-        _render_node(k, v, top=True, open_keys=open_keys) for k, v in obj.items()
-    )
-
-
-def _truncate_uuid(value):
-    return str(value)[-8:] if value else ""
-
-
-def _tree_header_text(kind, obj):
-    """Header line for a sequence/experiment/action object: 'name · uuid8'.
-
-    Data fields are HTML-escaped so the result is safe to interpolate directly
-    into markup (e.g. ``<b>{header_text}</b>``); the literal middle dot is not
-    data and is left unescaped.
-    """
-    name = obj.get(f"{kind}_name", "") if isinstance(obj, dict) else ""
-    uuid8 = _truncate_uuid(obj.get(f"{kind}_uuid")) if isinstance(obj, dict) else ""
-    name = _html.escape(str(name))
-    uuid8 = _html.escape(str(uuid8))
-    return f"{name} · {uuid8}" if uuid8 else f"{name}"
-
-
-def _server_header_text(server_name, cfg):
-    """Header line for an action-server row: 'NAME · host:port'.
-
-    Data fields are HTML-escaped so the result is safe to interpolate directly
-    into markup; the literal middle dot is not data and is left unescaped.
-    """
-    cfg = cfg or {}
-    name = _html.escape(str(server_name))
-    host = _html.escape(str(cfg.get("host", "")))
-    port = _html.escape(str(cfg.get("port", "")))
-    return f"{name} · {host}:{port}"
+# The collapsible-HTML renderers moved to object_tree alongside param_forms and
+# spec_parser, because the Reflex operator shows the same trees and docstrings.
+# Re-exported under their original private names: this module's own call sites
+# use them, and so does test_standalone_operator.
+_render_node = render_node
+_object_to_html = object_to_html
+_truncate_uuid = truncate_uuid
+_tree_header_text = tree_header_text
+_server_header_text = server_header_text
 
 
 class return_sequence_lib(BaseModel):
@@ -2412,40 +2371,8 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
                     ),
                 )
 
-    @staticmethod
-    def _doc_to_html(doc: str) -> str:
-        """Render a docstring as HTML, with the ``Args:`` block as a collapsed tree.
-
-        Text before/after the ``Args:`` section is kept as-is (newlines -> <br>);
-        the argument list is rendered inside a closed ``<details>`` element so it
-        starts collapsed and expands on click.
-        """
-        if not doc:
-            return ""
-        lines = doc.splitlines()
-        hdr_re = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)
-        sect_re = re.compile(
-            r"^\s*(Returns?|Raises|Yields?|Examples?|Notes?|Attributes)\s*:\s*$",
-            re.I,
-        )
-        hdr = next((i for i, l in enumerate(lines) if hdr_re.match(l)), None)
-        if hdr is None:
-            return _html.escape(doc).replace("\n", "<br>")
-        # end of the Args block: first blank line or next section header
-        end = len(lines)
-        for j in range(hdr + 1, len(lines)):
-            if lines[j].strip() == "" or sect_re.match(lines[j]):
-                end = j
-                break
-        args = BokehOperator._parse_arg_docs(doc)
-        items = "".join(
-            f"<div style='margin-left:1em'>{_html.escape(k)}: {_html.escape(v)}</div>"
-            for k, v in args.items()
-        )
-        tree = f"<details><summary><b>Args:</b></summary>{items}</details>"
-        pre = "<br>".join(_html.escape(l) for l in lines[:hdr])
-        post = "<br>".join(_html.escape(l) for l in lines[end:])
-        return "".join(p for p in (pre, tree, post) if p)
+    # Shared with the Reflex operator; see object_tree.
+    _doc_to_html = staticmethod(doc_to_html)
 
     def update_seq_doc(self, value):
         """Render the selected sequence's docstring into the sequence description widget."""
@@ -2771,12 +2698,7 @@ cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
     # active planhistory or queue tab when the user selects a row.
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _open_keys(obj):
-        """Top-level keys to expand by default: any '*_params' key."""
-        if not isinstance(obj, dict):
-            return []
-        return [k for k in obj if k.endswith("_params")]
+    _open_keys = staticmethod(open_keys_for)
 
     def _set_tree(self, header_div, tree_div, header_text, obj, open_keys):
         header_div.text = f"<b>{header_text}</b>" if header_text.strip() else "<b>—</b>"
