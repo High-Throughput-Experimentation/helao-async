@@ -63,6 +63,7 @@ from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
 from helao.helpers.config_loader import read_config
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers import win_job
 from helao.helpers.parent_death import (
     DETACH_MARKER_ENV,
     PARENT_PID_ENV,
@@ -197,14 +198,25 @@ class ConsoleMux:
         self.active = True
 
     def spawn_kwargs(self) -> dict:
-        """``Popen`` kwargs routing a child's output into the mux.
+        """``Popen`` kwargs for a launched server.
 
-        Empty while inactive, so the child inherits this process's stdout and
-        stderr exactly as it did before the mux existed.
+        Routes the child's output into the mux when active; while inactive the
+        child inherits this process's stdout and stderr exactly as it did before
+        the mux existed.
+
+        Also carries the Windows ``creationflags``, because every server is
+        spawned through here and that is the only place the flag has to be
+        added. The key is omitted entirely when the value is 0 rather than passed
+        as ``creationflags=0``: POSIX ``Popen`` rejects a non-zero value, and
+        leaving the key out keeps the Linux call byte-identical to what it was.
         """
-        if not self.active:
-            return {}
-        return {"stdout": subprocess.PIPE, "stderr": subprocess.STDOUT}
+        kwargs = {}
+        if self.active:
+            kwargs.update(stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        creationflags = win_job.spawn_creationflags()
+        if creationflags:
+            kwargs["creationflags"] = creationflags
+        return kwargs
 
     def child_env(self):
         """Environment for a spawned child, or ``None`` to inherit unchanged.
@@ -823,6 +835,25 @@ class Pidd:
             del self.d[k]
             self.write_global()
             return True
+
+        # Windows gets a cooperative step first, because it otherwise has none:
+        # `p.terminate()` there is `TerminateProcess`, which stops the process
+        # without running a single shutdown handler, so the GRACEFUL_WAIT below
+        # is measuring a corpse. CTRL_BREAK is the nearest thing to a polite stop
+        # and uvicorn handles it. A False return means no event was delivered, so
+        # nothing is waited for and the ladder proceeds exactly as before.
+        if win_job.supported() and win_job.ctrl_break(pid, LAUNCH_LOGGER):
+            if self._wait_gone(p, self.GRACEFUL_WAIT, k):
+                LAUNCH_LOGGER.info(
+                    f"Successfully terminated server '{k}' (graceful, CTRL_BREAK)."
+                )
+                del self.d[k]
+                self.write_global()
+                return True
+            LAUNCH_LOGGER.warning(
+                f"Server '{k}' still alive {self.GRACEFUL_WAIT}s after CTRL_BREAK; "
+                f"escalating."
+            )
 
         # Send SIGTERM (an alias for kill() on Windows) and wait past the servers'
         # graceful-shutdown floor before escalating to SIGKILL. Every branch reaps
@@ -1836,6 +1867,16 @@ def main():
     os.environ[PARENT_PID_ENV] = str(os.getpid())
     os.environ[DETACH_MARKER_ENV] = marker_path
 
+    # Windows' half of the same guarantee. PDEATHSIG does not exist there, so the
+    # launcher joins a kill-on-close job object and every server it spawns
+    # inherits membership; the kernel then terminates the group if this process
+    # dies. A no-op on Linux, where the children arm PDEATHSIG themselves.
+    #
+    # Bound to a name that lives as long as main() ON PURPOSE: closing the handle
+    # is what triggers the kill, so letting it be garbage-collected would take
+    # down the whole running group. Do not "tidy" this into a bare call.
+    win_job_handle = win_job.assign_launcher(LAUNCH_LOGGER)
+
     try:
         pidd = launcher(
             confArg=confArg,
@@ -2365,6 +2406,13 @@ def main():
                     f"that armed a parent-death signal will shut down when this "
                     f"launcher exits."
                 )
+            # The marker is enough on Linux, where each child decides for itself.
+            # On Windows the decision is the kernel's: the job object kills its
+            # members when this process's handle closes, and a process cannot be
+            # removed from a job, so the kill-on-close limit has to be dropped
+            # instead. Without this the job would take the group down and the
+            # marker would never be consulted.
+            win_job.release_for_detach(win_job_handle, LAUNCH_LOGGER)
             LAUNCH_LOGGER.info(
                 f"Disconnecting action monitor. Launch "
                 f"'python launch.py {confArg} --reconnect' to reconnect."

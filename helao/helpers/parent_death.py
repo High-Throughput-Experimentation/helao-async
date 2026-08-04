@@ -40,10 +40,12 @@ silently deleted the CTRL-d feature and taken a running instrument group down
 with the terminal.
 
 Windows is a first-class deployment target and **nothing here changes its
-behaviour**: every entry point no-ops off Linux. The Windows equivalent is a
-Job Object with ``JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE``, assigned by the parent
-at spawn time; that is a different mechanism in a different process and is
-explicitly out of scope for this module.
+behaviour**: every entry point no-ops off Linux. Its equivalent lives in
+:mod:`helao.helpers.win_job` — a Job Object with
+``JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`` that the *launcher* joins, so containment
+is inherited rather than armed per child. Deliberately a separate module: it acts
+in a different process, at a different time, through a different API, and the two
+share nothing but the detach handshake (both have to stand down for CTRL-d).
 """
 
 __all__ = [
