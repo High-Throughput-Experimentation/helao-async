@@ -115,6 +115,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
+    control_vis: nidaqmx_control
     action_vis: nidaqmx_vis
     live_vis: temp_vis
     params:
@@ -216,6 +217,13 @@ servers:
     group: visualizer
     bokeh: action_visualizer
     params: {}
+  CONTROL:
+    host: hte-adss-01.htejcap.caltech.edu
+    port: 5003
+    group: visualizer
+    bokeh: control_visualizer
+    params:
+      doc_name: Engineering Controls
   WORKSYRINGE:
     host: hte-adss-01.htejcap.caltech.edu
     port: 8013

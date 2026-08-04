@@ -105,6 +105,7 @@ servers:
     port: 8005
     group: action
     fast: galil_io
+    control_vis: digital_out_control
     params:
       galil_ip_str: 192.168.200.234
       dev_di:
@@ -155,6 +156,13 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: ECHE10 Visualizer
+  CONTROL:
+    host: hte-eche-10.htejcap.caltech.edu
+    port: 5003
+    group: visualizer
+    bokeh: control_visualizer
+    params:
+      doc_name: Engineering Controls
   SYNC:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8010

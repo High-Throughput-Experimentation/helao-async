@@ -55,6 +55,7 @@ servers:
     port: 8006
     group: action
     fast: nidaqmx_server
+    control_vis: nidaqmx_control
     action_vis: nidaqmx_vis
     params:
       dev_gasvalve:
@@ -100,6 +101,13 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: CCSI Visualizer
+  CONTROL:
+    host: hte-ccsi-02.htejcap.caltech.edu
+    port: 5003
+    group: visualizer
+    bokeh: control_visualizer
+    params:
+      doc_name: Engineering Controls
   LIVE:
     host: hte-ccsi-02.htejcap.caltech.edu
     port: 5004

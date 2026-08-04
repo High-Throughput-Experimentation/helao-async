@@ -96,6 +96,7 @@ servers:
     port: 8005
     group: action
     fast: galil_io
+    control_vis: digital_out_control
     params:
       galil_ip_str: 192.168.200.246
       dev_ai: {}
@@ -125,3 +126,10 @@ servers:
     bokeh: action_visualizer
     params:
       doc_name: UVIS Visualizer
+  CONTROL:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: control_visualizer
+    params:
+      doc_name: Engineering Controls
