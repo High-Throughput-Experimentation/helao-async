@@ -134,9 +134,14 @@ class _FakeState:
         self.status = ""
         self.loaded = False
 
-    # The real implementations, exercised rather than reimplemented.
+    # The real implementations, exercised rather than reimplemented. Every
+    # non-event method the handlers reach through `self` has to be listed:
+    # duck-typing buys isolation from Reflex's session machinery and costs this
+    # line, which is why a missing one fails loudly on the next run rather than
+    # quietly passing.
     _state_of = ControlState._state_of
     _apply = ControlState._apply
+    _read_into_rows = ControlState._read_into_rows
 
     async def __aenter__(self):
         return self
@@ -295,3 +300,52 @@ def test_every_state_key_has_a_button_class():
     with pytest.raises(KeyError):
         reflex_control_button_class("maybe")
     print("test_every_state_key_has_a_button_class PASS")
+
+
+def _reread(state):
+    asyncio.run(ControlState.reread.fn(state))
+
+
+def test_reread_refetches_where_load_would_not(page):
+    _, script = page
+    script["read"] = {"IO": {"gamry_aux": True, "Thorlab_led": True}}
+    state = _FakeState()
+    _load(state)
+    assert {r[1]: r[4] for r in state.rows}["gamry_aux"] == "on"
+
+    # A sequence drives the line while the page is open. `load` is guarded and
+    # would do nothing; `reread` is the path that is meant to overwrite.
+    script["read"] = {"IO": {"gamry_aux": False, "Thorlab_led": True}}
+    _load(state)
+    assert {r[1]: r[4] for r in state.rows}[
+        "gamry_aux"
+    ] == "on", "load must not refetch"
+
+    _reread(state)
+    assert {r[1]: r[4] for r in state.rows}["gamry_aux"] == "off"
+    print("test_reread_refetches_where_load_would_not PASS")
+
+
+def test_reread_restores_unknown_for_a_server_that_stops_answering(page):
+    _, script = page
+    script["read"] = {"IO": {"gamry_aux": True, "Thorlab_led": False}}
+    state = _FakeState()
+    _load(state)
+
+    script["read"] = {}  # both servers now unreachable
+    _reread(state)
+
+    assert all(r[4] == "unknown" for r in state.rows), state.rows
+    assert "could not read" in state.status
+    print("test_reread_restores_unknown_for_a_server_that_stops_answering PASS")
+
+
+def test_the_read_button_colour_is_not_a_line_state_colour():
+    from helao.core.servers.palette import (
+        REFLEX_CONTROL_READ_CLASS,
+        REFLEX_CONTROL_STATE_CLASSES,
+    )
+
+    # An action, not a fourth state a digital output could be in.
+    assert REFLEX_CONTROL_READ_CLASS not in set(REFLEX_CONTROL_STATE_CLASSES.values())
+    print("test_the_read_button_colour_is_not_a_line_state_colour PASS")

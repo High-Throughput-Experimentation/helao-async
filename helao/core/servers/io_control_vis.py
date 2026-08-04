@@ -113,6 +113,21 @@ class DigitalOutPanel:
             )
         else:
             rows.extend(self._build_group_rows())
+        # Re-read on demand. The panel reads once when it opens and otherwise
+        # only learns what it has commanded itself, so after a sequence has
+        # driven a line — or after a panel has been left open a while — this is
+        # how an engineer gets the truth back without reloading the page.
+        # `primary`, so it does not read as a fourth line state beside the
+        # success/default/warning the controls use.
+        self.read_button = Button(
+            label="Read state",
+            button_type="primary",
+            width=TOGGLE_WIDTH,
+            stylesheets=[semantic_button_stylesheet()],
+        )
+        self.read_button.on_event(ButtonClick, self._callback_read)
+        if self.items:
+            rows.append([Spacer(width=20), self.read_button])
         rows.append([Spacer(width=20), self.status_div])
         rows.append(Spacer(height=10))
 
@@ -241,6 +256,15 @@ class DigitalOutPanel:
             self.states.update({k: v for k, v in states.items() if k in self.states})
             self.status_div.text = f"{do_name}: {state_label(self.states[do_name])}"
         self._restyle(do_name)
+
+    def _callback_read(self, event) -> None:
+        """Re-read every line on demand.
+
+        Args:
+            event: Bokeh ``ButtonClick`` (unused).
+        """
+        self.status_div.text = "reading current state..."
+        self.vis.doc.add_next_tick_callback(self._refresh_states)
 
     async def _refresh_states(self) -> None:
         """Read every line once and restyle the whole bank."""

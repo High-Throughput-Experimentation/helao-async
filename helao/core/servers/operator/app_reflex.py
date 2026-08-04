@@ -2375,8 +2375,18 @@ def _param_field(row, state, options, index=None):
             unchanged.
     """
 
+    # An empty `rx.text` at the same `size`, not an `rx.box`: `2.5em` resolves
+    # against the element's *own* font size, and only the text carries
+    # `size="1"`. A box inherited the Radix default instead, so the label row
+    # reserved 40px (2.5 x 16) against the index column's 30px (2.5 x 12) and
+    # every parameter name sat right of its input. Measured 17px of offset,
+    # 10 of it from that and the rest from the two rows' `spacing` differing —
+    # which is why the spacing below is now stated on both rows rather than
+    # left to the default on one.
     indent = (
-        [] if index is None else [rx.box(width=_PARAM_INDEX_WIDTH, flex_shrink="0")]
+        []
+        if index is None
+        else [rx.text("", size="1", width=_PARAM_INDEX_WIDTH, flex_shrink="0")]
     )
     return rx.vstack(
         rx.hstack(
@@ -2385,6 +2395,7 @@ def _param_field(row, state, options, index=None):
             rx.spacer(),
             rx.text(row[3], size="1", class_name=_MUTED_TEXT),
             width="100%",
+            spacing="1",
         ),
         rx.hstack(
             *(

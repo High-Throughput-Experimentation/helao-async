@@ -26,6 +26,7 @@ from helao.core.servers.io_control import (
     state_label,
 )
 from helao.core.servers.palette import (
+    REFLEX_CONTROL_READ_CLASS,
     reflex_control_button_class,
     reflex_muted_text_class,
 )
@@ -200,16 +201,33 @@ class ControlState(rx.State):
                 for item in target.items
             ]
             self.status = "reading current state..."
+        # The same read the button runs, so the two cannot report differently.
+        await self._read_into_rows()
 
+    @rx.event(background=True)
+    async def reread(self):
+        """Re-read every line on demand.
+
+        Separate from :meth:`load` rather than clearing its guard: ``load``
+        must stay idempotent for ``on_mount``, which Reflex can fire more than
+        once, while this is the one path that is *supposed* to overwrite what
+        the page currently shows. The panel otherwise only learns what it has
+        commanded itself, so after a sequence has driven a line this is how an
+        engineer gets the truth back without reloading.
+        """
+        async with self:
+            self.status = "reading current state..."
+        await self._read_into_rows()
+
+    async def _read_into_rows(self):
+        """Read every server once and rebuild ``rows`` from what came back."""
         states: dict = {}
         for target in _CONFIG["targets"]:
             if not target.items:
                 continue
-            reported = await read_digital_outs(
+            states[target.server_key] = await read_digital_outs(
                 server_key=target.server_key, host=target.host, port=target.port
             )
-            states[target.server_key] = reported
-
         async with self:
             self.rows = [
                 _row(target, item, states.get(target.server_key, {}).get(item.name))
@@ -347,7 +365,19 @@ def control_page():
         )
     return rx.vstack(
         *[_server_block(target) for target in targets],
-        rx.text(ControlState.status, size="1", class_name=reflex_muted_text_class()),
+        rx.hstack(
+            rx.button(
+                "Read state",
+                on_click=ControlState.reread,
+                class_name=REFLEX_CONTROL_READ_CLASS,
+                size="2",
+            ),
+            rx.text(
+                ControlState.status, size="1", class_name=reflex_muted_text_class()
+            ),
+            align="center",
+            spacing="3",
+        ),
         width="100%",
         spacing="4",
         padding_x="1em",
