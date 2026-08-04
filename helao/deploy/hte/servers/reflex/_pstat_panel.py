@@ -13,6 +13,7 @@ import reflex as rx
 from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import (
+    MUTED_TEXT,
     X_COLUMN,
     latest_action_uuid,
     segment_trace_groups,
@@ -209,9 +210,7 @@ def make_pstat_panel(
                     rx.badge(state_cls.connection),
                     rx.spacer(),
                     rx.text(state_cls.action_name, size="1"),
-                    rx.text(
-                        state_cls.action_uuid, size="1", class_name="text-slate-500"
-                    ),
+                    rx.text(state_cls.action_uuid, size="1", class_name=MUTED_TEXT),
                     width="100%",
                     align="center",
                     spacing="3",

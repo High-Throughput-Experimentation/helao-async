@@ -13,12 +13,16 @@ only marker actually present in the data.
 **Cell selection.** The NI-DAQmx server streams one current and one voltage
 column per cell. Which cells to draw is an operator choice, so the columns are
 discovered from the stream rather than assumed, and filtered by selection.
+
+**Muted text.** One shade for every panel's secondary caption, here rather than
+repeated per module, so the four panels cannot drift apart.
 """
 
 __all__ = [
     "X_COLUMN",
     "CURRENT_PATTERN",
     "VOLTAGE_PATTERN",
+    "MUTED_TEXT",
     "split_on_restart",
     "segment_trace_groups",
     "segment_traces",
@@ -30,6 +34,14 @@ __all__ = [
 import re
 
 import numpy as np
+
+from helao.core.servers.palette import reflex_muted_text_class
+
+#: Muted-caption Tailwind utility, resolved once at module scope per
+#: ``palette``'s second rule. ``slate-600``, not the ``slate-500`` that clears
+#: AA on white: these panels render on the ``/action`` route's ``violet-50``
+#: canvas, where ``slate-500`` measures 4.34 and fails the 4.5 body floor.
+MUTED_TEXT = reflex_muted_text_class()
 
 #: Elapsed-seconds column every ws_data packet carries. Also the x axis.
 X_COLUMN = "t_s"
