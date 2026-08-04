@@ -119,6 +119,31 @@ inside it. Also the figure ``border_fill_color``, so a figure reads as flush
 within its panel rather than as a card floating on one.
 """
 
+PANEL_BORDER: Final[str] = TW["slate-400"]
+"""Hairline around a :data:`PANEL_BG` section in the Bokeh stack.
+
+One step darker than the panel it outlines, which is what the border is for:
+:data:`PAGE_BG` separates panels from the canvas at 1.42:1, but two panels
+stacked in the same column meet at an edge with *no* luminance step at all, so a
+tall page reads as one undivided slab. The border draws that missing edge.
+
+1.73:1 against :data:`PANEL_BG` and 2.45:1 against :data:`PAGE_BG` — clears the
+1.20 neighbouring-surface floor from both sides, which it has to, since the line
+has panel on one side and canvas on the other. ``slate-500`` also clears (3.21
+and 4.55) but at 1px reads as a drawn rule dividing two regions rather than as
+the edge of one; the ask was a thin border, so the lighter of the two shades
+that clear is the right one.
+"""
+
+PANEL_BORDER_WIDTH: Final[str] = "1px"
+"""Width of the :data:`PANEL_BORDER` hairline.
+
+A length rather than a hue, kept beside the colour because
+:func:`panel_styles` is the only consumer of either and a test can read a
+constant. 1px because the border marks an edge; anything heavier competes with
+the figure frames inside the panel.
+"""
+
 SURFACE_WHITE: Final[str] = WHITE
 """Tree overflow panels, input fields, and figure plot areas."""
 
@@ -339,6 +364,65 @@ header *height*, and narrowing the columns was no part of it.
 """
 
 
+TEXT_FLOOR_PX: Final[int] = 12
+"""Smallest font size any Reflex text may render at.
+
+The bottom of the Radix type scale (``--font-size-1`` is ``12px``) and the floor
+the project set when the stack's type was scaled down. Every size below is
+derived by stepping *down* that scale and clamping here, so a step that would
+land at 10px yields 12px instead of quietly going unreadable on an instrument
+screen standing a metre away.
+
+``test_no_reflex_text_size_is_below_the_12px_floor`` polices the ``size=`` props;
+:data:`INPUT_FONT_SIZE` and :data:`TABLE_BODY_FONT_SIZE` are the CSS-side sizes
+that cannot be expressed as a Radix ``size`` at all, and they are checked against
+this constant directly.
+"""
+
+INPUT_FONT_SIZE: Final[str] = "12px"
+"""Font size for every field rendering in :data:`INPUT_FONT_STACK` (Iosevka).
+
+One step down the Radix scale from the 14px these measured, which lands exactly
+on :data:`TEXT_FLOOR_PX`. Measured rather than assumed, and the two families of
+field got there by different routes: Radix's fields take ``--font-size-2``
+(14px) at ``size="2"``, which is both the explicit value the operator's param
+inputs carry and Radix's own default for the ones that pass no ``size``; gridjs's
+search box declares a bare ``font-size: 14px`` on ``.gridjs-input`` and answers
+to no size prop whatsoever.
+
+Set as CSS in :func:`reflex_font_css` rather than by lowering each ``size=``
+prop, because on a Radix field ``size`` is *geometry* — height, padding, radius,
+icon size — and stepping it down to ``"1"`` would shrink the control as well as
+its text. The fields keep their size-2 geometry and take size-1 text.
+"""
+
+TABLE_BODY_FONT_SIZE: Final[str] = "12px"
+"""Font size for ``rx.data_table`` (gridjs) body cells.
+
+Two steps down the Radix scale from the **16px** a gridjs body cell measured,
+which is where the type on those tables was left visibly larger than everything
+around it. 16px is not declared anywhere: ``td.gridjs-td`` carries no font size
+at all, so a cell inherits Radix's ``--default-font-size``, which is
+``--font-size-3``. Two steps is 16 -> 14 -> 12, landing on
+:data:`TEXT_FLOOR_PX`.
+
+**Radix tables are deliberately excluded.** An ``rx.table.root(size="1")`` sets
+``--font-size-2`` (14px) on the whole table and reads correctly at that size, so
+it keeps it — the data browser's dataset index and the operator's queue and
+history tables are all Radix and are all left alone.
+
+The two are easy to conflate because the data browser has one of each: its
+dataset index is a Radix table, while its *Table tab* is an ``rx.data_table``,
+the same widget the sample panel uses. Two gridjs tables cannot disagree about
+size, so bringing the sample panel down necessarily brings that tab with it,
+which is correct — they are the same widget in the same stack.
+
+Headers are excluded as well: gridjs's header is pinned at
+:data:`GRIDJS_HEADER_FONT_SIZE` (14px), one step above the new body size, which
+is what a header wants and what it already read as.
+"""
+
+
 def reflex_page_class(route: str) -> str:
     """Return the Tailwind utilities painting *route*'s page canvas.
 
@@ -448,6 +532,73 @@ def reflex_gridjs_header_css() -> str:
     )
 
 
+def reflex_table_body_css() -> str:
+    """Return the CSS sizing ``rx.data_table`` (gridjs) body cells.
+
+    CSS rather than a utility class, for the same two independent reasons the
+    header needs it: ``rx.data_table`` does not forward ``class_name`` to the
+    grid it renders, and gridjs ships ``td.gridjs-td`` as *unlayered* CSS, which
+    outranks anything Tailwind emits into ``@layer utilities``. See
+    :func:`reflex_gridjs_header_css`.
+
+    Scoped to gridjs on purpose — Radix tables keep their ``size="1"`` 14px; see
+    :data:`TABLE_BODY_FONT_SIZE`. Which means this function must *not* grow a
+    ``.rt-TableCell`` selector without care: Radix renders a ``<th>`` as
+    ``class="rt-TableCell rt-TableColumnHeaderCell"``, so the header *is* a
+    ``.rt-TableCell`` and ``.rt-TableColumnHeaderCell`` adds only
+    ``font-weight: 700`` — a bare ``.rt-TableCell`` rule would silently resize
+    every Radix column header too.
+
+    ``.gridjs-container`` prefixes the selector so it wins on specificity rather
+    than on source order, which ``head_components`` does not control.
+    """
+    return (
+        f".gridjs-container td.gridjs-td" f" {{ font-size: {TABLE_BODY_FONT_SIZE}; }}"
+    )
+
+
+def panel_styles(background: str, border: str = PANEL_BORDER) -> dict[str, str]:
+    """Return the inline styles painting and outlining one Bokeh section panel.
+
+    Used as ``styles=panel_styles(PANEL_BG)``, **replacing** the ``background=``
+    kwarg a section layout used to carry rather than joining it. A dict rather
+    than a stylesheet because ``LayoutDOM.styles`` is the only seam that reaches
+    a layout container: the container renders into its own shadow root, so no
+    ``<head>`` rule can select it, and a ``Theme`` entry for ``Column`` cannot
+    tell a section apart from the nested rows and columns inside it — it would
+    outline every one of them.
+
+    **Both declarations have to come from the same dict, and this is the whole
+    reason the function takes the background at all.** Bokeh 3's
+    ``LayoutDOM.background`` is a write-only alias that assigns
+    ``styles["background-color"]``, and a ``styles=`` kwarg *replaces* the dict
+    rather than merging into it. Passing both therefore silently loses whichever
+    came first: measured on Bokeh 3.9.1, ``background=..., styles=...`` yields
+    ``{'border': ...}`` with no background at all — every section panel would
+    have rendered unpainted, with nothing raised on either side. Passing one dict
+    also drops a deprecated property, which is why the call sites no longer use
+    ``background=``.
+
+    Args:
+        background: Panel fill, e.g. :data:`PANEL_BG`.
+        border: Border colour. Defaults to :data:`PANEL_BORDER`, which is the
+            right answer for every :data:`PANEL_BG` section and for the
+            :data:`PLAN_PANEL_NONQUEUED_BG` one (2.23:1, and darker). A section
+            painted a *dark* hue must pass its own: the border has to be darker
+            than the panel it outlines, and ``slate-400`` on a ``teal-600`` panel
+            would be a lighter line, reading as a highlight rather than an edge.
+            The aligner is the only layout with such panels and names its own
+            border role beside its own panel roles.
+
+    Returns:
+        dict[str, str]: A ``styles`` value for a Bokeh layout container.
+    """
+    return {
+        "background-color": background,
+        "border": f"{PANEL_BORDER_WIDTH} solid {border}",
+    }
+
+
 def reflex_font_css() -> str:
     """Return the Reflex stack's font CSS, ``@import`` lines first.
 
@@ -464,7 +615,10 @@ def reflex_font_css() -> str:
       whatever the source order, which ``head_components`` does not control.
     * the ``input``/``textarea``/``select`` group is the input font, class
       qualified for the same reason: bare ``html input`` is (0,0,2) and would
-      lose to Radix's own single-class rule on its field.
+      lose to Radix's own single-class rule on its field. It also carries
+      :data:`INPUT_FONT_SIZE`, because Radix declares a field's size on the
+      *field* and stepping the ``size=`` prop down would shrink the control's
+      geometry along with its text.
 
     ``rx.el.style`` is the only delivery seam — ``rx.App(style={...})`` cannot
     reach ``html`` at all. See ``reflex/app.py``.
@@ -484,7 +638,8 @@ def reflex_font_css() -> str:
         f"html input, html textarea, html select,"
         f" html .rt-TextFieldInput, html .rt-TextAreaInput,"
         f" html .rt-SelectTrigger, html .gridjs-input"
-        f" {{ font-family: {INPUT_FONT_STACK}; }}\n"
+        f" {{ font-family: {INPUT_FONT_STACK};"
+        f" font-size: {INPUT_FONT_SIZE}; }}\n"
     )
 
 

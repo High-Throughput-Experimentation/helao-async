@@ -13,7 +13,7 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.palette import PANEL_BG, SERIES
+from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 
@@ -119,7 +119,7 @@ class C_vis(LiveVisualizer):
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background=PANEL_BG,
+            styles=panel_styles(PANEL_BG),
             width=1024,
         )
 

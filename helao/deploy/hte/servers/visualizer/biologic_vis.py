@@ -18,7 +18,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.bokeh_theme import semantic_button_stylesheet
-from helao.core.servers.palette import PANEL_BG, SERIES
+from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -191,7 +191,7 @@ class C_vis(ActionVisualizer):
                 Spacer(height=10),
                 *self.plot_divs,
             ],
-            background=PANEL_BG,
+            styles=panel_styles(PANEL_BG),
             width=1024,
         )
 

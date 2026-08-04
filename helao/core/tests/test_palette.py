@@ -529,6 +529,17 @@ SURFACE_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-300", "white"): 1.48,
     ("amber-200", "white"): 1.25,
     ("sky-100", "slate-300"): 1.29,  # was sky-200 at 1.12, below the floor
+    # The section border, against everything it can sit between. Both sides of
+    # the line are declared for each panel it outlines, because the border has
+    # panel on one side and canvas on the other and has to be visible against
+    # both -- one row would only prove half of it.
+    ("slate-400", "slate-300"): 1.73,  # section border on the panel
+    ("slate-400", "slate-50"): 2.45,  # ... and against the page behind it
+    ("slate-400", "sky-100"): 2.23,  # ... on the non-queued plan panel
+    # The aligners' two dark panels take their own darker border: slate-400 is
+    # *lighter* than these, so on them it would read as a highlight.
+    ("slate-800", "teal-600"): 3.91,
+    ("slate-800", "yellow-700"): 2.97,
 }
 
 # --- Reflex functional-section colour --------------------------------------
@@ -1754,3 +1765,185 @@ def test_no_raw_color_literals_anywhere() -> None:
         f"FAIL until the final sweep phase lands; every site below must resolve "
         f"through helao.core.servers.palette:\n{rendered}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Section borders and the CSS-side font sizes
+# ---------------------------------------------------------------------------
+# The three checks below all guard failures that are invisible from the source
+# and silent in the browser, which is the recurring shape of every defect this
+# module has caught.
+
+
+def _bokeh_layout_sources() -> list[Path]:
+    """Return every non-test module that can build a Bokeh section layout.
+
+    Deployment paths are globbed, never named: this file is tracked in a public
+    repo and the deployments under ``helao/deploy`` other than ``hte`` and
+    ``test`` are separate private repositories. An absent path simply yields
+    nothing.
+    """
+    paths: set[Path] = set()
+    for pattern in ("helao/**/servers/**/*.py", "helao/**/layouts/**/*.py"):
+        for path in REPO_ROOT.glob(pattern):
+            if "/tests/" in path.as_posix():
+                continue
+            paths.add(path)
+    return sorted(paths)
+
+
+def test_panel_styles_carries_the_background_as_well_as_the_border() -> None:
+    """``panel_styles`` must emit ``background-color``, not only ``border``.
+
+    The regression this pins is a *silent* one, and it nearly shipped. Bokeh 3's
+    ``LayoutDOM.background`` is a write-only alias that assigns
+    ``styles["background-color"]``, and a ``styles=`` kwarg **replaces** that
+    dict rather than merging into it. So a section written as
+    ``layout(..., background=PANEL_BG, styles=panel_styles())`` keeps only the
+    border and loses its fill — measured on Bokeh 3.9.1 as
+    ``{'border': '1px solid #94a3b8'}``, with nothing raised on either side and
+    every section panel rendering unpainted.
+
+    Carrying both declarations in one dict is what makes that unrepresentable,
+    so the call sites pass no ``background=`` at all. See
+    ``test_no_section_layout_still_uses_the_background_kwarg``.
+    """
+    styles = palette.panel_styles(palette.PANEL_BG)
+    assert styles["background-color"] == palette.PANEL_BG
+    assert (
+        styles["border"] == f"{palette.PANEL_BORDER_WIDTH} solid {palette.PANEL_BORDER}"
+    )
+    custom = palette.panel_styles(palette.PANEL_BG, palette.TW["slate-800"])
+    assert custom["background-color"] == palette.PANEL_BG, "background must survive"
+    assert palette.TW["slate-800"] in custom["border"]
+
+
+# Names a *section* background is referred to by at a Bokeh call site. The
+# shared roles plus the per-layout aliases the two aligners declare for their own
+# panels -- those are sections too, and each takes its own darker border.
+#
+# Deliberately does NOT include the operator's param-input blocks
+# (`background=self.color_sq_param_inputs`): those are small tinted blocks
+# *inside* the Params section, one per parameter, not sections themselves.
+# Outlining every one of them would be noise, so they keep the plain kwarg.
+SECTION_BACKGROUND_NAMES: Final[frozenset[str]] = frozenset(
+    {
+        "PANEL_BG",
+        "PLAN_PANEL_NONQUEUED_BG",
+        "_PANEL_BG",
+        "_MOTOR_PANEL_BG",
+        "_ARROW_PANEL_BG",
+        "_JOG_PANEL_BG",
+    }
+)
+
+
+def test_no_layout_passes_both_background_and_styles() -> None:
+    """A Bokeh layout may never carry ``background=`` and ``styles=`` together.
+
+    This is the silent clobber, stated as an invariant: the two kwargs write the
+    same inline dict and the second wins outright, so whichever is listed first
+    is discarded with nothing raised. See
+    ``test_panel_styles_carries_the_background_as_well_as_the_border`` for the
+    measurement.
+
+    Scoped to ``layout``/``column``/``row`` so a ``background=`` on a ``Spacer``
+    -- a divider bar, which takes no ``styles`` -- is left alone.
+    """
+    offenders: list[str] = []
+    for path in _bokeh_layout_sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if _dotted_call_name(node.func) not in ("layout", "column", "row"):
+                continue
+            kwargs = {kw.arg for kw in node.keywords}
+            if {"background", "styles"} <= kwargs:
+                offenders.append(f"{path.relative_to(REPO_ROOT)}:{node.lineno}")
+    assert not offenders, (
+        "background= and styles= overwrite each other, so one of the two is "
+        "silently lost:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_every_section_background_is_routed_through_panel_styles() -> None:
+    """A section's fill must reach Bokeh via ``panel_styles``, not ``background=``.
+
+    Without this, a newly added visualizer panel renders unbordered and nothing
+    says so -- the sweep that added the borders would simply have skipped it.
+    Names rather than values because the call site refers to the role by name;
+    see :data:`SECTION_BACKGROUND_NAMES` for what is deliberately excluded.
+    """
+    offenders: list[str] = []
+    for path in _bokeh_layout_sources():
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if _dotted_call_name(node.func) not in ("layout", "column", "row"):
+                continue
+            for kw in node.keywords:
+                if kw.arg != "background":
+                    continue
+                name = kw.value.id if isinstance(kw.value, ast.Name) else None
+                if name in SECTION_BACKGROUND_NAMES:
+                    offenders.append(
+                        f"{path.relative_to(REPO_ROOT)}:{node.lineno} "
+                        f"background={name}"
+                    )
+    assert not offenders, (
+        "a section fill must be passed as styles=panel_styles(<bg>) so the "
+        "section also gets its border:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_section_background_sweep_actually_reaches_the_bokeh_sources() -> None:
+    """A guard on the two guards above: the file sweep must not be empty.
+
+    Both tests pass trivially if the globs match nothing -- the same
+    failure mode the Reflex-stack glob test exists for. Anchored on the
+    operator, which is the Bokeh UI named by the most configs, and on a count
+    that a moved directory would break.
+    """
+    found = {p.relative_to(REPO_ROOT).as_posix() for p in _bokeh_layout_sources()}
+    assert "helao/core/servers/operator/bokeh_operator.py" in found
+    assert len(found) >= 20, f"only {len(found)} Bokeh layout sources swept"
+    assert any(
+        "panel_styles" in p.read_text(encoding="utf-8") for p in _bokeh_layout_sources()
+    )
+
+
+def test_css_font_sizes_respect_the_text_floor() -> None:
+    """The two CSS-side sizes may not drop below :data:`palette.TEXT_FLOOR_PX`.
+
+    These are the sizes that cannot be expressed as a Radix ``size`` prop -- an
+    input's size is geometry, and gridjs takes no size prop at all -- so the
+    ``size=``-based floor test cannot see them. Stepping either one further down
+    the type scale is the plausible future edit, and 10px on an instrument
+    screen is the thing to stop.
+    """
+    for name in ("INPUT_FONT_SIZE", "TABLE_BODY_FONT_SIZE"):
+        raw = getattr(palette, name)
+        assert raw.endswith("px"), f"{name} must be a px length, got {raw!r}"
+        assert (
+            int(raw.removesuffix("px")) >= palette.TEXT_FLOOR_PX
+        ), f"{name} is {raw}, below the {palette.TEXT_FLOOR_PX}px floor"
+
+
+def test_table_body_css_leaves_radix_headers_alone() -> None:
+    """The body-size rule must not reach a Radix column header.
+
+    Radix renders a ``<th>`` as ``class="rt-TableCell rt-TableColumnHeaderCell"``
+    and ``.rt-TableColumnHeaderCell`` adds only ``font-weight: 700`` -- no size of
+    its own. So any ``.rt-TableCell`` selector here would resize every Radix
+    column header along with the body, and the headers are the part that already
+    reads correctly. The rule is gridjs-only; this is the guard on that.
+    """
+    css = palette.reflex_table_body_css()
+    assert "gridjs-td" in css, "the gridjs body rule is the point of this function"
+    assert "rt-TableCell" not in css, (
+        "a .rt-TableCell selector also matches every Radix column header; "
+        "keep this rule scoped to gridjs"
+    )
+    assert palette.TABLE_BODY_FONT_SIZE in css

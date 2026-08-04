@@ -14,7 +14,7 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.palette import PANEL_BG, red_ramp
+from helao.core.servers.palette import PANEL_BG, panel_styles, red_ramp
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import private_dispatcher
@@ -158,7 +158,7 @@ class C_vis(ActionVisualizer):
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
-            background=PANEL_BG,
+            styles=panel_styles(PANEL_BG),
             width=1024,
         )
 
