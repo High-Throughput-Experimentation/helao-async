@@ -113,7 +113,7 @@ def build(server_key: str, state_cls):
             ),
             rx.cond(
                 state_cls.error != "",
-                rx.text(state_cls.error, color_scheme="red"),
+                rx.text(state_cls.error, class_name="text-red-600"),
             ),
             plots.chart(
                 state_cls.chart_spec,

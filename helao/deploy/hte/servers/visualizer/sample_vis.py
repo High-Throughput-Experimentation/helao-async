@@ -20,6 +20,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataPackageModel
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.palette import PANEL_BG
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -211,7 +212,7 @@ class C_vis(ActionVisualizer):
                 [self.sample_tables["solid"]],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 

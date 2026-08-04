@@ -16,6 +16,7 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 
@@ -119,7 +120,7 @@ class C_vis(LiveVisualizer):
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -167,7 +168,7 @@ class C_vis(LiveVisualizer):
         self.plot.line(
             x="datetime",
             y="co2_ppm",
-            line_color="red",
+            line_color=SERIES[0],
             source=self.datasource,
         )
 

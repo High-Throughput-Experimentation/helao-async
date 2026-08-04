@@ -30,6 +30,7 @@ from typing import Any
 
 import numpy as np
 
+from helao.core.servers.palette import SERIES
 from helao.core.servers.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
     BufferStore,
@@ -54,16 +55,11 @@ except Exception as exc:  # pragma: no cover - import-time environment failure
 STORE = BufferStore()
 
 #: Reused across series so panel colors stay stable between renders.
-PALETTE = (
-    "#d62728",
-    "#1f77b4",
-    "#2ca02c",
-    "#ff7f0e",
-    "#9467bd",
-    "#8c564b",
-    "#e377c2",
-    "#7f7f7f",
-)
+#: 10 entries (`SERIES`), up from the 8-entry tuple this replaces, so the
+#: `idx % len(PALETTE)` wrap-around now lands on `cyan-600` (idx 8) and
+#: `fuchsia-600` (idx 9) instead of repeating red -- cosmetic, and only
+#: reachable by a chart with >= 9 traces (spec: "Qualitative series palette").
+PALETTE = SERIES
 
 
 def _as_float_array(values) -> np.ndarray:

@@ -45,6 +45,7 @@ from helao.core.servers.operator.app_reflex import (
 )
 from helao.core.servers.operator.app_reflex import build_page as operator_page
 from helao.core.servers.operator.app_reflex import configure as configure_operator
+from helao.core.servers.palette import CHART_CHROME
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
@@ -201,7 +202,7 @@ def _error_card(title: str, detail: str):
     """Render a visible failure instead of a blank slot."""
     return rx.card(
         rx.vstack(
-            rx.heading(title, size="3", color_scheme="red"),
+            rx.heading(title, size="3", class_name="text-red-600"),
             rx.text(detail, size="2"),
             align="start",
             spacing="2",
@@ -420,7 +421,21 @@ def build_app(world_cfg: dict, server_key: str):
     backend = FastAPI()
     backend.include_router(make_buffer_router(plots.STORE))
 
-    application = rx.App(api_transformer=backend)
+    # `App.style={":root": ...}` does *not* reach `<html>`: Reflex merges
+    # `App.style` per-component (`_get_component_style` matches only on
+    # component type), so an unmatched string key like ":root" falls through
+    # to the generic nested-selector path and Emotion serializes it as a
+    # *descendant* rule -- `.css-XXXX *:root{...}` -- scoped under whichever
+    # wrapper component happened to carry it. `:root` only ever matches
+    # `<html>`, and `<html>` is never a descendant of anything in the page
+    # body, so the rule can never match and the properties never apply
+    # anywhere (confirmed empty via `getComputedStyle` on every element).
+    # A real `<style>` tag in `<head>` is a genuine top-level rule instead.
+    _root_vars = "; ".join(f"{k}: {v}" for k, v in CHART_CHROME.items())
+    application = rx.App(
+        api_transformer=backend,
+        head_components=[rx.el.style(f":root {{ {_root_vars}; }}")],
+    )
 
     application.add_page(lambda: _index_page(routes), route="/", title="HELAO")
     application.add_page(
