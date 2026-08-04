@@ -2190,7 +2190,7 @@ class OperatorPlateState(rx.State):
 
 def _error_text(var):
     """Render an error line only when there is one."""
-    return rx.cond(var != "", rx.text(var, color_scheme="red", size="2"))
+    return rx.cond(var != "", rx.text(var, class_name="text-red-600", size="2"))
 
 
 def _table(
@@ -2289,7 +2289,7 @@ def _queue_tab(columns: list, rows_var, kind: str):
             rx.button(
                 "x",
                 size="1",
-                color_scheme="red",
+                class_name="text-red-600",
                 variant="soft",
                 disabled=~OperatorQueueState.can_edit_queue,
                 on_click=OperatorQueueState.remove(kind, index),
@@ -2315,7 +2315,7 @@ def _param_field(row, state, options):
         rx.hstack(
             rx.text(row[0], size="2", weight="medium"),
             rx.spacer(),
-            rx.text(row[3], size="1", color_scheme="gray"),
+            rx.text(row[3], size="1", class_name="text-slate-500"),
             width="100%",
         ),
         rx.cond(
@@ -2362,7 +2362,9 @@ def _library_panel():
                 on_change=OperatorLibState.select_item,
                 width="20em",
             ),
-            rx.text(OperatorLibState.version_hint, size="1", color_scheme="gray"),
+            rx.text(
+                OperatorLibState.version_hint, size="1", class_name="text-slate-500"
+            ),
             rx.button(
                 "Reload libraries", size="1", on_click=OperatorLibState.load_libraries
             ),
@@ -2380,7 +2382,7 @@ def _library_panel():
                 width="100%",
                 padding="0.5em 0.75em",
                 border_radius="var(--radius-2)",
-                background_color="var(--gray-2)",
+                class_name="bg-slate-50",
                 font_size="0.8em",
             ),
         ),
@@ -2485,7 +2487,7 @@ def _plan_panel():
                 rx.button(
                     "x",
                     size="1",
-                    color_scheme="red",
+                    class_name="text-red-600",
                     variant="soft",
                     on_click=OperatorPlanState.remove_row(index),
                 ),
@@ -2512,7 +2514,7 @@ def _plan_panel():
             rx.button(
                 "Clear plan",
                 variant="soft",
-                color_scheme="red",
+                class_name="text-red-600",
                 on_click=OperatorPlanState.clear_plan,
             ),
             spacing="3",
@@ -2565,7 +2567,7 @@ def _plate_panel():
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorPlateState.status, size="2", color_scheme="gray"),
+        rx.text(OperatorPlateState.status, size="2", class_name="text-slate-500"),
     )
 
 
@@ -2590,7 +2592,9 @@ def _spec_panel():
                 spacing="3",
                 align="center",
             ),
-            rx.text(OperatorSpecState.parser_note, size="1", color_scheme="gray"),
+            rx.text(
+                OperatorSpecState.parser_note, size="1", class_name="text-slate-500"
+            ),
             rx.text("Required sequence parameters:", size="2", weight="medium"),
             rx.scroll_area(
                 rx.vstack(
@@ -2613,7 +2617,7 @@ def _spec_panel():
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorSpecState.status, size="2", color_scheme="gray"),
+        rx.text(OperatorSpecState.status, size="2", class_name="text-slate-500"),
     )
 
 
@@ -2747,7 +2751,9 @@ def build_page():
         rx.button("Stop", variant="soft", on_click=OperatorQueueState.control("stop")),
         rx.button("Skip", variant="soft", on_click=OperatorQueueState.control("skip")),
         rx.button(
-            "E-STOP", color_scheme="red", on_click=OperatorQueueState.control("estop")
+            "E-STOP",
+            class_name="bg-red-900 hover:bg-red-950 text-white",
+            on_click=OperatorQueueState.control("estop"),
         ),
         spacing="3",
         align="center",

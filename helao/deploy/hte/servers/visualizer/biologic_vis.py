@@ -17,6 +17,8 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.bokeh_theme import semantic_button_stylesheet
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -140,6 +142,7 @@ class C_vis(ActionVisualizer):
                 label=f"Stop channel {ch}",
                 button_type="danger",
                 width=70,
+                stylesheets=[semantic_button_stylesheet()],
             )
             for ch in range(self.num_channels)
         ]
@@ -188,7 +191,7 @@ class C_vis(ActionVisualizer):
                 Spacer(height=10),
                 *self.plot_divs,
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -291,7 +294,7 @@ class C_vis(ActionVisualizer):
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
         LOGGER.info(f"{xstr}, {ystr}")
-        colors = ["red", "blue", "orange", "green"]
+        colors = [SERIES[0], SERIES[1], SERIES[3], SERIES[2]]
         self.channel_plots[channel].line(
             x=xstr,
             y=ystr,

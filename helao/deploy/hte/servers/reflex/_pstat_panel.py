@@ -209,7 +209,9 @@ def make_pstat_panel(
                     rx.badge(state_cls.connection),
                     rx.spacer(),
                     rx.text(state_cls.action_name, size="1"),
-                    rx.text(state_cls.action_uuid, size="1", color_scheme="gray"),
+                    rx.text(
+                        state_cls.action_uuid, size="1", class_name="text-slate-500"
+                    ),
                     width="100%",
                     align="center",
                     spacing="3",
@@ -240,7 +242,7 @@ def make_pstat_panel(
                 ),
                 rx.cond(
                     state_cls.error != "",
-                    rx.text(state_cls.error, color_scheme="red"),
+                    rx.text(state_cls.error, class_name="text-red-600"),
                 ),
                 rx.hstack(
                     rx.foreach(

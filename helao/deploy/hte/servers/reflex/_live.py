@@ -218,7 +218,7 @@ def make_live_panel(prefix: str, y_label: str, wants_mean=no_column):
                 ),
                 rx.cond(
                     state_cls.error != "",
-                    rx.text(state_cls.error, color_scheme="red"),
+                    rx.text(state_cls.error, class_name="text-red-600"),
                 ),
                 # Bound once. The payload is produced in pull(), per tick.
                 plots.chart(

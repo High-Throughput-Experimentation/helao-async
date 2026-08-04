@@ -89,6 +89,34 @@ Layout and the two rules worth knowing before editing it:
 
 Only `plots.py` and `xy_component.py` may import `xy` (a test enforces this). `xy` is pre-1.0; `docs/superpowers/notes/2026-08-01-xy-api-probe.md` records its verified call signatures and should be re-checked after any version bump.
 
+### Colours: one palette, two theme seams
+
+**`helao/core/servers/palette.py` is the single source of every colour in both UI stacks.** It is dependency-free (no bokeh, reflex, or matplotlib imports) and exports a Tailwind-derived `TW` shade table, the 10-entry qualitative `SERIES`, chrome roles, four Bokeh semantic-button constants, marker swatches, `CHART_CHROME`, and `red_ramp()`. **Never hardcode a colour anywhere else** — `helao/core/tests/test_palette.py` enforces this with an AST sweep and will fail.
+
+Things that will bite you when editing it:
+
+- **`palette.py` carries both `pink-400` and `pink-500`, deliberately.** `pink-500` is `SERIES[6]`; `pink-400` is the marker-swatch target. Neither supersedes the other; deleting either breaks something.
+- **The sweeper matches a bare CSS colour name, not a colour word inside a compound token.** `\b` treats `-` as a word boundary, so a naive pattern flags `red` inside `text-red-600` — i.e. it flags the Tailwind utilities the code is *supposed* to contain. The regex requires the match not be hyphen-flanked. It also walks the whole keyword value subtree (a `styles={...}` dict and an RGB tuple are not bare `Constant`s) and matches hex/`rgb(`/`color:` shapes anywhere, which is what catches f-strings and `CustomJS` code strings.
+- **`palette.py` and `bokeh_theme.py` are exempt from the sweep by exact path** (not basename) — they are the modules that are supposed to hold literals. A test pins that exemption list to exactly two entries.
+- **Contrast floors are per-role, not uniform**: body text 4.5:1, headings 3:1, controls 3:1, traces 2.0:1 plus CIE76 ΔE ≥ 15 between adjacent `SERIES` entries, surfaces 1.20:1. Identity swatches (the `label=""` marker chips) carry **no** floor — they exist to match a plotted hue. Accepted exceptions live in a registry keyed to their *measured* value, so a later change that degrades contrast still fails. Luminance/ΔE constants are pinned (linearization 0.04045, D65 0.95047/1.0/1.08883, f(t) 0.008856) because unpinned constants make two implementations disagree.
+- **The sweeper is calibrated against frozen fixtures** under `helao/core/tests/fixtures/sweeper_calibration/` (`*.py.txt` snapshots + complete manifests). **Never `black` or refresh that directory** — reformatting invalidates the pinned line numbers. Calibrating against live files instead would self-destruct the moment a sweep edits them.
+
+**Bokeh** themes via `bokeh_theme.apply_theme(doc)`, called once from `HelaoVis.__init__` (`helao/core/servers/vis.py`). That single hook reaches every Bokeh document, including the aligner served by `helao/hexagon/adapters/vis/galil_aligner_host.py`, which builds its own `Server` inside an action-server process and never passes through `bokeh_launcher.py` — no per-factory call could reach it.
+
+**Measured CSS reach — this is the part that surprises people.** In Bokeh 3 *every* `UIElement` renders into its own shadow root and layout containers nest, so a button in a row in a column is three boundaries deep. Consequences, all verified by `getComputedStyle` on a live page:
+
+- `GlobalInlineStyleSheet` lands in `<head>` and reaches **only** `html`/`body` chrome, the per-root shells that are direct children of `body`, and whatever CSS *inheritance* carries. Export the CSS as a `str` and build a fresh model per `apply_theme` call — a module-level `GlobalInlineStyleSheet` **instance** raises `RuntimeError: Models must be owned by only a single document` on the second browser connection, because the factory re-runs per client.
+- **`Div.text` is not light DOM.** It renders into the `Div`'s own shadow root, so a `<head>` selector cannot style `Div` innards. Those stay per-site Python values.
+- **There is no document-level shortcut for widget theming.** Bokeh's buttons are `var(--primary)`-driven and inherited custom properties *do* cross shadow boundaries, but Bokeh re-declares them on `:host` inside each widget's shadow root. Setting them on `html` changes nothing. Widget internals — ESTOP, param inputs, semantic buttons, marker chips — require a per-widget `InlineStyleSheet`.
+- **A `<style>` block inside `Div.text` targeting other widgets has been inert since the Bokeh 3 upgrade.** It is sealed in that `Div`'s shadow root. If you find that pattern, it is already dead, not working.
+- `semantic_button_stylesheet()` overrides `.bk-btn-{primary,success,warning,danger}` but must **never** emit a `.bk-btn-default` rule — the marker chips are `default` buttons with their own per-widget override, and a blanket rule collides with them. `button_type` is invisible to the AST sweep, so a `grep -rn 'button_type'` cross-check is the only guard against a site shipping stock-coloured.
+
+**Reflex** uses Tailwind utilities (`class_name="text-red-600"`), enabled by `plugins=[rx.plugins.TailwindV4Plugin()]` in `_app/rxconfig.py`. A bare plugin is right — every shade used is a stock Tailwind v4 colour. Two gotchas:
+
+- **Set `--chart-*` (and any `:root` CSS) via `head_components=[rx.el.style(...)]`, not `rx.App(style={":root": ...})`.** Reflex matches `App.style` keys against component types; an unmatched string key falls through to Emotion's nested-selector serialization and emits a *descendant* rule (`.css-XXXX *:root{…}`), which can never match `<html>`. It fails silently — nothing errors, the properties just resolve nowhere.
+- **Tailwind v4's palette is OKLCH-native**, so `bg-red-900` renders `rgb(130,24,26)` while `palette.py`'s `#7f1d1d` is `rgb(127,29,29)`. Same nominal shade, marginally different pixels (contrast delta ~0.006, immaterial). Computed-style assertions must be tolerance-based; an exact `rgb()` match is impossible.
+- **The bundle must be rebuilt whenever `class_name=` usage changes**, not just when a config's port changes — the compiled CSS only contains the utilities present at build time. A stale bundle renders new utilities **completely unstyled with no error on either side**, which is why the checks assert computed styles rather than grepping source. Treat `build_reflex_bundle.py` as "rebuild required", not "build once and ship".
+
 ### Formatting
 
 `black` (default settings, line length 88) is the project code formatter.

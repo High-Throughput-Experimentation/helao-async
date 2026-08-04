@@ -15,10 +15,16 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 
 FWIN = 20
+
+# Preserves each analog channel's plotted hue: the original per-channel colour
+# list was ["red", "blue", "green", "orange", "purple", "cyan", "magenta"];
+# these are the matching SERIES indices, in the same order.
+_CHANNEL_SERIES_IDX = (0, 1, 2, 3, 4, 8, 6)
 
 
 class C_vis(LiveVisualizer):
@@ -126,7 +132,7 @@ class C_vis(LiveVisualizer):
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -182,7 +188,7 @@ class C_vis(LiveVisualizer):
         # remove all old lines
         self.plot.renderers = []
 
-        colors = ["red", "blue", "green", "orange", "purple", "cyan", "magenta"]
+        colors = [SERIES[i] for i in _CHANNEL_SERIES_IDX]
         non_epoch_keys = [
             x for x in self.data_dict_keys if x not in ["datetime"] + self.mean_ai_keys
         ]
