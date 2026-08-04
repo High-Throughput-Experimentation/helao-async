@@ -13,7 +13,7 @@ REM OPENAPI-ONLY (single tier -- NO runtime golden-diff tier). Every diapump
 REM action (run_continuous, dispense_byvolume, dispense_byrate) actively DRIVES
 REM fluid; none is a safe non-perturbing read, so there is no valid runtime golden
 REM scenario the way cam's acquire_image is. The /openapi.json surface diff done
-REM here is the whole harness -- same openapi-only precedent as dbpack_canary.sh
+REM here is the whole harness -- same openapi-only precedent as sync_canary.sh
 REM and analysis_canary.sh.
 REM
 REM Why NOT parity_run.sh / harness.capture: that harness is hardcoded to the

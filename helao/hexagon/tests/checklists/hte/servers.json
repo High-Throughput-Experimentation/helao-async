@@ -38,7 +38,7 @@
       "representative_key": "CO2SENSOR"
     },
     {
-      "module": "dbpack_server.py",
+      "module": "sync_server.py",
       "keys": ["DB"],
       "representative_key": "DB"
     },

@@ -20,7 +20,7 @@ key)`` / ``self.s3.upload_file(filename, bucket, key)`` from a worker thread
 beyond assignment, so post-construction injection is sufficient and
 behavior-identical when ``s3_record`` is unset.
 
-Endpoint surface mirrors the hte dbpack_server verbatim so ``move_dir``'s
+Endpoint surface mirrors the hte sync_server verbatim so ``move_dir``'s
 ``/finish_yml`` handoff and the harness quiesce polls (``/n_queue`` +
 ``/tasks``) work unmodified. Windows-tolerant (pathlib only) so at-station
 captures (§6.6) can wire the same server.

@@ -137,7 +137,7 @@ servers:
   #   host: hte-eche-05.htejcap.caltech.edu
   #   port: 8010
   #   group: action
-  #   fast: dbpack_server
+  #   fast: sync_server
   #   params:
   #     aws_config_path: k:/users/hte/.credentials/aws_config.ini
   #     aws_profile: default

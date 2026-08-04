@@ -39,7 +39,7 @@ members, plus replace the hardcoded `"status": "active"/"finished"` dict payload
 
 **Explicit exclusions (do not touch):**
 - `helao/deploy/hte/drivers/data/dbpack_driver.py` (16 sites, duplicated `HelaoPath`) and
-  `helao/deploy/hte/servers/action/dbpack_server.py` (3 sites) — dbpack is **deprecated dead legacy** fully
+  `helao/deploy/hte/servers/action/sync_server.py` (3 sites) — dbpack is **deprecated dead legacy** fully
   superseded by `sync_driver.py` (project memory). Still referenced by hte configs, so it stays untouched and
   frozen; its removal is a P2 decision item (see Open questions).
 - `helao/deploy/Deployment-D/**` (excluded from the refactor entirely).
@@ -167,7 +167,7 @@ Deployment-B has zero in-scope sites (its only hit is under excluded `notes/`).
 conda run -n helao python run_unit_tests.py
 # zero raw literals outside allowed exclusions:
 grep -rnE --include='*.py' '["'\'']RUNS_(ACTIVE|FINISHED|SYNCED|DIAG|NOSYNC)["'\'']' helao/ \
-  | grep -vE 'run_dir\.py|dbpack_driver\.py|dbpack_server\.py|deploy/Deployment-D/|deploy/Deployment-B/notes/'
+  | grep -vE 'run_dir\.py|dbpack_driver\.py|sync_server\.py|deploy/Deployment-D/|deploy/Deployment-B/notes/'
 # expected: empty output (exit 1)
 grep -n '"status": "' helao/core/servers/orch.py   # expected: empty
 conda run -n helao python -c "import helao.core.servers.orch, helao.core.servers.base, helao.core.drivers.data.sync_driver, helao.helpers.yml_tools, helao.helpers.helao_data, helao.core.runners.micro_orch"
@@ -215,7 +215,7 @@ own directory (they are invisible to the parent repo's git).
   `configure_leancat` vs `configure_leancat_for_ADVENT_MEA` common core.
 - Deployment-C: delete `_old`/dead duplicate variants in `helao_nbio.py` (`extract_parts*`), unify the four `/run_<instrument>`
   handlers behind one parameterized handler.
-- Decision item: retire dbpack (`dbpack_driver.py` + `dbpack_server.py` + config entries) — superseded by
+- Decision item: retire dbpack (`dbpack_driver.py` + `sync_server.py` + config entries) — superseded by
   `sync_driver.py`; needs a config sweep and sign-off.
 - Gate: `run_unit_tests.py` + py_compile + "wrappers produce identical experiment/sequence lists" spot checks on
   the `test` deployment where applicable.

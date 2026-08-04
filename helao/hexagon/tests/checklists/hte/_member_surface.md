@@ -58,7 +58,7 @@ helao/deploy/hte/servers/action/biologic_server.py: ['action', 'app.base', 'app.
 helao/deploy/hte/servers/action/calc_server.py: ['action', 'app.base', 'app.driver', 'finish', 'helaodirs', 'setup_and_contain_action(']
 helao/deploy/hte/servers/action/cam_server.py: ['action', 'app.base', 'finish', 'setup_and_contain_action(']
 helao/deploy/hte/servers/action/co2sensor_server.py: ['action', 'app.base', 'finish', 'poller_class', 'setup_and_contain_action(']
-helao/deploy/hte/servers/action/dbpack_server.py: ['app.driver']
+helao/deploy/hte/servers/action/sync_server.py: ['app.driver']
 helao/deploy/hte/servers/action/diapump_server.py: ['action', 'app.base', 'app.driver', 'finish', 'poller_class', 'setup_and_contain_action(']
 helao/deploy/hte/servers/action/galil_io.py: ['action', 'app.base', 'app.driver', 'dyn_endpoints', 'finish', 'poller_class', 'setup_and_contain_action(']
 helao/deploy/hte/servers/action/galil_motion.py: ['action', 'app.base', 'app.driver', 'app.server_params', 'dyn_endpoints', 'finish', 'get_main_error', 'setup_and_contain_action(', 'world_cfg']
@@ -92,7 +92,7 @@ notes" below).
 | `calc_server.py` | `app.base`, `app.driver`, `base.helaodirs`, action-lifecycle |
 | `cam_server.py` | `app.base`, action-lifecycle (no `app.driver` hit — driver accessed some other way / not through this pattern set) |
 | `co2sensor_server.py` | `app.base`, `poller_class`, action-lifecycle |
-| `dbpack_server.py` | `app.driver` only (deprecated/dead per prior memory — minimal surface, do not migrate) |
+| `sync_server.py` | `app.driver` only (deprecated/dead per prior memory — minimal surface, do not migrate) |
 | `diapump_server.py` | `app.base`, `app.driver`, `poller_class`, action-lifecycle |
 | `galil_io.py` | `app.base`, `app.driver`, `dyn_endpoints`, `poller_class`, action-lifecycle |
 | `galil_motion.py` | `app.base`, `app.driver`, `app.server_params`, `dyn_endpoints`, `get_main_error`, `base.world_cfg`, action-lifecycle |

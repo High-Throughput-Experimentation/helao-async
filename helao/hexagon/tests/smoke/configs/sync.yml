@@ -1,11 +1,11 @@
-# STANDALONE dbpack_server canary config (P3a special-split, DB). Software-only
-# openapi-surface canary: dbpack_server wraps driver_classes=[HelaoSyncer]
+# STANDALONE sync_server canary config (P3a special-split, DB). Software-only
+# openapi-surface canary: sync_server wraps driver_classes=[HelaoSyncer]
 # (helao/core/drivers/data/sync_driver.py:2059) and exposes ONLY private/bare
 # endpoints (/finish_yml, /list_pending, /n_queue, /current_progress, ...) --
 # there is no `/{server_key}/{action}` action endpoint and no data-producing
 # action, so a runtime RUNS-tree golden diff is N/A for this server (unlike
 # galil/sample/gamry). The openapi surface diff (legacy vs hexagon route +
-# schema parity) is the appropriate check here -- see dbpack_canary.sh.
+# schema parity) is the appropriate check here -- see sync_canary.sh.
 #
 # Step-0 finding: HelaoSyncer.__init__ (sync_driver.py:690) only opens a real
 # AWS session when the `AWS_CONFIG_PATH` env var is set (it is not, on this
@@ -16,22 +16,22 @@
 # a placeholder string; no real S3 call happens since /finish_yml is never
 # exercised by this canary.
 #
-# This config is action-only: dbpack_server exposes only private/bare
+# This config is action-only: sync_server exposes only private/bare
 # endpoints, and no visualizer is declared anywhere DB is used, so a
 # visualizer panel here would only ever be blank. It exists so an openapi
 # diff can compare legacy vs hexagon like-for-like. Port 8010 copied from
 # eche10.yml's DB block.
 dummy: true
 simulation: true
-run_type: dbpack_server
-root: /tmp/INST_hlo_dbpack
+run_type: sync_server
+root: /tmp/INST_hlo_sync
 servers:
   SYNC:
     host: 127.0.0.1
     port: 8010
     group: action
     deployment: hte
-    fast: dbpack_server
+    fast: sync_server
     params:
       aws_profile: default
       testing: true
