@@ -121,6 +121,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "fuchsia-700": "#a21caf",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
+    "rose-50": "#fff1f2",
 }
 
 TW_KEY_RE: Final[re.Pattern[str]] = re.compile(r"^[a-z]+-(50|[1-9]00|950)$")
@@ -552,7 +553,7 @@ SURFACE_ROWS: Final[dict[tuple[str, str], float]] = {
 }
 
 # --- Reflex functional-section colour --------------------------------------
-# Text on each of the five Reflex route tints. Both columns are declared for
+# Text on each of the six Reflex route tints. Both columns are declared for
 # every tint rather than only the worst one, because "muted text moved to
 # slate-600" is a claim about all five surfaces and the margins are narrow
 # enough that guessing which cells fail does not work: slate-500 fails on
@@ -571,13 +572,16 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "amber-50"): 7.31,
     ("slate-900", "emerald-50"): 16.95,  # /browser
     ("slate-600", "emerald-50"): 7.19,
+    ("slate-900", "rose-50"): 16.25,  # /control
+    ("slate-600", "rose-50"): 6.90,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
-# Two of these cells fail the body floor outright and a third clears it by 0.02,
+# Three of these cells fail the body floor outright and a fourth clears it by 0.02,
 # which together are what make the migration mandatory rather than cosmetic. If
 # a later Tailwind revision moved slate-500 enough to change that, this says so.
 SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
+    ("slate-500", "rose-50"): 4.33,  # /control -- a third failing surface
     ("slate-500", "slate-50"): 4.55,
     ("slate-500", "sky-50"): 4.46,
     ("slate-500", "violet-50"): 4.34,
@@ -605,11 +609,11 @@ REFLEX_HEADER_ROWS: Final[dict[tuple[str, str], float]] = {
 # background that needs declaring -- the four brighter tints are strictly
 # easier.
 REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
-    ("violet-600", "violet-50"): 5.20,
-    ("blue-600", "violet-50"): 4.71,
-    ("cyan-600", "violet-50"): 3.36,  # the tightest cell in the whole design
-    ("slate-600", "violet-50"): 6.91,
-    ("emerald-600", "violet-50"): 3.44,
+    ("violet-600", "rose-50"): 5.19,
+    ("blue-600", "rose-50"): 4.70,
+    ("cyan-600", "rose-50"): 3.35,  # the tightest cell in the whole design
+    ("slate-600", "rose-50"): 6.90,
+    ("emerald-600", "rose-50"): 3.43,
 }
 
 
@@ -860,8 +864,9 @@ def test_page_tint_rows_cover_every_route_twice() -> None:
 def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     """The shade the Reflex stack moved *away* from, pinned as a measurement.
 
-    Two of the five tints put ``slate-500`` under the 4.5 body floor and a third
-    clears it by 0.02, which is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
+    Three of the six tints put ``slate-500`` under the 4.5 body floor and a
+    fourth clears it by 0.02, which is why ``REFLEX_MUTED_TEXT`` is
+    ``slate-600``.
     Asserting the numbers here means a future edit that reintroduces
     ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
     the shade enough to matter would surface as a published-value mismatch
@@ -871,19 +876,21 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_two_of_the_five_tints() -> None:
-    """Exactly two, and named -- not "at least one".
+def test_slate_500_fails_the_body_floor_on_three_of_the_six_tints() -> None:
+    """Exactly three, and named -- not "at least one".
 
-    A count would pass if the failing set moved to two different tints, and the
-    point of the row block above is that *which* surfaces fail is not guessable
-    from the shade names.
+    A count would pass if the failing set moved to three different tints, and
+    the point of the row block above is that *which* surfaces fail is not
+    guessable from the shade names. ``rose-50`` joined them when ``/control``
+    was added, at 4.33: a sixth route was not going to make the case for
+    ``slate-500`` any better, and it did not.
     """
     failing = {
         bg
         for (fg, bg) in SLATE_500_ON_TINT_ROWS
         if contrast_ratio(_shade(fg), _shade(bg)) < FLOOR_BODY_TEXT
     }
-    assert failing == {"sky-50", "violet-50"}
+    assert failing == {"sky-50", "violet-50", "rose-50"}
 
 
 def test_slate_600_clears_every_tint_by_a_real_margin() -> None:

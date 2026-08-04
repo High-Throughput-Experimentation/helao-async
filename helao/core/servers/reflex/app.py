@@ -58,6 +58,11 @@ from helao.core.servers.reflex.ingest import (
     set_registry,
 )
 from helao.core.servers.reflex import plots
+from helao.core.servers.reflex.control import (
+    ControlState,
+    configure_control,
+    control_page,
+)
 from helao.core.servers.reflex.state import make_panel_state
 from helao.core.servers.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
@@ -67,7 +72,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 #: Routes always registered so the navigation shell is complete even when a
 #: page has no content yet.
-SHELL_ROUTES = ("/", "/live", "/action", "/operator", "/browser")
+SHELL_ROUTES = ("/", "/live", "/action", "/operator", "/browser", "/control")
 
 #: Page name -> the config key whose panels belong on it.
 PAGE_TO_VIS_KEY = {"live": "live_vis", "action": "action_vis"}
@@ -275,6 +280,7 @@ def _nav():
         rx.link("Action", href="/action"),
         rx.link("Operator", href="/operator"),
         rx.link("Browser", href="/browser"),
+        rx.link("Control", href="/control"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -430,9 +436,14 @@ def build_app(world_cfg: dict, server_key: str):
         OperatorPlateState,
         OperatorSpecState,
     )
+    # Same for the control page's single state.
+    assert ControlState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
+    # And the control page's targets, which are enumerated from the config the
+    # same way -- the export process has no orchestration group to read.
+    configure_control(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -504,6 +515,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("Data browser", browser_page(), "/browser"),
         route="/browser",
         title="HELAO browser",
+    )
+    application.add_page(
+        lambda: _page("Engineering controls", control_page(), "/control"),
+        route="/control",
+        title="HELAO control",
     )
 
     @contextlib.asynccontextmanager
