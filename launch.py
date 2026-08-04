@@ -14,9 +14,14 @@ Usage:
 Example:
     To run the launcher, use the following command:
     python launch.py <config_file> [extra_option] [--restore] [--no-hot-reload]
+                     [--reconnect | --force-relaunch]
     Where <config_file> is the path to the configuration file and [extra_option] is an optional argument for additional
     launch options. The optional --restore flag makes launched orchestrators
-    import their previously exported queues (STATES/queues.pck) on startup. The
+    import their previously exported queues (STATES/queues.pck) on startup.
+    If servers from an earlier launch are still running, the launcher refuses to
+    start (they hold the ports, so a new group would silently defer to them) and
+    lists them; --reconnect attaches this monitor to that running group (how a
+    CTRL-d disconnect is resumed), --force-relaunch shuts it down first. The
     hot-reload watcher (which watches the parent and nested deployment git repos
     and restarts idle servers whose loaded code changes on a pull) runs by
     default; pass --no-hot-reload (or set `hot_reload.enabled: false` in the
@@ -35,6 +40,7 @@ import logging as pylogging
 import os
 import pickle
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -57,6 +63,13 @@ from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
 from helao.helpers.config_loader import read_config
 from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.parent_death import (
+    DETACH_MARKER_ENV,
+    PARENT_PID_ENV,
+    clear_detach_marker,
+    detach_marker_path,
+    write_detach_marker,
+)
 from helao.helpers.time_utils import get_ntp_time
 
 # Upper bound (seconds) for a blocking POST /shutdown. The server's shutdown
@@ -504,7 +517,17 @@ class Pidd:
             Closes all active servers and removes the PID file.
     """
 
-    def __init__(self, pidFile, pidPath, retries=3):
+    # Launcher scripts a managed helao server can be running under. Used to
+    # confirm a recorded PID really is one of ours; reflex servers are launched
+    # the same way and must be listed here too, or list_active() silently omits
+    # them and close() never kills them.
+    LAUNCHER_SCRIPTS = (
+        "fast_launcher.py",
+        "bokeh_launcher.py",
+        "reflex_launcher.py",
+    )
+
+    def __init__(self, pidFile, pidPath, retries=3, configPrefix=None):
         """
         Initializes the class with the given parameters.
 
@@ -539,6 +562,11 @@ class Pidd:
         # terminated children can be reaped; an unreaped child becomes a zombie
         # whose PID psutil.pid_exists() still reports as alive.
         self.procs = {}
+        # Config prefix this pid file belongs to, when known. Tightens the PID
+        # identity check by one more argv token, so a recycled PID that happens
+        # to be another config's server with the same server key is not mistaken
+        # for ours. None keeps the looser (launcher + server_key) check.
+        self.configPrefix = configPrefix
         self.reqKeys = ("host", "port", "group")
         self.codeKeys = ("fast", "bokeh", "reflex")
         self.d = {}
@@ -663,14 +691,35 @@ class Pidd:
             # gone, a zombie, or owned by another user (a reused PID) -> not ours
             return False
         launched_by = any(
-            launcher in arg
-            for arg in cmdline
-            for launcher in ("fast_launcher.py", "bokeh_launcher.py")
+            launcher in arg for arg in cmdline for launcher in self.LAUNCHER_SCRIPTS
         )
         # server_key is passed as its own argv element, so list membership is an
         # exact-token match (won't false-match a key that is a substring of a
         # longer server key or of a path).
-        return launched_by and server_key in cmdline
+        if not (launched_by and server_key in cmdline):
+            return False
+        return self._cmdline_matches_config(cmdline)
+
+    def _cmdline_matches_config(self, cmdline):
+        """Whether ``cmdline`` names this Pidd's config prefix.
+
+        The config is passed to each launcher as one argv token, either a bare
+        prefix or a full path to the YAML, so the prefix is recovered the same
+        way :func:`launcher` derives it: basename minus the final extension.
+
+        Args:
+            cmdline (list[str]): The candidate process's command line.
+
+        Returns:
+            bool: True when the prefix matches, or when no prefix is known
+            (in which case the caller's launcher+server_key check stands alone).
+        """
+        if not self.configPrefix:
+            return True
+        return any(
+            os.path.splitext(os.path.basename(arg))[0] == self.configPrefix
+            for arg in cmdline
+        )
 
     def _reap_child(self, k):
         """Reap the OS child for server ``k`` so a terminated process does not
@@ -691,22 +740,46 @@ class Pidd:
         ``psutil.Process.wait()`` reaps the process when it is a child of this
         process (which every launcher-spawned server is), preventing the zombie
         that would otherwise keep ``psutil.pid_exists()`` returning True forever.
+
+        A process this launcher *adopted* rather than spawned (``--reconnect``,
+        ``--force-relaunch``, or any Pidd built from an existing pickle) cannot
+        be reaped here: it lingers as a zombie owned by its real parent, which
+        ``wait()`` cannot tell from "still running" and so reports as a timeout.
+        The timeout branch therefore re-checks for that, otherwise a server that
+        had already exited cleanly was signalled again and then reported as
+        "Failed to terminate even after SIGKILL" -- six spurious ERRORs (and, on
+        a station, six alert emails) per teardown, plus ten wasted seconds each.
         """
         try:
             proc.wait(timeout=timeout)
         except psutil.TimeoutExpired:
-            return False
+            return self._already_dead(proc)
         except psutil.NoSuchProcess:
             pass
         # belt-and-suspenders: also reap via the Popen handle if we own it
         self._reap_child(k)
+        return self._already_dead(proc)
+
+    def _already_dead(self, proc) -> bool:
+        """Whether ``proc`` has stopped running, reaped or not.
+
+        Args:
+            proc (psutil.Process): Process to inspect.
+
+        Returns:
+            bool: True when the pid is gone, or still present only as a zombie
+            (i.e. it has exited and is merely awaiting its parent's wait()).
+        """
         if not psutil.pid_exists(proc.pid):
             return True
-        # a lingering PID that is a zombie counts as gone (already dead)
         try:
             return proc.status() == psutil.STATUS_ZOMBIE
         except psutil.NoSuchProcess:
             return True
+        except psutil.Error:
+            # Cannot tell (permissions, or a pid we may not inspect): assume it
+            # is alive, which keeps the escalation path conservative.
+            return False
 
     def kill_server(self, k):
         """
@@ -841,6 +914,179 @@ class Pidd:
             LAUNCH_LOGGER.info(f"All servers terminated. Removing '{self.pidFilePath}'")
             if os.path.exists(self.pidFilePath):
                 os.remove(self.pidFilePath)
+
+
+class StaleGroupError(Exception):
+    """A launch was attempted while a previous group is still serving.
+
+    Carries the live members so the caller can print them; raised instead of
+    launching because the alternative is the failure this guards against -- the
+    new launch cannot bind the held ports, logs "already running" at INFO for
+    every server, and leaves the *old* processes serving their original code
+    while everything reports success.
+
+    Attributes:
+        members: ``[(server_key, host, port, pid), ...]`` still alive.
+        pidFilePath: Pid pickle the members were recorded in.
+    """
+
+    def __init__(self, members, pidFilePath):
+        self.members = members
+        self.pidFilePath = pidFilePath
+        super().__init__(self.report())
+
+    def report(self) -> str:
+        """Return the operator-facing explanation, listing every live member."""
+        lines = [
+            f"{len(self.members)} server(s) from an earlier launch are STILL "
+            f"RUNNING and hold their ports:",
+            "",
+        ]
+        for key, host, port, pid in self.members:
+            lines.append(f"    {key:<16} pid {pid:<8} {host}:{port}")
+        lines += [
+            "",
+            "Launching now would NOT start these servers -- the new group would",
+            "fail to bind their ports and quietly defer to the old processes,",
+            "which keep serving the code they were started with. Choose one:",
+            "",
+            "    --reconnect        attach this monitor to the running group",
+            "                       (what a CTRL-d disconnect is resumed with)",
+            "    --force-relaunch   shut the running group down, then launch",
+            "",
+            f"PIDs are recorded in {self.pidFilePath}.",
+        ]
+        return "\n".join(lines)
+
+
+def group_map(confDict):
+    """Return ``{group: {server_key: server_cfg}}`` for every launchable group.
+
+    Args:
+        confDict (dict): Loaded configuration.
+
+    Returns:
+        dict: Servers bucketed by :data:`LAUNCH_ORDER` group.
+    """
+    return {
+        k: {sk: sv for sk, sv in confDict["servers"].items() if sv["group"] == k}
+        for k in LAUNCH_ORDER
+    }
+
+
+def prune_dead_pids(pidd):
+    """Drop pid entries whose processes are gone, silently.
+
+    The common case: a group was shut down (or died) and the pickle still lists
+    its PIDs. Nothing is wrong, so nothing is logged above debug -- the guard
+    must not become noise on every ordinary launch.
+
+    Args:
+        pidd (Pidd): Registry to prune. Rewritten only if something changed.
+
+    Returns:
+        list: Server keys that were removed.
+    """
+    live = {k for k, _, _, _ in pidd.list_active()}
+    dead = [k for k in list(pidd.d) if k not in live]
+    for k in dead:
+        del pidd.d[k]
+    if dead:
+        pidd.write_global()
+        LAUNCH_LOGGER.debug(
+            f"Cleared {len(dead)} stale pid entr{'y' if len(dead) == 1 else 'ies'} "
+            f"for server(s) that are no longer running: {dead}"
+        )
+    return dead
+
+
+def shutdown_live_members(pidd, confDict):
+    """Tear down an already-running group through the normal teardown path.
+
+    Sends the same ordered ``POST /shutdown`` sweep a CTRL-x teardown does, so
+    drivers disconnect and orchestrators export their queues to
+    ``STATES/queues.pck``, then hands over to :meth:`Pidd.close` for signalling
+    and reaping. Used by ``--force-relaunch``, where the members were adopted
+    from the pickle rather than spawned here, so ``pidd.procs`` is empty and
+    ``close()`` does the signalling on PID alone.
+
+    Args:
+        pidd (Pidd): Registry holding the live members.
+        confDict (dict): Loaded configuration, for each server's group.
+
+    Returns:
+        bool: True if nothing survived the teardown.
+    """
+    servers = confDict.get("servers", {})
+    for group in SHUTDOWN_POST_ORDER:
+        for key, host, port, _pid in pidd.list_active():
+            if servers.get(key, {}).get("group") != group:
+                continue
+            LAUNCH_LOGGER.info(f"Shutting down stale {group}/{key} at {host}:{port}.")
+            try:
+                requests.post(
+                    f"http://{host}:{port}/shutdown", timeout=SHUTDOWN_POST_TIMEOUT
+                )
+            except Exception:
+                # Already dead, wedged, or a bokeh app with no /shutdown route.
+                # close() below is what actually guarantees termination.
+                LAUNCH_LOGGER.info(
+                    f" ... no cooperative shutdown from {key}; will signal it."
+                )
+    # close() needs the group map it normally gets from launch_server_groups.
+    pidd.servers = group_map(confDict)
+    pidd.close()
+    pidd.write_global()  # close() removes the pickle on success; recreate it
+    survivors = pidd.list_active()
+    if survivors:
+        LAUNCH_LOGGER.error(
+            f"Could not terminate {[k for k, _, _, _ in survivors]}; they still "
+            f"hold their ports."
+        )
+        return False
+    return True
+
+
+def resolve_existing_group(pidd, confDict, reconnect=False, force_relaunch=False):
+    """Decide what to do about servers left over from an earlier launch.
+
+    Called before anything is launched. Dead pid entries are pruned silently;
+    genuinely live ones are only accepted with an explicit flag, because
+    deferring to them silently is the bug this exists to prevent.
+
+    Args:
+        pidd (Pidd): Registry loaded from the pid pickle.
+        confDict (dict): Loaded configuration.
+        reconnect (bool): Attach to the live group and proceed (the pre-existing
+            behaviour, now opt-in).
+        force_relaunch (bool): Tear the live group down, then proceed.
+
+    Raises:
+        StaleGroupError: Live members exist and neither flag was given.
+
+    Returns:
+        list: The live members found (empty when the pickle was merely stale).
+    """
+    prune_dead_pids(pidd)
+    members = pidd.list_active()
+    if not members:
+        return []
+    if force_relaunch:
+        LAUNCH_LOGGER.warning(
+            f"--force-relaunch: shutting down {len(members)} server(s) from an "
+            f"earlier launch: {[k for k, _, _, _ in members]}"
+        )
+        if not shutdown_live_members(pidd, confDict):
+            raise StaleGroupError(pidd.list_active(), pidd.pidFilePath)
+        return members
+    if reconnect:
+        LAUNCH_LOGGER.warning(
+            f"--reconnect: attaching to {len(members)} server(s) already running "
+            f"from an earlier launch: {[k for k, _, _, _ in members]}. These keep "
+            f"the code they were STARTED with -- this launch does not reload them."
+        )
+        return members
+    raise StaleGroupError(members, pidd.pidFilePath)
 
 
 def validateConfig(PIDD, confDict, helao_repo_root):
@@ -1026,7 +1272,15 @@ def wait_key():
     return keypress
 
 
-def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
+def launcher(
+    confArg,
+    confDict,
+    helao_repo_root,
+    extraopt="",
+    restore=False,
+    reconnect=False,
+    force_relaunch=False,
+):
     """
     Launches the Helao servers based on the provided configuration.
     Args:
@@ -1037,7 +1291,13 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
         restore (bool, optional): When True, pass ``--restore`` to launched
             orchestrators so they import their saved queues on startup. Defaults
             to False.
+        reconnect (bool, optional): Attach to a group that is already running
+            instead of refusing to launch. Defaults to False.
+        force_relaunch (bool, optional): Tear down a group that is already
+            running, then launch. Defaults to False.
     Raises:
+        StaleGroupError: If servers from an earlier launch are still running and
+            neither ``reconnect`` nor ``force_relaunch`` was given.
         Exception: If the configuration is invalid.
         Exception: If a server cannot be started due to port conflicts.
     Returns:
@@ -1053,7 +1313,17 @@ def launcher(confArg, confDict, helao_repo_root, extraopt="", restore=False):
     helaodirs = helao_dirs(confDict, "launcher")
 
     pidd = Pidd(
-        pidFile=f"pids_{confPrefix}_{extraopt}.pck", pidPath=helaodirs.states_root
+        pidFile=f"pids_{confPrefix}_{extraopt}.pck",
+        pidPath=helaodirs.states_root,
+        configPrefix=confPrefix,
+    )
+    # Before anything is launched: refuse to start on top of a group that is
+    # still serving, unless the operator said which way to resolve it.
+    resolve_existing_group(
+        pidd=pidd,
+        confDict=confDict,
+        reconnect=reconnect,
+        force_relaunch=force_relaunch,
     )
     if not validateConfig(
         PIDD=pidd, confDict=confDict, helao_repo_root=helao_repo_root
@@ -1107,11 +1377,7 @@ def launch_server_groups(
     active = pidd.list_active()
     activeKHP = [(k, h, p) for k, h, p, _ in active]
     activeHP = [(h, p) for k, h, p, _ in active]
-    allGroup = {
-        k: {sk: sv for sk, sv in confDict["servers"].items() if sv["group"] == k}
-        for k in LAUNCH_ORDER
-    }
-    pidd.servers = allGroup
+    pidd.servers = group_map(confDict)
     pidd.orchServs = []
     for group in LAUNCH_ORDER:
         LAUNCH_LOGGER.info(f"Launching {group} group.")
@@ -1140,6 +1406,15 @@ def launch_server_groups(
                     LAUNCH_LOGGER.info(
                         f"{server} already running with pid [{active[activeKHP.index(servKHP)][3]}]",
                     )
+                    # Adopt an orchestrator we are reconnecting to (--reconnect,
+                    # or a CTRL-r relaunch that found it still up). It is in our
+                    # own pid pickle and passed the cmdline identity check, so it
+                    # is ours, not the externally-managed case below -- and
+                    # without this it would be missing from orchServs, so the
+                    # teardown's /shutdown sweep would skip it and its queues
+                    # would never be exported to STATES/queues.pck.
+                    if group == "orchestrator" and codeKey == "fast":
+                        pidd.orchServs.append(server)
                 elif servHP in activeHP:
                     LAUNCH_LOGGER.warning(
                         f"Cannot start {server}, {servHost}:{servPort} is already in use."
@@ -1417,6 +1692,17 @@ def main():
     positional = [a for a in sys.argv[1:] if not a.startswith("--")]
     cli_flags = [a for a in sys.argv[1:] if a.startswith("--")]
     restore = "--restore" in cli_flags
+    # Resolutions for "a group from an earlier launch is still running".
+    # Mutually exclusive; --force-relaunch wins if both are given, since it is
+    # the more explicit request ("I want NEW processes").
+    reconnect = "--reconnect" in cli_flags
+    force_relaunch = "--force-relaunch" in cli_flags
+    if reconnect and force_relaunch:
+        print(
+            "--reconnect and --force-relaunch are mutually exclusive; "
+            "proceeding with --force-relaunch."
+        )
+        reconnect = False
     confArg = positional[0]
     config = read_config(confArg)
 
@@ -1524,13 +1810,48 @@ def main():
             except Exception:
                 LAUNCH_LOGGER.error(f"Error compressing log: {old_log}", exc_info=True)
 
-    pidd = launcher(
-        confArg=confArg,
-        confDict=config,
-        helao_repo_root=helao_repo_root,
-        extraopt=extraopt,
-        restore=restore,
-    )
+    # Children inherit both of these through their environment, so they are set
+    # before anything is spawned:
+    #   PARENT_PID_ENV    lets a child tell "my launcher died" from "my
+    #                     launcher's pid was recycled" (see
+    #                     helao.helpers.parent_death).
+    #   DETACH_MARKER_ENV names the file this launcher writes if it exits while
+    #                     deliberately leaving the group up (CTRL-d), which is
+    #                     what stops the kernel's parent-death signal from
+    #                     taking a healthy group down with the terminal.
+    confPrefix = os.path.splitext(os.path.basename(confArg))[0]
+    if helaodirs.states_root is None:
+        # helao_dirs returns None for every path when the config has no `root`,
+        # in which case Pidd cannot write its pid pickle either -- this just
+        # fails with the reason instead of a TypeError from inside os.path.join.
+        LAUNCH_LOGGER.error(
+            f"Config '{confPrefix}' defines no 'root', so there is no STATES "
+            f"directory to track this group in."
+        )
+        sys.exit(1)
+    marker_path = detach_marker_path(str(helaodirs.states_root), confPrefix, extraopt)
+    # A marker left by an earlier CTRL-d would otherwise keep protecting the
+    # NEXT group from the orphan case this whole mechanism exists to fix.
+    clear_detach_marker(marker_path)
+    os.environ[PARENT_PID_ENV] = str(os.getpid())
+    os.environ[DETACH_MARKER_ENV] = marker_path
+
+    try:
+        pidd = launcher(
+            confArg=confArg,
+            confDict=config,
+            helao_repo_root=helao_repo_root,
+            extraopt=extraopt,
+            restore=restore,
+            reconnect=reconnect,
+            force_relaunch=force_relaunch,
+        )
+    except StaleGroupError as stale:
+        # Not a traceback: this is an operator-facing decision, and the listing
+        # is the whole point.
+        LAUNCH_LOGGER.error("Refusing to launch on top of a running group.")
+        cprint(f"\n{stale.report()}\n", "red", attrs=["bold"])
+        sys.exit(1)
 
     def hotkey_msg():
         """
@@ -1610,6 +1931,34 @@ def main():
     # the hot-reload daemon so their read-modify-write on pidd.d / the pickle /
     # pidd.procs can't interleave and drop, resurrect, or double-restart a server.
     pidd_lock = threading.Lock()
+
+    # Set once, by whichever path tears the group down first, so a second
+    # request (a repeated signal, or a signal arriving during a CTRL-x) is a
+    # no-op instead of a second kill sweep over a half-dead group.
+    teardown_started = threading.Event()
+
+    def teardown_group():
+        """Shut the whole group down: /shutdown sweep, then signal and reap.
+
+        The single teardown path, shared by CTRL-x, SIGTERM/SIGINT and the
+        non-interactive interrupt. Idempotent: only the first caller runs it.
+
+        Returns:
+            bool: True if this call performed the teardown.
+        """
+        if teardown_started.is_set():
+            LAUNCH_LOGGER.info("Teardown already in progress; ignoring this request.")
+            return False
+        teardown_started.set()
+        # Orchestrators first (they detach subscribers and export non-empty
+        # queues), then action servers. Visualizer/operator bokeh apps have no
+        # /shutdown route, so pidd.close() signals those.
+        graceful_shutdown_all()
+        # hold pidd_lock so a concurrent hot-reload restart can't interleave its
+        # pidd mutation with the teardown's kill loop.
+        with pidd_lock:
+            pidd.close()
+        return True
 
     def restart_server(groupname, servername, restore=False):
         """Gracefully stop, kill, and relaunch a single server, re-registering
@@ -1935,9 +2284,7 @@ def main():
                 threading.Event().wait()
             except KeyboardInterrupt:
                 LAUNCH_LOGGER.info("Interrupted, terminating orchestration group.")
-                graceful_shutdown_all()
-                with pidd_lock:
-                    pidd.close()
+                teardown_group()
             return
         result = None
         while result not in ["\x18", "\x04"]:
@@ -2002,17 +2349,25 @@ def main():
             result = wait_key()
         if result == "\x18":
             LAUNCH_LOGGER.info("Detected CTRL-x, terminating orchestration group.")
-            # Orchestrators first (they detach subscribers and export non-empty
-            # queues), then action servers. Visualizer/operator bokeh apps have
-            # no /shutdown route, so pidd.close() signals those.
-            graceful_shutdown_all()
-            # hold pidd_lock so a concurrent hot-reload restart can't interleave
-            # its pidd mutation with the teardown's kill loop.
-            with pidd_lock:
-                pidd.close()
+            teardown_group()
         else:
+            # CTRL-d leaves every server running on purpose. Announce that
+            # *before* this process exits: each child armed a kernel
+            # parent-death signal, and the marker is what tells it this death is
+            # expected. Without it, disconnecting the monitor would take the
+            # whole group down (which is what already happened to the Reflex UI,
+            # the only server that had a parent-death watchdog before).
+            if write_detach_marker(marker_path):
+                LAUNCH_LOGGER.info(f"Wrote detach marker {marker_path}.")
+            else:
+                LAUNCH_LOGGER.error(
+                    f"Could not write the detach marker {marker_path}. Servers "
+                    f"that armed a parent-death signal will shut down when this "
+                    f"launcher exits."
+                )
             LAUNCH_LOGGER.info(
-                f"Disconnecting action monitor. Launch 'python launch.py {confArg}' to reconnect."
+                f"Disconnecting action monitor. Launch "
+                f"'python launch.py {confArg} --reconnect' to reconnect."
             )
 
     x = threading.Thread(target=thread_waitforkey)
@@ -2052,6 +2407,52 @@ def main():
         )
     hr = threading.Thread(target=thread_hotreload, args=(poll_seconds,), daemon=True)
     hr.start()
+
+    # ---- signal handling -------------------------------------------------
+    # Without this, killing or crashing the monitor left every child orphaned
+    # and holding its port: nothing ran the /shutdown sweep, so no driver
+    # disconnected and no orchestrator exported its queues.
+    #
+    # The handlers only record the request; the teardown itself runs below, on
+    # the main thread in ordinary context. That matters because the teardown
+    # takes pidd_lock and makes blocking HTTP calls with a 30s timeout. Doing
+    # that inside a handler would run it *while* another thread may hold
+    # pidd_lock (the hotkey thread mid-CTRL-r, or the hot-reload watcher
+    # mid-restart), stalling the handler for as long as that restart takes with
+    # no way to observe or interrupt it. Recording a flag and letting the loop
+    # act on it keeps the lock discipline identical to every other caller.
+    shutdown_signal = {}
+    stop_requested = threading.Event()
+
+    def _request_shutdown(signum, frame):
+        # Re-entrant by nature (a second CTRL-C, or SIGTERM after SIGINT), so it
+        # must stay a plain idempotent store. teardown_group() is what actually
+        # guarantees the sweep runs once.
+        shutdown_signal.setdefault("signum", signum)
+        stop_requested.set()
+
+    for _sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            signal.signal(_sig, _request_shutdown)
+        except (OSError, ValueError, AttributeError):
+            # A platform without this signal, or a non-main thread. Not fatal:
+            # the group still runs, it just loses the graceful path for that
+            # signal.
+            LAUNCH_LOGGER.warning(f"Could not install a handler for {_sig!r}.")
+
+    # Hold the main thread here rather than returning and parking in the
+    # interpreter's non-daemon-thread join. Same observable lifetime as before
+    # -- the process lives until the keypress thread ends (CTRL-x or CTRL-d) --
+    # but a signal now has a thread that can act on it.
+    while x.is_alive():
+        if stop_requested.wait(0.25):
+            signame = signal.Signals(shutdown_signal.get("signum", 0)).name
+            LAUNCH_LOGGER.info(f"Received {signame}; terminating orchestration group.")
+            teardown_group()
+            # The keypress thread is still blocked reading stdin and is not a
+            # daemon, so returning would hang here forever. Everything is torn
+            # down and reaped by now, so leave immediately and deliberately.
+            os._exit(0)
 
 
 if __name__ == "__main__":

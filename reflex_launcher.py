@@ -502,7 +502,16 @@ if __name__ == "__main__":
 
     from helao.helpers import config_loader
     from helao.helpers import helao_logging as logging
+    from helao.helpers.parent_death import arm_parent_death_signal, monitor_detached
     from helao.helpers.yml_tools import yml_load
+
+    # Die with launch.py rather than orphaning and holding this server's two
+    # ports. Armed here, at the top, so it also covers the port-preflight and
+    # backend-spawn phases below. The kernel keeps exactly one PDEATHSIG per
+    # process, so this is the *only* self-arming call in this launcher -- the
+    # separate install_pdeathsig() call under the backend's Popen arms the
+    # backend, which is a different process.
+    arm_parent_death_signal()
 
     helao_repo_root = os.path.dirname(os.path.realpath(__file__))
     confArg = sys.argv[1]
@@ -667,10 +676,10 @@ if __name__ == "__main__":
         )
         backend.poll()
 
-    # Die with launch.py. prctl reacts instantly on Linux; the watchdog is what
-    # every platform actually depends on, and it also covers the race where the
-    # parent dies before prctl lands. Both run: neither alone is sufficient.
-    install_pdeathsig(signal.SIGTERM)
+    # prctl was armed at the top of this block (arm_parent_death_signal). This
+    # watchdog is what every platform actually depends on, and it also covers
+    # the race where the parent dies before prctl lands. Both run: neither alone
+    # is sufficient.
     watch = parent_watch_target(os.getppid())
     if watch is None:
         LOGGER.info(f"no parent to watch; {server_key} will run until stopped directly")
@@ -678,6 +687,15 @@ if __name__ == "__main__":
         parent_pid = watch[0]
 
         def _parent_died():
+            if monitor_detached():
+                # CTRL-d: the launcher exited on purpose and left the group
+                # running. Before this check, disconnecting the monitor took the
+                # Reflex UI down with it while every other server survived.
+                LOGGER.info(
+                    f"launch.py (pid {parent_pid}) detached deliberately (CTRL-d); "
+                    f"{server_key} stays up on {servHost}:{servPort}."
+                )
+                return
             LOGGER.warning(
                 f"launch.py (pid {parent_pid}) is gone; shutting {server_key} down "
                 f"so it does not hold {servHost}:{servPort} and "
