@@ -128,10 +128,22 @@ echo [3/5] force-killing the launcher (no cooperative shutdown) ...
 REM /F is the point: TerminateProcess with no chance to run any teardown, which
 REM is what a crash or an End Task looks like. Only the monitor is killed -- the
 REM job object is what must take the children with it.
-for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process ^| Where-Object { $_.CommandLine -like '*launch.py %CONFIG%*' } ^| ForEach-Object { $_.ProcessId }"`) do (
-    echo     taskkill /F /PID %%p
-    taskkill /F /PID %%p >nul 2>&1
-)
+REM PowerShell does the killing itself rather than feeding pids to `taskkill`
+REM through `for /f`. Inside a backquoted `for /f`, cmd hands the string to the
+REM shell verbatim, so the `^|` that a bare pipe needs elsewhere arrives at
+REM PowerShell as a literal caret and it refuses the whole command
+REM ("A positional parameter cannot be found that accepts argument '^'"). That
+REM failed silently in the sense that mattered: the monitor was never killed, the
+REM children were still parented and alive, and the check duly reported them as
+REM orphans -- a FAIL that said nothing about the job object.
+REM
+REM `Stop-Process -Force` is TerminateProcess, the same abrupt kill `taskkill /F`
+REM performs, which is the point: no cooperative shutdown.
+REM
+REM `*launch.py %CONFIG%*` matches only the monitor. A child's command line is
+REM `fast_launcher.py <config>`, and "launcher.py" does not contain "launch.py"
+REM -- the characters after "launch" are "er.py", not ".py".
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %CONFIG%*' } | ForEach-Object { Write-Host ('    killing monitor pid ' + $_.ProcessId); Stop-Process -Id $_.ProcessId -Force }"
 
 echo     waiting 20s for the kernel to tear the job down ...
 ping -n 21 127.0.0.1 >nul
@@ -156,10 +168,16 @@ if errorlevel 1 (
 :cleanup
 REM Belt and braces: if the test failed, the group may still be running and
 REM holding hardware. Leave nothing behind either way.
+REM Kill the monitor and every child by command line, in one PowerShell call --
+REM same reason as above, and it must not be a `for /f`. Note what is NOT
+REM sufficient here: `taskkill /F /FI "WINDOWTITLE eq helao-orphan-smoke*"` only
+REM reaches the `cmd` wrapper `start` created. Killing that wrapper leaves
+REM `python launch.py` running (Windows has no parent-death signal, which is the
+REM very gap this test exists for), and the wrapper's death does not close the
+REM job handle either -- the job belongs to launch.py, not to cmd. A cleanup that
+REM relied on the window title therefore left a live group holding hardware.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %CONFIG%*' -or $_.CommandLine -like '*_launcher.py %CONFIG%*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq helao-orphan-smoke*" >nul 2>&1
-for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process ^| Where-Object { $_.CommandLine -like '*_launcher.py %CONFIG%*' -or $_.CommandLine -like '*launch.py %CONFIG%*' } ^| ForEach-Object { $_.ProcessId }"`) do (
-    taskkill /F /PID %%p >nul 2>&1
-)
 popd
 exit /b %RC%
 
