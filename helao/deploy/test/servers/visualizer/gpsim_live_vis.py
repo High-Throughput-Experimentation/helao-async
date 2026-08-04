@@ -19,7 +19,11 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.bokeh_theme import semantic_button_stylesheet
+from helao.core.servers.bokeh_theme import (
+    SECTION_MARGIN,
+    semantic_button_stylesheet,
+    stretch_section,
+)
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
@@ -83,7 +87,9 @@ class C_vis(LiveVisualizer):
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=880, output_backend="webgl")
+        self.plot = figure(
+            height=300, sizing_mode="stretch_width", output_backend="webgl"
+        )
         self.plot.xaxis.axis_label = "Eta (V vs O2/H2O)"
         self.plot.yaxis.axis_label = "density"
 
@@ -120,7 +126,7 @@ class C_vis(LiveVisualizer):
         self.layout = layout(
             [
                 Spacer(width=20),
-                [Div(text=headerbar, width=1004, height=15)],
+                [Div(text=headerbar, sizing_mode="stretch_width", height=15)],
                 [
                     Spacer(width=10),
                     self.input_update_rate,
@@ -130,12 +136,13 @@ class C_vis(LiveVisualizer):
                 Spacer(height=10),
                 [Spacer(width=10), self.plot, Spacer(width=10)],
                 Spacer(height=10),
-                [Div(text=tableheader, width=1004, height=15)],
+                [Div(text=tableheader, sizing_mode="stretch_width", height=15)],
                 [Spacer(width=10), self.table, Spacer(width=10)],
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         self._mount()
         self._add_plots()

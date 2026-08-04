@@ -15,6 +15,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
+from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 
@@ -127,12 +128,18 @@ class C_vis(ActionVisualizer):
         # to check if selection changed during ploting
         self.yselect = self.yaxis_selector_group.active
 
-        self.plot_VOLT = figure(title="CELL VOLTs", height=300, width=500)
-        self.plot_CURRENT = figure(title="CELL CURRENTs", height=300, width=500)
+        self.plot_VOLT = figure(
+            title="CELL VOLTs", height=300, sizing_mode="stretch_width"
+        )
+        self.plot_CURRENT = figure(
+            title="CELL CURRENTs", height=300, sizing_mode="stretch_width"
+        )
 
-        self.plot_VOLT_prev = figure(title="prev. CELL VOLTs", height=300, width=500)
+        self.plot_VOLT_prev = figure(
+            title="prev. CELL VOLTs", height=300, sizing_mode="stretch_width"
+        )
         self.plot_CURRENT_prev = figure(
-            title="prev. CELL CURRENTs", height=300, width=500
+            title="prev. CELL CURRENTs", height=300, sizing_mode="stretch_width"
         )
 
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
@@ -143,7 +150,10 @@ class C_vis(ActionVisualizer):
         headerbar = f"<b>NImax Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
+                [
+                    Spacer(width=20),
+                    Div(text=headerbar, sizing_mode="stretch_width", height=15),
+                ],
                 [self.input_max_points],
                 [self.paragraph1],
                 [self.yaxis_selector_group],
@@ -154,8 +164,9 @@ class C_vis(ActionVisualizer):
                 Spacer(height=10),
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         self._mount()
 

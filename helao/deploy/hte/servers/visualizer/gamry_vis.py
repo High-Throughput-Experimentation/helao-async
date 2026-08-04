@@ -6,7 +6,7 @@ from bokeh.layouts import Spacer, layout
 from bokeh.models import (
     Button,
     ColumnDataSource,
-    RadioButtonGroup,
+    Select,
     TextInput,
 )
 from bokeh.models.widgets import Div
@@ -16,7 +16,11 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.bokeh_theme import semantic_button_stylesheet
+from helao.core.servers.bokeh_theme import (
+    SECTION_MARGIN,
+    semantic_button_stylesheet,
+    stretch_section,
+)
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
@@ -48,8 +52,8 @@ class C_vis(ActionVisualizer):
 
     Subscribes to the server's ``ws_data`` WebSocket and renders the active
     run alongside up to ``max_prev`` recent runs in a side-by-side layout.
-    Provides radio-button axis selectors, max-points and max-previous
-    inputs, and a single stop button that aborts the current measurement.
+    Provides x/y axis dropdowns, max-points and max-previous inputs, and a
+    single stop button that aborts the current measurement.
     Common subscriber bring-up, the ``max datapoints`` callback, and the
     ingest loop are inherited from :class:`ActionVisualizer`.
 
@@ -65,12 +69,15 @@ class C_vis(ActionVisualizer):
         input_max_points: Widget setting ``max_points``.
         input_max_prev: Widget setting ``max_prev``.
         button_stop_measure: Bokeh button that requests action cancellation.
-        xaxis_selector_group: Radio buttons selecting the x-axis variable.
-        yaxis_selector_group: Radio buttons selecting the y-axis variable.
+        xaxis_selector_group: Dropdown selecting the x-axis variable.
+        yaxis_selector_group: Dropdown selecting the y-axis variable.
         plot: ``figure`` for the active action.
         plot_prev: ``figure`` overlaying the previous N actions.
-        xselect: Cached active index of ``xaxis_selector_group``.
-        yselect: Cached active index of ``yaxis_selector_group``.
+        xselect: Cached selection of ``xaxis_selector_group``, which is
+            the data-key name itself rather than an index into
+            ``data_dict_keys``.
+        yselect: Cached selection of ``yaxis_selector_group``, likewise a
+            data-key name.
     """
 
     SUBSCRIBE_LABEL = "potentiostat visualizer"
@@ -140,21 +147,31 @@ class C_vis(ActionVisualizer):
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
 
-        self.xaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=0, width=500
+        # Dropdowns rather than radio groups: a row of one button per data key
+        # was as wide as the plot beneath it, and the panel now stretches, so
+        # the buttons would have stretched with it. A Select carries its own
+        # title, so the separate "x-axis:"/"y-axis:" Divs above it are gone.
+        self.xaxis_selector_group = Select(
+            title="x-axis:",
+            value=self.data_dict_keys[0],
+            options=self.data_dict_keys,
+            width=150,
         )
-        self.yaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=3, width=500
+        self.yaxis_selector_group = Select(
+            title="y-axis:",
+            value=self.data_dict_keys[3],
+            options=self.data_dict_keys,
+            width=150,
         )
         self.xaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
+            "value", partial(self.callback_selector_change)
         )
         self.yaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
+            "value", partial(self.callback_selector_change)
         )
 
-        self.plot = figure(title="Title", height=300, width=500)
-        self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot = figure(title="Title", height=300, sizing_mode="stretch_width")
+        self.plot_prev = figure(title="Title", height=300, sizing_mode="stretch_width")
 
         # combine all sublayouts into a single one
         docs_url = f"http://{self.host}:{self.port}/docs#/"
@@ -162,7 +179,10 @@ class C_vis(ActionVisualizer):
         headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
+                [
+                    Spacer(width=20),
+                    Div(text=headerbar, sizing_mode="stretch_width", height=15),
+                ],
                 [
                     self.input_max_points,
                     Spacer(width=20),
@@ -171,21 +191,22 @@ class C_vis(ActionVisualizer):
                     self.button_stop_measure,
                 ],
                 [
-                    Div(text="""x-axis:""", width=500, height=15),
-                    Div(text="""y-axis:""", width=500, height=15),
+                    self.xaxis_selector_group,
+                    Spacer(width=20),
+                    self.yaxis_selector_group,
                 ],
-                [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         # to check if selection changed during ploting
-        self.xselect = self.xaxis_selector_group.active
-        self.yselect = self.yaxis_selector_group.active
+        self.xselect = self.xaxis_selector_group.value
+        self.yselect = self.yaxis_selector_group.value
 
         self._mount()
         self.reset_plot(forceupdate=True)
@@ -219,8 +240,8 @@ class C_vis(ActionVisualizer):
 
         Args:
             attr: Bokeh property name that changed.
-            old: Previous selector index.
-            new: New selector index.
+            old: Previously selected data key.
+            new: Newly selected data key.
         """
         self.reset_plot()
 
@@ -318,8 +339,8 @@ class C_vis(ActionVisualizer):
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
         self.plot_prev.title.text = f"last {len(self.prev_action_uuids)} actions"
-        xstr = self.data_dict_keys[self.xselect]
-        ystr = self.data_dict_keys[self.yselect]
+        xstr = self.xselect
+        ystr = self.yselect
         LOGGER.info(f"{xstr}, {ystr}")
         colors = [SERIES[0], SERIES[1], SERIES[3], SERIES[2]]
         self.plot.line(
@@ -381,20 +402,16 @@ class C_vis(ActionVisualizer):
                 self.datasource.data = {key: [] for key in self.data_dict_keys}
                 if action_name in AXIS_MAP:
                     xlab, ylab = AXIS_MAP[action_name]
-                    self.xaxis_selector_group.update(
-                        active=self.data_dict_keys.index(xlab)
-                    )
-                    self.yaxis_selector_group.update(
-                        active=self.data_dict_keys.index(ylab)
-                    )
-                    self.xselect = self.xaxis_selector_group.active
-                    self.yselect = self.yaxis_selector_group.active
+                    self.xaxis_selector_group.update(value=xlab)
+                    self.yaxis_selector_group.update(value=ylab)
+                    self.xselect = self.xaxis_selector_group.value
+                    self.yselect = self.yaxis_selector_group.value
                 self.button_stop_measure.label = f"Stop {action_name}"
                 self.button_stop_measure.button_type = "danger"
                 self._add_plots()
-        if (self.xselect != self.xaxis_selector_group.active) or (
-            self.yselect != self.yaxis_selector_group.active
+        if (self.xselect != self.xaxis_selector_group.value) or (
+            self.yselect != self.yaxis_selector_group.value
         ):
-            self.xselect = self.xaxis_selector_group.active
-            self.yselect = self.yaxis_selector_group.active
+            self.xselect = self.xaxis_selector_group.value
+            self.yselect = self.yaxis_selector_group.value
             self._add_plots()

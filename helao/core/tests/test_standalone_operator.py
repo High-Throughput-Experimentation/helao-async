@@ -1168,19 +1168,17 @@ def test_param_label_enumeration():
     # from index 4. Each grid row is row(cell, cell-or-Spacer); a single
     # parameter therefore pairs with a Spacer.
     # Each cell is layout([input_col, Spacer]) where input_col ==
-    # column(row(Spacer, name_div, desc_div, type_div), row(index_div, input)).
+    # column(row(Spacer, name_div, type_div), row(index_div, input)).
     grid_row = op.seq_param_layout[4]
     cell = grid_row.children[0]
     input_col = cell.children[0]
     label_row = input_col.children[0]
+    assert len(label_row.children) == 3, label_row.children
     name_div = label_row.children[1]
-    desc_div = label_row.children[2]
-    type_div = label_row.children[3]
+    type_div = label_row.children[2]
     index_div = input_col.children[1].children[0]
     assert index_div.text == "[0]", index_div.text
     assert name_div.text == "x", name_div.text
-    # The description sits between the name and the right-aligned type hint.
-    assert desc_div.styles.get("text-align") is None, desc_div.styles
     assert type_div.text.startswith("<i>["), type_div.text
     assert type_div.styles["text-align"] == "right", type_div.styles
     # widget key unchanged (decoupled from display)
@@ -1544,6 +1542,94 @@ def test_param_cells_render_two_to_a_row():
     print("test_param_cells_render_two_to_a_row PASS")
 
 
+def test_param_description_becomes_the_input_tooltip():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    # The mock library's lambda has no docstring, so give the selected entry
+    # one: the description comes from the parsed Args: section, not the widget.
+    op.sequences[0]["doc"] = "Do a thing.\n\nArgs:\n    x: The x value.\n"
+    op._update_param_layout("seq", 0)
+
+    # A native title attribute, not Bokeh's `description`: that renders a help
+    # icon beside an (empty) title, and RadioButtonGroup rejects it outright.
+    assert op.seq_param_input[0].html_attributes == {"title": "The x value."}
+
+    # No description means no attribute at all, rather than an empty tooltip.
+    op.sequences[0]["doc"] = "Do a thing."
+    op._update_param_layout("seq", 0)
+    assert op.seq_param_input[0].html_attributes == {}
+
+    # The label row no longer carries the description as a Div.
+    label_row = op.seq_param_layout[4].children[0].children[0].children[0]
+    assert len(label_row.children) == 3, label_row.children
+    op.cleanup_session(None)
+    print("test_param_description_becomes_the_input_tooltip PASS")
+
+
+def test_bool_param_tooltip_reaches_the_radio_group():
+    from bokeh.document import Document
+    from bokeh.models import RadioButtonGroup
+
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.sequences[0]["doc"] = "Do a thing.\n\nArgs:\n    flag: Whether to flag.\n"
+    op._update_param_layout("seq", 0, args=["flag"], defaults=[True], argtypes=[bool])
+
+    widget = op.seq_param_input[0]
+    assert isinstance(widget, RadioButtonGroup), type(widget)
+    assert widget.html_attributes == {"title": "Whether to flag."}
+    op.cleanup_session(None)
+    print("test_bool_param_tooltip_reaches_the_radio_group PASS")
+
+
+def test_param_form_is_one_contiguous_field():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import (
+        PARAM_CELL_NAME,
+        PARAM_FIELD_MARGIN,
+        PARAM_HEADING_MARGIN,
+        BokehOperator,
+    )
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    grid = _param_grid(op, ["a", "b", "c"], [1, 2, 3], [int, int, int])
+
+    # Rows are inset horizontally and abut vertically...
+    for grid_row in grid:
+        assert grid_row.margin == PARAM_FIELD_MARGIN, grid_row.margin
+        # ...and the cells inside carry none at all, so paired cells meet with
+        # no white line between the two columns. Only the cells: the filler an
+        # odd row ends on is a plain Spacer.
+        for cell in grid_row.children:
+            if cell.name == PARAM_CELL_NAME:
+                assert cell.margin == 0, cell.margin
+
+    # The caption above the field has a top margin only, so its bottom edge is
+    # the field's first row.
+    heading = op.seqspec_param_layout[2]
+    assert heading.margin == PARAM_HEADING_MARGIN, heading.margin
+    op.cleanup_session(None)
+    print("test_param_form_is_one_contiguous_field PASS")
+
+
+def test_selection_tabs_stretch_to_full_width():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    # A Tabs sizes to its widest panel and clips the panels to it, so the
+    # panels' own stretch_width is not enough.
+    assert op.select_tabs.sizing_mode == "stretch_width"
+    op.cleanup_session(None)
+    print("test_selection_tabs_stretch_to_full_width PASS")
+
+
 def test_sections_stretch_and_carry_a_margin():
     from bokeh.document import Document
 
@@ -1637,6 +1723,10 @@ def run_all():
     test_bool_param_without_a_bool_default_keeps_its_text_field()
     test_radio_group_round_trips_through_the_restore_setter()
     test_param_cells_render_two_to_a_row()
+    test_param_description_becomes_the_input_tooltip()
+    test_bool_param_tooltip_reaches_the_radio_group()
+    test_param_form_is_one_contiguous_field()
+    test_selection_tabs_stretch_to_full_width()
     test_sections_stretch_and_carry_a_margin()
     test_tree_views_are_bordered()
     print("ALL STANDALONE_OPERATOR TESTS PASS")

@@ -16,6 +16,7 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
+from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 
@@ -94,7 +95,7 @@ class C_vis(LiveVisualizer):
             partial(self.callback_input_update_rate, sender=self.input_update_rate),
         )
 
-        self.plot = figure(height=300, width=500)
+        self.plot = figure(height=300, sizing_mode="stretch_width")
         self.plot.xaxis.formatter = DatetimeTickFormatter(
             minutes="%T",
             hours="%T",
@@ -121,15 +122,16 @@ class C_vis(LiveVisualizer):
         headerbar = f"<b>Live vis module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Div(text=headerbar, width=1004, height=15)],
+                [Div(text=headerbar, sizing_mode="stretch_width", height=15)],
                 [self.input_max_points, self.input_update_rate],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         self._mount()
         self._add_plots()

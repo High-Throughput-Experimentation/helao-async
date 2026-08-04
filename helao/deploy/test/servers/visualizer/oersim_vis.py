@@ -21,6 +21,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
+from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 
@@ -94,8 +95,8 @@ class C_vis(ActionVisualizer):
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.plot = figure(title="Title", height=300, width=500)
-        self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot = figure(title="Title", height=300, sizing_mode="stretch_width")
+        self.plot_prev = figure(title="Title", height=300, sizing_mode="stretch_width")
         self.plot.xaxis.axis_label = "Time (seconds)"
         self.plot.yaxis.axis_label = "E vs RHE (V)"
         self.plot_prev.xaxis.axis_label = "Time (seconds)"
@@ -107,7 +108,10 @@ class C_vis(ActionVisualizer):
         headerbar = f"<b>OER CP simulator for server {server_link}</b>"
         self.layout = layout(
             [
-                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
+                [
+                    Spacer(width=20),
+                    Div(text=headerbar, sizing_mode="stretch_width", height=15),
+                ],
                 [
                     self.input_max_points,
                 ],
@@ -116,8 +120,9 @@ class C_vis(ActionVisualizer):
                 Spacer(height=10),
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         self._mount()
         self.reset_plot(self.cur_action_uuid, forceupdate=True)
