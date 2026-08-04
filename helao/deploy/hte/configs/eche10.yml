@@ -200,3 +200,11 @@ servers:
           vel_scale: 65970697.6  # device to mm/s
           acc_scale: 13518.2  # device to mm/s2
           move_limit_mm: 3.0
+  UI:
+    host: hte-eche-10.htejcap.caltech.edu
+    port: 5110          # frontend; 5111 is the backend
+    group: visualizer
+    deployment: hte
+    reflex: helao_ui
+    params:
+      pages: [live, action, operator, browser]
