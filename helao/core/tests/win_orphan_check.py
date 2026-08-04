@@ -94,21 +94,30 @@ def listening_ports(netstat_txt: str, ports) -> list[int]:
     return [p for p in wanted if p in held]
 
 
+#: Fewest non-empty lines a real process enumeration can plausibly have. A
+#: Windows machine runs dozens of processes at idle, while a failed capture
+#: yields nothing or a lone header row, so anything in between does not occur in
+#: practice and the exact threshold is not delicate.
+MIN_PROCESS_LINES = 15
+
+
 def evidence_is_usable(tasklist_csv: str) -> bool:
     """Whether the process listing can be believed at all.
 
-    **The guard on the guard.** "No launcher processes found" and "the process
-    listing is empty" are indistinguishable to
-    :func:`surviving_launchers`, and the second one is not a clean teardown, it
-    is a broken check that would pass forever. It is a live risk rather than a
-    hypothetical: ``wmic`` is deprecated and absent on current Windows builds,
-    where it writes nothing and exits quietly.
+    **The guard on the guard.** "No launcher processes found" and "the capture
+    failed" are indistinguishable to :func:`surviving_launchers`, and the second
+    is not a clean teardown but a check that would pass forever. A live risk, not
+    a hypothetical: ``wmic`` is deprecated and absent on current Windows builds,
+    where it writes nothing or a bare header and exits quietly.
 
-    The test is that the listing mentions ``python`` at all. That is a strong
-    invariant precisely here, because this module is *itself* run as
-    ``python -m helao.core.tests.win_orphan_check`` moments after the snapshot is
-    taken -- so a listing that cannot see a single python process cannot see the
-    caller either, and certainly cannot be trusted to see an orphan.
+    Judged on the **number of processes listed**, and an earlier version of this
+    got it wrong in a way worth recording. It required the listing to name
+    ``python``, reasoning that the checker is itself run as ``python -m`` moments
+    afterwards. That is the wrong way round: the snapshot is taken *before* this
+    process starts. So on a station where containment worked and nothing else was
+    running python, the listing correctly held no python at all -- and the guard
+    turned a PASS into "CANNOT JUDGE". A guard that fires on the success case is
+    worse than no guard.
 
     Args:
         tasklist_csv: The captured process listing.
@@ -116,7 +125,9 @@ def evidence_is_usable(tasklist_csv: str) -> bool:
     Returns:
         bool: True when the listing looks like a real process enumeration.
     """
-    return "python" in tasklist_csv.lower()
+    return len([line for line in tasklist_csv.splitlines() if line.strip()]) >= (
+        MIN_PROCESS_LINES
+    )
 
 
 def orphan_report(tasklist_csv: str, netstat_txt: str, ports, config_prefix="") -> str:
@@ -132,13 +143,15 @@ def orphan_report(tasklist_csv: str, netstat_txt: str, ports, config_prefix="") 
         str: Empty string on success; otherwise every finding, one per line.
     """
     if not evidence_is_usable(tasklist_csv):
+        lines = len([line for line in tasklist_csv.splitlines() if line.strip()])
         return (
-            "CANNOT JUDGE: the process listing names no python process at all, so "
-            "it is empty or truncated rather than clean -- this check would "
-            "otherwise pass no matter how many servers survived.\n"
-            "    On current Windows builds `wmic` is gone; the snapshot must come "
-            "from PowerShell (Get-CimInstance Win32_Process). Re-run the smoke "
-            "script, which prefers CIM and falls back to wmic."
+            f"CANNOT JUDGE: the process listing holds {lines} line(s), fewer than "
+            f"the {MIN_PROCESS_LINES} a real enumeration always has, so the capture "
+            f"failed rather than the machine being clean -- this check would "
+            f"otherwise pass no matter how many servers survived.\n"
+            f"    On current Windows builds `wmic` is gone and writes nothing; the "
+            f"snapshot must come from PowerShell (Get-CimInstance Win32_Process). "
+            f"Note this says nothing about containment either way."
         )
     procs = surviving_launchers(tasklist_csv, config_prefix)
     held = listening_ports(netstat_txt, ports)

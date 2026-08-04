@@ -11,29 +11,36 @@ prefix of another.
 from typing import Final
 
 from helao.core.tests.win_orphan_check import (
+    MIN_PROCESS_LINES,
     evidence_is_usable,
     listening_ports,
     orphan_report,
     surviving_launchers,
 )
 
-# `wmic process get CommandLine,ProcessId` output. Command line first, pid last,
-# which is why the pid is read as the trailing number and not the first one.
-WMIC_WITH_ORPHANS: Final[
-    str
-] = """CommandLine                                                        ProcessId
-python.exe -u fast_launcher.py golden SIM                           7412
-python.exe -u bokeh_launcher.py golden OPERATOR                     7480
-C:\\Windows\\explorer.exe                                            3120
-python.exe launch.py golden                                        7008
-"""
+# `wmic process get CommandLine,ProcessId` / PowerShell CIM output. Command line
+# first, pid last, which is why the pid is read as the trailing number.
+#
+# Padded with filler processes so both fixtures clear MIN_PROCESS_LINES: a real
+# enumeration lists dozens, and a fixture short enough to be mistaken for a failed
+# capture would exercise the usability guard instead of the parser.
+_FILLER: Final[str] = "\n".join(
+    f"C:\\Windows\\System32\\svchost.exe -k netsvcs  {900 + i}" for i in range(20)
+)
 
-WMIC_CLEAN: Final[
-    str
-] = """CommandLine                                                        ProcessId
-C:\\Windows\\explorer.exe                                            3120
-python.exe -m pytest                                                9001
-"""
+WMIC_WITH_ORPHANS: Final[str] = (
+    "CommandLine                                          ProcessId\n"
+    "python.exe -u fast_launcher.py golden SIM             7412\n"
+    "python.exe -u bokeh_launcher.py golden OPERATOR       7480\n"
+    "C:\\Windows\\explorer.exe                              3120\n"
+    "python.exe launch.py golden                           7008\n" + _FILLER + "\n"
+)
+
+WMIC_CLEAN: Final[str] = (
+    "CommandLine                                          ProcessId\n"
+    "C:\\Windows\\explorer.exe                              3120\n"
+    "python.exe -m pytest                                  9001\n" + _FILLER + "\n"
+)
 
 # `netstat -ano`. 50010 is present on purpose: a ":5001" substring match would
 # report port 5001 as still held when only 50010 is.
@@ -129,30 +136,50 @@ def test_orphan_report_names_every_survivor_and_points_at_the_cause() -> None:
     assert "AssignProcessToJobObject failed" in report
 
 
-def test_an_empty_process_listing_is_reported_as_unusable_not_clean() -> None:
-    """An empty listing must never read as a clean teardown.
+def test_a_failed_capture_is_reported_as_unusable_not_clean() -> None:
+    """A short listing must never read as a clean teardown.
 
-    This is the failure that would have made the whole smoke test worthless:
-    ``wmic`` is absent on current Windows builds and writes nothing, and
-    "found no launchers" in an empty file is indistinguishable from "no
-    launchers survived". The checker refuses to judge instead.
+    ``wmic`` is absent on current Windows builds and writes nothing or a bare
+    header, and "found no launchers" in an empty file is indistinguishable from
+    "no launchers survived". The checker refuses to judge instead, and says how
+    many lines it actually got so the next reader is not left guessing.
     """
     for unusable in ("", "\n", "CommandLine  ProcessId\n", "ERROR: bad command\n"):
         report = orphan_report(unusable, NETSTAT_CLEAR, [5001])
-        assert report, f"empty evidence must not pass: {unusable!r}"
+        assert report, f"a failed capture must not pass: {unusable!r}"
         assert "CANNOT JUDGE" in report
         assert "wmic" in report
+        assert "says nothing about containment" in report
 
 
-def test_evidence_is_usable_keys_on_the_checkers_own_interpreter() -> None:
-    """The listing must see a python process, because this check is one.
+def test_a_listing_with_no_python_at_all_is_still_usable() -> None:
+    """Zero python processes is a legitimate SUCCESS state, not broken evidence.
 
-    Run as ``python -m helao.core.tests.win_orphan_check`` moments after the
-    snapshot, so a listing with no python in it cannot even see its own caller.
+    Pins the mistake this replaced. The guard used to require the listing to name
+    ``python``, on the reasoning that the checker is itself run as ``python -m``
+    moments later -- but the snapshot is taken *before* this process starts. So on
+    a station where the job object killed every server and nothing else was
+    running python, the listing correctly held none, and the guard turned a PASS
+    into "CANNOT JUDGE". Both stations hit exactly that.
     """
-    assert evidence_is_usable(WMIC_CLEAN) is True
-    assert evidence_is_usable(WMIC_WITH_ORPHANS) is True
-    assert evidence_is_usable("C:\\Windows\\explorer.exe   3120\n") is False
+    listing = "\n".join(
+        f"C:\\Windows\\System32\\svchost.exe  {900 + i}" for i in range(30)
+    )
+    assert "python" not in listing
+    assert evidence_is_usable(listing) is True
+    assert orphan_report(listing, NETSTAT_CLEAR, [5001]) == "", "this is a clean pass"
+
+
+def test_evidence_usability_keys_on_the_process_count() -> None:
+    """Usable above the threshold, unusable below it."""
+
+    def listing(n):
+        return "\n".join(f"proc-{i}.exe  {900 + i}" for i in range(n))
+
+    assert evidence_is_usable(listing(MIN_PROCESS_LINES)) is True
+    assert evidence_is_usable(listing(MIN_PROCESS_LINES - 1)) is False
+    # Blank lines must not pad a failed capture up over the threshold.
+    assert evidence_is_usable("\n" * 100) is False
 
 
 def test_usable_evidence_with_orphans_still_reports_them() -> None:

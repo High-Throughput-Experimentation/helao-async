@@ -143,7 +143,13 @@ REM
 REM `*launch.py %CONFIG%*` matches only the monitor. A child's command line is
 REM `fast_launcher.py <config>`, and "launcher.py" does not contain "launch.py"
 REM -- the characters after "launch" are "er.py", not ".py".
-powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*launch.py %CONFIG%*' } | ForEach-Object { Write-Host ('    killing monitor pid ' + $_.ProcessId); Stop-Process -Id $_.ProcessId -Force }"
+REM Restricted to python processes. Matching on the command line alone also hit
+REM the `cmd /c` wrapper `start` created -- its own command line contains
+REM "launch.py <config>" too -- so the script reported "killing monitor pid" two
+REM or three times and it was unclear which process was the launcher. Killing the
+REM wrapper is harmless but it is not the thing under test, and the job object
+REM belongs to the python process regardless.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -like 'python*' -and $_.CommandLine -like '*launch.py %CONFIG%*' } | ForEach-Object { Write-Host ('    killing monitor pid ' + $_.ProcessId + ': ' + $_.CommandLine); Stop-Process -Id $_.ProcessId -Force }"
 
 echo     waiting 20s for the kernel to tear the job down ...
 ping -n 21 127.0.0.1 >nul
