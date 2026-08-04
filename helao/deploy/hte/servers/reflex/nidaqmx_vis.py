@@ -146,7 +146,7 @@ def build(server_key: str, state_cls):
 
     def figure(spec, url, layout, title):
         return rx.vstack(
-            rx.text(title, size="2", weight="medium"),
+            rx.text(title, size="1", weight="medium"),
             plots.chart(spec, url, layout, height=260),
             width="100%",
             spacing="1",
@@ -155,7 +155,7 @@ def build(server_key: str, state_cls):
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.heading(f"Cells: {server_key}", size="4"),
+                rx.heading(f"Cells: {server_key}", size="3"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.text(state_cls.action_uuid, size="1", class_name=MUTED_TEXT),
@@ -170,7 +170,7 @@ def build(server_key: str, state_cls):
                 spacing="3",
             ),
             rx.hstack(
-                rx.text("cells:", size="2"),
+                rx.text("cells:", size="1"),
                 rx.foreach(
                     state_cls.available_cells,
                     lambda cell: rx.checkbox(

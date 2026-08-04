@@ -206,7 +206,7 @@ def make_pstat_panel(
         return rx.card(
             rx.vstack(
                 rx.hstack(
-                    rx.heading(f"{title}: {server_key}", size="4"),
+                    rx.heading(f"{title}: {server_key}", size="3"),
                     rx.badge(state_cls.connection),
                     rx.spacer(),
                     rx.text(state_cls.action_name, size="1"),
@@ -216,14 +216,14 @@ def make_pstat_panel(
                     spacing="3",
                 ),
                 rx.hstack(
-                    rx.text("x:", size="2"),
+                    rx.text("x:", size="1"),
                     rx.select(
                         state_cls.axis_options,
                         value=state_cls.x_column,
                         on_change=state_cls.set_x,
                         width="9em",
                     ),
-                    rx.text("y:", size="2"),
+                    rx.text("y:", size="1"),
                     rx.select(
                         state_cls.axis_options,
                         value=state_cls.y_column,
@@ -247,7 +247,7 @@ def make_pstat_panel(
                     rx.foreach(
                         state_cls.chart_titles,
                         lambda heading, index: rx.vstack(
-                            rx.text(heading, size="2", weight="medium"),
+                            rx.text(heading, size="1", weight="medium"),
                             plots.chart(
                                 state_cls.chart_specs[index],
                                 state_cls.chart_urls[index],

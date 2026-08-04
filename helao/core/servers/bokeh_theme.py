@@ -22,6 +22,11 @@ against Bokeh 3.9.1 with headless Chromium; the readings are in
    It cannot reach ``Div`` content (Bokeh renders ``Div.text`` into the *Div's*
    shadow root — that content is not light DOM), nor widget internals, nor even
    a widget's host element. Keep it small; anything else added here is a no-op.
+   The **one** exception, and it is an exception Bokeh built deliberately, is
+   the ``--bokeh-base-font`` / ``--bokeh-mono-font`` pair: Bokeh references
+   those from inside each shadow root without ever declaring them, so setting
+   them on ``html`` themes every widget's typeface at once. See the comment
+   above the constant.
 3. :func:`marker_style_block` / :func:`semantic_button_stylesheet` — per-widget
    ``InlineStyleSheet``, which lands *inside* the target widget's shadow root.
    The only mechanism that can recolour a Bokeh widget. There is no
@@ -68,12 +73,15 @@ from helao.core.servers.palette import (
     BUTTON_WARNING_BG,
     ESTOP_BG,
     ESTOP_HOVER_BG,
+    INPUT_FONT_STACK,
     MARKER_SWATCHES,
     MUTED_TEXT_ON_WHITE,
     PAGE_BG,
     PANEL_BG,
     SURFACE_WHITE,
     TW,
+    UI_FONT_STACK,
+    font_import_css,
 )
 
 # Chart-chrome roles, named here rather than in palette.py because they are
@@ -112,6 +120,8 @@ HELAO_THEME: Final[Theme] = Theme(
                 "minor_tick_line_color": _AXIS_LINE,
                 "axis_label_text_color": BODY_TEXT,
                 "major_label_text_color": MUTED_TEXT_ON_WHITE,
+                "axis_label_text_font": UI_FONT_STACK,
+                "major_label_text_font": UI_FONT_STACK,
             },
             # minor_grid_line_color is deliberately absent: it defaults to None
             # and setting it would add gridlines no figure asked for.
@@ -123,20 +133,45 @@ HELAO_THEME: Final[Theme] = Theme(
             # section headers, which are Div markup styled at their own sites.
             "Title": {
                 "text_color": BODY_TEXT,
+                "text_font": UI_FONT_STACK,
             },
             "Label": {
                 "text_color": BODY_TEXT,
+                "text_font": UI_FONT_STACK,
             },
             "Legend": {
                 "background_fill_color": SURFACE_WHITE,
                 "border_line_color": _AXIS_LINE,
                 "label_text_color": BODY_TEXT,
                 "title_text_color": BODY_TEXT,
+                "label_text_font": UI_FONT_STACK,
+                "title_text_font": UI_FONT_STACK,
             },
             "ColorBar": {
                 "background_fill_color": SURFACE_WHITE,
                 "major_label_text_color": MUTED_TEXT_ON_WHITE,
                 "title_text_color": BODY_TEXT,
+                "major_label_text_font": UI_FONT_STACK,
+                "title_text_font": UI_FONT_STACK,
+            },
+            # The one Theme entry that is not chart furniture, and the only
+            # mechanism that gives a Bokeh *text field* a different family from
+            # the rest of the page. `styles` is an inline style on the widget's
+            # host element, which beats both the `:host{font-family:var(
+            # --base-font)}` rule inside the widget's own shadow root and the
+            # `*{font-family:inherit}` its parent layout imposes from the outer
+            # tree. Keyed on "InputWidget" so Theme's MRO walk reaches TextInput,
+            # TextAreaInput, Select, MultiSelect, NumericInput, Spinner,
+            # AutocompleteInput and DatePicker alike.
+            #
+            # It survives a widget that sets `stylesheets` explicitly -- which
+            # the operator's param inputs do, and then replace wholesale from
+            # CustomJS -- because a theme default is only lost for the *same*
+            # property. It does **not** survive a call site that sets `styles`
+            # on an input widget; no site does today, and
+            # test_no_bokeh_input_widget_sets_styles keeps it that way.
+            "InputWidget": {
+                "styles": {"font-family": INPUT_FONT_STACK},
             },
         }
     }
@@ -158,9 +193,36 @@ HELAO_THEME: Final[Theme] = Theme(
 # collapses the recessed-panel hierarchy this stack has always had — light
 # canvas, mid-tone panel, light plot area — and the section panels vanish into
 # the page on every document. See palette.PAGE_BG.
-GLOBAL_CSS: Final[str] = f"""
+#
+# The fonts are the one thing here that reaches *past* the document tree, and
+# they do it through a hole Bokeh left open rather than through inheritance.
+# `styles/base.css` opens every widget's shadow root with
+#
+#   :host{--base-font:var(--bokeh-base-font, Helvetica, Arial, sans-serif);
+#         --mono-font:var(--bokeh-mono-font, monospace);
+#         font-family:var(--base-font);}
+#   *,*:before,*:after{font-family:inherit;}
+#   pre,code,tt{font-family:var(--mono-font);}
+#
+# `--bokeh-base-font` and `--bokeh-mono-font` are *referenced and never
+# declared*, so unlike `--primary` and the rest of the colour vars — which Bokeh
+# re-declares on `:host` and which therefore cannot be themed from here at all —
+# an inherited custom property set on `html` reaches every widget in the
+# document. Measured on Bokeh 3.9.1: setting these two alone moved a Div's span,
+# a Button's label, a TextInput's `<input>`, a Select, a TextAreaInput and a
+# DataTable's header cells, including a button that carried its own
+# `InlineStyleSheet`. **`body { font-family: ... }` moves none of them** — the
+# probe's earlier reading of a stubborn `Helvetica, Arial, sans-serif` was this,
+# not a shadow-boundary limit on inheritance. Do not "simplify" this to a body
+# rule.
+GLOBAL_CSS: Final[str] = font_import_css() + f"""
+html {{
+  --bokeh-base-font: {UI_FONT_STACK};
+  --bokeh-mono-font: {INPUT_FONT_STACK};
+}}
 html, body {{
   background-color: {PAGE_BG};
+  font-family: {UI_FONT_STACK};
 }}
 body {{
   color: {BODY_TEXT};

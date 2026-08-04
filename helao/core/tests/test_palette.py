@@ -969,7 +969,10 @@ def test_reflex_page_tint_is_not_the_bokeh_page_bg_constant() -> None:
 def test_reflex_class_helpers_emit_the_declared_utilities() -> None:
     assert palette.reflex_page_class("/live") == "bg-sky-50 min-h-screen"
     assert palette.reflex_page_class("/operator") == "bg-amber-50 min-h-screen"
-    assert palette.reflex_header_class("action") == "bg-cyan-100 text-cyan-700"
+    assert (
+        palette.reflex_header_class("action")
+        == "bg-cyan-100 text-cyan-700 py-1! h-auto!"
+    )
     assert palette.reflex_table_class("action") == "border-l-[3px] border-cyan-600"
     assert palette.reflex_muted_text_class() == "text-slate-600"
 
@@ -1073,6 +1076,315 @@ def test_the_reflex_stack_glob_actually_matches_files() -> None:
     """A guard on the guard: a typo'd glob makes the sweep above vacuous."""
     for pattern in REFLEX_STACK_GLOBS:
         assert list(REPO_ROOT.glob(pattern)), f"{pattern} matched nothing"
+
+
+#: Reflex components on which Radix ``size`` is a *font* size. The distinction
+#: matters: on ``rx.button``/``rx.select``/``rx.input`` the same keyword is a
+#: component token driving padding and control height, so it is deliberately
+#: not swept -- shrinking one would change control geometry, not type size.
+REFLEX_TEXT_COMPONENTS: Final[frozenset[str]] = frozenset(
+    {
+        "rx.text",
+        "rx.heading",
+        "rx.table.cell",
+        "rx.table.column_header_cell",
+        "rx.code",
+        "rx.badge",
+    }
+)
+
+#: Radix's text scale is 12/14/16/18/20/24px for sizes 1-6, so ``"1"`` is
+#: exactly the 12px floor and there is nothing legal below it.
+REFLEX_MIN_TEXT_SIZE: Final[int] = 1
+
+
+def _dotted_call_name(node: ast.expr) -> str | None:
+    """Return ``rx.table.cell`` for the callee of such a call, else ``None``."""
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+        return ".".join(reversed(parts))
+    return None
+
+
+def test_no_reflex_text_size_is_below_the_12px_floor() -> None:
+    """No text-bearing Reflex component may carry a ``size`` under ``"1"``.
+
+    The floor is enforced rather than trusted, because the failure is invisible
+    from the source: ``size="0"`` is not an error Reflex raises, it just renders
+    below the 12px the type scale bottoms out at. AST-driven so each ``size`` is
+    attributed to the component that owns it -- a grep cannot tell a multi-line
+    ``rx.text(..., size="1")`` from an ``rx.button(..., size="1")`` and would
+    police the buttons this deliberately leaves alone.
+    """
+    offenders: list[str] = []
+    seen = 0
+    for pattern in REFLEX_STACK_GLOBS:
+        for path in sorted(REPO_ROOT.glob(pattern)):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call):
+                    continue
+                name = _dotted_call_name(node.func)
+                if name not in REFLEX_TEXT_COMPONENTS:
+                    continue
+                for kw in node.keywords:
+                    if kw.arg != "size":
+                        continue
+                    if not isinstance(kw.value, ast.Constant) or not isinstance(
+                        kw.value.value, str
+                    ):
+                        # A Var-driven size cannot be checked statically; the
+                        # floor then has to be argued at the call site.
+                        continue
+                    seen += 1
+                    where = f"{_relative(path)}:{kw.value.lineno}"
+                    if not kw.value.value.isdigit():
+                        offenders.append(f"{where} {name} size={kw.value.value!r}")
+                    elif int(kw.value.value) < REFLEX_MIN_TEXT_SIZE:
+                        offenders.append(f"{where} {name} size={kw.value.value!r}")
+    assert offenders == [], (
+        f'Radix size "{REFLEX_MIN_TEXT_SIZE}" is the 12px floor of the text '
+        "scale; nothing may render smaller:\n  " + "\n  ".join(offenders)
+    )
+    assert seen, "swept no text-component size= at all, so this proves nothing"
+
+
+def test_gridjs_header_css_trims_vertical_padding_only() -> None:
+    """The header's height complaint is fixed here, and only vertically.
+
+    gridjs's own ``th.gridjs-th`` sets ``14px``, measured as a 52.5px header row
+    against 49px body rows. This rule is the only thing that can override it (a
+    utility loses to unlayered CSS; see the function's docstring), so the padding
+    has to ride along with the hue.
+
+    The shorthand is asserted *absent*: ``padding: 4px`` would collapse gridjs's
+    24px horizontal padding too, narrowing every column -- a change nobody asked
+    for and one no colour test would have caught.
+    """
+    css = palette.reflex_gridjs_header_css()
+    pad = palette.GRIDJS_HEADER_PAD_Y
+    assert f"padding-top: {pad}" in css
+    assert f"padding-bottom: {pad}" in css
+    assert re.search(r"[;{]\s*padding:", css) is None, "must not use the shorthand"
+    assert "padding-left" not in css and "padding-right" not in css
+
+
+# --- typefaces -------------------------------------------------------------
+#: The CSS generic font families. A stack ending in one of these is guaranteed
+#: to resolve to *something* the browser has locally; a stack ending in a named
+#: family is not. https://drafts.csswg.org/css-fonts-4/#generic-font-families
+CSS_GENERIC_FAMILIES = frozenset(
+    {
+        "serif",
+        "sans-serif",
+        "monospace",
+        "cursive",
+        "fantasy",
+        "system-ui",
+        "ui-serif",
+        "ui-sans-serif",
+        "ui-monospace",
+        "ui-rounded",
+        "math",
+        "emoji",
+        "fangsong",
+    }
+)
+
+
+def _stack_entries(stack: str) -> list[str]:
+    """Split a ``font-family`` value into its families, unquoted."""
+    return [entry.strip().strip("\"'") for entry in stack.split(",")]
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["UI_FONT_STACK", "INPUT_FONT_STACK", "UI_FONT_FALLBACK", "INPUT_FONT_FALLBACK"],
+)
+def test_font_stacks_end_in_a_generic_family(name: str) -> None:
+    """**The offline guarantee, and the reason it is a construction not a check.**
+
+    Stations frequently run with no route to the internet, so both ``@import``
+    lines can simply fail — and a failed ``@import`` means only that the first
+    family in a stack is unavailable, which is the case CSS fallback already
+    exists for. That makes the *last* entry the promise: a generic family always
+    resolves to something installed, a named one does not.
+
+    Asserted rather than trusted because the failure mode is invisible from the
+    source. An editor who appends a favourite face, or trims the tail as
+    "redundant", leaves every offline station rendering in whatever the
+    browser's last-resort font happens to be — on the machine where the edit was
+    made, with the webfont cached, nothing looks wrong at all.
+    """
+    stack = getattr(palette, name)
+    entries = _stack_entries(stack)
+    assert len(entries) >= 2, f"{name} has no fallback at all: {stack!r}"
+    assert entries[-1] in CSS_GENERIC_FAMILIES, (
+        f"{name} ends in {entries[-1]!r}, which is a named family. The last "
+        f"entry must be one of the CSS generics or an offline station has no "
+        f"guaranteed font: {stack!r}"
+    )
+
+
+def test_the_two_font_roles_are_different_stacks() -> None:
+    """A single stack for both roles would silently drop the input/UI split."""
+    assert palette.UI_FONT_STACK != palette.INPUT_FONT_STACK
+    assert _stack_entries(palette.UI_FONT_STACK)[-1] == "sans-serif"
+    assert _stack_entries(palette.INPUT_FONT_STACK)[-1] == "monospace"
+
+
+def test_each_stack_leads_with_the_family_its_import_provides() -> None:
+    """The webfont's own family name, which is not always the obvious one.
+
+    ``iosevka.css`` names its faces ``Iosevka Web``; a stack asking only for
+    ``Iosevka`` ignores the webfont entirely and falls through to
+    ``ui-monospace`` — except on a machine with Iosevka installed locally, where
+    it looks right and the defect is invisible.
+    """
+    ui = _stack_entries(palette.UI_FONT_STACK)
+    assert ui[0] == "IBM Plex Sans Condensed"
+    assert "family=IBM+Plex+Sans+Condensed" in palette.UI_FONT_IMPORT
+
+    inp = _stack_entries(palette.INPUT_FONT_STACK)
+    assert inp[0] == "Iosevka Web", "the family iosevka.css actually defines"
+    assert inp[1] == "Iosevka", "a locally installed copy, for offline stations"
+    assert "iosevka" in palette.INPUT_FONT_IMPORT
+
+
+def test_the_ui_import_asks_for_display_swap() -> None:
+    """Without it a dead network holds the text invisible instead of falling back."""
+    assert "display=swap" in palette.UI_FONT_IMPORT
+
+
+def test_font_import_css_emits_imports_and_nothing_else() -> None:
+    """``@import`` is only valid before every style rule in its stylesheet.
+
+    A rule sneaking in ahead of one makes the browser drop it silently, leaving
+    both families unavailable and both stacks quietly on their fallbacks.
+    """
+    css = palette.font_import_css()
+    lines = [line.strip() for line in css.splitlines() if line.strip()]
+    assert lines, "emitted nothing"
+    assert all(line.startswith("@import") for line in lines), css
+    assert "{" not in css
+
+
+def test_reflex_font_css_puts_its_imports_before_any_rule() -> None:
+    css = palette.reflex_font_css()
+    assert css.index("@import") < css.index("{")
+    first_rule = css.index("{")
+    assert css.count("@import", 0, first_rule) == 2
+
+
+def test_reflex_font_css_overrides_both_frameworks_font_tokens() -> None:
+    """Radix and Tailwind each own a token that decides the resolved family.
+
+    Radix declares ``--default-font-family`` on ``.radix-themes`` — unlayered,
+    so a ``:root`` override loses to it on specificity and the page stays on
+    ``-apple-system``. Tailwind declares ``--font-sans`` in ``@layer theme``.
+    Missing either one leaves half the page on the old face.
+    """
+    css = palette.reflex_font_css()
+    assert f"--font-sans: {palette.UI_FONT_STACK}" in css
+    assert f"--font-mono: {palette.INPUT_FONT_STACK}" in css
+    for token in (
+        "--default-font-family",
+        "--heading-font-family",
+        "--strong-font-family",
+        "--em-font-family",
+        "--quote-font-family",
+    ):
+        assert f"{token}: {palette.UI_FONT_STACK}" in css, token
+    assert f"--code-font-family: {palette.INPUT_FONT_STACK}" in css
+    assert ".radix-themes" in css
+
+
+def test_reflex_font_css_outranks_radix_on_specificity() -> None:
+    """Every selector is class-qualified under ``html``, not bare.
+
+    ``head_components`` does not control where this lands relative to the
+    bundled Radix stylesheet, so the rules cannot rely on source order. A bare
+    ``input`` is (0,0,1) and loses to Radix's own single-class rule on its
+    field; ``html .rt-TextFieldInput`` is (0,1,1) and wins either way.
+    """
+    css = palette.reflex_font_css()
+    body = css[css.index("{") :]
+    selectors = [
+        part.strip()
+        for chunk in body.split("}")
+        if "{" in chunk
+        for part in chunk[: chunk.index("{")].split(",")
+        if part.strip()
+    ]
+    assert selectors
+    for selector in selectors:
+        assert selector == "html" or selector.startswith("html "), selector
+
+
+def test_reflex_font_css_gives_text_fields_the_input_font() -> None:
+    css = palette.reflex_font_css()
+    rule = css.rsplit("{", 1)
+    assert palette.INPUT_FONT_STACK in rule[1]
+    for target in ("input", "textarea", "select", ".rt-TextFieldInput"):
+        assert target in rule[0].rsplit("}", 1)[-1], target
+
+
+def test_reflex_header_class_carries_the_height_trim() -> None:
+    """Both utilities, both important, for every hue.
+
+    ``py-1`` alone cannot move the height: Radix sets
+    ``height: var(--table-cell-min-height)`` (36px) on ``.rt-TableCell``, and
+    ``height`` on a table cell is a minimum. Measured — trimming the padding
+    from 8px to 4px on its own left the cell at exactly 36px. And without the
+    trailing ``!`` neither utility applies at all, because Radix is unlayered
+    while Tailwind utilities are in ``@layer utilities``.
+    """
+    assert palette.REFLEX_HEADER_TRIM == "py-1! h-auto!"
+    for kind in palette.REFLEX_TABLE_HUES:
+        emitted = palette.reflex_header_class(kind)
+        assert emitted.endswith(palette.REFLEX_HEADER_TRIM), kind
+        for utility in palette.REFLEX_HEADER_TRIM.split():
+            assert utility.endswith("!"), utility
+
+
+def test_gridjs_header_css_sets_the_header_font_size() -> None:
+    """gridjs takes no Radix ``size`` prop, so this rule is the only route.
+
+    Measured 16px against 12px page body text before; 14px is one step above
+    the body, which is what a header wants.
+    """
+    css = palette.reflex_gridjs_header_css()
+    assert f"font-size: {palette.GRIDJS_HEADER_FONT_SIZE}" in css
+    size = palette.GRIDJS_HEADER_FONT_SIZE
+    assert size.endswith("px")
+    assert 12 <= int(size.removesuffix("px")) <= 16
+
+
+def test_gridjs_header_padding_cannot_clip_its_content() -> None:
+    """``4px`` is slack, not a squeeze, so the label and sort icon stay whole.
+
+    The tallest thing a header can hold is the sort button, and gridjs gives it
+    a flat ``height: 24px`` that no font size touches -- so 24px is the content
+    box to clear, and the padding only ever adds to it. Pinned as a number
+    because the safety of the value is the whole argument for it: 24 + 2*4 +
+    0.5px border measured 32.5px in-browser, down from 52.5px, with the sort
+    icon 4px clear of each edge.
+
+    A header *without* a sort button is shorter still, and got shorter again
+    when :data:`~helao.core.servers.palette.GRIDJS_HEADER_FONT_SIZE` brought the
+    label to 14px: its 21px line box measured 29.5px overall. The 24px figure
+    below is deliberately the worst case rather than that one.
+    """
+    pad = palette.GRIDJS_HEADER_PAD_Y
+    assert pad.endswith("px")
+    pad_px = int(pad.removesuffix("px"))
+    assert 0 <= pad_px < 14, "must trim gridjs's 14px without going negative"
+    content_px = 24
+    assert content_px + 2 * pad_px == 32
 
 
 def test_exceptions_registry_is_empty() -> None:

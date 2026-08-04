@@ -16,6 +16,7 @@ Three defects these pin, each of which is invisible to a normal smoke test:
 """
 
 import bokeh.models
+import pytest
 from bokeh.document import Document
 from bokeh.models import Div, GlobalInlineStyleSheet, InlineStyleSheet
 
@@ -41,10 +42,12 @@ from helao.core.servers.palette import (
     CHART_CHROME,
     ESTOP_BG,
     ESTOP_HOVER_BG,
+    INPUT_FONT_STACK,
     MARKER_SWATCHES,
     PAGE_BG,
     PANEL_BG,
     SURFACE_WHITE,
+    UI_FONT_STACK,
 )
 
 
@@ -393,6 +396,194 @@ def test_helao_vis_themes_its_document():
     (carrier,) = doc.roots
     assert isinstance(carrier, Div)
     assert CARRIER_TAG in carrier.tags
+
+
+# ---------------------------------------------------------------------------
+# Typefaces
+# ---------------------------------------------------------------------------
+def test_global_css_sets_the_two_bokeh_font_variables():
+    """The only document-level hook that reaches inside a Bokeh shadow root.
+
+    ``styles/base.css`` opens every widget's shadow root with
+    ``:host{--base-font:var(--bokeh-base-font, Helvetica, Arial, sans-serif);
+    font-family:var(--base-font)}``. Bokeh *references* ``--bokeh-base-font``
+    and never declares it — unlike ``--primary`` and the other colour vars,
+    which it re-declares on ``:host`` and which therefore cannot be themed from
+    the document at all. Measured on 3.9.1: these two alone moved a Div's span,
+    a Button's label, a TextInput, a Select, a TextAreaInput and a DataTable's
+    header cells; ``body { font-family: ... }`` moved none of them.
+
+    The names are asserted because a typo here is a silent no-op — the page
+    renders in Bokeh's Helvetica and nothing is logged.
+    """
+    assert f"--bokeh-base-font: {UI_FONT_STACK}" in GLOBAL_CSS
+    assert f"--bokeh-mono-font: {INPUT_FONT_STACK}" in GLOBAL_CSS
+    # On `html`, so it is inherited by every root shell and every shadow root
+    # below them. On `body` it would still inherit, but `html` is where the
+    # probe measured it and costs nothing.
+    html_block = GLOBAL_CSS[GLOBAL_CSS.index("html {") :]
+    assert "--bokeh-base-font" in html_block[: html_block.index("}")]
+
+
+def test_global_css_starts_with_the_font_imports():
+    """``@import`` after a style rule is dropped by the browser, silently."""
+    body = GLOBAL_CSS.strip()
+    assert body.startswith("@import")
+    assert body.index("@import") < body.index("{")
+    assert body.count("@import", 0, body.index("{")) == 2
+
+
+@pytest.mark.parametrize(
+    "cls,prop",
+    [
+        ("Axis", "axis_label_text_font"),
+        ("Axis", "major_label_text_font"),
+        ("Title", "text_font"),
+        ("Label", "text_font"),
+        ("Legend", "label_text_font"),
+        ("Legend", "title_text_font"),
+        ("ColorBar", "major_label_text_font"),
+        ("ColorBar", "title_text_font"),
+    ],
+)
+def test_theme_sets_the_figure_text_fonts(cls: str, prop: str):
+    """Canvas-rendered text takes no CSS at all; it takes these properties.
+
+    A figure's labels are drawn into a canvas, so the ``--bokeh-*-font``
+    variables above cannot touch them — BokehJS builds a ``ctx.font`` shorthand
+    from ``text_font_style``/``text_font_size``/``text_font``. The whole stack is
+    passed rather than a bare family name because a canvas font shorthand
+    accepts a comma-separated list: verified in-browser, where
+    ``ctx.font = '13px ' + stack`` round-tripped unchanged and measured a
+    different width from Bokeh's ``Helvetica, Arial, sans-serif`` default (65px
+    against 71.5px for the same string). An unparseable value would have been
+    ignored silently and left the figure text on Helvetica.
+    """
+    assert HELAO_THEME._json["attrs"][cls][prop] == UI_FONT_STACK
+
+
+def test_theme_gives_input_widgets_the_input_font():
+    """Keyed on ``InputWidget`` so Theme's MRO walk reaches every text field.
+
+    ``styles`` (an inline style on the widget's *host* element) rather than
+    ``stylesheets``, and that is the measured distinction rather than a
+    preference. A ``:host{--bokeh-base-font: ...}`` sheet on an input **is
+    delivered** — the property reads back changed on the host — and still does
+    not move the font, because the host's ``font-family`` comes from its parent
+    layout's ``*{font-family:inherit}`` in the *outer* tree, and an outer-tree
+    declaration beats a ``:host`` rule. An inline style beats both.
+    """
+    attrs = HELAO_THEME._json["attrs"]
+    assert attrs["InputWidget"]["styles"] == {"font-family": INPUT_FONT_STACK}
+    assert issubclass(bokeh.models.TextInput, bokeh.models.InputWidget)
+    assert issubclass(bokeh.models.Select, bokeh.models.InputWidget)
+
+
+def test_theme_font_reaches_a_widget_that_sets_its_own_stylesheets():
+    """The operator's param inputs set ``stylesheets`` and replace them from JS.
+
+    A theme default is only lost for the *same* property, so a widget carrying
+    its own ``stylesheets`` still gets ``styles`` from the theme. This is why the
+    input font did not need a single call-site edit.
+    """
+    from bokeh.models import TextInput
+
+    doc = Document()
+    apply_theme(doc)
+    sheeted = TextInput(value="x", stylesheets=[color_rule(".bk-input", BODY_TEXT)])
+    doc.add_root(sheeted)
+    assert sheeted.styles == {"font-family": INPUT_FONT_STACK}
+    assert sheeted.stylesheets == [color_rule(".bk-input", BODY_TEXT)]
+
+
+def test_a_call_site_that_sets_styles_on_an_input_would_lose_the_font():
+    """The one way the input font can be lost — pinned so it stays hypothetical.
+
+    ``styles`` is a whole-property default, so a call site passing its own dict
+    replaces it rather than merging. No site does today
+    (``test_no_bokeh_input_widget_sets_styles``); this documents *why* that
+    matters, by demonstrating the loss.
+    """
+    from bokeh.models import TextInput
+
+    doc = Document()
+    apply_theme(doc)
+    overriding = TextInput(value="x", styles={"text-align": "right"})
+    doc.add_root(overriding)
+    assert "font-family" not in overriding.styles
+
+
+#: Bokeh input widgets, by the name a call site constructs them under. Themed
+#: through ``InputWidget``, so any of them passing its own ``styles`` would drop
+#: the input font.
+_BOKEH_INPUT_WIDGETS = frozenset(
+    {
+        "AutocompleteInput",
+        "ColorPicker",
+        "DatePicker",
+        "DateRangeSlider",
+        "DatetimePicker",
+        "FileInput",
+        "MultiChoice",
+        "MultiSelect",
+        "NumericInput",
+        "PasswordInput",
+        "Select",
+        "Spinner",
+        "TextAreaInput",
+        "TextInput",
+    }
+)
+
+
+def test_no_bokeh_input_widget_sets_styles():
+    """AST guard on the one thing that can silently undo the input font.
+
+    Swept rather than trusted because the failure is invisible from either side:
+    the widget renders, the theme is applied, and only the typeface is wrong.
+    Globbed so a newly added visualizer cannot slip past, and it names no
+    deployment — this repo is a public remote.
+    """
+    import ast
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    targets = sorted(
+        {
+            *repo_root.glob("helao/deploy/*/servers/**/*.py"),
+            *repo_root.glob("helao/deploy/*/layouts/**/*.py"),
+            *repo_root.glob("helao/core/servers/**/*.py"),
+        }
+    )
+    offenders: list[str] = []
+    seen = 0
+    for path in targets:
+        if "fixtures" in path.parts:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else None
+            name = name or (func.id if isinstance(func, ast.Name) else None)
+            if name not in _BOKEH_INPUT_WIDGETS:
+                continue
+            seen += 1
+            for kw in node.keywords:
+                if kw.arg == "styles":
+                    rel = path.relative_to(repo_root)
+                    offenders.append(f"{rel}:{kw.value.lineno} {name}")
+    assert seen, "swept no input-widget construction at all, so this proves nothing"
+    assert offenders == [], (
+        "these input widgets pass their own `styles`, which replaces the "
+        "theme's `font-family` default and drops the input font. Merge the "
+        "theme value in at the call site, or move the style to a wrapper:\n  "
+        + "\n  ".join(offenders)
+    )
 
 
 # ---------------------------------------------------------------------------

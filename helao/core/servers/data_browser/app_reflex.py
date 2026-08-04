@@ -599,7 +599,7 @@ def build_page():
                 f"showing the first {MAX_INDEX_ROWS} of ",
                 BrowserState.index_total,
                 " matches -- narrow the filter to reach the rest",
-                size="2",
+                size="1",
                 class_name="text-amber-700",
             ),
         ),
@@ -697,7 +697,7 @@ def build_page():
             BrowserState.error != "",
             rx.text(BrowserState.error, class_name="text-red-600"),
         ),
-        rx.text(BrowserState.status, size="2"),
+        rx.text(BrowserState.status, size="1"),
         index_box,
         rx.tabs.root(
             rx.tabs.list(

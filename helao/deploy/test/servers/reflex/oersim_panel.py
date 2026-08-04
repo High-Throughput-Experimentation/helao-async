@@ -98,7 +98,7 @@ def build(server_key: str, state_cls):
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.heading(f"Action: {server_key}", size="4"),
+                rx.heading(f"Action: {server_key}", size="3"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.input(

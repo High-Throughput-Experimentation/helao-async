@@ -2201,7 +2201,7 @@ class OperatorPlateState(rx.State):
 
 def _error_text(var):
     """Render an error line only when there is one."""
-    return rx.cond(var != "", rx.text(var, class_name="text-red-600", size="2"))
+    return rx.cond(var != "", rx.text(var, class_name="text-red-600", size="1"))
 
 
 def _table(
@@ -2272,7 +2272,7 @@ def _tree_pane(header_var, html_var):
     ``<details>``, so expanding a node needs no round trip.
     """
     return rx.vstack(
-        rx.text(header_var, weight="bold", size="2"),
+        rx.text(header_var, weight="bold", size="1"),
         rx.scroll_area(
             rx.html(html_var),
             type="auto",
@@ -2338,7 +2338,7 @@ def _param_field(row, state, options):
 
     return rx.vstack(
         rx.hstack(
-            rx.text(row[0], size="2", weight="medium"),
+            rx.text(row[0], size="1", weight="medium"),
             rx.spacer(),
             rx.text(row[3], size="1", class_name=_MUTED_TEXT),
             width="100%",
@@ -2476,12 +2476,12 @@ def _library_panel():
             spacing="3",
         ),
         _error_text(OperatorLibState.error),
-        rx.text(OperatorLibState.status, size="2"),
+        rx.text(OperatorLibState.status, size="1"),
         # The plan state's feedback is repeated here because "Add to plan"
         # lives on this tab: an operator who buffers a sequence and sees
         # nothing has no way to tell it worked without changing tabs.
         _error_text(OperatorPlanState.error),
-        rx.text(OperatorPlanState.status, size="2"),
+        rx.text(OperatorPlanState.status, size="1"),
         width="100%",
         spacing="3",
     )
@@ -2548,7 +2548,7 @@ def _plan_panel():
         # select_plan_row and had nowhere to render.
         _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
         _error_text(OperatorPlanState.error),
-        rx.text(OperatorPlanState.status, size="2"),
+        rx.text(OperatorPlanState.status, size="1"),
         width="100%",
         spacing="3",
     )
@@ -2573,7 +2573,7 @@ def _plate_panel():
                     on_change=OperatorPlateState.set_sample,
                     width="8em",
                 ),
-                rx.text("code ", OperatorPlateState.code, size="2"),
+                rx.text("code ", OperatorPlateState.code, size="1"),
                 rx.text(OperatorPlateState.composition, size="1"),
                 spacing="3",
                 align="center",
@@ -2586,11 +2586,11 @@ def _plate_panel():
                 on_select=OperatorPlateState.on_select,
             ),
             _error_text(OperatorPlateState.error),
-            rx.text(OperatorPlateState.status, size="2"),
+            rx.text(OperatorPlateState.status, size="1"),
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorPlateState.status, size="2", class_name=_MUTED_TEXT),
+        rx.text(OperatorPlateState.status, size="1", class_name=_MUTED_TEXT),
     )
 
 
@@ -2616,7 +2616,7 @@ def _spec_panel():
                 align="center",
             ),
             rx.text(OperatorSpecState.parser_note, size="1", class_name=_MUTED_TEXT),
-            rx.text("Required sequence parameters:", size="2", weight="medium"),
+            rx.text("Required sequence parameters:", size="1", weight="medium"),
             rx.scroll_area(
                 rx.vstack(
                     rx.foreach(
@@ -2634,11 +2634,11 @@ def _spec_panel():
             ),
             rx.button("Enqueue spec sequence", on_click=OperatorSpecState.enqueue),
             _error_text(OperatorSpecState.error),
-            rx.text(OperatorSpecState.status, size="2"),
+            rx.text(OperatorSpecState.status, size="1"),
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorSpecState.status, size="2", class_name=_MUTED_TEXT),
+        rx.text(OperatorSpecState.status, size="1", class_name=_MUTED_TEXT),
     )
 
 
@@ -2770,7 +2770,7 @@ def build_page():
         rx.Component: The page body.
     """
     controls = rx.hstack(
-        rx.text(OperatorQueueState.status, size="2", weight="medium"),
+        rx.text(OperatorQueueState.status, size="1", weight="medium"),
         rx.spacer(),
         rx.button("Start", on_click=OperatorQueueState.control("start")),
         rx.button("Stop", variant="soft", on_click=OperatorQueueState.control("stop")),
