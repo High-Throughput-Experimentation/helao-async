@@ -44,7 +44,7 @@ TW: Final[Mapping[str, str]] = {
     "slate-800": "#1e293b",
     "slate-900": "#0f172a",
     "slate-950": "#020617",
-    "red-100": "#fee2e2",
+    "red-400": "#f87171",
     "red-500": "#ef4444",
     "red-600": "#dc2626",
     "red-700": "#b91c1c",
@@ -676,8 +676,29 @@ SERIES: Final[tuple[str, ...]] = (
 # ---------------------------------------------------------------------------
 # Continuous ramp
 # ---------------------------------------------------------------------------
-RAMP_START: Final[str] = TW["red-100"]
+RAMP_START: Final[str] = TW["red-400"]
+"""Lightest end of the spectra recency ramp — the *newest* trace.
+
+**Was ``red-100``, which measured 1.22:1 against the white plot area and was
+effectively invisible.** The trace floor is 2.0:1 and this is a trace, but no
+test measured the ramp: ``test_red_ramp`` checked its length, endpoints and
+monotonicity only, so a shade three steps too light passed every gate. That is
+now covered by ``test_every_red_ramp_step_clears_the_trace_floor``.
+
+The lightest end is the one that matters here, and that is not obvious: in
+``spec_vis`` a newly-arrived spectrum is drawn ``_ramp[0]`` and older ones shift
+*darker*, so the light end is the freshest data rather than the faded history.
+
+``red-400`` is the lightest red that clears the floor: ``red-200`` measures 1.45
+and ``red-300`` 1.90, both still under it. Every step of a 10-entry ramp then
+lands between 2.77 and 10.02 (against ``red-100``'s 1.22-10.02, whose first three
+steps were all below the floor). ``red-500`` would clear it too but compresses
+the ramp's luminance spread from 6.0x to 4.2x, and the spread is what encodes
+recency at all.
+"""
+
 RAMP_END: Final[str] = TW["red-900"]
+"""Darkest end of the spectra ramp — the oldest retained trace, 10.02:1."""
 
 
 def _to_rgb(hex_color: str) -> tuple[int, int, int]:

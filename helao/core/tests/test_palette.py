@@ -362,15 +362,24 @@ def test_chart_crosshair_is_the_xy_default_made_palette_sourced() -> None:
 
 
 def test_red_ramp() -> None:
-    assert palette.red_ramp(1) == (TW["red-100"],)
+    """Shape of the ramp: length, endpoints, hex form, monotonic darkening.
+
+    Written against ``RAMP_START``/``RAMP_END`` rather than named shades. It
+    previously pinned ``red-100`` literally, which meant the shade had to be
+    edited in two places to move the ramp -- and this test asserts *structure*,
+    so which shade sits at the end is not its business. Whether that shade is
+    visible is ``test_every_red_ramp_step_clears_the_trace_floor``'s business;
+    this test passing while the ramp was invisible is exactly why that one exists.
+    """
+    assert palette.red_ramp(1) == (palette.RAMP_START,)
     ramp = palette.red_ramp(2)
-    assert ramp == (TW["red-100"], TW["red-900"])
+    assert ramp == (palette.RAMP_START, palette.RAMP_END)
     ramp = palette.red_ramp(5)
     assert len(ramp) == 5
-    assert ramp[0] == TW["red-100"]
-    assert ramp[-1] == TW["red-900"]
+    assert ramp[0] == palette.RAMP_START
+    assert ramp[-1] == palette.RAMP_END
     assert all(re.fullmatch(r"#[0-9a-f]{6}", step) for step in ramp)
-    # monotonically darkening: red-100 -> red-900 falls in every channel
+    # monotonically darkening: start -> end falls in every channel
     lums = [_luminance(step) for step in palette.red_ramp(12)]
     assert lums == sorted(lums, reverse=True)
     with pytest.raises(ValueError):
@@ -1896,3 +1905,52 @@ def test_every_section_background_is_routed_through_panel_styles() -> None:
         "a section fill must be passed as styles=panel_styles(<bg>) so the "
         "section also gets its border:\n  " + "\n  ".join(offenders)
     )
+
+
+def test_every_red_ramp_step_clears_the_trace_floor() -> None:
+    """Every shade the spectra ramp can emit must be visible on the plot area.
+
+    **The test that was missing when this shipped wrong.** ``test_red_ramp``
+    checks the ramp's length, endpoints and monotonic darkening -- all of which a
+    ramp starting at ``red-100`` satisfied while measuring 1.22:1 against the
+    white plot area, i.e. invisible. Shape was verified and the only property
+    that mattered was not.
+
+    Measured against ``SURFACE_WHITE`` rather than ``PANEL_BG``, because a trace
+    is drawn inside the figure's plot area, and that is white -- ``PANEL_BG`` is
+    the figure's ``border_fill_color`` around it. Checking the wrong background
+    is how a light trace passes: ``red-100`` on ``slate-300`` measures 1.72, still
+    under the floor but nearly half again as much as the 1.22 that is actually on
+    screen.
+
+    Swept across ramp lengths because the interpolation puts the steps at
+    different places for each: only ``n`` = the panel's ``max_spectra`` is used
+    today, but the function takes any ``n``, and ``n == 1`` is its own branch
+    returning the light end alone.
+    """
+    for n in (1, 2, 3, 5, 10, 12, 25):
+        for index, shade in enumerate(palette.red_ramp(n)):
+            measured = contrast_ratio(shade, palette.SURFACE_WHITE)
+            assert measured >= FLOOR_TRACE, (
+                f"red_ramp({n})[{index}] = {shade} measures {measured:.2f} on the "
+                f"white plot area, below the {FLOOR_TRACE} trace floor"
+            )
+
+
+def test_the_ramps_light_end_is_the_newest_trace_and_is_visible() -> None:
+    """The light end is the freshest spectrum, not faded history.
+
+    Worth pinning because it is the opposite of what the naming suggests and it
+    decides which end the floor matters most for: ``spec_vis`` draws an arriving
+    spectrum with ``_ramp[0]`` and shifts the existing ones *darker*, so the
+    lightest shade is the data the operator is actually watching. When this was
+    ``red-100`` the newest trace was the least visible thing on the figure.
+    """
+    ramp = palette.red_ramp(10)
+    assert ramp[0] == palette.RAMP_START
+    assert ramp[-1] == palette.RAMP_END
+    newest = contrast_ratio(ramp[0], palette.SURFACE_WHITE)
+    assert newest >= FLOOR_TRACE, f"the newest trace measures only {newest:.2f}"
+    # And the ramp must still span enough luminance to read as recency at all.
+    spread = _luminance(palette.RAMP_START) / _luminance(palette.RAMP_END)
+    assert spread > 4.0, f"ramp spread collapsed to {spread:.1f}x; recency unreadable"
