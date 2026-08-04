@@ -49,7 +49,6 @@ from helao.core.servers.palette import (
     CHART_CHROME,
     reflex_font_css,
     reflex_gridjs_header_css,
-    reflex_table_body_css,
     reflex_page_class,
 )
 from helao.core.servers.reflex.discovery import resolve_panel_module
@@ -456,10 +455,7 @@ def build_app(world_cfg: dict, server_key: str):
     # The gridjs header rule rides the same seam. It cannot be a Tailwind
     # utility: `rx.data_table` does not forward `class_name` to the grid, and
     # gridjs's own `th.gridjs-th` is unlayered CSS, which outranks anything in
-    # `@layer utilities`. See `palette.reflex_gridjs_header_css`. The table-body
-    # size rule rides it too, and for both tables: gridjs for the reason above,
-    # Radix because it declares the size on the table rather than the cell, so
-    # there is no per-cell prop to step down. See `palette.reflex_table_body_css`.
+    # `@layer utilities`. See `palette.reflex_gridjs_header_css`.
     # The font CSS is first, and it has to be: it opens with two `@import`
     # lines, and an `@import` is only valid ahead of every style rule in its own
     # stylesheet. Each `rx.el.style` is a separate stylesheet, so the ordering
@@ -475,7 +471,6 @@ def build_app(world_cfg: dict, server_key: str):
             rx.el.style(reflex_font_css()),
             rx.el.style(f":root {{ {_root_vars}; }}"),
             rx.el.style(reflex_gridjs_header_css()),
-            rx.el.style(reflex_table_body_css()),
         ],
     )
 
