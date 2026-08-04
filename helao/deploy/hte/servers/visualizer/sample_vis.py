@@ -144,7 +144,6 @@ class C_vis(ActionVisualizer):
             title="num latest samples to return",
             disabled=False,
             width=150,
-            height=40,
         )
         # execute on input field change
         self.input_max_smps.on_change(
@@ -153,11 +152,18 @@ class C_vis(ActionVisualizer):
         )
 
         # selector for give_only inheritance
+        #
+        # height=31 matches a TextInput's input box, so this lines up with the
+        # box beside it; the previous height=40 stood 9px taller and sat 19px
+        # low. Its label Div below is height=17 to mirror a TextInput's own
+        # title label (12px font, 17.14px line-height, no margin) — measured,
+        # because the pairing only reads as aligned if the label above each
+        # control is the same height.
         self.inheritance_selector_group = CheckboxButtonGroup(
             labels=["give_only"],
             active=[],
             width=150,
-            height=40,
+            height=31,
         )
         self.inheritance_selector_group.on_change(
             "active",
@@ -180,7 +186,19 @@ class C_vis(ActionVisualizer):
                     self.input_max_smps,
                     Spacer(width=50),
                     [
-                        Div(text="filter by inheritance:"),
+                        # height/font/margin mirror a TextInput's own title
+                        # label (17px tall, 12px font, no margin — measured), so
+                        # this stand-in label leaves the group at exactly the
+                        # height of the input box in the same row. margin=0 is
+                        # the load-bearing part: a Div's default 5px margin was
+                        # pushing the group 10px low all by itself.
+                        Div(
+                            text="filter by inheritance:",
+                            width=150,
+                            height=17,
+                            margin=0,
+                            styles={"font-size": "12px"},
+                        ),
                         self.inheritance_selector_group,
                     ],
                 ],
