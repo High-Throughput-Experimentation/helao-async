@@ -69,6 +69,8 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "orange-500": "#f97316",
     "orange-600": "#ea580c",
     "orange-700": "#c2410c",
+    "amber-50": "#fffbeb",
+    "amber-100": "#fef3c7",
     "amber-200": "#fde68a",
     "amber-400": "#fbbf24",
     "amber-500": "#f59e0b",
@@ -85,22 +87,34 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "green-600": "#16a34a",
     "green-700": "#15803d",
     "green-800": "#166534",
+    "emerald-50": "#ecfdf5",
+    "emerald-100": "#d1fae5",
+    "emerald-500": "#10b981",
+    "emerald-600": "#059669",
+    "emerald-700": "#047857",
     "teal-500": "#14b8a6",
     "teal-600": "#0d9488",
     "teal-700": "#0f766e",
+    "cyan-100": "#cffafe",
     "cyan-400": "#22d3ee",
     "cyan-500": "#06b6d4",
     "cyan-600": "#0891b2",
     "cyan-700": "#0e7490",
+    "sky-50": "#f0f9ff",
     "sky-100": "#e0f2fe",
     "sky-200": "#bae6fd",
     "sky-500": "#0ea5e9",
     "sky-600": "#0284c7",
     "sky-700": "#0369a1",
+    "blue-50": "#eff6ff",
+    "blue-100": "#dbeafe",
     "blue-600": "#2563eb",
     "blue-700": "#1d4ed8",
     "blue-800": "#1e40af",
+    "violet-50": "#f5f3ff",
+    "violet-100": "#ede9fe",
     "violet-600": "#7c3aed",
+    "violet-700": "#6d28d9",
     "purple-700": "#7e22ce",
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
@@ -410,6 +424,67 @@ SURFACE_ROWS: Final[dict[tuple[str, str], float]] = {
     ("sky-100", "slate-300"): 1.29,  # was sky-200 at 1.12, below the floor
 }
 
+# --- Reflex functional-section colour --------------------------------------
+# Text on each of the five Reflex route tints. Both columns are declared for
+# every tint rather than only the worst one, because "muted text moved to
+# slate-600" is a claim about all five surfaces and the margins are narrow
+# enough that guessing which cells fail does not work: slate-500 fails on
+# violet-50 (4.34) and sky-50 (4.46) but passes on slate-50 (4.55), amber-50
+# (4.59) and emerald-50 (4.52) -- the last by 0.02. Only a complete row set
+# separates those, and only slate-600 clears every one of them by a margin
+# (6.91-7.31) rather than by a rounding error.
+PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
+    ("slate-900", "slate-50"): 17.06,  # index
+    ("slate-600", "slate-50"): 7.24,
+    ("slate-900", "sky-50"): 16.75,  # /live
+    ("slate-600", "sky-50"): 7.11,
+    ("slate-900", "violet-50"): 16.28,  # /action
+    ("slate-600", "violet-50"): 6.91,
+    ("slate-900", "amber-50"): 17.22,  # /operator
+    ("slate-600", "amber-50"): 7.31,
+    ("slate-900", "emerald-50"): 16.95,  # /browser
+    ("slate-600", "emerald-50"): 7.19,
+}
+
+# The shade slate-600 replaced, kept as a measurement rather than a comment.
+# Two of these cells fail the body floor outright and a third clears it by 0.02,
+# which together are what make the migration mandatory rather than cosmetic. If
+# a later Tailwind revision moved slate-500 enough to change that, this says so.
+SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
+    ("slate-500", "slate-50"): 4.55,
+    ("slate-500", "sky-50"): 4.46,
+    ("slate-500", "violet-50"): 4.34,
+    ("slate-500", "amber-50"): 4.59,
+    ("slate-500", "emerald-50"): 4.52,
+}
+
+# Each table's header text on its own header background. Body-floor rows: a
+# column header is body-sized text.
+#
+# ``blue-700`` appears here *and* as MARKER_SWATCH_2, deliberately, the same way
+# both pinks exist for separate roles. Neither supersedes the other and neither
+# may be deleted on the grounds that the other exists.
+REFLEX_HEADER_ROWS: Final[dict[tuple[str, str], float]] = {
+    ("violet-700", "violet-100"): 5.98,  # Sequences
+    ("blue-700", "blue-100"): 5.49,  # Experiments
+    ("cyan-700", "cyan-100"): 4.79,  # Actions
+    ("slate-700", "slate-100"): 9.45,  # Servers
+    ("emerald-700", "emerald-100"): 4.84,  # data browser
+}
+
+# Each table's 3px left border against its worst-case page tint. A border is a
+# non-text graphical object, so the 3:1 control floor applies, not 4.5. Every
+# one of the five is worst on violet-50, the darkest tint, so that is the only
+# background that needs declaring -- the four brighter tints are strictly
+# easier.
+REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
+    ("violet-600", "violet-50"): 5.20,
+    ("blue-600", "violet-50"): 4.71,
+    ("cyan-600", "violet-50"): 3.36,  # the tightest cell in the whole design
+    ("slate-600", "violet-50"): 6.91,
+    ("emerald-600", "violet-50"): 3.44,
+}
+
 
 def _shade(name: str) -> str:
     return WHITE if name == "white" else TW[name]
@@ -547,6 +622,259 @@ def test_page_and_panel_are_distinct() -> None:
     )
 
 
+@pytest.mark.parametrize("pair", sorted(PAGE_TINT_TEXT_ROWS))
+def test_page_tint_text_contrast(pair: tuple[str, str]) -> None:
+    _check(pair, PAGE_TINT_TEXT_ROWS[pair], FLOOR_BODY_TEXT)
+
+
+def test_page_tint_rows_cover_every_route_twice() -> None:
+    """Both text roles, declared for every route. No tint may go unmeasured."""
+    tints = set(palette.REFLEX_PAGE_TINTS.values())
+    assert {bg for _, bg in PAGE_TINT_TEXT_ROWS} == tints
+    for tint in tints:
+        assert ("slate-900", tint) in PAGE_TINT_TEXT_ROWS
+        assert (palette.REFLEX_MUTED_TEXT, tint) in PAGE_TINT_TEXT_ROWS
+
+
+@pytest.mark.parametrize("pair", sorted(SLATE_500_ON_TINT_ROWS))
+def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
+    """The shade the Reflex stack moved *away* from, pinned as a measurement.
+
+    Two of the five tints put ``slate-500`` under the 4.5 body floor and a third
+    clears it by 0.02, which is why ``REFLEX_MUTED_TEXT`` is ``slate-600``.
+    Asserting the numbers here means a future edit that reintroduces
+    ``slate-500`` cannot claim it was fine, and a Tailwind revision that changed
+    the shade enough to matter would surface as a published-value mismatch
+    rather than as silently degraded text.
+    """
+    measured = contrast_ratio(_shade(pair[0]), _shade(pair[1]))
+    assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
+
+
+def test_slate_500_fails_the_body_floor_on_two_of_the_five_tints() -> None:
+    """Exactly two, and named -- not "at least one".
+
+    A count would pass if the failing set moved to two different tints, and the
+    point of the row block above is that *which* surfaces fail is not guessable
+    from the shade names.
+    """
+    failing = {
+        bg
+        for (fg, bg) in SLATE_500_ON_TINT_ROWS
+        if contrast_ratio(_shade(fg), _shade(bg)) < FLOOR_BODY_TEXT
+    }
+    assert failing == {"sky-50", "violet-50"}
+
+
+def test_slate_600_clears_every_tint_by_a_real_margin() -> None:
+    """The positive half of the claim: the replacement is not marginal either.
+
+    ``emerald-50`` shows why this matters -- ``slate-500`` "passes" there at 4.52,
+    two hundredths above the floor, which is not a margin anyone should ship
+    muted text on. ``slate-600`` is at 7.19 on the same surface.
+    """
+    for tint in set(palette.REFLEX_PAGE_TINTS.values()):
+        measured = contrast_ratio(TW[palette.REFLEX_MUTED_TEXT], TW[tint])
+        assert measured >= 6.5, f"{palette.REFLEX_MUTED_TEXT} on {tint} is {measured}"
+
+
+@pytest.mark.parametrize("pair", sorted(REFLEX_HEADER_ROWS))
+def test_reflex_table_header_contrast(pair: tuple[str, str]) -> None:
+    _check(pair, REFLEX_HEADER_ROWS[pair], FLOOR_BODY_TEXT)
+
+
+def test_header_rows_cover_every_table_hue() -> None:
+    declared = {(text, background) for background, text, _ in _table_hues()}
+    assert declared == set(REFLEX_HEADER_ROWS)
+
+
+@pytest.mark.parametrize("pair", sorted(REFLEX_BORDER_ROWS))
+def test_reflex_table_border_contrast(pair: tuple[str, str]) -> None:
+    _check(pair, REFLEX_BORDER_ROWS[pair], FLOOR_CONTROL)
+
+
+def test_border_rows_cover_every_hue_at_its_worst_tint() -> None:
+    """Each border is declared against the tint it is *weakest* on.
+
+    Declaring the strongest pair would be the same shape of test and would prove
+    nothing: a border only fails where the canvas is darkest.
+    """
+    tints = sorted(set(palette.REFLEX_PAGE_TINTS.values()))
+    for _, _, border in _table_hues():
+        worst = min(tints, key=lambda tint: contrast_ratio(TW[border], TW[tint]))
+        assert (border, worst) in REFLEX_BORDER_ROWS, (
+            f"{border} is weakest on {worst}, which is the pair that has to be "
+            f"declared"
+        )
+
+
+def _table_hues() -> tuple[tuple[str, str, str], ...]:
+    return tuple(palette.REFLEX_TABLE_HUES.values())
+
+
+def test_reflex_page_tints_cover_the_shell_routes() -> None:
+    """One tint per route, and every route distinct from its neighbours.
+
+    A duplicated tint is the same defect ``test_page_and_panel_are_distinct``
+    guards for the Bokeh canvas: nothing fails, every contrast row passes, and
+    the signal the colour exists to carry is simply gone.
+    """
+    from helao.core.servers.reflex.app import SHELL_ROUTES
+
+    assert set(palette.REFLEX_PAGE_TINTS) == set(SHELL_ROUTES)
+    assert len(set(palette.REFLEX_PAGE_TINTS.values())) == len(SHELL_ROUTES)
+
+
+def test_reflex_page_tint_shades_are_all_in_tw() -> None:
+    missing = sorted(v for v in palette.REFLEX_PAGE_TINTS.values() if v not in TW)
+    assert missing == [], f"tint names must be TW keys: {missing}"
+
+
+def test_reflex_table_hue_shades_are_all_in_tw() -> None:
+    names = [name for triple in _table_hues() for name in triple]
+    assert sorted(n for n in names if n not in TW) == []
+
+
+def test_reflex_table_hues_are_one_family_each() -> None:
+    """A table's background, text and border come from one ramp.
+
+    Mixing families would leave the header and its border reading as two
+    unrelated signals rather than one object type.
+    """
+    for kind, (background, text, border) in palette.REFLEX_TABLE_HUES.items():
+        families = {name.split("-")[0] for name in (background, text, border)}
+        assert len(families) == 1, f"{kind} spans families {families}"
+
+
+def test_reflex_table_hues_are_mutually_distinct() -> None:
+    assert len({triple[0] for triple in _table_hues()}) == len(
+        palette.REFLEX_TABLE_HUES
+    )
+
+
+def test_reflex_page_tint_is_not_the_bokeh_page_bg_constant() -> None:
+    """The two canvases are separate constants even where they name a shade.
+
+    ``PAGE_BG`` is the Bokeh page; ``REFLEX_PAGE_TINTS["/"]`` is the Reflex
+    index. Both currently resolve to ``slate-50``, which is a coincidence of
+    both wanting the faintest neutral -- moving one must not move the other, so
+    neither is defined in terms of the other.
+    """
+    assert palette.PAGE_BG == TW["slate-50"]
+    assert palette.REFLEX_PAGE_TINTS["/"] == "slate-50"
+    assert isinstance(palette.REFLEX_PAGE_TINTS["/"], str)
+    assert not palette.REFLEX_PAGE_TINTS["/"].startswith("#")
+
+
+def test_reflex_class_helpers_emit_the_declared_utilities() -> None:
+    assert palette.reflex_page_class("/live") == "bg-sky-50 min-h-screen"
+    assert palette.reflex_page_class("/operator") == "bg-amber-50 min-h-screen"
+    assert palette.reflex_header_class("action") == "bg-cyan-100 text-cyan-700"
+    assert palette.reflex_table_class("action") == "border-l-[3px] border-cyan-600"
+    assert palette.reflex_muted_text_class() == "text-slate-600"
+
+
+def test_reflex_page_class_carries_min_h_screen_for_every_route() -> None:
+    """Without it the tint stops at the content box and the page reads as two.
+
+    Asserted per route rather than once, because the helper takes the route as
+    an argument and a conditional could drop it for one of them.
+    """
+    for route in palette.REFLEX_PAGE_TINTS:
+        assert palette.reflex_page_class(route).endswith(" min-h-screen")
+
+
+def test_reflex_class_helpers_raise_on_an_unknown_key() -> None:
+    """Loudly at build time, rather than an untinted page that looks unfinished."""
+    with pytest.raises(KeyError):
+        palette.reflex_page_class("/nope")
+    with pytest.raises(KeyError):
+        palette.reflex_header_class("nope")
+    with pytest.raises(KeyError):
+        palette.reflex_table_class("nope")
+
+
+def test_gridjs_header_css_carries_the_browser_hue() -> None:
+    """The one CSS rule the Reflex stack needs, pinned to the same two shades.
+
+    It exists because ``rx.data_table`` drops ``class_name`` and gridjs's own
+    ``th.gridjs-th`` is unlayered, so a Tailwind utility can reach neither the
+    element nor a winning cascade position. Asserting the shades here keeps that
+    rule from drifting away from ``REFLEX_TABLE_HUES["browser"]``, which is the
+    only reason it is allowed to hold literals at all.
+    """
+    css = palette.reflex_gridjs_header_css()
+    background, text, _ = palette.REFLEX_TABLE_HUES["browser"]
+    assert f"background-color: {TW[background]}" in css
+    assert f"color: {TW[text]}" in css
+    assert TW[background] == "#d1fae5"
+    assert TW[text] == "#047857"
+
+
+def test_gridjs_header_css_outranks_gridjs_on_specificity() -> None:
+    """Not on source order, which ``head_components`` does not control.
+
+    gridjs declares ``th.gridjs-th`` (0,1,1) and ``th.gridjs-th-sort:hover``
+    (0,2,1). Every selector here adds ``.gridjs-container``, so the resting rule
+    is (0,2,1) and the hover rule (0,3,1) -- each strictly above the rule it has
+    to beat, whichever stylesheet the browser happens to parse first.
+    """
+    css = palette.reflex_gridjs_header_css()
+    selectors = [part.strip() for part in css.split("{")[0].split(",")]
+    assert len(selectors) == 3
+    assert all(part.startswith(".gridjs-container ") for part in selectors)
+    assert any(":hover" in part for part in selectors)
+    assert any(":focus" in part for part in selectors)
+
+
+def test_gridjs_hover_does_not_reintroduce_a_grey_header() -> None:
+    """One declaration block, so hover cannot fall back to gridjs's grey.
+
+    The alternative -- ``emerald-200`` for hover -- measures 4.28 against
+    ``emerald-700`` and would need a standing contrast exception, so the resting
+    fill is repeated and the pointer cursor carries the affordance.
+    """
+    css = palette.reflex_gridjs_header_css()
+    assert css.count("{") == 1, "hover must share the resting declaration block"
+    assert contrast_ratio(TW["emerald-700"], "#a7f3d0") == pytest.approx(4.28, abs=0.01)
+    assert contrast_ratio(TW["emerald-700"], "#a7f3d0") < FLOOR_BODY_TEXT
+
+
+REFLEX_STACK_GLOBS: Final[tuple[str, ...]] = (
+    "helao/core/servers/reflex/**/*.py",
+    "helao/core/servers/operator/app_reflex.py",
+    "helao/core/servers/data_browser/app_reflex.py",
+    "helao/deploy/*/servers/reflex/**/*.py",
+)
+
+
+def test_no_muted_slate_500_remains_in_the_reflex_stack() -> None:
+    """``text-slate-500`` fails the body floor on two of the five route tints.
+
+    A grep rather than a computed-style check because the failure mode is a
+    *source* one: the utility renders perfectly, it is simply too light. Globbed
+    so a panel added later cannot reintroduce it, and it names no deployment.
+    """
+    offenders: list[str] = []
+    for pattern in REFLEX_STACK_GLOBS:
+        for path in REPO_ROOT.glob(pattern):
+            for lineno, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(), 1
+            ):
+                if "text-slate-500" in line:
+                    offenders.append(f"{_relative(path)}:{lineno}")
+    assert offenders == [], (
+        "muted text in the Reflex stack must be text-slate-600; slate-500 is "
+        f"4.34 on violet-50, under the 4.5 body floor:\n  " + "\n  ".join(offenders)
+    )
+
+
+def test_the_reflex_stack_glob_actually_matches_files() -> None:
+    """A guard on the guard: a typo'd glob makes the sweep above vacuous."""
+    for pattern in REFLEX_STACK_GLOBS:
+        assert list(REPO_ROOT.glob(pattern)), f"{pattern} matched nothing"
+
+
 def test_exceptions_registry_is_empty() -> None:
     """Pinned so the registry cannot quietly grow to absorb regressions.
 
@@ -567,6 +895,9 @@ def test_every_accepted_exception_is_a_declared_row() -> None:
         | set(BODY_TEXT_ROWS)
         | set(BUTTON_SURFACE_ROWS)
         | set(BUTTON_LABEL_ROWS)
+        | set(PAGE_TINT_TEXT_ROWS)
+        | set(REFLEX_HEADER_ROWS)
+        | set(REFLEX_BORDER_ROWS)
     )
     assert set(ACCEPTED_CONTRAST_EXCEPTIONS) <= declared
 

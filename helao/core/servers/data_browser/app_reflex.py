@@ -36,10 +36,25 @@ import reflex as rx
 from helao.core.servers.data_browser import sources
 from helao.core.servers.data_browser import state as dbstate
 from helao.core.servers.data_browser.app import FILTER_COLS, INDEX_TABLE_COLS
+from helao.core.servers.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+# The browser's table hue, resolved once at module scope per `palette`'s second
+# rule: a mistyped key is then an import-time KeyError rather than a blank page
+# from inside a page factory.
+#
+# These reach the *index* table's header cells and both tables' left border. The
+# Table tab's gridjs header is not styled from here and cannot be: `rx.data_table`
+# drops `class_name` before it reaches the grid, and gridjs's own `th.gridjs-th`
+# is unlayered CSS that outranks any Tailwind utility. Both halves fail silently,
+# rendering a stock grey header with nothing logged either side. That header's hue
+# comes from `palette.reflex_gridjs_header_css`, injected into `<head>` by
+# `reflex/app.py`; the border below is ours because it sits on a wrapper we own.
+_HEADER_CLASS = reflex_header_class("browser")
+_TABLE_CLASS = reflex_table_class("browser")
 
 #: Trailing points kept per trace. Mirrors the Bokeh browser's ``max_points``
 #: server param default.
@@ -592,8 +607,11 @@ def build_page():
             rx.table.root(
                 rx.table.header(
                     rx.table.row(
-                        rx.table.column_header_cell(""),
-                        *[rx.table.column_header_cell(col) for col in INDEX_TABLE_COLS],
+                        rx.table.column_header_cell("", class_name=_HEADER_CLASS),
+                        *[
+                            rx.table.column_header_cell(col, class_name=_HEADER_CLASS)
+                            for col in INDEX_TABLE_COLS
+                        ],
                     )
                 ),
                 rx.table.body(
@@ -614,6 +632,7 @@ def build_page():
                 ),
                 width="100%",
                 size="1",
+                class_name=_TABLE_CLASS,
             ),
             type="auto",
             scrollbars="vertical",
@@ -661,12 +680,15 @@ def build_page():
         spacing="3",
     )
 
-    table_tab = rx.data_table(
-        data=BrowserState.summary_view,
-        columns=list(dbstate.SUMMARY_COLS),
-        pagination=True,
-        search=False,
-        sort=True,
+    table_tab = rx.box(
+        rx.data_table(
+            data=BrowserState.summary_view,
+            columns=list(dbstate.SUMMARY_COLS),
+            pagination=True,
+            search=False,
+            sort=True,
+        ),
+        class_name=_TABLE_CLASS,
     )
 
     return rx.vstack(

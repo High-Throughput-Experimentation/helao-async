@@ -16,6 +16,7 @@ from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.state import ActionVisState
 from helao.deploy.hte.servers.reflex._action import (
     CURRENT_PATTERN,
+    MUTED_TEXT,
     VOLTAGE_PATTERN,
     X_COLUMN,
     cell_numbers,
@@ -157,7 +158,7 @@ def build(server_key: str, state_cls):
                 rx.heading(f"Cells: {server_key}", size="4"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
-                rx.text(state_cls.action_uuid, size="1", class_name="text-slate-500"),
+                rx.text(state_cls.action_uuid, size="1", class_name=MUTED_TEXT),
                 rx.input(
                     default_value=state_cls.window_points.to_string(),
                     on_blur=state_cls.on_window_points,

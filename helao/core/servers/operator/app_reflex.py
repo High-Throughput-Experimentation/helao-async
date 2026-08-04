@@ -92,6 +92,11 @@ from helao.core.servers.operator.object_tree import (
     server_header_text,
     tree_header_text,
 )
+from helao.core.servers.palette import (
+    reflex_header_class,
+    reflex_muted_text_class,
+    reflex_table_class,
+)
 from helao.core.servers.reflex import plots
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
@@ -100,6 +105,12 @@ from helao.helpers.import_autolibs import repo_path as _autolib_repo_path
 from helao.helpers.import_autolibs import repo_root as _autolib_repo_root
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Muted text, resolved once at module scope per ``palette``'s second rule. It
+#: is ``slate-600``, not the ``slate-500`` that serves the same role on white:
+#: across the five route tints ``slate-500`` measures 4.34--4.59, failing the
+#: 4.5 body floor on two of them and clearing it by 0.02 on a third.
+_MUTED_TEXT = reflex_muted_text_class()
 
 #: Columns shown in each queue table, mirroring the Bokeh operator's tables.
 #: These are a contract with ``RemoteBackend``'s list methods, which project
@@ -2200,6 +2211,7 @@ def _table(
     height: str = "14em",
     row_actions=None,
     on_row_click=None,
+    hue: str | None = None,
 ):
     """A scrolling table over ``list[list[str]]`` rows.
 
@@ -2213,6 +2225,12 @@ def _table(
             clicked, which is how the attribute tree is selected. Bokeh gets row
             selection from its ``ColumnDataSource``; an ``rx.table`` has none, so
             the click goes on the row itself.
+        hue: Optional key of ``REFLEX_TABLE_HUES`` naming what kind of object
+            the rows are. Colours the header row and puts a 3px marker down the
+            table's left edge, so the same object type reads the same whether it
+            is being shown as a queue or as history. The **body stays white**
+            either way: saturating the cells behind the data is what makes a
+            coloured table hard to read.
     """
 
     def render(row, index):
@@ -2227,15 +2245,19 @@ def _table(
             cursor="pointer",
         )
 
-    headers = [rx.table.column_header_cell(col) for col in columns]
+    header_class = reflex_header_class(hue) if hue else ""
+    headers = [
+        rx.table.column_header_cell(col, class_name=header_class) for col in columns
+    ]
     if row_actions is not None:
-        headers.append(rx.table.column_header_cell(""))
+        headers.append(rx.table.column_header_cell("", class_name=header_class))
     return rx.scroll_area(
         rx.table.root(
             rx.table.header(rx.table.row(*headers)),
             rx.table.body(rx.foreach(rows_var, render)),
             width="100%",
             size="1",
+            class_name=reflex_table_class(hue) if hue else "",
         ),
         type="auto",
         scrollbars="vertical",
@@ -2268,6 +2290,9 @@ def _queue_tab(columns: list, rows_var, kind: str):
     return _table(
         columns,
         rows_var,
+        # The queue kinds are exactly the hue keys, so the same object type is
+        # the same colour here and in History.
+        hue=kind,
         on_row_click=lambda row, index: OperatorQueueState.select_queue_row(
             kind, index
         ),
@@ -2315,7 +2340,7 @@ def _param_field(row, state, options):
         rx.hstack(
             rx.text(row[0], size="2", weight="medium"),
             rx.spacer(),
-            rx.text(row[3], size="1", class_name="text-slate-500"),
+            rx.text(row[3], size="1", class_name=_MUTED_TEXT),
             width="100%",
         ),
         rx.cond(
@@ -2362,9 +2387,7 @@ def _library_panel():
                 on_change=OperatorLibState.select_item,
                 width="20em",
             ),
-            rx.text(
-                OperatorLibState.version_hint, size="1", class_name="text-slate-500"
-            ),
+            rx.text(OperatorLibState.version_hint, size="1", class_name=_MUTED_TEXT),
             rx.button(
                 "Reload libraries", size="1", on_click=OperatorLibState.load_libraries
             ),
@@ -2567,7 +2590,7 @@ def _plate_panel():
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorPlateState.status, size="2", class_name="text-slate-500"),
+        rx.text(OperatorPlateState.status, size="2", class_name=_MUTED_TEXT),
     )
 
 
@@ -2592,9 +2615,7 @@ def _spec_panel():
                 spacing="3",
                 align="center",
             ),
-            rx.text(
-                OperatorSpecState.parser_note, size="1", class_name="text-slate-500"
-            ),
+            rx.text(OperatorSpecState.parser_note, size="1", class_name=_MUTED_TEXT),
             rx.text("Required sequence parameters:", size="2", weight="medium"),
             rx.scroll_area(
                 rx.vstack(
@@ -2617,7 +2638,7 @@ def _spec_panel():
             width="100%",
             spacing="3",
         ),
-        rx.text(OperatorSpecState.status, size="2", class_name="text-slate-500"),
+        rx.text(OperatorSpecState.status, size="2", class_name=_MUTED_TEXT),
     )
 
 
@@ -2647,6 +2668,7 @@ def _queue_panel():
                 _table(
                     ["server", "status", "driver"],
                     OperatorQueueState.server_rows,
+                    hue="server",
                     # By name, not index: the row already carries it.
                     on_row_click=lambda row, index: (
                         OperatorQueueState.select_server_row(row[0])
@@ -2703,6 +2725,7 @@ def _history_panel():
                 _table(
                     HIST_COLS["action"],
                     OperatorPlanState.action_history,
+                    hue="action",
                     on_row_click=lambda row, index: (
                         OperatorPlanState.select_history_row("action", index)
                     ),
@@ -2713,6 +2736,7 @@ def _history_panel():
                 _table(
                     HIST_COLS["experiment"],
                     OperatorPlanState.experiment_history,
+                    hue="experiment",
                     on_row_click=lambda row, index: (
                         OperatorPlanState.select_history_row("experiment", index)
                     ),
@@ -2723,6 +2747,7 @@ def _history_panel():
                 _table(
                     HIST_COLS["sequence"],
                     OperatorPlanState.sequence_history,
+                    hue="sequence",
                     on_row_click=lambda row, index: (
                         OperatorPlanState.select_history_row("sequence", index)
                     ),

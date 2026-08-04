@@ -15,7 +15,7 @@ import reflex as rx
 
 from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.state import ActionVisState
-from helao.deploy.hte.servers.reflex._action import latest_action_uuid
+from helao.deploy.hte.servers.reflex._action import MUTED_TEXT, latest_action_uuid
 from helao.deploy.hte.servers.reflex._spectra import (
     channel_columns,
     downsample,
@@ -131,8 +131,8 @@ def build(server_key: str, state_cls):
                 rx.heading(f"Spectra: {server_key}", size="4"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
-                rx.text(state_cls.axis_label, size="1", class_name="text-slate-500"),
-                rx.text(state_cls.action_uuid, size="1", class_name="text-slate-500"),
+                rx.text(state_cls.axis_label, size="1", class_name=MUTED_TEXT),
+                rx.text(state_cls.action_uuid, size="1", class_name=MUTED_TEXT),
                 width="100%",
                 align="center",
                 spacing="3",

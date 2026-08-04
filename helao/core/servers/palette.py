@@ -51,6 +51,7 @@ TW: Final[Mapping[str, str]] = {
     "red-900": "#7f1d1d",
     "red-950": "#450a0a",
     "orange-600": "#ea580c",
+    "amber-50": "#fffbeb",
     "amber-200": "#fde68a",
     "amber-500": "#f59e0b",
     "amber-700": "#b45309",
@@ -60,17 +61,28 @@ TW: Final[Mapping[str, str]] = {
     "green-500": "#22c55e",
     "green-600": "#16a34a",
     "green-700": "#15803d",
+    "emerald-50": "#ecfdf5",
+    "emerald-100": "#d1fae5",
+    "emerald-600": "#059669",
+    "emerald-700": "#047857",
     "teal-600": "#0d9488",
+    "cyan-100": "#cffafe",
     "cyan-400": "#22d3ee",
     "cyan-500": "#06b6d4",
     "cyan-600": "#0891b2",
+    "cyan-700": "#0e7490",
+    "sky-50": "#f0f9ff",
     "sky-100": "#e0f2fe",
     "sky-200": "#bae6fd",
     "sky-600": "#0284c7",
     "sky-700": "#0369a1",
+    "blue-100": "#dbeafe",
     "blue-600": "#2563eb",
     "blue-700": "#1d4ed8",
+    "violet-50": "#f5f3ff",
+    "violet-100": "#ede9fe",
     "violet-600": "#7c3aed",
+    "violet-700": "#6d28d9",
     "purple-800": "#6b21a8",
     "fuchsia-600": "#c026d3",
     "pink-400": "#f472b6",
@@ -130,6 +142,153 @@ the signal.
 
 PARAM_INPUT_BG: Final[str] = TW["amber-200"]
 """Operator param-input blocks and plate-map fill/border. Replaces ``#F9E79F``."""
+
+# ---------------------------------------------------------------------------
+# Reflex functional-section colour
+# ---------------------------------------------------------------------------
+REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
+    "/": "slate-50",
+    "/live": "sky-50",
+    "/action": "violet-50",
+    "/operator": "amber-50",
+    "/browser": "emerald-50",
+}
+"""One page canvas per Reflex route — the functional-section signal.
+
+Values are TW shade **names**, not hex, and that is the load-bearing choice.
+Each name has to yield two things that must never drift apart: ``TW[name]`` for
+the contrast matrix in ``test_palette.py``, and ``f"bg-{name}"`` for the
+Tailwind utility the component actually carries. The Reflex stack reaches its
+colours through utility classes rather than inline hex, so a hex constant here
+would be unusable at the call site, while a hand-written class string at the
+call site would be unmeasurable here.
+
+Distinct from :data:`PAGE_BG`, which is the **Bokeh** canvas. The ``"/"`` entry
+happens to name the same shade; that is a coincidence of both wanting the
+faintest neutral, not a shared constant. Changing one must not move the other.
+
+Every tint clears the 4.5 body floor against :data:`BODY_TEXT` (16.28–17.22)
+and against :data:`REFLEX_MUTED_TEXT` (6.91–7.31). ``slate-500`` does not: it
+measures 4.34 on ``violet-50`` and 4.46 on ``sky-50``, and clears the floor on
+``emerald-50`` by 0.02 — which is why muted text in the Reflex stack is a step
+darker than the ``slate-500`` that serves the same role on white.
+"""
+
+REFLEX_TABLE_HUES: Final[Mapping[str, tuple[str, str, str]]] = {
+    "sequence": ("violet-100", "violet-700", "violet-600"),
+    "experiment": ("blue-100", "blue-700", "blue-600"),
+    "action": ("cyan-100", "cyan-700", "cyan-600"),
+    "server": ("slate-100", "slate-700", "slate-600"),
+    "browser": ("emerald-100", "emerald-700", "emerald-600"),
+}
+"""Per-table hue by table *kind*: ``(header background, header text, border)``.
+
+Keyed by kind rather than by tab, so the Queues and History views of the same
+object type read as the same thing — which is the whole point of colouring by
+function. Shade names, for the same reason as :data:`REFLEX_PAGE_TINTS`.
+
+**Table bodies stay white.** Only the header row carries saturation; a tinted
+body makes the data harder to read and would need every cell's text re-measured
+against it. Zebra striping, if any is ever added, stays ``slate-50``.
+
+Each header text clears the 4.5 body floor on its own header background
+(4.79–9.45). Each 600-level border clears the 3.0 non-text floor against every
+entry in :data:`REFLEX_PAGE_TINTS`, worst case ``cyan-600`` at 3.36 on
+``violet-50``.
+"""
+
+REFLEX_MUTED_TEXT: Final[str] = "slate-600"
+"""Muted text throughout the Reflex stack, as a TW shade name.
+
+One value rather than the Bokeh stack's two surface-keyed roles
+(:data:`MUTED_TEXT_ON_WHITE` / :data:`MUTED_TEXT_ON_PANEL`), because every
+Reflex page now sits on a tint and two of the five cannot carry ``slate-500``
+at all. A per-route muted role would be the *consistent* generalisation of the
+Bokeh split, and it is deliberately not what this is: it would mean a caption
+changing shade as you navigate, to buy back a step of lightness on three
+surfaces. One shade that clears the floor on all five is the better trade.
+"""
+
+
+def reflex_page_class(route: str) -> str:
+    """Return the Tailwind utilities painting *route*'s page canvas.
+
+    ``min-h-screen`` is part of the answer, not decoration: without it the tint
+    stops at the bottom of the content box and the viewport below it stays the
+    browser default, so a short page reads as two colours.
+
+    Args:
+        route: A key of :data:`REFLEX_PAGE_TINTS`.
+
+    Raises:
+        KeyError: For an unknown route — loudly, at build time, rather than
+            rendering an untinted page that looks merely unfinished.
+    """
+    return f"bg-{REFLEX_PAGE_TINTS[route]} min-h-screen"
+
+
+def reflex_header_class(kind: str) -> str:
+    """Return the Tailwind utilities for *kind*'s table header cells.
+
+    Args:
+        kind: A key of :data:`REFLEX_TABLE_HUES`.
+    """
+    background, text, _ = REFLEX_TABLE_HUES[kind]
+    return f"bg-{background} text-{text}"
+
+
+def reflex_table_class(kind: str) -> str:
+    """Return the Tailwind utilities for *kind*'s 3px left border.
+
+    Carried by the table's container rather than the header row, so the marker
+    runs the full height of the table and stays visible while the body scrolls.
+
+    Args:
+        kind: A key of :data:`REFLEX_TABLE_HUES`.
+    """
+    _, _, border = REFLEX_TABLE_HUES[kind]
+    return f"border-l-[3px] border-{border}"
+
+
+def reflex_muted_text_class() -> str:
+    """Return the Tailwind utility for muted text on any Reflex page tint."""
+    return f"text-{REFLEX_MUTED_TEXT}"
+
+
+def reflex_gridjs_header_css() -> str:
+    """Return the CSS giving the data browser's gridjs header its table hue.
+
+    **The one place in the Reflex stack that needs CSS rather than a utility
+    class, for two independent reasons.** ``rx.data_table`` does not forward
+    ``class_name`` to the grid it renders, so the utility never reaches the DOM
+    at all — and even when it does, gridjs ships ``th.gridjs-th`` as *unlayered*
+    CSS while Tailwind v4 emits utilities into ``@layer utilities``, which every
+    unlayered rule outranks regardless of specificity. Verified both ways with
+    ``getComputedStyle``: the class was absent from the element and no matching
+    rule existed in any stylesheet.
+
+    Authored here rather than at the call site because a CSS ``color:``
+    declaration is exactly what the sweeper in ``test_palette.py`` flags, and
+    this module is one of the two it exempts. ``bokeh_theme.py``'s ``GLOBAL_CSS``
+    is the same arrangement for the other stack.
+
+    Selectors are prefixed with ``.gridjs-container`` to outrank gridjs's own
+    ``th.gridjs-th`` (0,1,1) and ``th.gridjs-th-sort:hover`` (0,2,1) on
+    specificity rather than on source order, which ``head_components`` does not
+    control. Hover and focus repeat the resting background on purpose: the only
+    in-family step up is ``emerald-200``, which drops the header text to 4.28 and
+    would need a standing contrast exception to ship. The ``cursor: pointer``
+    gridjs already sets on a sortable header carries the affordance instead.
+    """
+    background, text, _ = REFLEX_TABLE_HUES["browser"]
+    fill, ink = TW[background], TW[text]
+    return (
+        f".gridjs-container th.gridjs-th,"
+        f".gridjs-container th.gridjs-th.gridjs-th-sort:hover,"
+        f".gridjs-container th.gridjs-th.gridjs-th-sort:focus"
+        f" {{ background-color: {fill}; color: {ink}; }}"
+    )
+
 
 # ---------------------------------------------------------------------------
 # Text

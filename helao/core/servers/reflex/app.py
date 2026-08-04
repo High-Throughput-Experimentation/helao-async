@@ -45,7 +45,11 @@ from helao.core.servers.operator.app_reflex import (
 )
 from helao.core.servers.operator.app_reflex import build_page as operator_page
 from helao.core.servers.operator.app_reflex import configure as configure_operator
-from helao.core.servers.palette import CHART_CHROME
+from helao.core.servers.palette import (
+    CHART_CHROME,
+    reflex_gridjs_header_css,
+    reflex_page_class,
+)
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
@@ -277,8 +281,20 @@ def _nav():
     )
 
 
-def _page(title: str, body):
-    """Wrap page content in the shared shell."""
+def _page(title: str, body, route: str):
+    """Wrap page content in the shared shell, tinted for *route*.
+
+    The tint is the functional-section signal: each route carries its own canvas
+    so a glance tells you which page you are on. It goes on this outermost
+    ``vstack`` rather than on ``html``/``body`` because Reflex's ``App.style``
+    cannot reach ``<html>`` (see :func:`build_app`), and it carries
+    ``min-h-screen`` so a short page does not read as two colours.
+
+    Args:
+        title: Page heading.
+        body: Page content.
+        route: The route being rendered, a key of ``REFLEX_PAGE_TINTS``.
+    """
     return rx.vstack(
         _nav(),
         rx.divider(),
@@ -287,13 +303,14 @@ def _page(title: str, body):
         width="100%",
         spacing="3",
         padding_bottom="2em",
+        class_name=reflex_page_class(route),
     )
 
 
-def _panel_page(title: str, targets: list, empty_note: str):
+def _panel_page(title: str, targets: list, empty_note: str, route: str):
     """Render a page of panels, or an explanatory note when there are none."""
     if not targets:
-        return _page(title, rx.text(empty_note, padding_x="1em"))
+        return _page(title, rx.text(empty_note, padding_x="1em"), route)
     return _page(
         title,
         rx.vstack(
@@ -302,6 +319,7 @@ def _panel_page(title: str, targets: list, empty_note: str):
             spacing="4",
             padding_x="1em",
         ),
+        route,
     )
 
 
@@ -323,12 +341,13 @@ def _index_page(routes: dict):
             spacing="2",
             padding_x="1em",
         ),
+        "/",
     )
 
 
-def _stub_page(title: str, spec_note: str):
+def _stub_page(title: str, spec_note: str, route: str = "/"):
     """Render a placeholder route that states what will fill it."""
-    return _page(title, rx.text(spec_note, padding_x="1em"))
+    return _page(title, rx.text(spec_note, padding_x="1em"), route)
 
 
 def _ensure_panel_states(routes: dict) -> None:
@@ -431,10 +450,18 @@ def build_app(world_cfg: dict, server_key: str):
     # body, so the rule can never match and the properties never apply
     # anywhere (confirmed empty via `getComputedStyle` on every element).
     # A real `<style>` tag in `<head>` is a genuine top-level rule instead.
+    #
+    # The gridjs header rule rides the same seam. It cannot be a Tailwind
+    # utility: `rx.data_table` does not forward `class_name` to the grid, and
+    # gridjs's own `th.gridjs-th` is unlayered CSS, which outranks anything in
+    # `@layer utilities`. See `palette.reflex_gridjs_header_css`.
     _root_vars = "; ".join(f"{k}: {v}" for k, v in CHART_CHROME.items())
     application = rx.App(
         api_transformer=backend,
-        head_components=[rx.el.style(f":root {{ {_root_vars}; }}")],
+        head_components=[
+            rx.el.style(f":root {{ {_root_vars}; }}"),
+            rx.el.style(reflex_gridjs_header_css()),
+        ],
     )
 
     application.add_page(lambda: _index_page(routes), route="/", title="HELAO")
@@ -443,6 +470,7 @@ def build_app(world_cfg: dict, server_key: str):
             "Live visualizers",
             routes["/live"],
             "No server in this config declares a `live_vis` panel.",
+            "/live",
         ),
         route="/live",
         title="HELAO live",
@@ -452,17 +480,18 @@ def build_app(world_cfg: dict, server_key: str):
             "Action visualizers",
             routes["/action"],
             "No server in this config declares an `action_vis` panel.",
+            "/action",
         ),
         route="/action",
         title="HELAO action",
     )
     application.add_page(
-        lambda: _page("Operator", operator_page()),
+        lambda: _page("Operator", operator_page(), "/operator"),
         route="/operator",
         title="HELAO operator",
     )
     application.add_page(
-        lambda: _page("Data browser", browser_page()),
+        lambda: _page("Data browser", browser_page(), "/browser"),
         route="/browser",
         title="HELAO browser",
     )
