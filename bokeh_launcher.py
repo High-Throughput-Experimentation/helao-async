@@ -61,9 +61,15 @@ if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
+from helao.helpers.parent_death import arm_parent_death_signal
 from helao.helpers.yml_tools import yml_load
 
 if __name__ == "__main__":
+    # Die with launch.py rather than orphaning and holding this server's port if
+    # the launcher is SIGKILLed. Linux-only and a no-op elsewhere; must run
+    # before anything binds a port, and from the child rather than a
+    # preexec_fn (see helao.helpers.parent_death).
+    arm_parent_death_signal()
     log_root = "."
     # launch.py sets HELAO_FORCE_COLOR when it pumps our output through its own
     # tty stdout: emit raw ANSI so the launcher's colorama translates it (which
