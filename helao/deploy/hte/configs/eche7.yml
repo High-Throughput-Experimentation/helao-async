@@ -136,7 +136,7 @@ servers:
       doc_name: ECHE7 Visualizer
   CONTROL:
     host: hte-eche-07.htejcap.caltech.edu
-    port: 5003
+    port: 5005
     group: visualizer
     bokeh: control_visualizer
     params:

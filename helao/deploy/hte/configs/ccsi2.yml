@@ -103,7 +103,7 @@ servers:
       doc_name: CCSI Visualizer
   CONTROL:
     host: hte-ccsi-02.htejcap.caltech.edu
-    port: 5003
+    port: 5005
     group: visualizer
     bokeh: control_visualizer
     params:

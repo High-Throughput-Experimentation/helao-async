@@ -197,7 +197,7 @@ servers:
     params: {}
   CONTROL:
     host: hte-adss-03.htejcap.caltech.edu
-    port: 5003
+    port: 5005
     group: visualizer
     bokeh: control_visualizer
     params:
