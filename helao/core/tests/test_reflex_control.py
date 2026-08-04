@@ -349,3 +349,38 @@ def test_the_read_button_colour_is_not_a_line_state_colour():
     # An action, not a fourth state a digital output could be in.
     assert REFLEX_CONTROL_READ_CLASS not in set(REFLEX_CONTROL_STATE_CLASSES.values())
     print("test_the_read_button_colour_is_not_a_line_state_colour PASS")
+
+
+def test_the_status_distinguishes_unreachable_from_unknown(page):
+    """Three outcomes, because they call for different actions.
+
+    A server that did not answer is a connectivity problem; a server that
+    answered but knows nothing about a line is what a write-mirror-only server
+    reports on a fresh start. Reporting the second as "read current state" hid
+    exactly the fact an engineer needed on the NI panel.
+    """
+    _, script = page
+    state = _FakeState()
+
+    # answered, but knows nothing about anything
+    script["read"] = {
+        "IO": {"gamry_aux": None, "Thorlab_led": None},
+        "NI": {"PeriPump1": None, "CO2": None},
+    }
+    _load(state)
+    assert "unknown: gamry_aux" in state.status, state.status
+    assert "could not read" not in state.status, state.status
+
+    # did not answer at all
+    script["read"] = {}
+    _reread(state)
+    assert "could not read" in state.status, state.status
+
+    # everything known
+    script["read"] = {
+        "IO": {"gamry_aux": True, "Thorlab_led": False},
+        "NI": {"PeriPump1": True, "CO2": False},
+    }
+    _reread(state)
+    assert state.status == "read current state", state.status
+    print("test_the_status_distinguishes_unreachable_from_unknown PASS")

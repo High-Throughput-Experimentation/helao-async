@@ -234,13 +234,20 @@ class ControlState(rx.State):
                 for target in _CONFIG["targets"]
                 for item in target.items
             ]
+            # Three outcomes, not two, and they are worth telling apart: a
+            # server that did not answer, a server that answered but knows
+            # nothing about a line, and a clean read. The middle one is what a
+            # write-mirror-only server reports on a fresh start, and calling it
+            # "read current state" — as this did — hides the one fact the
+            # engineer needs.
             unread = [key for key, got in states.items() if not got]
-            self.status = (
-                f"could not read: {', '.join(unread)}; those controls show "
-                f"unknown until used"
-                if unread
-                else "read current state"
-            )
+            unknown = [row[1] for row in self.rows if row[4] == "unknown"]
+            parts = []
+            if unread:
+                parts.append(f"could not read: {', '.join(unread)}")
+            if unknown:
+                parts.append(f"unknown: {', '.join(unknown)}")
+            self.status = "; ".join(parts) if parts else "read current state"
 
     @rx.event(background=True)
     async def toggle(self, server_key: str, do_name: str):

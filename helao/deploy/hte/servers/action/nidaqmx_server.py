@@ -74,6 +74,42 @@ DO_GROUPS = (
 )
 
 
+def _do_readback_to_bool(value):
+    """Coerce a DO readback to a bool, or ``None`` if it cannot be read.
+
+    ``Task.read(number_of_samples_per_channel=1)`` nests its result: one
+    channel and one sample still arrive as a list, and with
+    ``CHAN_PER_LINE`` a multi-line task nests twice. Unwrapping until a
+    scalar appears covers every shape without asserting one, which matters
+    because the shape depends on the module rather than on this code.
+
+    ``None`` rather than ``False`` for anything unreadable — on a control
+    panel "could not read this line" and "this line is off" must not look the
+    same.
+
+    Args:
+        value: The ``value`` field of a driver digital-out result.
+
+    Returns:
+        bool | None: The line state, or ``None`` when it did not resolve.
+    """
+    for _ in range(4):
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return None
+            value = value[0]
+        else:
+            break
+    if isinstance(value, bool):
+        return value
+    if value is None or isinstance(value, (list, tuple)):
+        return None
+    try:
+        return bool(int(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def build_do_port_map(server_params: dict) -> tuple[dict, dict]:
     """Flatten this server's digital-output groups into one name namespace.
 
@@ -804,22 +840,37 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post("/get_digital_outs", tags=["private"])
         async def get_digital_outs():
-            """Return the last state written to each configured digital output.
+            """Return the state of every configured digital output.
 
-            **A mirror, not a measurement.** A DO line on this hardware is
-            opened, written and closed inside a one-shot task and NI-DAQmx
-            offers no readback for it, so the only thing this server can report
-            is what it last wrote (``driver.do_state``). A name maps to ``None``
-            when nothing has written it since the server started, which a panel
-            must show as unknown rather than as off — the line may be energised
-            from a previous run.
+            Read from the hardware where the module supports DO readback, and
+            from the driver's write mirror where it does not. The mirror alone
+            is not enough: it starts empty, so on a freshly started server every
+            line reported unknown and stayed that way until something wrote it —
+            which is exactly what a panel opened to check the instrument cannot
+            use.
+
+            A name still maps to ``None`` when neither source knows it, and a
+            panel must show that as unknown rather than as off: the line may be
+            energised from a previous run.
 
             Returns:
                 ``(error_code, {do_name: bool | None})`` covering every
-                configured digital output, not only the ones written so far.
+                configured digital output.
             """
-            state = app.driver.do_state
-            return ErrorCodes.none, {name: state.get(name) for name in do_ports}
+            mirror = app.driver.do_state
+            states = {}
+            for name, port in do_ports.items():
+                datadict = await app.driver.get_digital_out(do_port=port, do_name=name)
+                if datadict.get("error_code") == ErrorCodes.none:
+                    states[name] = _do_readback_to_bool(datadict.get("value"))
+                else:
+                    states[name] = None
+                if states[name] is None:
+                    # Readback unsupported, or this line has never been read
+                    # successfully. What this server last wrote is still a
+                    # better answer than nothing.
+                    states[name] = mirror.get(name)
+            return ErrorCodes.none, states
 
         @app.post("/set_digital_out", tags=["private"])
         async def set_digital_out_direct(do_name: str = "", on: bool = False):

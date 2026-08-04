@@ -294,3 +294,53 @@ def test_nidaqmx_driver_mirror_starts_unknown_and_records_writes():
     reported = {name: driver.do_state.get(name) for name in ("CO2", "Ar")}
     assert reported == {"CO2": True, "Ar": None}
     print("test_nidaqmx_driver_mirror_starts_unknown_and_records_writes PASS")
+
+
+# --------------------------------------------------------------------------
+# nidaqmx digital-out readback
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ([True], True),  # one channel, one sample
+        ([False], False),
+        ([[True]], True),  # CHAN_PER_LINE nests twice
+        ([[False]], False),
+        (True, True),
+        (1, True),
+        (0, False),
+        (None, None),  # unreadable -> unknown, NOT off
+        ([], None),
+        ("nonsense", None),
+    ],
+)
+def test_do_readback_to_bool(raw, expected):
+    from helao.deploy.hte.servers.action.nidaqmx_server import _do_readback_to_bool
+
+    assert _do_readback_to_bool(raw) is expected
+
+
+def test_a_line_readback_cannot_read_falls_back_to_the_mirror():
+    """The whole point of keeping the mirror once hardware readback exists.
+
+    Not every DO module supports readback. Where it fails, what this server
+    last wrote is still a better answer than unknown — and where it fails *and*
+    nothing has been written, unknown is the honest answer.
+    """
+    from helao.deploy.hte.servers.action.nidaqmx_server import _do_readback_to_bool
+
+    mirror = {"written": True}
+
+    def resolve(readback, name):
+        state = _do_readback_to_bool(readback)
+        return mirror.get(name) if state is None else state
+
+    # readback works -> hardware wins, even over a stale mirror entry
+    assert resolve([False], "written") is False
+    # readback unsupported -> the mirror answers
+    assert resolve(None, "written") is True
+    # neither knows -> unknown, not off
+    assert resolve(None, "never_written") is None
+    print("test_a_line_readback_cannot_read_falls_back_to_the_mirror PASS")
