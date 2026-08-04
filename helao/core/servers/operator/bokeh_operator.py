@@ -32,6 +32,7 @@ from bokeh.models import (
     CustomJS,
     DataTable,
     InlineStyleSheet,
+    RadioButtonGroup,
     Select,
     TableColumn,
     TabPanel,
@@ -74,6 +75,8 @@ from helao.core.servers.palette import (
     MODIFIED_PARAM_TEXT,
     MUTED_TEXT_ON_PANEL,
     PANEL_BG,
+    PANEL_BORDER,
+    PANEL_BORDER_WIDTH,
     PARAM_INPUT_BG,
     PLAN_PANEL_NONQUEUED_BG,
     SELECTED_MARKER_OUTLINE,
@@ -109,6 +112,85 @@ _object_to_html = object_to_html
 _truncate_uuid = truncate_uuid
 _tree_header_text = tree_header_text
 _server_header_text = server_header_text
+
+
+#: Margin (top, right, bottom, left) on every section panel. The sections
+#: themselves are ``stretch_width``, so this is the only thing holding them off
+#: the browser's edges — and off each other, since two adjacent 4px margins
+#: collapse to nothing in a Bokeh flex container (each child is its own box, so
+#: they sum to 8px between panels rather than the 4px CSS margin collapsing
+#: would give in ordinary block flow).
+SECTION_MARGIN = (4, 4, 4, 4)
+
+#: ``LayoutDOM.name`` carried by exactly the parameter cells that may share a
+#: row with a neighbour. ``_pair_param_cells`` groups consecutive blocks
+#: carrying it into two-column rows and passes everything else through at full
+#: width, which is what keeps the plate map, the file input and the
+#: custom-position selector — all of which a special-cased parameter appends or
+#: substitutes *after* its cell — out of the grid without the pairing pass
+#: needing to know they exist.
+PARAM_CELL_NAME = "helao_param_cell"
+
+#: Labels of the two-way radio group a ``bool`` parameter renders as. They are
+#: the *values* as well as the labels: ``param_widget_value`` returns the active
+#: one verbatim, and ``parse_bokeh_input`` maps exactly these two strings to
+#: Python booleans, so nothing downstream has to learn about the widget.
+BOOL_LABELS = ["True", "False"]
+
+#: Styles on the two metadata tree views. They are white ``Div``s sitting on a
+#: white-ish panel, so without an outline the scroll box has no edge and its
+#: content reads as loose text in the panel rather than as a pane of its own —
+#: the same argument :func:`panel_styles` makes for a section, on a control that
+#: is not a section and so cannot use it. The padding is what keeps the tree's
+#: first character off the line now drawn beside it.
+TREE_VIEW_STYLES = {
+    "overflow": "auto",
+    "max-height": "200px",
+    "background-color": SURFACE_WHITE,
+    "border": f"{PANEL_BORDER_WIDTH} solid {PANEL_BORDER}",
+    "padding": "4px",
+}
+
+
+def param_widget_value(widget) -> str:
+    """Return the current value of a parameter widget as a string.
+
+    Parameter widgets are mostly ``TextInput``/``Select``, which carry a
+    ``value``, but a ``bool`` parameter renders as a ``RadioButtonGroup``, whose
+    state is an index into ``labels`` and which raises on ``.value`` — Bokeh
+    models reject attributes they do not declare, so a missed call site fails
+    loudly rather than silently reading a stale default.
+
+    Args:
+        widget: A widget from one of the ``*_param_input`` lists.
+
+    Returns:
+        str: The value, as the string the parameter coercion expects.
+    """
+    if isinstance(widget, RadioButtonGroup):
+        active = widget.active
+        if active is None or not (0 <= active < len(widget.labels)):
+            return ""
+        return widget.labels[active]
+    return widget.value
+
+
+def set_param_widget_value(widget, value) -> None:
+    """Write ``value`` into a parameter widget, whatever kind it is.
+
+    The inverse of :func:`param_widget_value`. A value that is not one of
+    :data:`BOOL_LABELS` clears a radio group's selection rather than guessing,
+    so a bad restore reads as "nothing chosen" instead of silently as ``False``.
+
+    Args:
+        widget: A widget from one of the ``*_param_input`` lists.
+        value: The new value; stringified for a radio group's comparison.
+    """
+    if isinstance(widget, RadioButtonGroup):
+        text = str(value)
+        widget.active = widget.labels.index(text) if text in widget.labels else None
+        return
+    widget.value = value
 
 
 class return_sequence_lib(BaseModel):
@@ -560,11 +642,7 @@ class BokehOperator:
         self.planhistory_tree_div = Div(
             text="",
             sizing_mode="stretch_width",
-            styles={
-                "overflow": "auto",
-                "max-height": "200px",
-                "background-color": SURFACE_WHITE,
-            },
+            styles=dict(TREE_VIEW_STYLES),
         )
         self.queue_tree_header = Div(
             text="<b>select a row</b>", height=20, sizing_mode="stretch_width"
@@ -572,11 +650,7 @@ class BokehOperator:
         self.queue_tree_div = Div(
             text="",
             sizing_mode="stretch_width",
-            styles={
-                "overflow": "auto",
-                "max-height": "200px",
-                "background-color": SURFACE_WHITE,
-            },
+            styles=dict(TREE_VIEW_STYLES),
         )
 
         self.error_txt = Div(
@@ -693,7 +767,7 @@ class BokehOperator:
 
         self.orch_section = Div(
             text="<b>Orchestrator</b>",
-            width=self.max_width - 20,
+            sizing_mode="stretch_width",
             height=32,
             styles={"font-size": "150%", "color": HEADING_TEXT},
         )
@@ -705,15 +779,18 @@ class BokehOperator:
                         Spacer(width=20),
                         Div(
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
-                            width=self.max_width - 20,
+                            sizing_mode="stretch_width",
                             height=32,
                             styles={"font-size": "200%", "color": HEADING_TEXT},
                         ),
                     ],
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
+                    height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
                 Spacer(height=10),
             ],
+            sizing_mode="stretch_width",
             height_policy="min",
         )
         # Selector tabs hold only the dropdown + description. The sequence
@@ -734,10 +811,12 @@ class BokehOperator:
                         [self.sequence_dropdown, self.sequence_version_div],
                     ],
                     styles=panel_styles(PANEL_BG),
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ],
+            sizing_mode="stretch_width",
             height_policy="min",
         )
 
@@ -748,10 +827,12 @@ class BokehOperator:
                         [self.experiment_dropdown, self.experiment_version_div],
                     ],
                     styles=panel_styles(PANEL_BG),
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ],
+            sizing_mode="stretch_width",
             height_policy="min",
         )
 
@@ -762,10 +843,12 @@ class BokehOperator:
                         [self.seqspec_dropdown],
                     ],
                     styles=panel_styles(PANEL_BG),
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ],
+            sizing_mode="stretch_width",
             height_policy="min",
         )
 
@@ -777,8 +860,9 @@ class BokehOperator:
                         Spacer(width=20),
                         self.orch_section,
                     ],
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
                 layout(
                     [
@@ -798,6 +882,7 @@ class BokehOperator:
                     styles=panel_styles(PANEL_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
                 layout(
                     [
@@ -842,6 +927,7 @@ class BokehOperator:
                     styles=panel_styles(PLAN_PANEL_NONQUEUED_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
                 layout(
                     [
@@ -920,8 +1006,10 @@ class BokehOperator:
                     styles=panel_styles(PANEL_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ],
+            sizing_mode="stretch_width",
             height_policy="min",
         )
 
@@ -1191,8 +1279,9 @@ class BokehOperator:
             layout(
                 [row(button, checkbox)],
                 styles=panel_styles(PANEL_BG),
-                width=self.max_width,
+                sizing_mode="stretch_width",
                 height_policy="min",
+                margin=SECTION_MARGIN,
             ),
         ]
 
@@ -1249,14 +1338,123 @@ class BokehOperator:
                 styles=panel_styles(PANEL_BG),
                 sizing_mode="stretch_width",
                 height_policy="min",
+                margin=SECTION_MARGIN,
             ),
             layout(
                 [button_row],
                 styles=panel_styles(PANEL_BG),
-                width=self.max_width,
+                sizing_mode="stretch_width",
                 height_policy="min",
+                margin=SECTION_MARGIN,
             ),
         ]
+
+    def _param_cell(self, children: list):
+        """Wrap ``children`` as one cell of the two-column parameter grid.
+
+        Carries :data:`PARAM_CELL_NAME` so ``_pair_param_cells`` picks it up,
+        and an explicit ``flex: 1 1 0%`` rather than a plain ``stretch_width``:
+        two ``stretch_width`` siblings in a row size from their content first,
+        so a long description in one cell would steal width from the other and
+        the two inputs would not line up down the page.
+
+        ``align-self: stretch`` is the height half of the same argument.
+        ``height_policy="min"`` gives each cell an explicit height, which
+        overrides the flex default and leaves the shorter of two paired cells
+        ending part-way up the row — the tinted blocks then read as ragged
+        rather than as a grid. It has to be ``!important``: Bokeh writes the
+        computed height onto the host's inline style.
+
+        Args:
+            children: Rows for the cell, in ``layout()`` form.
+
+        Returns:
+            The cell's layout container.
+        """
+        return layout(
+            children,
+            background=self.color_sq_param_inputs,
+            sizing_mode="stretch_width",
+            height_policy="min",
+            margin=SECTION_MARGIN,
+            name=PARAM_CELL_NAME,
+            stylesheets=[
+                InlineStyleSheet(
+                    css=":host { flex: 1 1 0% !important;"
+                    " align-self: stretch !important; }"
+                )
+            ],
+        )
+
+    def _param_extra_block(self, children: list):
+        """Wrap ``children`` as a full-width block beneath a parameter cell.
+
+        Used for the widgets a special-cased parameter adds *besides* its input
+        — the plate map, its element/code/composition readouts, and the
+        sample-list file picker. Deliberately without :data:`PARAM_CELL_NAME`:
+        these are too wide for half a row, and staying out of the grid is also
+        what keeps them directly beneath the parameter they belong to.
+
+        Args:
+            children: Rows for the block, in ``layout()`` form.
+
+        Returns:
+            The block's layout container.
+        """
+        return layout(
+            children,
+            background=self.color_sq_param_inputs,
+            sizing_mode="stretch_width",
+            height_policy="min",
+            margin=SECTION_MARGIN,
+        )
+
+    @staticmethod
+    def _pair_param_cells(blocks: list) -> list:
+        """Group consecutive parameter cells into two-column rows.
+
+        Only blocks carrying :data:`PARAM_CELL_NAME` are paired; anything else
+        (the plate map, the sample-list file input, the substituted
+        custom-position selector) passes through at full width and also breaks
+        a pair, so a parameter's own extra widgets stay directly beneath it
+        rather than being separated from it by the next parameter.
+
+        A cell left over at the end of a run is paired with a spacer instead of
+        being widened, so the last input in an odd-length form has the same
+        width as every other one.
+
+        Args:
+            blocks: The dynamic-parameter section of a param layout, in order.
+
+        Returns:
+            list: The same blocks, with parameter cells wrapped in two-up rows.
+        """
+
+        def _pair(first, second):
+            return row(
+                first,
+                second if second is not None else Spacer(sizing_mode="stretch_width"),
+                spacing=0,
+                sizing_mode="stretch_width",
+            )
+
+        paired: list = []
+        pending = None
+        for block in blocks:
+            if getattr(block, "name", None) == PARAM_CELL_NAME:
+                if pending is None:
+                    pending = block
+                else:
+                    paired.append(_pair(pending, block))
+                    pending = None
+                continue
+            if pending is not None:
+                paired.append(_pair(pending, None))
+                pending = None
+            paired.append(block)
+        if pending is not None:
+            paired.append(_pair(pending, None))
+        return paired
 
     def _update_param_layout(
         self, mode: str, idx: int, args=None, defaults=None, argtypes=None
@@ -1336,8 +1534,9 @@ class BokehOperator:
                         Spacer(height=10),
                     ],
                     styles=panel_styles(PANEL_BG),
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ]
             + self._build_param_header(mode)
@@ -1355,8 +1554,9 @@ class BokehOperator:
                         ],
                     ],
                     background=self.color_sq_param_inputs,
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
                     height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             ]
         )
@@ -1365,6 +1565,11 @@ class BokehOperator:
         param_input = getattr(self, cfg["input_attr"])
         private_input = getattr(self, cfg["private_attr"])
         argtype_list = getattr(self, cfg["types_attr"])
+
+        # Everything appended from here down is the dynamic parameter section,
+        # and only that section is paired into two columns — the description,
+        # header and footer blocks stay full width.
+        dyn_start = len(param_layout)
 
         self.add_dynamic_inputs(
             param_input,
@@ -1392,13 +1597,20 @@ class BokehOperator:
                         ],
                     ],
                     background=self.color_sq_param_inputs,
-                    width=self.max_width,
+                    sizing_mode="stretch_width",
+                    height_policy="min",
+                    margin=SECTION_MARGIN,
                 ),
             )
 
+        param_layout[dyn_start:] = self._pair_param_cells(param_layout[dyn_start:])
+
         param_layout.extend(self._build_param_footer(mode))
 
-        self.dynamic_col.children.insert(3, layout(param_layout, height_policy="min"))
+        self.dynamic_col.children.insert(
+            3,
+            layout(param_layout, sizing_mode="stretch_width", height_policy="min"),
+        )
 
         if cfg["refresh"]:
             self.refresh_inputs(param_input, private_input)
@@ -1599,7 +1811,7 @@ class BokehOperator:
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         input_params = {
-            paraminput.name: parse_bokeh_input(paraminput.value)
+            paraminput.name: parse_bokeh_input(param_widget_value(paraminput))
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
@@ -1626,7 +1838,7 @@ class BokehOperator:
         specfile = self.seqspecs[idx]
         parser_kwargs = self.config_dict.get("parser_kwargs", {})
         seqspec_input_params = {
-            paraminput.name: parse_bokeh_input(paraminput.value)
+            paraminput.name: parse_bokeh_input(param_widget_value(paraminput))
             for paraminput in self.seqspec_param_input
         }
         seq = self.seqspec_parser.parser(
@@ -1641,7 +1853,9 @@ class BokehOperator:
         # replace defaults with loaded params
         for i, x in enumerate(self.seq_param_input):
             if x.name in loaded_params:
-                self.seq_param_input[i].value = str(loaded_params[x.name])
+                set_param_widget_value(
+                    self.seq_param_input[i], str(loaded_params[x.name])
+                )
 
     def callback_clicked_pmplot(self, event, sender):
         """On a double-tap on the plate map, snap the marker to the nearest sample."""
@@ -1984,9 +2198,9 @@ class BokehOperator:
 
         sequence_params = {
             paraminput.name: (
-                input_type(parse_bokeh_input(paraminput.value))
+                input_type(parse_bokeh_input(param_widget_value(paraminput)))
                 if input_type in BUILTIN_TYPES
-                else parse_bokeh_input(paraminput.value)
+                else parse_bokeh_input(param_widget_value(paraminput))
             )
             for paraminput, input_type in zip(
                 self.seq_param_input, self.seq_param_input_types
@@ -2018,9 +2232,9 @@ class BokehOperator:
         LOGGER.info(f"selected experiment from list: {selected_experiment}")
         experiment_params = {
             paraminput.name: (
-                input_type(parse_bokeh_input(paraminput.value))
+                input_type(parse_bokeh_input(param_widget_value(paraminput)))
                 if input_type in BUILTIN_TYPES
-                else parse_bokeh_input(paraminput.value)
+                else parse_bokeh_input(param_widget_value(paraminput))
             )
             for paraminput, input_type in zip(
                 self.exp_param_input, self.exp_param_input_types
@@ -2065,9 +2279,15 @@ class BokehOperator:
             )
 
     def update_input_value(self, sender, value):
-        """Assign ``value`` to ``sender.value`` (Bokeh next-tick safe setter)."""
+        """Assign ``value`` to ``sender`` (Bokeh next-tick safe setter).
+
+        Routed through :func:`set_param_widget_value` because this is the setter
+        every restore path uses — loading last-used parameters, and the
+        spec-file hand-off — and any of those may land on a ``bool``
+        parameter's radio group rather than on a text field.
+        """
         if sender is not None:
-            sender.value = value
+            set_param_widget_value(sender, value)
         else:
             LOGGER.warning("tried to update value of nonexistant sender")
 
@@ -2165,39 +2385,6 @@ class BokehOperator:
             #     continue
             # disabled = False
 
-            initial_stylesheet = [color_rule(".bk-input", BODY_TEXT)]
-            text_input = TextInput(
-                value=def_val,
-                title="",
-                name=args[idx],
-                disabled=True if args[idx].endswith("_version") else False,
-                width=400,
-                height=31,
-                margin=(0, 5, 0, 5),
-                stylesheets=initial_stylesheet,
-            )
-            if args[idx] not in self.skip_default_highlights:
-                # Both rules are built in Python and the JS only picks between
-                # them, so no CSS is assembled in the browser and neither
-                # declaration appears as a literal at this call site.
-                default_rule = color_rule(".bk-input", BODY_TEXT, important=True)
-                modified_rule = color_rule(
-                    ".bk-input", MODIFIED_PARAM_TEXT, important=True
-                )
-                color_callback_js = CustomJS(
-                    args=dict(input=text_input),
-                    code=f"""
-cb_obj.stylesheets = [
-    cb_obj.value_input === '{def_val}' ? `{default_rule}` : `{modified_rule}`
-]
-""",
-                )
-                text_input.js_on_change("value", color_callback_js)
-                text_input.js_on_change("value_input", color_callback_js)
-            param_input.append(text_input)
-            argtype_list.append(argtypes[idx])
-            idx_col_w = 35
-            input_w = 400
             type_hint = (
                 str(argtypes[idx])
                 .split()[-1]
@@ -2205,57 +2392,121 @@ cb_obj.stylesheets = [
                 .split(".")[-1]
                 .replace("[", " of ")
             )
+            # A plain ``bool`` renders as a two-way radio group rather than a
+            # free-text field. Restricted to a default that is already one of
+            # BOOL_LABELS: an ``Optional[bool]`` reads back as "Optional of
+            # bool" here and never matches, but a bare ``bool`` annotation with
+            # a ``None`` default would, and a radio group has no third position
+            # to put it in — such a parameter keeps its text field, where
+            # ``None`` still round-trips.
+            is_bool = type_hint == "bool" and def_val in BOOL_LABELS
+            if is_bool:
+                param_widget = RadioButtonGroup(
+                    labels=list(BOOL_LABELS),
+                    active=BOOL_LABELS.index(def_val),
+                    name=args[idx],
+                    disabled=args[idx].endswith("_version"),
+                    height=31,
+                    margin=(0, 5, 0, 5),
+                    sizing_mode="stretch_width",
+                )
+            else:
+                initial_stylesheet = [color_rule(".bk-input", BODY_TEXT)]
+                param_widget = TextInput(
+                    value=def_val,
+                    title="",
+                    name=args[idx],
+                    disabled=True if args[idx].endswith("_version") else False,
+                    height=31,
+                    margin=(0, 5, 0, 5),
+                    sizing_mode="stretch_width",
+                    stylesheets=initial_stylesheet,
+                )
+                if args[idx] not in self.skip_default_highlights:
+                    # Both rules are built in Python and the JS only picks
+                    # between them, so no CSS is assembled in the browser and
+                    # neither declaration appears as a literal at this call
+                    # site. A radio group needs no equivalent: which position is
+                    # selected is the whole widget, so a changed value is
+                    # already visible without recolouring anything.
+                    default_rule = color_rule(".bk-input", BODY_TEXT, important=True)
+                    modified_rule = color_rule(
+                        ".bk-input", MODIFIED_PARAM_TEXT, important=True
+                    )
+                    color_callback_js = CustomJS(
+                        args=dict(input=param_widget),
+                        code=f"""
+cb_obj.stylesheets = [
+    cb_obj.value_input === '{def_val}' ? `{default_rule}` : `{modified_rule}`
+]
+""",
+                    )
+                    param_widget.js_on_change("value", color_callback_js)
+                    param_widget.js_on_change("value_input", color_callback_js)
+            param_input.append(param_widget)
+            argtype_list.append(argtypes[idx])
+            idx_col_w = 35
             name_div = Div(
                 text=f"{args[idx]}",
-                width=input_w // 2,
-                height=14,
+                width=200,
+                height_policy="min",
                 margin=(0, 5, 0, 5),
             )
+            # The parsed ``Args:`` description sits between the name and the
+            # type annotation, in the label row above the input rather than in a
+            # second column beside it: with the form in two columns there is no
+            # room for a column of prose, and above the field it stays on the
+            # same reading line as the name it describes.
+            desc_div = Div(
+                text=arg_descs.get(args[idx], ""),
+                sizing_mode="stretch_width",
+                height_policy="min",
+                margin=(0, 5, 0, 5),
+                styles={"color": MUTED_TEXT_ON_PANEL},
+            )
+            # Right-aligned, and last in the row, so the annotation lands on the
+            # cell's right edge whatever the description's length.
             type_div = Div(
                 text=f"<i>[{type_hint}]</i>",
-                width=input_w - input_w // 2,
-                height=14,
+                width=140,
+                height_policy="min",
                 margin=(0, 5, 0, 5),
                 styles={"text-align": "right"},
             )
             index_div = Div(
                 text=f"[{idx}]",
                 width=idx_col_w,
-                height=text_input.height,
+                height=param_widget.height,
                 margin=(0, 5, 0, 5),
-                styles={"text-align": "right", "line-height": f"{text_input.height}px"},
+                styles={
+                    "text-align": "right",
+                    "line-height": f"{param_widget.height}px",
+                },
             )
             input_col = column(
-                row(Spacer(width=idx_col_w), name_div, type_div, spacing=0),
-                row(index_div, param_input[item], spacing=0),
+                row(
+                    Spacer(width=idx_col_w),
+                    name_div,
+                    desc_div,
+                    type_div,
+                    spacing=0,
+                    sizing_mode="stretch_width",
+                ),
+                row(
+                    index_div,
+                    param_input[item],
+                    spacing=0,
+                    sizing_mode="stretch_width",
+                ),
                 spacing=5,
-                width=idx_col_w + input_w,
-            )
-            # Right column: the parsed Args: description, shown persistently
-            # beside the input field regardless of focus.
-            desc_div = Div(
-                text=arg_descs.get(args[idx], ""),
-                sizing_mode="stretch_width",
-                styles={"color": MUTED_TEXT_ON_PANEL, "margin-left": "12px"},
-            )
-            desc_col = column(
-                Spacer(height=name_div.height + 5),
-                desc_div,
                 sizing_mode="stretch_width",
             )
             param_layout.append(
-                layout(
+                self._param_cell(
                     [
-                        row(
-                            input_col,
-                            desc_col,
-                            spacing=10,
-                            sizing_mode="stretch_width",
-                        ),
+                        input_col,
                         Spacer(height=10),
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
+                    ]
                 )
             )
             item = item + 1
@@ -2287,13 +2538,11 @@ cb_obj.stylesheets = [
                 )
                 self.update_pm_plot(private_input[-1], [])
                 param_layout.append(
-                    layout(
+                    self._param_extra_block(
                         [
                             [private_input[-1]],
                             Spacer(height=10),
-                        ],
-                        background=self.color_sq_param_inputs,
-                        width=self.max_width,
+                        ]
                     )
                 )
 
@@ -2328,13 +2577,11 @@ cb_obj.stylesheets = [
                     )
                 )
                 param_layout.append(
-                    layout(
+                    self._param_extra_block(
                         [
                             [private_input[-3], private_input[-2], private_input[-1]],
                             Spacer(height=10),
-                        ],
-                        background=self.color_sq_param_inputs,
-                        width=self.max_width,
+                        ]
                     )
                 )
 
@@ -2362,13 +2609,15 @@ cb_obj.stylesheets = [
                         param_input[-1].value = def_val
                     else:
                         param_input[-1].value = self.dev_customitems[0]
-                param_layout[-1] = layout(
+                # Substituted for the text cell, and stays a grid cell: the
+                # selector is no wider than the input it replaces, so dropping
+                # it out of the two-column flow would leave a full-width row in
+                # the middle of the form.
+                param_layout[-1] = self._param_cell(
                     [
                         [param_input[-1]],
                         Spacer(height=10),
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
+                    ]
                 )
 
             elif args[idx] == "liquid_custom_position":
@@ -2383,25 +2632,25 @@ cb_obj.stylesheets = [
                         param_input[-1].value = def_val
                     else:
                         param_input[-1].value = self.dev_customitems[0]
-                param_layout[-1] = layout(
+                # Substituted for the text cell, and stays a grid cell: the
+                # selector is no wider than the input it replaces, so dropping
+                # it out of the two-column flow would leave a full-width row in
+                # the middle of the form.
+                param_layout[-1] = self._param_cell(
                     [
                         [param_input[-1]],
                         Spacer(height=10),
-                    ],
-                    background=self.color_sq_param_inputs,
-                    width=self.max_width,
+                    ]
                 )
 
             elif self.dataAPI is not None and args[idx] == "plate_sample_no_list":
                 private_input.append(FileInput(width=200, accept=".txt"))
                 param_layout.append(
-                    layout(
+                    self._param_extra_block(
                         [
                             [private_input[-1]],
                             Spacer(height=10),
-                        ],
-                        background=self.color_sq_param_inputs,
-                        width=self.max_width,
+                        ]
                     )
                 )
                 private_input[-1].on_change(

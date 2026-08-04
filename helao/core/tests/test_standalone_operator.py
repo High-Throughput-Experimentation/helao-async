@@ -1164,19 +1164,25 @@ def test_param_label_enumeration():
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"  # selected in __init__; single param "x"
     # seq_param_layout has 4 fixed prefix entries (load/save header block,
-    # description block, Spacer, params header block), then param rows appended
-    # by add_dynamic_inputs from index 4.
-    # Each param row is layout([row(input_col, desc_col), Spacer]) where
-    # input_col == column(row(Spacer, name_div, type_div), row(index_div, input)).
-    param_row = op.seq_param_layout[4].children[0]
-    input_col = param_row.children[0]
+    # description block, Spacer, params header block), then the parameter grid
+    # from index 4. Each grid row is row(cell, cell-or-Spacer); a single
+    # parameter therefore pairs with a Spacer.
+    # Each cell is layout([input_col, Spacer]) where input_col ==
+    # column(row(Spacer, name_div, desc_div, type_div), row(index_div, input)).
+    grid_row = op.seq_param_layout[4]
+    cell = grid_row.children[0]
+    input_col = cell.children[0]
     label_row = input_col.children[0]
     name_div = label_row.children[1]
-    type_div = label_row.children[2]
+    desc_div = label_row.children[2]
+    type_div = label_row.children[3]
     index_div = input_col.children[1].children[0]
     assert index_div.text == "[0]", index_div.text
     assert name_div.text == "x", name_div.text
+    # The description sits between the name and the right-aligned type hint.
+    assert desc_div.styles.get("text-align") is None, desc_div.styles
     assert type_div.text.startswith("<i>["), type_div.text
+    assert type_div.styles["text-align"] == "right", type_div.styles
     # widget key unchanged (decoupled from display)
     assert op.seq_param_input[0].name == "x"
     op.cleanup_session(None)
@@ -1420,6 +1426,164 @@ def test_layout_is_stretch_width():
     print("test_layout_is_stretch_width PASS")
 
 
+def _param_grid(op, args, defaults, argtypes):
+    """Rebuild the spec-file parameter form from an explicit signature.
+
+    The seqspec mode is the only one that takes ``args``/``defaults``/
+    ``argtypes`` directly, which is what lets these tests exercise parameter
+    kinds the mock library does not happen to contain. Returns the dynamic
+    section of the layout — everything after the four fixed prefix blocks.
+    """
+    op._update_param_layout(
+        "seqspec", 0, args=args, defaults=defaults, argtypes=argtypes
+    )
+    # Prefix is description + Spacer + params header (seqspec has no
+    # load/save header row), then the grid, then the two footer blocks.
+    return op.seqspec_param_layout[3:-2]
+
+
+def test_bool_param_renders_a_radio_group():
+    from bokeh.document import Document
+    from bokeh.models import RadioButtonGroup
+
+    from helao.core.servers.operator.bokeh_operator import (
+        BOOL_LABELS,
+        BokehOperator,
+        param_widget_value,
+    )
+    from helao.helpers.to_json import parse_bokeh_input
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    _param_grid(op, ["flag", "n"], [True, 3], [bool, int])
+
+    widget = op.seqspec_param_input[0]
+    assert isinstance(widget, RadioButtonGroup), type(widget)
+    assert widget.labels == BOOL_LABELS, widget.labels
+    assert widget.active == 0, widget.active
+    assert widget.name == "flag"
+    # The non-bool parameter beside it is untouched.
+    assert not isinstance(op.seqspec_param_input[1], RadioButtonGroup)
+
+    # The label IS the value, and survives the coercion the enqueue paths use.
+    assert param_widget_value(widget) == "True"
+    assert parse_bokeh_input(param_widget_value(widget)) is True
+    widget.active = 1
+    assert parse_bokeh_input(param_widget_value(widget)) is False
+    op.cleanup_session(None)
+    print("test_bool_param_renders_a_radio_group PASS")
+
+
+def test_bool_param_without_a_bool_default_keeps_its_text_field():
+    from bokeh.document import Document
+    from bokeh.models import RadioButtonGroup
+
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    # A radio group has no third position for None, and defaulting it to False
+    # would change what the operator enqueues.
+    _param_grid(op, ["flag"], [None], [bool])
+    assert not isinstance(op.seqspec_param_input[0], RadioButtonGroup)
+    assert op.seqspec_param_input[0].value == "None"
+    op.cleanup_session(None)
+    print("test_bool_param_without_a_bool_default_keeps_its_text_field PASS")
+
+
+def test_radio_group_round_trips_through_the_restore_setter():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import (
+        BokehOperator,
+        param_widget_value,
+    )
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    _param_grid(op, ["flag"], [True], [bool])
+    widget = op.seqspec_param_input[0]
+
+    # update_input_value is the setter every restore path goes through.
+    op.update_input_value(widget, "False")
+    assert param_widget_value(widget) == "False"
+    op.update_input_value(widget, "True")
+    assert param_widget_value(widget) == "True"
+    # A value that is not a label clears the selection rather than guessing.
+    op.update_input_value(widget, "banana")
+    assert widget.active is None
+    assert param_widget_value(widget) == ""
+    op.cleanup_session(None)
+    print("test_radio_group_round_trips_through_the_restore_setter PASS")
+
+
+def test_param_cells_render_two_to_a_row():
+    from bokeh.document import Document
+    from bokeh.layouts import Spacer
+
+    from helao.core.servers.operator.bokeh_operator import (
+        PARAM_CELL_NAME,
+        BokehOperator,
+    )
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    grid = _param_grid(op, ["a", "b", "c"], [1, 2, 3], [int, int, int])
+
+    assert len(grid) == 2, len(grid)
+    assert [child.name for child in grid[0].children] == [
+        PARAM_CELL_NAME,
+        PARAM_CELL_NAME,
+    ]
+    # The odd cell pairs with a spacer rather than widening, so every input in
+    # the form has the same width.
+    assert grid[1].children[0].name == PARAM_CELL_NAME
+    assert isinstance(grid[1].children[1], Spacer)
+
+    # An even count leaves no spacer at all.
+    grid = _param_grid(op, ["a", "b"], [1, 2], [int, int])
+    assert len(grid) == 1, len(grid)
+    assert all(child.name == PARAM_CELL_NAME for child in grid[0].children)
+    op.cleanup_session(None)
+    print("test_param_cells_render_two_to_a_row PASS")
+
+
+def test_sections_stretch_and_carry_a_margin():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import (
+        SECTION_MARGIN,
+        BokehOperator,
+    )
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    sections = [
+        op.layout0.children[0],
+        op.layout1.children[0],
+        op.layout2.children[0],
+        op.layout4.children[1],
+    ]
+    for section in sections:
+        assert section.sizing_mode == "stretch_width", section.sizing_mode
+        assert section.margin == SECTION_MARGIN, section.margin
+        # A fixed width would defeat the stretch whatever the sizing mode says.
+        assert section.width is None, section.width
+    op.cleanup_session(None)
+    print("test_sections_stretch_and_carry_a_margin PASS")
+
+
+def test_tree_views_are_bordered():
+    from bokeh.document import Document
+
+    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.core.servers.palette import PANEL_BORDER
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    for tree in (op.planhistory_tree_div, op.queue_tree_div):
+        assert PANEL_BORDER in tree.styles["border"], tree.styles
+        assert tree.styles["padding"] == "4px", tree.styles
+    # Separate dicts, so restyling one tree cannot silently restyle the other.
+    assert op.planhistory_tree_div.styles is not op.queue_tree_div.styles
+    op.cleanup_session(None)
+    print("test_tree_views_are_bordered PASS")
+
+
 def run_all():
     test_endpoint_helpers_shapes()
     test_remote_backend_dispatch_and_serialize()
@@ -1469,6 +1633,12 @@ def run_all():
     test_queue_tree_render_lazy_sequence()
     test_queue_tree_lazy_empty_clears()
     test_layout_is_stretch_width()
+    test_bool_param_renders_a_radio_group()
+    test_bool_param_without_a_bool_default_keeps_its_text_field()
+    test_radio_group_round_trips_through_the_restore_setter()
+    test_param_cells_render_two_to_a_row()
+    test_sections_stretch_and_carry_a_margin()
+    test_tree_views_are_bordered()
     print("ALL STANDALONE_OPERATOR TESTS PASS")
 
 
