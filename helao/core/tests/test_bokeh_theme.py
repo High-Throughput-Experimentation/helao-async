@@ -38,11 +38,13 @@ from helao.core.servers.palette import (
     BUTTON_PRIMARY_BG,
     BUTTON_SUCCESS_BG,
     BUTTON_WARNING_BG,
+    CHART_CHROME,
     ESTOP_BG,
     ESTOP_HOVER_BG,
     MARKER_SWATCHES,
     PAGE_BG,
     PANEL_BG,
+    SURFACE_WHITE,
 )
 
 
@@ -391,3 +393,28 @@ def test_helao_vis_themes_its_document():
     (carrier,) = doc.roots
     assert isinstance(carrier, Div)
     assert CARRIER_TAG in carrier.tags
+
+
+# ---------------------------------------------------------------------------
+# Cross-stack plot-interior parity
+# ---------------------------------------------------------------------------
+def test_the_two_stacks_agree_about_the_plot_interior() -> None:
+    """The Bokeh figure and the Reflex xy chart paint the same three roles alike.
+
+    This is the one assertion that can only live here: ``test_palette.py`` is
+    the gate on ``CHART_CHROME`` but must not import ``bokeh_theme``, and
+    ``palette.py`` cannot compare the two because it is what both read from.
+
+    Background, gridlines and axis lines are the visually dominant parts of a
+    plot, and until ``CHART_CHROME`` covered them the Reflex charts sat at
+    ``xy-client.js``'s own JS fallbacks while the Bokeh figures took theirs from
+    :data:`HELAO_THEME`. The two stacks therefore disagreed about the plot
+    interior on pages that render both — which is precisely the failure a single
+    shared palette exists to make impossible. Pinning the equality here means a
+    later edit to one side fails instead of silently reopening the gap.
+    """
+    attrs = HELAO_THEME._json["attrs"]
+    assert CHART_CHROME["--chart-bg"] == attrs["Plot"]["background_fill_color"]
+    assert CHART_CHROME["--chart-bg"] == SURFACE_WHITE
+    assert CHART_CHROME["--chart-grid"] == attrs["Grid"]["grid_line_color"]
+    assert CHART_CHROME["--chart-axis"] == attrs["Axis"]["axis_line_color"]

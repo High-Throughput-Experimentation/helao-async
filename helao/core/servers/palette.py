@@ -454,14 +454,65 @@ def _rgba(hex_color: str, alpha: float) -> str:
 
 
 CHART_CHROME: Final[Mapping[str, str]] = {
+    # --- plot interior: the surfaces the Bokeh figures already theme ---------
+    "--chart-bg": SURFACE_WHITE,
+    "--chart-grid": TW["slate-300"],
+    "--chart-axis": TW["slate-400"],
+    # --- text ---------------------------------------------------------------
     "--chart-text": TW["slate-700"],
+    "--chart-annotation-text": TW["slate-700"],
+    # --- overlays -----------------------------------------------------------
     "--chart-tooltip-bg": _rgba(TW["slate-800"], 0.95),
     "--chart-tooltip-text": WHITE,
+    "--chart-badge-bg": _rgba(TW["slate-800"], 0.95),
+    "--chart-badge-text": WHITE,
+    "--chart-crosshair": _rgba(TW["slate-900"], 0.42),
+    # --- chrome fills -------------------------------------------------------
     "--chart-legend-bg": TW["slate-100"],
+    "--chart-modebar-bg": WHITE,
+    "--chart-modebar-active": TW["slate-100"],
+    # --- interaction affordances -------------------------------------------
+    "--chart-focus": TW["sky-600"],
+    "--chart-modebar-focus": TW["sky-600"],
+    "--chart-selection": TW["sky-600"],
+    "--chart-selection-fill": _rgba(TW["sky-600"], 0.12),
+    "--chart-zoom-selection": TW["sky-700"],
+    "--chart-zoom-selection-fill": _rgba(TW["sky-700"], 0.12),
 }
-"""Four of the 22 CSS custom properties ``xy-client.js`` reads.
+"""Nineteen of the 22 CSS custom properties ``xy-client.js`` reads.
 
-The other 18 — including the visually dominant ``--chart-bg``, ``--chart-grid``
-and ``--chart-axis`` — are knowingly left at their JS fallbacks, so "chart
-chrome matches the palette" is scoped to text, tooltip and legend background.
+Delivered as one ``:root`` block through ``head_components`` in
+``helao/core/servers/reflex/app.py`` — **not** ``rx.App(style=...)``, which
+serializes a string key into a descendant selector that can never match
+``<html>`` and so fails silently.
+
+The point of covering ``--chart-bg``, ``--chart-grid`` and ``--chart-axis`` is
+parity, not decoration: the Bokeh figures take those same three roles from
+``HELAO_THEME`` (``Plot.background_fill_color``, ``Grid.grid_line_color``, the
+axis line colour). While the Reflex charts sat at xy's own JS fallbacks the two
+stacks disagreed about the plot interior, which is exactly what a shared palette
+is supposed to make impossible.
+
+**The remaining three are deliberately unset because they are not colours.**
+``--chart-cursor`` and ``--chart-cursor-pan`` resolve into ``cursor:`` and hold
+CSS cursor *keywords* (``crosshair`` and ``grab``); ``--chart-tick-label-max-width``
+resolves inside ``maxWidth: min(...)`` and holds a *length*. Assigning any of
+them a colour does not merely fail to theme anything — it breaks the feature,
+silently: the pan tool loses its grab cursor and tick labels lose their clamp.
+``test_chart_chrome_omits_the_three_non_colour_vars`` exists so that nobody
+"completes the set" later. That test, plus the subset check against the 22 names
+xy actually reads, is why a typo'd variable name cannot ship as a no-op either.
+
+Two values are pinned to xy's own defaults rather than changed: ``--chart-crosshair``
+is ``rgba(15, 23, 42, .42)`` in the JS, which *is* ``slate-900`` at 0.42, so
+routing it through :data:`TW` makes it palette-sourced without moving a pixel.
+
+``--chart-legend-bg`` and ``--chart-modebar-active`` are both ``slate-100`` on a
+white chart background — 1.10:1, below the 1.20 neighbouring-surface floor, and
+they carry **no** surface row on purpose. That floor governs a panel boundary
+that has to be *seen*; these two are faint chrome washes behind their own
+content, and the affordance is carried by the legend swatches and modebar icons
+sitting on them, not by the step in the background. Lifting them to
+``slate-200`` (1.23:1) would clear the floor at the cost of making resting
+chrome compete with the data it sits over.
 """
