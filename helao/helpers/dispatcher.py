@@ -207,6 +207,13 @@ async def async_action_dispatcher(
                             f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
                         )
                         success = False
+                        # Counted, like the exception branch below. A non-200
+                        # is not transport noise that will pass on its own —
+                        # without this the loop condition never changes and
+                        # the call spins forever on a 404 or a 422.
+                        retry_count += 1
+                        if retry_count < retries:
+                            await asyncio.sleep(retry_count * timeout / 2)
                     else:
                         success = True
         except Exception:
@@ -316,6 +323,13 @@ async def async_private_dispatcher(
                             f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
                         )
                         success = False
+                        # Counted, like the exception branch below. A non-200
+                        # is not transport noise that will pass on its own —
+                        # without this the loop condition never changes and
+                        # the call spins forever on a 404 or a 422.
+                        retry_count += 1
+                        if retry_count < retries:
+                            await asyncio.sleep(retry_count * timeout / 2)
                     else:
                         success = True
         except Exception:
