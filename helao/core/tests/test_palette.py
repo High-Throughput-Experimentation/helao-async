@@ -402,7 +402,9 @@ BUTTON_LABEL_ROWS: Final[dict[tuple[str, str], float]] = {
 }
 
 SURFACE_ROWS: Final[dict[tuple[str, str], float]] = {
-    ("slate-300", "slate-50"): 1.42,
+    # The page canvas against the panels sitting on it. This is the pair that
+    # regressed: pointing both at slate-300 made every section panel vanish.
+    ("slate-50", "slate-300"): 1.42,
     ("slate-300", "white"): 1.48,
     ("amber-200", "white"): 1.25,
     ("sky-100", "slate-300"): 1.29,  # was sky-200 at 1.12, below the floor
@@ -521,6 +523,28 @@ def test_no_swatch_rows_are_asserted() -> None:
     assert (
         declared & swatch_only == set()
     ), f"swatch-only shades must carry no asserted row: {declared & swatch_only}"
+
+
+def test_page_and_panel_are_distinct() -> None:
+    """The page canvas must not be the same colour as the panels on it.
+
+    A regression guard for a real defect: ``GLOBAL_CSS`` painted ``html``/``body``
+    in ``PANEL_BG``, the same value the section panels use. Nothing failed — the
+    sweep was clean, every contrast row passed, the pages rendered — but the
+    panels were invisible on every visualizer, the operator, and the data
+    browser, because a surface against an identical surface has no contrast at
+    all. Only looking at a page caught it.
+
+    The pre-palette stack had a recessed-panel hierarchy (white canvas,
+    ``#D6DBDF`` panel, white plot area) and this keeps it.
+    """
+    assert palette.PAGE_BG != palette.PANEL_BG
+    ratio = contrast_ratio(palette.PAGE_BG, palette.PANEL_BG)
+    assert ratio >= FLOOR_SURFACE, (
+        f"page {palette.PAGE_BG} vs panel {palette.PANEL_BG} is {ratio:.2f}:1, "
+        f"under the {FLOOR_SURFACE} surface floor — panels will not read as "
+        f"separate regions from the canvas behind them"
+    )
 
 
 def test_exceptions_registry_is_empty() -> None:
