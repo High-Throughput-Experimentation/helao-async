@@ -41,6 +41,7 @@ from helao.core.servers.palette import (
     ESTOP_BG,
     ESTOP_HOVER_BG,
     MARKER_SWATCHES,
+    PAGE_BG,
     PANEL_BG,
 )
 
@@ -130,8 +131,17 @@ def test_global_css_is_a_string_not_a_model():
 
 
 def test_global_css_carries_palette_chrome():
-    assert PANEL_BG in GLOBAL_CSS
+    assert PAGE_BG in GLOBAL_CSS
     assert BODY_TEXT in GLOBAL_CSS
+
+
+def test_global_css_paints_the_page_not_the_panel_colour():
+    """The canvas must be ``PAGE_BG``. Painting it ``PANEL_BG`` — which an
+    earlier draft did — makes every section panel vanish into the page, with
+    nothing failing anywhere to say so."""
+    assert PAGE_BG != PANEL_BG
+    assert f"background-color: {PAGE_BG}" in GLOBAL_CSS
+    assert f"background-color: {PANEL_BG}" not in GLOBAL_CSS
 
 
 def test_global_css_declares_no_box_model_on_root_shells():

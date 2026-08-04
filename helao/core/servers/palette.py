@@ -82,11 +82,33 @@ WHITE: Final[str] = "#ffffff"
 # ---------------------------------------------------------------------------
 # Surfaces
 # ---------------------------------------------------------------------------
+PAGE_BG: Final[str] = TW["slate-50"]
+"""The page canvas — ``html``/``body``, behind every panel.
+
+**Distinct from :data:`PANEL_BG` on purpose, and it must stay that way.** Before
+this palette existed the page was Bokeh's default white and panels were
+``#D6DBDF``, giving a recessed-panel look: light canvas, mid-tone panel, light
+plot area. An earlier draft pointed both the canvas and the panels at
+``PANEL_BG``, which collapsed that hierarchy — the section panels became
+invisible against the page on every visualizer, the operator, and the data
+browser, because a 1.0:1 "contrast" is no contrast.
+
+``slate-50`` restores the separation at 1.42:1, within a hair of the original
+white's 1.48:1, while keeping the canvas in the slate family so it does not read
+as stark white against slate panels. ``test_page_and_panel_are_distinct``
+guards the collapse.
+"""
+
 PANEL_BG: Final[str] = TW["slate-300"]
-"""Panel / layout background. Replaces ``#D6DBDF`` across both stacks."""
+"""Panel / layout background. Replaces ``#D6DBDF`` across both stacks.
+
+Sits *between* :data:`PAGE_BG` behind it and :data:`SURFACE_WHITE` plot areas
+inside it. Also the figure ``border_fill_color``, so a figure reads as flush
+within its panel rather than as a card floating on one.
+"""
 
 SURFACE_WHITE: Final[str] = WHITE
-"""Tree overflow panels and input fields."""
+"""Tree overflow panels, input fields, and figure plot areas."""
 
 SURFACE_ALT: Final[str] = TW["slate-50"]
 """The faint off-white surface; replaces Radix ``var(--gray-2)``."""

@@ -70,6 +70,7 @@ from helao.core.servers.palette import (
     ESTOP_HOVER_BG,
     MARKER_SWATCHES,
     MUTED_TEXT_ON_WHITE,
+    PAGE_BG,
     PANEL_BG,
     SURFACE_WHITE,
     TW,
@@ -153,9 +154,13 @@ HELAO_THEME: Final[Theme] = Theme(
 # are in the document tree and therefore reachable, and apply_theme adds one for
 # the theme carrier — a border or margin there would open a gap at the top of
 # every page.
+# The canvas is PAGE_BG, *not* PANEL_BG. Painting the page in the panel colour
+# collapses the recessed-panel hierarchy this stack has always had — light
+# canvas, mid-tone panel, light plot area — and the section panels vanish into
+# the page on every document. See palette.PAGE_BG.
 GLOBAL_CSS: Final[str] = f"""
 html, body {{
-  background-color: {PANEL_BG};
+  background-color: {PAGE_BG};
 }}
 body {{
   color: {BODY_TEXT};
