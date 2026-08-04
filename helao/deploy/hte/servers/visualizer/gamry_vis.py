@@ -108,7 +108,6 @@ class C_vis(ActionVisualizer):
             title="max datapoints",
             disabled=False,
             width=150,
-            height=40,
         )
         self.input_max_points.on_change(
             "value",
@@ -120,7 +119,6 @@ class C_vis(ActionVisualizer):
             title="max previous plots",
             disabled=False,
             width=150,
-            height=40,
         )
         self.input_max_prev.on_change(
             "value",
@@ -131,6 +129,13 @@ class C_vis(ActionVisualizer):
             label="Stopped",
             button_type="primary",
             width=70,
+            # Bottom-aligned so the button lines up with the input boxes beside
+            # it rather than with their titles. A Button has no title, so the
+            # default start-alignment rides it up to the label row -- measured
+            # 20px high of the inputs before this. The titled inputs above also
+            # drop their height=40: that forced 9px of slack below a 31px input
+            # box, which left the button 8px short even when bottom-aligned.
+            align="end",
             stylesheets=[semantic_button_stylesheet()],
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
