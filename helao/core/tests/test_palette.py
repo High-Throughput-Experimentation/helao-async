@@ -241,17 +241,124 @@ def test_two_muted_text_roles_keyed_by_surface() -> None:
     assert palette.MUTED_TEXT_ON_WHITE != palette.MUTED_TEXT_ON_PANEL
 
 
-def test_chart_chrome_has_the_four_vars() -> None:
-    assert set(palette.CHART_CHROME) == {
+# The 22 CSS custom properties ``xy-client.js`` reads, transcribed from the
+# bundled client into *this* file. Authored separately from ``CHART_CHROME`` for
+# the same reason as :data:`CANONICAL_TAILWIND`: a subset check against the set
+# the palette itself supplies would reduce to ``assert set(d) <= set(d)``. With
+# the list held here, a mistyped variable name — which the browser accepts in
+# silence and simply resolves nowhere — fails a test instead of shipping.
+XY_CHART_VARS: Final[frozenset[str]] = frozenset(
+    {
+        "--chart-annotation-text",
+        "--chart-axis",
+        "--chart-badge-bg",
+        "--chart-badge-text",
+        "--chart-bg",
+        "--chart-crosshair",
+        "--chart-cursor",
+        "--chart-cursor-pan",
+        "--chart-focus",
+        "--chart-grid",
+        "--chart-legend-bg",
+        "--chart-modebar-active",
+        "--chart-modebar-bg",
+        "--chart-modebar-focus",
+        "--chart-selection",
+        "--chart-selection-fill",
         "--chart-text",
+        "--chart-tick-label-max-width",
         "--chart-tooltip-bg",
         "--chart-tooltip-text",
-        "--chart-legend-bg",
+        "--chart-zoom-selection",
+        "--chart-zoom-selection-fill",
     }
-    assert palette.CHART_CHROME["--chart-text"] == TW["slate-700"]
-    assert palette.CHART_CHROME["--chart-tooltip-bg"] == "rgba(30, 41, 59, 0.95)"
-    assert palette.CHART_CHROME["--chart-tooltip-text"] == WHITE
-    assert palette.CHART_CHROME["--chart-legend-bg"] == TW["slate-100"]
+)
+
+# Three of the 22 hold something other than a colour, and assigning a colour to
+# any of them breaks a working feature rather than failing to theme one.
+NON_COLOUR_CHART_VARS: Final[frozenset[str]] = frozenset(
+    {
+        "--chart-cursor",  # `cursor: var(--chart-cursor, crosshair)` — a keyword
+        "--chart-cursor-pan",  # `cursor: var(--chart-cursor-pan, grab)` — a keyword
+        "--chart-tick-label-max-width",  # `min(var(--…, Npx))` — a length
+    }
+)
+
+
+def test_chart_chrome_names_are_all_read_by_xy() -> None:
+    """No ``CHART_CHROME`` key may be a name ``xy-client.js`` never looks up.
+
+    An unread custom property is a *silent* no-op: the ``:root`` block still
+    parses, the page still renders, and the chart simply keeps the JS fallback.
+    Nothing in either stack notices.
+    """
+    unread = set(palette.CHART_CHROME) - XY_CHART_VARS
+    assert unread == set(), f"CHART_CHROME sets properties xy never reads: {unread}"
+
+
+def test_chart_chrome_omits_the_three_non_colour_vars() -> None:
+    """The regression guard against "completing the set".
+
+    ``CHART_CHROME`` covers 19 of 22, and the three left out are left out
+    *because they are not colours* — two CSS cursor keywords and a length. A
+    later edit that fills the gap for symmetry would drop the pan tool's grab
+    cursor and unclamp the tick labels, and neither failure surfaces anywhere:
+    the properties are syntactically fine, they just no longer mean what
+    ``cursor:`` and ``min()`` need them to mean.
+    """
+    intruders = set(palette.CHART_CHROME) & NON_COLOUR_CHART_VARS
+    assert intruders == set(), (
+        f"{sorted(intruders)} hold CSS keywords/lengths, not colours — setting "
+        f"them to a colour breaks the feature instead of theming it"
+    )
+    assert set(palette.CHART_CHROME) == XY_CHART_VARS - NON_COLOUR_CHART_VARS
+    assert len(palette.CHART_CHROME) == 19
+
+
+def test_chart_chrome_values() -> None:
+    assert palette.CHART_CHROME == {
+        "--chart-bg": palette.SURFACE_WHITE,
+        "--chart-grid": TW["slate-300"],
+        "--chart-axis": TW["slate-400"],
+        "--chart-text": TW["slate-700"],
+        "--chart-annotation-text": TW["slate-700"],
+        "--chart-tooltip-bg": "rgba(30, 41, 59, 0.95)",
+        "--chart-tooltip-text": WHITE,
+        "--chart-badge-bg": "rgba(30, 41, 59, 0.95)",
+        "--chart-badge-text": WHITE,
+        "--chart-crosshair": "rgba(15, 23, 42, 0.42)",
+        "--chart-legend-bg": TW["slate-100"],
+        "--chart-modebar-bg": WHITE,
+        "--chart-modebar-active": TW["slate-100"],
+        "--chart-focus": TW["sky-600"],
+        "--chart-modebar-focus": TW["sky-600"],
+        "--chart-selection": TW["sky-600"],
+        "--chart-selection-fill": "rgba(2, 132, 199, 0.12)",
+        "--chart-zoom-selection": TW["sky-700"],
+        "--chart-zoom-selection-fill": "rgba(3, 105, 161, 0.12)",
+    }
+
+
+def test_chart_bg_matches_the_bokeh_plot_area() -> None:
+    """The Reflex chart canvas and the Bokeh plot area are the same surface.
+
+    This is the parity claim the whole change exists for: the Bokeh figures take
+    their background from ``HELAO_THEME``'s ``Plot.background_fill_color``, and
+    while ``--chart-bg`` sat at xy's own fallback the two stacks disagreed about
+    the plot interior.
+    """
+    assert palette.CHART_CHROME["--chart-bg"] == palette.SURFACE_WHITE
+
+
+def test_chart_crosshair_is_the_xy_default_made_palette_sourced() -> None:
+    """``rgba(15, 23, 42, .42)`` is what ``xy-client.js`` already falls back to.
+
+    ``slate-900`` *is* ``rgb(15, 23, 42)``, so this entry changes no pixel — it
+    moves the value from a hardcoded fallback in a vendored JS bundle to the
+    palette, where a later shade edit carries it along.
+    """
+    assert palette.CHART_CHROME["--chart-crosshair"] == "rgba(15, 23, 42, 0.42)"
+    assert TW["slate-900"] == "#0f172a"  # == rgb(15, 23, 42)
 
 
 def test_red_ramp() -> None:
@@ -486,6 +593,47 @@ REFLEX_BORDER_ROWS: Final[dict[tuple[str, str], float]] = {
 }
 
 
+# --- xy chart surfaces ------------------------------------------------------
+# Everything the plot interior paints, measured against `--chart-bg`, which is
+# the one background all of it sits on. Keyed by CHART_CHROME *variable name*
+# rather than by shade name, so a row tracks the role even if the shade behind
+# it moves, and pinned with the floor that role answers to — the roles here span
+# three different floors, which is why the floor is a column rather than one
+# value for the whole table.
+#
+# Floors, and why each is the right one:
+#
+# * Gridlines are `FLOOR_SURFACE` (1.20), not a text or control floor. A
+#   gridline's job is to be *findable* against the canvas while staying quieter
+#   than every trace drawn over it; that is the same "two neighbouring surfaces
+#   must not collapse into one" question `SURFACE_ROWS` asks, and `slate-300`
+#   answers it at the same 1.48 it gives the Bokeh panel against white. Holding
+#   a 1px reference line to the 4.5 body floor would force it up past the data.
+# * Axis lines are `FLOOR_TRACE` (2.0). An axis is a stroke that carries meaning
+#   — it is the frame the reader measures against, not backdrop — so it sits
+#   with the traces rather than with the surfaces, one step darker at
+#   `slate-400`.
+# * Selection, zoom-band and focus borders are `FLOOR_CONTROL` (3.0): WCAG's
+#   non-text floor for a graphical object that communicates interaction state.
+# * `--chart-text` and `--chart-annotation-text` are tick labels and annotation
+#   labels — body-sized text, so `FLOOR_BODY_TEXT` (4.5).
+#
+# `--chart-legend-bg` and `--chart-modebar-active` are deliberately absent; see
+# the `CHART_CHROME` docstring. Both measure 1.10 against `--chart-bg` and both
+# are faint chrome washes whose content carries the affordance, so neither is a
+# surface-boundary row and neither takes an exception.
+CHART_SURFACE_ROWS: Final[dict[tuple[str, str], tuple[float, float]]] = {
+    ("--chart-grid", "--chart-bg"): (1.48, FLOOR_SURFACE),
+    ("--chart-axis", "--chart-bg"): (2.56, FLOOR_TRACE),
+    ("--chart-selection", "--chart-bg"): (4.10, FLOOR_CONTROL),
+    ("--chart-zoom-selection", "--chart-bg"): (5.93, FLOOR_CONTROL),
+    ("--chart-focus", "--chart-bg"): (4.10, FLOOR_CONTROL),
+    ("--chart-modebar-focus", "--chart-bg"): (4.10, FLOOR_CONTROL),
+    ("--chart-text", "--chart-bg"): (10.35, FLOOR_BODY_TEXT),
+    ("--chart-annotation-text", "--chart-bg"): (10.35, FLOOR_BODY_TEXT),
+}
+
+
 def _shade(name: str) -> str:
     return WHITE if name == "white" else TW[name]
 
@@ -575,6 +723,58 @@ def test_button_label_rows_cover_every_button_surface() -> None:
 @pytest.mark.parametrize("pair", sorted(SURFACE_ROWS))
 def test_neighbouring_surface_contrast(pair: tuple[str, str]) -> None:
     _check(pair, SURFACE_ROWS[pair], FLOOR_SURFACE)
+
+
+@pytest.mark.parametrize("pair", sorted(CHART_SURFACE_ROWS))
+def test_chart_surface_contrast(pair: tuple[str, str]) -> None:
+    """Every painted part of the plot interior, against the chart background.
+
+    Resolved through ``CHART_CHROME`` rather than through :data:`TW`, so the row
+    measures the value the browser will actually receive.
+    """
+    published, floor = CHART_SURFACE_ROWS[pair]
+    fg, bg = (palette.CHART_CHROME[name] for name in pair)
+    measured = contrast_ratio(fg, bg)
+    assert measured == pytest.approx(published, abs=0.01), (
+        f"{pair[0]} ({fg}) on {pair[1]} ({bg}): published {published:.2f}, "
+        f"measured {measured:.2f}"
+    )
+    assert measured >= floor, (
+        f"{pair[0]} on {pair[1]} is {measured:.2f}, below its {floor} floor "
+        f"(see the floor rationale above CHART_SURFACE_ROWS)"
+    )
+
+
+def test_grid_and_axis_are_distinguishable_from_the_chart_background() -> None:
+    """The two roles the Bokeh figures already theme and the Reflex charts did not.
+
+    Named separately from the parametrized rows because "the gridlines are
+    visible" is the claim, and it must not be satisfiable by the rows table
+    simply losing an entry. The ordering assertion is part of it: the axis has to
+    read as *stronger* than the gridlines, or the frame disappears into the mesh.
+    """
+    chrome = palette.CHART_CHROME
+    bg = chrome["--chart-bg"]
+    grid = contrast_ratio(chrome["--chart-grid"], bg)
+    axis = contrast_ratio(chrome["--chart-axis"], bg)
+    assert grid >= FLOOR_SURFACE, f"gridlines are {grid:.2f} on the canvas"
+    assert axis >= FLOOR_TRACE, f"axis lines are {axis:.2f} on the canvas"
+    assert axis > grid, "the axis must read stronger than the gridlines it frames"
+
+
+def test_chart_rows_cover_every_interaction_affordance() -> None:
+    """Selection, zoom band and both focus rings each carry a declared row.
+
+    Omitting one is exactly how an under-contrast control slips through: the
+    palette still looks complete and the missing pair is simply never measured.
+    """
+    measured = {fg for fg, _ in CHART_SURFACE_ROWS}
+    assert {
+        "--chart-selection",
+        "--chart-zoom-selection",
+        "--chart-focus",
+        "--chart-modebar-focus",
+    } <= measured
 
 
 def test_no_swatch_rows_are_asserted() -> None:
