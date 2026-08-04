@@ -5,6 +5,7 @@ __all__ = ["Vis", "HelaoVis"]
 from socket import gethostname
 
 from helao.core.models.machine import MachineModel
+from helao.core.servers.bokeh_theme import apply_theme
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.helao_logging import print_message
@@ -34,6 +35,10 @@ class HelaoVis(HelaoBokehAPI):
             doc: Bokeh ``Document`` for this server instance.
         """
         super().__init__(server_key, doc)
+        # Single seam for the palette: every HELAO Bokeh document is a HelaoVis,
+        # including the aligner whose Server is built inside an action-server
+        # process and never passes through bokeh_launcher.py.
+        apply_theme(self.doc)
         self.vis = Vis(self)
 
 

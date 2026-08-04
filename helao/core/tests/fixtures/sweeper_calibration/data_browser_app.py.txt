@@ -17,16 +17,11 @@ from bokeh.models import (
     Tabs,
     TextInput,
 )
+from bokeh.palettes import Category10
 from bokeh.plotting import figure
 
-from helao.core.servers.bokeh_theme import semantic_button_stylesheet
 from helao.core.servers.data_browser import sources
 from helao.core.servers.data_browser import state as dbstate
-from helao.core.servers.palette import (
-    BROWSER_FAILURE_TEXT,
-    BROWSER_HEADER_TEXT,
-    SERIES,
-)
 
 INDEX_TABLE_COLS = [
     "source",
@@ -52,6 +47,7 @@ FILTER_COLS = [
     "file_name",
     "date",
 ]
+PALETTE = Category10[10]
 
 
 def build_document(vis):
@@ -79,7 +75,7 @@ class _UI:
         # --- header ---
         header = Div(
             text=f"<b>Data Browser on {gethostname().lower()}</b>",
-            styles={"font-size": "180%", "color": BROWSER_HEADER_TEXT},
+            styles={"font-size": "180%", "color": "#2471A3"},
             width=1000,
             height=32,
         )
@@ -94,14 +90,7 @@ class _UI:
         )
         self.date_start = TextInput(title="From (YY.WW/MMDD)", width=140)
         self.date_end = TextInput(title="To (YY.WW/MMDD)", width=140)
-        # The scan button flips primary -> warning -> primary across a scan, so it
-        # carries the four-type sheet rather than a single-type override.
-        self.scan_btn = Button(
-            label="Scan",
-            button_type="primary",
-            width=80,
-            stylesheets=[semantic_button_stylesheet()],
-        )
+        self.scan_btn = Button(label="Scan", button_type="primary", width=80)
         self.status = Div(text="", width=600)
 
         self.group_sel.on_change("active", self._on_group_change)
@@ -132,10 +121,7 @@ class _UI:
             stylesheets=[InlineStyleSheet(css=":host { height: 30vh; }")],
         )
         self.add_btn = Button(
-            label="+ Add selected to plot",
-            button_type="success",
-            width=300,
-            stylesheets=[semantic_button_stylesheet()],
+            label="+ Add selected to plot", button_type="success", width=300
         )
         self.clear_btn = Button(label="Clear plot", width=300)
         self.add_btn.on_click(self._on_add)
@@ -235,7 +221,7 @@ class _UI:
                 continue
             tr = dbstate.downsample(tr, self.max_points)
             src = ColumnDataSource(data=tr)
-            color = SERIES[i % len(SERIES)]
+            color = PALETTE[i % len(PALETTE)]
             if self.type_sel.value == "scatter":
                 self.plot.scatter(
                     "x", "y", source=src, color=color, legend_label=ds.label
@@ -288,26 +274,16 @@ class _UI:
             self.index_df = sources.get_index(self.root, self._current_source(), ds, de)
         except Exception as exc:
             self.index_df = None
-            self._set_status(f"scan failed: {exc}", failed=True)
+            self.status.text = f"<span style='color:#c0392b'>scan failed: {exc}</span>"
             self.vis.print_message(f"data_browser scan failed: {exc}", error=True)
             return
         finally:
             self.scan_btn.button_type = "primary"
             self.scan_btn.disabled = False
-        self._set_status(
+        self.status.text = (
             f"indexed {len(self.index_df)} datasets from {self._current_source()}"
         )
         self._refresh_index_table()
-
-    def _set_status(self, text: str, failed: bool = False) -> None:
-        """Write the status line, red on failure and default otherwise.
-
-        The colour rides the ``Div``'s own ``styles`` rather than an inline
-        ``<span style=…>``, so it resolves through the palette and clears
-        itself on the next normal message.
-        """
-        self.status.styles = {"color": BROWSER_FAILURE_TEXT} if failed else {}
-        self.status.text = text
 
     def _filtered_df(self):
         if self.index_df is None:
@@ -350,4 +326,4 @@ class _UI:
         self._refresh_axes()
         self._rebuild_plot()
         self._rebuild_tables()
-        self._set_status(f"{len(self.selected)} dataset(s) selected")
+        self.status.text = f"{len(self.selected)} dataset(s) selected"

@@ -157,7 +157,7 @@ def build(server_key: str, state_cls):
                 rx.heading(f"Cells: {server_key}", size="4"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
-                rx.text(state_cls.action_uuid, size="1", color_scheme="gray"),
+                rx.text(state_cls.action_uuid, size="1", class_name="text-slate-500"),
                 rx.input(
                     default_value=state_cls.window_points.to_string(),
                     on_blur=state_cls.on_window_points,
@@ -184,7 +184,7 @@ def build(server_key: str, state_cls):
             ),
             rx.cond(
                 state_cls.error != "",
-                rx.text(state_cls.error, color_scheme="red"),
+                rx.text(state_cls.error, class_name="text-red-600"),
             ),
             rx.hstack(
                 figure(

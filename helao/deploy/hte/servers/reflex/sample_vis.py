@@ -176,7 +176,7 @@ def build(server_key: str, state_cls):
             ),
             rx.cond(
                 state_cls.status != "",
-                rx.text(state_cls.status, size="2", color_scheme="amber"),
+                rx.text(state_cls.status, size="2", class_name="text-amber-700"),
             ),
             *[table(name, rows_by_type[name]) for name in SAMPLE_TYPES],
             width="100%",

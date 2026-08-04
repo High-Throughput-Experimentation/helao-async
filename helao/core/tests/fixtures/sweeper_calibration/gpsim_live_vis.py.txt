@@ -19,8 +19,6 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.bokeh_theme import semantic_button_stylesheet
-from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 
@@ -92,7 +90,6 @@ class C_vis(LiveVisualizer):
             disabled=True,
             button_type="success",
             width=400,
-            stylesheets=[semantic_button_stylesheet()],
         )  # success: green, danger: red
 
         self.table = DataTable(
@@ -133,7 +130,7 @@ class C_vis(LiveVisualizer):
                 [Div(text=tableheader, width=1004, height=15)],
                 [Spacer(width=10), self.table, Spacer(width=10)],
             ],
-            background=PANEL_BG,
+            background="#D6DBDF",
             width=1024,
         )
 
@@ -213,7 +210,7 @@ class C_vis(LiveVisualizer):
         # remove all old lines
         self.plot.renderers = []
 
-        colors = [SERIES[0], SERIES[1], SERIES[2], SERIES[3]]
+        colors = ["red", "blue", "green", "orange"]
         for i, (k, (phist, pedge, pnum, ghist, gedge, gnum)) in enumerate(
             self.hists.items()
         ):

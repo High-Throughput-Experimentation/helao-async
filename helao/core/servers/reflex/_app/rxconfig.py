@@ -22,4 +22,5 @@ config = rx.Config(
     app_name="helao_ui",
     backend_port=int(os.environ.get("HELAO_REFLEX_BACKEND_PORT", "5011")),
     api_url=os.environ.get("HELAO_REFLEX_API_URL", "http://127.0.0.1:5011"),
+    plugins=[rx.plugins.TailwindV4Plugin()],
 )
