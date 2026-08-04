@@ -87,6 +87,13 @@ TW: Final[Mapping[str, str]] = {
     "fuchsia-600": "#c026d3",
     "pink-400": "#f472b6",
     "pink-500": "#ec4899",
+    # The /control page canvas. A rose rather than a sixth cool tint because it
+    # is the only 50-level shade well separated from the other five, and a
+    # faintly cautionary canvas suits the one page whose buttons energise
+    # hardware. It is *not* in the red/ESTOP family: red-700 upward is what
+    # carries danger here, and rose-50 at 16.25 against slate-900 is a page
+    # background, not a warning.
+    "rose-50": "#fff1f2",
 }
 
 WHITE: Final[str] = "#ffffff"
@@ -177,6 +184,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/action": "violet-50",
     "/operator": "amber-50",
     "/browser": "emerald-50",
+    "/control": "rose-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
@@ -379,6 +387,40 @@ def reflex_page_class(route: str) -> str:
             rendering an untinted page that looks merely unfinished.
     """
     return f"bg-{REFLEX_PAGE_TINTS[route]} min-h-screen"
+
+
+#: Tailwind utilities for a digital-output control, by the state it reports.
+#:
+#: Three entries because a digital output has three states, and the third is
+#: not a shade of the second: a line nobody has read is *unknown*, and on the
+#: NI server — which cannot read its outputs back at all — it may well be
+#: energised. Painting unknown like off would make the panel lie by omission,
+#: so it takes the amber that reads as "attention", distinct from both.
+#:
+#: ``emerald-700`` and ``amber-700``, not the 600s: white on ``emerald-600`` is
+#: 3.77, under the 4.5 body floor, and the label is body text on a control.
+#: Measured 5.48 and 5.02 at the 700s. Off is white with a ``slate-400`` edge —
+#: the same hairline every section carries, so an off control reads as an empty
+#: box rather than as a fourth colour.
+REFLEX_CONTROL_STATE_CLASSES: Final[Mapping[str, str]] = {
+    "on": "bg-emerald-700 text-white",
+    "off": "bg-white text-slate-900 border border-slate-400",
+    "unknown": "bg-amber-700 text-white",
+}
+"""Per-state control-button utilities; see the comment above."""
+
+
+def reflex_control_button_class(state: str) -> str:
+    """Return the Tailwind utilities for a control reporting *state*.
+
+    Args:
+        state: ``"on"``, ``"off"`` or ``"unknown"``.
+
+    Raises:
+        KeyError: For anything else — loudly, rather than rendering a control
+            whose colour says nothing about the line it drives.
+    """
+    return REFLEX_CONTROL_STATE_CLASSES[state]
 
 
 def reflex_header_class(kind: str) -> str:

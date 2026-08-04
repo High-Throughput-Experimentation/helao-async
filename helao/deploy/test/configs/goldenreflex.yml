@@ -38,7 +38,18 @@ servers:
     group: action
     fast: ws_simulator
     live_vis: wssim_panel
-    params: {}
+    # `dev_do` and `control_vis` for the same reason CPSIM and GPSIM are here:
+    # without them /control renders empty and the page is never exercised. The
+    # simulator has no digital-output endpoints, so every control opens
+    # unknown and a click reports a failed write -- which is the honest
+    # failure path, and the one a station hits when its IO server is down.
+    control_vis: digital_out_control
+    params:
+      dev_do:
+        gamry_aux: 1
+        Thorlab_led: 7
+        cell_valve: 2
+        purge_valve: 3
   # CPSIM and GPSIM exist so the browser check actually exercises all three
   # panels. Without CPSIM there is no `action_vis` server at all, so /action
   # renders empty and the ws_data path -- the one that shipped two Critical
