@@ -190,6 +190,14 @@ def route_map(world_cfg: dict, pages, limit_vis=None) -> dict:
     list where a page was not requested or has no panels — a requested-but-empty
     page still renders and says so, rather than 404ing.
 
+    **``pages`` does not decide which pages exist**, despite the name. It is
+    read only through :data:`PAGE_TO_VIS_KEY`, so all it selects is which
+    *panels* mount on ``/live`` and ``/action``; every route is registered
+    unconditionally by ``build_app``, and ``/operator``, ``/browser`` and
+    ``/control`` have never consulted it at all. A page is made empty by
+    config, never absent. What opts a station into the control page is a
+    server declaring ``control_vis``.
+
     Args:
         world_cfg: The loaded HELAO world config.
         pages: Page names from the Reflex server's ``params.pages``.
