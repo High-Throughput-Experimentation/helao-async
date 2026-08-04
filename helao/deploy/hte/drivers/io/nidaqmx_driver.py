@@ -711,6 +711,65 @@ class cNIMAX(HelaoDriver):
             "value": on,
         }
 
+    async def get_digital_out(
+        self, do_port=None, do_name: str = "", *args, **kwargs
+    ) -> dict:
+        """Read a digital output line back from the hardware.
+
+        NI-DAQmx can read a task built from ``do_channels`` — ``Task.read``
+        dispatches on ``ChannelType.DIGITAL_OUTPUT`` — which returns the line's
+        current output state on devices that support DO readback. Not all do,
+        so a failure here is expected rather than exceptional and is reported
+        as ``not_available`` for the caller to fall back on :attr:`do_state`.
+
+        Opening the task does not disturb the line: ``set_digital_out`` has
+        always opened and closed a one-shot DO task per write and the outputs
+        persist across it, which is the same lifecycle with no ``write`` call.
+
+        Args:
+            do_port: NI-DAQ channel string for the digital output.
+            do_name: Friendly name for the channel.
+
+        Returns:
+            Dict with `error_code`, `port`, `name`, `type` ("digital_out"),
+            and `value` — ``None`` when the line could not be read.
+        """
+        value = None
+        err_code = ErrorCodes.none
+        if do_port is None:
+            return {
+                "error_code": ErrorCodes.not_available,
+                "port": do_port,
+                "name": do_name,
+                "type": "digital_out",
+                "value": None,
+            }
+        try:
+            with nidaqmx.Task() as task_do_port:
+                task_do_port.do_channels.add_do_chan(
+                    do_port,
+                    line_grouping=LineGrouping.CHAN_PER_LINE,
+                )
+                value = task_do_port.read(number_of_samples_per_channel=1)
+        except Exception:
+            # Not every DO module supports readback. Warning, not error: the
+            # caller has a mirror to fall back on and the panel stays truthful
+            # either way.
+            LOGGER.warning(
+                f"digital-out readback unsupported or failed for '{do_name}' "
+                f"({do_port}); falling back to the write mirror",
+                exc_info=True,
+            )
+            err_code = ErrorCodes.not_available
+
+        return {
+            "error_code": err_code,
+            "port": do_port,
+            "name": do_name,
+            "type": "digital_out",
+            "value": value,
+        }
+
     async def get_digital_in(
         self, di_port=None, di_name: str = "", on: bool = False, *args, **kwargs
     ) -> dict:
