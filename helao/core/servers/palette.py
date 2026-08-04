@@ -409,6 +409,20 @@ REFLEX_CONTROL_STATE_CLASSES: Final[Mapping[str, str]] = {
 }
 """Per-state control-button utilities; see the comment above."""
 
+REFLEX_CONTROL_READ_CLASS: Final[str] = "bg-sky-700 text-white"
+"""Utilities for the control panel's "read state" button.
+
+Deliberately *not* an entry in :data:`REFLEX_CONTROL_STATE_CLASSES`: that map is
+keyed by the state of a line, and this button has no line and no state — it is
+an action. Sharing the map would invite a fourth "state" that no digital output
+can ever be in.
+
+``sky-700`` is :data:`BUTTON_PRIMARY_BG` exactly, so the button reads the same
+in both UI stacks — the Bokeh half gets it from ``button_type="primary"``.
+White on it is 5.93, and it is 5.40 against the ``/control`` canvas, so it is
+legible as a control and distinct from all three state colours.
+"""
+
 
 def reflex_control_button_class(state: str) -> str:
     """Return the Tailwind utilities for a control reporting *state*.

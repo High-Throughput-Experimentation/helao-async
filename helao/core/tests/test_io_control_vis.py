@@ -262,3 +262,40 @@ def test_a_reply_about_other_lines_does_not_invent_controls(transport):
 
     assert set(panel.states) == {"gamry_aux", "Thorlab_led"}
     print("test_a_reply_about_other_lines_does_not_invent_controls PASS")
+
+
+def test_the_read_button_refetches_every_line(transport):
+    _, script = transport
+    script["read"] = {"gamry_aux": True, "Thorlab_led": True}
+    panel = _build(_Panel, "IO")
+    assert panel.states["gamry_aux"] is True
+
+    # A sequence drives the line while the panel is open; the panel cannot
+    # know, because it only learns what it commands itself.
+    script["read"] = {"gamry_aux": False, "Thorlab_led": True}
+    assert panel.states["gamry_aux"] is True, "still showing the stale value"
+
+    panel._callback_read(None)
+    _drain(panel.vis.doc)
+
+    assert panel.states["gamry_aux"] is False
+    assert panel.buttons["gamry_aux"].label.endswith(": OFF")
+    print("test_the_read_button_refetches_every_line PASS")
+
+
+def test_the_read_button_is_not_a_line_state_colour(transport):
+    panel = _build(_Panel, "IO")
+    # `primary`, so it cannot be mistaken for a fourth state beside the
+    # success/default/warning the controls themselves use.
+    assert panel.read_button.button_type == "primary"
+    assert panel.read_button.button_type not in {
+        b.button_type for b in panel.buttons.values()
+    }
+    print("test_the_read_button_is_not_a_line_state_colour PASS")
+
+
+def test_a_server_with_no_outputs_gets_no_read_button(transport):
+    panel = _build(_Panel, "BARE")
+    labels = [b.label for b in panel.layout.select({"type": Button})]
+    assert labels == [], labels
+    print("test_a_server_with_no_outputs_gets_no_read_button PASS")
