@@ -13,6 +13,7 @@ __all__ = ["WS_PATH", "STATE_BASE", "build", "panel_id"]
 
 import reflex as rx
 
+from helao.core.servers.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import latest_action_uuid
 from helao.deploy.hte.servers.reflex._samples import (
@@ -25,6 +26,20 @@ WS_PATH = "ws_data"
 
 #: Samples requested per type, matching the Bokeh panel's default.
 DEFAULT_MAX_SAMPLES = 10
+
+#: Table hue, keyed by kind like every other Reflex table. ``action`` rather than
+#: ``browser``: these tables are the SAMPLE server's *action* visualizer and sit
+#: on ``/action`` beside the other action panels, and the palette keys hue by
+#: what a table holds and where it lives. The widget and the compact look are the
+#: data browser's; only the hue follows this page.
+_TABLE_KIND = "action"
+_HEADER_CLASS = reflex_header_class(_TABLE_KIND)
+_TABLE_CLASS = reflex_table_class(_TABLE_KIND)
+
+#: Height of each sample table's scroll area. Four tables stack in this panel, so
+#: an unbounded one would push the rest of the page down as ``latest N`` grows;
+#: the Bokeh panel pins the same tables to 200px for the same reason.
+_TABLE_HEIGHT = "14em"
 
 
 def panel_id(server_key: str, session_token: str) -> str:
@@ -55,10 +70,11 @@ class _State(ActionVisState, mixin=True):
         The tables come from `refresh`, not from the packets: this panel reads
         the server's sample registry, which the data stream does not carry.
 
-        Written only on change. This panel's body is four ``rx.data_table``s,
-        which rebuild on any state delta -- so an unconditional write here made
-        them rebuild at the render cadence forever, bouncing every panel below
-        them as the tables changed height.
+        Written only on change. This panel's body is four tables, which rebuild
+        on any state delta -- so an unconditional write here made them rebuild at
+        the render cadence forever, bouncing every panel below them as the tables
+        changed height. Still true of the Radix tables that replaced the gridjs
+        ones; the scroll areas bound the movement but do not remove the churn.
         """
         assign(self, "action_uuid", latest_action_uuid(ingest))
 
@@ -133,14 +149,52 @@ def build(server_key: str, state_cls):
     columns = list(SAMPLE_COLUMNS)
 
     def table(label, rows):
+        """One sample type's table, shaped like the data browser's index table.
+
+        A Radix ``rx.table`` rather than ``rx.data_table`` (gridjs). Two reasons,
+        and the first is the visible one: Radix reads more compactly and picks up
+        the stack's shared table styling, while gridjs came out looking like a
+        different application on the page.
+
+        The second is that gridjs cannot be styled from here at all. It drops
+        ``class_name`` before it reaches the grid, *and* ships its own unlayered
+        CSS, which outranks anything Tailwind emits into ``@layer utilities`` --
+        so every gridjs tweak had to be hand-authored CSS in ``palette.py``,
+        while ``reflex_header_class``/``reflex_table_class`` simply work here.
+
+        What is given up: gridjs's built-in search and sort. Neither was enabled
+        on this panel (``search=False, sort=False``), and the data browser's own
+        index table is a Radix table without them either.
+        """
         return rx.vstack(
             rx.text(f"Newest {label} samples:", size="1", weight="medium"),
-            rx.data_table(
-                data=rows,
-                columns=columns,
-                pagination=False,
-                search=False,
-                sort=False,
+            rx.scroll_area(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            *[
+                                rx.table.column_header_cell(
+                                    col, class_name=_HEADER_CLASS
+                                )
+                                for col in columns
+                            ]
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(
+                            rows,
+                            lambda row: rx.table.row(
+                                rx.foreach(row, lambda cell: rx.table.cell(cell))
+                            ),
+                        )
+                    ),
+                    width="100%",
+                    size="1",
+                    class_name=_TABLE_CLASS,
+                ),
+                type="auto",
+                scrollbars="vertical",
+                height=_TABLE_HEIGHT,
             ),
             width="100%",
             spacing="1",
