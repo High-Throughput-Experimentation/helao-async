@@ -132,6 +132,22 @@ class cNIMAX(HelaoDriver):
 
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
+        #: Last state written to each digital output, keyed by ``do_name``.
+        #:
+        #: A *mirror*, not a measurement, and the distinction matters at the
+        #: call site. ``set_digital_out`` opens a one-shot ``nidaqmx.Task`` per
+        #: write and closes it, and NI-DAQmx gives no readback for a line held
+        #: that way, so there is nothing on this driver to ask. A name absent
+        #: from this dict means "not written since this server started", which
+        #: a control panel must render as unknown rather than as off: the line
+        #: may well be energised from a previous run.
+        #:
+        #: Every path that drives a DO on this driver goes through
+        #: ``set_digital_out`` -- including ``estop`` and ``Heatloop`` -- so the
+        #: mirror does not miss the driver's own writes. It cannot see a line
+        #: changed by anything outside this process.
+        self.do_state: dict[str, bool] = {}
+
         LOGGER.info("init NI-MAX")
 
         # connection/device state -- populated by connect()/arm_cell_iv(), not here
@@ -677,6 +693,15 @@ class cNIMAX(HelaoDriver):
                     err_code = ErrorCodes.not_available
         else:
             err_code = ErrorCodes.not_available
+
+        # Record what was written, and only on a write that succeeded, so the
+        # mirror never claims a state the hardware was not asked for. This is
+        # the *only* source of digital-out state on this driver: a DO line here
+        # is opened, written and closed inside a one-shot task, and NI-DAQmx
+        # offers no readback for it -- unlike the Galil, whose controller can be
+        # asked. See `do_state` for what that costs the caller.
+        if err_code == ErrorCodes.none and do_name:
+            self.do_state[do_name] = on
 
         return {
             "error_code": err_code,

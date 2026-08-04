@@ -8,9 +8,16 @@ multivalve, led, fswbcd, heater) plus digital-input endpoints for foot
 switches, multi-cell IV measurement, monitor acquisition, and a
 temperature-controlled heat loop. Thermocouple monitor channels are
 always-on, polled by :class:`cNIMAXPoller`.
+
+Alongside those per-group digital-output *actions* it registers two **private**
+endpoints, ``get_digital_outs`` and ``set_digital_out``, which the engineering
+control panel uses. They flatten every configured group into one name namespace
+and call the driver directly, so a manual toggle neither writes a row into the
+run record nor queues behind an orchestrated action. The read reports the
+driver's write mirror rather than the hardware — see ``cNIMAX.do_state``.
 """
 
-__all__ = ["makeApp"]
+__all__ = ["makeApp", "build_do_port_map", "DO_GROUPS"]
 
 # NIdaqmx server
 # https://nidaqmx-python.readthedocs.io/en/latest/task.html
@@ -48,6 +55,58 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 from ...drivers.io.nidaqmx_driver import CellIVExec, DevMonExec, cNIMAX, cNIMAXPoller
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+#: Config groups whose entries are digital outputs, i.e. every group that gets
+#: an endpoint taking ``on: bool``. Order fixes which group's port wins if two
+#: ever claim a name, but a collision is refused rather than resolved — see
+#: :func:`build_do_port_map`.
+DO_GROUPS = (
+    "dev_mastercell",
+    "dev_activecell",
+    "dev_pump",
+    "dev_gasvalve",
+    "dev_liquidvalve",
+    "dev_multivalve",
+    "dev_led",
+    "dev_fswbcd",
+    "dev_heat",
+)
+
+
+def build_do_port_map(server_params: dict) -> tuple[dict, dict]:
+    """Flatten this server's digital-output groups into one name namespace.
+
+    Unlike the Galil and Advantech servers, this one has no single ``dev_do``
+    block: its digital outputs are spread across one config group per function.
+    A control panel wants them as one list of named lines, so the groups are
+    flattened — and because nothing forbids two groups using the same name, the
+    owners are tracked so an ambiguous name can be refused instead of silently
+    driving whichever port happened to be written last. No config in this repo
+    has a collision; the check is here because picking wrong would energise the
+    wrong physical line.
+
+    Args:
+        server_params: The server's ``params`` config block.
+
+    Returns:
+        tuple: ``(do_ports, do_owners)`` — name to NI-DAQ channel string, and
+        name to the list of groups that declared it.
+    """
+    do_ports: dict = {}
+    do_owners: dict = {}
+    for group_name in DO_GROUPS:
+        for do_name, do_port in (server_params.get(group_name) or {}).items():
+            do_owners.setdefault(do_name, []).append(group_name)
+            do_ports.setdefault(do_name, do_port)
+    for do_name, owners in do_owners.items():
+        if len(owners) > 1:
+            LOGGER.error(
+                f"digital output '{do_name}' is configured in more than one "
+                f"group ({', '.join(owners)}); the private set_digital_out "
+                f"endpoint will refuse it"
+            )
+    return do_ports, do_owners
 
 
 async def nidaqmx_dyn_endpoints(app: BaseAPI):
@@ -725,6 +784,65 @@ def makeApp(server_key) -> BaseAPI:
         async def heatloopstop():
             """Signal the driver's heat loop to exit."""
             app.driver.stop_heatloop()
+
+    # Private digital-out endpoints for the engineering control panel. Same
+    # driver call the per-group toggle actions make, without the action
+    # wrapper: a panel toggle is a manual intervention, not a step of an
+    # experiment, so it should neither write a row into the run record nor
+    # queue behind whatever the orchestrator is running on this server.
+    #
+    # This server has no single ``dev_do`` block -- its digital outputs are
+    # spread across one config group per function -- so the map is assembled
+    # from every group that carries an ``on: bool`` endpoint above. The names
+    # are flattened into one namespace because that is what a panel needs and
+    # what the Galil and Advantech servers already expose; a collision between
+    # two groups is reported rather than silently resolved, since picking
+    # either one would drive the wrong line. No config in this repo has one.
+    do_ports, do_owners = build_do_port_map(app.server_params)
+
+    if do_ports:
+
+        @app.post("/get_digital_outs", tags=["private"])
+        async def get_digital_outs():
+            """Return the last state written to each configured digital output.
+
+            **A mirror, not a measurement.** A DO line on this hardware is
+            opened, written and closed inside a one-shot task and NI-DAQmx
+            offers no readback for it, so the only thing this server can report
+            is what it last wrote (``driver.do_state``). A name maps to ``None``
+            when nothing has written it since the server started, which a panel
+            must show as unknown rather than as off — the line may be energised
+            from a previous run.
+
+            Returns:
+                ``(error_code, {do_name: bool | None})`` covering every
+                configured digital output, not only the ones written so far.
+            """
+            state = app.driver.do_state
+            return ErrorCodes.none, {name: state.get(name) for name in do_ports}
+
+        @app.post("/set_digital_out", tags=["private"])
+        async def set_digital_out_direct(do_name: str = "", on: bool = False):
+            """Drive one digital output without creating an action.
+
+            Args:
+                do_name: Name from any of the server's ``dev_*`` config groups.
+                on: ``True`` to drive the line high, ``False`` for low.
+
+            Returns:
+                ``(error_code, {do_name: bool | None})`` carrying the state now
+                mirrored for that line. ``not_available`` when the name is not
+                configured, or when two groups claim it.
+            """
+            if do_name not in do_ports or len(do_owners.get(do_name, [])) > 1:
+                return ErrorCodes.not_available, {}
+            datadict = await app.driver.set_digital_out(
+                do_port=do_ports[do_name], do_name=do_name, on=on
+            )
+            return (
+                datadict.get("error_code", ErrorCodes.unspecified),
+                {do_name: app.driver.do_state.get(do_name)},
+            )
 
     @app.post(f"/{server_key}/stop", tags=["action"])
     async def stop():

@@ -7,9 +7,15 @@ digital I/O (``get_analog_in``, ``set_analog_out``, ``get_digital_in``,
 acquisition (``acquire_analog_in`` via :class:`AiMonExec`) and an emergency
 ``reset``. Endpoints are registered dynamically depending on which of
 ``dev_ai``/``dev_ao``/``dev_di``/``dev_do`` the driver provides.
+
+Alongside the digital-out *actions* it also registers two **private** twins,
+``get_digital_outs`` and ``set_digital_out``, which the engineering control
+panel uses. They call the same driver methods without the action wrapper, so a
+manual toggle neither writes a row into the run record nor queues behind an
+orchestrated action on this server.
 """
 
-__all__ = ["makeApp"]
+__all__ = ["makeApp", "do_value_to_bool"]
 
 from typing import Optional, Union
 
@@ -30,6 +36,32 @@ from helao.helpers import helao_logging as logging
 from ...drivers.io.galil_io_driver import AiMonExec, Galil, GalilPoller, TriggerType
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def do_value_to_bool(value):
+    """Coerce a Galil digital-out readback to a bool, or ``None`` if unreadable.
+
+    ``get_digital_out`` returns whatever ``MG @OUT[port]`` gave back, which
+    gclib renders as a string like ``" 1.0000"`` rather than as a number. Going
+    through ``float`` covers that, the bare ``"1"`` form, and a driver that has
+    already coerced. ``None`` rather than ``False`` on failure, because on a
+    control panel "we could not read this line" and "this line is off" must not
+    look the same.
+
+    Args:
+        value: The ``value`` field of a driver digital-out result.
+
+    Returns:
+        bool | None: The line state, or ``None`` when it did not parse.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return None
+    try:
+        return bool(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
 
 
 async def galil_dyn_endpoints(app: BaseAPI):
@@ -203,6 +235,60 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 await active.enqueue_data_dflt(datadict=datadict)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
+
+            # Private twins of the two digital-out endpoints above, for the
+            # engineering control panel. Same driver calls, no action wrapper:
+            # a panel toggle is a manual intervention, not a step of an
+            # experiment, and routing it through the action machinery would put
+            # a row in the run record for every click and queue that click
+            # behind whatever the orchestrator is running on this server.
+            #
+            # Bare paths, not ``/{server_key}/...``: that prefix is the action
+            # namespace. Reached with ``async_private_dispatcher``.
+
+            @app.post("/get_digital_outs", tags=["private"])
+            async def get_digital_outs():
+                """Return the state of every configured digital output.
+
+                Read from the controller (``MG @OUT[port]`` per line) rather
+                than from anything this server remembers, so a line a sequence
+                changed still reads back correctly.
+
+                Returns:
+                    ``(error_code, {do_name: bool | None})``. A name maps to
+                    ``None`` when its readback did not parse, which a panel
+                    should show as unknown rather than as off.
+                """
+                states = {}
+                error_code = ErrorCodes.none
+                for do_name in app.driver.dev_do:
+                    datadict = await app.driver.get_digital_out(do_name=do_name)
+                    item_code = datadict.get("error_code", ErrorCodes.unspecified)
+                    if item_code != ErrorCodes.none:
+                        error_code = item_code
+                    states[do_name] = do_value_to_bool(datadict.get("value"))
+                return error_code, states
+
+            @app.post("/set_digital_out", tags=["private"])
+            async def set_digital_out_direct(do_name: str = "", on: bool = False):
+                """Drive one digital output without creating an action.
+
+                Args:
+                    do_name: Key in the server's ``dev_do`` config block.
+                    on: ``True`` to set the bit, ``False`` to clear it.
+
+                Returns:
+                    ``(error_code, {do_name: bool | None})`` carrying the
+                    post-write readback, so a caller does not need a second
+                    round trip to learn what the line ended up at.
+                """
+                if do_name not in app.driver.dev_do:
+                    return ErrorCodes.not_available, {}
+                datadict = await app.driver.set_digital_out(on=on, do_name=do_name)
+                return (
+                    datadict.get("error_code", ErrorCodes.unspecified),
+                    {do_name: do_value_to_bool(datadict.get("value"))},
+                )
 
         if app.driver.dev_di and app.driver.dev_do:
 
