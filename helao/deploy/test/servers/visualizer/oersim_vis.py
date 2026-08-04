@@ -20,6 +20,7 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 
@@ -114,7 +115,7 @@ class C_vis(ActionVisualizer):
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -181,7 +182,7 @@ class C_vis(ActionVisualizer):
 
         self.plot.title.text = f"active action_uuid: {self.cur_action_uuid}"
         self.plot_prev.title.text = f"previous action_uuid: {self.prev_action_uuid}"
-        colors = ["red", "blue", "orange", "green"]
+        colors = [SERIES[0], SERIES[1], SERIES[3], SERIES[2]]
         self.plot.line(
             x="t_s",
             y="erhe_v",

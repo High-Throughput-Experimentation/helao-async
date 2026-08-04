@@ -6,6 +6,7 @@ from socket import gethostname
 from bokeh.layouts import Spacer, layout
 from bokeh.models.widgets import Div
 
+from helao.core.servers.palette import HEADING_TEXT
 from helao.core.servers.vis import HelaoVis
 from helao.core.servers.vis_subscriber import mount_visualizers
 from helao.helpers import helao_logging as logging
@@ -49,10 +50,9 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
                     text=f"<b>Action visualizer on {gethostname().lower()} -- config: {config_filename}</b>",
                     width=1004,
                     height=32,
-                    styles={"font-size": "200%", "color": "#CB4335"},
+                    styles={"font-size": "200%", "color": HEADING_TEXT},
                 ),
             ],
-            # background="#D6DBDF",
             width=1024,
         )
     )

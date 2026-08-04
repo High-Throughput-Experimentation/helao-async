@@ -15,6 +15,7 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 
@@ -126,7 +127,7 @@ class C_vis(ActionVisualizer):
                 [self.plot, Spacer(width=20), self.table],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -178,14 +179,14 @@ class C_vis(ActionVisualizer):
         self.plot.line(
             x="datetime",
             y="voltage",
-            line_color="blue",
+            line_color=SERIES[1],
             legend_label="Voltage (V)",
             source=self.datasource,
         )
         self.plot.line(
             x="datetime",
             y="current",
-            line_color="green",
+            line_color=SERIES[2],
             legend_label="Current (A)",
             source=self.datasource,
         )

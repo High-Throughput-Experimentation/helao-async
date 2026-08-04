@@ -16,6 +16,8 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.bokeh_theme import semantic_button_stylesheet
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -129,6 +131,7 @@ class C_vis(ActionVisualizer):
             label="Stopped",
             button_type="primary",
             width=70,
+            stylesheets=[semantic_button_stylesheet()],
         )
         self.button_stop_measure.on_event(ButtonClick, self.callback_stop_measure)
 
@@ -171,7 +174,7 @@ class C_vis(ActionVisualizer):
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -313,7 +316,7 @@ class C_vis(ActionVisualizer):
         xstr = self.data_dict_keys[self.xselect]
         ystr = self.data_dict_keys[self.yselect]
         LOGGER.info(f"{xstr}, {ystr}")
-        colors = ["red", "blue", "orange", "green"]
+        colors = [SERIES[0], SERIES[1], SERIES[3], SERIES[2]]
         self.plot.line(
             x=xstr,
             y=ystr,

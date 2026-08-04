@@ -585,7 +585,7 @@ def build_page():
                 BrowserState.index_total,
                 " matches -- narrow the filter to reach the rest",
                 size="2",
-                color_scheme="amber",
+                class_name="text-amber-700",
             ),
         ),
         rx.scroll_area(
@@ -673,7 +673,7 @@ def build_page():
         controls,
         rx.cond(
             BrowserState.error != "",
-            rx.text(BrowserState.error, color_scheme="red"),
+            rx.text(BrowserState.error, class_name="text-red-600"),
         ),
         rx.text(BrowserState.status, size="2"),
         index_box,

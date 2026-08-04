@@ -8,13 +8,13 @@ from bokeh.models import (
     TextInput,
 )
 from bokeh.models.widgets import Div
-from bokeh.palettes import Category10
 from bokeh.plotting import figure
 
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
+from helao.core.servers.palette import PANEL_BG, SERIES
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 
@@ -153,7 +153,7 @@ class C_vis(ActionVisualizer):
                 [self.plot_CURRENT, self.plot_CURRENT_prev],
                 Spacer(height=10),
             ],
-            background="#D6DBDF",
+            background=PANEL_BG,
             width=1024,
         )
 
@@ -217,7 +217,7 @@ class C_vis(ActionVisualizer):
         self.plot_VOLT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
         self.plot_CURRENT_prev.title.text = f"action_uuid: {self.prev_action_uuid}"
 
-        colors = Category10[10]
+        colors = SERIES
         for i in self.yselect:
             _ = self.plot_VOLT.line(
                 x="t_s",

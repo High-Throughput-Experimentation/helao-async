@@ -44,11 +44,6 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.bokeh_theme import (
-    color_rule,
-    estop_button_stylesheet,
-    semantic_button_stylesheet,
-)
 from helao.core.servers.operator import param_store, spec_parser
 from helao.core.servers.operator.object_tree import (
     doc_to_html,
@@ -65,19 +60,6 @@ from helao.core.servers.operator.param_forms import (
     parse_arg_docs,
     resolve_campaign_uuid,
     version_hint_parts,
-)
-from helao.core.servers.palette import (
-    BODY_TEXT,
-    ESTOP_BG,
-    ESTOP_HOVER_BG,
-    HEADING_TEXT,
-    MODIFIED_PARAM_TEXT,
-    MUTED_TEXT_ON_PANEL,
-    PANEL_BG,
-    PARAM_INPUT_BG,
-    PLAN_PANEL_NONQUEUED_BG,
-    SELECTED_MARKER_OUTLINE,
-    SURFACE_WHITE,
 )
 from helao.core.servers.vis import Vis
 from helao.helpers.config_loader import is_ui_only_server
@@ -192,7 +174,7 @@ class BokehOperator:
                 dev_custom = {}
             self.dev_customitems = [key for key in dev_custom.keys()]
 
-        self.color_sq_param_inputs = PARAM_INPUT_BG
+        self.color_sq_param_inputs = "#F9E79F"
         self.max_width = 1024
         # holds the page layout
         self.layout = []
@@ -389,7 +371,7 @@ class BokehOperator:
             width=300,
             height=31,
             margin=(22, 5, 0, 5),
-            styles={"line-height": "31px", "color": MUTED_TEXT_ON_PANEL},
+            styles={"line-height": "31px", "color": "#566573"},
         )
 
         self.experiment_dropdown = Select(
@@ -401,7 +383,7 @@ class BokehOperator:
             width=300,
             height=31,
             margin=(22, 5, 0, 5),
-            styles={"line-height": "31px", "color": MUTED_TEXT_ON_PANEL},
+            styles={"line-height": "31px", "color": "#566573"},
         )
 
         # specification file loader
@@ -424,13 +406,15 @@ class BokehOperator:
             self.callback_estop_orch,
             height=100,
             sizing_mode="fixed",
-            # ESTOP's own sheet, and *only* it: both this and
-            # semantic_button_stylesheet() target .bk-btn.bk-btn-danger at equal
-            # specificity, so whichever came later in the list would win and the
-            # ESTOP would silently render as an ordinary red-700 danger button.
-            # _make_button skips the shared sheet whenever a caller supplies its
-            # own, which is what keeps this the only sheet here.
-            stylesheets=[estop_button_stylesheet()],
+            stylesheets=[
+                InlineStyleSheet(
+                    css=(
+                        ".bk-btn.bk-btn-danger { background-color: #7B0000; "
+                        "border-color: #5A0000; } "
+                        ".bk-btn.bk-btn-danger:hover { background-color: #5A0000; }"
+                    )
+                )
+            ],
         )
         self.button_add_expplan = self._make_button(
             "Add plan", "default", 100, self.callback_add_expplan
@@ -484,11 +468,7 @@ class BokehOperator:
             disabled=False,
             button_type="danger",
             sizing_mode="stretch_width",
-            # update_tables drives this through all four types (success while
-            # running, warning/primary when stopped, danger otherwise), so it
-            # needs the sheet that carries all four.
-            stylesheets=[semantic_button_stylesheet()],
-        )  # fills width left by the other buttons
+        )  # success: green, danger: red; fills width left by the other buttons
 
         self.orch_stepact_button = self._make_stepwise_button(
             "actions", self.callback_toggle_stepact
@@ -562,7 +542,7 @@ class BokehOperator:
             styles={
                 "overflow": "auto",
                 "max-height": "200px",
-                "background-color": SURFACE_WHITE,
+                "background-color": "white",
             },
         )
         self.queue_tree_header = Div(
@@ -574,7 +554,7 @@ class BokehOperator:
             styles={
                 "overflow": "auto",
                 "max-height": "200px",
-                "background-color": SURFACE_WHITE,
+                "background-color": "white",
             },
         )
 
@@ -582,7 +562,7 @@ class BokehOperator:
             text="""no error""",
             sizing_mode="stretch_width",
             height=60,
-            styles={"font-size": "100%", "color": BODY_TEXT},
+            styles={"font-size": "100%", "color": "black"},
         )
 
         self.input_sequence_label = TextInput(
@@ -694,7 +674,7 @@ class BokehOperator:
             text="<b>Orchestrator</b>",
             width=self.max_width - 20,
             height=32,
-            styles={"font-size": "150%", "color": HEADING_TEXT},
+            styles={"font-size": "150%", "color": "#CB4335"},
         )
 
         self.layout0 = layout(
@@ -706,9 +686,10 @@ class BokehOperator:
                             text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
                             width=self.max_width - 20,
                             height=32,
-                            styles={"font-size": "200%", "color": HEADING_TEXT},
+                            styles={"font-size": "200%", "color": "#CB4335"},
                         ),
                     ],
+                    # background="#D6DBDF",
                     width=self.max_width,
                 ),
                 Spacer(height=10),
@@ -732,7 +713,7 @@ class BokehOperator:
                     [
                         [self.sequence_dropdown, self.sequence_version_div],
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -746,7 +727,7 @@ class BokehOperator:
                     [
                         [self.experiment_dropdown, self.experiment_version_div],
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -760,7 +741,7 @@ class BokehOperator:
                     [
                         [self.seqspec_dropdown],
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -776,6 +757,7 @@ class BokehOperator:
                         Spacer(width=20),
                         self.orch_section,
                     ],
+                    # background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -794,7 +776,7 @@ class BokehOperator:
                         ),
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -838,7 +820,7 @@ class BokehOperator:
                             spacing=4,
                         ),
                     ],
-                    background=PLAN_PANEL_NONQUEUED_BG,
+                    background="#AED6F1",
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -906,7 +888,7 @@ class BokehOperator:
                                     text="<b>Error message:</b>",
                                     height=15,
                                     sizing_mode="stretch_width",
-                                    styles={"font-size": "100%", "color": BODY_TEXT},
+                                    styles={"font-size": "100%", "color": "black"},
                                 ),
                                 self.error_txt,
                                 sizing_mode="stretch_width",
@@ -916,7 +898,7 @@ class BokehOperator:
                         ),
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -1060,20 +1042,7 @@ class BokehOperator:
     def _make_button(
         self, label: str, btn_type: str, width: int, callback, **kwargs
     ) -> Button:
-        """Create a Bokeh ``Button`` already wired to ``callback`` on click.
-
-        A semantic ``btn_type`` also gets the palette's per-widget override,
-        which is the only mechanism that can recolour a Bokeh widget: Bokeh
-        supplies its semantic colours from inside each widget's own shadow root,
-        where no document-level stylesheet reaches. ``"default"`` is left alone —
-        it is Bokeh's neutral, and the aligner's marker chips are default buttons
-        carrying their own override.
-
-        A caller passing its own ``stylesheets`` (the ESTOP button) is not
-        given the shared sheet: its override already covers the one type it uses.
-        """
-        if btn_type != "default" and "stylesheets" not in kwargs:
-            kwargs["stylesheets"] = [semantic_button_stylesheet()]
+        """Create a Bokeh ``Button`` already wired to ``callback`` on click."""
         btn = Button(label=label, button_type=btn_type, width=width, **kwargs)
         btn.on_event(ButtonClick, callback)
         return btn
@@ -1083,12 +1052,7 @@ class BokehOperator:
         is_step = self.backend.get_step_flags()[kind]
         label = f"{'STEP' if is_step else 'RUN'}-THRU {kind}"
         btn = Button(
-            label=label,
-            button_type="danger" if is_step else "success",
-            width=170,
-            # One sheet carries all four types, so update_stepwise_toggle's
-            # danger<->success flip keeps its palette colours.
-            stylesheets=[semantic_button_stylesheet()],
+            label=label, button_type="danger" if is_step else "success", width=170
         )
         btn.on_event(ButtonClick, callback)
         return btn
@@ -1189,7 +1153,7 @@ class BokehOperator:
         return [
             layout(
                 [row(button, checkbox)],
-                background=PANEL_BG,
+                background="#D6DBDF",
                 width=self.max_width,
                 height_policy="min",
             ),
@@ -1245,13 +1209,13 @@ class BokehOperator:
                     Spacer(height=16),
                     row(comment, sizing_mode="stretch_width"),
                 ],
-                background=PANEL_BG,
+                background="#D6DBDF",
                 sizing_mode="stretch_width",
                 height_policy="min",
             ),
             layout(
                 [button_row],
-                background=PANEL_BG,
+                background="#D6DBDF",
                 width=self.max_width,
                 height_policy="min",
             ),
@@ -1334,7 +1298,7 @@ class BokehOperator:
                         [getattr(self, cfg["descr_attr"])],
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    background="#D6DBDF",
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -1349,7 +1313,7 @@ class BokehOperator:
                                 text=cfg["header"],
                                 width=200 + 50,
                                 height=15,
-                                styles={"font-size": "100%", "color": BODY_TEXT},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                     ],
@@ -1386,7 +1350,7 @@ class BokehOperator:
                                 text="-- none --",
                                 width=200 + 50,
                                 height=15,
-                                styles={"font-size": "100%", "color": BODY_TEXT},
+                                styles={"font-size": "100%", "color": "black"},
                             ),
                         ],
                     ],
@@ -2164,7 +2128,7 @@ class BokehOperator:
             #     continue
             # disabled = False
 
-            initial_stylesheet = [color_rule(".bk-input", BODY_TEXT)]
+            initial_stylesheet = [".bk-input { color: black; }"]
             text_input = TextInput(
                 value=def_val,
                 title="",
@@ -2176,19 +2140,14 @@ class BokehOperator:
                 stylesheets=initial_stylesheet,
             )
             if args[idx] not in self.skip_default_highlights:
-                # Both rules are built in Python and the JS only picks between
-                # them, so no CSS is assembled in the browser and neither
-                # declaration appears as a literal at this call site.
-                default_rule = color_rule(".bk-input", BODY_TEXT, important=True)
-                modified_rule = color_rule(
-                    ".bk-input", MODIFIED_PARAM_TEXT, important=True
-                )
                 color_callback_js = CustomJS(
                     args=dict(input=text_input),
                     code=f"""
-cb_obj.stylesheets = [
-    cb_obj.value_input === '{def_val}' ? `{default_rule}` : `{modified_rule}`
-]
+var new_color = "black";
+if (cb_obj.value_input !== '{def_val}') {{
+    new_color = "red";
+}}
+cb_obj.stylesheets = [`.bk-input {{ color: ${{new_color}} !important; }}`]
 """,
                 )
                 text_input.js_on_change("value", color_callback_js)
@@ -2235,7 +2194,7 @@ cb_obj.stylesheets = [
             desc_div = Div(
                 text=arg_descs.get(args[idx], ""),
                 sizing_mode="stretch_width",
-                styles={"color": MUTED_TEXT_ON_PANEL, "margin-left": "12px"},
+                styles={"color": "#566573", "margin-left": "12px"},
             )
             desc_col = column(
                 Spacer(height=name_div.height + 5),
@@ -2453,7 +2412,7 @@ cb_obj.stylesheets = [
         if len(old_point) > 0:
             plot_mpmap.renderers.remove(old_point[0])
         plot_mpmap.square(
-            x, y, size=5, color=None, alpha=0.5, line_color=BODY_TEXT, name="PMplot"
+            x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
         )
 
     def get_pm(self, plateid: int, sender):
@@ -2640,7 +2599,7 @@ cb_obj.stylesheets = [
                         line_width=2,
                         color=None,
                         alpha=1.0,
-                        line_color=SELECTED_MARKER_OUTLINE,
+                        line_color=(255, 0, 0),
                         name="selsample",
                     )
 

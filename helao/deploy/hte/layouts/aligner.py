@@ -34,6 +34,11 @@ from bokeh.plotting import figure
 
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
+from helao.core.servers.bokeh_theme import (
+    marker_style_block,
+    semantic_button_stylesheet,
+)
+from helao.core.servers.palette import BODY_TEXT, MARKER_SWATCHES, PANEL_BG, TW
 from helao.core.servers.vis import Vis
 from helao.helpers import helao_logging as logging
 from helao.helpers.plate_api import HTEPlateAPI
@@ -41,6 +46,18 @@ from helao.helpers.plate_api import HTEPlateAPI
 from ..drivers.motion.enum import MoveModes, TransformationModes
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+# Panel roles for this layout only. palette.py holds the shared roles and the
+# shade table; a deployment names its own roles over TW rather than pushing
+# single-use names into the shared module.
+_MOTOR_PANEL_BG = TW["teal-600"]
+"""Absolute/relative motor jog panel. Was web-named teal."""
+
+_ARROW_PANEL_BG = TW["yellow-700"]
+"""Arrow-key jog panel. Was web-named olive."""
+
+_PLATE_FILL = TW["slate-400"]
+"""Plate-boundary rect fill. Drawn at ``fill_alpha=0.0``; was ``"gray"``."""
 
 
 class Aligner:
@@ -113,13 +130,10 @@ class Aligner:
     def create_layout(self):
         """Construct all Bokeh widgets and add them to the document."""
 
-        self.MarkerColors = [
-            (255, 0, 0),
-            (0, 0, 255),
-            (0, 255, 0),
-            (255, 165, 0),
-            (255, 105, 180),
-        ]
+        # The plotted marker hues and the five marker chips must agree — matching
+        # a plotted hue is the chips' only job — so both read MARKER_SWATCHES in
+        # the same order.
+        self.MarkerColors = list(MARKER_SWATCHES)
 
         self.MarkerNames = ["Cell", "Blue", "Green", "Orange", "Pink"]
         self.MarkerSample = [None, None, None, None, None]
@@ -149,7 +163,15 @@ class Aligner:
         #### getPM group elements ###
         ######################################################################
 
-        self.button_goalign = Button(label="Go", button_type="danger", width=150)
+        self.button_goalign = Button(
+            label="Go",
+            button_type="danger",
+            width=150,
+            # IOloop_helper flips this danger<->success with the aligner's
+            # enabled state; the sheet carries all four types so the toggle
+            # keeps its palette colours.
+            stylesheets=[semantic_button_stylesheet()],
+        )
         self.button_skipalign = Button(
             label="Skip this step", button_type="default", width=150
         )
@@ -160,8 +182,12 @@ class Aligner:
         )
 
         self.aligner_enabled_status = Toggle(
-            label="Disabled", disabled=True, button_type="danger", width=50
-        )  # success: green, danger: red
+            label="Disabled",
+            disabled=True,
+            button_type="danger",
+            width=50,
+            stylesheets=[semantic_button_stylesheet()],
+        )  # flipped danger<->success by IOloop_helper
 
         self.layout_getPM = layout(
             self.button_goalign,
@@ -188,7 +214,10 @@ class Aligner:
 
         # Calc. Motor-Plate Coord. Transform
         self.calib_button_calc = Button(
-            label="Calc", button_type="primary", width=110 - 50
+            label="Calc",
+            button_type="primary",
+            width=110 - 50,
+            stylesheets=[semantic_button_stylesheet()],
         )
         self.calib_button_calc.on_event(ButtonClick, self.clicked_calc)
 
@@ -198,7 +227,10 @@ class Aligner:
         self.calib_button_reset.on_event(ButtonClick, self.clicked_reset)
 
         self.calib_button_done = Button(
-            label="Sub.", button_type="danger", width=110 - 50
+            label="Sub.",
+            button_type="danger",
+            width=110 - 50,
+            stylesheets=[semantic_button_stylesheet()],
         )
         self.calib_button_done.on_event(ButtonClick, self.clicked_submit)
 
@@ -225,7 +257,13 @@ class Aligner:
                 TextInput(value="", title=buf, disabled=True, width=60, height=40)
             )
             self.calib_pt_del_button.append(
-                Button(label="Del", button_type="primary", width=(int)(30), height=25)
+                Button(
+                    label="Del",
+                    button_type="primary",
+                    width=(int)(30),
+                    height=25,
+                    stylesheets=[semantic_button_stylesheet()],
+                )
             )
             self.calib_pt_del_button[i].on_click(
                 partial(self.clicked_calib_del_pt, idx=i)
@@ -332,7 +370,7 @@ class Aligner:
                                     self.calib_ymotor[2],
                                 ],
                                 Spacer(height=10),
-                                background="#C0C0C0",
+                                background=PANEL_BG,
                             ),
                         ]
                     ),
@@ -365,7 +403,10 @@ class Aligner:
             value="0", title="abs y (mm)", disabled=False, width=60, height=40
         )
         self.motor_moveabs_button = Button(
-            label="Move", button_type="primary", width=60
+            label="Move",
+            button_type="primary",
+            width=60,
+            stylesheets=[semantic_button_stylesheet()],
         )
         self.motor_moveabs_button.on_event(ButtonClick, self.clicked_moveabs)
 
@@ -376,7 +417,10 @@ class Aligner:
             value="0", title="rel y (mm)", disabled=False, width=60, height=40
         )
         self.motor_moverel_button = Button(
-            label="Move", button_type="primary", width=60
+            label="Move",
+            button_type="primary",
+            width=60,
+            stylesheets=[semantic_button_stylesheet()],
         )
         self.motor_moverel_button.on_event(ButtonClick, self.clicked_moverel)
 
@@ -387,12 +431,21 @@ class Aligner:
             value="0", title="motor y (mm)", disabled=True, width=60, height=40
         )
 
-        self.motor_read_button = Button(label="Read", button_type="primary", width=60)
+        self.motor_read_button = Button(
+            label="Read",
+            button_type="primary",
+            width=60,
+            stylesheets=[semantic_button_stylesheet()],
+        )
         self.motor_read_button.on_event(ButtonClick, self.clicked_readmotorpos)
 
         self.motor_move_indicator = Toggle(
-            label="Stage Moving", disabled=True, button_type="danger", width=50
-        )  # success: green, danger: red
+            label="Stage Moving",
+            disabled=True,
+            button_type="danger",
+            width=50,
+            stylesheets=[semantic_button_stylesheet()],
+        )  # flipped danger<->success by IOloop_helper
 
         self.motor_movedist_text = TextInput(
             value="0", title="move (mm)", disabled=False, width=40, height=40
@@ -422,7 +475,7 @@ class Aligner:
                     ],
                     self.motor_move_indicator,
                     Spacer(height=15, width=240),
-                    background="#008080",
+                    background=_MOTOR_PANEL_BG,
                 ),
                 layout(
                     [
@@ -431,7 +484,7 @@ class Aligner:
                         [Spacer(height=25), self.motor_move_check],
                     ],
                     Spacer(height=10, width=240),
-                    background="#808000",
+                    background=_ARROW_PANEL_BG,
                 ),
             ]
         )
@@ -443,6 +496,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttondown = Button(
@@ -451,6 +505,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttonleft = Button(
@@ -459,6 +514,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttonright = Button(
@@ -467,6 +523,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
 
@@ -476,6 +533,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttondownleft = Button(
@@ -484,6 +542,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttonupright = Button(
@@ -492,6 +551,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
         self.motor_buttondownright = Button(
@@ -500,6 +560,7 @@ class Aligner:
             disabled=False,
             width=dimarrow,
             height=dimarrow,
+            stylesheets=[semantic_button_stylesheet()],
             # css_classes=[buf]
         )
 
@@ -595,6 +656,15 @@ class Aligner:
         self.marker_fraction = []
         self.marker_layout = []
 
+        # One sheet per chip, in MARKER_SWATCHES order. This replaces the
+        # <style>-inside-a-Div block the aligner used to carry, which has been
+        # inert since the Bokeh 3 upgrade: that stylesheet was sealed in the
+        # Div's own shadow root while the chips live in five others, so no
+        # selector could bridge them and the chips rendered plain default grey.
+        # A per-widget InlineStyleSheet lands inside the target widget's shadow
+        # root, which is the only place a Bokeh widget can be recoloured from.
+        marker_sheets = marker_style_block()
+
         for idx in range(len(self.MarkerNames)):
             self.marker_type_text.append(
                 Paragraph(text=f"{self.MarkerNames[idx]} Marker", width=120, height=15)
@@ -605,6 +675,7 @@ class Aligner:
                     button_type="primary",
                     width=(int)(self.totalwidth / 5 - 40),
                     height=25,
+                    stylesheets=[semantic_button_stylesheet()],
                 )
             )
             self.marker_index.append(
@@ -676,6 +747,7 @@ class Aligner:
                     width=40,
                     height=40,
                     css_classes=[buf],
+                    stylesheets=[marker_sheets[idx]],
                 )
             )
             self.marker_buttonsel[idx].on_click(
@@ -715,17 +787,17 @@ class Aligner:
             [
                 [
                     self.marker_layout[0],
-                    Spacer(width=5, background=(0, 0, 0)),
+                    Spacer(width=5, background=BODY_TEXT),
                     self.marker_layout[1],
-                    Spacer(width=5, background=(0, 0, 0)),
+                    Spacer(width=5, background=BODY_TEXT),
                     self.marker_layout[2],
-                    Spacer(width=5, background=(0, 0, 0)),
+                    Spacer(width=5, background=BODY_TEXT),
                     self.marker_layout[3],
-                    Spacer(width=5, background=(0, 0, 0)),
+                    Spacer(width=5, background=BODY_TEXT),
                     self.marker_layout[4],
                 ]
             ],
-            background="#C0C0C0",
+            background=PANEL_BG,
         )
 
         ######################################################################
@@ -760,10 +832,10 @@ class Aligner:
             angle=0.0,
             angle_units="rad",
             fill_alpha=0.0,
-            fill_color="gray",
+            fill_color=_PLATE_FILL,
             line_width=2,
             alpha=1.0,
-            line_color=(0, 0, 0),
+            line_color=BODY_TEXT,
             name="plate_boundary",
         )
 
@@ -777,41 +849,21 @@ class Aligner:
         # add all to alignerwebdoc
         ######################################################################
 
+        # Concatenated rather than an f-string so the {{supplied_color_str}}
+        # placeholder keeps both its braces in the rendered markup.
         self.divmanual = Div(
-            text="""<b>Hotkeys:</b> Not supported by bokeh. Will be added later.<svg width="20" height="20">
-        <rect width="20" height="20" style="fill:{{supplied_color_str}};stroke-width:3;stroke:rgb(0,0,0)" />
-        </svg>""",
+            text=(
+                "<b>Hotkeys:</b> Not supported by bokeh. Will be added later."
+                '<svg width="20" height="20">\n'
+                '        <rect width="20" height="20" '
+                'style="fill:{{supplied_color_str}};stroke-width:3;stroke:'
+                + BODY_TEXT
+                + '" />\n        </svg>'
+            ),
             width=self.totalwidth,
             height=200,
         )
-        self.css_styles = Div(text="""<style>
-            .custom_button_Marker1 button.bk.bk-btn.bk-btn-default {
-                color: black;
-                background-color: #ff0000;
-            }
-            
-            .custom_button_Marker2 button.bk.bk-btn.bk-btn-default {
-                color: black;
-                background-color: #0000ff;
-            }
-            
-            .custom_button_Marker3 button.bk.bk-btn.bk-btn-default {
-                color: black;
-                background-color: #00ff00;
-            }
-            
-            .custom_button_Marker4 button.bk.bk-btn.bk-btn-default {
-                color: black;
-                background-color: #FFA500;
-            }
-            
-            .custom_button_Marker5 button.bk.bk-btn.bk-btn-default {
-                color: black;
-                background-color: #FF69B4;
-            }
-            </style>""")
 
-        self.vis.doc.add_root(self.css_styles)
         self.vis.doc.add_root(
             layout(
                 [
@@ -1520,7 +1572,7 @@ class Aligner:
         if len(old_point) > 0:
             self.plot_mpmap.renderers.remove(old_point[0])
         self.plot_mpmap.square(
-            x, y, size=5, color=None, alpha=0.5, line_color="black", name="PMplot"
+            x, y, size=5, color=None, alpha=0.5, line_color=BODY_TEXT, name="PMplot"
         )
 
     def update_Markerdisplay(self, selMarker):
