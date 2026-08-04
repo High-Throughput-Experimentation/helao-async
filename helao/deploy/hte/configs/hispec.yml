@@ -151,7 +151,7 @@ servers:
       doc_name: ECHE11 Visualizer
   CONTROL:
     host: hte-eche-11.htejcap.caltech.edu
-    port: 5003
+    port: 5005
     group: visualizer
     bokeh: control_visualizer
     params:

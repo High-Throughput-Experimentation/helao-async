@@ -128,7 +128,7 @@ servers:
       doc_name: UVIS Visualizer
   CONTROL:
     host: 127.0.0.1
-    port: 5003
+    port: 5005
     group: visualizer
     bokeh: control_visualizer
     params:
