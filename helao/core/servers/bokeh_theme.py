@@ -51,7 +51,9 @@ __all__ = [
     "HELAO_THEME",
     "GLOBAL_CSS",
     "CARRIER_TAG",
+    "SECTION_MARGIN",
     "apply_theme",
+    "stretch_section",
     "color_declaration",
     "color_rule",
     "estop_button_stylesheet",
@@ -61,7 +63,7 @@ __all__ = [
 
 from typing import Final
 
-from bokeh.models import Div, GlobalInlineStyleSheet, InlineStyleSheet
+from bokeh.models import Column, Div, GlobalInlineStyleSheet, InlineStyleSheet, Row
 from bokeh.themes import Theme
 
 from helao.core.servers.palette import (
@@ -230,6 +232,53 @@ body {{
 """
 
 CARRIER_TAG: Final[str] = "helao_theme_carrier"
+
+SECTION_MARGIN: Final[tuple[int, int, int, int]] = (4, 4, 4, 4)
+"""Margin (top, right, bottom, left) on every Bokeh section panel.
+
+Sections are ``sizing_mode="stretch_width"``, so this is the only thing holding
+them off the browser's edges — and off each other. Two adjacent margins do not
+collapse in a Bokeh flex container (each child is its own flex box, not a block
+in normal flow), so panels sit 8px apart and 4px from the page edge.
+
+Here rather than in ``palette.py`` because it is a layout value, not a colour,
+and ``palette`` is deliberately the one module whose contents are colours; here
+rather than in each app because the operator and every visualizer have to agree
+or the pages do not line up when a station runs several side by side.
+"""
+
+
+def stretch_section(panel):
+    """Make ``panel`` and its nested containers fill the page width, in place.
+
+    **Do not pass ``sizing_mode="stretch_width"`` to ``layout()`` instead.**
+    ``bokeh.layouts._create_grid`` assigns that mode to every child it walks
+    whose own ``sizing_mode`` is ``None`` and whose width/height policies are
+    both ``"auto"`` — which is every plain ``TextInput(width=150)``,
+    ``Button(width=70)`` and ``DataTable(width=400)``. The fixed width is then
+    ignored and the widget stretches. Measured on a visualizer panel at 1600px:
+    two 150px inputs came out 785px each, and a row of ``[plot, Spacer, table]``
+    split three ways so the plot rendered at 526px instead of filling the space
+    the table left. Nothing is raised, and at 1024px — the width the panels used
+    to be pinned to — it is barely visible.
+
+    Walking the built tree afterwards avoids that: only ``Row``/``Column``
+    containers are touched, so a figure that asked for ``stretch_width`` still
+    gets it and a widget that asked for a width keeps it.
+
+    Args:
+        panel: The container returned by ``layout()``.
+
+    Returns:
+        The same object, for use as an expression.
+    """
+    panel.sizing_mode = "stretch_width"
+    for child in getattr(panel, "children", []):
+        if isinstance(child, (Row, Column)):
+            stretch_section(child)
+    return panel
+
+
 """Tag marking the hidden root that carries the document's ``GLOBAL_CSS``."""
 
 

@@ -46,9 +46,11 @@ from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.servers.bokeh_theme import (
+    SECTION_MARGIN,
     color_rule,
     estop_button_stylesheet,
     semantic_button_stylesheet,
+    stretch_section,
 )
 from helao.core.servers.operator import param_store, spec_parser
 from helao.core.servers.operator.object_tree import (
@@ -114,13 +116,17 @@ _tree_header_text = tree_header_text
 _server_header_text = server_header_text
 
 
-#: Margin (top, right, bottom, left) on every section panel. The sections
-#: themselves are ``stretch_width``, so this is the only thing holding them off
-#: the browser's edges — and off each other, since two adjacent 4px margins
-#: collapse to nothing in a Bokeh flex container (each child is its own box, so
-#: they sum to 8px between panels rather than the 4px CSS margin collapsing
-#: would give in ordinary block flow).
-SECTION_MARGIN = (4, 4, 4, 4)
+#: Margin on the blocks that make up the parameter form. They are the one place
+#: a section margin is *wrong*: the tinted blocks are not separate sections but
+#: consecutive rows of one form, and a 4px gutter around each drew a white
+#: outline around every parameter. Zero vertically so the rows abut into a
+#: single tinted field, and the same 4px horizontally as everything else so the
+#: field's outer edges still line up with the sections above and below it.
+PARAM_FIELD_MARGIN = (0, 4, 0, 4)
+
+#: Margin on the "Optional/Required … parameters:" caption that opens the
+#: field. Top only — its bottom edge is the field's first row.
+PARAM_HEADING_MARGIN = (4, 4, 0, 4)
 
 #: ``LayoutDOM.name`` carried by exactly the parameter cells that may share a
 #: row with a neighbour. ``_pair_param_cells`` groups consecutive blocks
@@ -774,19 +780,20 @@ class BokehOperator:
 
         self.layout0 = layout(
             [
-                layout(
-                    [
-                        Spacer(width=20),
-                        Div(
-                            text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
-                            sizing_mode="stretch_width",
-                            height=32,
-                            styles={"font-size": "200%", "color": HEADING_TEXT},
-                        ),
-                    ],
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                stretch_section(
+                    layout(
+                        [
+                            Spacer(width=20),
+                            Div(
+                                text=f"<b>{self.config_dict.get('doc_name', 'BokehOperator')} on {gethostname().lower()} -- config: {os.path.basename(self.loaded_config_path)}</b>",
+                                sizing_mode="stretch_width",
+                                height=32,
+                                styles={"font-size": "200%", "color": HEADING_TEXT},
+                            ),
+                        ],
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
                 Spacer(height=10),
             ],
@@ -806,14 +813,15 @@ class BokehOperator:
         # block instead (see ``_update_param_layout``).
         self.layout1 = layout(
             [
-                layout(
-                    [
-                        [self.sequence_dropdown, self.sequence_version_div],
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                stretch_section(
+                    layout(
+                        [
+                            [self.sequence_dropdown, self.sequence_version_div],
+                        ],
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
             ],
             sizing_mode="stretch_width",
@@ -822,14 +830,15 @@ class BokehOperator:
 
         self.layout2 = layout(
             [
-                layout(
-                    [
-                        [self.experiment_dropdown, self.experiment_version_div],
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                stretch_section(
+                    layout(
+                        [
+                            [self.experiment_dropdown, self.experiment_version_div],
+                        ],
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
             ],
             sizing_mode="stretch_width",
@@ -838,14 +847,15 @@ class BokehOperator:
 
         self.layout3 = layout(
             [
-                layout(
-                    [
-                        [self.seqspec_dropdown],
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                stretch_section(
+                    layout(
+                        [
+                            [self.seqspec_dropdown],
+                        ],
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
             ],
             sizing_mode="stretch_width",
@@ -855,158 +865,165 @@ class BokehOperator:
         self.layout4 = layout(
             [
                 Spacer(height=10),
-                layout(
-                    [
-                        Spacer(width=20),
-                        self.orch_section,
-                    ],
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
-                ),
-                layout(
-                    [
-                        row(
-                            self.button_add_expplan,
-                            self.button_add_smpseqs,
-                            self.button_prepend_plan,
-                            self.button_clear_expplan,
-                            self.button_start_orch,
-                            self.button_stop_orch,
-                            self.reset_run_id_on_stop,
-                            spacing=4,
-                            sizing_mode="stretch_width",
-                        ),
-                        Spacer(height=10),
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
-                ),
-                layout(
-                    [
+                stretch_section(
+                    layout(
                         [
-                            Div(
-                                text="<b>Non-queued:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
+                            Spacer(width=20),
+                            self.orch_section,
                         ],
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
+                ),
+                stretch_section(
+                    layout(
                         [
                             row(
-                                column(
-                                    self.planhistory_tabs,
-                                    sizing_mode="stretch_width",
-                                    stylesheets=[
-                                        InlineStyleSheet(
-                                            css=":host { flex: 7 1 0% !important; }"
-                                        )
-                                    ],
-                                ),
-                                column(
-                                    self.planhistory_tree_header,
-                                    self.planhistory_tree_div,
-                                    sizing_mode="stretch_width",
-                                    stylesheets=[
-                                        InlineStyleSheet(
-                                            css=":host { flex: 3 1 0% !important; }"
-                                        )
-                                    ],
-                                ),
+                                self.button_add_expplan,
+                                self.button_add_smpseqs,
+                                self.button_prepend_plan,
+                                self.button_clear_expplan,
+                                self.button_start_orch,
+                                self.button_stop_orch,
+                                self.reset_run_id_on_stop,
+                                spacing=4,
                                 sizing_mode="stretch_width",
                             ),
+                            Spacer(height=10),
                         ],
-                        row(
-                            self.button_plan_move_up,
-                            self.button_plan_move_down,
-                            self.button_plan_remove,
-                            spacing=4,
-                        ),
-                    ],
-                    styles=panel_styles(PLAN_PANEL_NONQUEUED_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
-                layout(
-                    [
+                stretch_section(
+                    layout(
                         [
-                            Div(
-                                text="<b>Queues:</b>",
-                                width=200 + 50,
-                                height=15,
-                            ),
-                        ],
-                        row(
-                            self.orch_stepact_button,
-                            self.orch_stepexp_button,
-                            self.orch_stepseq_button,
-                            self.orch_status_button,
-                            spacing=4,
-                            sizing_mode="stretch_width",
-                        ),
-                        [
-                            row(
-                                column(
-                                    self.queue_tabs,
-                                    sizing_mode="stretch_width",
-                                    stylesheets=[
-                                        InlineStyleSheet(
-                                            css=":host { flex: 7 1 0% !important; }"
-                                        )
-                                    ],
-                                ),
-                                column(
-                                    self.queue_tree_header,
-                                    self.queue_tree_div,
-                                    sizing_mode="stretch_width",
-                                    stylesheets=[
-                                        InlineStyleSheet(
-                                            css=":host { flex: 3 1 0% !important; }"
-                                        )
-                                    ],
-                                ),
-                                sizing_mode="stretch_width",
-                            ),
-                        ],
-                        row(
-                            self.button_queue_move_up,
-                            self.button_queue_move_down,
-                            self.button_queue_remove,
-                            spacing=4,
-                        ),
-                        Spacer(height=10),
-                        row(
-                            self.button_skip_exp,
-                            self.button_clear_seqs,
-                            self.button_clear_exps,
-                            self.button_clear_action,
-                            self.button_update,
-                            spacing=4,
-                        ),
-                        Spacer(height=10),
-                        row(
-                            column(self.button_estop_orch),
-                            column(
+                            [
                                 Div(
-                                    text="<b>Error message:</b>",
+                                    text="<b>Non-queued:</b>",
+                                    width=200 + 50,
                                     height=15,
-                                    sizing_mode="stretch_width",
-                                    styles={"font-size": "100%", "color": BODY_TEXT},
                                 ),
-                                self.error_txt,
+                            ],
+                            [
+                                row(
+                                    column(
+                                        self.planhistory_tabs,
+                                        sizing_mode="stretch_width",
+                                        stylesheets=[
+                                            InlineStyleSheet(
+                                                css=":host { flex: 7 1 0% !important; }"
+                                            )
+                                        ],
+                                    ),
+                                    column(
+                                        self.planhistory_tree_header,
+                                        self.planhistory_tree_div,
+                                        sizing_mode="stretch_width",
+                                        stylesheets=[
+                                            InlineStyleSheet(
+                                                css=":host { flex: 3 1 0% !important; }"
+                                            )
+                                        ],
+                                    ),
+                                    sizing_mode="stretch_width",
+                                ),
+                            ],
+                            row(
+                                self.button_plan_move_up,
+                                self.button_plan_move_down,
+                                self.button_plan_remove,
+                                spacing=4,
+                            ),
+                        ],
+                        styles=panel_styles(PLAN_PANEL_NONQUEUED_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
+                ),
+                stretch_section(
+                    layout(
+                        [
+                            [
+                                Div(
+                                    text="<b>Queues:</b>",
+                                    width=200 + 50,
+                                    height=15,
+                                ),
+                            ],
+                            row(
+                                self.orch_stepact_button,
+                                self.orch_stepexp_button,
+                                self.orch_stepseq_button,
+                                self.orch_status_button,
+                                spacing=4,
                                 sizing_mode="stretch_width",
                             ),
-                            spacing=10,
-                            sizing_mode="stretch_width",
-                        ),
-                        Spacer(height=10),
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                            [
+                                row(
+                                    column(
+                                        self.queue_tabs,
+                                        sizing_mode="stretch_width",
+                                        stylesheets=[
+                                            InlineStyleSheet(
+                                                css=":host { flex: 7 1 0% !important; }"
+                                            )
+                                        ],
+                                    ),
+                                    column(
+                                        self.queue_tree_header,
+                                        self.queue_tree_div,
+                                        sizing_mode="stretch_width",
+                                        stylesheets=[
+                                            InlineStyleSheet(
+                                                css=":host { flex: 3 1 0% !important; }"
+                                            )
+                                        ],
+                                    ),
+                                    sizing_mode="stretch_width",
+                                ),
+                            ],
+                            row(
+                                self.button_queue_move_up,
+                                self.button_queue_move_down,
+                                self.button_queue_remove,
+                                spacing=4,
+                            ),
+                            Spacer(height=10),
+                            row(
+                                self.button_skip_exp,
+                                self.button_clear_seqs,
+                                self.button_clear_exps,
+                                self.button_clear_action,
+                                self.button_update,
+                                spacing=4,
+                            ),
+                            Spacer(height=10),
+                            row(
+                                column(self.button_estop_orch),
+                                column(
+                                    Div(
+                                        text="<b>Error message:</b>",
+                                        height=15,
+                                        sizing_mode="stretch_width",
+                                        styles={
+                                            "font-size": "100%",
+                                            "color": BODY_TEXT,
+                                        },
+                                    ),
+                                    self.error_txt,
+                                    sizing_mode="stretch_width",
+                                ),
+                                spacing=10,
+                                sizing_mode="stretch_width",
+                            ),
+                            Spacer(height=10),
+                        ],
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
             ],
             sizing_mode="stretch_width",
@@ -1022,6 +1039,10 @@ class BokehOperator:
         self.seqspec_select_tab = TabPanel(
             child=self.layout3, title="Specification Files"
         )
+        # The Tabs container needs the stretch itself: its panels' contents are
+        # already stretch_width, but a Tabs sizes to its widest panel and then
+        # clips them to that, so the selection block sat at the dropdown's
+        # width while every section below it filled the page.
         if self.seqspec_folder is not None and self.seqspec_parser is not None:
             self.select_tabs = Tabs(
                 tabs=[
@@ -1029,6 +1050,7 @@ class BokehOperator:
                     self.experiment_select_tab,
                     self.seqspec_select_tab,
                 ],
+                sizing_mode="stretch_width",
             )
         else:
             self.select_tabs = Tabs(
@@ -1036,6 +1058,7 @@ class BokehOperator:
                     self.sequence_select_tab,
                     self.experiment_select_tab,
                 ],
+                sizing_mode="stretch_width",
                 height_policy="min",
             )
         self.select_tabs.on_change("active", self.update_selector_layout)
@@ -1276,12 +1299,13 @@ class BokehOperator:
             return []
         checkbox.align = "center"
         return [
-            layout(
-                [row(button, checkbox)],
-                styles=panel_styles(PANEL_BG),
-                sizing_mode="stretch_width",
-                height_policy="min",
-                margin=SECTION_MARGIN,
+            stretch_section(
+                layout(
+                    [row(button, checkbox)],
+                    styles=panel_styles(PANEL_BG),
+                    height_policy="min",
+                    margin=SECTION_MARGIN,
+                )
             ),
         ]
 
@@ -1329,23 +1353,25 @@ class BokehOperator:
         # auto-row stays fixed-width and the children never expand.
         comment.sizing_mode = "stretch_width"
         return [
-            layout(
-                [
-                    row(*field_row, sizing_mode="stretch_width"),
-                    Spacer(height=16),
-                    row(comment, sizing_mode="stretch_width"),
-                ],
-                styles=panel_styles(PANEL_BG),
-                sizing_mode="stretch_width",
-                height_policy="min",
-                margin=SECTION_MARGIN,
+            stretch_section(
+                layout(
+                    [
+                        row(*field_row, sizing_mode="stretch_width"),
+                        Spacer(height=16),
+                        row(comment, sizing_mode="stretch_width"),
+                    ],
+                    styles=panel_styles(PANEL_BG),
+                    height_policy="min",
+                    margin=SECTION_MARGIN,
+                )
             ),
-            layout(
-                [button_row],
-                styles=panel_styles(PANEL_BG),
-                sizing_mode="stretch_width",
-                height_policy="min",
-                margin=SECTION_MARGIN,
+            stretch_section(
+                layout(
+                    [button_row],
+                    styles=panel_styles(PANEL_BG),
+                    height_policy="min",
+                    margin=SECTION_MARGIN,
+                )
             ),
         ]
 
@@ -1355,8 +1381,8 @@ class BokehOperator:
         Carries :data:`PARAM_CELL_NAME` so ``_pair_param_cells`` picks it up,
         and an explicit ``flex: 1 1 0%`` rather than a plain ``stretch_width``:
         two ``stretch_width`` siblings in a row size from their content first,
-        so a long description in one cell would steal width from the other and
-        the two inputs would not line up down the page.
+        so an over-long parameter name in one cell would steal width from the
+        other and the two inputs would not line up down the page.
 
         ``align-self: stretch`` is the height half of the same argument.
         ``height_policy="min"`` gives each cell an explicit height, which
@@ -1365,25 +1391,30 @@ class BokehOperator:
         rather than as a grid. It has to be ``!important``: Bokeh writes the
         computed height onto the host's inline style.
 
+        No margin at all: the inset belongs to the row (see
+        :data:`PARAM_FIELD_MARGIN`), so paired cells meet with no white line
+        between them and the whole form reads as one tinted field.
+
         Args:
             children: Rows for the cell, in ``layout()`` form.
 
         Returns:
             The cell's layout container.
         """
-        return layout(
-            children,
-            background=self.color_sq_param_inputs,
-            sizing_mode="stretch_width",
-            height_policy="min",
-            margin=SECTION_MARGIN,
-            name=PARAM_CELL_NAME,
-            stylesheets=[
-                InlineStyleSheet(
-                    css=":host { flex: 1 1 0% !important;"
-                    " align-self: stretch !important; }"
-                )
-            ],
+        return stretch_section(
+            layout(
+                children,
+                background=self.color_sq_param_inputs,
+                height_policy="min",
+                margin=0,
+                name=PARAM_CELL_NAME,
+                stylesheets=[
+                    InlineStyleSheet(
+                        css=":host { flex: 1 1 0% !important;"
+                        " align-self: stretch !important; }"
+                    )
+                ],
+            )
         )
 
     def _param_extra_block(self, children: list):
@@ -1401,12 +1432,13 @@ class BokehOperator:
         Returns:
             The block's layout container.
         """
-        return layout(
-            children,
-            background=self.color_sq_param_inputs,
-            sizing_mode="stretch_width",
-            height_policy="min",
-            margin=SECTION_MARGIN,
+        return stretch_section(
+            layout(
+                children,
+                background=self.color_sq_param_inputs,
+                height_policy="min",
+                margin=PARAM_FIELD_MARGIN,
+            )
         )
 
     @staticmethod
@@ -1436,6 +1468,10 @@ class BokehOperator:
                 second if second is not None else Spacer(sizing_mode="stretch_width"),
                 spacing=0,
                 sizing_mode="stretch_width",
+                # The cells inside carry no horizontal margin of their own, so
+                # the two columns meet with no white line between them and the
+                # inset lives on the row.
+                margin=PARAM_FIELD_MARGIN,
             )
 
         paired: list = []
@@ -1521,42 +1557,44 @@ class BokehOperator:
         # below the description block (see ``_build_param_header``).
         param_layout = (
             [
-                layout(
-                    [
+                stretch_section(
+                    layout(
                         [
-                            Div(
-                                text=cfg["descr_label"],
-                                width=200 + 50,
-                                height=15,
-                            ),
+                            [
+                                Div(
+                                    text=cfg["descr_label"],
+                                    width=200 + 50,
+                                    height=15,
+                                ),
+                            ],
+                            [getattr(self, cfg["descr_attr"])],
+                            Spacer(height=10),
                         ],
-                        [getattr(self, cfg["descr_attr"])],
-                        Spacer(height=10),
-                    ],
-                    styles=panel_styles(PANEL_BG),
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                        styles=panel_styles(PANEL_BG),
+                        height_policy="min",
+                        margin=SECTION_MARGIN,
+                    )
                 ),
             ]
             + self._build_param_header(mode)
             + [
                 Spacer(height=10),
-                layout(
-                    [
+                stretch_section(
+                    layout(
                         [
-                            Div(
-                                text=cfg["header"],
-                                width=200 + 50,
-                                height=15,
-                                styles={"font-size": "100%", "color": BODY_TEXT},
-                            ),
+                            [
+                                Div(
+                                    text=cfg["header"],
+                                    width=200 + 50,
+                                    height=15,
+                                    styles={"font-size": "100%", "color": BODY_TEXT},
+                                ),
+                            ],
                         ],
-                    ],
-                    background=self.color_sq_param_inputs,
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                        background=self.color_sq_param_inputs,
+                        height_policy="min",
+                        margin=PARAM_HEADING_MARGIN,
+                    )
                 ),
             ]
         )
@@ -1584,22 +1622,23 @@ class BokehOperator:
 
         if not param_input:
             param_layout.append(
-                layout(
-                    [
+                stretch_section(
+                    layout(
                         [
-                            Spacer(width=10),
-                            Div(
-                                text="-- none --",
-                                width=200 + 50,
-                                height=15,
-                                styles={"font-size": "100%", "color": BODY_TEXT},
-                            ),
+                            [
+                                Spacer(width=10),
+                                Div(
+                                    text="-- none --",
+                                    width=200 + 50,
+                                    height=15,
+                                    styles={"font-size": "100%", "color": BODY_TEXT},
+                                ),
+                            ],
                         ],
-                    ],
-                    background=self.color_sq_param_inputs,
-                    sizing_mode="stretch_width",
-                    height_policy="min",
-                    margin=SECTION_MARGIN,
+                        background=self.color_sq_param_inputs,
+                        height_policy="min",
+                        margin=PARAM_FIELD_MARGIN,
+                    )
                 ),
             )
 
@@ -2400,6 +2439,17 @@ class BokehOperator:
             # to put it in — such a parameter keeps its text field, where
             # ``None`` still round-trips.
             is_bool = type_hint == "bool" and def_val in BOOL_LABELS
+            # The parsed ``Args:`` description is the input's tooltip. A native
+            # ``title`` attribute rather than Bokeh's ``description``: that
+            # renders a "?" icon beside the widget's *title*, which is empty
+            # here, and RadioButtonGroup does not accept it at all — it is an
+            # InputWidget property, and a group is not an InputWidget. Hovering
+            # the control itself is also the behaviour being asked for.
+            # ``html_attributes`` is on UIElement, so one mechanism covers both
+            # widget kinds. Omitted entirely when there is no description, so a
+            # widget never carries an empty tooltip.
+            arg_desc = arg_descs.get(args[idx], "")
+            tooltip = {"title": arg_desc} if arg_desc else {}
             if is_bool:
                 param_widget = RadioButtonGroup(
                     labels=list(BOOL_LABELS),
@@ -2409,6 +2459,7 @@ class BokehOperator:
                     height=31,
                     margin=(0, 5, 0, 5),
                     sizing_mode="stretch_width",
+                    html_attributes=tooltip,
                 )
             else:
                 initial_stylesheet = [color_rule(".bk-input", BODY_TEXT)]
@@ -2421,6 +2472,7 @@ class BokehOperator:
                     margin=(0, 5, 0, 5),
                     sizing_mode="stretch_width",
                     stylesheets=initial_stylesheet,
+                    html_attributes=tooltip,
                 )
                 if args[idx] not in self.skip_default_highlights:
                     # Both rules are built in Python and the JS only picks
@@ -2446,30 +2498,22 @@ cb_obj.stylesheets = [
             param_input.append(param_widget)
             argtype_list.append(argtypes[idx])
             idx_col_w = 35
+            # The label row is name … type. The description is no longer in it —
+            # it is the input's tooltip — so the name takes the slack and the
+            # row is a fixed one line high again, which is what lets paired
+            # cells stay the same height without a description forcing a wrap.
             name_div = Div(
                 text=f"{args[idx]}",
-                width=200,
-                height_policy="min",
-                margin=(0, 5, 0, 5),
-            )
-            # The parsed ``Args:`` description sits between the name and the
-            # type annotation, in the label row above the input rather than in a
-            # second column beside it: with the form in two columns there is no
-            # room for a column of prose, and above the field it stays on the
-            # same reading line as the name it describes.
-            desc_div = Div(
-                text=arg_descs.get(args[idx], ""),
                 sizing_mode="stretch_width",
-                height_policy="min",
+                height=14,
                 margin=(0, 5, 0, 5),
-                styles={"color": MUTED_TEXT_ON_PANEL},
             )
             # Right-aligned, and last in the row, so the annotation lands on the
-            # cell's right edge whatever the description's length.
+            # cell's right edge.
             type_div = Div(
                 text=f"<i>[{type_hint}]</i>",
                 width=140,
-                height_policy="min",
+                height=14,
                 margin=(0, 5, 0, 5),
                 styles={"text-align": "right"},
             )
@@ -2487,7 +2531,6 @@ cb_obj.stylesheets = [
                 row(
                     Spacer(width=idx_col_w),
                     name_div,
-                    desc_div,
                     type_div,
                     spacing=0,
                     sizing_mode="stretch_width",

@@ -6,6 +6,7 @@ from bokeh.layouts import Spacer, layout
 from bokeh.models.widgets import Div
 
 from helao.core.servers.palette import HEADING_TEXT
+from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
 from helao.core.servers.vis import HelaoVis
 from helao.core.servers.vis_subscriber import mount_visualizers
 from helao.helpers import helao_logging as logging
@@ -40,17 +41,19 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
     )
 
     app.vis.doc.add_root(
-        layout(
-            [
-                Spacer(width=20),
-                Div(
-                    text=f"<b>Live visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
-                    width=1004,
-                    height=32,
-                    styles={"font-size": "200%", "color": HEADING_TEXT},
-                ),
-            ],
-            width=1024,
+        stretch_section(
+            layout(
+                [
+                    Spacer(width=20),
+                    Div(
+                        text=f"<b>Live visualizer on {gethostname().lower()} -- config: {confPrefix}.py</b>",
+                        sizing_mode="stretch_width",
+                        height=32,
+                        styles={"font-size": "200%", "color": HEADING_TEXT},
+                    ),
+                ],
+                margin=SECTION_MARGIN,
+            )
         )
     )
     app.vis.doc.add_root(Spacer(height=10))

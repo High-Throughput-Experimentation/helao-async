@@ -15,6 +15,7 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.palette import PANEL_BG, panel_styles, red_ramp
+from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import private_dispatcher
@@ -139,11 +140,11 @@ class C_vis(ActionVisualizer):
         #     labels=self.data_dict_keys, active=[1, 3], width=500
         # )
 
-        self.plot = figure(title="Title", height=300, width=500)
+        self.plot = figure(title="Title", height=300, sizing_mode="stretch_width")
         self.plot.xaxis.axis_label = "Wavelength (nm)"
         self.plot.yaxis.axis_label = "Transmittance (counts/sec)"
 
-        self.plot_prev = figure(title="Title", height=300, width=500)
+        self.plot_prev = figure(title="Title", height=300, sizing_mode="stretch_width")
         self.plot_prev.xaxis.axis_label = "Wavelength (nm)"
         self.plot_prev.yaxis.axis_label = "Transmittance (counts/sec)"
         # combine all sublayouts into a single one
@@ -152,15 +153,19 @@ class C_vis(ActionVisualizer):
         headerbar = f"<b>Spectrometer Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
+                [
+                    Spacer(width=20),
+                    Div(text=headerbar, sizing_mode="stretch_width", height=15),
+                ],
                 [self.input_max_spectra, Spacer(width=20), self.input_downsample],
                 Spacer(height=10),
                 [self.plot, Spacer(width=20), self.plot_prev],
                 Spacer(height=10),
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         # to check if selection changed during ploting
         # self.xselect = self.xaxis_selector_group.active

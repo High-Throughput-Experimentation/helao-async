@@ -7,7 +7,7 @@ from bokeh.layouts import Spacer, layout
 from bokeh.models import (
     Button,
     ColumnDataSource,
-    RadioButtonGroup,
+    Select,
     TextInput,
 )
 from bokeh.models.widgets import Div
@@ -17,7 +17,11 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.bokeh_theme import semantic_button_stylesheet
+from helao.core.servers.bokeh_theme import (
+    SECTION_MARGIN,
+    semantic_button_stylesheet,
+    stretch_section,
+)
 from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import ActionVisualizer
@@ -46,7 +50,7 @@ class C_vis(ActionVisualizer):
 
     Subscribes to the action server's ``ws_data`` WebSocket and streams
     per-channel time-series plots (active and previous run side-by-side) with
-    radio-button x/y selectors, a max-points input, and per-channel stop
+    x/y axis dropdowns, a max-points input, and per-channel stop
     buttons. Common subscriber bring-up, the ``max datapoints`` callback, and
     the ingest loop are inherited from :class:`ActionVisualizer`.
 
@@ -59,13 +63,16 @@ class C_vis(ActionVisualizer):
         channel_action_uuid_prev: Previous action UUID per channel.
         layout: Composed Bokeh layout mounted on the document.
         input_max_points: Widget setting ``max_points``.
-        xaxis_selector_group: Radio buttons selecting the x-axis variable.
-        yaxis_selector_group: Radio buttons selecting the y-axis variable.
+        xaxis_selector_group: Dropdown selecting the x-axis variable.
+        yaxis_selector_group: Dropdown selecting the y-axis variable.
         channel_plots: Per-channel live ``figure`` objects.
         channel_plots_prev: Per-channel prior-run ``figure`` objects.
         stop_buttons: Per-channel danger buttons that abort the channel.
-        xselect: Cached active index of ``xaxis_selector_group``.
-        yselect: Cached active index of ``yaxis_selector_group``.
+        xselect: Cached selection of ``xaxis_selector_group``, which is
+            the data-key name itself rather than an index into
+            ``data_dict_keys``.
+        yselect: Cached selection of ``yaxis_selector_group``, likewise a
+            data-key name.
     """
 
     SUBSCRIBE_LABEL = "potentiostat visualizer"
@@ -114,26 +121,36 @@ class C_vis(ActionVisualizer):
             partial(self.callback_input_max_points, sender=self.input_max_points),
         )
 
-        self.xaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=0, width=500
+        # Dropdowns rather than radio groups: a row of one button per data key
+        # was as wide as the plots beneath it, and the panel now stretches, so
+        # the buttons would have stretched with it. A Select carries its own
+        # title, so the separate "x-axis:"/"y-axis:" Divs above it are gone.
+        self.xaxis_selector_group = Select(
+            title="x-axis:",
+            value=self.data_dict_keys[0],
+            options=self.data_dict_keys,
+            width=150,
         )
-        self.yaxis_selector_group = RadioButtonGroup(
-            labels=self.data_dict_keys, active=3, width=500
+        self.yaxis_selector_group = Select(
+            title="y-axis:",
+            value=self.data_dict_keys[3],
+            options=self.data_dict_keys,
+            width=150,
         )
         self.xaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
+            "value", partial(self.callback_selector_change)
         )
         self.yaxis_selector_group.on_change(
-            "active", partial(self.callback_selector_change)
+            "value", partial(self.callback_selector_change)
         )
 
         self.channel_plots = [
-            figure(title=f"channel {ch}", height=300, width=500)
+            figure(title=f"channel {ch}", height=300, sizing_mode="stretch_width")
             for ch in range(self.num_channels)
         ]
 
         self.channel_plots_prev = [
-            figure(title=f"channel {ch}", height=300, width=500)
+            figure(title=f"channel {ch}", height=300, sizing_mode="stretch_width")
             for ch in range(self.num_channels)
         ]
 
@@ -181,23 +198,27 @@ class C_vis(ActionVisualizer):
         headerbar = f"<b>Potentiostat Visualizer module for server {server_link}</b>"
         self.layout = layout(
             [
-                [Spacer(width=20), Div(text=headerbar, width=1004, height=15)],
+                [
+                    Spacer(width=20),
+                    Div(text=headerbar, sizing_mode="stretch_width", height=15),
+                ],
                 [self.input_max_points],
                 [
-                    Div(text="""x-axis:""", width=500, height=15),
-                    Div(text="""y-axis:""", width=500, height=15),
+                    self.xaxis_selector_group,
+                    Spacer(width=20),
+                    self.yaxis_selector_group,
                 ],
-                [self.xaxis_selector_group, self.yaxis_selector_group],
                 Spacer(height=10),
                 *self.plot_divs,
             ],
             styles=panel_styles(PANEL_BG),
-            width=1024,
+            margin=SECTION_MARGIN,
         )
+        stretch_section(self.layout)
 
         # to check if selection changed during ploting
-        self.xselect = self.xaxis_selector_group.active
-        self.yselect = self.yaxis_selector_group.active
+        self.xselect = self.xaxis_selector_group.value
+        self.yselect = self.yaxis_selector_group.value
 
         self._mount()
         for ch, _ in self.channel_action_uuid.items():
@@ -208,8 +229,8 @@ class C_vis(ActionVisualizer):
 
         Args:
             attr: Bokeh property name that changed.
-            old: Previous selector index.
-            new: New selector index.
+            old: Previously selected data key.
+            new: Newly selected data key.
         """
         for ch in self.channel_action_uuid:
             self.reset_plot(ch)
@@ -291,8 +312,8 @@ class C_vis(ActionVisualizer):
         self.channel_plots_prev[channel].title.text = (
             f"[ch:{channel:0d}] last action_uuid: {self.channel_action_uuid_prev[channel]}"
         )
-        xstr = self.data_dict_keys[self.xselect]
-        ystr = self.data_dict_keys[self.yselect]
+        xstr = self.xselect
+        ystr = self.yselect
         LOGGER.info(f"{xstr}, {ystr}")
         colors = [SERIES[0], SERIES[1], SERIES[3], SERIES[2]]
         self.channel_plots[channel].line(
@@ -350,20 +371,16 @@ class C_vis(ActionVisualizer):
                 }
                 if action_name in AXIS_MAP:
                     xlab, ylab = AXIS_MAP[action_name]
-                    self.xaxis_selector_group.update(
-                        active=self.data_dict_keys.index(xlab)
-                    )
-                    self.yaxis_selector_group.update(
-                        active=self.data_dict_keys.index(ylab)
-                    )
-                    self.xselect = self.xaxis_selector_group.active
-                    self.yselect = self.yaxis_selector_group.active
+                    self.xaxis_selector_group.update(value=xlab)
+                    self.yaxis_selector_group.update(value=ylab)
+                    self.xselect = self.xaxis_selector_group.value
+                    self.yselect = self.yaxis_selector_group.value
                 self._add_plots(channel)
-        if (self.xselect != self.xaxis_selector_group.active) or (
-            self.yselect != self.yaxis_selector_group.active
+        if (self.xselect != self.xaxis_selector_group.value) or (
+            self.yselect != self.yaxis_selector_group.value
         ):
-            self.xselect = self.xaxis_selector_group.active
-            self.yselect = self.yaxis_selector_group.active
+            self.xselect = self.xaxis_selector_group.value
+            self.yselect = self.yaxis_selector_group.value
             self._add_plots(channel)
 
     def callback_stop_measure(self, event, channel):
