@@ -38,7 +38,13 @@ from helao.core.servers.bokeh_theme import (
     marker_style_block,
     semantic_button_stylesheet,
 )
-from helao.core.servers.palette import BODY_TEXT, MARKER_SWATCHES, PANEL_BG, TW
+from helao.core.servers.palette import (
+    BODY_TEXT,
+    MARKER_SWATCHES,
+    PANEL_BG,
+    TW,
+    panel_styles,
+)
 from helao.core.servers.vis import Vis
 from helao.helpers import helao_logging as logging
 from helao.helpers.plate_api import HTEPlateAPI
@@ -55,6 +61,17 @@ _MOTOR_PANEL_BG = TW["teal-600"]
 
 _ARROW_PANEL_BG = TW["yellow-700"]
 """Arrow-key jog panel. Was web-named olive."""
+
+_DARK_PANEL_BORDER = TW["slate-800"]
+"""Section border for this layout's two *dark* panels.
+
+``palette.PANEL_BORDER`` (``slate-400``) is the shared section border and is
+correct on every light panel, but it is *lighter* than ``teal-600`` and
+``yellow-700`` — on those it would read as a highlight rather than as the edge of
+a panel. One dark neutral serves both: 3.91:1 on the motor panel and 2.97:1 on
+the arrow panel, darker than each and well clear of the 1.20 neighbouring-surface
+floor.
+"""
 
 _PLATE_FILL = TW["slate-400"]
 """Plate-boundary rect fill. Drawn at ``fill_alpha=0.0``; was ``"gray"``."""
@@ -370,7 +387,7 @@ class Aligner:
                                     self.calib_ymotor[2],
                                 ],
                                 Spacer(height=10),
-                                background=PANEL_BG,
+                                styles=panel_styles(PANEL_BG),
                             ),
                         ]
                     ),
@@ -475,7 +492,7 @@ class Aligner:
                     ],
                     self.motor_move_indicator,
                     Spacer(height=15, width=240),
-                    background=_MOTOR_PANEL_BG,
+                    styles=panel_styles(_MOTOR_PANEL_BG, _DARK_PANEL_BORDER),
                 ),
                 layout(
                     [
@@ -484,7 +501,7 @@ class Aligner:
                         [Spacer(height=25), self.motor_move_check],
                     ],
                     Spacer(height=10, width=240),
-                    background=_ARROW_PANEL_BG,
+                    styles=panel_styles(_ARROW_PANEL_BG, _DARK_PANEL_BORDER),
                 ),
             ]
         )
@@ -797,7 +814,7 @@ class Aligner:
                     self.marker_layout[4],
                 ]
             ],
-            background=PANEL_BG,
+            styles=panel_styles(PANEL_BG),
         )
 
         ######################################################################

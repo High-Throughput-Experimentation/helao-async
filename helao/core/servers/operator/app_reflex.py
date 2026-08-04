@@ -112,6 +112,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 #: 4.5 body floor on two of them and clearing it by 0.02 on a third.
 _MUTED_TEXT = reflex_muted_text_class()
 
+#: Width of the ``[n]`` parameter-index column in the Build form, reserved twice
+#: over: once by the index text itself and once by an empty box in the label row
+#: above it, so the parameter name still starts flush with the input below it.
+#: An em rather than a px so it tracks the 12px input font instead of drifting
+#: when the type scale moves; 2.5em holds ``[99]`` right-aligned, which is past
+#: any parameter count a sequence has. The Bokeh operator reserves 35px for the
+#: same decoration.
+_PARAM_INDEX_WIDTH = "2.5em"
+
 #: Columns shown in each queue table, mirroring the Bokeh operator's tables.
 #: These are a contract with ``RemoteBackend``'s list methods, which project
 #: each queue item down to a fixed key set. ``queue_rows`` renders an unknown
@@ -740,6 +749,27 @@ class OperatorQueueState(rx.State):
     def can_edit_queue(self) -> bool:
         """Whether the queue-editing controls are enabled."""
         return self.reachable and may_edit_queue(self.orch_state)
+
+    # Queue depths for the tab titles. Computed vars rather than
+    # ``seq_rows.length()`` at the call site: on the class those attributes are
+    # Vars, which pyright types as the annotated ``list[list[str]]`` and then
+    # rejects ``.length()`` on. A computed var reads as a plain ``int`` to both
+    # pyright and the template, and recomputes from the same rows the tab's own
+    # table renders, so the count cannot drift from the table.
+    @rx.var
+    def seq_count(self) -> int:
+        """Number of sequences in the orchestrator's sequence queue."""
+        return len(self.seq_rows)
+
+    @rx.var
+    def exp_count(self) -> int:
+        """Number of experiments in the orchestrator's experiment queue."""
+        return len(self.exp_rows)
+
+    @rx.var
+    def act_count(self) -> int:
+        """Number of actions in the orchestrator's action queue."""
+        return len(self.act_rows)
 
     @rx.event(background=True)
     async def select_queue_row(self, kind: str, index: int):
@@ -1773,7 +1803,10 @@ class OperatorPlanState(rx.State):
 
     @rx.var
     def plan_count(self) -> int:
-        """How many sequences are buffered, for the flush button's label."""
+        """How many sequences are buffered.
+
+        Read by the flush button's label and by the Plan tab's title.
+        """
         return len(self.plan_view)
 
     def _set_plan(self, plan: list) -> None:
@@ -2324,7 +2357,7 @@ def _queue_tab(columns: list, rows_var, kind: str):
     )
 
 
-def _param_field(row, state, options):
+def _param_field(row, state, options, index=None):
     """One parameter input, by kind.
 
     ``row`` is ``[name, kind, value, help]``. The kinds are compared on the
@@ -2334,37 +2367,78 @@ def _param_field(row, state, options):
         row: The flattened field row.
         state: State owning ``set_param``. Defaults to the library form.
         options: Var holding the select options, when the form has any.
+        index: Position of this parameter in the form, rendered as a faint
+            ``[n]`` to the left of the control — the same decoration the Bokeh
+            operator carries (``index_div``, right-aligned in a 35px column).
+            ``None`` omits it *and* the column that reserves its width, so a
+            caller that passes no index gets the previous full-width layout
+            unchanged.
     """
 
+    indent = (
+        [] if index is None else [rx.box(width=_PARAM_INDEX_WIDTH, flex_shrink="0")]
+    )
     return rx.vstack(
         rx.hstack(
+            *indent,
             rx.text(row[0], size="1", weight="medium"),
             rx.spacer(),
             rx.text(row[3], size="1", class_name=_MUTED_TEXT),
             width="100%",
         ),
-        rx.cond(
-            row[1] == "bool",
-            rx.checkbox(
-                checked=row[2].lower() == "true",
-                on_change=lambda value: OperatorLibState.set_param_bool(row[0], value),
+        rx.hstack(
+            *(
+                []
+                if index is None
+                else [
+                    rx.text(
+                        f"[{index}]",
+                        size="1",
+                        class_name=_MUTED_TEXT,
+                        width=_PARAM_INDEX_WIDTH,
+                        flex_shrink="0",
+                        text_align="right",
+                    )
+                ]
             ),
-            rx.cond(
-                row[1] == "select",
-                rx.select(
-                    options,
-                    value=row[2],
-                    on_change=lambda value: state.set_param(row[0], value),
-                    width="100%",
-                    size="2",
+            # The control sits in a growing box rather than directly in the
+            # hstack: `rx.cond` takes no layout props of its own, so without a
+            # wrapper the field would size to its content and leave the rest of
+            # the row empty once the index column is beside it. `min_width="0"`
+            # is what lets it shrink inside a narrow grid cell instead of
+            # forcing the column wider than its share.
+            rx.box(
+                rx.cond(
+                    row[1] == "bool",
+                    rx.checkbox(
+                        checked=row[2].lower() == "true",
+                        on_change=lambda value: OperatorLibState.set_param_bool(
+                            row[0], value
+                        ),
+                    ),
+                    rx.cond(
+                        row[1] == "select",
+                        rx.select(
+                            options,
+                            value=row[2],
+                            on_change=lambda value: state.set_param(row[0], value),
+                            width="100%",
+                            size="2",
+                        ),
+                        rx.input(
+                            value=row[2],
+                            on_change=lambda value: state.set_param(row[0], value),
+                            width="100%",
+                            size="2",
+                        ),
+                    ),
                 ),
-                rx.input(
-                    value=row[2],
-                    on_change=lambda value: state.set_param(row[0], value),
-                    width="100%",
-                    size="2",
-                ),
+                flex_grow="1",
+                min_width="0",
             ),
+            width="100%",
+            spacing="1",
+            align="center",
         ),
         width="100%",
         spacing="1",
@@ -2446,15 +2520,24 @@ def _library_panel():
             align="center",
         ),
         rx.scroll_area(
-            rx.vstack(
+            # Two columns, so a sequence with many parameters needs half the
+            # scrolling. `rx.grid` rather than a wrapping flex: the fields then
+            # share one column width and their inputs line up down the page,
+            # which a wrap would only do when every label happened to be the
+            # same length. The index passed here is what draws the faint `[n]`.
+            rx.grid(
                 rx.foreach(
                     OperatorLibState.param_rows,
-                    lambda row: _param_field(
-                        row, OperatorLibState, OperatorLibState.position_options
+                    lambda row, index: _param_field(
+                        row,
+                        OperatorLibState,
+                        OperatorLibState.position_options,
+                        index=index,
                     ),
                 ),
+                columns="2",
+                spacing="3",
                 width="100%",
-                spacing="2",
             ),
             type="auto",
             scrollbars="vertical",
@@ -2647,9 +2730,26 @@ def _queue_panel():
     return rx.vstack(
         rx.tabs.root(
             rx.tabs.list(
-                rx.tabs.trigger("Sequences", value="sequence"),
-                rx.tabs.trigger("Experiments", value="experiment"),
-                rx.tabs.trigger("Actions", value="action"),
+                # Each queue's depth in its own tab title, so the operator can
+                # read it without selecting the tab. The count comes off the
+                # same var the tab's table renders, which is what keeps the two
+                # from disagreeing -- a separately-tracked counter would drift
+                # the moment a refresh replaced the rows.
+                #
+                # "Servers" is deliberately left bare: it is a status table, not
+                # a queue, so a number beside it would read as a backlog.
+                rx.tabs.trigger(
+                    f"Sequences [{OperatorQueueState.seq_count}]",
+                    value="sequence",
+                ),
+                rx.tabs.trigger(
+                    f"Experiments [{OperatorQueueState.exp_count}]",
+                    value="experiment",
+                ),
+                rx.tabs.trigger(
+                    f"Actions [{OperatorQueueState.act_count}]",
+                    value="action",
+                ),
                 rx.tabs.trigger("Servers", value="servers"),
             ),
             rx.tabs.content(
@@ -2790,7 +2890,12 @@ def build_page():
         rx.tabs.root(
             rx.tabs.list(
                 rx.tabs.trigger("Build", value="build"),
-                rx.tabs.trigger("Plan", value="plan"),
+                # How many sequences the Build tab has assembled but not yet
+                # flushed. The plan buffer is the one piece of operator state the
+                # orchestrator does not own, so this count is the only place it
+                # is visible without opening the tab. Mirrors the Bokeh
+                # operator's "Add plan [n]" button label.
+                rx.tabs.trigger(f"Plan [{OperatorPlanState.plan_count}]", value="plan"),
                 rx.tabs.trigger("Queues", value="queues"),
                 rx.tabs.trigger("History", value="history"),
                 rx.tabs.trigger("Specs", value="specs"),

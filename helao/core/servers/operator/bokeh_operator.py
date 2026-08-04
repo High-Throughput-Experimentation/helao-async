@@ -78,6 +78,7 @@ from helao.core.servers.palette import (
     PLAN_PANEL_NONQUEUED_BG,
     SELECTED_MARKER_OUTLINE,
     SURFACE_WHITE,
+    panel_styles,
 )
 from helao.core.servers.vis import Vis
 from helao.helpers.config_loader import is_ui_only_server
@@ -732,7 +733,7 @@ class BokehOperator:
                     [
                         [self.sequence_dropdown, self.sequence_version_div],
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -746,7 +747,7 @@ class BokehOperator:
                     [
                         [self.experiment_dropdown, self.experiment_version_div],
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -760,7 +761,7 @@ class BokehOperator:
                     [
                         [self.seqspec_dropdown],
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     width=self.max_width,
                     height_policy="min",
                 ),
@@ -794,7 +795,7 @@ class BokehOperator:
                         ),
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -838,7 +839,7 @@ class BokehOperator:
                             spacing=4,
                         ),
                     ],
-                    background=PLAN_PANEL_NONQUEUED_BG,
+                    styles=panel_styles(PLAN_PANEL_NONQUEUED_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -916,7 +917,7 @@ class BokehOperator:
                         ),
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     sizing_mode="stretch_width",
                     height_policy="min",
                 ),
@@ -1189,7 +1190,7 @@ class BokehOperator:
         return [
             layout(
                 [row(button, checkbox)],
-                background=PANEL_BG,
+                styles=panel_styles(PANEL_BG),
                 width=self.max_width,
                 height_policy="min",
             ),
@@ -1245,13 +1246,13 @@ class BokehOperator:
                     Spacer(height=16),
                     row(comment, sizing_mode="stretch_width"),
                 ],
-                background=PANEL_BG,
+                styles=panel_styles(PANEL_BG),
                 sizing_mode="stretch_width",
                 height_policy="min",
             ),
             layout(
                 [button_row],
-                background=PANEL_BG,
+                styles=panel_styles(PANEL_BG),
                 width=self.max_width,
                 height_policy="min",
             ),
@@ -1334,7 +1335,7 @@ class BokehOperator:
                         [getattr(self, cfg["descr_attr"])],
                         Spacer(height=10),
                     ],
-                    background=PANEL_BG,
+                    styles=panel_styles(PANEL_BG),
                     width=self.max_width,
                     height_policy="min",
                 ),
