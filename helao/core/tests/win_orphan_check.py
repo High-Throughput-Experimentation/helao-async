@@ -94,6 +94,31 @@ def listening_ports(netstat_txt: str, ports) -> list[int]:
     return [p for p in wanted if p in held]
 
 
+def evidence_is_usable(tasklist_csv: str) -> bool:
+    """Whether the process listing can be believed at all.
+
+    **The guard on the guard.** "No launcher processes found" and "the process
+    listing is empty" are indistinguishable to
+    :func:`surviving_launchers`, and the second one is not a clean teardown, it
+    is a broken check that would pass forever. It is a live risk rather than a
+    hypothetical: ``wmic`` is deprecated and absent on current Windows builds,
+    where it writes nothing and exits quietly.
+
+    The test is that the listing mentions ``python`` at all. That is a strong
+    invariant precisely here, because this module is *itself* run as
+    ``python -m helao.core.tests.win_orphan_check`` moments after the snapshot is
+    taken -- so a listing that cannot see a single python process cannot see the
+    caller either, and certainly cannot be trusted to see an orphan.
+
+    Args:
+        tasklist_csv: The captured process listing.
+
+    Returns:
+        bool: True when the listing looks like a real process enumeration.
+    """
+    return "python" in tasklist_csv.lower()
+
+
 def orphan_report(tasklist_csv: str, netstat_txt: str, ports, config_prefix="") -> str:
     """Return a human-readable verdict, empty when the teardown was clean.
 
@@ -106,6 +131,15 @@ def orphan_report(tasklist_csv: str, netstat_txt: str, ports, config_prefix="") 
     Returns:
         str: Empty string on success; otherwise every finding, one per line.
     """
+    if not evidence_is_usable(tasklist_csv):
+        return (
+            "CANNOT JUDGE: the process listing names no python process at all, so "
+            "it is empty or truncated rather than clean -- this check would "
+            "otherwise pass no matter how many servers survived.\n"
+            "    On current Windows builds `wmic` is gone; the snapshot must come "
+            "from PowerShell (Get-CimInstance Win32_Process). Re-run the smoke "
+            "script, which prefers CIM and falls back to wmic."
+        )
     procs = surviving_launchers(tasklist_csv, config_prefix)
     held = listening_ports(netstat_txt, ports)
     if not procs and not held:
@@ -140,10 +174,25 @@ def main(argv) -> int:
         prefix = args[i + 1]
         del args[i : i + 2]
     tasklist_path, netstat_path, *ports = args
-    with open(tasklist_path, errors="replace") as fh:
-        tasklist_csv = fh.read()
-    with open(netstat_path, errors="replace") as fh:
-        netstat_txt = fh.read()
+    # Read defensively: a missing evidence file means the collecting step failed,
+    # which is a broken check rather than a clean teardown. Reported as a plain
+    # message and a distinct exit 2, because whoever sees this is standing at an
+    # instrument PC and a traceback is not the useful thing to show them. The
+    # smoke script gates on `errorlevel 1`, so 2 still reads as FAIL.
+    contents = []
+    for path in (tasklist_path, netstat_path):
+        try:
+            with open(path, errors="replace") as fh:
+                contents.append(fh.read())
+        except OSError as exc:
+            print(
+                f"CANNOT JUDGE: could not read the evidence file {path!r} ({exc}).\n"
+                f"    The collecting step did not produce it, so this run proves "
+                f"nothing either way.",
+                file=sys.stderr,
+            )
+            return 2
+    tasklist_csv, netstat_txt = contents
     report = orphan_report(tasklist_csv, netstat_txt, ports, prefix)
     if report:
         print(report)

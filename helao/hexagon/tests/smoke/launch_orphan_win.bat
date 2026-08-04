@@ -8,14 +8,13 @@ REM would, and asserts that nothing survives: no fast_launcher/bokeh_launcher/
 REM reflex_launcher process, and none of the group's ports still LISTENING.
 REM
 REM WHY THIS EXISTS AT ALL. On Linux each server arms prctl(PR_SET_PDEATHSIG)
-REM and dies with its launcher; that path is verified in CI-able unit tests plus
-REM a live `kill -9` on the golden group. Windows has no PDEATHSIG, so it gets a
-REM Job Object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE instead: launch.py joins
-REM the job and every server it spawns inherits membership, so the kernel
-REM terminates the group when the launcher's handle closes. THAT MECHANISM HAS
-REM NEVER BEEN RUN ON WINDOWS -- it was written and unit-tested on Linux against
-REM a fake kernel32. This script is how it gets confirmed at a station, and it
-REM should be run before trusting the behaviour on any instrument PC.
+REM and dies with its launcher; that path is verified by unit tests plus a live
+REM `kill -9` on the golden group. Windows has no PDEATHSIG, so it gets a Job
+REM Object with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE instead: launch.py joins the
+REM job and every server it spawns inherits membership, so the kernel terminates
+REM the group when the launcher's handle closes. THAT MECHANISM HAS NEVER BEEN
+REM CONFIRMED ON WINDOWS -- it was written and unit-tested on Linux against a
+REM fake kernel32. This script is how it gets confirmed at a station.
 REM
 REM The stakes are higher here than a held port: the Windows-only drivers are
 REM Galil (gclib) and Gamry (comtypes), and an orphaned Gamry server still owns
@@ -32,11 +31,19 @@ REM         launch_orphan_win.bat                  -> golden, ports 5001 5002 50
 REM         launch_orphan_win.bat clad 5110 5111   -> a station config
 REM
 REM Run it on a station that is IDLE. It force-kills a launcher and expects the
-REM whole group to die; do not run it against a group that is executing a
-REM sequence. It launches its own group and does not touch an existing one --
-REM but the stale-group guard means it will refuse to start if one is running,
-REM which is itself the correct outcome and is reported as such.
+REM whole group to die; do not run it against a group executing a sequence. It
+REM launches its own group and does not touch an existing one -- but the
+REM stale-group guard means it will refuse to start if one is already running,
+REM which is the correct outcome and is reported as such.
 REM ---------------------------------------------------------------------------
+
+REM Repo root, resolved BEFORE any `shift`. This must stay above the argument
+REM parsing: SHIFT moves %1 into %0, so %~dp0 read afterwards is the path of an
+REM *argument*, not of this script. That bug sent `pushd` to C:\ and the launcher
+REM then failed with "can't open file 'launch.py'", which surfaced as the
+REM pre-check reporting no group -- a correct message about the wrong cause.
+set REPO=%~dp0..\..\..\..
+for %%I in ("%REPO%") do set REPO=%%~fI
 
 REM Default to failure. Every success path sets this to 0 explicitly, so an exit
 REM route nobody thought about reports FAIL rather than a silent PASS.
@@ -44,7 +51,7 @@ set RC=1
 
 set CONFIG=%1
 if "%CONFIG%"=="" set CONFIG=golden
-shift
+if not "%1"=="" shift
 
 set PORTS=
 :collect_ports
@@ -55,45 +62,73 @@ goto collect_ports
 :ports_done
 if "!PORTS!"=="" set PORTS= 5001 5002 5003
 
-set REPO=%~dp0..\..\..\..
 pushd "%REPO%"
+if errorlevel 1 (
+    echo FAIL: could not enter the repo root "%REPO%".
+    exit /b 1
+)
+echo     repo root: %REPO%
 
 set OUT=%TEMP%\helao_orphan_smoke
 if not exist "%OUT%" mkdir "%OUT%"
+set PROCS=%OUT%\procs.txt
+set LAUNCHLOG=%OUT%\launch.log
 
 echo [1/5] launching %CONFIG% ...
 REM `start` so this script keeps control; the launcher gets its own window, which
-REM is also what gives it a console for the CTRL_BREAK path to be meaningful.
-start "helao-orphan-smoke" /MIN cmd /c "python launch.py %CONFIG% > "%OUT%\launch.log" 2>&1"
+REM is also what gives it a real console -- the CTRL_BREAK path in kill_server is
+REM only meaningful for a child that has one.
+REM
+REM Short (8.3) paths for the `cd` target and the redirect, because a redirect
+REM inside an already-quoted `cmd /c` string cannot itself be quoted reliably --
+REM `cmd /c "... > "%LOG%" 2>&1"` is four quotes and cmd's own de-quoting rules
+REM decide what that means. A short path contains no spaces, so it needs no
+REM quoting at all. (If 8.3 generation is disabled on the volume, %%~sI returns
+REM the long path unchanged; that is still correct for any path without spaces,
+REM which both of these are on a station.)
+for %%I in ("%REPO%") do set REPOS=%%~sI
+for %%I in ("%OUT%") do set OUTS=%%~sI
+start "helao-orphan-smoke" /MIN cmd /c "cd /d %REPOS% && python launch.py %CONFIG% > %OUTS%\launch.log 2>&1"
 
-echo     waiting 60s for the group to bind its ports ...
+echo [2/5] waiting for a launcher child to appear (up to 180s) ...
+REM Polled, not a fixed sleep. A cold start is ~30s on Linux and slower on a
+REM station, and a fixed wait either fails a healthy launch or wastes minutes.
+set /a TRIES=0
+:wait_loop
+set /a TRIES+=1
 REM No `sleep` on stock Windows; a pingable loopback delay is the usual stand-in.
-ping -n 61 127.0.0.1 >nul
-
-echo [2/5] confirming the group came up ...
-wmic process get CommandLine,ProcessId > "%OUT%\wmic_before.txt" 2>nul
-netstat -ano > "%OUT%\netstat_before.txt"
-REM A DIRECT check, not the orphan checker with its result inverted. Inverting it
-REM would treat *any* non-zero exit as "the group is up", including the checker
-REM failing to open a file or dying on a traceback -- so a broken pre-check would
-REM read as a healthy group and the whole smoke test would pass without ever
-REM having launched anything. This asks the one question that matters instead:
-REM is a launcher child actually running for this config?
-findstr /i "_launcher.py %CONFIG%" "%OUT%\wmic_before.txt" >nul 2>&1
+ping -n 6 127.0.0.1 >nul
+call :snapshot_procs
+REM Two chained findstr calls, because `findstr "a b"` searches for a OR b --
+REM one call would match any python process once the config name appeared
+REM anywhere on its line.
+findstr /i /c:"_launcher.py" "%PROCS%" | findstr /i /c:"%CONFIG%" >nul 2>&1
 if not errorlevel 1 goto group_is_up
-echo     FAIL: no launcher child is running for %CONFIG%.
+if %TRIES% LSS 36 goto wait_loop
+
+echo     FAIL: no launcher child is running for %CONFIG% after 180s.
 echo     The group has to be up for this test to mean anything -- a silent bind
 echo     failure or a stale-group refusal would otherwise look like a pass.
-echo     Check "%OUT%\launch.log".
-set RC=1
+echo.
+echo     ---- last 40 lines of %LAUNCHLOG% ----
+REM Printed here rather than left for the operator to find: this is the failure
+REM mode that actually happened first, and the cause is always in this log.
+if exist "%LAUNCHLOG%" (
+    powershell -NoProfile -Command "Get-Content -LiteralPath '%LAUNCHLOG%' -Tail 40" 2>nul
+) else (
+    echo     [no log file: the launcher never started - check the cwd above]
+)
+echo     --------------------------------------
 goto cleanup
+
 :group_is_up
+echo     group is up after ~%TRIES%0s.
 
 echo [3/5] force-killing the launcher (no cooperative shutdown) ...
 REM /F is the point: TerminateProcess with no chance to run any teardown, which
 REM is what a crash or an End Task looks like. Only the monitor is killed -- the
 REM job object is what must take the children with it.
-for /f "tokens=2" %%p in ('wmic process where "CommandLine like '%%launch.py %CONFIG%%%'" get ProcessId^,CommandLine 2^>nul ^| findstr /i "launch.py"') do (
+for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process ^| Where-Object { $_.CommandLine -like '*launch.py %CONFIG%*' } ^| ForEach-Object { $_.ProcessId }"`) do (
     echo     taskkill /F /PID %%p
     taskkill /F /PID %%p >nul 2>&1
 )
@@ -102,11 +137,11 @@ echo     waiting 20s for the kernel to tear the job down ...
 ping -n 21 127.0.0.1 >nul
 
 echo [4/5] collecting evidence ...
-wmic process get CommandLine,ProcessId > "%OUT%\wmic_after.txt" 2>nul
+call :snapshot_procs
 netstat -ano > "%OUT%\netstat_after.txt"
 
 echo [5/5] verdict:
-python -m helao.core.tests.win_orphan_check "%OUT%\wmic_after.txt" "%OUT%\netstat_after.txt" !PORTS! --prefix %CONFIG%
+python -m helao.core.tests.win_orphan_check "%PROCS%" "%OUT%\netstat_after.txt" !PORTS! --prefix %CONFIG%
 if errorlevel 1 (
     echo.
     echo RESULT: FAIL -- orphan containment is NOT working on this machine.
@@ -119,11 +154,29 @@ if errorlevel 1 (
 )
 
 :cleanup
-REM Belt and braces: if the test failed, the group is still running and holding
-REM hardware. Leave nothing behind either way.
+REM Belt and braces: if the test failed, the group may still be running and
+REM holding hardware. Leave nothing behind either way.
 taskkill /F /FI "WINDOWTITLE eq helao-orphan-smoke*" >nul 2>&1
-for /f "tokens=2" %%p in ('wmic process where "CommandLine like '%%_launcher.py %CONFIG%%%'" get ProcessId^,CommandLine 2^>nul ^| findstr /i "_launcher.py"') do (
+for /f "usebackq tokens=*" %%p in (`powershell -NoProfile -Command "Get-CimInstance Win32_Process ^| Where-Object { $_.CommandLine -like '*_launcher.py %CONFIG%*' -or $_.CommandLine -like '*launch.py %CONFIG%*' } ^| ForEach-Object { $_.ProcessId }"`) do (
     taskkill /F /PID %%p >nul 2>&1
 )
 popd
 exit /b %RC%
+
+REM ---------------------------------------------------------------------------
+:snapshot_procs
+REM Write "<command line> <pid>" per process, pid last -- the shape
+REM win_orphan_check.surviving_launchers parses.
+REM
+REM PowerShell/CIM rather than `wmic`: WMIC is deprecated and is absent on
+REM current Windows builds, where it fails silently and leaves an EMPTY file.
+REM An empty process list reads as "no launcher survived", which would turn this
+REM test into one that always passes. `wmic` is kept only as a fallback for older
+REM stations, and is used only when PowerShell produced nothing.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | ForEach-Object { '{0} {1}' -f $_.CommandLine, $_.ProcessId }" > "%PROCS%" 2>nul
+for %%S in ("%PROCS%") do if %%~zS GTR 0 goto :eof
+wmic process get CommandLine,ProcessId > "%PROCS%" 2>nul
+for %%S in ("%PROCS%") do if %%~zS GTR 0 goto :eof
+echo     WARNING: could not enumerate processes (neither PowerShell CIM nor wmic
+echo     produced output). This check cannot detect orphans on this machine.
+goto :eof

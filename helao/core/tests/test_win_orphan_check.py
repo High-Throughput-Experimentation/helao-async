@@ -11,6 +11,7 @@ prefix of another.
 from typing import Final
 
 from helao.core.tests.win_orphan_check import (
+    evidence_is_usable,
     listening_ports,
     orphan_report,
     surviving_launchers,
@@ -126,3 +127,36 @@ def test_orphan_report_names_every_survivor_and_points_at_the_cause() -> None:
     assert "port 5001 still LISTENING" in report
     assert "win_job" in report
     assert "AssignProcessToJobObject failed" in report
+
+
+def test_an_empty_process_listing_is_reported_as_unusable_not_clean() -> None:
+    """An empty listing must never read as a clean teardown.
+
+    This is the failure that would have made the whole smoke test worthless:
+    ``wmic`` is absent on current Windows builds and writes nothing, and
+    "found no launchers" in an empty file is indistinguishable from "no
+    launchers survived". The checker refuses to judge instead.
+    """
+    for unusable in ("", "\n", "CommandLine  ProcessId\n", "ERROR: bad command\n"):
+        report = orphan_report(unusable, NETSTAT_CLEAR, [5001])
+        assert report, f"empty evidence must not pass: {unusable!r}"
+        assert "CANNOT JUDGE" in report
+        assert "wmic" in report
+
+
+def test_evidence_is_usable_keys_on_the_checkers_own_interpreter() -> None:
+    """The listing must see a python process, because this check is one.
+
+    Run as ``python -m helao.core.tests.win_orphan_check`` moments after the
+    snapshot, so a listing with no python in it cannot even see its own caller.
+    """
+    assert evidence_is_usable(WMIC_CLEAN) is True
+    assert evidence_is_usable(WMIC_WITH_ORPHANS) is True
+    assert evidence_is_usable("C:\\Windows\\explorer.exe   3120\n") is False
+
+
+def test_usable_evidence_with_orphans_still_reports_them() -> None:
+    """The new guard must not swallow a real finding."""
+    report = orphan_report(WMIC_WITH_ORPHANS, NETSTAT_HOLDING, [5001], "golden")
+    assert "CANNOT JUDGE" not in report
+    assert "7412" in report
