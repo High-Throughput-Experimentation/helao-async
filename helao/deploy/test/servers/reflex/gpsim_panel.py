@@ -185,7 +185,7 @@ def build(server_key: str, state_cls):
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.heading(f"GP simulator: {server_key}", size="4"),
+                rx.heading(f"GP simulator: {server_key}", size="3"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.input(
@@ -208,7 +208,7 @@ def build(server_key: str, state_cls):
                 state_cls.chart_layout,
                 height=320,
             ),
-            rx.heading("Last 20 acquisitions across all orchestrators", size="3"),
+            rx.heading("Last 20 acquisitions across all orchestrators", size="2"),
             rx.data_table(
                 data=state_cls.table_rows,
                 columns=TABLE_COLUMNS,

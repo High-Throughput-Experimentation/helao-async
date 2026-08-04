@@ -128,7 +128,7 @@ def build(server_key: str, state_cls):
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.heading(f"Spectra: {server_key}", size="4"),
+                rx.heading(f"Spectra: {server_key}", size="3"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.text(state_cls.axis_label, size="1", class_name=MUTED_TEXT),

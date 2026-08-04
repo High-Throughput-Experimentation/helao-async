@@ -197,7 +197,7 @@ def make_live_panel(prefix: str, y_label: str, wants_mean=no_column):
         return rx.card(
             rx.vstack(
                 rx.hstack(
-                    rx.heading(f"{y_label}: {server_key}", size="4"),
+                    rx.heading(f"{y_label}: {server_key}", size="3"),
                     rx.badge(state_cls.connection),
                     rx.spacer(),
                     rx.input(

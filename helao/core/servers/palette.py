@@ -209,6 +209,135 @@ changing shade as you navigate, to buy back a step of lightness on three
 surfaces. One shade that clears the floor on all five is the better trade.
 """
 
+# ---------------------------------------------------------------------------
+# Typefaces
+# ---------------------------------------------------------------------------
+# Not colours, but the same argument puts them here: one source, two stacks.
+# Both stacks reach the families through the constants below, and both deliver
+# the two ``@import`` lines through their own document-CSS seam
+# (``reflex/app.py``'s ``head_components`` and ``bokeh_theme.GLOBAL_CSS``).
+UI_FONT_FALLBACK: Final[str] = (
+    "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "
+    '"Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif'
+)
+"""What the UI font falls back to, ending in the ``sans-serif`` generic."""
+
+INPUT_FONT_FALLBACK: Final[str] = (
+    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "
+    '"Liberation Mono", "Courier New", monospace'
+)
+"""What the input font falls back to, ending in the ``monospace`` generic."""
+
+UI_FONT_STACK: Final[str] = f'"IBM Plex Sans Condensed", {UI_FONT_FALLBACK}'
+"""Every glyph that is not inside a text field.
+
+**The fallback tail is the entire offline story, and it is a construction
+rather than a check.** Stations routinely run with no route to the internet, so
+:data:`UI_FONT_IMPORT` will simply fail to fetch — and a failed ``@import``
+means nothing more than that the *first* family in a stack is unavailable,
+which is the case CSS font fallback already exists to handle. No JS font
+detection is involved anywhere, and none should be added: a detector can only
+observe the same absence the cascade already handles, and it can do it wrongly.
+
+``test_font_stacks_end_in_a_generic_family`` is the guard. Editing either stack
+to end in a named family would leave an offline station rendering in whatever
+the browser's last-resort font happens to be.
+"""
+
+INPUT_FONT_STACK: Final[str] = f'"Iosevka Web", "Iosevka", {INPUT_FONT_FALLBACK}'
+"""Text fields, and monospaced runs (``pre``/``code``) in either stack.
+
+Iosevka is a fixed-pitch face, which is why it also takes the ``mono`` role
+rather than only the input role: a station operator reads sample IDs, plate
+coordinates and JSON out of these fields, and column alignment is the point.
+Same fallback rule as :data:`UI_FONT_STACK`.
+
+**Two Iosevka entries, and both are load-bearing.** The stylesheet at
+:data:`INPUT_FONT_IMPORT` names its faces ``Iosevka Web`` (and ``Iosevka Web
+Oblique`` for italics) — *not* ``Iosevka``. A stack asking only for ``Iosevka``
+therefore ignores the webfont entirely and silently falls through to
+``ui-monospace``… except on a developer machine that happens to have Iosevka
+installed, where it renders correctly and the bug is invisible. ``Iosevka``
+stays as the second entry because it is the name a locally installed copy
+answers to, which is the only way an offline station can have Iosevka at all.
+"""
+
+UI_FONT_IMPORT: Final[str] = (
+    "@import url('https://fonts.googleapis.com/css2"
+    "?family=IBM+Plex+Sans+Condensed:wght@400;500;600;700&display=swap');"
+)
+"""Google Fonts request for the UI family. ``display=swap`` is not optional.
+
+Without it the browser holds text invisible for its font-block period while the
+request is outstanding, so a station on a slow or half-dead network renders a
+blank page rather than a fallback one.
+"""
+
+INPUT_FONT_IMPORT: Final[str] = (
+    "@import url('https://iosevka-webfonts.github.io/iosevka/iosevka.css');"
+)
+"""The Iosevka webfont stylesheet, as the project specified it."""
+
+
+def font_import_css() -> str:
+    """Return the two ``@import`` lines, and nothing else.
+
+    **Must be emitted first in whichever stylesheet carries it.** ``@import`` is
+    only valid ahead of every style rule in a stylesheet; a browser drops one
+    that appears after a rule, silently, leaving both families unavailable and
+    both stacks quietly on their fallbacks. Both callers concatenate this at the
+    very top of their document CSS for that reason.
+    """
+    return f"{UI_FONT_IMPORT}\n{INPUT_FONT_IMPORT}\n"
+
+
+REFLEX_HEADER_TRIM: Final[str] = "py-1! h-auto!"
+"""Height trim for a Radix table header cell: 36px measured, 28px after.
+
+**Padding alone cannot move this number, and that is the whole subtlety.**
+Radix's ``.rt-TableCell`` sets ``height: var(--table-cell-min-height)``, which
+is ``calc(36px * var(--scaling))`` at sizes 1 and 2 — and ``height`` on a table
+cell acts as a *minimum*. Measured: dropping the padding from 8px to 4px on its
+own left the cell at exactly 36px, with the extra 8px reappearing as content
+box. ``h-auto`` releases the floor; then 4px + a 20px line box gives 28px.
+
+Both utilities carry Tailwind's trailing ``!``, and both need it: Radix Themes
+is **unlayered** CSS while Tailwind v4 emits utilities into ``@layer
+utilities``, and an unlayered rule outranks every layered one regardless of
+specificity. Without the ``!`` the classes reach the element and nothing moves.
+
+Only the *header* is trimmed. ``--table-cell-min-height`` would have been the
+smaller change but it is declared per table size and would take the body rows
+with it; the complaint was about the header.
+"""
+
+GRIDJS_HEADER_FONT_SIZE: Final[str] = "14px"
+"""Font size for a gridjs header cell.
+
+gridjs's header inherits nothing useful — it measured 16px while the body text
+around it had come down to 12px, so the table read as though its header
+belonged to a different page. 14px is one step above the body, which is what a
+header wants, and is set in the same rule as the header's hue and padding
+because only that rule can reach a ``th.gridjs-th`` at all.
+"""
+
+GRIDJS_HEADER_PAD_Y: Final[str] = "4px"
+"""Vertical padding for a gridjs header cell, replacing gridjs's own ``14px``.
+
+A length rather than a colour, and so the one non-hue value in this module. It
+lives here because it can only be applied from
+:func:`reflex_gridjs_header_css` — see that function for why a Tailwind utility
+cannot reach a ``th.gridjs-th`` at all — and a constant a test can read beats a
+number buried in an f-string.
+
+Measured, not guessed: gridjs's ``14px`` gave a 52.5px header against 49px body
+rows. ``4px`` gives 32.5px, a 38% trim. It cannot clip, because the content it
+pads is 24px tall either way — the label's ``line-height`` and the sort button
+are both 24px — so this value is entirely slack above and below the glyphs.
+Horizontal padding is deliberately left at gridjs's ``24px``: the complaint was
+header *height*, and narrowing the columns was no part of it.
+"""
+
 
 def reflex_page_class(route: str) -> str:
     """Return the Tailwind utilities painting *route*'s page canvas.
@@ -230,11 +359,18 @@ def reflex_page_class(route: str) -> str:
 def reflex_header_class(kind: str) -> str:
     """Return the Tailwind utilities for *kind*'s table header cells.
 
+    Carries :data:`REFLEX_HEADER_TRIM` as well as the hue, so the operator's
+    queue and history tables and the data browser's table trim together —
+    every Radix header cell in the Reflex stack takes its class from here.
+    Radix components *do* forward ``class_name``, so unlike ``rx.data_table``
+    the utility route works here; see the constant for the two cascade facts
+    that make it work.
+
     Args:
         kind: A key of :data:`REFLEX_TABLE_HUES`.
     """
     background, text, _ = REFLEX_TABLE_HUES[kind]
-    return f"bg-{background} text-{text}"
+    return f"bg-{background} text-{text} {REFLEX_HEADER_TRIM}"
 
 
 def reflex_table_class(kind: str) -> str:
@@ -279,6 +415,25 @@ def reflex_gridjs_header_css() -> str:
     in-family step up is ``emerald-200``, which drops the header text to 4.28 and
     would need a standing contrast exception to ship. The ``cursor: pointer``
     gridjs already sets on a sortable header carries the affordance instead.
+
+    The rule also trims the header's **vertical** padding, and has to: gridjs's
+    own ``th.gridjs-th`` sets ``14px``, which measured a 52.5px header row —
+    *taller* than the 49px body rows below it despite holding one line of text.
+    Only ``padding-top``/``padding-bottom`` are set, never the ``padding``
+    shorthand, so the 24px horizontal padding keeps the columns' breathing room.
+    ``GRIDJS_HEADER_PAD_Y`` is safe against clipping because the header's content
+    box is 24px whether it holds the label (``line-height: 24px``) or the sort
+    button (24px tall), so the padding is pure slack on both; measured 32.5px
+    after, with the sort icon 4px clear of each edge.
+
+    It belongs in this same rule rather than a utility class for the reason
+    above — a ``th.gridjs-th`` padding declared in ``@layer utilities`` loses to
+    gridjs's unlayered one no matter how specific it is.
+
+    :data:`GRIDJS_HEADER_FONT_SIZE` rides along for a third instance of the same
+    reason. gridjs takes no Radix ``size`` prop, so its header cannot be brought
+    down by the means every other label on the page uses, and it measured 16px
+    against 12px body text.
     """
     background, text, _ = REFLEX_TABLE_HUES["browser"]
     fill, ink = TW[background], TW[text]
@@ -286,7 +441,50 @@ def reflex_gridjs_header_css() -> str:
         f".gridjs-container th.gridjs-th,"
         f".gridjs-container th.gridjs-th.gridjs-th-sort:hover,"
         f".gridjs-container th.gridjs-th.gridjs-th-sort:focus"
-        f" {{ background-color: {fill}; color: {ink}; }}"
+        f" {{ background-color: {fill}; color: {ink};"
+        f" font-size: {GRIDJS_HEADER_FONT_SIZE};"
+        f" padding-top: {GRIDJS_HEADER_PAD_Y}; padding-bottom:"
+        f" {GRIDJS_HEADER_PAD_Y}; }}"
+    )
+
+
+def reflex_font_css() -> str:
+    """Return the Reflex stack's font CSS, ``@import`` lines first.
+
+    Three groups of declarations, each answering a different owner of the
+    resolved family:
+
+    * ``--font-sans`` / ``--font-mono`` are **Tailwind v4**'s theme variables,
+      declared in ``@layer theme`` on ``:root, :host``. Setting them unlayered
+      wins, and it is what makes the ``font-sans``/``font-mono`` utilities and
+      Tailwind's preflight agree with the rest of the page.
+    * ``--default-font-family`` and its five siblings are **Radix Themes**'
+      tokens, declared on ``.radix-themes``. Radix is unlayered, so a ``:root``
+      override loses to it on specificity; ``html .radix-themes`` (0,1,1) wins
+      whatever the source order, which ``head_components`` does not control.
+    * the ``input``/``textarea``/``select`` group is the input font, class
+      qualified for the same reason: bare ``html input`` is (0,0,2) and would
+      lose to Radix's own single-class rule on its field.
+
+    ``rx.el.style`` is the only delivery seam — ``rx.App(style={...})`` cannot
+    reach ``html`` at all. See ``reflex/app.py``.
+    """
+    return (
+        font_import_css() + f"html {{ --font-sans: {UI_FONT_STACK};"
+        f" --font-mono: {INPUT_FONT_STACK}; }}\n"
+        f"html .radix-themes, html body {{"
+        f" --default-font-family: {UI_FONT_STACK};"
+        f" --heading-font-family: {UI_FONT_STACK};"
+        f" --strong-font-family: {UI_FONT_STACK};"
+        f" --em-font-family: {UI_FONT_STACK};"
+        f" --quote-font-family: {UI_FONT_STACK};"
+        f" --code-font-family: {INPUT_FONT_STACK};"
+        f" --default-mono-font-family: {INPUT_FONT_STACK};"
+        f" font-family: {UI_FONT_STACK}; }}\n"
+        f"html input, html textarea, html select,"
+        f" html .rt-TextFieldInput, html .rt-TextAreaInput,"
+        f" html .rt-SelectTrigger, html .gridjs-input"
+        f" {{ font-family: {INPUT_FONT_STACK}; }}\n"
     )
 
 

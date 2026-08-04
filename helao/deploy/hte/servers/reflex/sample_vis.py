@@ -134,7 +134,7 @@ def build(server_key: str, state_cls):
 
     def table(label, rows):
         return rx.vstack(
-            rx.text(f"Newest {label} samples:", size="2", weight="medium"),
+            rx.text(f"Newest {label} samples:", size="1", weight="medium"),
             rx.data_table(
                 data=rows,
                 columns=columns,
@@ -155,7 +155,7 @@ def build(server_key: str, state_cls):
     return rx.card(
         rx.vstack(
             rx.hstack(
-                rx.heading(f"Samples: {server_key}", size="4"),
+                rx.heading(f"Samples: {server_key}", size="3"),
                 rx.badge(state_cls.connection),
                 rx.spacer(),
                 rx.input(
@@ -176,7 +176,7 @@ def build(server_key: str, state_cls):
             ),
             rx.cond(
                 state_cls.status != "",
-                rx.text(state_cls.status, size="2", class_name="text-amber-700"),
+                rx.text(state_cls.status, size="1", class_name="text-amber-700"),
             ),
             *[table(name, rows_by_type[name]) for name in SAMPLE_TYPES],
             width="100%",

@@ -47,6 +47,7 @@ from helao.core.servers.operator.app_reflex import build_page as operator_page
 from helao.core.servers.operator.app_reflex import configure as configure_operator
 from helao.core.servers.palette import (
     CHART_CHROME,
+    reflex_font_css,
     reflex_gridjs_header_css,
     reflex_page_class,
 )
@@ -206,8 +207,8 @@ def _error_card(title: str, detail: str):
     """Render a visible failure instead of a blank slot."""
     return rx.card(
         rx.vstack(
-            rx.heading(title, size="3", class_name="text-red-600"),
-            rx.text(detail, size="2"),
+            rx.heading(title, size="2", class_name="text-red-600"),
+            rx.text(detail, size="1"),
             align="start",
             spacing="2",
         ),
@@ -268,7 +269,7 @@ def _render_panel(target: PanelTarget):
 def _nav():
     """Render the shared navigation bar."""
     return rx.hstack(
-        rx.heading("HELAO", size="5"),
+        rx.heading("HELAO", size="4"),
         rx.spacer(),
         rx.link("Live", href="/live"),
         rx.link("Action", href="/action"),
@@ -298,7 +299,7 @@ def _page(title: str, body, route: str):
     return rx.vstack(
         _nav(),
         rx.divider(),
-        rx.heading(title, size="6", padding_x="1em"),
+        rx.heading(title, size="5", padding_x="1em"),
         body,
         width="100%",
         spacing="3",
@@ -331,7 +332,7 @@ def _index_page(routes: dict):
             *[
                 rx.hstack(
                     rx.link(path, href=path),
-                    rx.text(f"{len(targets)} panel(s)", size="2"),
+                    rx.text(f"{len(targets)} panel(s)", size="1"),
                     spacing="3",
                 )
                 for path, targets in routes.items()
@@ -455,10 +456,19 @@ def build_app(world_cfg: dict, server_key: str):
     # utility: `rx.data_table` does not forward `class_name` to the grid, and
     # gridjs's own `th.gridjs-th` is unlayered CSS, which outranks anything in
     # `@layer utilities`. See `palette.reflex_gridjs_header_css`.
+    # The font CSS is first, and it has to be: it opens with two `@import`
+    # lines, and an `@import` is only valid ahead of every style rule in its own
+    # stylesheet. Each `rx.el.style` is a separate stylesheet, so the ordering
+    # that matters is *within* `reflex_font_css()` -- but keeping it first here
+    # too means a later edit that merges these blocks cannot silently drop both
+    # webfonts. Nothing else about it is order-dependent: its selectors are
+    # specificity-qualified precisely because `head_components` does not control
+    # where it lands relative to the bundled Radix and Tailwind stylesheets.
     _root_vars = "; ".join(f"{k}: {v}" for k, v in CHART_CHROME.items())
     application = rx.App(
         api_transformer=backend,
         head_components=[
+            rx.el.style(reflex_font_css()),
             rx.el.style(f":root {{ {_root_vars}; }}"),
             rx.el.style(reflex_gridjs_header_css()),
         ],
