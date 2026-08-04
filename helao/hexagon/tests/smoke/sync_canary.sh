@@ -1,32 +1,32 @@
 #!/usr/bin/env bash
 # ---------------------------------------------------------------------------
-# Linux canary for the dbpackhex hexagon cut-over: runtime /openapi.json diff.
+# Linux canary for the synchex hexagon cut-over: runtime /openapi.json diff.
 # Bash port of sample_canary.sh's conventions for a SOFTWARE openapi-surface
-# canary -- dbpack_server wraps driver_classes=[HelaoSyncer]
+# canary -- sync_server wraps driver_classes=[HelaoSyncer]
 # (helao/core/drivers/data/sync_driver.py:2059) and exposes ONLY private/bare
 # endpoints (/finish_yml, /list_pending, /n_queue, /current_progress, ...);
 # there is no `/{server_key}/{action}` action endpoint and no data-producing
 # action, so a runtime RUNS-tree golden diff is N/A for this server -- the
 # openapi surface diff (this script) is the topology-appropriate parity
-# check. See dbpack.yml's header comment for the aws_bucket/AWS_CONFIG_PATH
+# check. See sync.yml's header comment for the aws_bucket/AWS_CONFIG_PATH
 # gate investigation that makes the syncer launchable on Linux without real AWS.
 #
-# Launches the LEGACY dbpack group and the HEXAGON dbpackhex group in turn,
+# Launches the LEGACY dbpack group and the HEXAGON synchex group in turn,
 # dumps each syncer server's live /openapi.json, and diffs them. An identical
 # route/schema surface proves the hexagon makeActionApp factory produces a
 # byte-parity action server for this cut-over target.
 #
-# Both configs share root /tmp/INST_hlo_dbpack and port 8010, so they MUST
+# Both configs share root /tmp/INST_hlo_sync and port 8010, so they MUST
 # run sequentially (this script does that) -- never launch both at once.
 #
-# Usage: dbpack_canary.sh [root] [outdir]
-#   root   default /tmp/INST_hlo_dbpack    (must match the configs' root: key)
-#   outdir default /tmp/dbpackhex_canary
+# Usage: sync_canary.sh [root] [outdir]
+#   root   default /tmp/INST_hlo_sync    (must match the configs' root: key)
+#   outdir default /tmp/synchex_canary
 # ---------------------------------------------------------------------------
 set -u
 
-ROOT="${1:-/tmp/INST_hlo_dbpack}"
-OUTDIR="${2:-/tmp/dbpackhex_canary}"
+ROOT="${1:-/tmp/INST_hlo_sync}"
+OUTDIR="${2:-/tmp/synchex_canary}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../../../.." && pwd)"
@@ -44,8 +44,8 @@ if [ $? -ne 0 ]; then
 fi
 
 mkdir -p "$OUTDIR"
-LEGACY_JSON="$OUTDIR/dbpack_openapi.json"
-HEX_JSON="$OUTDIR/dbpackhex_openapi.json"
+LEGACY_JSON="$OUTDIR/sync_openapi.json"
+HEX_JSON="$OUTDIR/synchex_openapi.json"
 
 # ---------------------------------------------------------------------------
 kill_one() {
@@ -60,7 +60,7 @@ kill_one() {
   conda run -n helao python "$SCRIPT_DIR/kill_group.py" "$ROOT" "$prefix"
   # 2) kill the launch.py monitor for THIS prefix by matching its command
   # line -- precise, so it can never hit this shell. The trailing
-  # ".yml" ensures prefix "dbpack" cannot match "dbpackhex" ("dbpack.yml" is a distinct filename, so no collision).
+  # ".yml" ensures prefix "dbpack" cannot match "synchex" ("sync.yml" is a distinct filename, so no collision).
   pkill -f "launch\\.py .*${prefix}\\.yml --no-hot-reload" 2>/dev/null || true
 }
 
@@ -121,7 +121,7 @@ open(sys.argv[1], 'wb').write(
 
 # ---------------------------------------------------------------------------
 run_one dbpack "$LEGACY_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
-run_one dbpackhex "$HEX_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
+run_one synchex "$HEX_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
 
 echo
 echo "[canary] diffing openapi surfaces"
@@ -132,7 +132,7 @@ cat "$OUTDIR/openapi_diff.txt"
 
 echo
 if [ "$DIFF_RC" -eq 0 ]; then
-  echo "[canary] PASS -- dbpackhex openapi surface matches legacy dbpack" > "$OUTDIR/canary_result.txt"
+  echo "[canary] PASS -- synchex openapi surface matches legacy dbpack" > "$OUTDIR/canary_result.txt"
 else
   echo "[canary] DIFFS FOUND rc=$DIFF_RC -- see openapi_diff.txt" > "$OUTDIR/canary_result.txt"
 fi

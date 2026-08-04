@@ -34,7 +34,7 @@ HTE_ACTION_SHIM_MODULES = [
     "tec_server",
     # P3b-2: dbpack (HelaoSyncer; legacy syncer kept — native-sync cut-over is a
     # separate P2e-style step) + analysis (config-driven analyze_ endpoints).
-    "dbpack_server",
+    "sync_server",
     "analysis_server",
 ]
 

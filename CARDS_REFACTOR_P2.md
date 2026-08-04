@@ -26,7 +26,7 @@ OpenAPI operation ids) must be byte-identical, proven by captured baselines.
 
 **Decisions (one option each, per mandate):**
 
-- **dbpack retirement: DEFERRED (keep frozen).** Retiring `dbpack_driver.py`/`dbpack_server.py`
+- **dbpack retirement: DEFERRED (keep frozen).** Retiring `dbpack_driver.py`/`sync_server.py`
   requires sweeping ~10 hte YAML configs on live-hardware stations plus operator sign-off — out of
   scope for a pure-structural, no-behavior-change phase. dbpack stays untouched and frozen exactly
   as in Increment 1. Do NOT touch any dbpack file in P2.
@@ -431,7 +431,7 @@ grep -n 'extract_parts_old' helao/deploy/Deployment-C/scripts/icpms/convert_icpm
 
 # 5) dbpack untouched (frozen per decision)
 git diff --stat feat/cards-refactor -- helao/deploy/hte/drivers/data/dbpack_driver.py \
-    helao/deploy/hte/servers/action/dbpack_server.py             # empty
+    helao/deploy/hte/servers/action/sync_server.py             # empty
 
 # 6) Duplication actually killed
 diff helao/deploy/hte/specifications/last2weeks.py helao/deploy/hte/specifications/bimonthly.py | head -5

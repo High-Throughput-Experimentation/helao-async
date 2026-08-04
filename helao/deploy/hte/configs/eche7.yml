@@ -145,7 +145,7 @@ servers:
     host: hte-eche-07.htejcap.caltech.edu
     port: 8010
     group: action
-    fast: dbpack_server
+    fast: sync_server
     params:
       aws_profile: default
       testing: false

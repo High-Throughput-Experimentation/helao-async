@@ -167,7 +167,7 @@ servers:
     host: hte-eche-10.htejcap.caltech.edu
     port: 8010
     group: action
-    fast: dbpack_server
+    fast: sync_server
     log_level: 10
     params:
       aws_profile: default

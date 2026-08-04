@@ -2764,7 +2764,7 @@ git commit -m "feat(test): golden capture configs with sim DB server entry (reco
 
 **Interfaces:**
 - Consumes: legacy `helao.core.servers.base_api.BaseAPI` (constructor kwargs `server_key, server_title, description, version, driver_classes`; non-`HelaoDriver` classes are instantiated as `driver_class(self.base)` — `base_api.py:656-671`) and `helao.core.drivers.data.sync_driver.HelaoSyncer` (`__init__(self, action_serv: Base, db_server_name: str = "DB")`; attributes used by endpoints: `enqueue_yml(upath, rank)`, `list_pending()`, `finish_pending(actions_first=True)`, `reset_sync(path)`, `running_tasks`, `task_queue`, `progress`); config params from Task 10.
-- Produces: `makeApp(server_key) -> BaseAPI` exposing the full dbpack HTTP surface (`/finish_yml`, `/list_pending`, `/finish_pending`, `/reset_sync`, `/tasks`, `/list_exceptions`, `/n_queue`, `/current_progress` — mirrored verbatim from `helao/deploy/hte/servers/action/dbpack_server.py` so `move_dir`'s `yml_finisher` handoff and the harness quiesce polls work unmodified); classes `RecordingS3Client(sim_root: Path)` (duck-typed boto3 surface: `upload_fileobj(fileobj, bucket, key, **kw)`, `upload_file(filename, bucket, key, **kw)`, writes `<root>/S3_SIM/<bucket>/<key>` + appends `{"bucket","key","mode","gzip"}` lines to `<root>/S3_SIM/manifest.jsonl`, thread-safe) and `SimHelaoSyncer(HelaoSyncer)` (injects the recorder when `params.s3_record` is truthy). **No legacy seam is required** (see Global Constraints); if review ever DOES demand a constructor-level override instead of the subclass, the minimal legacy diff is `SyncDriver.__init__(self, config, helaodirs, s3_client=None)` + `self.s3 = s3_client if s3_client is not None else …` with default `None` preserving current behavior — record that as a follow-up, do not apply it in P0.
+- Produces: `makeApp(server_key) -> BaseAPI` exposing the full dbpack HTTP surface (`/finish_yml`, `/list_pending`, `/finish_pending`, `/reset_sync`, `/tasks`, `/list_exceptions`, `/n_queue`, `/current_progress` — mirrored verbatim from `helao/deploy/hte/servers/action/sync_server.py` so `move_dir`'s `yml_finisher` handoff and the harness quiesce polls work unmodified); classes `RecordingS3Client(sim_root: Path)` (duck-typed boto3 surface: `upload_fileobj(fileobj, bucket, key, **kw)`, `upload_file(filename, bucket, key, **kw)`, writes `<root>/S3_SIM/<bucket>/<key>` + appends `{"bucket","key","mode","gzip"}` lines to `<root>/S3_SIM/manifest.jsonl`, thread-safe) and `SimHelaoSyncer(HelaoSyncer)` (injects the recorder when `params.s3_record` is truthy). **No legacy seam is required** (see Global Constraints); if review ever DOES demand a constructor-level override instead of the subclass, the minimal legacy diff is `SyncDriver.__init__(self, config, helaodirs, s3_client=None)` + `self.s3 = s3_client if s3_client is not None else …` with default `None` preserving current behavior — record that as a follow-up, do not apply it in P0.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2851,7 +2851,7 @@ key)`` / ``self.s3.upload_file(filename, bucket, key)`` from a worker thread
 beyond assignment, so post-construction injection is sufficient and
 behavior-identical when ``s3_record`` is unset.
 
-Endpoint surface mirrors the hte dbpack_server verbatim so ``move_dir``'s
+Endpoint surface mirrors the hte sync_server verbatim so ``move_dir``'s
 ``/finish_yml`` handoff and the harness quiesce polls (``/n_queue`` +
 ``/tasks``) work unmodified. Windows-tolerant (pathlib only) so at-station
 captures (§6.6) can wire the same server.

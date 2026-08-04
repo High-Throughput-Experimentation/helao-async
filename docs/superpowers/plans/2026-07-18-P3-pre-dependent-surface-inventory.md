@@ -65,7 +65,7 @@ SERVERS: list[tuple[str, str | None]] = [
     ("calc_server.py", "CALC"),
     ("cam_server.py", "CAM"),
     ("co2sensor_server.py", "CO2SENSOR"),
-    ("dbpack_server.py", "DB"),
+    ("sync_server.py", "DB"),
     ("diapump_server.py", "DOSEPUMP"),
     ("galil_io.py", "IO"),
     ("galil_motion.py", "MOTOR"),

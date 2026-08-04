@@ -1,0 +1,23 @@
+# HEXAGON CANARY for the sync_server station (P3a special-split). Copy of
+# sync.yml with `deployment: hexagon` flipping DB (sync_server) onto the
+# hexagon factory. sync.yml stays legacy for rollback; the cut-over is
+# ONLY the `deployment: hexagon` key. Action-only (see sync.yml's header --
+# no visualizer is declared for DB). Ports/root/params match sync.yml so an
+# openapi diff compares like-for-like. See sync.yml for the
+# aws_bucket/AWS_CONFIG_PATH gate investigation and the why-openapi-only (no
+# action endpoints -> no runtime RUNS-tree diff) rationale.
+dummy: true
+simulation: true
+run_type: sync_server
+root: /tmp/INST_hlo_sync
+servers:
+  SYNC:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sync_server
+    deployment: hexagon
+    params:
+      aws_profile: default
+      testing: true
+      aws_bucket: helao-canary-dummy

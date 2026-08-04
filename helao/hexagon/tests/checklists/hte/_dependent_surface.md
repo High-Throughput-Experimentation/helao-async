@@ -183,27 +183,27 @@ for f in sorted(cfgs.glob("*.yml")):
 Real (corrected) output:
 
 ```
-adss.yml: fast=['async_orch2', 'dbpack_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
-adss3.yml: fast=['async_orch2', 'dbpack_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
-anec.yml: fast=['async_orch2', 'dbpack_server', 'galil_io', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
-ccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'dbpack_server', 'galil_io', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
-ccsi2.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'dbpack_server', 'diapump_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
-clad.yml: fast=['async_orch2', 'dbpack_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche10.yml: fast=['async_orch2', 'cam_server', 'dbpack_server', 'galil_io', 'galil_motion', 'gamry_server2', 'kinesis_server', 'sample_server', 'spec_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
+adss.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
+adss3.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
+anec.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
+ccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'galil_io', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+ccsi2.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'diapump_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+clad.yml: fast=['async_orch2', 'sync_server', 'galil_motion', 'gamry_server2', 'nidaqmx_server', 'pal_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=['5003']
+eche10.yml: fast=['async_orch2', 'cam_server', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'kinesis_server', 'sample_server', 'spec_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 eche4.yml: fast=['async_orch2', 'biologic_server'] bokeh=['standalone_operator'] bokeh_port=[]
 eche5.yml: fast=['async_orch2', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=[]
-eche6.yml: fast=['async_orch2', 'dbpack_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche7.yml: fast=['async_orch2', 'dbpack_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-eche8.yml: fast=['async_orch2', 'dbpack_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-ecms1.yml: fast=['async_orch2', 'calc_server', 'dbpack_server', 'gamry_server2', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
-ecms2.yml: fast=['async_orch2', 'calc_server', 'dbpack_server', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+eche6.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
+eche7.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
+eche8.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
+ecms1.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'gamry_server2', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+ecms2.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 gamry.yml: fast=['gamry_server2'] bokeh=['action_visualizer'] bokeh_port=[]
-hispec.yml: fast=['andor_server', 'async_orch2', 'biologic_server', 'calc_server', 'dbpack_server', 'galil_io', 'galil_motion', 'kinesis_server', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-icpm1.yml: fast=['analysis_server', 'async_orch2', 'dbpack_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
-partialccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'dbpack_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+hispec.yml: fast=['andor_server', 'async_orch2', 'biologic_server', 'calc_server', 'sync_server', 'galil_io', 'galil_motion', 'kinesis_server', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
+icpm1.yml: fast=['analysis_server', 'async_orch2', 'sync_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
+partialccsi1.yml: fast=['async_orch2', 'calc_server', 'co2sensor_server', 'sync_server', 'mfc_server', 'nidaqmx_server', 'sample_server', 'syringe_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 power_supply_test.yml: fast=['async_orch2', 'power_supply_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=[]
 uvis.yml: fast=['async_orch2', 'galil_io', 'galil_motion', 'sample_server', 'spec_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-xrfs1.yml: fast=['analysis_server', 'async_orch2', 'dbpack_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
+xrfs1.yml: fast=['analysis_server', 'async_orch2', 'sync_server', 'sample_server'] bokeh=['standalone_operator'] bokeh_port=[]
 ```
 
 (For reference/contrast, the plan's uncommented-naive script over-reported
@@ -231,7 +231,7 @@ numbers above are the ones this inventory relies on.)
   confirmed against the frozen 23-module Task 1 manifest); the one
   `fast: gamry_server` string in the source tree (`eche4.yml` line 95) is
   itself commented out, so this is not a live dangling reference.
-- `sample_server`, `dbpack_server`, `galil_io`/`galil_motion`, and
+- `sample_server`, `sync_server`, `galil_io`/`galil_motion`, and
   `gamry_server2` are the most widely shared action-server modules across
   configs — highest blast radius if their hexagon adapter has a defect.
 
