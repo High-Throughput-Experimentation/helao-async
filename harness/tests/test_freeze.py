@@ -207,6 +207,50 @@ def test_key_override_substitutes_the_server_key():
     assert any("missing" in b for b in blockers), "a wrong key should not pass"
 
 
+def _external(path, ref):
+    r = _route(path)
+    r[freeze.EXTERNAL_KEY] = ref
+    return r
+
+
+def test_external_routes_are_not_reported_missing():
+    """A foreign registrar's routes cannot be seen by extracting this module.
+
+    One real server composes 15 of its 16 routes from a registrar imported out of
+    another deployment. Unmarked, every freeze reported all 15 as `missing`, and
+    the only escapes were deleting them from the baseline or learning to ignore
+    the report.
+    """
+    ref = "harness.endpoints:whatever"
+    frozen = [_external("/K/from_elsewhere", ref), _route("/K/local")]
+    merged, drift = freeze.merge_routes(frozen, [_route("/K/local")])
+    assert merged == frozen, "a foreign route must not be dropped"
+    assert [d["path"] for d in drift] == ["/K/from_elsewhere"]
+    assert freeze.external_routes(frozen) == {("/K/from_elsewhere", "post"): ref}
+
+
+def test_verify_external_confirms_the_route_in_its_registrar():
+    """The marker is a check, not a mute button.
+
+    Suppressing these routes outright would mean the baseline silently stops
+    noticing if the upstream registrar drops one -- trading a false alarm for a
+    blind spot. So the registrar's own module is extracted and the route is looked
+    up there.
+    """
+    ref = "helao.deploy.hte.servers.action.gamry_server2:gamry_dyn_endpoints"
+    ok, problems = freeze.verify_external([_external("/PSTAT/run_CA", ref)], "PSTAT")
+    assert ok == ["/PSTAT/run_CA"] and problems == []
+
+    # A route the registrar does not register is a problem: the baseline would be
+    # asserting something nothing registers.
+    ok, problems = freeze.verify_external([_external("/PSTAT/nope", ref)], "PSTAT")
+    assert ok == [] and any("no longer registers it" in p for p in problems)
+
+    # So is a marker naming a module that does not exist.
+    ok, problems = freeze.verify_external([_external("/K/x", "no.such.module:fn")], "K")
+    assert any("not a file" in p for p in problems)
+
+
 def test_hte_freeze_is_clean_and_skips_nothing():
     """hte is the public regression case for the skip NOT firing.
 

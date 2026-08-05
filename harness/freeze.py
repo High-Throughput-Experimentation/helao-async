@@ -28,21 +28,27 @@ So this tool never blindly overwrites:
 * a **removed** route is stronger still: ``--accept-drift`` will NOT drop it.
   Each removal must be named with ``--accept-missing <path>``.
 
-The asymmetry is deliberate and was learned the hard way. A blanket
-``--accept-drift`` over a whole deployment once applied a server's 11 ``missing``
-records and cut its frozen baseline from 16 routes to 5 — silently deleting the
-runtime-registered routes that baseline existed to assert. Widening a schema is
-recoverable; deleting the thing the gate checks is how a gate stops gating. So
-the two authorities are separate, and the destructive one is per-route.
+Those defaults are the important part. Regenerating a checklist to make a diff
+pass is the failure mode the frozen-checklist gate exists to prevent, so
+changing a baseline has to be a deliberate act with a reason in the commit.
 
-That default is the important one. Regenerating a checklist to make a diff pass
-is the failure mode the frozen-checklist gate exists to prevent, so widening the
-baseline has to be a deliberate act with a reason recorded in the commit.
+The removal asymmetry was learned the hard way: a blanket ``--accept-drift`` over
+a whole deployment once applied a server's 11 ``missing`` records and cut its
+frozen baseline from 16 routes to 5, silently deleting the very routes that
+baseline existed to assert. Widening a schema is recoverable; deleting the thing
+the gate checks is how a gate stops gating. Hence two separate authorities, the
+destructive one per-route.
 
-And it skips a checklist frozen under a **synthesized** server key — see
-:func:`synthesized_key` for why that is a scope decision rather than drift, and
-why the superficially similar "frozen with ``{server_key}`` unsubstituted" case
-must still be frozen normally.
+Two kinds of entry are not drift at all, and are recognized rather than reported:
+
+* a checklist frozen under a **synthesized** server key (:func:`synthesized_key`)
+  — a scope decision about an unwired server, not drift. Note the superficially
+  similar "frozen with ``{server_key}`` unsubstituted" case must still be frozen
+  normally;
+* a route contributed by a **foreign registrar** (:data:`EXTERNAL_KEY`) — static
+  extraction of this module cannot see it by construction, so it is checked
+  against the module that registers it (:func:`verify_external`) instead of being
+  either reported or ignored.
 """
 
 from __future__ import annotations
@@ -62,6 +68,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 #: Manifest filename inside a deployment's checklist directory. Maps each
 #: action-server module to the server key substituted for ``{server_key}``.
 MANIFEST = "servers.json"
+
+#: Per-route key naming the foreign registrar that contributes a route, as
+#: ``"dotted.module:callable"``. A server may compose its endpoint set from a
+#: registrar imported out of ANOTHER deployment (spec §9.2(4) sanctions that
+#: cross-deployment reuse), in which case the route's decorator does not live in
+#: the module being frozen and static extraction of that module provably cannot
+#: produce it. Without the marker every such route reads as ``missing`` on every
+#: freeze -- 15 of 16 routes on one real server -- and the only ways out are to
+#: delete them from the baseline or to learn to ignore the report. Both are worse
+#: than recording where they come from.
+EXTERNAL_KEY = "external_registrar"
 
 
 def _route_key(route: dict) -> tuple[str, str]:
@@ -126,6 +143,52 @@ def _merge_params(frozen_params: list, current_params: list) -> list:
         fz = frozen_by_name.get(cur.get("name")) if isinstance(cur, dict) else None
         out.append(fz if fz is not None and same_modulo_spelling(fz, cur) else cur)
     return out
+
+
+def external_routes(frozen: list[dict]) -> dict[tuple[str, str], str]:
+    """``{(path, method): "module:callable"}`` for foreign-registrar routes."""
+    return {_route_key(r): r[EXTERNAL_KEY] for r in frozen if r.get(EXTERNAL_KEY)}
+
+
+def verify_external(
+    frozen: list[dict], server_key: Optional[str]
+) -> tuple[list[str], list[str]]:
+    """Check each foreign-registrar route still exists where it claims to.
+
+    Returns ``(ok_notes, problems)``. This is what makes the marker a check
+    rather than a mute button: suppressing these routes from the ``missing``
+    report would mean the baseline silently stops noticing if the upstream
+    registrar drops one. So instead the registrar's own module is extracted and
+    the route looked up there.
+
+    A marker naming a module that cannot be found, or a route absent from it, is
+    a problem -- it means the baseline is asserting something nothing registers.
+    """
+    ok: list[str] = []
+    problems: list[str] = []
+    cache: dict[str, set[tuple[str, str]]] = {}
+    for key, ref in sorted(external_routes(frozen).items()):
+        module = ref.split(":", 1)[0]
+        if module not in cache:
+            src = REPO_ROOT / (module.replace(".", "/") + ".py")
+            if not src.is_file():
+                problems.append(
+                    f"{key[0]}: {EXTERNAL_KEY} names {module}, which is not a file "
+                    f"at {src.relative_to(REPO_ROOT) if src.is_absolute() else src}"
+                )
+                cache[module] = set()
+                continue
+            cache[module] = {
+                _route_key(r) for r in extract_routes(src, server_key=server_key)
+            }
+        if key in cache[module]:
+            ok.append(key[0])
+        elif cache[module]:
+            problems.append(
+                f"{key[0]}: marked as registered by {module}, but that module no "
+                f"longer registers it"
+            )
+    return ok, problems
 
 
 def applicable_drift(
@@ -330,13 +393,28 @@ def freeze_deployment(
         applied = applicable_drift(
             drift, accept_drift=accept_drift, accept_missing=accept_missing
         )
+        # Routes a foreign registrar contributes are not "missing" -- static
+        # extraction of THIS module cannot see them by construction. Verify them
+        # against the registrar that claims them instead of reporting them.
+        foreign = set(external_routes(frozen))
+        if foreign:
+            ok, problems = verify_external(frozen, key)
+            lines.append(
+                f"  external   {stem} ({len(ok)}/{len(foreign)} routes confirmed "
+                f"in their registrar)"
+            )
+            blockers.extend(f"{stem}: {p}" for p in problems)
 
         for d in drift:
             msg = f"{stem}: {d['kind']} {d['method'].upper()} {d['path']}"
             if d["kind"] == "changed":
                 msg += f" [{d['field']}]"
             if d in applied:
+                # Explicitly named, so still report it even if foreign-marked:
+                # deleting a route stays a visible act.
                 lines.append(f"  ACCEPTED {msg}")
+            elif d["kind"] == "missing" and (d["path"], d["method"]) in foreign:
+                continue
             elif d["kind"] == "missing":
                 # Say how, or the reader reaches for --accept-drift and finds it
                 # does nothing -- which reads as a broken flag rather than a guard.
