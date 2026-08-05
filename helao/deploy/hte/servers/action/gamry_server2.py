@@ -56,7 +56,6 @@ from ...drivers.pstat.gamry.technique import (
     GamryTechnique,
 )
 
-global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
@@ -1126,30 +1125,6 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the Gamry potentiostat.
-
-    Args:
-        server_key: Unique key identifying this server in the orchestration
-            group.
-
-    Returns:
-        The configured BaseAPI instance with technique endpoints attached
-        via :func:`gamry_dyn_endpoints` plus action-level ``get_meas_status``
-        and ``stop`` endpoints and private state/measurement helpers.
-    """
-
-    app = BaseAPI(
-        server_key=server_key,
-        server_title=server_key,
-        description="Gamry instrument/action server",
-        version=4.0,
-        driver_classes=[GamryComAdapter],
-        # poller_class=GamryPoller,
-        dyn_endpoints=gamry_dyn_endpoints,
-    )
-
     @app.post(f"/{server_key}/get_meas_status", tags=["action"])
     async def get_meas_status():
         """Report the dtaq sink's current state.
@@ -1180,7 +1155,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary.
         """
         active = await app.base.setup_and_contain_action(action_abbr="stop")
-        for exec_key in app.base.executors.keys():
+        for exec_key in app.base.executors:
             app.base.stop_executor(exec_key)
         finished_action = await active.finish()
         return finished_action.as_dict()
@@ -1189,7 +1164,7 @@ def makeApp(server_key) -> BaseAPI:
     async def stop_private() -> list:
         """Stop every active executor and return the list of stopped keys."""
         stopped_keys = []
-        for exec_key in app.base.executors.keys():
+        for exec_key in app.base.executors:
             app.base.stop_executor(exec_key)
             stopped_keys.append(exec_key)
         return stopped_keys
@@ -1223,5 +1198,29 @@ def makeApp(server_key) -> BaseAPI:
         """Return a single auxiliary reading via ``pstat.MeasureA()``."""
         state = app.driver.pstat.MeasureA()
         return state
+
+
+def makeApp(server_key) -> BaseAPI:
+    """Build the BaseAPI app for the Gamry potentiostat.
+
+    Args:
+        server_key: Unique key identifying this server in the orchestration
+            group.
+
+    Returns:
+        The configured BaseAPI instance with technique endpoints attached
+        via :func:`gamry_dyn_endpoints` plus action-level ``get_meas_status``
+        and ``stop`` endpoints and private state/measurement helpers.
+    """
+
+    app = BaseAPI(
+        server_key=server_key,
+        server_title=server_key,
+        description="Gamry instrument/action server",
+        version=4.0,
+        driver_classes=[GamryComAdapter],
+        # poller_class=GamryPoller,
+        dyn_endpoints=gamry_dyn_endpoints,
+    )
 
     return app
