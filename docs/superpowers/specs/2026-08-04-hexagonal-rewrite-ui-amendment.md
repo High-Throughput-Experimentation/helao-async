@@ -66,7 +66,7 @@ shared helpers, not config-selected panels):
 | hte | 19 files = **13 config-selected** + 6 helpers | 3 station (`clad`, `eche10`, `hispec`) + 1 dev (`htereflex`) | **15** of 21 |
 | test | 4 = 3 panels + 1 helper | 1 (`goldenreflex`) | 1 (`goldenreflex`) |
 | Deployment-A | **none** | none | none |
-| Deployment-B | 6 = **5 config-selected** + 1 helper, plus its own palette-sweep test | 1 dev config | none |
+| Deployment-B | 6 = **4 local config-selected** + 1 helper + 1 package `__init__`, plus its own palette-sweep test. A 5th config-selected panel name resolves **cross-deployment** to hte's potentiostat panel (present in both stacks) — the same edge noted for Deployment-C. Corrected by measurement 2026-08-05; the panels carry **no estop buttons**, unlike their Bokeh counterparts (P7-UI blocker) | 1 dev config — so this deployment's **station** carries no `reflex:` server, and §10's dual-stack estop-drill condition is **not met** for P5 | none |
 | Deployment-C | **none of its own** | 1 station config | 1 station config |
 
 Two things in that table are easy to misread. First, `control_vis` is **not** a
