@@ -5,7 +5,9 @@ Runs the hexagon-specific static gates that must pass BEFORE a config's
 adapters, on Linux, no server launch and no hardware:
 
 1. **config sanity** — unique server keys, unique host:port, exactly one of
-   `fast`/`bokeh` per server (the launcher's cross-cutting rule).
+   `fast`/`bokeh`/`reflex` per server (the launcher's cross-cutting rule).
+   A `reflex:` server occupies TWO consecutive ports (static frontend, then
+   backend), so the uniqueness check reserves `port + 1` for it as well.
 2. **shim completeness** — every `deployment: hexagon` server has a hexagon
    shim module at `helao/deploy/hexagon/servers/<group>/<fast|bokeh>.py`
    (missing shim = `ModuleNotFoundError` at launch — must be caught here).
@@ -33,7 +35,16 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
+from helao.core.servers.reflex.discovery import reserved_addresses
 from helao.helpers.config_loader import read_config
+
+#: The launcher's server code keys, pinned to ``launch.py``'s ``codeKeys``. A
+#: config is validated against the SAME set the launcher will accept, so a
+#: preflight pass cannot be followed by a launcher rejection (or, worse, by a
+#: server the launcher silently SKIPS because its key is unrecognized).
+#: ``test_code_keys_match_the_launcher`` reads launch.py's tuple and asserts
+#: agreement rather than trusting this copy.
+CODE_KEYS = ("fast", "bokeh", "reflex")
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HEXAGON_SERVERS = REPO_ROOT / "helao" / "deploy" / "hexagon" / "servers"
@@ -117,18 +128,37 @@ def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
 
 def _config_sanity(servers: dict) -> list[str]:
     issues: list[str] = []
-    hostports: dict[tuple, str] = {}
+    #: "host:port" -> the server key that claimed it. A reflex server claims two,
+    #: and the second one appears nowhere in the config -- which is exactly why it
+    #: has to be reserved here: a station has already shipped a control panel on a
+    #: port the Galil aligner binds, invisible to a per-entry check.
+    claimed: dict[str, str] = {}
     for key, s in servers.items():
-        has_fast, has_bokeh = "fast" in s, "bokeh" in s
-        if has_fast == has_bokeh:
-            issues.append(f"{key}: must declare exactly one of fast/bokeh")
-        hp = (s.get("host"), s.get("port"))
-        if None in hp:
+        declared = [k for k in CODE_KEYS if k in s]
+        if len(declared) != 1:
+            issues.append(
+                f"{key}: must declare exactly one of {'/'.join(CODE_KEYS)}"
+                + (f" (declares {'+'.join(declared)})" if declared else "")
+            )
+        if s.get("host") is None or s.get("port") is None:
             issues.append(f"{key}: missing host/port")
-        elif hp in hostports:
-            issues.append(f"{key}: host:port {hp} collides with {hostports[hp]}")
-        else:
-            hostports[hp] = key
+            continue
+        for addr in reserved_addresses(s):
+            if addr in claimed:
+                owner = claimed[addr]
+                detail = f"{key}: {addr} collides with {owner}"
+                # Name the invisible claim explicitly, or the message reads as a
+                # config typo when in fact one of the two entries never wrote
+                # that port down.
+                if addr != f"{s['host']}:{s['port']}":
+                    detail += f" ({key}'s reflex backend port, port + 1)"
+                elif (
+                    addr != f"{servers[owner].get('host')}:{servers[owner].get('port')}"
+                ):
+                    detail += f" ({owner}'s reflex backend port, port + 1)"
+                issues.append(detail)
+            else:
+                claimed[addr] = key
     return issues
 
 
@@ -136,6 +166,15 @@ def _shim_completeness(servers: dict) -> list[str]:
     issues: list[str] = []
     for key, s in servers.items():
         if s.get("deployment") != HEXAGON:
+            continue
+        if "reflex" in s:
+            # Master spec D9: both UI stacks stay on legacy core through P0-P6 and
+            # migrate together in P7-UI, so there is no hexagon UI shim to find.
+            # Say that, rather than reporting a missing group/module.
+            issues.append(
+                f"{key}: reflex servers are not hexagon-composed (spec D9 — UI "
+                f"hosting is P7-UI); drop 'deployment: hexagon' from this server"
+            )
             continue
         module = _server_module(s)
         group = s.get("group")
