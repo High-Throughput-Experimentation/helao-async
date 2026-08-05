@@ -6,7 +6,7 @@ lives in :mod:`helao.core.servers.motion_control`, which
 *routes through* those rules rather than reimplementing them, and that its two
 row storages stay independent.
 
-Three of these tests exist because their failure mode is silent:
+Four of these tests exist because their failure mode is silent:
 
 * a panel module with no ``DO_GROUPS`` used to raise into a handler that
   **drops the panel**, so a station's motion controls would simply never have
@@ -14,13 +14,17 @@ Three of these tests exist because their failure mode is silent:
 * a confirmation granted for one value must not authorise another, and a stale
   arm looks exactly like a working one;
 * a bare ``list`` annotation on a var ``rx.foreach`` iterates fails the
-  *frontend build*, not the import -- at a station with no Node to rebuild it.
+  *frontend build*, not the import -- at a station with no Node to rebuild it;
+* a follow-up that stops on the first ``moving: False`` leaves the *pre-move*
+  coordinate on screen, which is indistinguishable from a move that has not
+  gone anywhere. That one was found on a live instrument rather than here.
 
 Event handlers are exercised directly rather than through a browser, as in
 ``test_reflex_control.py``: they are coroutines whose job is to fold a
 transport result into rows, and that is what can be wrong.
 """
 
+import ast
 import asyncio
 import inspect
 import json
@@ -34,6 +38,9 @@ from helao.core.servers import palette
 from helao.core.servers.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
+    FOLLOWUP_CEILING_S,
+    FOLLOWUP_GRACE_S,
+    FOLLOWUP_INTERVAL_S,
     REFUSED_STATUS,
     Units,
 )
@@ -135,6 +142,10 @@ class _FakeState:
         self.motion_rows = []
         self.status = ""
         self.loaded = False
+        self.tick_ms = control_mod.IDLE_TICK_MS
+        self.followup_server = ""
+        self.followup_since = 0.0
+        self.followup_busy = False
 
     _state_of = ControlState._state_of
     _apply = ControlState._apply
@@ -144,6 +155,8 @@ class _FakeState:
     _rewrite_motion = ControlState._rewrite_motion
     _blank_position = ControlState._blank_position
     _refresh_positions = ControlState._refresh_positions
+    _begin_followup = ControlState._begin_followup
+    _end_followup = ControlState._end_followup
 
     async def __aenter__(self):
         return self
@@ -162,6 +175,11 @@ def page(monkeypatch):
         "move": (ErrorCodes.none, {}),
         "stop": (ErrorCodes.none, {"stopped": ["x", "y", "w"]}),
         "write": {},
+        # Every position read this test provoked, in order. Kept apart from
+        # ``sent`` on purpose: the follow-up reads *after* a command, so
+        # appending reads there would move what ``sent[-1]`` means in every
+        # test that asserts on the last command dispatched.
+        "position_reads": [],
     }
 
     async def _read(server_key, host, port):
@@ -172,6 +190,7 @@ def page(monkeypatch):
         return dict(script["write"])
 
     async def _positions(server_key, host, port):
+        script["position_reads"].append(server_key)
         return {
             axis: dict(values)
             for axis, values in (script["positions"].get(server_key) or {}).items()
@@ -208,6 +227,11 @@ def _stop(state, server_key):
 
 def _toggle(state, server_key, do_name):
     asyncio.run(ControlState.toggle.fn(state, server_key, do_name))
+
+
+def _tick(state):
+    """Fire one interval tick, as the page's ticking component would."""
+    asyncio.run(ControlState.follow_up.fn(state))
 
 
 def _motion(state, axis):
@@ -842,6 +866,387 @@ def test_stopping_an_unknown_server_is_a_no_op(page):
 
 
 # --------------------------------------------------------------------------
+# the follow-up refresh
+# --------------------------------------------------------------------------
+#
+# Reported from a live instrument: after a move the readout did not update
+# when the motion ended, and the operator had to press Read. Both stacks
+# already re-read after dispatching, but a fire-and-forget driver answers
+# before the stage has moved, so that read captures the *pre-move* coordinate
+# and nothing re-reads afterwards.
+
+
+@pytest.fixture
+def clock(monkeypatch):
+    """Hold the page's monotonic clock still, and let a test advance it.
+
+    The same clock the arm timeout counts in, patched where the page reads it.
+    Advancing it by hand is what makes the grace window and the ceiling
+    testable at all -- the alternative is a test that sleeps for two minutes.
+    """
+    held = {"t": 1000.0}
+    monkeypatch.setattr(control_mod, "_now", lambda: held["t"])
+    return held
+
+
+def _commanded_move(state, page, *, moving):
+    """Dispatch a small move on x, the server answering with *moving*."""
+    _, script = page
+    script["positions"] = _positioned(x_mm=1.0, x_counts=6398, moving=moving)
+    ControlState.set_move_value.fn(state, "MOTOR", "x", "0.5")
+    _move(state, "MOTOR", "x")
+
+
+def test_a_commanded_move_starts_a_follow_up(page, clock):
+    """The defect itself: one read after dispatch is not enough."""
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+
+    _commanded_move(state, page, moving=True)
+
+    assert state.followup_server == "MOTOR"
+    assert state.followup_since == clock["t"]
+    # The tick has to speed up as well as be armed: a follow-up nothing ever
+    # fires is the stale readout with extra state.
+    assert state.tick_ms == control_mod.FOLLOWUP_TICK_MS
+    print("test_a_commanded_move_starts_a_follow_up PASS")
+
+
+def test_the_follow_up_re_reads_while_moving_and_stops_once_it_clears(page, clock):
+    """The whole feature, end to end.
+
+    Each tick renders what it read, so when the follow-up does stop, the
+    coordinate on screen is the last one the instrument reported rather than
+    the one from the tick before.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=True)
+
+    # Past the grace window, still travelling: keep going.
+    clock["t"] += FOLLOWUP_GRACE_S + FOLLOWUP_INTERVAL_S
+    script["positions"] = _positioned(x_mm=2.0, x_counts=12796, moving=True)
+    _tick(state)
+
+    assert state.followup_server == "MOTOR", "it stopped while the axis was moving"
+    assert _motion(state, "x")[MOTION_LABEL] == "2.000 mm / 12796 counts"
+
+    # Arrived.
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    script["positions"] = _positioned(x_mm=3.0, x_counts=19194, moving=False)
+    _tick(state)
+
+    assert state.followup_server == ""
+    assert state.tick_ms == control_mod.IDLE_TICK_MS
+    assert _motion(state, "x")[MOTION_LABEL] == "3.000 mm / 19194 counts"
+    assert _motion(state, "x")[MOTION_MOVING] == "stopped"
+    print("test_the_follow_up_re_reads_while_moving_and_stops_once_it_clears PASS")
+
+
+def test_the_grace_window_survives_an_immediate_not_moving(page, clock):
+    """The exact bug being fixed, as a test.
+
+    A read taken immediately after dispatch can answer ``moving: False`` --
+    not because the move finished, but because it had not started. A policy of
+    "re-read while moving" sees that first answer, concludes the move is over,
+    and leaves the pre-move coordinate on screen.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    # The driver has not started the stage yet, so it reports stationary at the
+    # coordinate it was already at.
+    _commanded_move(state, page, moving=False)
+    assert state.followup_server == "MOTOR"
+
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    assert FOLLOWUP_INTERVAL_S < FOLLOWUP_GRACE_S, "the grace window is the point"
+    script["positions"] = _positioned(x_mm=1.0, x_counts=6398, moving=False)
+    reads = len(script["position_reads"])
+    _tick(state)
+
+    assert len(script["position_reads"]) == reads + 1, "it did not read at all"
+    assert state.followup_server == "MOTOR", "it gave up inside the grace window"
+
+    # Now the stage is genuinely moving, which is what the window was there to
+    # catch, and the follow-up carries on past it.
+    clock["t"] += FOLLOWUP_GRACE_S
+    script["positions"] = _positioned(x_mm=1.4, x_counts=8957, moving=True)
+    _tick(state)
+
+    assert state.followup_server == "MOTOR"
+    assert _motion(state, "x")[MOTION_LABEL] == "1.400 mm / 8957 counts"
+    print("test_the_grace_window_survives_an_immediate_not_moving PASS")
+
+
+def test_a_silent_moving_flag_ends_the_follow_up_at_the_grace_window(page, clock):
+    """``moving`` is tri-state, and only an explicit ``True`` sustains it.
+
+    Treating "the driver could not say" as "still moving" would poll a silent
+    server all the way to the ceiling after every single move.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=None)
+
+    clock["t"] += FOLLOWUP_GRACE_S
+    _tick(state)
+
+    assert state.followup_server == ""
+    assert _motion(state, "x")[MOTION_MOVING] == "unknown"
+    print("test_a_silent_moving_flag_ends_the_follow_up_at_the_grace_window PASS")
+
+
+def test_the_tick_issues_no_request_once_the_follow_up_is_over(page, clock):
+    """A page-level interval fires forever; this is what makes that acceptable.
+
+    An idle ``/control`` tab must not put traffic on a station's motion
+    servers, and it must not overwrite whatever the status line last said.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=False)
+    clock["t"] += FOLLOWUP_GRACE_S
+    _tick(state)
+    assert state.followup_server == "", "the follow-up should be over by now"
+
+    state.status = "something the engineer is reading"
+    reads = len(script["position_reads"])
+    for _ in range(10):
+        clock["t"] += FOLLOWUP_INTERVAL_S
+        _tick(state)
+
+    assert len(script["position_reads"]) == reads, script["position_reads"]
+    assert state.status == "something the engineer is reading"
+    assert state.tick_ms == control_mod.IDLE_TICK_MS
+    print("test_the_tick_issues_no_request_once_the_follow_up_is_over PASS")
+
+
+def test_the_ceiling_terminates_a_permanently_moving_axis(page, clock):
+    """A stuck axis, or a driver whose flag never clears.
+
+    Unbounded is the failure this page's no-server-side-loop rule exists to
+    prevent, and a tick that never gives up is the same thing wearing a
+    component. The bound is computed from the policy's own constants rather
+    than pinned to a number here, so a change to either is not silently
+    absorbed.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=True)
+    started = clock["t"]
+    reads = len(script["position_reads"])
+
+    # Deliberately more iterations than the ceiling allows: the loop must be
+    # ended by the policy, not by running out of range.
+    ticks = int(FOLLOWUP_CEILING_S / FOLLOWUP_INTERVAL_S) + 10
+    for _ in range(ticks):
+        clock["t"] += FOLLOWUP_INTERVAL_S
+        _tick(state)
+        if not state.followup_server:
+            break
+    else:
+        raise AssertionError(f"the follow-up was still running after {ticks} ticks")
+
+    assert clock["t"] - started <= FOLLOWUP_CEILING_S + FOLLOWUP_INTERVAL_S
+    assert (
+        len(script["position_reads"]) - reads
+        <= FOLLOWUP_CEILING_S / FOLLOWUP_INTERVAL_S + 1
+    )
+    assert state.tick_ms == control_mod.IDLE_TICK_MS
+    # And it says which of the two endings this was: the coordinate on screen
+    # is the last one read, not a settled one, and Read is what is left.
+    assert "still moving" in state.status, state.status
+    assert "Read" in state.status, state.status
+    print("test_the_ceiling_terminates_a_permanently_moving_axis PASS")
+
+
+def test_a_settled_follow_up_does_not_claim_the_move_finished(page, clock):
+    """It reports what it did -- read a position -- not what it cannot know."""
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=False)
+
+    clock["t"] += FOLLOWUP_GRACE_S
+    _tick(state)
+
+    assert state.status == "MOTOR: position updated", state.status
+    assert "still moving" not in state.status
+    print("test_a_settled_follow_up_does_not_claim_the_move_finished PASS")
+
+
+def test_a_second_move_restarts_the_follow_up_clock(page, clock):
+    """Or the second move inherits the first's elapsed time.
+
+    A move commanded two minutes after the last one would then be past the
+    ceiling before its first tick and would never follow up at all.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=True)
+
+    clock["t"] += FOLLOWUP_CEILING_S * 2
+    _commanded_move(state, page, moving=True)
+
+    assert state.followup_since == clock["t"]
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    _tick(state)
+    assert state.followup_server == "MOTOR"
+    print("test_a_second_move_restarts_the_follow_up_clock PASS")
+
+
+def test_an_overlapping_tick_is_dropped_rather_than_queued(page, clock):
+    """A motion server slower than the interval must not stack up reads.
+
+    Interleaved reads can land out of order and leave an older coordinate on
+    top of a newer one -- a stale readout produced by the mechanism that exists
+    to prevent stale readouts.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+    _commanded_move(state, page, moving=True)
+
+    state.followup_busy = True
+    reads = len(script["position_reads"])
+    _tick(state)
+
+    assert len(script["position_reads"]) == reads
+    assert state.followup_server == "MOTOR", "and it must not end the follow-up"
+    print("test_an_overlapping_tick_is_dropped_rather_than_queued PASS")
+
+
+def test_a_refused_move_starts_no_follow_up(page, clock):
+    """Nothing moved, so there is nothing to settle.
+
+    And a follow-up would end by overwriting the status that names the remedy
+    with its own, which is the one line the engineer needs.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+
+    script["move"] = (ErrorCodes.in_progress, {})
+    ControlState.set_move_value.fn(state, "MOTOR", "x", "0.5")
+    _move(state, "MOTOR", "x")
+
+    assert state.followup_server == ""
+    assert state.tick_ms == control_mod.IDLE_TICK_MS
+    assert REFUSED_STATUS in state.status, state.status
+    print("test_a_refused_move_starts_no_follow_up PASS")
+
+
+def test_a_failed_move_starts_no_follow_up(page, clock):
+    """The command may not have landed, and the coordinate is already unknown.
+
+    Polling a server that just failed to answer would only overwrite the
+    failure with a cheerier line.
+    """
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+
+    script["move"] = (ErrorCodes.unspecified, {})
+    ControlState.set_move_value.fn(state, "MOTOR", "x", "0.5")
+    _move(state, "MOTOR", "x")
+
+    assert state.followup_server == ""
+    assert FAILED_STATUS in state.status, state.status
+    print("test_a_failed_move_starts_no_follow_up PASS")
+
+
+def test_stop_settles_the_readout_too(page, clock):
+    """A stop is a deceleration, not an instant halt.
+
+    And it is the moment an engineer most needs the coordinate the stage
+    actually came to rest at.
+    """
+    _, script = page
+    script["positions"] = _positioned(moving=True)
+    state = _FakeState()
+    _load(state)
+
+    _stop(state, "MOTOR")
+    assert state.followup_server == "MOTOR"
+    assert state.tick_ms == control_mod.FOLLOWUP_TICK_MS
+
+    clock["t"] += FOLLOWUP_GRACE_S
+    script["positions"] = _positioned(x_mm=1.2, x_counts=7678, moving=False)
+    _tick(state)
+
+    assert state.followup_server == ""
+    assert _motion(state, "x")[MOTION_LABEL] == "1.200 mm / 7678 counts"
+    print("test_stop_settles_the_readout_too PASS")
+
+
+def test_a_failed_stop_starts_no_follow_up(page, clock):
+    _, script = page
+    script["positions"] = _positioned()
+    state = _FakeState()
+    _load(state)
+
+    script["stop"] = (ErrorCodes.unspecified, {})
+    _stop(state, "MOTOR")
+
+    assert state.followup_server == ""
+    assert FAILED_STATUS in state.status, state.status
+    print("test_a_failed_stop_starts_no_follow_up PASS")
+
+
+def test_a_digital_only_server_never_starts_a_follow_up(page, clock):
+    """There are no coordinates to settle, so there is nothing to re-read."""
+    _, script = page
+    script["read"] = {"IO": {"gamry_aux": True, "Thorlab_led": False}}
+    script["write"] = {"gamry_aux": False}
+    state = _FakeState()
+    _load(state)
+    reads = len(script["position_reads"])
+
+    _toggle(state, "IO", "gamry_aux")
+    _tick(state)
+
+    assert state.followup_server == ""
+    assert state.tick_ms == control_mod.IDLE_TICK_MS
+    assert len(script["position_reads"]) == reads
+    print("test_a_digital_only_server_never_starts_a_follow_up PASS")
+
+
+def test_the_cadence_is_the_shared_layer_s_and_not_the_page_s():
+    """Two UI stacks that pick their own cadence drift, and that is the point.
+
+    The page may convert the shared interval to the milliseconds its component
+    takes; it may not choose a number.
+    """
+    assert control_mod.FOLLOWUP_TICK_MS == int(FOLLOWUP_INTERVAL_S * 1000)
+    source = (
+        REPO_ROOT / "helao" / "core" / "servers" / "reflex" / "control.py"
+    ).read_text(encoding="utf-8")
+    assert "should_follow_up" in source, "the page must ask the shared policy"
+    # The three policy constants are imported, never restated.
+    for name in ("FOLLOWUP_INTERVAL_S", "FOLLOWUP_GRACE_S", "FOLLOWUP_CEILING_S"):
+        assert f"{name} =" not in source, f"{name} is redefined in the page"
+    print("test_the_cadence_is_the_shared_layer_s_and_not_the_page_s PASS")
+
+
+# --------------------------------------------------------------------------
 # the page itself
 # --------------------------------------------------------------------------
 
@@ -902,14 +1307,44 @@ def test_the_page_never_drives_itself_from_a_loop():
 
     A ``while True`` in a background handler would go on polling a station's
     motion servers forever after the browser is gone, logging a delta to a
-    disconnected client on every pass.
+    disconnected client on every pass. The follow-up refresh is driven by a
+    component in the page instead -- see the test below -- which is a
+    *narrower* allowance than "no loops", so this stays as it was minus the
+    one line that forbade the component.
     """
     source = (
         REPO_ROOT / "helao" / "core" / "servers" / "reflex" / "control.py"
     ).read_text(encoding="utf-8")
-    for offender in ("while True", "asyncio.sleep", "rx.moment"):
-        assert offender not in source, f"{offender} in the control page"
+    tree = ast.parse(source)
+    # The AST, not a substring sweep: the prose in this module has to be free
+    # to say "while the axis is moving", and a grep for "while" cannot tell
+    # that from a loop. Any ``while`` at all, not only ``while True`` -- a loop
+    # over a flag the browser cannot clear is the same leak.
+    loops = [node for node in ast.walk(tree) if isinstance(node, ast.While)]
+    assert not loops, f"control.py has a while loop at line {loops and loops[0].lineno}"
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            name = ast.unparse(node.func)
+            assert not name.endswith(
+                ("asyncio.sleep", "create_task", "ensure_future")
+            ), f"control.py:{node.lineno} drives itself with {name}"
     print("test_the_page_never_drives_itself_from_a_loop PASS")
+
+
+def test_the_refresh_is_driven_by_a_component_in_the_page():
+    """A component stops existing when its tab does; a loop does not.
+
+    Asserted on the rendered page rather than on the source, because what has
+    to be true is that the tick is *in the tree* -- a handler defined and never
+    mounted is the stale readout with extra state.
+    """
+    control_mod.configure_control(WORLD, "REFLEX")
+    text = _rendered(control_mod.control_page())
+
+    assert "Moment" in text, "no ticking component in the page"
+    assert "tick_ms" in text, "the tick is not bound to the page's interval var"
+    assert "follow_up" in text, "the tick drives nothing"
+    print("test_the_refresh_is_driven_by_a_component_in_the_page PASS")
 
 
 # --------------------------------------------------------------------------

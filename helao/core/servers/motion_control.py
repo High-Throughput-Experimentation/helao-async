@@ -61,6 +61,10 @@ __all__ = [
     "stop_motion",
     "position_label",
     "outcome_status",
+    "FOLLOWUP_INTERVAL_S",
+    "FOLLOWUP_GRACE_S",
+    "FOLLOWUP_CEILING_S",
+    "should_follow_up",
 ]
 
 import math
@@ -649,6 +653,62 @@ def _mm_text(mm: Optional[float]) -> str:
     if not math.isfinite(value):
         return "?"
     return f"{value:.3f}"
+
+
+#: How often to re-read while an axis is still moving.
+FOLLOWUP_INTERVAL_S = 0.5
+
+#: How long to keep re-reading *regardless* of what ``moving`` says.
+#:
+#: A move command returns once the motion has been *dispatched*, which for a
+#: fire-and-forget driver is before the stage has begun to move. Reading
+#: immediately afterwards can therefore answer ``moving: False`` -- not because
+#: the move finished, but because it had not started. A policy of "re-read
+#: while moving" would see that first answer, conclude the move was over, and
+#: leave the pre-move coordinate on screen: exactly the stale readout this
+#: follow-up exists to fix. The grace window covers the gap between dispatch
+#: and motion.
+FOLLOWUP_GRACE_S = 2.0
+
+#: When to give up, whatever ``moving`` still says.
+#:
+#: An axis that reports ``moving`` forever -- stuck, or a driver whose flag
+#: never clears -- must not be followed forever. On the Reflex side especially:
+#: an unbounded refresh is the failure mode the "never drive a refresh from a
+#: server-side loop" rule exists to prevent, because ``on_unmount`` does not
+#: fire on tab close. Bounded means it always stops on its own, and the Read
+#: button remains for anything past the ceiling.
+FOLLOWUP_CEILING_S = 120.0
+
+
+def should_follow_up(positions: dict, elapsed_s: float) -> bool:
+    """Whether to re-read positions again after ``elapsed_s`` of following up.
+
+    Shared by both UI stacks so the refresh cadence cannot drift between them.
+
+    Args:
+        positions: The most recent :func:`read_axis_positions` payload.
+        elapsed_s: Seconds since the follow-up began (i.e. since dispatch).
+
+    Returns:
+        bool: ``True`` while the grace window is open or some axis still
+        reports motion, ``False`` once the ceiling is reached.
+
+    Note:
+        ``moving`` is tri-state. Only an explicit ``True`` sustains the
+        follow-up past the grace window -- ``None`` means the driver could not
+        say, and treating "don't know" as "still moving" would poll a silent
+        server until the ceiling on every move.
+    """
+    if elapsed_s >= FOLLOWUP_CEILING_S:
+        return False
+    if elapsed_s < FOLLOWUP_GRACE_S:
+        return True
+    return any(
+        (axis or {}).get("moving") is True
+        for axis in (positions or {}).values()
+        if isinstance(axis, dict)
+    )
 
 
 def _counts_text(counts: Optional[int]) -> str:

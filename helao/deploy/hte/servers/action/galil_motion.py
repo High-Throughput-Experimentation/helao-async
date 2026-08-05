@@ -37,6 +37,7 @@ Exit helao and restart.
 
 __all__ = ["makeApp"]
 
+import asyncio
 from enum import Enum
 from typing import Optional, Union
 
@@ -115,6 +116,54 @@ def _first_count(counts) -> Optional[int]:
         return int(counts)
     except (TypeError, ValueError):
         return None
+
+
+#: Panel moves currently in flight. A strong reference has to be held: the
+#: event loop keeps only a weak one to a running task, so a bare
+#: ``create_task`` whose result nobody stores can be collected mid-move.
+PANEL_MOVE_TASKS: set = set()
+
+
+def _dispatch_panel_move(coro, axis: str, value: float, units: str):
+    """Run a panel move in the background and report what it eventually did.
+
+    The endpoint that calls this has already answered the panel, so this
+    callback is the only place a later failure can surface. Both failure
+    shapes are covered, and the second is the common one:
+
+    * an exception -- which without a done-callback becomes "Task exception
+      was never retrieved" at collection time, i.e. nothing an operator sees;
+    * a non-``none`` ``ErrorCodes`` in the returned dict, which is how
+      ``_motor_move`` reports nearly every real fault. An exception-only
+      callback would swallow those silently.
+
+    The completed count is logged too. It used to be in the endpoint's return
+    payload and cannot be now, so the log is where it lives.
+    """
+    task = asyncio.create_task(coro)
+    PANEL_MOVE_TASKS.add(task)
+
+    def _report(finished: asyncio.Task) -> None:
+        PANEL_MOVE_TASKS.discard(finished)
+        what = f"panel move on axis '{axis}' to {value} {units}"
+        if finished.cancelled():
+            LOGGER.error(f"{what} was cancelled before it completed")
+            return
+        exc = finished.exception()
+        if exc is not None:
+            LOGGER.error(f"{what} raised {exc!r}", exc_info=exc)
+            return
+        result = finished.result() or {}
+        error_code = _first_error(result.get("err_code"))
+        if error_code != ErrorCodes.none:
+            LOGGER.error(f"{what} -> {error_code}")
+        else:
+            LOGGER.info(
+                f"{what} completed, counts={_first_count(result.get('counts'))}"
+            )
+
+    task.add_done_callback(_report)
+    return task
 
 
 async def galil_dyn_endpoints(app: BaseAPI):
@@ -701,13 +750,24 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 units: Units = Units.mm,
                 speed: Optional[int] = None,
             ):
-                """Move one axis without creating an action.
+                """Start a move on one axis without creating an action.
+
+                **Returns as soon as the move is dispatched, not when the
+                stage arrives.** ``_motor_move`` settle-polls until motion
+                ceases -- up to a 30-minute cap -- while the panel dispatches
+                every private call with a 5 s timeout, so a blocking route
+                reported any move longer than about five seconds as a failure
+                while it was in fact succeeding. An operator shown "failed"
+                on a successful move retries it, which issues a *second*
+                move. Returning at once removes that, at the price stated
+                below. The action routes are unaffected and still block: an
+                experiment step must not continue before the stage arrives.
 
                 Refused outright while an action is running on this server:
                 unlike a stop, a concurrent move has no safety justification,
                 and the refusal is reported as its own outcome rather than as
                 a failure so the panel can name the remedy. No device call is
-                made in that case.
+                made -- and no task is launched -- in that case.
 
                 The value is dispatched in the domain ``units`` names. Under
                 ``counts`` the driver hands the integer to ``PR``/``PA``
@@ -728,9 +788,21 @@ async def galil_dyn_endpoints(app: BaseAPI):
                     speed: Optional speed override in counts/sec.
 
                 Returns:
-                    ``(error_code, {"axis", "requested", "units", "counts"})``.
-                    ``counts`` is the integer the controller was commanded
-                    with, or ``None`` when the driver did not report one.
+                    ``(error_code, {"axis", "requested", "units", "counts"})``
+                    -- the same shape as before, with a changed meaning. The
+                    code now says **accepted and dispatched**, never
+                    "completed": nothing about the move's outcome is known
+                    yet. A failure after dispatch reaches the log (see
+                    ``_dispatch_panel_move``) and the panel's position
+                    readout, not this return value. That trade was made
+                    deliberately -- a wrong "failed" is worse here than a
+                    delayed "failed", because it provokes a duplicate move.
+
+                    ``counts`` is likewise the integer this endpoint knows
+                    will be commanded, which it has only for a counts move;
+                    an mm move reports ``None`` rather than inventing a
+                    plausible-looking figure, since the conversion happens in
+                    the driver and has not run yet.
                 """
                 running = _running_actions(app)
                 if running:
@@ -742,24 +814,35 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
                 # TOCTOU residual, stated rather than discovered at a station:
                 # an action can start between the check above and the driver
-                # call below. Galil closes it downstream -- ``_motor_move``
-                # guards on ``self.motor_busy`` and returns ``in_progress`` --
-                # so the race here degrades to a refusal, not to two
-                # simultaneous move commands.
+                # call below -- a slightly wider window now that the call runs
+                # in a task rather than inline. Galil closes it downstream --
+                # ``_motor_move`` guards on ``self.motor_busy`` and returns
+                # ``in_progress`` -- so the race here degrades to a refusal,
+                # not to two simultaneous move commands. What the widened
+                # window costs is only *where* the refusal is reported: it
+                # lands in the log instead of in this endpoint's return.
                 axis_name = getattr(axis, "value", axis)
-                datadict = await app.driver._motor_move(
-                    d_mm=value,
+                _dispatch_panel_move(
+                    app.driver._motor_move(
+                        d_mm=value,
+                        axis=axis_name,
+                        speed=speed,
+                        mode=mode,
+                        transformation=TransformationModes.motorxy,
+                        units=units.value,
+                    ),
                     axis=axis_name,
-                    speed=speed,
-                    mode=mode,
-                    transformation=TransformationModes.motorxy,
+                    value=value,
                     units=units.value,
                 )
-                return _first_error(datadict.get("err_code")), {
+                # np.floor, not int(): the driver floors, and int() truncates
+                # towards zero, so a negative non-integral count would be
+                # reported one count short of what the controller is given.
+                return ErrorCodes.none, {
                     "axis": axis_name,
                     "requested": value,
                     "units": units.value,
-                    "counts": _first_count(datadict.get("counts")),
+                    "counts": int(np.floor(value)) if units == Units.counts else None,
                 }
 
             @app.post("/stop_motion", tags=["private"])

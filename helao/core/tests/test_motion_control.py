@@ -975,3 +975,81 @@ def test_the_shared_constants_are_present_and_sane():
     assert motion_control.READ_RETRIES < 5
     assert motion_control.WRITE_RETRIES < 5
     print("test_the_shared_constants_are_present_and_sane PASS")
+
+
+# ---------------------------------------------------------------------------
+# Follow-up refresh policy.
+#
+# Added after a live-instrument test: the readout did not update when motion
+# ended on the fire-and-forget driver family, because a move command returns
+# once the motion is *dispatched*. These pin the two rules that make a shared
+# refresh policy work across drivers with opposite blocking semantics.
+# ---------------------------------------------------------------------------
+
+
+def test_the_grace_window_survives_an_immediate_not_moving():
+    # THE bug this policy exists to fix. A read taken straight after dispatch
+    # can answer moving=False because the stage has not started yet, not
+    # because it finished. A naive "poll while moving" believes that first
+    # answer and leaves the pre-move coordinate on screen forever.
+    assert motion_control.should_follow_up({"x": {"moving": False}}, 0.0) is True
+    assert (
+        motion_control.should_follow_up(
+            {"x": {"moving": False}}, motion_control.FOLLOWUP_GRACE_S - 0.01
+        )
+        is True
+    )
+    print("test_the_grace_window_survives_an_immediate_not_moving PASS")
+
+
+def test_it_stops_once_motion_has_genuinely_ceased():
+    assert (
+        motion_control.should_follow_up(
+            {"x": {"moving": False}}, motion_control.FOLLOWUP_GRACE_S + 0.01
+        )
+        is False
+    )
+    print("test_it_stops_once_motion_has_genuinely_ceased PASS")
+
+
+def test_it_keeps_reading_while_an_axis_reports_motion():
+    assert motion_control.should_follow_up({"x": {"moving": True}}, 30.0) is True
+    # One moving axis is enough; the panel reads every axis in one call.
+    assert (
+        motion_control.should_follow_up(
+            {"x": {"moving": False}, "y": {"moving": True}}, 30.0
+        )
+        is True
+    )
+    print("test_it_keeps_reading_while_an_axis_reports_motion PASS")
+
+
+def test_unknown_motion_does_not_sustain_the_follow_up():
+    # `moving` is tri-state. None means the driver could not say -- treating
+    # "don't know" as "still moving" would poll a silent server all the way to
+    # the ceiling on every single move.
+    assert motion_control.should_follow_up({"x": {"moving": None}}, 30.0) is False
+    print("test_unknown_motion_does_not_sustain_the_follow_up PASS")
+
+
+def test_the_ceiling_terminates_a_permanently_moving_axis():
+    # An axis whose flag never clears must not be followed forever: on the
+    # Reflex side an unbounded refresh outlives the browser tab.
+    assert (
+        motion_control.should_follow_up(
+            {"x": {"moving": True}}, motion_control.FOLLOWUP_CEILING_S
+        )
+        is False
+    )
+    assert motion_control.FOLLOWUP_CEILING_S > motion_control.FOLLOWUP_GRACE_S
+    assert motion_control.FOLLOWUP_INTERVAL_S < motion_control.FOLLOWUP_GRACE_S
+    print("test_the_ceiling_terminates_a_permanently_moving_axis PASS")
+
+
+def test_a_malformed_or_empty_payload_ends_the_follow_up_quietly():
+    # An unreachable server yields {}; a garbled reply may not hold dicts.
+    assert motion_control.should_follow_up({}, 30.0) is False
+    assert motion_control.should_follow_up(None, 30.0) is False
+    assert motion_control.should_follow_up({"x": None}, 30.0) is False
+    assert motion_control.should_follow_up({"x": "moving"}, 30.0) is False
+    print("test_a_malformed_or_empty_payload_ends_the_follow_up_quietly PASS")

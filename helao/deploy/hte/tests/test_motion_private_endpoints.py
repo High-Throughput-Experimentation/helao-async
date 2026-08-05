@@ -26,6 +26,16 @@ running must be *refused* with ``ErrorCodes.in_progress`` and reach no device,
 while a stop must halt regardless -- and must halt without de-energizing,
 since a de-energized vertical axis drops.
 
+**Dispatch, not completion.** ``/move_axis`` answers as soon as the move is
+launched: ``_motor_move`` settle-polls to a 30-minute cap while the panel
+dispatches with a 5 s timeout, so a blocking route reported every move longer
+than about five seconds as failed while it was succeeding -- and an operator
+shown that retries, issuing a second move. Two consequences are asserted here:
+a move must return without waiting for the stage, and a failure *after*
+dispatch must reach the log, since the return value can no longer carry it.
+Tests that assert what reached the controller therefore await the dispatched
+task (``_galil_move``) instead of the endpoint alone.
+
 Neither server's hardware is present (``gclib`` is Windows-only and no
 Thorlabs stage is attached), but neither is needed: the galil vendor seam is
 ``GalilCommandChannel`` and the Kinesis one is ``Thorlabs.KinesisMotor``, and
@@ -36,6 +46,7 @@ of ``run_unit_tests.py``.
 """
 
 import asyncio
+import time
 import types
 from typing import Optional
 
@@ -243,6 +254,48 @@ def _emitted(channel, prefix):
     return [c for c in channel.commands if c.startswith(prefix)]
 
 
+async def _settle_galil_moves():
+    """Wait for every panel move the galil endpoint dispatched.
+
+    ``/move_axis`` returns as soon as the move is *dispatched*, so a test that
+    asserts what reached the controller has to await the background task the
+    endpoint launched -- and inside the same event loop, since ``asyncio.run``
+    closes the loop, and cancels anything still pending on it, on return.
+    """
+    from helao.deploy.hte.servers.action import galil_motion
+
+    while galil_motion.PANEL_MOVE_TASKS:
+        await asyncio.gather(
+            *list(galil_motion.PANEL_MOVE_TASKS), return_exceptions=True
+        )
+
+
+def _galil_move(app, **kwargs):
+    """Call ``/move_axis`` and wait for the move it dispatched to finish."""
+
+    async def _run():
+        result = await app.routes["/move_axis"].fn(**kwargs)
+        await _settle_galil_moves()
+        return result
+
+    return asyncio.run(_run())
+
+
+def _wait_until(predicate, timeout=10.0):
+    """Poll ``predicate`` from a non-async test thread.
+
+    Needed by the ``TestClient`` cases only: those drive the endpoint from
+    another thread, so the dispatched move cannot be awaited directly, and the
+    response now arrives *before* the move has reached the device.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return bool(predicate())
+
+
 # --------------------------------------------------------------------------
 # galil: registration
 # --------------------------------------------------------------------------
@@ -287,9 +340,7 @@ def test_galil_halt_route_is_not_named_for_an_estop():
 
 def test_galil_counts_move_reaches_the_controller_undivided():
     app, ch = _galil_app()
-    error_code, payload = asyncio.run(
-        app.routes["/move_axis"].fn(axis="x", value=7, units=Units.counts)
-    )
+    error_code, payload = _galil_move(app, axis="x", value=7, units=Units.counts)
 
     assert "PRC=7" in ch.commands, ch.commands
     assert error_code == ErrorCodes.none
@@ -307,11 +358,7 @@ def test_galil_mm_move_of_the_same_distance_loses_a_count():
     "helpful" conversion added at this layer would fail here.
     """
     app, ch = _galil_app()
-    asyncio.run(
-        app.routes["/move_axis"].fn(
-            axis="x", value=7 * ADSS_B_COUNT_TO_MM, units=Units.mm
-        )
-    )
+    _galil_move(app, axis="x", value=7 * ADSS_B_COUNT_TO_MM, units=Units.mm)
     assert "PRC=6" in ch.commands, ch.commands
     assert "PRC=7" not in ch.commands
     print("test_galil_mm_move_of_the_same_distance_loses_a_count PASS")
@@ -321,11 +368,7 @@ def test_galil_absolute_counts_move_emits_pa_not_pr():
     app, ch = _galil_app()
     from helao.deploy.hte.drivers.motion.galil_motion_driver import MoveModes
 
-    asyncio.run(
-        app.routes["/move_axis"].fn(
-            axis="y", value=4321, mode=MoveModes.absolute, units=Units.counts
-        )
-    )
+    _galil_move(app, axis="y", value=4321, mode=MoveModes.absolute, units=Units.counts)
     assert "PAB=4321" in ch.commands, ch.commands
     assert not _emitted(ch, "PRB"), ch.commands
     print("test_galil_absolute_counts_move_emits_pa_not_pr PASS")
@@ -333,7 +376,7 @@ def test_galil_absolute_counts_move_emits_pa_not_pr():
 
 def test_galil_move_never_de_energizes_a_motor():
     app, ch = _galil_app()
-    asyncio.run(app.routes["/move_axis"].fn(axis="x", value=25, units=Units.counts))
+    _galil_move(app, axis="x", value=25, units=Units.counts)
     assert not _emitted(ch, "MO"), ch.commands
     print("test_galil_move_never_de_energizes_a_motor PASS")
 
@@ -344,15 +387,26 @@ def test_galil_move_uses_the_motor_frame_only():
     The plate and instrument transforms are millimetre arithmetic; a count fed
     through one comes out as a plausible-looking and entirely wrong target,
     which the driver refuses. The endpoint must therefore never hand it
-    anything but ``motorxy`` -- and the proof is that a counts move succeeds
-    rather than being refused as ``not_available``.
+    anything but ``motorxy``.
+
+    The proof is the emitted command, not the return code: since the endpoint
+    dispatches rather than completes, it returns ``none`` before the driver
+    has had a chance to refuse anything. The refusal would land in the log, so
+    that is asserted empty too.
     """
+    from helao.deploy.hte.servers.action import galil_motion
+
     app, ch = _galil_app()
-    error_code, _ = asyncio.run(
-        app.routes["/move_axis"].fn(axis="x", value=11, units=Units.counts)
-    )
-    assert error_code == ErrorCodes.none
+    recorder = _Recorder()
+    original = galil_motion.LOGGER
+    galil_motion.LOGGER = recorder
+    try:
+        _galil_move(app, axis="x", value=11, units=Units.counts)
+    finally:
+        galil_motion.LOGGER = original
+
     assert "PRC=11" in ch.commands, ch.commands
+    assert recorder.messages["error"] == [], recorder.messages
     print("test_galil_move_uses_the_motor_frame_only PASS")
 
 
@@ -362,6 +416,14 @@ def test_galil_move_uses_the_motor_frame_only():
 
 
 def test_galil_move_is_refused_while_an_action_is_running():
+    """The busy refusal survives the move becoming a background dispatch.
+
+    It has to happen *before* the task is launched, or the refusal turns into
+    a move that is accepted, dispatched, and only then declined by the
+    driver's own guard -- reported nowhere the panel can see.
+    """
+    from helao.deploy.hte.servers.action import galil_motion
+
     app, ch = _galil_app(busy_on=("move",))
     error_code, payload = asyncio.run(
         app.routes["/move_axis"].fn(axis="x", value=7, units=Units.counts)
@@ -374,6 +436,8 @@ def test_galil_move_is_refused_while_an_action_is_running():
     assert payload == {}
     # And no device call at all -- not a call that the driver then declined.
     assert ch.commands == [], ch.commands
+    # Nor a task: the refusal is decided before anything is dispatched.
+    assert galil_motion.PANEL_MOVE_TASKS == set()
     print("test_galil_move_is_refused_while_an_action_is_running PASS")
 
 
@@ -386,9 +450,7 @@ def test_galil_move_is_allowed_when_every_endpoint_is_idle():
     """
     app, ch = _galil_app()
     app.set_idle("move", "easymove", "query_positions")
-    error_code, _ = asyncio.run(
-        app.routes["/move_axis"].fn(axis="x", value=3, units=Units.counts)
-    )
+    error_code, _ = _galil_move(app, axis="x", value=3, units=Units.counts)
     assert error_code == ErrorCodes.none
     assert "PRC=3" in ch.commands, ch.commands
     print("test_galil_move_is_allowed_when_every_endpoint_is_idle PASS")
@@ -557,14 +619,164 @@ def test_galil_move_rejects_an_unconfigured_axis(galil_client):
 
 
 def test_galil_move_accepts_both_spelled_units(galil_client):
+    from helao.deploy.hte.servers.action import galil_motion
+
     client, channel = galil_client
     for units in ("mm", "counts"):
         resp = client.post(
             "/move_axis", params={"axis": "x", "value": 1, "units": units}
         )
         assert resp.status_code == 200, (units, resp.text)
-    assert _emitted(channel, "PRC"), channel.commands
+    # Polled, not asserted outright: the response now arrives before the
+    # dispatched move has reached the device, and this test drives the app
+    # from another thread, so there is no task here to await.
+    assert _wait_until(lambda: _emitted(channel, "PRC")), channel.commands
+    # Drained before the client tears the loop down, so a pending move is not
+    # cancelled out from under the done-callback.
+    _wait_until(lambda: not galil_motion.PANEL_MOVE_TASKS)
     print("test_galil_move_accepts_both_spelled_units PASS")
+
+
+# --------------------------------------------------------------------------
+# galil: dispatch, not completion
+# --------------------------------------------------------------------------
+
+
+def test_galil_panel_move_returns_before_the_stage_arrives():
+    """The defect this endpoint's asynchrony exists to fix.
+
+    ``_motor_move`` settle-polls until motion stops, to a 30-minute cap, and
+    the panel dispatches with a 5 s timeout -- so while this route blocked,
+    every move longer than about five seconds was reported to the operator as
+    a failure while the stage was in fact moving to where it was asked.
+
+    Asserted without a clock: the stand-in driver call parks on an event this
+    test only sets *after* the endpoint has answered, so the call can complete
+    at all only if the endpoint did not wait for it. ``wait_for`` turns the
+    regression into a failure instead of a hang.
+    """
+    app, _ = _galil_app()
+    started = asyncio.Event()
+    released = asyncio.Event()
+
+    async def _slow_move(**kwargs):
+        started.set()
+        await released.wait()
+        return {"err_code": [ErrorCodes.none], "counts": [7]}
+
+    async def _run():
+        app.driver._motor_move = _slow_move
+        error_code, payload = await asyncio.wait_for(
+            app.routes["/move_axis"].fn(axis="x", value=7, units=Units.counts),
+            timeout=10,
+        )
+        # Answered while the move has not even begun -- the strongest form of
+        # "did not wait for it".
+        assert not started.is_set()
+        assert error_code == ErrorCodes.none
+        assert payload == {"axis": "x", "requested": 7, "units": "counts", "counts": 7}
+
+        released.set()
+        await _settle_galil_moves()
+        # ...and the move did run, rather than being dropped on the floor.
+        assert started.is_set()
+
+    asyncio.run(_run())
+    print("test_galil_panel_move_returns_before_the_stage_arrives PASS")
+
+
+def test_galil_panel_move_holds_a_reference_to_its_task():
+    """A bare ``create_task`` can be garbage-collected mid-move.
+
+    The loop keeps only a weak reference to a running task, so the dispatcher
+    has to hold a strong one until the move finishes -- and drop it after, or
+    the set grows for the life of the server.
+    """
+    from helao.deploy.hte.servers.action import galil_motion
+
+    app, _ = _galil_app()
+    released = asyncio.Event()
+
+    async def _slow_move(**kwargs):
+        await released.wait()
+        return {"err_code": [ErrorCodes.none], "counts": [7]}
+
+    async def _run():
+        app.driver._motor_move = _slow_move
+        await app.routes["/move_axis"].fn(axis="x", value=7, units=Units.counts)
+        assert len(galil_motion.PANEL_MOVE_TASKS) == 1, galil_motion.PANEL_MOVE_TASKS
+        released.set()
+        await _settle_galil_moves()
+        assert galil_motion.PANEL_MOVE_TASKS == set()
+
+    asyncio.run(_run())
+    print("test_galil_panel_move_holds_a_reference_to_its_task PASS")
+
+
+def test_galil_background_move_that_raises_is_logged_not_swallowed():
+    """The cost of answering early, and the only thing that pays it back.
+
+    Once the endpoint has returned, a raising move produces nothing but
+    "Task exception was never retrieved" at collection time -- which is to say
+    nothing an operator or a log reader ever sees. The done-callback is what
+    turns it back into a record, and it has to name the axis and the value,
+    since the panel is by then reporting a move it believes succeeded.
+    """
+    from helao.deploy.hte.servers.action import galil_motion
+
+    app, _ = _galil_app()
+
+    async def _exploding_move(**kwargs):
+        raise RuntimeError("gclib went away")
+
+    recorder = _Recorder()
+    original = galil_motion.LOGGER
+    galil_motion.LOGGER = recorder
+    try:
+        app.driver._motor_move = _exploding_move
+        error_code, _ = _galil_move(app, axis="x", value=7, units=Units.counts)
+    finally:
+        galil_motion.LOGGER = original
+
+    # The panel was told the move was accepted -- which it was.
+    assert error_code == ErrorCodes.none
+    assert recorder.messages["error"], recorder.messages
+    logged = recorder.messages["error"][0]
+    assert "gclib went away" in logged
+    assert "'x'" in logged, logged
+    assert "7" in logged, logged
+    print("test_galil_background_move_that_raises_is_logged_not_swallowed PASS")
+
+
+def test_galil_background_move_that_returns_an_error_code_is_logged():
+    """The common failure shape, which an exception-only callback would miss.
+
+    ``_motor_move`` funnels nearly every real fault into an ``ErrorCodes``
+    value rather than raising -- the busy guard, a rejected command, a
+    timeout. Those used to be the endpoint's return value and now have nowhere
+    else to go.
+    """
+    from helao.deploy.hte.servers.action import galil_motion
+
+    app, _ = _galil_app()
+
+    async def _failing_move(**kwargs):
+        return {"err_code": [ErrorCodes.motor], "counts": [None]}
+
+    recorder = _Recorder()
+    original = galil_motion.LOGGER
+    galil_motion.LOGGER = recorder
+    try:
+        app.driver._motor_move = _failing_move
+        _galil_move(app, axis="x", value=7, units=Units.counts)
+    finally:
+        galil_motion.LOGGER = original
+
+    assert recorder.messages["error"], recorder.messages
+    # Formatted the same way the dispatcher formats it, so the assertion
+    # cannot pass or fail on an enum-repr difference.
+    assert f"{ErrorCodes.motor}" in recorder.messages["error"][0]
+    print("test_galil_background_move_that_returns_an_error_code_is_logged PASS")
 
 
 # --------------------------------------------------------------------------

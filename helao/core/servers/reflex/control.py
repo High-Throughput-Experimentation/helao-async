@@ -17,11 +17,24 @@ for a control that has none of them.
 
 Like the operator and the data browser, this page is built directly rather than
 through the ``PanelTarget`` machinery: that is for WebSocket-fed panels with a
-render tick, and a control panel has neither. It reads once when it mounts,
-after every command, and otherwise only when a control is clicked. Never on a
-timer: ``on_unmount`` does not fire when a tab is closed, so a server-side
-refresh loop would go on polling a station's motion servers forever after the
-browser is gone.
+render tick, and a control panel has no data stream behind it. It reads once
+when it mounts, after every command, and otherwise only when a control is
+clicked — plus, after a command the server accepted, a **bounded follow-up**
+that keeps re-reading the coordinates until the motion settles. That exists
+because a fire-and-forget driver answers a move *before* the stage has moved,
+so the read that follows the dispatch captures the pre-move coordinate and the
+readout then sits stale until somebody presses Read. Reported from a live
+instrument, not hypothesised.
+
+**The follow-up is driven by a ticking component in the page, never by a
+server-side loop.** ``on_unmount`` fires on in-app navigation but not when a
+tab is closed, so a ``while True`` in a background handler would go on polling
+a station's motion servers forever after the browser is gone, logging a delta
+to a disconnected client on every pass. A component stops existing with its
+tab. When and for how long to keep reading is
+:func:`~helao.core.servers.motion_control.should_follow_up`'s decision, not
+this page's, so the two stacks cannot come to refresh differently — the same
+rule that keeps the confirmation threshold out of here.
 """
 
 __all__ = ["ControlState", "configure_control", "control_page", "control_targets"]
@@ -43,6 +56,9 @@ from helao.core.servers.io_control import (
 from helao.core.servers.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
+    FOLLOWUP_CEILING_S,
+    FOLLOWUP_GRACE_S,
+    FOLLOWUP_INTERVAL_S,
     Units,
     discover_axes,
     exceeds_warn_threshold,
@@ -50,6 +66,7 @@ from helao.core.servers.motion_control import (
     outcome_status,
     position_label,
     read_axis_positions,
+    should_follow_up,
     stop_motion,
 )
 from helao.core.servers.palette import (
@@ -83,6 +100,26 @@ MOVE_MODES = ["relative", "absolute"]
 #: The unit dropdown's options, from the shared enum so the page cannot offer a
 #: unit the endpoint would 422 on.
 UNIT_NAMES = [unit.value for unit in Units]
+
+#: The page's tick while a command is being followed up, in milliseconds. The
+#: shared cadence converted once, rather than a number chosen here: a page that
+#: picked its own would be the drift between the two stacks that
+#: :mod:`~helao.core.servers.motion_control` exists to prevent.
+FOLLOWUP_TICK_MS = int(FOLLOWUP_INTERVAL_S * 1000)
+
+#: The page's tick when nothing is being followed up.
+#:
+#: Slow, and deliberately **not zero** even though ``interval=0`` is
+#: react-moment's documented way to disable the timer outright. Whether that
+#: component *restarts* a timer it had disabled when the prop goes back above
+#: zero is a behaviour of a JavaScript dependency no Python test in this repo
+#: can observe — and if it does not, a zero idle tick leaves the follow-up
+#: permanently dead while every test here still passes. A slow non-zero tick
+#: fails the other way instead: the readout settles a few seconds late rather
+#: than never. The tick itself costs nothing when idle —
+#: :meth:`ControlState.follow_up` returns before any I/O — so what is being
+#: bought with this interval is only the frequency of a no-op event.
+IDLE_TICK_MS = 5000
 
 # Column indices into a motion row. Named, because the rows are flat lists of
 # strings -- which is what ``rx.foreach`` can iterate -- and ``row[7]`` at a
@@ -381,13 +418,45 @@ class ControlState(rx.State):
     #: Guards the mount read, which Reflex may fire more than once.
     loaded: bool = False
 
+    #: How often the page's tick fires, in milliseconds. Bound to the ticking
+    #: component in :func:`control_page`, so raising it to
+    #: :data:`FOLLOWUP_TICK_MS` is what starts a follow-up refresh and dropping
+    #: it back to :data:`IDLE_TICK_MS` is what ends one.
+    tick_ms: int = IDLE_TICK_MS
+
+    #: The server whose coordinates are being followed after a command, or
+    #: ``""`` when none is.
+    #:
+    #: One server at a time, not a set: a second command simply retargets the
+    #: follow-up and restarts its clock. Two axes being followed on two
+    #: different servers at once would need one clock each, and the case it
+    #: would serve — an engineer driving two stations from one browser tab
+    #: within the same two seconds — is not one this panel has.
+    followup_server: str = ""
+
+    #: When the current follow-up began, on the same monotonic clock the arm
+    #: timeout counts in. Monotonic for the same reason: an NTP step must not
+    #: extend or curtail it.
+    followup_since: float = 0.0
+
+    #: Whether a follow-up read is in flight.
+    #:
+    #: A tick that lands while the previous read has not answered is dropped
+    #: rather than queued — a motion server answering slower than the interval
+    #: would otherwise accumulate overlapping reads that interleave their
+    #: writes and can leave an older coordinate on top of a newer one.
+    followup_busy: bool = False
+
     @rx.event(background=True)
     async def load(self):
         """Read every server's outputs once, when the page mounts.
 
-        Once, not on a timer: these are engineering controls, not a data
+        Once, and never on a poll: these are engineering controls, not a data
         stream. The page therefore shows truth at open plus whatever it has
-        commanded since — the same contract the Bokeh panel keeps.
+        commanded since — the same contract the Bokeh panel keeps. The
+        follow-up in :meth:`follow_up` is not a poll of that kind; it is
+        bounded, and it only runs while a command this page issued is still
+        settling.
         """
         async with self:
             if self.loaded:
@@ -715,6 +784,11 @@ class ControlState(rx.State):
         await self._refresh_positions(server_key)
         async with self:
             self.status = f"{axis}: move commanded"
+            # This read is not the last word. The command returns once the move
+            # has been *dispatched*, and a fire-and-forget driver returns before
+            # the stage has moved, so what was just rendered may still be the
+            # pre-move coordinate.
+            self._begin_followup(server_key)
 
     @rx.event(background=True)
     async def stop(self, server_key: str):
@@ -754,17 +828,31 @@ class ControlState(rx.State):
             if not isinstance(stopped, (list, tuple)) or not stopped:
                 stopped = [item.axis for item in target.axes]
             self.status = f"{server_key}: stopped {', '.join(str(a) for a in stopped)}"
+            # A stop is a deceleration, not an instant halt, so the read above
+            # is as provisional as a move's is -- and this is the moment an
+            # engineer most needs the coordinate the stage actually came to
+            # rest at.
+            self._begin_followup(server_key)
 
-    async def _refresh_positions(self, server_key: str) -> None:
+    async def _refresh_positions(self, server_key: str) -> dict:
         """Re-read one server's coordinates, leaving every other row alone.
 
         Targeted rather than a whole-page read: a move must not restate every
         digital output on the page, and a station's other servers have nothing
         to say about an axis that just moved.
+
+        Returns:
+            dict: What the server reported, as
+            :func:`~helao.core.servers.motion_control.read_axis_positions`
+            returns it, or ``{}``. Returned rather than only rendered because
+            the follow-up has to ask the shared policy whether to read again,
+            and that question is asked of the *reply* — the rows have already
+            flattened ``moving`` to a word, and reading it back out of them
+            would make that rendering load-bearing.
         """
         target = _CONFIG["servers"].get(server_key)
         if target is None or not target.axes:
-            return
+            return {}
         got = await read_axis_positions(
             server_key=target.server_key, host=target.host, port=target.port
         )
@@ -783,6 +871,112 @@ class ControlState(rx.State):
                 )
                 for row in self.motion_rows
             ]
+        return got
+
+    @rx.event(background=True)
+    async def follow_up(self, _tick: str = ""):
+        """Re-read the coordinates of a server that was just commanded.
+
+        Bound to the ticking component in :func:`control_page`, which is the
+        whole of why this is safe to run repeatedly: the tick lives in the
+        page, so it stops existing when the tab does. A ``while True`` here
+        would keep polling a station's motion servers long after the browser
+        was gone, because ``on_unmount`` fires on in-app navigation and not on
+        a closed tab.
+
+        **Inert unless a command started a follow-up.** With no
+        :attr:`followup_server` this returns before touching the network, so
+        the tick that keeps firing on an idle page costs one no-op event and
+        issues no request to any instrument.
+
+        Whether to read *again* is
+        :func:`~helao.core.servers.motion_control.should_follow_up`'s decision.
+        Two things it encodes and this must not defeat: the read that follows a
+        dispatch can honestly answer ``moving: False`` because the stage has
+        not started yet, which is why the first seconds are read regardless;
+        and ``moving`` is tri-state, so only an explicit ``True`` sustains the
+        follow-up after that.
+
+        Args:
+            _tick: The interval component's value. Unused; present because
+                ``on_change`` passes one.
+        """
+        async with self:
+            server_key = self.followup_server
+            if not server_key or self.followup_busy:
+                return
+            since = self.followup_since
+            self.followup_busy = True
+        try:
+            positions = await self._refresh_positions(server_key)
+            async with self:
+                if self.followup_server != server_key:
+                    # A newer command retargeted the follow-up while this read
+                    # was in flight. That one owns the tick and its own clock
+                    # now, and ending "the" follow-up here would stop it after
+                    # a single interval.
+                    return
+                elapsed = _now() - since
+                if not should_follow_up(positions, elapsed):
+                    self._end_followup(server_key, positions, elapsed)
+        finally:
+            # In a finally so a read that raised does not wedge the follow-up
+            # busy forever, which would leave the readout stale in exactly the
+            # case this whole mechanism exists for.
+            async with self:
+                self.followup_busy = False
+
+    def _begin_followup(self, server_key: str) -> None:
+        """Start re-reading one server's coordinates until its motion settles.
+
+        Called only after a command the server *accepted*. A refused or failed
+        command moved nothing, so there is nothing to settle — and following up
+        anyway would overwrite the status naming that failure with this
+        mechanism's own, hiding the one line the engineer needs.
+
+        Args:
+            server_key: The server just commanded.
+        """
+        target = _CONFIG["servers"].get(server_key)
+        if target is None or not target.axes:
+            return
+        self.followup_server = server_key
+        self.followup_since = _now()
+        self.tick_ms = FOLLOWUP_TICK_MS
+
+    def _end_followup(self, server_key: str, positions: dict, elapsed: float) -> None:
+        """Stop following one server, and say how the following ended.
+
+        Two endings, told apart because they mean opposite things. Reaching the
+        ceiling with an axis still reporting motion is not a settled readout:
+        the coordinate on screen is the last one read and the stage may still
+        be moving, so the status says so and points at the Read button, which
+        is precisely what it is still there for.
+
+        Args:
+            server_key: The server being followed.
+            positions: The last read.
+            elapsed: Seconds since the follow-up began.
+        """
+        self.followup_server = ""
+        self.followup_since = 0.0
+        self.tick_ms = IDLE_TICK_MS
+        # Asked of the shared policy rather than re-derived here: ``moving`` is
+        # tri-state and only an explicit True counts, and at exactly the grace
+        # boundary ``should_follow_up`` reduces to that one question -- past
+        # the grace window, short of the ceiling.
+        if elapsed >= FOLLOWUP_CEILING_S and should_follow_up(
+            positions, FOLLOWUP_GRACE_S
+        ):
+            self.status = (
+                f"{server_key}: still moving after {int(FOLLOWUP_CEILING_S)}s — "
+                f"press Read state for the current position"
+            )
+        else:
+            # What happened, not what it implies. A driver that never reports
+            # ``moving`` has not told this panel the move finished; it has told
+            # it where the axis is now.
+            self.status = f"{server_key}: position updated"
 
     def _motion_row_of(self, server_key: str, axis: str):
         """Return the row currently rendered for one axis, or ``None``."""
@@ -1051,6 +1245,16 @@ def control_page():
             ),
             align="center",
             spacing="3",
+        ),
+        # The follow-up's tick, in the page rather than in a background loop:
+        # a component stops existing when its tab closes, and ``on_unmount``
+        # does not fire then. It ticks whether or not anything is moving --
+        # ``follow_up`` returns before any I/O unless a command started one --
+        # and :attr:`ControlState.tick_ms` is what makes it slow while idle.
+        rx.moment(
+            interval=ControlState.tick_ms,
+            on_change=ControlState.follow_up,
+            display="none",
         ),
         width="100%",
         spacing="4",
