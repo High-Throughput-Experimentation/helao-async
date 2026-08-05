@@ -27,6 +27,7 @@ from helao.hexagon.domain.orchestration import EstopFanout, FinishActiveEstopped
 
 __all__ = [
     "DriverFaultEdge",
+    "EstopOrch",
     "EstopPolicy",
     "EstopTopology",
     "OrchEstopRequest",
@@ -35,6 +36,8 @@ __all__ = [
     "StopPrivate",
     "StopRecorders",
     "UiEstopButton",
+    "UiGracefulStopButton",
+    "UiOrchEstopButton",
     "derive_estop_topology",
     "mark_estopped",
 ]
@@ -101,6 +104,35 @@ class DriverFaultEdge:
 
 @dataclass(frozen=True)
 class UiEstopButton:
+    """The station panel's full-cascade button ("stop everything").
+
+    Yields the same commands as :class:`DriverFaultEdge`. The two smaller
+    buttons below are deliberately NOT folded into this one -- see
+    :meth:`EstopPolicy.commands_for`.
+    """
+
+    source: str
+
+
+@dataclass(frozen=True)
+class UiGracefulStopButton:
+    """The station panel's "safe stop" button: orchestrators only, via /stop.
+
+    Lets the running action finish. Emits no recorder or private stops.
+    """
+
+    source: str
+
+
+@dataclass(frozen=True)
+class UiOrchEstopButton:
+    """The station panel's emergency-stop button: orchestrators only, via
+    /estop_orch.
+
+    Distinct from :class:`UiGracefulStopButton` in the *route* it hits, not the
+    key set -- which is exactly why it cannot share a trigger with it.
+    """
+
     source: str
 
 
@@ -114,7 +146,14 @@ class OrchEstopRequest:
     reason: str
 
 
-Trigger = Union[DriverFaultEdge, UiEstopButton, StatusEstopIngested, OrchEstopRequest]
+Trigger = Union[
+    DriverFaultEdge,
+    UiEstopButton,
+    UiGracefulStopButton,
+    UiOrchEstopButton,
+    StatusEstopIngested,
+    OrchEstopRequest,
+]
 
 
 # --- commands (executed via the Transport port, P1b) ---
@@ -141,7 +180,26 @@ class StopPrivate:
     keys: tuple[str, ...]
 
 
-Command = Union[StopOrch, StopRecorders, StopPrivate, EstopFanout, FinishActiveEstopped]
+@dataclass(frozen=True)
+class EstopOrch:
+    """POST /estop_orch on an orchestrator key.
+
+    Not the same as :class:`StopOrch` (which is /stop, a graceful stop that lets
+    the running action finish) and not the same as :class:`EstopFanout` (which is
+    what the receiving orchestrator then does to its own group).
+    """
+
+    key: str
+
+
+Command = Union[
+    StopOrch,
+    StopRecorders,
+    StopPrivate,
+    EstopOrch,
+    EstopFanout,
+    FinishActiveEstopped,
+]
 
 
 class EstopPolicy:
@@ -151,6 +209,18 @@ class EstopPolicy:
         self.topology = topology
 
     def commands_for(self, trigger: Trigger) -> tuple[Command, ...]:
+        # The two SMALLER station-panel buttons, handled first because they are
+        # narrower cases of "a UI asked for a stop". Each hits orchestrators
+        # ONLY, and they differ from each other in the route, not the key set:
+        # graceful stop is /stop (the running action finishes), emergency stop
+        # is /estop_orch. Folding either into UiEstopButton below would change
+        # what a safety button does on the wire -- escalating a graceful stop
+        # into a full cascade, or downgrading an emergency stop onto /stop --
+        # and no artifact diff would show it.
+        if isinstance(trigger, UiGracefulStopButton):
+            return tuple(StopOrch(key=k) for k in self.topology.orch_keys)
+        if isinstance(trigger, UiOrchEstopButton):
+            return tuple(EstopOrch(key=k) for k in self.topology.orch_keys)
         if isinstance(trigger, (DriverFaultEdge, UiEstopButton)):
             # the (previously hardcoded) station-side cascade: orchestrators
             # first, then recorders, then stop_private targets -- fixed order,
