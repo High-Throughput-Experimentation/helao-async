@@ -23,7 +23,8 @@ So this tool never blindly overwrites:
   PEP 585 spelling is copied through **byte-verbatim** from the frozen file;
 * a genuinely new route is appended;
 * a **changed** schema or a **removed** route is a real surface change, and is
-  reported and left UNAPPLIED unless ``--accept-drift`` says otherwise.
+  reported and left UNAPPLIED unless ``--accept-drift`` says otherwise — and even
+  then it is applied **surgically**, touching only the flagged route and field.
 
 That default is the important one. Regenerating a checklist to make a diff pass
 is the failure mode the frozen-checklist gate exists to prevent, so widening the
@@ -43,7 +44,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from harness.endpoints import diff_route_sets, extract_routes
+from harness.endpoints import diff_route_sets, extract_routes, normalize_annotation
 from helao.hexagon.preflight import _checklist_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -88,8 +89,79 @@ def synthesized_key(frozen: list[dict]) -> Optional[str]:
     return None if only == "{server_key}" else only
 
 
+def _merge_params(frozen_params: list, current_params: list) -> list:
+    """``current_params``, but keeping a frozen param's verbatim text where the
+    type is unchanged and only its PEP 585 spelling moved.
+
+    Needed because ``diff_route_sets`` reports ``params`` as one field, so
+    accepting a real correction to ONE parameter would otherwise rewrite every
+    other parameter on that route — including spellings the gate already ignores.
+    """
+    frozen_by_name = {
+        p["name"]: p for p in frozen_params if isinstance(p, dict) and "name" in p
+    }
+
+    def same_modulo_spelling(a: dict, b: dict) -> bool:
+        def norm(p: dict) -> dict:
+            out = dict(p)
+            ann = out.get("annotation")
+            if isinstance(ann, str):
+                out["annotation"] = normalize_annotation(ann)
+            return out
+
+        return norm(a) == norm(b)
+
+    out = []
+    for cur in current_params:
+        fz = frozen_by_name.get(cur.get("name")) if isinstance(cur, dict) else None
+        out.append(fz if fz is not None and same_modulo_spelling(fz, cur) else cur)
+    return out
+
+
+def apply_drift(
+    frozen: list[dict], current: list[dict], drift: list[dict]
+) -> list[dict]:
+    """``frozen`` with ONLY the reported ``drift`` records applied.
+
+    A ``missing`` record drops that route; a ``changed`` record replaces just the
+    named field on that route (and, for ``params``, only the parameters that truly
+    differ — see :func:`_merge_params`). Every other route and field stays
+    byte-verbatim, and the surviving order is preserved.
+
+    The alternative — taking the current extraction wholesale for that server —
+    is what the first version did, and it silently rewrote four unrelated verbatim
+    annotations while correcting six real ones, two of them on routes the diff had
+    not even flagged. An escape hatch that churns the record it is editing defeats
+    the point of freezing additively at all.
+    """
+    cur_by_key = {_route_key(r): r for r in current}
+    dropped = {(d["path"], d["method"]) for d in drift if d["kind"] == "missing"}
+    changes: dict[tuple[str, str], list[str]] = {}
+    for d in drift:
+        if d["kind"] == "changed":
+            changes.setdefault((d["path"], d["method"]), []).append(d["field"])
+
+    out: list[dict] = []
+    for route in frozen:
+        key = _route_key(route)
+        if key in dropped:
+            continue
+        fields = changes.get(key)
+        if fields:
+            cur = cur_by_key[key]
+            route = dict(route)
+            for field in fields:
+                route[field] = (
+                    _merge_params(route[field], cur[field])
+                    if field == "params"
+                    else cur[field]
+                )
+        out.append(route)
+    return out
+
+
 def merge_routes(
-    frozen: list[dict], current: list[dict]
+    frozen: list[dict], current: list[dict], *, accept_drift: bool = False
 ) -> tuple[list[dict], list[dict]]:
     """Merge ``current`` into ``frozen`` additively.
 
@@ -99,16 +171,22 @@ def merge_routes(
     (a frozen route the module no longer registers) and ``changed`` (same route,
     different schema beyond PEP 585 spelling). ``extra`` records are the additions
     and are applied, not reported as drift.
+
+    With ``accept_drift`` the drift records are applied too, surgically
+    (:func:`apply_drift`) rather than by replacing the server's whole route list.
     """
     drift = [d for d in diff_route_sets(frozen, current) if d["kind"] != "extra"]
     frozen_keys = {_route_key(r) for r in frozen}
     additions = [r for r in current if _route_key(r) not in frozen_keys]
+    if accept_drift and drift:
+        frozen = apply_drift(frozen, current, drift)
     if not additions:
-        # Return the frozen list ITSELF, untouched. Not `sorted(frozen)`: a frozen
-        # file need not be stored in sorted order (one is kept in source-declaration
+        # Return the frozen list AS IT STANDS -- untouched when no drift was
+        # accepted, patched in place when it was. Not `sorted(...)`: a frozen file
+        # need not be stored in sorted order (one is kept in source-declaration
         # order), and re-sorting it would rewrite a verbatim record to no effect --
         # the very thing this module exists to avoid. Callers detect "nothing to do"
-        # by identity/equality with what they read.
+        # by equality with what they read.
         return frozen, drift
     # Adding a route does normalize the file to sorted order. Harmless: the gate
     # compares by (path, method), so order carries no meaning, and entry CONTENT is
@@ -180,7 +258,7 @@ def freeze_deployment(
                 )
                 continue
         current = extract_routes(src, server_key=key)
-        merged, drift = merge_routes(frozen, current)
+        merged, drift = merge_routes(frozen, current, accept_drift=accept_drift)
 
         for d in drift:
             msg = f"{stem}: {d['kind']} {d['method'].upper()} {d['path']}"
@@ -190,8 +268,6 @@ def freeze_deployment(
                 lines.append(f"  ACCEPTED {msg}")
             else:
                 blockers.append(msg)
-        if accept_drift and drift:
-            merged = sorted(current, key=_route_key)
 
         if merged == frozen:
             lines.append(f"  unchanged  {stem} ({len(frozen)} routes)")
@@ -214,7 +290,7 @@ def main(argv=None) -> int:
     p.add_argument(
         "--accept-drift",
         action="store_true",
-        help="also apply changed/removed routes (widens the gate — record why)",
+        help="also apply changed/removed routes, surgically (record why in the commit)",
     )
     p.add_argument("--dry-run", action="store_true", help="report without writing")
     p.add_argument(

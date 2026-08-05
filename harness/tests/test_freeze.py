@@ -77,6 +77,55 @@ def test_merge_does_not_reorder_a_file_it_has_nothing_to_add_to():
     assert [r["path"] for r in merged] == ["/K/get", "/K/set", "/K/home"]
 
 
+def test_accept_drift_touches_only_the_flagged_parameter():
+    """Correcting one param must not rewrite its neighbours' verbatim spelling.
+
+    `diff_route_sets` reports `params` as a single field, so a naive accept
+    replaces the whole list. The first version of this tool did that per SERVER
+    and rewrote four unrelated annotations while fixing six real ones.
+    """
+    frozen = [
+        _route(
+            "/K/move",
+            params=[
+                # A real defect: an annotation the source never had.
+                {"name": "speed", "annotation": "Optional[int]", "default": "None"},
+                # Spelling-only: a typing sweep moved it; the gate ignores this.
+                {"name": "d_mm", "annotation": "List[float]", "default": "[0, 0]"},
+            ],
+        )
+    ]
+    current = [
+        _route(
+            "/K/move",
+            params=[
+                {"name": "speed", "annotation": "int", "default": "None"},
+                {"name": "d_mm", "annotation": "list[float]", "default": "[0, 0]"},
+            ],
+        )
+    ]
+    merged, drift = freeze.merge_routes(frozen, current, accept_drift=True)
+    anns = {p["name"]: p["annotation"] for p in merged[0]["params"]}
+    assert anns["speed"] == "int", "the flagged correction was not applied"
+    assert anns["d_mm"] == "List[float]", "verbatim spelling was churned"
+    assert [d["kind"] for d in drift] == ["changed"]
+
+
+def test_accept_drift_drops_a_removed_route_and_leaves_the_rest_verbatim():
+    frozen = [_route("/K/gone"), _route("/K/kept")]
+    current = [_route("/K/kept")]
+    merged, _ = freeze.merge_routes(frozen, current, accept_drift=True)
+    assert [r["path"] for r in merged] == ["/K/kept"]
+    assert merged[0] is frozen[1], "surviving entry was rebuilt rather than kept"
+
+
+def test_accept_drift_is_inert_when_there_is_no_drift():
+    frozen = [_route("/K/a"), _route("/K/b")]
+    merged, drift = freeze.merge_routes(frozen, list(frozen), accept_drift=True)
+    assert drift == []
+    assert merged == frozen
+
+
 def test_synthesized_key_detects_a_concrete_prefix():
     assert freeze.synthesized_key([_route("/CALC/a"), _route("/CALC/b")]) == "CALC"
 
