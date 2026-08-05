@@ -1780,6 +1780,31 @@ def test_the_sample_list_load_button_shares_its_parameter_cell():
     assert len(picked) == 1, len(picked)
     assert _file_inputs(cells[1]) == []
 
+    # Beside the input rather than beneath it: same row, and after it, so the
+    # button reads as belonging to the field it fills.
+    from bokeh.models import TextInput
+
+    rows_with_picker = []
+    stack, seen = [cells[0]], set()
+    while stack:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        kids = getattr(node, "children", None) or []
+        if any(isinstance(kid, FileInput) for kid in kids):
+            rows_with_picker.append(kids)
+        stack.extend(kids)
+    assert len(rows_with_picker) == 1, len(rows_with_picker)
+    siblings = rows_with_picker[0]
+    text_at = [
+        i
+        for i, kid in enumerate(siblings)
+        if isinstance(kid, TextInput) and kid.name == "plate_sample_no_list"
+    ]
+    assert text_at, "picker is not in the same row as its text input"
+    assert siblings.index(picked[0]) > text_at[0], "picker precedes its input"
+
     # Minimal by construction: the label and the box come from the stylesheet,
     # so a Python `width=` here would size the host while the native control
     # inside kept its own and the two would disagree.
