@@ -173,7 +173,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "Union[List[str], str]",
+        "annotation": "Union[list[str], str, None]",
         "default": "None"
       }
     ]

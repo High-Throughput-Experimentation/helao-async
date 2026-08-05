@@ -404,7 +404,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/query_moving", tags=["action"])
             async def query_moving(
-                axis: Union[list[str], str] = None,
+                axis: Union[list[str], str, None] = None,
             ):
                 """Return whether the given axis or list of axes is currently moving."""
                 active = await app.base.setup_and_contain_action(
