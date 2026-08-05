@@ -54,6 +54,7 @@ servers:
     port: 8003
     group: action
     fast: galil_motion
+    control_vis: motion_control_letter_scale
     params:
       enable_aligner: true
       bokeh_port: 5003

@@ -185,6 +185,43 @@ note. Reach is wider than the Reflex rollout: **15 of 21 hte configs** declare
 and one Deployment-C config — see the table in §2. Any inventory that treats `control_vis`
 as a Reflex-era key will miss 11 hte configs.
 
+**Update 2026-08-05 — `control_vis` now selects motion panels too, and a hexagon
+adapter gained a UI-facing surface.** Two entries, because they are different kinds
+of thing:
+
+1. **`control_vis` is no longer digital-output-only.** It now also selects
+   *motion-axis* panels, and hte ships three motion panel modules in **each** stack
+   (six files): `motion_control_letter_scale`, `motion_control_name_scale`,
+   `motion_control_inverse_scale` — named for the three *config schemas*
+   (`axis_id`→letter with letter-keyed `count_to_mm`; `axis_id`→serial with
+   name-keyed `count_to_mm`; an `axes:` block whose `pos_scale` is the
+   **reciprocal**, counts per mm). The panel module supplies the schema through a
+   new `AXIS_SOURCE` attribute, mirroring how `DO_GROUPS` supplies the output
+   blocks, so both discovery functions now have the *same* contract:
+   `discover_do_items(config, groups)` and `discover_axes(config, axis_source)`.
+   That alignment is deliberate — it is what lets P7's single `ControlSurface`
+   port cover `io_control` and `motion_control` without forking either. 12 hte
+   config blocks and one private deployment's station config declare the new
+   values.
+
+2. **`NativeGalilMotion.query_axis_position_counts` is a dependent surface with no
+   port in front of it.** It lives under `helao/hexagon/adapters/native/` and its
+   only consumer is a legacy-core UI module — exactly the category this inventory
+   exists to record. It is legal under D9 today (the UI stays on legacy core
+   through P0–P6), but P7-UI inherits it, and omitting it here would hide a
+   surface from the phase that has to wrap it. The hte Kinesis and private
+   deployment's Thorlabs drivers gained equivalent dual-unit reads; those are
+   deployment drivers, not hexagon adapters, so only the Galil one belongs in
+   *this* inventory.
+
+Three new bare-path private routes per motion server (`/move_axis`,
+`/stop_motion`, `/get_axis_positions`) are frozen in the usual checklists —
+`galil_motion.json` 24→27, `kinesis_server.json` 5→8, and 16→19 in a private
+deployment — additively, no `--accept-drift`. The route is `/stop_motion` and
+deliberately **not** `/stop_private`: that name is reserved in
+`EstopPolicy._VALID_ROLES`, and this halt-only route must never be taggable into
+an estop cascade, which has to de-energize.
+
 The same section gains **`reflex:` servers** in its per-config server set, and the
 `bokeh_port`-style "invisible port claim" hazard of §8.3(3d) gains its worst case yet:
 a `reflex:` server claims `port + 1` with nothing in the config naming that port. One

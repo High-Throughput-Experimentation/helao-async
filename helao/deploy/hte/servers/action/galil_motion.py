@@ -45,6 +45,7 @@ import numpy as np
 from helao.core.error import ErrorCodes
 from helao.core.models.file import FileConnParams
 from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.motion_control import Units
 from helao.helpers import helao_logging as logging
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.make_str_enum import make_str_enum
@@ -65,6 +66,55 @@ from ...drivers.motion.galil_motion_driver import (
 )
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def _running_actions(app: BaseAPI) -> list:
+    """Names of this server's endpoints that currently have a running action.
+
+    Whether an action is running is knowable only server-side, from the
+    ``Base`` object no shared module holds, so this check cannot live beside
+    the rest of the panel logic in ``motion_control.py`` -- only the
+    *rendering* of a refusal does. Same sweep the queueing middleware performs
+    in ``base_api.py``, without its single-endpoint narrowing: a panel command
+    for the stage cares that the server is moving something, not which route
+    was asked to move it.
+    """
+    return [
+        ep for ep, em in app.base.actionservermodel.endpoints.items() if em.active_dict
+    ]
+
+
+def _first_error(err_code) -> ErrorCodes:
+    """Collapse ``_motor_move``'s per-axis error list to a single code.
+
+    The driver reports one code per requested axis; these endpoints request
+    exactly one, but the early-refusal branches return a bare code rather than
+    a list, so both shapes arrive here. The first non-``none`` entry wins --
+    a partial success on a single-axis move is still a failed move.
+    """
+    if isinstance(err_code, list):
+        for code in err_code:
+            if code != ErrorCodes.none:
+                return code
+        return ErrorCodes.none if err_code else ErrorCodes.unspecified
+    return err_code if err_code is not None else ErrorCodes.unspecified
+
+
+def _first_count(counts) -> Optional[int]:
+    """Pull the commanded count out of ``_motor_move``'s per-axis list.
+
+    ``None`` -- never ``0`` -- when the driver did not report one: zero is a
+    legitimate count, so a missing value shown as zero would read as a
+    deliberate no-op move.
+    """
+    if isinstance(counts, list):
+        counts = counts[0] if counts else None
+    if counts is None:
+        return None
+    try:
+        return int(counts)
+    except (TypeError, ValueError):
+        return None
 
 
 async def galil_dyn_endpoints(app: BaseAPI):
@@ -623,6 +673,173 @@ async def galil_dyn_endpoints(app: BaseAPI):
                     active.action.error_code = ErrorCodes.not_available
                 finished_action = await active.finish()
                 return finished_action.as_dict()
+
+        if dev_axis:
+
+            # Private motion controls for the engineering control panel. Same
+            # driver calls as the action routes above, no action wrapper: a
+            # panel click is a manual intervention, not a step of an
+            # experiment, and routing it through the action machinery would
+            # put a row in the run record for every click and queue that click
+            # behind whatever the orchestrator is running on this server.
+            #
+            # Bare paths, not ``/{server_key}/...``: that prefix is the action
+            # namespace. Reached with ``async_private_dispatcher``.
+            #
+            # ``mode`` and ``units`` are enums rather than strings on purpose.
+            # A free-text ``units`` would let ``"count"`` -- the plausible
+            # misspelling -- fall through to the millimetre branch and execute
+            # a 10 000-*count* move as 10 000 *millimetres*. FastAPI answers
+            # 422 instead. ``axis`` and ``value`` are required for the same
+            # reason: a defaulted axis moves something nobody named.
+
+            @app.post("/move_axis", tags=["private"])
+            async def move_axis(
+                axis: dev_axisitems,
+                value: float,
+                mode: MoveModes = MoveModes.relative,
+                units: Units = Units.mm,
+                speed: Optional[int] = None,
+            ):
+                """Move one axis without creating an action.
+
+                Refused outright while an action is running on this server:
+                unlike a stop, a concurrent move has no safety justification,
+                and the refusal is reported as its own outcome rather than as
+                a failure so the panel can name the remedy. No device call is
+                made in that case.
+
+                The value is dispatched in the domain ``units`` names. Under
+                ``counts`` the driver hands the integer to ``PR``/``PA``
+                undivided, so it reaches the stage exactly as typed; the
+                conversion (or its deliberate absence) happens there, never
+                here.
+
+                Always the ``motorxy`` frame: this is a raw motor-axis
+                control, so the plate and instrument transforms -- which are
+                mm arithmetic and would silently garble a count -- are never
+                involved.
+
+                Args:
+                    axis: Axis name from the server's ``axis_id`` config.
+                    value: Move magnitude or absolute target, in ``units``.
+                    mode: Relative or absolute interpretation of ``value``.
+                    units: ``mm`` or ``counts``.
+                    speed: Optional speed override in counts/sec.
+
+                Returns:
+                    ``(error_code, {"axis", "requested", "units", "counts"})``.
+                    ``counts`` is the integer the controller was commanded
+                    with, or ``None`` when the driver did not report one.
+                """
+                running = _running_actions(app)
+                if running:
+                    LOGGER.info(
+                        f"refusing panel move on axis '{axis}': actions running "
+                        f"on {running}"
+                    )
+                    return ErrorCodes.in_progress, {}
+
+                # TOCTOU residual, stated rather than discovered at a station:
+                # an action can start between the check above and the driver
+                # call below. Galil closes it downstream -- ``_motor_move``
+                # guards on ``self.motor_busy`` and returns ``in_progress`` --
+                # so the race here degrades to a refusal, not to two
+                # simultaneous move commands.
+                axis_name = getattr(axis, "value", axis)
+                datadict = await app.driver._motor_move(
+                    d_mm=value,
+                    axis=axis_name,
+                    speed=speed,
+                    mode=mode,
+                    transformation=TransformationModes.motorxy,
+                    units=units.value,
+                )
+                return _first_error(datadict.get("err_code")), {
+                    "axis": axis_name,
+                    "requested": value,
+                    "units": units.value,
+                    "counts": _first_count(datadict.get("counts")),
+                }
+
+            @app.post("/stop_motion", tags=["private"])
+            async def stop_motion():
+                """Halt every axis, leaving the motors energized.
+
+                ``ST`` only, never ``MO``: a de-energized vertical axis drops
+                under gravity, so a panel stop that cut the holding current
+                would be more dangerous than the motion it interrupted. That
+                is also why this route is **not** named for an estop -- an
+                estop must de-energize, and a halt-only route wearing that
+                name would under-stop whatever cascade adopted it.
+
+                **Unconditional, including mid-sequence, and the consequence
+                is accepted rather than hidden.** A running action is not
+                cancelled, failed, or notified: its executor keeps polling,
+                observes that motion has ceased, and completes normally --
+                reporting a position that is not the one it commanded. So the
+                run record can end up describing a move that did not go where
+                it says it went. That is the correct trade for an engineering
+                escape hatch (halting a crashing stage must not depend on the
+                orchestrator being responsive), but it is a data-integrity
+                hazard, which is why the case is logged at WARNING here.
+
+                Returns:
+                    ``(error_code, {"stopped": [axis, ...]})`` listing the
+                    axes the stop was issued to.
+                """
+                axes = app.driver.get_all_axis()
+                running = _running_actions(app)
+                if running:
+                    LOGGER.warning(
+                        f"panel stop_motion issued while actions are running on "
+                        f"{running}; motion will halt without notifying them, so "
+                        f"their recorded end position will not be the commanded one"
+                    )
+                ret = await app.driver.stop_axis(axes)
+                return _first_error(ret.get("err_code")), {"stopped": axes}
+
+            @app.post("/get_axis_positions", tags=["private"])
+            async def get_axis_positions():
+                """Return every axis's coordinate in both millimetres and counts.
+
+                One position sample per axis, rendered twice. The counts are
+                the controller's own integer and the millimetres are derived
+                from that same integer, so the two halves always describe the
+                same instant -- taking a second, scaled reading would give two
+                round trips at two instants, which cannot describe one
+                coordinate on a moving axis.
+
+                Returns:
+                    ``(error_code, {axis: {"mm": float|None,
+                    "counts": int|None, "moving": bool|None}})``. ``None``
+                    rather than ``0`` throughout: zero is a legitimate motor
+                    coordinate, so a value shown as zero must mean zero.
+                """
+                axes = app.driver.get_all_axis()
+                positions = await app.driver.query_axis_position_counts(axis=axes)
+                # A separate exchange, but for a different quantity (the SC
+                # stop-code register), not a second sample of the position.
+                moving = await app.driver.query_axis_moving(axis=axes)
+                statuses = moving.get("motor_status") or []
+                state = {}
+                for idx, ax in enumerate(axes):
+                    mm = None
+                    counts = None
+                    if idx < len(positions.get("ax", [])):
+                        mm = positions["position"][idx]
+                        counts = positions["counts"][idx]
+                    status = statuses[idx] if idx < len(statuses) else None
+                    state[ax] = {
+                        "mm": mm,
+                        "counts": None if counts is None else int(counts),
+                        "moving": (
+                            None
+                            if status not in ("moving", "stopped")
+                            else (status == "moving")
+                        ),
+                    }
+                return ErrorCodes.none, state
 
 
 def makeApp(server_key) -> BaseAPI:

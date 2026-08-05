@@ -81,7 +81,13 @@ class DigitalOutPanel:
 
         self.host = self.serv_config.get("host", None)
         self.port = self.serv_config.get("port", None)
-        self.items = discover_do_items(self.serv_config, self.DO_GROUPS)
+        # `getattr` rather than `self.DO_GROUPS`, because the class default
+        # above is silently *wrong* for a panel that is not a digital-output
+        # panel rather than absent. A sibling control panel declaring nothing
+        # would inherit ("dev_do",) and render a phantom bank of outputs read
+        # from a server that has none — no error, just controls for lines that
+        # do not exist. An empty tuple renders the honest "none configured".
+        self.items = discover_do_items(self.serv_config, getattr(self, "DO_GROUPS", ()))
         #: Last known state per line; every control starts unknown and the
         #: open-time read fills in what it can.
         self.states = {item.name: None for item in self.items}
