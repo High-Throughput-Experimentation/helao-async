@@ -59,6 +59,18 @@ _AXIS_LETTERS = "ABCDEFGH"
 _AXIS_INIT = [("MT", 2), ("CE", 4), ("TW", 32000), ("SD", 256000)]
 
 
+def _wants_counts(units: Any) -> bool:
+    """True when ``units`` selects the counts domain rather than mm.
+
+    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
+    member carries its own value, so one comparison covers both and no
+    spelling can fall through silently -- anything that is not exactly
+    ``"counts"`` is mm, and the endpoint's typed enum is what rejects a
+    misspelling with a 422 before it ever reaches here.
+    """
+    return getattr(units, "value", units) == "counts"
+
+
 class NativeGalilMotion(HelaoDriver):
     """Galil motion driver implemented directly over a GalilCommandChannel.
 
@@ -316,6 +328,63 @@ class NativeGalilMotion(HelaoDriver):
         )
         return {"ax": ret_ax, "position": ret_position}
 
+    async def query_axis_position_counts(self, axis, *args, **kwargs) -> dict:
+        """Query positions keeping the raw ``TP`` counts alongside the mm value.
+
+        Same ``TP``/``PA`` exchange as :meth:`query_axis_position`, but the
+        controller's integer is *retained* instead of being multiplied away:
+        **one device sample, two renderings**. Never take a second sample to
+        produce the other unit -- two round trips at two instants cannot
+        describe one coordinate on a moving axis.
+
+        mm is ``None``, never ``0.0``, for an axis with no ``count_to_mm``
+        entry. Zero is a legitimate motor coordinate, so a missing scale
+        rendered as ``0.0 mm`` is a confident lie.
+        :meth:`query_axis_position` keeps its ``.get(axl, 0)`` default
+        deliberately -- its return shape backs frozen action routes -- so the
+        honest default lives here, in the new code, only.
+
+        Side-effect free: unlike the other queries this one does not feed the
+        aligner position sink. It exists for on-demand engineering reads, and
+        the aligner's feed stays driven by the action-path queries.
+
+        Returns:
+            Dict ``{"ax": [...], "position": [...], "counts": [...]}`` with one
+            entry per requested axis (``None`` in every list for an axis the
+            controller did not report).
+        """
+        if not self.galil_enabled:
+            return {"ax": [], "position": [], "counts": []}
+        if not isinstance(axis, list):
+            axis = [axis]
+        q_tp = self._channel.command("TP")
+        cmd = "PA " + ",".join("?" for _ in range(len(q_tp.split(","))))
+        q = self._channel.command(cmd)
+        axlett = _AXIS_LETTERS[0 : len(q.split(","))]
+        inv_axis_id = {d: v for v, d in self.axis_id.items()}
+        ax_abc_to_xyz = {l: inv_axis_id[l] for l in axlett if l in inv_axis_id}
+        count_to_mm = self.config_dict.get("count_to_mm", {})
+        raw = {axl: int(round(float(r))) for axl, r in zip(axlett, q.split(", "))}
+        axcounts = {ax_abc_to_xyz.get(k, None): c for k, c in raw.items()}
+        axpos = {}
+        for axl, c in raw.items():
+            # P8: `.get(axl)` -> None for a missing scale, NOT `.get(axl, 0)`.
+            scale = count_to_mm.get(axl)
+            axpos[ax_abc_to_xyz.get(axl, None)] = None if scale is None else c * scale
+        ret_ax: list = []
+        ret_position: list = []
+        ret_counts: list = []
+        for ax in axis:
+            if ax in axcounts:
+                ret_ax.append(ax)
+                ret_position.append(axpos[ax])
+                ret_counts.append(axcounts[ax])
+            else:
+                ret_ax.append(None)
+                ret_position.append(None)
+                ret_counts.append(None)
+        return {"ax": ret_ax, "position": ret_position, "counts": ret_counts}
+
     async def query_axis_moving(self, axis, *args, **kwargs) -> dict:
         """Classify each axis moving/stopped from the ``SC`` stop-code register."""
         if not self.galil_enabled:
@@ -405,7 +474,9 @@ class NativeGalilMotion(HelaoDriver):
         return switch
 
     # --- coordinate-transform move orchestration (native-2) ---------------
-    async def _motor_move(self, d_mm, axis, speed, mode, transformation) -> dict:
+    async def _motor_move(
+        self, d_mm, axis, speed, mode, transformation, units="mm"
+    ) -> dict:
         """Transform coordinates, issue the per-axis move sequence, settle-poll.
 
         Faithful port of the legacy ``Galil._motor_move``: converts ``d_mm`` from
@@ -413,6 +484,23 @@ class NativeGalilMotion(HelaoDriver):
         ``count_to_mm``, clamps speed, emits ``SP``/``PR|PA|HM``/``BG`` per axis,
         then polls ``query_axis_moving`` until every axis stops or the timeout
         fires. Same return dict + ErrorCodes semantics.
+
+        ``units`` selects the domain of the supplied values and defaults to mm,
+        so every existing caller is unaffected:
+
+        - ``"mm"`` -- the historical path, byte-identical: value / count_to_mm,
+          floored, with the floored remainder reported as ``err_dist``.
+        - ``"counts"`` -- the supplied value **is** the controller count. It is
+          handed to ``PR``/``PA`` with no division and no scale lookup at all,
+          so it reaches the stage exactly as typed and works on an axis with no
+          configured ``count_to_mm``. ``err_dist`` is 0.0 because nothing was
+          rounded away by a conversion. (``d_mm`` keeps its name for call-site
+          compatibility; under ``units="counts"`` it carries counts.)
+
+        A counts move is only defined in the ``motorxy`` frame: the plate and
+        instrument transforms are mm arithmetic, so feeding them counts would
+        silently garble the target. That combination is refused outright rather
+        than converted.
         """
         if self.motor_busy or not self.galil_enabled:
             return {
@@ -437,6 +525,26 @@ class NativeGalilMotion(HelaoDriver):
         stopping = False
         mode = MoveModes(mode)
         transformation = TransformationModes(transformation)
+        counts_mode = _wants_counts(units)
+
+        if counts_mode and transformation != TransformationModes.motorxy:
+            # The platexy/instrxy branches below do mm arithmetic on d_mm; a
+            # count fed through them would come out as a plausible-looking and
+            # entirely wrong target. Refuse instead of converting.
+            self.motor_busy = False
+            LOGGER.error(
+                f"counts moves are only defined in the motorxy frame, "
+                f"got transformation={transformation}; refusing the move"
+            )
+            return {
+                "moved_axis": None,
+                "speed": None,
+                "accepted_rel_dist": None,
+                "supplied_rel_dist": None,
+                "err_dist": None,
+                "err_code": ErrorCodes.not_available,
+                "counts": None,
+            }
 
         tmpmotorpos = await self.query_axis_position(axis=self.get_all_axis())
         current_positionvec = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
@@ -554,9 +662,20 @@ class NativeGalilMotion(HelaoDriver):
                 continue
 
             try:
-                float_counts = d / count_to_mm[axl]
-                counts = int(np.floor(float_counts))
-                error_distance = count_to_mm[axl] * (float_counts - counts)
+                if counts_mode:
+                    # No division and no count_to_mm lookup: the caller's value
+                    # IS the count, so it reaches PR/PA exactly as supplied.
+                    counts = int(np.floor(float(d)))
+                    if counts != d:
+                        LOGGER.warning(
+                            f"counts move on axis '{axl}' supplied a "
+                            f"non-integral count {d!r}; floored to {counts}"
+                        )
+                    error_distance = 0.0
+                else:
+                    float_counts = d / count_to_mm[axl]
+                    counts = int(np.floor(float_counts))
+                    error_distance = count_to_mm[axl] * (float_counts - counts)
                 if speed is None:
                     speed = self.motor_def_speed_count_sec
                 else:

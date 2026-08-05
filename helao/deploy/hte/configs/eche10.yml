@@ -55,6 +55,7 @@ servers:
     port: 8003
     group: action
     fast: galil_motion
+    control_vis: motion_control_letter_scale
     params:
       enable_aligner: true
       bokeh_port: 5003
@@ -192,6 +193,7 @@ servers:
     port: 8015
     group: action
     fast: kinesis_server
+    control_vis: motion_control_inverse_scale
     params:
       axes:
         z:

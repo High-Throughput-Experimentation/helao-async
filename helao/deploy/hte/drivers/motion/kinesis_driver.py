@@ -51,6 +51,17 @@ MOTION_STATES = [
 ]
 
 
+def _wants_counts(units) -> bool:
+    """True when ``units`` selects the counts domain rather than mm.
+
+    Accepts the shared ``Units`` str-enum or a bare string: a ``(str, Enum)``
+    member carries its own value, so one comparison covers both. Anything that
+    is not exactly ``"counts"`` is mm; the endpoint's typed enum is what
+    rejects a misspelling with a 422 before it can reach here.
+    """
+    return getattr(units, "value", units) == "counts"
+
+
 class KinesisMotor(HelaoDriver):
     """`HelaoDriver` managing one Thorlabs Kinesis motor per configured axis.
 
@@ -126,6 +137,49 @@ class KinesisMotor(HelaoDriver):
             )
         return response
 
+    def query_axis_positions(self) -> dict:
+        """Read every axis once and render that single sample as mm and counts.
+
+        ``get_position(scale=False)`` is called **exactly once per axis** and
+        the mm value is derived locally from the raw device count -- one
+        sample, two renderings. Calling ``get_position`` twice (once scaled,
+        once not) would be two round trips at two instants, which cannot
+        describe one coordinate on a moving axis.
+
+        ``pos_scale`` is **counts per mm**, so mm per count is its reciprocal;
+        that reciprocal is the only scale arithmetic here. mm is ``None``,
+        never ``0``, when an axis has no usable ``pos_scale`` -- zero is a
+        legitimate coordinate, and a missing scale rendered as ``0.0 mm``
+        would be a confident lie.
+
+        Returns:
+            Dict ``{axis: {"mm": float|None, "counts": int|None,
+            "moving": bool|None}}``. A per-axis read that fails leaves that
+            axis's entries ``None`` rather than dropping the axis.
+        """
+        state: dict[str, dict[str, Optional[float | int | bool]]] = {}
+        axes_cfg = self.config.get("axes", {})
+        for axis, motor in self.motors.items():
+            entry: dict[str, Optional[float | int | bool]] = {
+                "mm": None,
+                "counts": None,
+                "moving": None,
+            }
+            try:
+                raw = motor.get_position(scale=False)
+                entry["counts"] = int(raw)
+                pos_scale = axes_cfg.get(axis, {}).get("pos_scale")
+                if pos_scale:  # falsy covers both missing and zero
+                    entry["mm"] = float(raw) * (1.0 / float(pos_scale))
+            except Exception:
+                LOGGER.error(f"position query failed on axis {axis}", exc_info=True)
+            try:
+                entry["moving"] = any(k in MOTION_STATES for k in motor.get_status())
+            except Exception:
+                LOGGER.error(f"status query failed on axis {axis}", exc_info=True)
+            state[axis] = entry
+        return state
+
     def setup(
         self,
         axis: str,
@@ -159,14 +213,22 @@ class KinesisMotor(HelaoDriver):
             )
         return response
 
-    def move(self, axis: str, move_mode: MoveModes, value: float) -> DriverResponse:
+    def move(
+        self, axis: str, move_mode: MoveModes, value: float, units: str = "mm"
+    ) -> DriverResponse:
         """Start a relative or absolute move on the named axis.
 
         Args:
             axis: Axis name (key in `self.motors`).
             move_mode: `MoveModes.relative` calls `move_by`,
                 `MoveModes.absolute` calls `move_to`.
-            value: Target distance or absolute position in physical units.
+            value: Target distance or absolute position, in the domain named
+                by `units`.
+            units: `"mm"` (default) keeps the historical call unchanged --
+                pylablib scales the physical value into device counts using
+                the axis scale. `"counts"` passes `scale=False`, so `value`
+                reaches the controller as the count it already is, with no
+                conversion applied anywhere.
         """
         try:
             if move_mode == MoveModes.relative:
@@ -174,7 +236,10 @@ class KinesisMotor(HelaoDriver):
             elif move_mode == MoveModes.absolute:
                 move_func = self.motors[axis].move_to
                 LOGGER.info("kinesis motor starting motion")
-            move_func(value)
+            if _wants_counts(units):
+                move_func(value, scale=False)
+            else:
+                move_func(value)
             response = DriverResponse(
                 response=DriverResponseType.success,
                 message="move started",

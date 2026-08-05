@@ -17,6 +17,7 @@ from typing import Optional
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base_api import BaseAPI
+from helao.core.servers.motion_control import Units
 from helao.helpers.executor import Executor
 
 from ...drivers.motion.kinesis_driver import (
@@ -25,6 +26,22 @@ from ...drivers.motion.kinesis_driver import (
     KinesisPoller,
     MoveModes,
 )
+
+
+def _running_actions(app: BaseAPI) -> list:
+    """Names of this server's endpoints that currently have a running action.
+
+    Whether an action is running is knowable only server-side, from the
+    ``Base`` object no shared module holds, so this check cannot live beside
+    the rest of the panel logic in ``motion_control.py`` -- only the
+    *rendering* of a refusal does. Same sweep the queueing middleware performs
+    in ``base_api.py``, without its single-endpoint narrowing: a panel command
+    for the stage cares that the server is moving something, not which route
+    was asked to move it.
+    """
+    return [
+        ep for ep, em in app.base.actionservermodel.endpoints.items() if em.active_dict
+    ]
 
 
 class KinesisMotorExec(Executor):
@@ -268,6 +285,153 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             """Stop the Kinesis poller background loop."""
             await app.poller.stop_polling()
             return "stop_polling: ok"
+
+        # Private motion controls for the engineering control panel. Same
+        # driver calls as the action routes above, no action wrapper: a panel
+        # click is a manual intervention, not a step of an experiment, and
+        # routing it through the action machinery would put a row in the run
+        # record for every click and queue that click behind whatever the
+        # orchestrator is running on this server.
+        #
+        # Bare paths, not ``/{server_key}/...``: that prefix is the action
+        # namespace. Reached with ``async_private_dispatcher``.
+        #
+        # These three return ``(error_code, payload)`` tuples, unlike the two
+        # polling routes directly above, which return a bare string. The tuple
+        # is the convention the panel's shared layer unwraps; a copied bare
+        # string would leave every readout permanently unknown.
+        #
+        # ``mode`` and ``units`` are enums rather than strings on purpose. A
+        # free-text ``units`` would let ``"count"`` -- the plausible
+        # misspelling -- fall through to the millimetre branch and execute a
+        # 10 000-*count* move as 10 000 *millimetres*. FastAPI answers 422
+        # instead. ``axis`` and ``value`` are required for the same reason: a
+        # defaulted axis moves something nobody named.
+
+        @app.post("/move_axis", tags=["private"])
+        async def move_axis(
+            axis: app.driver.dev_kinesis,
+            value: float,
+            mode: MoveModes = MoveModes.relative,
+            units: Units = Units.mm,
+            speed: Optional[int] = None,
+        ):
+            """Move one axis without creating an action.
+
+            Refused outright while an action is running on this server: unlike
+            a stop, a concurrent move has no safety justification, and the
+            refusal is reported as its own outcome rather than as a failure so
+            the panel can name the remedy. No device call is made in that case.
+
+            The value is dispatched in the domain ``units`` names. Under
+            ``counts`` the driver passes ``scale=False``, so the integer
+            reaches the controller as the count it already is; the conversion
+            (or its deliberate absence) happens there, never here.
+
+            Args:
+                axis: Axis name from the server's ``axes`` config.
+                value: Move magnitude or absolute target, in ``units``.
+                mode: Relative or absolute interpretation of ``value``.
+                units: ``mm`` or ``counts``.
+                speed: Accepted for signature parity with the other motion
+                    servers and ignored -- velocity on a Kinesis axis is set
+                    through ``set_velocity``, not per move.
+
+            Returns:
+                ``(error_code, {"axis", "requested", "units", "counts"})``.
+                ``counts`` carries the commanded integer for a counts move and
+                is ``None`` for a millimetre one: the endpoint performs no
+                conversion, so it has no count to report and will not invent
+                a plausible-looking one.
+            """
+            running = _running_actions(app)
+            if running:
+                LOGGER.info(
+                    f"refusing panel move on axis '{axis}': actions running "
+                    f"on {running}"
+                )
+                return ErrorCodes.in_progress, {}
+
+            # TOCTOU residual, stated rather than discovered at a station: an
+            # action can start between the check above and the driver call
+            # below. Unlike Galil, this driver has no downstream busy guard --
+            # ``move_by``/``move_to`` during motion is a re-target, not a
+            # fault -- so the race degrades to "the panel's move wins". It is
+            # a residual, not a closed hole.
+            axis_name = getattr(axis, "value", axis)
+            resp = app.driver.move(axis_name, mode, value, units=units.value)
+            error_code = (
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
+            )
+            return error_code, {
+                "axis": axis_name,
+                "requested": value,
+                "units": units.value,
+                "counts": int(value) if units == Units.counts else None,
+            }
+
+        @app.post("/stop_motion", tags=["private"])
+        async def stop_motion():
+            """Halt every axis, leaving the motors energized.
+
+            ``KinesisMotor.stop`` only, never a de-energize: a vertical axis
+            that lost its holding current would drop under gravity, so a panel
+            stop that cut it would be more dangerous than the motion it
+            interrupted. That is also why this route is **not** named for an
+            estop -- an estop must de-energize, and a halt-only route wearing
+            that name would under-stop whatever cascade adopted it.
+
+            **Unconditional, including mid-sequence, and the consequence is
+            accepted rather than hidden.** A running action is not cancelled,
+            failed, or notified: its executor keeps polling, observes that
+            motion has ceased, and completes normally -- reporting a position
+            that is not the one it commanded. So the run record can end up
+            describing a move that did not go where it says it went. That is
+            the correct trade for an engineering escape hatch (halting a
+            crashing stage must not depend on the orchestrator being
+            responsive), but it is a data-integrity hazard, which is why the
+            case is logged at WARNING here.
+
+            Returns:
+                ``(error_code, {"stopped": [axis, ...]})`` listing the axes
+                the stop was issued to.
+            """
+            axes = list(app.driver.motors)
+            running = _running_actions(app)
+            if running:
+                LOGGER.warning(
+                    f"panel stop_motion issued while actions are running on "
+                    f"{running}; motion will halt without notifying them, so "
+                    f"their recorded end position will not be the commanded one"
+                )
+            resp = app.driver.stop()
+            error_code = (
+                ErrorCodes.none
+                if resp.response == "success"
+                else ErrorCodes.critical_error
+            )
+            return error_code, {"stopped": axes}
+
+        @app.post("/get_axis_positions", tags=["private"])
+        async def get_axis_positions():
+            """Return every axis's coordinate in both millimetres and counts.
+
+            One position sample per axis, rendered twice: the driver reads the
+            raw device count once and derives millimetres from that same
+            integer, so the two halves always describe the same instant.
+            Taking a second, scaled reading would be two round trips at two
+            instants, which cannot describe one coordinate on a moving axis.
+
+            Returns:
+                ``(error_code, {axis: {"mm": float|None, "counts": int|None,
+                "moving": bool|None}})``. ``None`` rather than ``0``
+                throughout -- including for an axis whose ``pos_scale`` is
+                missing -- because zero is a legitimate motor coordinate, so a
+                value shown as zero must mean zero.
+            """
+            return ErrorCodes.none, app.driver.query_axis_positions()
 
 
 def makeApp(server_key) -> BaseAPI:

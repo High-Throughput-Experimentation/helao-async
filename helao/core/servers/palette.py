@@ -437,6 +437,90 @@ def reflex_control_button_class(state: str) -> str:
     return REFLEX_CONTROL_STATE_CLASSES[state]
 
 
+#: Tailwind utilities for a motion axis's move button, by whether the move has
+#: been confirmed.
+#:
+#: Two entries, because a move button has exactly two states a *colour* has to
+#: carry: it is about to ask, or it is about to go. They take the same two hues
+#: the Bokeh half reaches through ``button_type`` — ``sky-700`` is
+#: :data:`BUTTON_PRIMARY_BG` and ``amber-700`` is :data:`BUTTON_WARNING_BG` —
+#: so a move button reads the same in both stacks rather than merely being
+#: styled in both.
+#:
+#: Armed shares ``amber-700`` with the digital outputs' *unknown*
+#: (:data:`REFLEX_CONTROL_STATE_CLASSES`), and that is the intended reading:
+#: amber is this page's "attention" on both halves, and the two are never the
+#: same widget — a digital control carries its line's name and state, an armed
+#: move carries the word "Confirm". Giving armed its own hue would have to
+#: come out of the rose family the ``/control`` canvas already uses, putting it
+#: next to the stop button, which is the one confusion worth spending a colour
+#: to avoid.
+#:
+#: Measured white-on-surface (4.5 body floor) and surface-on-``rose-50`` (3.0
+#: control floor): ``sky-700`` 5.93 / 5.40, ``amber-700`` 5.02 / 4.57.
+#:
+#: An axis with no configured scale gets no third entry — its move control is
+#: *disabled* rather than recoloured, so Radix's own disabled treatment carries
+#: it and no colour has to mean "you cannot press this".
+REFLEX_MOTION_MOVE_CLASSES: Final[Mapping[str, str]] = {
+    "ready": "bg-sky-700 text-white",
+    "armed": "bg-amber-700 text-white",
+}
+"""Per-arm-state move-button utilities; see the comment above."""
+
+REFLEX_MOTION_STOP_CLASS: Final[str] = "bg-red-700 text-white"
+"""Utilities for a motion server's stop button.
+
+``red-700`` is :data:`BUTTON_DANGER_BG` exactly, which is what the Bokeh half
+gets from ``button_type="danger"``. Deliberately **not** the ESTOP red
+(:data:`ESTOP_BG`, ``red-900``): this button halts one server's axes with the
+motors still energised, and painting it as the estop would claim an authority
+it does not have.
+
+White on it is 6.47, and it is 5.89 against the ``/control`` canvas — the
+strongest of the three buttons on the page against both, which is the right
+place for the emphasis to land.
+"""
+
+REFLEX_MOTION_INPUT_CLASS: Final[str] = (
+    "bg-white text-slate-900 border border-slate-500"
+)
+"""Utilities for a motion axis's move-value field.
+
+A white field on the ``rose-50`` canvas, so the one editable thing in a row of
+readouts is visibly editable. The hairline is a step darker than the
+``slate-400`` the *off* control carries: that border separates a white fill
+from a white-ish card, while this one has to hold the 3.0 control floor against
+both the field (``slate-500`` on white, 4.76) and the canvas around it
+(4.33). ``border-slate-500`` is not ``text-slate-500`` — the shade is too light
+for body text on these tints and only ever appears here as an edge.
+"""
+
+REFLEX_MOTION_READOUT_CLASS: Final[str] = "font-mono text-slate-900"
+"""Utilities for the dual-unit coordinate readout.
+
+Monospaced because the readout is two numbers that change together and a
+proportional face makes the digits jump sideways as they do — the same reason
+:data:`INPUT_FONT_STACK` exists for the Bokeh input fields. ``slate-900`` is
+body text, 16.25 on the ``/control`` canvas and 17.85 on a white card, so the
+``"?"`` an unread axis renders is as legible as a coordinate.
+"""
+
+
+def reflex_motion_move_class(state: str) -> str:
+    """Return the Tailwind utilities for a move button in *state*.
+
+    Args:
+        state: ``"ready"`` or ``"armed"``.
+
+    Raises:
+        KeyError: For anything else — loudly at build time, rather than a move
+            button whose colour does not say whether the next click moves a
+            stage.
+    """
+    return REFLEX_MOTION_MOVE_CLASSES[state]
+
+
 def reflex_header_class(kind: str) -> str:
     """Return the Tailwind utilities for *kind*'s table header cells.
 

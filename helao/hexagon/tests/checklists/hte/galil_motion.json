@@ -386,5 +386,58 @@
         "default": "'NA'"
       }
     ]
+  },
+  {
+    "path": "/get_axis_positions",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_axis_positions",
+    "params": []
+  },
+  {
+    "path": "/move_axis",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "move_axis",
+    "params": [
+      {
+        "name": "axis",
+        "annotation": "dev_axisitems",
+        "default": null
+      },
+      {
+        "name": "value",
+        "annotation": "float",
+        "default": null
+      },
+      {
+        "name": "mode",
+        "annotation": "MoveModes",
+        "default": "MoveModes.relative"
+      },
+      {
+        "name": "units",
+        "annotation": "Units",
+        "default": "Units.mm"
+      },
+      {
+        "name": "speed",
+        "annotation": "Optional[int]",
+        "default": "None"
+      }
+    ]
+  },
+  {
+    "path": "/stop_motion",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "stop_motion",
+    "params": []
   }
 ]
