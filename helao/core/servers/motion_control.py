@@ -656,7 +656,13 @@ def _mm_text(mm: Optional[float]) -> str:
 
 
 #: How often to re-read while an axis is still moving.
-FOLLOWUP_INTERVAL_S = 0.5
+#:
+#: One second, not a fraction of one: the follow-up shares the controller's
+#: command channel with the move it is watching -- the Galil driver's own wait
+#: loop polls the same connection -- so a tighter cadence buys nothing but
+#: contention. A readout that settles within a second of the stage stopping is
+#: indistinguishable from instant to an operator.
+FOLLOWUP_INTERVAL_S = 1.0
 
 #: How long to keep re-reading *regardless* of what ``moving`` says.
 #:
@@ -678,7 +684,20 @@ FOLLOWUP_GRACE_S = 2.0
 #: server-side loop" rule exists to prevent, because ``on_unmount`` does not
 #: fire on tab close. Bounded means it always stops on its own, and the Read
 #: button remains for anything past the ceiling.
-FOLLOWUP_CEILING_S = 120.0
+#:
+#: **Derived from the driver, not chosen.** The Galil driver waits for its own
+#: moves up to a hard 30-minute cap (``tmax`` in ``_motor_move``), so a move it
+#: has itself given up on cannot still be running: 30 minutes is the longest a
+#: legitimate move can last, and therefore the earliest this may stop without
+#: abandoning real motion.
+#:
+#: An earlier value of 120 s was reasoned about rather than derived, and was
+#: **wrong at a real station**: eche10's x-axis travels 1.562 mm/s at its
+#: configured default speed, so any move past ~187 mm outlives 120 s. The
+#: follow-up quit mid-travel and the readout never settled -- the exact bug the
+#: follow-up exists to fix, reintroduced by an invented number. Derive limits
+#: like this from the hardware's own bounds.
+FOLLOWUP_CEILING_S = 30.0 * 60.0
 
 
 def should_follow_up(positions: dict, elapsed_s: float) -> bool:
@@ -700,15 +719,28 @@ def should_follow_up(positions: dict, elapsed_s: float) -> bool:
         say, and treating "don't know" as "still moving" would poll a silent
         server until the ceiling on every move.
     """
-    if elapsed_s >= FOLLOWUP_CEILING_S:
-        return False
-    if elapsed_s < FOLLOWUP_GRACE_S:
-        return True
-    return any(
+    still_moving = any(
         (axis or {}).get("moving") is True
         for axis in (positions or {}).values()
         if isinstance(axis, dict)
     )
+    if elapsed_s >= FOLLOWUP_CEILING_S:
+        if still_moving:
+            # Abandoning motion that is still running, so the readout will not
+            # settle on its own and the operator must press Read. Says so out
+            # loud: the previous ceiling was too low for a real move and the
+            # only symptom was a stale number, which is not a diagnosable
+            # report. If this line appears, the ceiling is wrong again -- or an
+            # axis is genuinely stuck, which is worth a look either way.
+            LOGGER.warning(
+                "motion follow-up hit its %.0fs ceiling while an axis still "
+                "reported motion; the readout will not settle on its own",
+                FOLLOWUP_CEILING_S,
+            )
+        return False
+    if elapsed_s < FOLLOWUP_GRACE_S:
+        return True
+    return still_moving
 
 
 def _counts_text(counts: Optional[int]) -> str:
