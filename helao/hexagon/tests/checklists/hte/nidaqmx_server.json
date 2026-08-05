@@ -19,7 +19,7 @@
       },
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       }
     ]
@@ -63,7 +63,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -303,6 +303,15 @@
     "params": []
   },
   {
+    "path": "/get_digital_outs",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_digital_outs",
+    "params": []
+  },
+  {
     "path": "/monloop",
     "method": "post",
     "tags": [
@@ -319,6 +328,26 @@
     ],
     "handler": "readtemp",
     "params": []
+  },
+  {
+    "path": "/set_digital_out",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_digital_out_direct",
+    "params": [
+      {
+        "name": "do_name",
+        "annotation": "str",
+        "default": "''"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
   },
   {
     "path": "/stopheatloop",

@@ -19,7 +19,7 @@
       },
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       }
     ]
@@ -127,7 +127,7 @@
       },
       {
         "name": "out_name",
-        "annotation": "Optional[Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]]",
+        "annotation": "Optional[Union[app.driver.dev_doitems, list[app.driver.dev_doitems]]]",
         "default": "'led'"
       },
       {
@@ -137,27 +137,27 @@
       },
       {
         "name": "toggle_init_delay",
-        "annotation": "Union[float, List[float]]",
+        "annotation": "Union[float, list[float]]",
         "default": "0"
       },
       {
         "name": "toggle_duty",
-        "annotation": "Union[float, List[float]]",
+        "annotation": "Union[float, list[float]]",
         "default": "0.5"
       },
       {
         "name": "toggle_period",
-        "annotation": "Union[float, List[float]]",
+        "annotation": "Union[float, list[float]]",
         "default": "2.0"
       },
       {
         "name": "toggle_duration",
-        "annotation": "Union[float, List[float]]",
+        "annotation": "Union[float, list[float]]",
         "default": "-1"
       },
       {
         "name": "req_out_name",
-        "annotation": "Optional[Union[app.driver.dev_doitems, List[app.driver.dev_doitems]]]",
+        "annotation": "Optional[Union[app.driver.dev_doitems, list[app.driver.dev_doitems]]]",
         "default": "None"
       }
     ]
@@ -190,5 +190,34 @@
     ],
     "handler": "stop_digital_cycle",
     "params": []
+  },
+  {
+    "path": "/get_digital_outs",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "get_digital_outs",
+    "params": []
+  },
+  {
+    "path": "/set_digital_out",
+    "method": "post",
+    "tags": [
+      "private"
+    ],
+    "handler": "set_digital_out_direct",
+    "params": [
+      {
+        "name": "do_name",
+        "annotation": "str",
+        "default": "''"
+      },
+      {
+        "name": "on",
+        "annotation": "bool",
+        "default": "False"
+      }
+    ]
   }
 ]

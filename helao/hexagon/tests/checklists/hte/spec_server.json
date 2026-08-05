@@ -9,7 +9,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -34,7 +34,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -79,7 +79,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {

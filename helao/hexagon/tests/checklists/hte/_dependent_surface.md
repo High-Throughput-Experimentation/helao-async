@@ -258,3 +258,47 @@ set.) These 10 configs are the concrete "invisible port" instances P3e must
 resolve explicitly (find the actual bound port via each server's own
 `host`/`port` keys, not assume a missing `bokeh_port` means no operator
 UI).
+
+---
+
+## Addendum, 2026-08-04 — UI-era keys (master spec Amendment 1 §5.3)
+
+The sections above were generated 2026-07-21 and enumerate **two** vis keys. A third
+exists, and one new code key claims a port nothing in the config names. Both are §8.3(3c)
+and §8.3(3d) surface. Counted on `unstable` @ `8e18c0f9` over comment-stripped configs.
+
+### `control_vis` — the third vis key (15 of 21 configs)
+
+Declared on an action server; the group's `control_visualizer` Bokeh server mounts every
+such panel. **Not a Reflex-era key** — it is a Bokeh feature the Reflex `/control` route
+also renders, and only 4 of these configs carry a `reflex:` server at all. An inventory
+that treats it as Reflex-only misses 11 configs.
+
+| `control_vis` value | configs |
+|---|---|
+| `nidaqmx_control` | `adss`, `adss3`, `ccsi2`, `clad`, `ecms1`, `ecms2`, `partialccsi1` |
+| `digital_out_control` | `eche6`, `eche7`, `eche8`, `eche10`, `hispec`, `uvis` |
+| both | `anec`, `ccsi1` |
+
+Backed by private, bare-path routes on the declaring server — `POST /get_digital_outs`
+and `POST /set_digital_out` — now present in the frozen JSON for `galil_io` and
+`nidaqmx_server` (241 routes total, up from 237). These write **no artifact of any kind**
+(master spec §5.2 row 15), which is the whole point: an action would write a run-record row
+per click and queue behind the orchestrator.
+
+### `reflex:` — the third code key (4 configs), claiming two ports
+
+`clad`, `eche10`, `hispec` (stations) and `htereflex` (dev), all with value `helao_ui`.
+
+**The invisible-port hazard of §8.3(3d), worst case:** a `reflex:` server occupies `port`
+*and* `port + 1` (static frontend, then backend). Only the first appears in the config.
+`reflex.discovery.reserved_addresses` is what makes the uniqueness check see both; one
+collision has already shipped and been fixed (a control panel placed on 5003, which the
+Galil aligner binds). Treat `port + 1` as claimed at preflight, not at review.
+
+### Re-freeze note
+
+Re-running `harness/hte_freeze.py` also diffed 11 servers with **no surface change** —
+the PEP 585 sweep rewrote `List[...]`→`list[...]` and the extractor records annotations as
+source text. Evaluate a checklist diff as a route-set (path, method) and parameter-name
+diff first; annotation spelling is reported separately (master spec §8.3(5)).
