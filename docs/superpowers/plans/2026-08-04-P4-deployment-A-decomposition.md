@@ -244,12 +244,29 @@ Deployment-A is the **least** UI-affected deployment, and that is a scheduling a
      is §8.3's documented design, not a defect — but the frozen file does not record which
      entries came from which tier, so a static freezer reads the runtime ones as removals.
      Worth marking so the tool can skip them; not blocking.
-   - **The one genuine loose end: six motion routes are frozen with `Optional[...]`
-     parameters that never existed in the source.** No commit in that file's history contains
-     the string, and the extractor only `ast.unparse`s what is written, so something inferred
-     nullability from a `= None` default. This one matters because motion **is** one of the
-     four hardware servers and **is** gating. (A seventh reported delta is pure PEP 585
-     spelling, already normalized at the comparison layer — ignore that one.)
+   - **The one genuine defect — six motion routes frozen with `Optional[...]` parameters
+     that never existed in the source. FIXED 2026-08-04.** Traced conclusively: the source at
+     the very commit that wrote the checklist already said `str = None` / `int = None`, and
+     `Optional` appears in that file today only inside a docstring. The extractor only
+     `ast.unparse`s what is written, so it cannot invent a type — whatever produced the
+     original checklist inferred nullability from a `= None` default, and did so **only** for
+     bare `str`/`int`, leaving config-shaped dynamic enums and existing `Union[...]` alone
+     even though they also default to `None`. Same signature as the NI-DAQmx case above.
+
+     Why it mattered: the two forms emit **different** OpenAPI. Measured —
+     `int = None` → `{"type": "integer"}`, `Optional[int] = None` →
+     `{"anyOf": [{"type":"integer"},{"type":"null"}]}`. So the frozen file recorded a schema
+     the live server will never emit, on a server that **is** one of the four hardware
+     servers and **is** gating. It was not firing: the canary diffs compare legacy-vs-hex
+     captured artifacts, both live, so they agree. It would have fired as six false
+     mismatches the day §8.3(2)'s runtime `/openapi.json` cross-check runs — a scarce station
+     window. Corrected via `--accept-drift` as a **transcription fix**, not a baseline
+     widening: the checklist exists to record legacy behaviour, and it was wrong about it.
+
+     **Not fixed, deliberately:** the source really does say `speed: int = None`, an
+     annotation that contradicts its own default. Changing it to `Optional[int]` is
+     wire-visible per the measurement above, so the parity rule says preserve. Post-parity
+     backlog, needing a P4d-style recorded decision.
 3. **Its palette sweep is broader than the parent's, which is the safe direction.** The
    parent's AST sweep globs `helao/deploy/*/servers/**`; this deployment's own test
    `rglob`s the entire repo, so the extracted aligner host — which lives under `layouts/`,
@@ -353,11 +370,13 @@ canary gate passed at station on 2026-07-29. The live config is **not yet flippe
 **Linux-completable prerequisites for P4f:**
 1. IO server checklist re-freeze — **DONE** (additive, +1 route), and the missing generic
    freeze script now exists as `harness/freeze.py`.
-2. **Mostly not open.** Of the five checklists the freezer flags, four cover modules that are
-   deliberately out of scope — not wired by any operational config, not gating — so their
-   flags are report noise, not work (delta #2). The one item that is real: the six motion
-   routes frozen with `Optional[...]` annotations absent from the source, on a server that
-   **is** gating.
+2. **Closed.** Of the checklists the freezer flags, four cover modules deliberately out of
+   scope — not wired by any operational config, not gating — and are now skipped rather than
+   reported. The one real defect, six motion routes carrying `Optional[...]` annotations the
+   source never had, is **fixed** (delta #2). What remains flagged is the potentiostat's 11
+   runtime-registered cross-deployment routes: correct to leave unapplied, since accepting
+   would delete them from the baseline; worth marking as runtime-sourced so the static
+   freezer stops proposing it.
 3. Hexagon preflight rejected every config carrying a `reflex:` server — **FIXED**
    2026-08-04 (Amendment 1 §9.1). It had the same stale "exactly one of fast/bokeh" rule the
    spec did, which blocked the P3e gate for three hte stations and one Deployment-C station.

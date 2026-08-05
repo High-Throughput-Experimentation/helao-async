@@ -120,6 +120,18 @@ def extract_routes(module_path: Path, server_key: Optional[str] = None) -> list[
     return sorted(routes, key=lambda r: (r["path"], r["method"]))
 
 
+def normalize_annotation(text: str) -> str:
+    """An annotation with PEP 585 alias spelling folded to the builtin generics.
+
+    ``List[float]`` -> ``list[float]``. Public because two callers must agree
+    exactly on what counts as a spelling-only difference: this module's diff (so
+    the gate ignores a typing sweep) and the freezer (so it keeps the frozen
+    verbatim text when only the spelling moved). A second implementation would
+    drift.
+    """
+    return _PEP585_RE.sub(lambda m: m.group(1).lower(), text)
+
+
 def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     """Checklist diff: every frozen route present with equal schema, no extras."""
 
@@ -134,7 +146,7 @@ def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
             (
                 {
                     k: (
-                        _PEP585_RE.sub(lambda m: m.group(1).lower(), v)
+                        normalize_annotation(v)
                         if k == "annotation" and isinstance(v, str)
                         else v
                     )
