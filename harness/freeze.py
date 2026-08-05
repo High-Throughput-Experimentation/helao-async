@@ -22,9 +22,18 @@ So this tool never blindly overwrites:
 * a route that still exists and whose schema matches the frozen entry modulo
   PEP 585 spelling is copied through **byte-verbatim** from the frozen file;
 * a genuinely new route is appended;
-* a **changed** schema or a **removed** route is a real surface change, and is
-  reported and left UNAPPLIED unless ``--accept-drift`` says otherwise — and even
-  then it is applied **surgically**, touching only the flagged route and field.
+* a **changed** schema is a real surface change, reported and left UNAPPLIED
+  unless ``--accept-drift`` says otherwise — and even then applied
+  **surgically**, touching only the flagged route and field;
+* a **removed** route is stronger still: ``--accept-drift`` will NOT drop it.
+  Each removal must be named with ``--accept-missing <path>``.
+
+The asymmetry is deliberate and was learned the hard way. A blanket
+``--accept-drift`` over a whole deployment once applied a server's 11 ``missing``
+records and cut its frozen baseline from 16 routes to 5 — silently deleting the
+runtime-registered routes that baseline existed to assert. Widening a schema is
+recoverable; deleting the thing the gate checks is how a gate stops gating. So
+the two authorities are separate, and the destructive one is per-route.
 
 That default is the important one. Regenerating a checklist to make a diff pass
 is the failure mode the frozen-checklist gate exists to prevent, so widening the
@@ -42,6 +51,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from collections.abc import Iterable
 from typing import Optional
 
 from harness.endpoints import diff_route_sets, extract_routes, normalize_annotation
@@ -118,6 +128,38 @@ def _merge_params(frozen_params: list, current_params: list) -> list:
     return out
 
 
+def applicable_drift(
+    drift: list[dict],
+    *,
+    accept_drift: bool = False,
+    accept_missing: Iterable[str] = (),
+) -> list[dict]:
+    """The subset of ``drift`` the caller has actually authorized applying.
+
+    Two separate authorities, because the two record kinds carry very different
+    risk:
+
+    * ``changed`` — a schema difference. Authorized in bulk by ``accept_drift``;
+      widening or narrowing a param schema is visible in the next diff and
+      recoverable.
+    * ``missing`` — a route the module no longer registers. Authorized ONLY by
+      naming its path in ``accept_missing``, because applying it DELETES the
+      route from the baseline, and a deleted route is one the gate silently
+      stops asserting. ``accept_drift`` alone never drops a route.
+
+    Anything not authorized stays in the caller's blocker list, so the freeze
+    exits non-zero rather than quietly narrowing the record.
+    """
+    named = set(accept_missing or ())
+    out: list[dict] = []
+    for d in drift:
+        if d["kind"] == "changed" and accept_drift:
+            out.append(d)
+        elif d["kind"] == "missing" and d["path"] in named:
+            out.append(d)
+    return out
+
+
 def apply_drift(
     frozen: list[dict], current: list[dict], drift: list[dict]
 ) -> list[dict]:
@@ -161,7 +203,11 @@ def apply_drift(
 
 
 def merge_routes(
-    frozen: list[dict], current: list[dict], *, accept_drift: bool = False
+    frozen: list[dict],
+    current: list[dict],
+    *,
+    accept_drift: bool = False,
+    accept_missing: Iterable[str] = (),
 ) -> tuple[list[dict], list[dict]]:
     """Merge ``current`` into ``frozen`` additively.
 
@@ -172,14 +218,19 @@ def merge_routes(
     different schema beyond PEP 585 spelling). ``extra`` records are the additions
     and are applied, not reported as drift.
 
-    With ``accept_drift`` the drift records are applied too, surgically
-    (:func:`apply_drift`) rather than by replacing the server's whole route list.
+    Authorized drift records are applied too, surgically (:func:`apply_drift`)
+    rather than by replacing the server's whole route list — and which records
+    count as authorized is :func:`applicable_drift`'s decision, not this
+    function's. Notably ``accept_drift`` alone never drops a route.
     """
     drift = [d for d in diff_route_sets(frozen, current) if d["kind"] != "extra"]
     frozen_keys = {_route_key(r) for r in frozen}
     additions = [r for r in current if _route_key(r) not in frozen_keys]
-    if accept_drift and drift:
-        frozen = apply_drift(frozen, current, drift)
+    applied = applicable_drift(
+        drift, accept_drift=accept_drift, accept_missing=accept_missing
+    )
+    if applied:
+        frozen = apply_drift(frozen, current, applied)
     if not additions:
         # Return the frozen list AS IT STANDS -- untouched when no drift was
         # accepted, patched in place when it was. Not `sorted(...)`: a frozen file
@@ -205,6 +256,7 @@ def freeze_deployment(
     deployment: str,
     *,
     accept_drift: bool = False,
+    accept_missing: Iterable[str] = (),
     dry_run: bool = False,
     only: Optional[str] = None,
     include_unwired: bool = False,
@@ -214,8 +266,12 @@ def freeze_deployment(
 
     Args:
         deployment: Deployment directory name under ``helao/deploy/``.
-        accept_drift: Apply ``changed``/``missing`` records too, widening or
-            shrinking the baseline. Requires a recorded reason in the commit.
+        accept_drift: Apply ``changed`` records too, altering param schemas in
+            the baseline. Requires a recorded reason in the commit. Does NOT
+            drop routes — see ``accept_missing``.
+        accept_missing: Paths whose ``missing`` records may be applied, i.e.
+            whose routes may be DELETED from the baseline. Named per route on
+            purpose (:func:`applicable_drift`).
         dry_run: Report without writing.
         only: Restrict to one module basename (with or without ``.py``).
         include_unwired: Freeze synthesized-key checklists too (see
@@ -265,14 +321,26 @@ def freeze_deployment(
                 )
                 continue
         current = extract_routes(src, server_key=key)
-        merged, drift = merge_routes(frozen, current, accept_drift=accept_drift)
+        merged, drift = merge_routes(
+            frozen,
+            current,
+            accept_drift=accept_drift,
+            accept_missing=accept_missing,
+        )
+        applied = applicable_drift(
+            drift, accept_drift=accept_drift, accept_missing=accept_missing
+        )
 
         for d in drift:
             msg = f"{stem}: {d['kind']} {d['method'].upper()} {d['path']}"
             if d["kind"] == "changed":
                 msg += f" [{d['field']}]"
-            if accept_drift:
+            if d in applied:
                 lines.append(f"  ACCEPTED {msg}")
+            elif d["kind"] == "missing":
+                # Say how, or the reader reaches for --accept-drift and finds it
+                # does nothing -- which reads as a broken flag rather than a guard.
+                blockers.append(f"{msg}  (name it: --accept-missing {d['path']})")
             else:
                 blockers.append(msg)
 
@@ -297,7 +365,15 @@ def main(argv=None) -> int:
     p.add_argument(
         "--accept-drift",
         action="store_true",
-        help="also apply changed/removed routes, surgically (record why in the commit)",
+        help="also apply changed param schemas, surgically (record why in the "
+        "commit); never drops a route",
+    )
+    p.add_argument(
+        "--accept-missing",
+        action="append",
+        metavar="PATH",
+        help="allow DELETING this route from the baseline; repeatable. Named per "
+        "route because a dropped route is one the gate stops asserting",
     )
     p.add_argument("--dry-run", action="store_true", help="report without writing")
     p.add_argument(
@@ -316,6 +392,7 @@ def main(argv=None) -> int:
         lines, blockers = freeze_deployment(
             a.deployment,
             accept_drift=a.accept_drift,
+            accept_missing=a.accept_missing or (),
             dry_run=a.dry_run,
             only=a.only,
             include_unwired=a.include_unwired,
@@ -328,7 +405,7 @@ def main(argv=None) -> int:
     for line in lines:
         print(line)
     if blockers:
-        print("\nUNAPPLIED surface drift (re-run with --accept-drift to apply):")
+        print("\nUNAPPLIED surface drift:")
         for b in blockers:
             print(f"  {b}")
         return 1
