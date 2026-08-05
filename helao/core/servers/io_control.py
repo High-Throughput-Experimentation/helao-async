@@ -30,6 +30,8 @@ __all__ = [
     "UNKNOWN",
     "DoItem",
     "discover_do_items",
+    "group_do_items",
+    "group_heading",
     "read_digital_outs",
     "set_digital_out",
     "state_label",
@@ -110,6 +112,45 @@ def discover_do_items(server_config: dict, groups) -> list:
             seen.add(name)
             items.append(DoItem(name=name, group=group))
     return items
+
+
+def group_do_items(items) -> list:
+    """Split a server's lines into the sections a panel renders.
+
+    Shared because the grouping is what a station's config *means* — the NI
+    server keeps one ``dev_*`` block per function, so its controls read as pumps
+    / gas valves / liquid valves rather than as one bank of twenty names — and a
+    panel that flattened that in one stack and not the other would be showing
+    two different instruments.
+
+    Args:
+        items: :class:`DoItem` list, in the order
+            :func:`discover_do_items` returned it (group order, then config
+            order).
+
+    Returns:
+        list[tuple[str, list[DoItem]]]: One entry per *populated* group, in
+        first-appearance order. A group a server declares but configures no
+        lines in yields no entry, so it cannot render an empty heading.
+    """
+    grouped: dict = {}
+    for item in items:
+        grouped.setdefault(item.group, []).append(item)
+    return list(grouped.items())
+
+
+def group_heading(group: str) -> str:
+    """Return the section heading for a ``dev_*`` group.
+
+    Args:
+        group: The config block name, e.g. ``"dev_pump"``.
+
+    Returns:
+        str: The name without its ``dev_`` prefix, e.g. ``"pump"``. The prefix
+        is a config convention, not something an engineer at the station needs
+        to read on every heading.
+    """
+    return group.removeprefix("dev_")
 
 
 async def read_digital_outs(server_key: str, host: str, port: int) -> dict:

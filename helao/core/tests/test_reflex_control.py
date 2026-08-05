@@ -11,6 +11,7 @@ transport result into ``rows``, and that is what can be wrong.
 """
 
 import asyncio
+import json
 
 import pytest
 
@@ -384,3 +385,61 @@ def test_the_status_distinguishes_unreachable_from_unknown(page):
     _reread(state)
     assert state.status == "read current state", state.status
     print("test_the_status_distinguishes_unreachable_from_unknown PASS")
+
+
+# --------------------------------------------------------------------------
+# grouping
+# --------------------------------------------------------------------------
+
+
+def _rendered(component) -> str:
+    """Flatten a Reflex component to the text a build would compile.
+
+    The grouping is a layout property, and layout is what a handler test cannot
+    see: `rows` is flat and page-wide, so a group heading with a filter that
+    forgot the group would render every one of a server's controls under every
+    one of its headings and no state assertion would notice.
+    """
+    return json.dumps(component.render(), default=str)
+
+
+def test_a_grouped_server_renders_a_heading_per_group(page):
+    control_mod.configure_control(WORLD, "REFLEX")
+    text = _rendered(control_mod.control_page())
+
+    # Headings are the group name without the dev_ prefix, as in the Bokeh
+    # panel; a single-group server gets none, since it would just repeat "do".
+    assert "pump:" in text and "gasvalve:" in text, text
+    assert "do:" not in text, text
+    print("test_a_grouped_server_renders_a_heading_per_group PASS")
+
+
+def test_a_grouped_control_is_filtered_by_group_as_well_as_server(page):
+    control_mod.configure_control(WORLD, "REFLEX")
+    text = _rendered(control_mod.control_page())
+
+    # Both halves of the condition, per group. Without the group half every
+    # control of that server would appear under every heading it has.
+    for group in ("dev_pump", "dev_gasvalve"):
+        assert group in text, f"{group} is not filtered on: {text}"
+    print("test_a_grouped_control_is_filtered_by_group_as_well_as_server PASS")
+
+
+def test_a_server_with_no_lines_says_so_rather_than_rendering_a_group(page):
+    world = {
+        "servers": {
+            "EMPTY": {
+                "host": "127.0.0.1",
+                "port": 8008,
+                "control_vis": "digital_out_control",
+                "params": {},
+            }
+        }
+    }
+    control_mod.configure_control(world, "REFLEX")
+    try:
+        text = _rendered(control_mod.control_page())
+        assert "no digital outputs configured" in text, text
+    finally:
+        control_mod.configure_control(WORLD, "REFLEX")
+    print("test_a_server_with_no_lines_says_so_rather_than_rendering_a_group PASS")

@@ -21,6 +21,8 @@ import reflex as rx
 from helao.core.servers.reflex.discovery import resolve_panel_module
 from helao.core.servers.io_control import (
     discover_do_items,
+    group_do_items,
+    group_heading,
     read_digital_outs,
     set_digital_out,
     state_label,
@@ -325,8 +327,40 @@ def _control_button(row):
     )
 
 
+def _group_block(target: ControlTarget, group: str, with_heading: bool):
+    """Render one ``dev_*`` group's controls, under its heading.
+
+    One flat ``rows`` var filtered per group, rather than a var per group:
+    ``rows`` is what the event handlers rewrite, so a control repaints wherever
+    it is rendered, and a per-group copy would be a second place for the same
+    state to live. The filter is on both the server key and the group, since
+    ``rows`` is page-wide.
+    """
+    controls = rx.flex(
+        rx.foreach(
+            ControlState.rows,
+            lambda row: rx.cond(
+                (row[0] == target.server_key) & (row[2] == group),
+                _control_button(row),
+                rx.fragment(),
+            ),
+        ),
+        wrap="wrap",
+        spacing="2",
+    )
+    if not with_heading:
+        return controls
+    return rx.vstack(
+        rx.heading(f"{group_heading(group)}:", size="2"),
+        controls,
+        align="start",
+        spacing="2",
+        width="100%",
+    )
+
+
 def _server_block(target: ControlTarget):
-    """Render one server's heading and its controls."""
+    """Render one server's heading and its controls, grouped as configured."""
     if not target.items:
         body = rx.text(
             "no digital outputs configured",
@@ -334,21 +368,19 @@ def _server_block(target: ControlTarget):
             class_name=reflex_muted_text_class(),
         )
     else:
-        # One flat `rows` var filtered per block, rather than a var per server:
-        # `rows` is what the event handlers rewrite, so a control repaints
-        # wherever it is rendered, and a per-server copy would be a second place
-        # for the same state to live.
-        body = rx.flex(
-            rx.foreach(
-                ControlState.rows,
-                lambda row: rx.cond(
-                    row[0] == target.server_key,
-                    _control_button(row),
-                    rx.fragment(),
-                ),
-            ),
-            wrap="wrap",
-            spacing="2",
+        # Grouped through the shared layer, so the sections here are the same
+        # sections the Bokeh panel shows for the same config. A heading only
+        # where there is more than one populated group: on a single-block server
+        # it would just repeat "do".
+        grouped = group_do_items(target.items)
+        body = rx.vstack(
+            *[
+                _group_block(target, group, with_heading=len(grouped) > 1)
+                for group, _ in grouped
+            ],
+            align="start",
+            spacing="3",
+            width="100%",
         )
     return rx.card(
         rx.vstack(
