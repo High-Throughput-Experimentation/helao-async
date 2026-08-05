@@ -18,12 +18,16 @@ import asyncio
 import pytest
 from bokeh.document import Document
 from bokeh.models import Button, Div, NumericInput, Select
+from bokeh.server.callbacks import PeriodicCallback
 
 from helao.core.error import ErrorCodes
 from helao.core.servers import motion_control_vis as mod
 from helao.core.servers.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
+    FOLLOWUP_CEILING_S,
+    FOLLOWUP_GRACE_S,
+    FOLLOWUP_INTERVAL_S,
     REFUSED_STATUS,
 )
 from helao.core.servers.motion_control_vis import MotionPanel
@@ -90,12 +94,28 @@ class _FakeVis:
 
 
 def _drain(doc):
-    """Run whatever the panel queued on the document, including coroutines."""
+    """Run whatever the panel queued on the document, including coroutines.
+
+    A callback unregistered by an earlier callback in the same pass is skipped
+    rather than run from the snapshot. Two reasons, and the second is why this
+    is not merely tidiness:
+
+    * Bokeh does not run a removed callback either -- ``remove_periodic_callback``
+      cancels it, so firing one from a stale list tests behaviour the product
+      cannot exhibit.
+    * ``Document.session_callbacks`` is built from a **set**, so its order is
+      not guaranteed. Without the check, whether a failed move's teardown is
+      undone by a follow-up tick still holding a reference depends on set
+      iteration order -- which is exactly the kind of test that passes until it
+      doesn't.
+    """
     for _ in range(8):
         callbacks = list(doc.session_callbacks)
         if not callbacks:
             break
         for cb in callbacks:
+            if cb not in doc.session_callbacks:
+                continue
             result = cb.callback()
             if asyncio.iscoroutine(result):
                 asyncio.run(result)
@@ -170,6 +190,32 @@ def _divs(panel) -> str:
 def _click_move(panel, axis):
     panel._callback_move(None, axis=axis)
     _drain(panel.vis.doc)
+
+
+def _periodics(doc) -> list:
+    """Every periodic callback registered on the document.
+
+    Asserted against directly, rather than trusting the panel's own
+    ``_followup`` attribute, because the failure being guarded against is a
+    callback that outlives the panel's record of it -- one that keeps polling
+    the action server while the panel believes nothing is running.
+    """
+    return [cb for cb in doc.session_callbacks if isinstance(cb, PeriodicCallback)]
+
+
+def _tick(panel):
+    """Fire the follow-up poller exactly once.
+
+    ``_drain`` cannot be used for this: a periodic callback, unlike a next-tick
+    one, stays registered after it runs, so draining fires it an arbitrary
+    number of times. Every assertion about *when* a follow-up ends needs one
+    tick at one known clock reading.
+    """
+    callback = panel._followup
+    assert callback is not None, "no follow-up is running to tick"
+    result = callback.callback()
+    if asyncio.iscoroutine(result):
+        asyncio.run(result)
 
 
 # --------------------------------------------------------------------------
@@ -563,6 +609,286 @@ def test_a_move_with_no_value_typed_sends_nothing(transport):
     assert sent == []
     assert "enter a value" in panel.status_div.text, panel.status_div.text
     print("test_a_move_with_no_value_typed_sends_nothing PASS")
+
+
+# --------------------------------------------------------------------------
+# The follow-up refresh.
+#
+# Reported from a live instrument: after a move, the readout did not update
+# when motion ended and an engineer had to press Read. Both stacks already
+# re-read after dispatching a move, but a fire-and-forget driver returns before
+# the stage has moved, so that read captured the pre-move coordinate and
+# nothing re-read afterwards.
+
+
+def test_a_move_starts_a_follow_up_at_the_shared_interval(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    panel = _build(_LetterPanel, "MOTOR")
+    assert panel._followup is None, "there is nothing to follow before a command"
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    assert panel._followup is not None
+    assert len(_periodics(panel.vis.doc)) == 1
+    # Derived from the shared constant rather than restated as a number here:
+    # a cadence written twice is a cadence the two UI stacks can drift apart on.
+    assert panel._followup.period == FOLLOWUP_INTERVAL_S * 1000
+    print("test_a_move_starts_a_follow_up_at_the_shared_interval PASS")
+
+
+def test_a_follow_up_keeps_reading_while_the_axis_is_moving(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    # The stage is under way: reads report motion, and a coordinate that is
+    # stale the instant it arrives.
+    script["read"] = {"x": {"mm": 20.0, "counts": 127926, "moving": True}}
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    clock["t"] += FOLLOWUP_GRACE_S + 1
+    _tick(panel)
+    assert panel._followup is not None, "an axis still moving must keep being read"
+    assert panel.positions["x"]["mm"] == 20.0
+    assert "moving" in panel.readouts["x"].text
+
+    # It arrives.
+    script["read"] = {"x": {"mm": 40.0, "counts": 255853, "moving": False}}
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    _tick(panel)
+
+    assert panel._followup is None, "the follow-up must end once motion clears"
+    # The arrival coordinate, left on screen, with nobody having pressed Read.
+    assert panel.readouts["x"].text == "40.000 mm / 255853 counts"
+    print("test_a_follow_up_keeps_reading_while_the_axis_is_moving PASS")
+
+
+def test_the_grace_window_survives_an_immediate_not_moving(transport, clock):
+    # The exact defect. A move call returns once the motion has been
+    # *dispatched*, so the read that follows it can answer `moving: False` --
+    # not because the move finished, but because it had not started -- and
+    # report the pre-move coordinate. A plain "re-read while moving" policy
+    # would stop on that first answer and leave the stale number on screen,
+    # which is the bug, not the fix.
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+    assert panel.positions["x"]["mm"] == 1.0, "the post-dispatch read is pre-move"
+    assert panel._followup is not None, "a not-yet-started move must not end it"
+
+    # Inside the grace window, the stage gets going.
+    script["read"] = {"x": {"mm": 1.5, "counts": 9595, "moving": True}}
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    _tick(panel)
+    assert panel._followup is not None
+
+    script["read"] = {"x": {"mm": 2.0, "counts": 12793, "moving": False}}
+    clock["t"] += FOLLOWUP_GRACE_S + FOLLOWUP_INTERVAL_S
+    _tick(panel)
+
+    assert panel._followup is None
+    assert panel.readouts["x"].text == "2.000 mm / 12793 counts"
+    print("test_the_grace_window_survives_an_immediate_not_moving PASS")
+
+
+def test_the_poller_is_unregistered_when_the_follow_up_ends(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+    assert len(_periodics(panel.vis.doc)) == 1
+
+    clock["t"] += FOLLOWUP_GRACE_S + 1
+    _tick(panel)
+
+    # Not merely "stopped ticking": a periodic callback left registered polls
+    # the action server for the entire life of the document, which on a station
+    # with a panel left open means indefinitely.
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    print("test_the_poller_is_unregistered_when_the_follow_up_ends PASS")
+
+
+def test_a_second_move_extends_the_follow_up_rather_than_stacking_one(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": True}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+    first = panel._followup
+    started = panel._followup_started
+
+    clock["t"] += FOLLOWUP_GRACE_S + 1
+    panel.inputs["x"].value = 2.0
+    _click_move(panel, "x")
+
+    # N moves on one open panel must not mean N concurrent pollers, each
+    # reading the same server every interval and holding its own ceiling.
+    assert len(_periodics(panel.vis.doc)) == 1
+    assert panel._followup is first, "the running poller was replaced, not extended"
+    # Extended, not merely reused: the newest command is the one whose arrival
+    # the panel is now waiting on, so it gets a full grace window.
+    assert panel._followup_started > started
+    print("test_a_second_move_extends_the_follow_up_rather_than_stacking_one PASS")
+
+
+def test_the_ceiling_ends_a_permanently_moving_axis(transport, clock):
+    # A stuck axis, or a driver whose `moving` flag never clears, must not be
+    # followed forever.
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": True}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    clock["t"] += FOLLOWUP_CEILING_S - 1
+    _tick(panel)
+    assert panel._followup is not None, "still inside the ceiling"
+
+    clock["t"] += 2
+    _tick(panel)
+
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    # And the manual escape hatch remains for anything past the ceiling.
+    assert panel.read_button.disabled is False
+    print("test_the_ceiling_ends_a_permanently_moving_axis PASS")
+
+
+def test_a_follow_up_over_a_silent_server_ends_at_the_grace_window(transport, clock):
+    # `moving` is tri-state, and only an explicit True sustains a follow-up
+    # past the grace window. A server that cannot say whether an axis is moving
+    # has not said that it is -- treating "don't know" as "still moving" would
+    # poll a silent server all the way to the ceiling on every single move.
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    script["read"] = {}  # the transport reports an unreachable server this way
+    clock["t"] += FOLLOWUP_GRACE_S + 1
+    _tick(panel)
+
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    assert panel.readouts["x"].text == "? mm / ? counts"
+    print("test_a_follow_up_over_a_silent_server_ends_at_the_grace_window PASS")
+
+
+def test_the_stop_button_starts_a_follow_up_so_the_readout_settles(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 20.0, "counts": 127926, "moving": True}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel._callback_stop(None)
+    _drain(panel.vis.doc)
+    assert panel._followup is not None, "a halt is not instantaneous either"
+
+    # The stage decelerates and settles past where it was told to halt.
+    script["read"] = {"x": {"mm": 20.4, "counts": 130485, "moving": False}}
+    clock["t"] += FOLLOWUP_GRACE_S + 1
+    _tick(panel)
+
+    assert panel._followup is None
+    assert panel.readouts["x"].text == "20.400 mm / 130485 counts"
+    assert "energized" in panel.status_div.text, panel.status_div.text
+    print("test_the_stop_button_starts_a_follow_up_so_the_readout_settles PASS")
+
+
+def test_the_follow_up_leaves_the_command_outcome_on_screen(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": True}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+    clock["t"] += FOLLOWUP_INTERVAL_S
+    _tick(panel)
+
+    # A read's own "read 4 of 4 axes" summary would displace the outcome of the
+    # command the engineer just issued, which is the more useful thing to leave
+    # on the status line.
+    assert "move sent" in panel.status_div.text, panel.status_div.text
+    print("test_the_follow_up_leaves_the_command_outcome_on_screen PASS")
+
+
+def test_arming_a_move_starts_no_follow_up(transport):
+    # The first click of a confirmed move sends nothing, so there is nothing to
+    # follow.
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 100.0
+    _click_move(panel, "x")
+
+    assert panel.arms["x"] is not None
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    print("test_arming_a_move_starts_no_follow_up PASS")
+
+
+def test_a_failed_move_starts_no_follow_up(transport):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    script["move"] = (ErrorCodes.unspecified, {})
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    # The readout stays honestly unknown; a poller would have quietly replaced
+    # that "?" with a coordinate the panel has no grounds to present as the
+    # result of the command it just failed.
+    assert panel.readouts["x"].text == "? mm / ? counts"
+    print("test_a_failed_move_starts_no_follow_up PASS")
+
+
+def test_a_failing_command_ends_a_running_follow_up(transport, clock):
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": True}}
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+    assert panel._followup is not None
+
+    script["move"] = (ErrorCodes.unspecified, {})
+    panel.inputs["x"].value = 2.0
+    _click_move(panel, "x")
+
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    assert panel.readouts["x"].text == "? mm / ? counts"
+    print("test_a_failing_command_ends_a_running_follow_up PASS")
+
+
+def test_a_refused_move_starts_no_follow_up(transport):
+    # Nothing reached the device, so there is no arrival to wait for.
+    _, script = transport
+    script["read"] = {"x": {"mm": 1.0, "counts": 6396, "moving": False}}
+    script["move"] = (ErrorCodes.in_progress, {})
+    panel = _build(_LetterPanel, "MOTOR")
+
+    panel.inputs["x"].value = 1.0
+    _click_move(panel, "x")
+
+    assert panel._followup is None
+    assert _periodics(panel.vis.doc) == []
+    assert REFUSED_STATUS in panel.status_div.text, panel.status_div.text
+    print("test_a_refused_move_starts_no_follow_up PASS")
 
 
 # --------------------------------------------------------------------------

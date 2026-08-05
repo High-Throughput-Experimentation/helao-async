@@ -34,6 +34,7 @@ from helao.core.servers.bokeh_theme import (
 )
 from helao.core.servers.motion_control import (
     ARM_TIMEOUT_S,
+    FOLLOWUP_INTERVAL_S,
     REFUSED_STATUS,
     Units,
     discover_axes,
@@ -42,6 +43,7 @@ from helao.core.servers.motion_control import (
     outcome_status,
     position_label,
     read_axis_positions,
+    should_follow_up,
     stop_motion,
 )
 from helao.core.servers.palette import BODY_TEXT, HEADING_TEXT, PANEL_BG, panel_styles
@@ -70,12 +72,19 @@ ROW_HEIGHT = 32
 #: endpoints take, so this module imports no deployment's enum.
 MOVE_MODES = ["relative", "absolute"]
 
+#: The follow-up poll period, in the milliseconds Bokeh's
+#: ``add_periodic_callback`` takes. **Derived** from the shared interval rather
+#: than restated as a number, so the two UI stacks cannot come to disagree about
+#: how often a moving axis is re-read.
+FOLLOWUP_PERIOD_MS = int(FOLLOWUP_INTERVAL_S * 1000)
+
 
 def _now() -> float:
-    """Return a monotonic timestamp, for arm expiry.
+    """Return a monotonic timestamp, for arm expiry and follow-up elapsion.
 
-    Wrapped in a function of its own so the expiry can be exercised without
-    sleeping through :data:`~helao.core.servers.motion_control.ARM_TIMEOUT_S`.
+    Wrapped in a function of its own so both can be exercised without sleeping
+    through :data:`~helao.core.servers.motion_control.ARM_TIMEOUT_S` or
+    :data:`~helao.core.servers.motion_control.FOLLOWUP_CEILING_S`.
     """
     return time.monotonic()
 
@@ -136,6 +145,12 @@ class MotionPanel:
         #: or ``None``. Bound to the triple it was granted for, so a value
         #: edited after arming cannot execute under the earlier confirmation.
         self.arms: dict[str, Optional[tuple]] = {item.axis: None for item in self.items}
+        #: The running follow-up poller, or ``None`` when none is running. One
+        #: per panel, never one per move -- see :meth:`_start_follow_up`.
+        self._followup = None
+        #: When the running follow-up began, by :func:`_now`. Reset, not
+        #: accumulated, when a second command extends the poller.
+        self._followup_started = 0.0
 
         self.inputs = {}
         self.mode_selects = {}
@@ -436,15 +451,25 @@ class MotionPanel:
         if not status:
             self.status_div.text = f"{axis}: move sent"
             await self._refresh_positions(clear_status=False)
+            # That read is the *pre*-move coordinate more often than not: the
+            # call above returns once the move has been dispatched, which for a
+            # fire-and-forget driver is before the stage has begun to move.
+            # Following up is what puts the arrival coordinate on screen.
+            self._start_follow_up()
             return
         self.status_div.text = f"{axis}: {status}"
         if status == REFUSED_STATUS:
             # Refused is not failed: the server made no device call, so the
             # coordinate the panel holds is still the one the server reported.
             # Blanking it would report a fault the instrument does not have.
+            # A follow-up already running is likewise left alone -- it is
+            # tracking a move this refusal did not affect.
             return
         # The move may or may not have started, so the only honest coordinate
-        # is unknown.
+        # is unknown. Any follow-up ends with it: a poller that kept reading
+        # would quietly overwrite that "?" with a coordinate this panel has no
+        # grounds to present as the result of the command it just failed.
+        self._stop_follow_up()
         self.positions[axis] = {"mm": None, "counts": None, "moving": None}
         self._restyle_readout(axis)
 
@@ -472,6 +497,9 @@ class MotionPanel:
             return
         self.status_div.text = "stopped; motors still energized"
         await self._refresh_positions(clear_status=False)
+        # A halt is not instantaneous either -- a stage decelerates -- so the
+        # readout settles by the same follow-up a move uses.
+        self._start_follow_up()
 
     def _callback_read(self, event) -> None:
         """Re-read every axis on demand.
@@ -481,6 +509,80 @@ class MotionPanel:
         """
         self.status_div.text = "reading current position..."
         self.vis.doc.add_next_tick_callback(self._refresh_positions)
+
+    def _start_follow_up(self) -> None:
+        """Begin -- or extend -- the post-command follow-up refresh.
+
+        Driven from the document with ``add_periodic_callback`` rather than
+        from a loop inside a callback: a ``while`` here would hold the document
+        for the whole of the move, and a page whose document is held renders
+        blank, which is the same reason
+        :data:`~helao.core.servers.motion_control.CALL_TIMEOUT` is as short as
+        it is.
+
+        **A second command extends the running poller, it never starts a
+        second.** Otherwise N moves on one open panel means N concurrent
+        pollers, all reading the same server every
+        :data:`~helao.core.servers.motion_control.FOLLOWUP_INTERVAL_S` and each
+        holding its own copy of the ceiling. Resetting the start time is the
+        right extension: the newest command is the one whose arrival the panel
+        is now waiting on, so it gets a full grace window and a full ceiling.
+        """
+        self._followup_started = _now()
+        if self._followup is not None:
+            return
+        self._followup = self.vis.doc.add_periodic_callback(
+            self._follow_up_tick, FOLLOWUP_PERIOD_MS
+        )
+
+    def _stop_follow_up(self) -> None:
+        """End the follow-up and unregister its callback.
+
+        Unregistering is the whole point of this method existing. A periodic
+        callback left registered is not merely untidy -- it polls the action
+        server for the entire life of the document, which for an engineering
+        panel left open on a station means forever.
+
+        Idempotent: Bokeh raises ``ValueError`` on a second removal, and the
+        end of a follow-up can be reached from a tick and from a failed command
+        alike.
+        """
+        callback, self._followup = self._followup, None
+        if callback is None:
+            return
+        try:
+            self.vis.doc.remove_periodic_callback(callback)
+        except ValueError:
+            # Already gone -- the session tore it down, or it was removed
+            # between the read above and here.
+            pass
+
+    async def _follow_up_tick(self) -> None:
+        """Re-read once, and decide whether to keep following up.
+
+        The decision is
+        :func:`~helao.core.servers.motion_control.should_follow_up`'s, not this
+        module's: the cadence, the grace window and the ceiling are shared with
+        the Reflex panel precisely so that a station cannot behave differently
+        depending on which UI an engineer happened to open.
+        """
+        try:
+            await self._refresh_positions(clear_status=False)
+        except Exception:
+            # Bounded above all else. An exception that left the poller
+            # registered would repeat itself every interval for the life of the
+            # document, and the Read button remains for a manual retry.
+            LOGGER.error(
+                f"'{self.serv_key}' follow-up read failed; stopping the " f"follow-up",
+                exc_info=True,
+            )
+            self._stop_follow_up()
+            return
+        # Read after the await, not before it: a command dispatched while this
+        # read was in flight has extended the window, and this tick must honour
+        # that rather than end on the older command's clock.
+        if not should_follow_up(self.positions, _now() - self._followup_started):
+            self._stop_follow_up()
 
     async def _refresh_positions(self, clear_status: bool = True) -> None:
         """Read every axis once and re-render the whole readout.
