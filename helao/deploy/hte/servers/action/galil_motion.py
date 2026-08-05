@@ -301,7 +301,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/easymove", tags=["action"])
             async def easymove(
-                axis: dev_axisitems = None,
+                axis: Optional[dev_axisitems] = None,
                 d_mm: float = 0,
                 speed: Optional[int] = None,
                 mode: MoveModes = MoveModes.relative,
@@ -386,7 +386,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/query_position", tags=["action"])
             async def query_position(
                 # axis: Union[list[str], str] = None
-                axis: dev_axisitems = None,
+                axis: Optional[dev_axisitems] = None,
             ):
                 """Return the current position of a single named axis."""
                 active = await app.base.setup_and_contain_action(
@@ -425,7 +425,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/axis_off", tags=["action"])
             async def axis_off(
                 # axis: Union[list[str], str] = None
-                axis: dev_axisitems = None,
+                axis: Optional[dev_axisitems] = None,
             ):
                 """De-energise (turn off) the named motor axis."""
                 # http://127.0.0.1:8001/motor/set/off?axis=x
@@ -442,7 +442,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
             @app.post(f"/{server_key}/axis_on", tags=["action"])
             async def axis_on(
-                axis: dev_axisitems = None,
+                axis: Optional[dev_axisitems] = None,
             ):
                 """Energise (turn on) the named motor axis."""
                 active = await app.base.setup_and_contain_action(action_abbr="axis_on")

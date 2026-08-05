@@ -24,7 +24,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "dev_axisitems",
+        "annotation": "Optional[dev_axisitems]",
         "default": "None"
       }
     ]
@@ -39,7 +39,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "dev_axisitems",
+        "annotation": "Optional[dev_axisitems]",
         "default": "None"
       }
     ]
@@ -63,7 +63,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "dev_axisitems",
+        "annotation": "Optional[dev_axisitems]",
         "default": "None"
       },
       {
@@ -188,7 +188,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "dev_axisitems",
+        "annotation": "Optional[dev_axisitems]",
         "default": "None"
       }
     ]

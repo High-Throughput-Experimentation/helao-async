@@ -400,7 +400,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_load_solid", tags=["action"])
     async def archive_custom_load_solid(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
         sample_no: int = 1,
         plate_id: int = 1,
     ):
@@ -435,7 +435,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_load", tags=["action"])
     async def archive_custom_load(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
         load_sample_in: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ] = Body(
@@ -473,7 +473,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_unload", tags=["action"])
     async def archive_custom_unload(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
@@ -580,7 +580,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_query_sample", tags=["action"])
     async def archive_custom_query_sample(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
     ):
         """Look up the sample currently loaded at a custom position.
 
@@ -610,7 +610,7 @@ def makeApp(server_key) -> BaseAPI:
 
     @app.post(f"/{server_key}/archive_custom_add_liquid", tags=["action"])
     async def archive_custom_add_liquid(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
         source_liquid_in: LiquidSample = Body(
             LiquidSample.model_validate(
                 {"sample_no": 1, "machine_name": gethostname().lower()}
@@ -665,7 +665,7 @@ def makeApp(server_key) -> BaseAPI:
     @app.post(f"/{server_key}/archive_custom_add_gas", tags=["action"])
     @action_version(2)
     async def archive_custom_add_gas(
-        custom: dev_customitems = None,
+        custom: Optional[dev_customitems] = None,
         source_gas_in: GasSample = Body(
             GasSample.model_validate(
                 {"sample_no": 1, "machine_name": gethostname().lower()}

@@ -33,7 +33,7 @@ __all__ = ["makeApp", "build_do_port_map", "DO_GROUPS"]
 # - handshake as stream with interrupt
 
 
-from typing import Union
+from typing import Optional, Union
 
 from fastapi import Body, Query
 
@@ -237,7 +237,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/mastercell", tags=["action"])
         async def mastercell(
-            cell: dev_mastercellitems = None,
+            cell: Optional[dev_mastercellitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen master cell.
@@ -270,7 +270,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/activecell", tags=["action"])
         async def activecell(
-            cell: dev_activecellitems = None,
+            cell: Optional[dev_activecellitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen active cell.
@@ -303,7 +303,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/pump", tags=["action"])
         async def pump(
-            pump: dev_pumpitems = None,
+            pump: Optional[dev_pumpitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen pump.
@@ -336,7 +336,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/gasvalve", tags=["action"])
         async def gasvalve(
-            gasvalve: dev_gasvalveitems = None,
+            gasvalve: Optional[dev_gasvalveitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen gas valve.
@@ -371,7 +371,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/liquidvalve", tags=["action"])
         async def liquidvalve(
-            liquidvalve: dev_liquidvalveitems = None,
+            liquidvalve: Optional[dev_liquidvalveitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen liquid valve.
@@ -406,7 +406,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/multivalve", tags=["action"])
         async def multivalve(
-            multivalve: dev_multivalveitems = None,
+            multivalve: Optional[dev_multivalveitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen multi-port valve.
@@ -441,7 +441,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/led", tags=["action"])
         async def led(
-            led: dev_leditems = None,
+            led: Optional[dev_leditems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen LED.
@@ -474,7 +474,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/fswbcd", tags=["action"])
         async def fswbcd(
-            fswbcd: dev_fswbcditems = None,
+            fswbcd: Optional[dev_fswbcditems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to a foot-switch BCD output.
@@ -509,7 +509,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/fsw", tags=["action"])
         async def fsw(
-            fsw: dev_fswitems = None,
+            fsw: Optional[dev_fswitems] = None,
         ):
             """Read the digital input wired to the chosen foot switch.
 
@@ -695,7 +695,7 @@ def makeApp(server_key) -> BaseAPI:
 
         @app.post(f"/{server_key}/heater", tags=["action"])
         async def heater(
-            heater: dev_heatitems = None,
+            heater: Optional[dev_heatitems] = None,
             on: bool = True,
         ):
             """Toggle the digital line wired to the chosen heater.

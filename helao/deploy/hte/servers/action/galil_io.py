@@ -93,7 +93,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/get_analog_in", tags=["action"])
             @action_version(2)
             async def get_analog_in(
-                ai_item: app.driver.dev_aiitems = None,
+                ai_item: Optional[app.driver.dev_aiitems] = None,
             ):
                 """Read a single analog input channel identified by ``ai_item``."""
                 active = await app.base.setup_and_contain_action(action_abbr="get_ai")
@@ -147,7 +147,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/set_analog_out", tags=["action"])
             @action_version(2)
             async def set_analog_out(
-                ao_item: app.driver.dev_aoitems = None,
+                ao_item: Optional[app.driver.dev_aoitems] = None,
                 value: Optional[float] = None,
             ):
                 """Drive an analog output channel ``ao_item`` to ``value``."""
@@ -171,7 +171,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/get_digital_in", tags=["action"])
             @action_version(2)
             async def get_digital_in(
-                di_item: app.driver.dev_diitems = None,
+                di_item: Optional[app.driver.dev_diitems] = None,
             ):
                 """Read the state of a digital input ``di_item``."""
                 active = await app.base.setup_and_contain_action(action_abbr="get_di")
@@ -194,7 +194,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/get_digital_out", tags=["action"])
             @action_version(2)
             async def get_digital_out(
-                do_item: app.driver.dev_doitems = None,
+                do_item: Optional[app.driver.dev_doitems] = None,
             ):
                 """Read the current setpoint of a digital output ``do_item``."""
                 active = await app.base.setup_and_contain_action(action_abbr="get_do")
@@ -217,7 +217,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             @app.post(f"/{server_key}/set_digital_out", tags=["action"])
             @action_version(2)
             async def set_digital_out(
-                do_item: app.driver.dev_doitems = None,
+                do_item: Optional[app.driver.dev_doitems] = None,
                 on: bool = False,
             ):
                 """Set the digital output ``do_item`` on or off."""

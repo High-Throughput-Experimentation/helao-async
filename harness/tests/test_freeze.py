@@ -146,6 +146,27 @@ def test_synthesized_key_none_when_ambiguous_or_absent():
     assert freeze.synthesized_key([]) is None
 
 
+def test_key_override_substitutes_the_server_key():
+    """`--key` is how a synthesized-key checklist stays maintainable.
+
+    The manifest correctly records no OPERATIONAL key for an unwired server, but
+    its checklist's paths were frozen under one, so re-freezing needs that key
+    supplied rather than inferred. Exercised here against hte's galil_io, whose
+    real key happens to be IO: passing it changes nothing, and passing a wrong
+    key makes every frozen path read as missing.
+    """
+    lines, blockers = freeze.freeze_deployment(
+        "hte", only="galil_io", key_override="IO", dry_run=True
+    )
+    assert blockers == []
+    assert any("unchanged" in ln for ln in lines), lines
+
+    _, blockers = freeze.freeze_deployment(
+        "hte", only="galil_io", key_override="WRONGKEY", dry_run=True
+    )
+    assert any("missing" in b for b in blockers), "a wrong key should not pass"
+
+
 def test_hte_freeze_is_clean_and_skips_nothing():
     """hte is the public regression case for the skip NOT firing.
 

@@ -9,7 +9,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -44,7 +44,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -79,7 +79,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -99,7 +99,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -124,7 +124,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       }
     ]
@@ -139,7 +139,7 @@
     "params": [
       {
         "name": "custom",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {

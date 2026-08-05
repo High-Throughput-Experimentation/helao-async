@@ -208,6 +208,7 @@ def freeze_deployment(
     dry_run: bool = False,
     only: Optional[str] = None,
     include_unwired: bool = False,
+    key_override: Optional[str] = None,
 ) -> tuple[list[str], list[str]]:
     """Freeze one deployment's action-server checklists additively.
 
@@ -221,6 +222,12 @@ def freeze_deployment(
             :func:`synthesized_key`). Off by default so a deliberate scope
             decision is not reported as drift; passing it re-extracts those with
             no key, which WILL report every frozen path as missing.
+        key_override: Substitute this server key instead of the manifest's, and
+            do not skip on a synthesized key. This is how a synthesized-key
+            checklist is legitimately maintained: the manifest correctly records
+            no OPERATIONAL key, but the checklist's paths were frozen under one,
+            so re-freezing it needs that key supplied rather than inferred.
+            Meaningful only with ``only``.
 
     Returns:
         ``(lines, blockers)`` — human-readable report lines, and the subset that
@@ -246,7 +253,7 @@ def freeze_deployment(
             continue
         dst = checklist_dir / f"{stem}.json"
         frozen = json.loads(dst.read_text()) if dst.is_file() else []
-        key = entry.get("representative_key")
+        key = key_override or entry.get("representative_key")
         if key is None and not include_unwired:
             invented = synthesized_key(frozen)
             if invented is not None:
@@ -294,6 +301,11 @@ def main(argv=None) -> int:
     )
     p.add_argument("--dry-run", action="store_true", help="report without writing")
     p.add_argument(
+        "--key",
+        help="substitute this server key instead of the manifest's (use with "
+        "--only, to maintain a checklist frozen under a synthesized key)",
+    )
+    p.add_argument(
         "--include-unwired",
         action="store_true",
         help="also freeze checklists held under a synthesized server key "
@@ -307,6 +319,7 @@ def main(argv=None) -> int:
             dry_run=a.dry_run,
             only=a.only,
             include_unwired=a.include_unwired,
+            key_override=a.key,
         )
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)
