@@ -19,7 +19,7 @@
       },
       {
         "name": "fast_samples_in",
-        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       }
     ]
