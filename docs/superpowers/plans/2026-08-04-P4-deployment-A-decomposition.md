@@ -1,8 +1,9 @@
 # P4 — Deployment-A Migration: Decomposition & Sequencing
 
-> **Status:** P4a–P4e **implemented and Linux-green** (247 tests across 17 files, verified
-> 2026-08-05); **P4f step 1 — the config flip — is DONE (2026-08-05)**; what remains is
-> station-only: the a3 aligner dry-run and P4f's single risk-ordered window. Locks sub-project
+> **Status: P4 COMPLETE (2026-08-05).** P4a–P4e implemented and Linux-green (247 tests across 17
+> files); P4f step 1 — the config flip — landed in place the same day; and **all station smoke
+> tests passed at the station on 2026-08-05** (reported by the operator), discharging the phase's
+> two remaining hardware gates. Nothing in P4 is outstanding. Locks sub-project
 > boundaries, dependency order, and the Linux/at-station gate split for P4 of the hexagonal
 > rewrite (master spec: `docs/superpowers/specs/2026-07-16-framework-hexagonal-rewrite-design.md`
 > §P4, as amended by `2026-08-04-hexagonal-rewrite-ui-amendment.md`; mandated per §13).
@@ -183,7 +184,7 @@ Eight audited latent bugs (`deploy-A.md` §4), split by wire visibility:
   dispatch-param serialization; dispatching a real sequence is impossible on Linux because
   every one drives hardware.
 
-### P4f — Assembly: hex flip + terminal at-station smoke  *(step 1 DONE; the station window is the phase's terminal gate)*
+### P4f — Assembly: hex flip + terminal at-station smoke  *(COMPLETE — flip 2026-08-05, station smoke PASSED 2026-08-05)*
 
 1. **Flip the live demo config. DONE 2026-08-05**, resolving the plan's "flip to the hex
    variant *or* add the keys in place" either/or in favour of **in place**. Per the resolved
@@ -391,10 +392,11 @@ private**.
 canary gate passed at station on 2026-07-29. **The live config is flipped** (P4f step 1, in
 place; the rehearsal variant deleted) and preflights non-vacuously.
 
-**Every Linux-authorable item in this phase is now discharged.** The three prerequisites
-below are closed, and so is the flip. What remains is station-only.
+**Every Linux-authorable item in this phase is discharged**, and so are both station gates —
+**all P4 station smoke tests passed 2026-08-05**. The phase is closed; the two items below are
+retained as the record of what the station window covered, not as outstanding work.
 
-**Two things stand between here and P4 complete, both requiring station access:**
+**The two station gates, both now PASSED (2026-08-05):**
 1. The **a3 aligner dry-run** (custom hlo `file_type` preserved; named-plate calibration and
    backup written byte-identically through the injected context).
 2. **P4f** — flip the live config, then the single risk-ordered station window.

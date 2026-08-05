@@ -1,6 +1,8 @@
 # P5 — Deployment-B Migration: Decomposition & Sequencing
 
-> **Status:** planning artifact, authored 2026-08-05. No P5 code written yet. The phase's
+> **Status:** authored 2026-08-05; **P5a is DONE** (checklist baseline re-frozen the same day),
+> the rest of the phase is unstarted. **P4 closed 2026-08-05** — its station smoke passed — so
+> this phase is unblocked and is the active one. The phase's
 > **inputs** are already in place and were re-measured for this plan: the dependent-surface
 > inventory and hardware canaries landed with P3-pre, `EstopPolicy` landed with P1, and the
 > audit's "stale driver test" has since been repaired. Locks sub-project boundaries, dependency
@@ -109,7 +111,7 @@ Carried as post-parity backlog, per spec §P5:
 ## Sub-project decomposition & dependency order
 
 ```
-P5a (checklist re-freeze)          Linux-only, BLOCKING — do first
+P5a (checklist re-freeze)          Linux-only, BLOCKING — DONE 2026-08-05
         │
 P5c (simulated adapters) ──────────Linux-only  ← moved early, see above
         │
@@ -126,7 +128,22 @@ P5g (assembly: flip + station window)  ── terminal HARDWARE gate
 P5d and P5e are independent of the estop work and of each other; they can run in parallel with
 P5b once P5a has landed.
 
-### P5a — Checklist baseline re-freeze *(Linux-only; BLOCKING prerequisite)*
+### P5a — Checklist baseline re-freeze *(Linux-only; BLOCKING prerequisite — **DONE 2026-08-05**)*
+
+**Discharged.** All 18 routes accepted with the changed-params flag; route counts held
+byte-identically (10 / 12 / 10) and a follow-up dry-run reports zero drift. Measured breakdown:
+**48 param defaults** rewritten from the unwrapped form to the raw param-function text, plus
+**exactly 1 annotation** (`List[…]` → `list[…]`). Both wire-invisible, each verified rather than
+asserted — `List[X]` and `list[X]` were measured to emit byte-identical OpenAPI, and all 48
+default rewrites were AST-checked to be the same value re-expressed (the new default parses to a
+call whose first positional argument is the old recorded text).
+
+**One correction to the diagnosis below:** it attributed the drift entirely to the tooling
+generation mismatch. 48 of 49 deltas are that; the single annotation delta is a genuine source
+change from the PEP 585 typing sweep that landed after the freeze. So the baseline was stale for
+two independent reasons. Nothing about the chosen fix changes — but "purely the wrapper text" was
+an overstatement, and the same care applies to the next deployment's baseline: check for *both*
+causes before concluding a re-freeze is transcription-only.
 
 **Measured problem.** `harness/freeze.py <deployment> --dry-run` reports **18 routes with
 changed `[params]` and zero route-set changes**. This is not source drift. These checklists were
@@ -348,7 +365,10 @@ exists with Q7 resolved; the audit's "stale driver test" was repaired and now pa
 deployment's own suite is green (3 test files: library exports, palette sweep, 25 Reflex panel
 tests). No P5 code has been written.
 
-**The one blocking item is P5a**, and it is a single re-freeze plus a commit.
+**P5a — the one blocking item — is DONE** (2026-08-05): baseline re-frozen, route counts held,
+dry-run clean, 49 param records rewritten and both delta classes verified wire-invisible. The
+next slice is **P5c (simulators)**, per the reordering in Decision 3, and the next *artifact* is
+the private executable plan with real paths and per-slice task lists.
 
 **What has no Linux path even after P5c:** only the terminal station window itself — the real
 serial press, the real arm, and the real fault source. Everything else in this phase, including
