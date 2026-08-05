@@ -104,7 +104,7 @@
       },
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0], embed=True)"
       },
       {
@@ -169,7 +169,7 @@
       },
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {
@@ -289,7 +289,7 @@
       },
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {
@@ -589,7 +589,7 @@
       },
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "[0.0]"
       },
       {
@@ -619,7 +619,7 @@
     "params": [
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {
@@ -689,7 +689,7 @@
     "params": [
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {
@@ -769,7 +769,7 @@
     "params": [
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {
@@ -849,7 +849,7 @@
     "params": [
       {
         "name": "sampleperiod",
-        "annotation": "list[float]",
+        "annotation": "List[float]",
         "default": "Body([0.0], embed=True)"
       },
       {

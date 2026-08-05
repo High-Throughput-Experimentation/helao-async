@@ -206,16 +206,37 @@ Deployment-A is the **least** UI-affected deployment, and that is a scheduling a
    window, and adding a first-ever frontend bundle build at that station would couple a
    hardware parity gate to a build artifact whose failure mode is a blank, silently
    disconnected page. Adding Reflex here is a P7-UI concern.
-2. **Its IO server gained the private digital-out setter on 2026-08-04, so its frozen
-   checklist is now stale** — exactly the drift class corrected for hte in the amendment's
-   §5.1. The checklist has the action-namespaced setter and two private getters, but not the
-   new private setter. **New P4f prerequisite: re-freeze that server's checklist before the
-   flip**, because preflight gates each `fast: graft` server against it and a stale baseline
-   makes the gate assert the wrong surface. Note there is **no freeze script for this
-   deployment** — hte has `harness/hte_freeze.py`; this deployment's original freeze was ad
-   hoc. Write the equivalent rather than re-freezing by hand, and apply the amendment's
-   §8.3(5) rule when reading the resulting diff: route-set and parameter-name deltas first,
-   annotation spelling reported separately.
+2. **Its IO server gained the private digital-out setter on 2026-08-04. DONE** — re-frozen
+   additively via the new generic `harness/freeze.py` (7 routes, +1, zero deletions), so
+   preflight now gates that `fast: graft` server against a baseline that matches its code.
+
+   **But freezing it exposed a larger problem: the deployment's other checklists are not
+   reproducible by the committed tooling.** Running the freezer across all 9 modules reports
+   drift in five of them that is *not* code drift:
+   - **Server-key substitutions the manifest says do not exist.** Four checklists were frozen
+     with concrete keys while `servers.json` records `representative_key: null` for those
+     modules ("not wired in tracked configs"). The keys came from the audit's list of
+     commented-out aliases. Manifest and checklists therefore disagree, and no mechanical
+     re-freeze can reproduce the frozen paths.
+   - **Routes static extraction cannot see.** The potentiostat checklist contains the
+     technique routes and private probes that the **cross-deployment** dyn-endpoint registrar
+     adds at runtime. Static AST extraction of the local module alone will never produce
+     them — this is §8.3's documented static/runtime split, but the frozen file mixes both
+     tiers without recording which is which.
+   - **Annotations the extractor cannot emit.** Six motion routes are frozen with
+     `Optional[...]` parameters that **never existed in the source** — no commit in that file's
+     history contains the string, and the extractor only `ast.unparse`s what is written.
+     Something inferred nullability from a `= None` default. (One reported delta *is* pure
+     PEP 585 spelling, already normalized at the comparison layer; the `Optional` ones are not.)
+
+   Consequence: the original freeze was not produced by `harness/endpoints.py`, so the
+   P3-pre rule "extraction reproducible via a committed script" does not hold for this
+   deployment. **This is a P4f prerequisite in its own right, and it must not be resolved by
+   re-freezing** — that would silently shrink the parity baseline of a deployment awaiting its
+   station gate (dropping the runtime-registered potentiostat routes from the checklist would
+   make the gate stop asserting them). Resolve it deliberately: reconcile the manifest's keys
+   with reality, and either record the runtime-registered tier separately or mark those
+   entries as runtime-sourced so the static freezer leaves them alone.
 3. **Its palette sweep is broader than the parent's, which is the safe direction.** The
    parent's AST sweep globs `helao/deploy/*/servers/**`; this deployment's own test
    `rglob`s the entire repo, so the extracted aligner host — which lives under `layouts/`,
@@ -316,10 +337,17 @@ canary gate passed at station on 2026-07-29. The live config is **not yet flippe
    backup written byte-identically through the injected context).
 2. **P4f** — flip the live config, then the single risk-ordered station window.
 
-**One Linux-completable prerequisite for P4f:** re-freeze the IO server's endpoint checklist
-for the private digital-out setter, and write the missing per-deployment freeze script while
-doing it (Amendment-1 delta #2). Do this **before** the flip, or preflight gates the flip
-against a baseline that predates the deployment's own code.
+**Linux-completable prerequisites for P4f:**
+1. IO server checklist re-freeze — **DONE** (additive, +1 route), and the missing generic
+   freeze script now exists as `harness/freeze.py`.
+2. **Open:** reconcile the five non-reproducible checklists (Amendment-1 delta #2). Not a
+   re-freeze — a deliberate reconciliation, because re-freezing would shrink the baseline.
+3. Hexagon preflight rejected every config carrying a `reflex:` server — **FIXED**
+   2026-08-04 (Amendment 1 §9.1). It had the same stale "exactly one of fast/bokeh" rule the
+   spec did, which blocked the P3e gate for three hte stations and one Deployment-C station.
+   Deployment-A has no Reflex server so P4f was never blocked by it, but P4f runs the same
+   gate. The validator now shares the launcher's code keys (pinned by a test that reads
+   `launch.py`) and reserves a reflex entry's `port + 1`.
 
 **Dependency reminder for the phases after this one:** P5 and P6 reuse this phase's
 config-driven graft and its public-port/private-specifics split. Neither needs a

@@ -149,19 +149,31 @@ re-running `harness/hte_freeze.py`: route set diff is four additions, **zero rem
 The frozen checklists under `helao/hexagon/tests/checklists/hte/` are re-frozen as part of
 this amendment.
 
-### 5.2 The extractor compares annotation strings — a formatting sweep breaks the freeze
+### 5.2 A frozen checklist is a verbatim record, so freezing must be additive
 
-Re-freezing produced diffs in 11 servers that have **no surface change at all**: the PEP 585
+A blind re-extract produced diffs in 11 servers with **no surface change at all**: the PEP 585
 sweep (`14a373ef`) rewrote `List[...]` to `list[...]`, and `harness/endpoints.py` records the
-annotation as source text. Left unaddressed this is a live hazard in both directions — a
-reviewer either re-freezes reflexively (and a real removal rides along unnoticed) or trusts
-a stale freeze.
+annotation as source text.
 
-**Rule added to §8.3:** a checklist diff must be evaluated as a **route-set** diff
-(path, method) plus a **parameter-name** diff first; annotation-spelling changes are
-reported separately and do not by themselves constitute surface drift. The comparison
-script used for this amendment is the reference implementation of that rule and belongs in
-`harness/` before P4's checklist work.
+**That is not a gate hazard, and treating it as one was an error in this amendment's first
+draft.** `diff_route_sets` has normalized PEP 585 alias spelling *when it compares* since
+`24c2cda8` (2026-07-30), precisely so the frozen JSONs stay verbatim records of the
+pre-migration legacy surface while the gate stays immune to future sweeps. The gate was
+never spelling-sensitive. So a re-freeze after a formatting change is not merely
+unnecessary — it **overwrites deliberately-verbatim provenance**, which is what the first
+pass of this amendment did before being reverted.
+
+**Rule added to §8.3(5):** never re-freeze for a formatting or typing change, and freeze
+**additively**. `harness/freeze.py` is that tool: manifest-driven and generic over
+deployments (so a private deployment's module list and checklist location stay inside its own
+repo, resolved through `preflight._checklist_dir` so the freezer and the gate cannot
+disagree), it keeps every surviving frozen entry **byte-verbatim**, appends genuinely new
+routes, and **refuses** to apply a `changed` schema or a `missing` route without an explicit
+`--accept-drift`. Widening or shrinking a parity baseline is a deliberate act with a reason
+in the commit, never a side effect of running a script.
+
+Net effect on hte: the checklist diff against the 2026-07-16 freeze is **two files, 58
+insertions, zero deletions** — exactly the four new routes and nothing else.
 
 ### 5.3 `control_vis` joins the dependent-surface inventory
 
@@ -284,8 +296,19 @@ normalizer silently drops the other endpoint's messages with no error on either 
 Correct: **exactly one of `fast`/`bokeh`/`reflex`** (`launch.py:583`). And the uniqueness
 check is no longer one address per server: a `reflex:` entry claims `host:port` **and**
 `host:port+1`, resolved by `reflex.discovery.reserved_addresses` (`launch.py:61`). The
-preflight validator inherits both, and the second is the load-bearing half — nothing else
-in the config may claim `port + 1`, and nothing in the config mentions it.
+second is the load-bearing half — nothing else in the config may claim `port + 1`, and
+nothing in the config mentions it.
+
+**The hexagon preflight validator carried the same stale rule, and it was a live gate
+failure, not just a doc error.** `helao/hexagon/preflight.py` rejected *every* config with a
+`reflex:` server outright — `PREFLIGHT FAILED … must declare exactly one of fast/bokeh` —
+which blocked the P3e gate for the three Reflex-adopting hte stations and for the
+Deployment-C station config. Fixed 2026-08-04: the validator now shares the launcher's code
+keys (pinned by a test that reads `launch.py`'s tuple, so they cannot drift) and reserves a
+reflex entry's backend port through the same `reserved_addresses` helper the launcher uses.
+A reflex server declaring `deployment: hexagon` is now rejected with a message naming D9
+rather than a misleading "missing group/module". Verified: all six reflex-carrying configs in
+tracked repos preflight OK, and the non-reflex hexagon canaries still pass.
 
 ### 9.2 §9.4 — hot-reload snapshot statement incomplete
 
