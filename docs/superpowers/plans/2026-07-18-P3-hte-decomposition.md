@@ -10,11 +10,11 @@ Migrate the `hte` deployment onto the hexagon composition, station-by-station, a
 
 ## The audited surface (spec §8.1, frozen maps `deploy-hte-servers.md` + `deploy-hte-drivers-A/B.md`)
 
-- **23 action-server modules**, **237 static endpoints** + config-driven `analyze_<name>` (ANA).
+- **23 action-server modules**, **241 static endpoints** + config-driven `analyze_<name>` (ANA). *(237 when this plan was written; +4 on 2026-08-04 — the private `POST /get_digital_outs` + `POST /set_digital_out` pair on `galil_io` and `nidaqmx_server`, backing the engineering control panel. Checklists re-frozen; see master-spec Amendment 1 §5.1.)*
 - **~18 Hardware-adapter port targets** (of 23 driver classes: DBPack dead, Leancat broken-orphan, Calc→domain service, Archive→SampleState, sample_shim already-shaped). **15 Linux-importable/testable, 8 Windows-only** (Gamry/Biologic/SM303/Andor/galil-io/galil-motion/NI/PAL — need lazy adapter-scoped vendor imports, §11.1).
 - **242 experiment fns / 13 modules; 86 sequence fns / 14 modules** (flat name-keyed registries; two known collision hazards).
-- **13 config-selected `*_vis` modules** (+ 2 thin hosts + data_browser shim); **4 operator scripts**.
-- **21 station configs**; only `gamry.yml` declares `simulation: true`.
+- **13 config-selected `*_vis` modules** (+ 2 thin hosts + data_browser shim); **4 operator scripts**. *(As of 2026-08-04 also **13 config-selected Reflex panel modules** and a third vis key `control_vis` in **15 of 21 configs** with its `control_visualizer` host. Both are P7-UI subjects under D9, not P3 subjects — but they are P3 **inventory**: see `_dependent_surface.md`'s 2026-08-04 addendum.)*
+- **21 station configs**; only `gamry.yml` declares `simulation: true`. *(4 now also declare a `reflex:` server — `clad`, `eche10`, `hispec`, and the `htereflex` dev config — each claiming `port` **and** `port + 1`. Those three stations' cut-over runbooks need a `build_reflex_bundle.py` step; the other control-panel stations need only a visualizer restart.)*
 
 ## Hard constraint: the Linux / hardware gate split
 

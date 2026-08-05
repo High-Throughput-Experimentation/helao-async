@@ -123,7 +123,7 @@
     "params": [
       {
         "name": "matrix",
-        "annotation": "List",
+        "annotation": "list",
         "default": "[[1, 0, 0], [0, 1, 0], [0, 0, 1]]"
       }
     ]
@@ -138,12 +138,12 @@
     "params": [
       {
         "name": "d_mm",
-        "annotation": "List[float]",
+        "annotation": "list[float]",
         "default": "[0, 0]"
       },
       {
         "name": "axis",
-        "annotation": "List[str]",
+        "annotation": "list[str]",
         "default": "['x', 'y']"
       },
       {
@@ -173,7 +173,7 @@
     "params": [
       {
         "name": "axis",
-        "annotation": "Union[List[str], str]",
+        "annotation": "Union[list[str], str]",
         "default": "None"
       }
     ]

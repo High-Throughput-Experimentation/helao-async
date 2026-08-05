@@ -18,7 +18,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -103,17 +103,17 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
         "name": "CA_Vval__V_list",
-        "annotation": "List[float]",
+        "annotation": "list[float]",
         "default": "Body([], embed=True)"
       },
       {
         "name": "CA_Tval__s_list",
-        "annotation": "List[float]",
+        "annotation": "list[float]",
         "default": "Body([], embed=True)"
       },
       {
@@ -198,7 +198,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -283,7 +283,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -388,7 +388,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -488,7 +488,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
@@ -553,7 +553,7 @@
     "params": [
       {
         "name": "fast_samples_in",
-        "annotation": "List[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
+        "annotation": "list[Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]]",
         "default": "Body([], embed=True)"
       },
       {
