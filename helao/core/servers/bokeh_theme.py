@@ -234,6 +234,15 @@ body {{
 CARRIER_TAG: Final[str] = "helao_theme_carrier"
 
 SECTION_MARGIN: Final[tuple[int, int, int, int]] = (4, 4, 4, 4)
+
+#: Box of the ``FileInput`` load button (see :func:`file_load_button_stylesheet`).
+#:
+#: CSS lengths rather than ints: they are interpolated into a stylesheet, not
+#: passed to a Bokeh ``width=``. Sizing the widget in Python instead would set
+#: the *host* box while the native control inside kept its intrinsic width, and
+#: the two would disagree.
+FILE_LOAD_BUTTON_WIDTH: Final[str] = "56px"
+FILE_LOAD_BUTTON_HEIGHT: Final[str] = "28px"
 """Margin (top, right, bottom, left) on every Bokeh section panel.
 
 Sections are ``sizing_mode="stretch_width"``, so this is the only thing holding
@@ -436,6 +445,58 @@ def marker_style_block() -> list[InlineStyleSheet]:
         )
         for swatch in MARKER_SWATCHES
     ]
+
+
+def file_load_button_stylesheet() -> InlineStyleSheet:
+    """Return a fresh ``InlineStyleSheet`` reducing a ``FileInput`` to one button.
+
+    Bokeh 3 renders ``FileInput`` as a **native** ``<input type="file">`` inside
+    the widget's own shadow root, so what the browser draws is a platform
+    button plus a status string -- "Browse... No file selected" in Firefox,
+    "Choose File / No file chosen" in Chrome. Beside a one-line text input that
+    is three widgets' worth of chrome for a file picker nobody reads the state
+    of, and the wording is not ours.
+
+    Neither half is fixable the obvious way. A native file input is a *replaced*
+    element, so ``::before`` on it never renders, and ``::file-selector-button``
+    cannot be relabelled -- ``content`` does not apply to it. What *is*
+    styleable is ``:host``: this sheet is injected into the FileInput's own
+    shadow root, where the host is an ordinary element that takes a pseudo.
+
+    So the host draws the label, and the native control is stretched over the
+    whole host and made invisible -- still the thing that receives the click, so
+    the file dialog opens with no JavaScript and no reach into the shadow DOM
+    from outside. Sizing lives here rather than on the Python widget for the
+    same reason it does for the semantic buttons: the caller should ask for "a
+    load button", not compute a pixel box.
+
+    Returns:
+        InlineStyleSheet: A new instance per call. A module-level instance
+        would raise ``Models must be owned by only a single document`` on the
+        second browser connection, because the document factory re-runs per
+        client.
+    """
+    return InlineStyleSheet(
+        css=(
+            ":host { position: relative; display: inline-block; "
+            f"width: {FILE_LOAD_BUTTON_WIDTH}; height: {FILE_LOAD_BUTTON_HEIGHT}; "
+            f"border-radius: 4px; background-color: {BUTTON_PRIMARY_BG}; "
+            "overflow: hidden; }"
+            ':host::before { content: "load"; position: absolute; inset: 0; '
+            "display: flex; align-items: center; justify-content: center; "
+            f"color: {BUTTON_LABEL}; font-size: 12px; line-height: 1; "
+            "pointer-events: none; }"
+            ":host(:hover) { filter: brightness(0.92); }"
+            # The native control keeps the click. Transparent rather than
+            # `display: none`, which would stop it receiving one at all.
+            'input[type="file"] { position: absolute; inset: 0; width: 100%; '
+            "height: 100%; opacity: 0; padding: 0; margin: 0; border: 0; "
+            "cursor: pointer; }"
+            'input[type="file"]::file-selector-button { width: 100%; '
+            "height: 100%; opacity: 0; padding: 0; margin: 0; border: 0; "
+            "cursor: pointer; }"
+        )
+    )
 
 
 def semantic_button_stylesheet() -> InlineStyleSheet:

@@ -1734,3 +1734,58 @@ def run_all():
 
 if __name__ == "__main__":
     run_all()
+
+
+def test_the_sample_list_load_button_shares_its_parameter_cell():
+    """The file picker belongs to its parameter, not to the next grid slot.
+
+    Regression from a station report. The picker was appended as a block of its
+    own, which read correctly while the form was one column wide. Under the
+    two-column grid that block took the *next* slot, so the button for
+    ``plate_sample_no_list`` drew beneath the preceding parameter -- offering to
+    load a list it has nothing to do with.
+    """
+    from bokeh.document import Document
+    from bokeh.models.widgets import FileInput
+
+    from helao.core.servers.operator.bokeh_operator import (
+        PARAM_CELL_NAME,
+        BokehOperator,
+    )
+
+    def _file_inputs(model):
+        found, stack, seen = [], [model], set()
+        while stack:
+            node = stack.pop()
+            if id(node) in seen:
+                continue
+            seen.add(id(node))
+            if isinstance(node, FileInput):
+                found.append(node)
+            stack.extend(getattr(node, "children", None) or [])
+        return found
+
+    op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
+    op.dataAPI = object()  # the branch only tests `is not None`
+    grid = _param_grid(op, ["plate_sample_no_list", "other"], [[], 2], [list, int])
+
+    # Two parameters is one row of two cells. A third slot would mean the
+    # picker took a cell of its own again, which is the bug.
+    assert len(grid) == 1, [type(row).__name__ for row in grid]
+    cells = grid[0].children
+    assert [cell.name for cell in cells] == [PARAM_CELL_NAME, PARAM_CELL_NAME]
+
+    # And it sits in its own parameter's cell, not the neighbour's.
+    picked = _file_inputs(cells[0])
+    assert len(picked) == 1, len(picked)
+    assert _file_inputs(cells[1]) == []
+
+    # Minimal by construction: the label and the box come from the stylesheet,
+    # so a Python `width=` here would size the host while the native control
+    # inside kept its own and the two would disagree.
+    assert picked[0].stylesheets, "load button carries no stylesheet"
+    assert '"load"' in picked[0].stylesheets[0].css
+    assert picked[0].width is None, picked[0].width
+
+    op.cleanup_session(None)
+    print("test_the_sample_list_load_button_shares_its_parameter_cell PASS")

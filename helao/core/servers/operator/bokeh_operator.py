@@ -49,6 +49,7 @@ from helao.core.servers.bokeh_theme import (
     SECTION_MARGIN,
     color_rule,
     estop_button_stylesheet,
+    file_load_button_stylesheet,
     semantic_button_stylesheet,
     stretch_section,
 )
@@ -2687,14 +2688,29 @@ cb_obj.stylesheets = [
                 )
 
             elif self.dataAPI is not None and args[idx] == "plate_sample_no_list":
-                private_input.append(FileInput(width=200, accept=".txt"))
-                param_layout.append(
-                    self._param_extra_block(
-                        [
-                            [private_input[-1]],
-                            Spacer(height=10),
-                        ]
+                # Sizing and label come from the stylesheet, not from `width=`:
+                # the widget renders a native file input, so a Python width
+                # sets the host box while the control inside keeps its own.
+                private_input.append(
+                    FileInput(
+                        accept=".txt",
+                        stylesheets=[file_load_button_stylesheet()],
                     )
+                )
+                # Inside this parameter's own cell and directly beneath its text
+                # input, replacing the cell rather than appending one. As its own
+                # cell it consumed the next slot in the two-column grid, which
+                # put it under the *previous* parameter -- next to the list it
+                # loads only while the form was one column wide.
+                #
+                # Indented past the index gutter so it lines up with the input
+                # above it rather than with the row's `[n]` label.
+                param_layout[-1] = self._param_cell(
+                    [
+                        input_col,
+                        [Spacer(width=idx_col_w), private_input[-1]],
+                        Spacer(height=10),
+                    ]
                 )
                 private_input[-1].on_change(
                     "value",
