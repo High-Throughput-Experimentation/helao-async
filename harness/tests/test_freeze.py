@@ -111,12 +111,52 @@ def test_accept_drift_touches_only_the_flagged_parameter():
     assert [d["kind"] for d in drift] == ["changed"]
 
 
-def test_accept_drift_drops_a_removed_route_and_leaves_the_rest_verbatim():
+def test_accept_drift_alone_never_drops_a_route():
+    """The guard: bulk-accepting schema changes must not delete routes.
+
+    A deployment-wide --accept-drift once applied 11 `missing` records and cut a
+    frozen baseline from 16 routes to 5, deleting the runtime-registered routes it
+    existed to assert. Widening a schema is recoverable; a dropped route is one
+    the gate silently stops checking.
+    """
     frozen = [_route("/K/gone"), _route("/K/kept")]
     current = [_route("/K/kept")]
-    merged, _ = freeze.merge_routes(frozen, current, accept_drift=True)
-    assert [r["path"] for r in merged] == ["/K/kept"]
-    assert merged[0] is frozen[1], "surviving entry was rebuilt rather than kept"
+    merged, drift = freeze.merge_routes(frozen, current, accept_drift=True)
+    assert merged == frozen, "accept_drift deleted a route"
+    assert [d["kind"] for d in drift] == ["missing"]
+
+
+def test_accept_missing_drops_only_the_named_route():
+    frozen = [_route("/K/gone"), _route("/K/also_gone"), _route("/K/kept")]
+    current = [_route("/K/kept")]
+    merged, _ = freeze.merge_routes(frozen, current, accept_missing=["/K/gone"])
+    assert [r["path"] for r in merged] == ["/K/also_gone", "/K/kept"]
+    assert merged[1] is frozen[2], "surviving entry was rebuilt rather than kept"
+
+
+def test_applicable_drift_separates_the_two_authorities():
+    drift = [
+        {"path": "/K/a", "method": "post", "kind": "changed", "field": "params"},
+        {"path": "/K/b", "method": "post", "kind": "missing"},
+    ]
+    assert freeze.applicable_drift(drift) == []
+    assert [d["path"] for d in freeze.applicable_drift(drift, accept_drift=True)] == [
+        "/K/a"
+    ]
+    assert [
+        d["path"] for d in freeze.applicable_drift(drift, accept_missing=["/K/b"])
+    ] == ["/K/b"]
+    both = freeze.applicable_drift(drift, accept_drift=True, accept_missing=["/K/b"])
+    assert len(both) == 2
+
+
+def test_unnamed_removal_stays_a_blocker_and_says_how_to_name_it():
+    """Otherwise --accept-drift looks like a broken flag rather than a guard."""
+    _, blockers = freeze.freeze_deployment(
+        "hte", only="galil_io", key_override="WRONGKEY", accept_drift=True, dry_run=True
+    )
+    assert blockers, "wrong key should still report every frozen path as missing"
+    assert all("--accept-missing" in b for b in blockers if "missing" in b), blockers
 
 
 def test_accept_drift_is_inert_when_there_is_no_drift():
