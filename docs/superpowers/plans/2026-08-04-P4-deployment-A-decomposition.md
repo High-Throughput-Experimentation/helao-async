@@ -1,7 +1,8 @@
 # P4 — Deployment-A Migration: Decomposition & Sequencing
 
-> **Status:** P4a–P4e **implemented and Linux-green** (217 tests across 13 files, verified
-> 2026-08-04); **P4f and one mid-stream at-station gate remain**. Locks sub-project
+> **Status:** P4a–P4e **implemented and Linux-green** (247 tests across 17 files, verified
+> 2026-08-05); **P4f step 1 — the config flip — is DONE (2026-08-05)**; what remains is
+> station-only: the a3 aligner dry-run and P4f's single risk-ordered window. Locks sub-project
 > boundaries, dependency order, and the Linux/at-station gate split for P4 of the hexagonal
 > rewrite (master spec: `docs/superpowers/specs/2026-07-16-framework-hexagonal-rewrite-design.md`
 > §P4, as amended by `2026-08-04-hexagonal-rewrite-ui-amendment.md`; mandated per §13).
@@ -182,12 +183,39 @@ Eight audited latent bugs (`deploy-A.md` §4), split by wire visibility:
   dispatch-param serialization; dispatching a real sequence is impossible on Linux because
   every one drives hardware.
 
-### P4f — Assembly: hex flip + terminal at-station smoke  *(REMAINING — the phase's terminal gate)*
+### P4f — Assembly: hex flip + terminal at-station smoke  *(step 1 DONE; the station window is the phase's terminal gate)*
 
-1. **Flip the live demo config** to the hex variant (or add the `deployment:`/`legacy_module:`
-   keys in place) and preflight it. Per the resolved Q1, the flip list is **that config only**
-   — the dormant simulation config gates nothing and must not consume a station window.
-   Confirmed still unflipped as of 2026-08-04.
+1. **Flip the live demo config. DONE 2026-08-05**, resolving the plan's "flip to the hex
+   variant *or* add the keys in place" either/or in favour of **in place**. Per the resolved
+   Q1 the flip list was **that config only** — the dormant simulation config gates nothing and
+   must not consume a station window. All four action servers now carry `fast: graft` +
+   `deployment: hexagon` + `legacy_module:`; the orchestrator, operator and visualizer entries
+   are unflipped by design (non-action roles are out of P4 scope, and D9 keeps both UI stacks
+   on legacy core until P7-UI).
+
+   **The hex rehearsal variant was deleted rather than promoted.** It existed (P4e) only to
+   prove a hex-composed group preflights non-vacuously, and it did that by duplicating the live
+   config's params verbatim. Promoting it would have left two ~190-line configs holding the
+   same real station hardware params — device serials, channel maps, a vendor DLL path, ports,
+   `root:` — to be hand-synced for the rest of the deployment's life, and would have made
+   rollback all-or-nothing (launch the other prefix). In place, **rollback is per server and
+   needs no second file:** delete that server's two keys and restore its `fast:` module name.
+   The legacy modules are untouched in-tree, so a rolled-back server is byte-identical to
+   pre-flip. The preflight pin went from three configs to two.
+
+   Evidence: `PREFLIGHT OK` on both remaining configs, and the checklist gate proven **live**
+   on the flipped config by negative control — a scratch copy with one `legacy_module:` pointed
+   at a nonexistent module failed with `frozen endpoint checklist missing`. 247 tests across 17
+   files green on a vendor-less Linux box.
+
+   **A silent-pass trap in the gate, found while proving it, that the station runbook must
+   respect.** Preflight infers the deployment from the config's **path** — a config not under
+   `helao/deploy/<dep>/configs/` yields no deployment, and the checklist-presence gate then
+   returns early and **passes silently**. The first negative control was run on a copy in a
+   scratch directory and printed `PREFLIGHT OK` with a deliberately broken `legacy_module:`.
+   So: preflight the **in-tree** config path. A copy staged elsewhere returns a meaningless OK
+   and does not say that the route gate was skipped. (Not fixed here — widening the validator
+   is outside a config flip; recorded as a backlog item and a runbook constraint.)
 2. **At-station, single risk-ordered window:** full-group hex launch of the demo config; the
    motion canary + diff re-run (driver internals changed in P4a); the aligner dry-run if a3
    has not already discharged it; the potentiostat diff (P4b's OpenAPI ordering); one
@@ -358,9 +386,13 @@ private**.
 
 ## Execution note
 
-**Current state, verified 2026-08-04:** P4a–P4e are implemented and green — 217 tests across
-13 files in the deployment's suite, all passing on a vendor-less Linux box. The hardware
-canary gate passed at station on 2026-07-29. The live config is **not yet flipped**.
+**Current state, verified 2026-08-05:** P4a–P4e are implemented and green — 247 tests across
+17 files in the deployment's suite, all passing on a vendor-less Linux box. The hardware
+canary gate passed at station on 2026-07-29. **The live config is flipped** (P4f step 1, in
+place; the rehearsal variant deleted) and preflights non-vacuously.
+
+**Every Linux-authorable item in this phase is now discharged.** The three prerequisites
+below are closed, and so is the flip. What remains is station-only.
 
 **Two things stand between here and P4 complete, both requiring station access:**
 1. The **a3 aligner dry-run** (custom hlo `file_type` preserved; named-plate calibration and
@@ -373,10 +405,13 @@ canary gate passed at station on 2026-07-29. The live config is **not yet flippe
 2. **Closed.** Of the checklists the freezer flags, four cover modules deliberately out of
    scope — not wired by any operational config, not gating — and are now skipped rather than
    reported. The one real defect, six motion routes carrying `Optional[...]` annotations the
-   source never had, is **fixed** (delta #2). What remains flagged is the potentiostat's 11
-   runtime-registered cross-deployment routes: correct to leave unapplied, since accepting
-   would delete them from the baseline; worth marking as runtime-sourced so the static
-   freezer stops proposing it.
+   source never had, is **fixed** (delta #2). The potentiostat's runtime-registered
+   cross-deployment routes — the last thing still flagged, and correct to leave unapplied since
+   accepting would have deleted them from the baseline — are now **marked as externally
+   registered**, so the freezer confirms them against the foreign registrar instead of
+   proposing their removal. **Re-verified 2026-08-05:** a freeze dry-run over all nine modules
+   reports zero drift — five `unchanged`, one `external` (15/15 routes confirmed in their
+   registrar), four deliberate scope-skips. Nothing outstanding.
 3. Hexagon preflight rejected every config carrying a `reflex:` server — **FIXED**
    2026-08-04 (Amendment 1 §9.1). It had the same stale "exactly one of fast/bokeh" rule the
    spec did, which blocked the P3e gate for three hte stations and one Deployment-C station.
