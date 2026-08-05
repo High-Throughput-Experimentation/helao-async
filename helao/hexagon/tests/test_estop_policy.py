@@ -58,6 +58,60 @@ def test_ui_button_same_cascade_as_fault_edge():
     )
 
 
+# --- the two SMALLER UI stop buttons (P5b) ---
+#
+# A private deployment's station visualizer carries THREE safety buttons, not
+# one, and they send different things. UiEstopButton above is the largest --
+# the full orch/recorder/private cascade. The other two are strictly smaller,
+# and collapsing them onto UiEstopButton would escalate a graceful stop into a
+# full cascade and downgrade an emergency stop off its own route: both
+# safety-relevant, and neither visible in an artifact diff.
+
+
+def test_graceful_stop_button_stops_only_orchestrators():
+    """ "Safe stop": POST /stop to every orchestrator, and nothing else."""
+    p = ep.EstopPolicy(topo())
+    assert p.commands_for(ep.UiGracefulStopButton(source="vis")) == (
+        ep.StopOrch(key="ORCH"),
+    )
+
+
+def test_orch_estop_button_requests_estop_not_graceful_stop():
+    """ "Estop": POST /estop_orch to every orchestrator, and nothing else.
+
+    Distinct from StopOrch (which is /stop) and from EstopFanout (the orch-side
+    fanout the receiving orchestrator performs).
+    """
+    p = ep.EstopPolicy(topo())
+    assert p.commands_for(ep.UiOrchEstopButton(source="vis")) == (
+        ep.EstopOrch(key="ORCH"),
+    )
+
+
+def test_the_full_cascade_button_is_unchanged_by_the_smaller_two():
+    """Pin the largest button's shape so adding triggers cannot alter it."""
+    p = ep.EstopPolicy(topo())
+    assert p.commands_for(ep.UiEstopButton(source="vis")) == (
+        ep.StopOrch(key="ORCH"),
+        ep.StopRecorders(keys=("RECORD1", "RECORD2")),
+        ep.StopPrivate(keys=("PSTAT1",)),
+    )
+
+
+def test_both_smaller_buttons_reach_every_orchestrator():
+    cfg = dict(SERVERS_CFG)
+    cfg["ORCH2"] = {"group": "orchestrator"}
+    p = ep.EstopPolicy(ep.derive_estop_topology(cfg))
+    assert p.commands_for(ep.UiGracefulStopButton(source="vis")) == (
+        ep.StopOrch(key="ORCH"),
+        ep.StopOrch(key="ORCH2"),
+    )
+    assert p.commands_for(ep.UiOrchEstopButton(source="vis")) == (
+        ep.EstopOrch(key="ORCH"),
+        ep.EstopOrch(key="ORCH2"),
+    )
+
+
 def test_orch_estop_request_full_sequence():
     """/estop_orch and status-ingested estop drive the orch-side sequence:
     fanout to every server then finalize actives (core-01 §7)."""
