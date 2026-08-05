@@ -28,6 +28,11 @@ So this tool never blindly overwrites:
 That default is the important one. Regenerating a checklist to make a diff pass
 is the failure mode the frozen-checklist gate exists to prevent, so widening the
 baseline has to be a deliberate act with a reason recorded in the commit.
+
+And it skips a checklist frozen under a **synthesized** server key — see
+:func:`synthesized_key` for why that is a scope decision rather than drift, and
+why the superficially similar "frozen with ``{server_key}`` unsubstituted" case
+must still be frozen normally.
 """
 
 from __future__ import annotations
@@ -52,6 +57,37 @@ def _route_key(route: dict) -> tuple[str, str]:
     return (route["path"], route["method"])
 
 
+def synthesized_key(frozen: list[dict]) -> Optional[str]:
+    """The concrete server key a checklist's paths were frozen under, if any.
+
+    Returns the single ``/<KEY>/...`` prefix shared by every key-prefixed path in
+    ``frozen``, or None when the paths carry the literal ``{server_key}`` (never
+    substituted), when they disagree, or when there are none.
+
+    This distinguishes two situations that both show up as
+    ``representative_key: null`` in a manifest, and must NOT be treated alike:
+
+    * **Frozen unsubstituted** (``{server_key}`` in the paths) — the manifest and
+      the checklist agree that no key was supplied. Freezing works normally and
+      must keep working, or a route added to such a module later goes unnoticed.
+    * **Frozen under a synthesized key** (a concrete prefix) — the checklist was
+      produced from a canary config invented to give an *unwired, non-gating*
+      server openapi-only coverage, while the manifest surveyed the operational
+      configs and correctly recorded no key. Both artifacts are right about
+      different questions, and re-extracting with no key reports every frozen
+      path as ``missing`` — a defect list manufactured out of a scope decision.
+    """
+    prefixes = {
+        p.split("/")[1]
+        for p in (r["path"] for r in frozen)
+        if p.startswith("/") and len(p.split("/")) > 2
+    }
+    if len(prefixes) != 1:
+        return None
+    only = prefixes.pop()
+    return None if only == "{server_key}" else only
+
+
 def merge_routes(
     frozen: list[dict], current: list[dict]
 ) -> tuple[list[dict], list[dict]]:
@@ -67,8 +103,17 @@ def merge_routes(
     drift = [d for d in diff_route_sets(frozen, current) if d["kind"] != "extra"]
     frozen_keys = {_route_key(r) for r in frozen}
     additions = [r for r in current if _route_key(r) not in frozen_keys]
-    merged = sorted(frozen + additions, key=_route_key)
-    return merged, drift
+    if not additions:
+        # Return the frozen list ITSELF, untouched. Not `sorted(frozen)`: a frozen
+        # file need not be stored in sorted order (one is kept in source-declaration
+        # order), and re-sorting it would rewrite a verbatim record to no effect --
+        # the very thing this module exists to avoid. Callers detect "nothing to do"
+        # by identity/equality with what they read.
+        return frozen, drift
+    # Adding a route does normalize the file to sorted order. Harmless: the gate
+    # compares by (path, method), so order carries no meaning, and entry CONTENT is
+    # still copied through verbatim.
+    return sorted(frozen + additions, key=_route_key), drift
 
 
 def load_manifest(checklist_dir: Path) -> list[dict]:
@@ -84,6 +129,7 @@ def freeze_deployment(
     accept_drift: bool = False,
     dry_run: bool = False,
     only: Optional[str] = None,
+    include_unwired: bool = False,
 ) -> tuple[list[str], list[str]]:
     """Freeze one deployment's action-server checklists additively.
 
@@ -93,6 +139,10 @@ def freeze_deployment(
             shrinking the baseline. Requires a recorded reason in the commit.
         dry_run: Report without writing.
         only: Restrict to one module basename (with or without ``.py``).
+        include_unwired: Freeze synthesized-key checklists too (see
+            :func:`synthesized_key`). Off by default so a deliberate scope
+            decision is not reported as drift; passing it re-extracts those with
+            no key, which WILL report every frozen path as missing.
 
     Returns:
         ``(lines, blockers)`` — human-readable report lines, and the subset that
@@ -116,9 +166,20 @@ def freeze_deployment(
         if not src.is_file():
             blockers.append(f"{stem}: module missing at {src.relative_to(REPO_ROOT)}")
             continue
-        current = extract_routes(src, server_key=entry.get("representative_key"))
         dst = checklist_dir / f"{stem}.json"
         frozen = json.loads(dst.read_text()) if dst.is_file() else []
+        key = entry.get("representative_key")
+        if key is None and not include_unwired:
+            invented = synthesized_key(frozen)
+            if invented is not None:
+                note = entry.get("note")
+                lines.append(
+                    f"  skipped    {stem} — frozen under synthesized key "
+                    f"'{invented}'; manifest declares no operational key"
+                    + (f" ({note})" if note else "")
+                )
+                continue
+        current = extract_routes(src, server_key=key)
         merged, drift = merge_routes(frozen, current)
 
         for d in drift:
@@ -156,6 +217,12 @@ def main(argv=None) -> int:
         help="also apply changed/removed routes (widens the gate — record why)",
     )
     p.add_argument("--dry-run", action="store_true", help="report without writing")
+    p.add_argument(
+        "--include-unwired",
+        action="store_true",
+        help="also freeze checklists held under a synthesized server key "
+        "(unwired, non-gating servers — skipped by default)",
+    )
     a = p.parse_args(argv)
     try:
         lines, blockers = freeze_deployment(
@@ -163,6 +230,7 @@ def main(argv=None) -> int:
             accept_drift=a.accept_drift,
             dry_run=a.dry_run,
             only=a.only,
+            include_unwired=a.include_unwired,
         )
     except FileNotFoundError as e:
         print(f"error: {e}", file=sys.stderr)

@@ -210,33 +210,46 @@ Deployment-A is the **least** UI-affected deployment, and that is a scheduling a
    additively via the new generic `harness/freeze.py` (7 routes, +1, zero deletions), so
    preflight now gates that `fast: graft` server against a baseline that matches its code.
 
-   **But freezing it exposed a larger problem: the deployment's other checklists are not
-   reproducible by the committed tooling.** Running the freezer across all 9 modules reports
-   drift in five of them that is *not* code drift:
-   - **Server-key substitutions the manifest says do not exist.** Four checklists were frozen
-     with concrete keys while `servers.json` records `representative_key: null` for those
-     modules ("not wired in tracked configs"). The keys came from the audit's list of
-     commented-out aliases. Manifest and checklists therefore disagree, and no mechanical
-     re-freeze can reproduce the frozen paths.
-   - **Routes static extraction cannot see.** The potentiostat checklist contains the
-     technique routes and private probes that the **cross-deployment** dyn-endpoint registrar
-     adds at runtime. Static AST extraction of the local module alone will never produce
-     them — this is §8.3's documented static/runtime split, but the frozen file mixes both
-     tiers without recording which is which.
-   - **Annotations the extractor cannot emit.** Six motion routes are frozen with
-     `Optional[...]` parameters that **never existed in the source** — no commit in that file's
-     history contains the string, and the extractor only `ast.unparse`s what is written.
-     Something inferred nullability from a `= None` default. (One reported delta *is* pure
-     PEP 585 spelling, already normalized at the comparison layer; the `Optional` ones are not.)
+   **Reading the freezer's report on the other eight modules needs the scope decision in
+   hand, or it manufactures work that does not exist.** Run across all 9, it flags five —
+   and four of those five are **not defects**:
 
-   Consequence: the original freeze was not produced by `harness/endpoints.py`, so the
-   P3-pre rule "extraction reproducible via a committed script" does not hold for this
-   deployment. **This is a P4f prerequisite in its own right, and it must not be resolved by
-   re-freezing** — that would silently shrink the parity baseline of a deployment awaiting its
-   station gate (dropping the runtime-registered potentiostat routes from the checklist would
-   make the gate stop asserting them). Resolve it deliberately: reconcile the manifest's keys
-   with reality, and either record the runtime-registered tier separately or mark those
-   entries as runtime-sourced so the static freezer leaves them alone.
+   - **Four modules are deliberately out of scope, and their `representative_key: null` is
+     correct.** Two software servers, one openapi-only pump server, and the NI-DAQmx
+     re-export are **not wired by any operational config** and are **not gating** — a
+     standing scope decision, recorded both in the manifest's own per-entry notes ("not wired
+     in tracked configs") and in this phase's hardware-scope note, which lists exactly four
+     hardware servers and excludes these. Their frozen checklists carry concrete server keys
+     because the canary configs that exercise them were **synthesized** to give those servers
+     openapi-only coverage; the manifest surveyed *operational* configs, which is the right
+     question for it to answer. Manifest and checklists are each accurate about different
+     things. **Nothing to reconcile, and nothing here is a P4f prerequisite.**
+     `harness/freeze.py` now **skips** a checklist frozen under a synthesized key, quoting
+     the manifest's own note as the reason, so its report no longer presents a scope decision
+     as a defect list — which is exactly how it was misread once. `--include-unwired` forces
+     them if ever needed. The narrowness matters: four *hte* modules also carry
+     `representative_key: null`, but they are frozen with `{server_key}` **unsubstituted**,
+     agreeing with their manifest, and must keep being frozen or a route added to one later
+     goes unnoticed. So the skip fires on a concrete prefix, never on the placeholder.
+   - **The NI-DAQmx re-export is a special case of the above.** Its local module is 727 bytes
+     with **zero** extractable routes — a pure pass-through to hte's server — and its
+     checklist is hte's route set with a synthesized key substituted. So static extraction of
+     the local module can never reproduce it, and it is consequently missing the two
+     digital-out routes hte's module gained on 2026-08-04. Harmless while nothing wires it;
+     it becomes real the day something does. Per this phase's out-of-scope list, that
+     module's surface is tracked against the hte adapter, not rebuilt here.
+   - **The potentiostat checklist mixes the static and runtime tiers.** It contains technique
+     routes and private probes that the **cross-deployment** dyn-endpoint registrar adds at
+     runtime, which static AST extraction of the local module will never produce. That split
+     is §8.3's documented design, not a defect — but the frozen file does not record which
+     entries came from which tier, so a static freezer reads the runtime ones as removals.
+     Worth marking so the tool can skip them; not blocking.
+   - **The one genuine loose end: six motion routes are frozen with `Optional[...]`
+     parameters that never existed in the source.** No commit in that file's history contains
+     the string, and the extractor only `ast.unparse`s what is written, so something inferred
+     nullability from a `= None` default. This one matters because motion **is** one of the
+     four hardware servers and **is** gating. (A seventh reported delta is pure PEP 585
+     spelling, already normalized at the comparison layer — ignore that one.)
 3. **Its palette sweep is broader than the parent's, which is the safe direction.** The
    parent's AST sweep globs `helao/deploy/*/servers/**`; this deployment's own test
    `rglob`s the entire repo, so the extracted aligner host — which lives under `layouts/`,
@@ -340,8 +353,11 @@ canary gate passed at station on 2026-07-29. The live config is **not yet flippe
 **Linux-completable prerequisites for P4f:**
 1. IO server checklist re-freeze — **DONE** (additive, +1 route), and the missing generic
    freeze script now exists as `harness/freeze.py`.
-2. **Open:** reconcile the five non-reproducible checklists (Amendment-1 delta #2). Not a
-   re-freeze — a deliberate reconciliation, because re-freezing would shrink the baseline.
+2. **Mostly not open.** Of the five checklists the freezer flags, four cover modules that are
+   deliberately out of scope — not wired by any operational config, not gating — so their
+   flags are report noise, not work (delta #2). The one item that is real: the six motion
+   routes frozen with `Optional[...]` annotations absent from the source, on a server that
+   **is** gating.
 3. Hexagon preflight rejected every config carrying a `reflex:` server — **FIXED**
    2026-08-04 (Amendment 1 §9.1). It had the same stale "exactly one of fast/bokeh" rule the
    spec did, which blocked the P3e gate for three hte stations and one Deployment-C station.
