@@ -15,6 +15,8 @@ from helao.core.servers import io_control
 from helao.core.servers.io_control import (
     DoItem,
     discover_do_items,
+    group_do_items,
+    group_heading,
     read_digital_outs,
     set_digital_out,
     state_label,
@@ -204,3 +206,42 @@ def test_set_returns_empty_when_the_call_raises(dispatched):
         == {}
     )
     print("test_set_returns_empty_when_the_call_raises PASS")
+
+
+# --------------------------------------------------------------------------
+# grouping
+# --------------------------------------------------------------------------
+
+
+def test_grouping_keeps_config_order_within_and_across_groups():
+    items = discover_do_items(NI_CFG, ("dev_pump", "dev_gasvalve", "dev_led"))
+    grouped = group_do_items(items)
+
+    assert [group for group, _ in grouped] == ["dev_pump", "dev_gasvalve", "dev_led"]
+    assert [i.name for i in grouped[1][1]] == ["CO2", "Ar"]
+    print("test_grouping_keeps_config_order_within_and_across_groups PASS")
+
+
+def test_a_declared_but_unconfigured_group_gets_no_section():
+    # Both panels render a heading per returned group, so an empty group here
+    # would be a heading over nothing.
+    items = discover_do_items(NI_CFG, ("dev_pump", "dev_liquidvalve"))
+    assert [group for group, _ in group_do_items(items)] == ["dev_pump"]
+    print("test_a_declared_but_unconfigured_group_gets_no_section PASS")
+
+
+def test_every_line_appears_in_exactly_one_group():
+    items = discover_do_items(NI_CFG, ("dev_pump", "dev_gasvalve", "dev_led"))
+    grouped = group_do_items(items)
+
+    flattened = [item.name for _, in_group in grouped for item in in_group]
+    assert flattened == [i.name for i in items]
+    assert len(set(flattened)) == len(flattened)
+    print("test_every_line_appears_in_exactly_one_group PASS")
+
+
+def test_the_heading_drops_the_config_prefix():
+    assert group_heading("dev_gasvalve") == "gasvalve"
+    # Not a `dev_` block at all: passed through rather than mangled.
+    assert group_heading("outputs") == "outputs"
+    print("test_the_heading_drops_the_config_prefix PASS")

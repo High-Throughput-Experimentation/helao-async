@@ -25,6 +25,8 @@ from helao.core.servers.bokeh_theme import (
 )
 from helao.core.servers.io_control import (
     discover_do_items,
+    group_do_items,
+    group_heading,
     read_digital_outs,
     set_digital_out,
     state_label,
@@ -145,18 +147,16 @@ class DigitalOutPanel:
     def _build_group_rows(self) -> list:
         """Return the layout rows for the controls, grouped and wrapped."""
         rows = []
-        for group in self.DO_GROUPS:
-            in_group = [item for item in self.items if item.group == group]
-            if not in_group:
-                continue
-            if len(self.DO_GROUPS) > 1:
-                # Only worth a heading when a server has more than one group;
-                # on a single-block server it would just repeat "dev_do".
+        grouped = group_do_items(self.items)
+        for group, in_group in grouped:
+            if len(grouped) > 1:
+                # Only worth a heading when a server has more than one populated
+                # group; on a single-block server it would just repeat "dev_do".
                 rows.append(
                     [
                         Spacer(width=20),
                         Div(
-                            text=f"<b>{group.removeprefix('dev_')}:</b>",
+                            text=f"<b>{group_heading(group)}:</b>",
                             sizing_mode="stretch_width",
                             height=15,
                             styles={"color": HEADING_TEXT},
