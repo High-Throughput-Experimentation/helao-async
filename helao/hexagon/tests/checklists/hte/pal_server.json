@@ -94,7 +94,7 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -159,7 +159,7 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -264,7 +264,7 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -354,12 +354,12 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -404,12 +404,12 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -479,7 +479,7 @@
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -539,7 +539,7 @@
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -649,12 +649,12 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -719,7 +719,7 @@
       },
       {
         "name": "source",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {
@@ -814,7 +814,7 @@
       },
       {
         "name": "dest",
-        "annotation": "dev_customitems",
+        "annotation": "Optional[dev_customitems]",
         "default": "None"
       },
       {

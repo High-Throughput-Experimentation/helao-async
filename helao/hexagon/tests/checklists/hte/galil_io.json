@@ -43,7 +43,7 @@
     "params": [
       {
         "name": "ai_item",
-        "annotation": "app.driver.dev_aiitems",
+        "annotation": "Optional[app.driver.dev_aiitems]",
         "default": "None"
       }
     ]
@@ -58,7 +58,7 @@
     "params": [
       {
         "name": "di_item",
-        "annotation": "app.driver.dev_diitems",
+        "annotation": "Optional[app.driver.dev_diitems]",
         "default": "None"
       }
     ]
@@ -73,7 +73,7 @@
     "params": [
       {
         "name": "do_item",
-        "annotation": "app.driver.dev_doitems",
+        "annotation": "Optional[app.driver.dev_doitems]",
         "default": "None"
       }
     ]
@@ -97,7 +97,7 @@
     "params": [
       {
         "name": "ao_item",
-        "annotation": "app.driver.dev_aoitems",
+        "annotation": "Optional[app.driver.dev_aoitems]",
         "default": "None"
       },
       {
@@ -172,7 +172,7 @@
     "params": [
       {
         "name": "do_item",
-        "annotation": "app.driver.dev_doitems",
+        "annotation": "Optional[app.driver.dev_doitems]",
         "default": "None"
       },
       {
