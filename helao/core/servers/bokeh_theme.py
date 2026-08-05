@@ -241,8 +241,12 @@ SECTION_MARGIN: Final[tuple[int, int, int, int]] = (4, 4, 4, 4)
 #: passed to a Bokeh ``width=``. Sizing the widget in Python instead would set
 #: the *host* box while the native control inside kept its intrinsic width, and
 #: the two would disagree.
+#: The height matches the parameter form's text inputs (``height=31`` in
+#: ``bokeh_operator``), because the button sits *beside* one: a shorter box
+#: would float against the taller input and read as misaligned rather than as
+#: a pair.
 FILE_LOAD_BUTTON_WIDTH: Final[str] = "56px"
-FILE_LOAD_BUTTON_HEIGHT: Final[str] = "28px"
+FILE_LOAD_BUTTON_HEIGHT: Final[str] = "31px"
 """Margin (top, right, bottom, left) on every Bokeh section panel.
 
 Sections are ``sizing_mode="stretch_width"``, so this is the only thing holding

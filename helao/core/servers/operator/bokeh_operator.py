@@ -2528,6 +2528,15 @@ cb_obj.stylesheets = [
                     "line-height": f"{param_widget.height}px",
                 },
             )
+            # Named rather than inlined so a special-cased parameter can put a
+            # widget beside its input — see `plate_sample_no_list` below — without
+            # reaching into `input_col.children` by index.
+            input_row = row(
+                index_div,
+                param_input[item],
+                spacing=0,
+                sizing_mode="stretch_width",
+            )
             input_col = column(
                 row(
                     Spacer(width=idx_col_w),
@@ -2536,12 +2545,7 @@ cb_obj.stylesheets = [
                     spacing=0,
                     sizing_mode="stretch_width",
                 ),
-                row(
-                    index_div,
-                    param_input[item],
-                    spacing=0,
-                    sizing_mode="stretch_width",
-                ),
+                input_row,
                 spacing=5,
                 sizing_mode="stretch_width",
             )
@@ -2694,24 +2698,23 @@ cb_obj.stylesheets = [
                 private_input.append(
                     FileInput(
                         accept=".txt",
+                        # Matches the text input it sits beside. Bokeh's default
+                        # widget margin has a 5px top, which would drop the
+                        # button that far below the field's top edge.
+                        margin=(0, 5, 0, 5),
                         stylesheets=[file_load_button_stylesheet()],
                     )
                 )
-                # Inside this parameter's own cell and directly beneath its text
-                # input, replacing the cell rather than appending one. As its own
-                # cell it consumed the next slot in the two-column grid, which
-                # put it under the *previous* parameter -- next to the list it
-                # loads only while the form was one column wide.
+                # Into this parameter's own input row, immediately right of the
+                # text input it fills. `input_col` is already the cell's child,
+                # so appending here places the button without rebuilding the
+                # cell.
                 #
-                # Indented past the index gutter so it lines up with the input
-                # above it rather than with the row's `[n]` label.
-                param_layout[-1] = self._param_cell(
-                    [
-                        input_col,
-                        [Spacer(width=idx_col_w), private_input[-1]],
-                        Spacer(height=10),
-                    ]
-                )
+                # It was previously a full-width block appended as its own
+                # entry, which read correctly while the form was one column
+                # wide; under the two-column grid that block took the next slot
+                # and drew beneath the *previous* parameter instead.
+                input_row.children.append(private_input[-1])
                 private_input[-1].on_change(
                     "value",
                     partial(
