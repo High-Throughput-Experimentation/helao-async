@@ -327,20 +327,33 @@ no deployment and the checklist gate **passes silently**.
    Rationale and rejected alternatives in P5b. The deciding fact: two of the three buttons send
    strictly smaller command sets, and collapsing them changes a safety path's wire in both
    directions.
-3. **Build the simulators before the estop extraction, not after.** Reordering against the
+3. **The cascade stays HTTP-only, issued by the executor adapter, and is NOT routed through the
+   Transport port** — added 2026-08-05 while authoring the executable plan, and it contradicts the
+   obvious reading of §4.2.5 ("commands execute through the Transport/OrchControl outbound port"),
+   so it is recorded rather than assumed. Measured: the port's adapter is **ZMQ-RPC-first with
+   HTTP fallback**, while both legacy cascades use raw `httpx` — HTTP only. Routing through the
+   port would change the wire whenever RPC is up, and would send the recorder-stop leg — which is
+   an **action** route, not a private one — over RPC, **bypassing the action-queuing middleware
+   that HTTP traverses** (a semantic difference the port's own contract documents). On a
+   safety-critical path that is not an acceptable silent change. What §4.2.5 actually demands is
+   still satisfied: no raw HTTP *in a driver*, no hardcoded server keys *in code*, and one
+   implementation instead of two. *Revisit* if the Transport port gains an explicit HTTP-only
+   mode. *Rejected:* the action-dispatch method (it builds a real `Action`; legacy sends a bare
+   two-key dict); accepting RPC-first (the queuing bypass above).
+4. **Build the simulators before the estop extraction, not after.** Reordering against the
    spec's listed order, justified by the spec's own requirement that the drill be rehearsed
    against sims first. Costs nothing: no other slice depends on the estop work.
-4. **Fix the visualizer's drifted recorder-stop leg to the driver's correct form.** It is
+5. **Fix the visualizer's drifted recorder-stop leg to the driver's correct form.** It is
    wire-visible, so it needs a recorded sign-off — but the leg currently 404s under the config
    where it differs, so no consumer can depend on the broken shape. Same reasoning P4d used, and
    the same limit: correct the caller toward the frozen route, never the route toward the caller.
-5. **Leave both UI stacks on legacy core (D9), and do not port the Reflex safety buttons in
+6. **Leave both UI stacks on legacy core (D9), and do not port the Reflex safety buttons in
    P5.** The Reflex panels' missing estop buttons are a real gap (correction #3) but fixing it
    means adding a control surface to a UI, which is P7-UI's subject and needs the ControlSurface
    port. P5 must simply not claim dual-stack coverage it does not have.
-6. **Delete the vestigial panel module referenced by no config.** It has no counterpart in the
+7. **Delete the vestigial panel module referenced by no config.** It has no counterpart in the
    other stack, no server to subscribe to, and no config naming it. Dead surface.
-7. **Keep the two driver-data YAMLs in the config directory.** Shipping behaviour tables beside
+8. **Keep the two driver-data YAMLs in the config directory.** Shipping behaviour tables beside
    group configs is unusual, but they are referenced by path from server params and moving them
    is a config-breaking change with zero parity gain. Post-parity cosmetic.
 
