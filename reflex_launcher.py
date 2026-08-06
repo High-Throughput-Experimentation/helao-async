@@ -500,6 +500,7 @@ if __name__ == "__main__":
         # socket works without the Proactor loop's missing add_reader family.
         asyncio.set_event_loop(asyncio.SelectorEventLoop())
 
+    from helao.core.version import hlo_version
     from helao.helpers import config_loader
     from helao.helpers import helao_logging as logging
     from helao.helpers.parent_death import arm_parent_death_signal, monitor_detached
@@ -548,6 +549,7 @@ if __name__ == "__main__":
         "deployment",
         os.path.basename(os.path.dirname(os.path.dirname(config_path))),
     )
+    CONFIG["hlo_version"] = hlo_version
 
     bundle = resolve_bundle(helao_repo_root)
     if bundle is None:
