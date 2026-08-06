@@ -1769,6 +1769,7 @@ def test_no_raw_color_literals_anywhere() -> None:
         {
             *REPO_ROOT.glob("helao/deploy/*/servers/**/*.py"),
             *REPO_ROOT.glob("helao/core/servers/**/*.py"),
+            *REPO_ROOT.glob("helao/hexagon/**/*.py"),
         }
     )
     findings = sweep_color_literals(targets)
@@ -1781,6 +1782,21 @@ def test_no_raw_color_literals_anywhere() -> None:
         f"FAIL until the final sweep phase lands; every site below must resolve "
         f"through helao.core.servers.palette:\n{rendered}"
     )
+
+
+def test_sweep_reaches_hexagon_tree() -> None:
+    """Amendment §7: the whole-tree sweep must cover ``helao/hexagon/``.
+
+    Vacuity trap: an empty or mistyped glob passes ``test_no_raw_color_literals
+    _anywhere``'s ``findings == []`` assertion just as well as a correctly
+    covered tree does — a glob that silently stops matching is
+    indistinguishable from a clean sweep. Pinning one file that is known to
+    live under ``helao/hexagon/`` makes an inert glob fail loudly instead.
+    """
+    targets = {_relative(p) for p in REPO_ROOT.glob("helao/hexagon/**/*.py")}
+    assert (
+        "helao/hexagon/adapters/vis/galil_aligner_host.py" in targets
+    ), "helao/hexagon/**/*.py matched nothing under adapters/vis — glob is inert"
 
 
 # ---------------------------------------------------------------------------

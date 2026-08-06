@@ -27,7 +27,7 @@ decided against observed event reliability on the bench.
 
 **Wired as the gamry action server's driver** (``driver_classes=[GamryComAdapter]``)
 after at-station validation (single-pump/no-missed-points, PEIS, golden_diff,
-MTA apartment affinity — PR #205). The COM/threading behavior is not
+MTA apartment affinity — PR 205). The COM/threading behavior is not
 Linux-runtime-verifiable; the Linux tests cover the marshalling + drain +
 strategy machinery with COM stubbed. See
 ``docs/superpowers/plans/2026-07-22-P3a-gamry-com-sta-thread.md``.
@@ -270,7 +270,7 @@ class GamryComAdapter(HelaoDriver):
         ``driver.pstat.<M>()`` (DigitalIn TTL wait, MeasureV/I/A, measure_ocv).
         Under the default MTA apartment (``coinit_flags=0x0``) COM marshals
         these cross-thread calls automatically, so calling from the event-loop
-        thread is safe (validated at-station, PR #205 — no RPC_E_WRONG_THREAD).
+        thread is safe (validated at-station, PR 205 — no RPC_E_WRONG_THREAD).
         NOTE: if ever switched to STA (``0x2``), these raw off-thread calls
         would need routing through ``thread.submit`` instead.
         """
