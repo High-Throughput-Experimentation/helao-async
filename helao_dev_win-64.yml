@@ -43,6 +43,7 @@ dependencies:
   - mpltern
   - msgspec
   - munch
+  - nodejs>=22.12
   - ntplib
   - numpy
   - orjson
@@ -94,3 +95,9 @@ dependencies:
   - websockets
   - zeroconf
   - zeromq
+variables:
+  # Reflex ignores node unless this is set: without it, `reflex export` downloads
+  # its own bun from GitHub at first build, which fails on a station with no
+  # access there. conda-forge's win-64 bun stops at 0.6.0, below Reflex's 1.3.0
+  # minimum, so npm is the only viable Windows path.
+  REFLEX_USE_NPM: "1"
