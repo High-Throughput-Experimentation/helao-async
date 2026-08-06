@@ -88,6 +88,8 @@ class HelaoDict:
             return strtime
         elif isinstance(val, (UUID, date)):
             return str(val)
+        elif isinstance(val, np.ndarray):
+            return val.tolist()
         elif isinstance(val, list):
             return [self._serialize_item(val=item) for item in val]
         elif isinstance(val, tuple):
