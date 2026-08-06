@@ -59,7 +59,11 @@ class C_vis(ActionVisualizer):
         pws_port = self.port
 
         # Common variables to monitor: voltage, current, power, status (if available)
+        # "datetime" first, as every sibling live panel does: `add_points`
+        # appends one timestamp per package unconditionally, and the plots below
+        # use it as the x axis, so omitting it raised KeyError on every call.
         self.data_dict_keys = [
+            "datetime",
             "t_s",
             # "voltage",
             "current_a",

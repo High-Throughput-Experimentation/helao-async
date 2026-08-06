@@ -34,13 +34,13 @@ raise" premise for the ws_live family):
   column (e.g. a composition string) is silently ignored, matching the
   Reflex ingest layer's `normalize_data_package` semantics.
 
-`power_supply_vis` carries a genuine pre-existing defect, found by running
-its real code rather than assumed: `data_dict_keys = ["t_s", "current_a"]`
-(no `"datetime"`), but `add_points` unconditionally does
-`data_dict["datetime"].append(...)` once per package -- so it raises
-`KeyError: 'datetime'` on **every** call, including the happy path. Pinned
-below, not fixed (production code is out of scope for this slice); flag to
-the team separately.
+`power_supply_vis` carried a genuine defect, found by running its real code
+rather than assumed: `data_dict_keys` was `["t_s", "current_a"]` with no
+`"datetime"`, while `add_points` appends to `data_dict["datetime"]` once per
+package and the panel's own plots use it as the x axis -- so it raised
+`KeyError: 'datetime'` on **every** call, including the happy path. Fixed by
+adding the key first in the list, matching all six sibling live panels; the
+test below now asserts the payload lands instead of pinning the crash.
 
 Run directly (`python -m pytest` on this file) -- the hte suite is not part
 of `run_unit_tests.py`.
@@ -289,20 +289,22 @@ def test_mfc_vis_ingests_recognized_and_raises_on_unrecognized():
     asyncio.run(_run())
 
 
-def test_power_supply_vis_raises_on_every_call_preexisting_defect():
-    """Measured, pinned pre-existing defect: data_dict_keys omits "datetime"
-    but add_points unconditionally appends to it, so even a fully-recognized
-    payload raises. This is NOT a P7b regression -- it is characterized here
-    so the wire-conformance gate does not silently claim this panel works."""
+def test_power_supply_vis_ingests_a_recognized_payload():
+    """Was a crash on every call: add_points appends one "datetime" per package
+    and the plots use it as the x axis, but the key was missing from
+    data_dict_keys. Asserts the streamed values, not merely that nothing raised
+    -- a panel that silently dropped the payload would satisfy the latter."""
     module = _import("power_supply_vis")
 
     async def _run():
         vis = _build(module, "PWR0")
         assert vis.connected
-        assert "datetime" not in vis.data_dict_keys
-        decoded = await _decoded_live({"current_a": 1.2})
-        with pytest.raises(KeyError, match="datetime"):
-            vis.add_points([decoded])
+        assert vis.data_dict_keys[0] == "datetime"
+        decoded = await _decoded_live({"t_s": 0.5, "current_a": 1.2})
+        vis.add_points([decoded])
+        assert list(vis.datasource.data["current_a"]) == [1.2]
+        assert list(vis.datasource.data["t_s"]) == [0.5]
+        assert len(vis.datasource.data["datetime"]) == 1
 
     asyncio.run(_run())
 
@@ -392,7 +394,7 @@ if __name__ == "__main__":
     test_pressure_vis_ingests_recognized_and_raises_on_unrecognized()
     test_tec_vis_ingests_recognized_via_tec_vals_and_raises_on_unrecognized()
     test_mfc_vis_ingests_recognized_and_raises_on_unrecognized()
-    test_power_supply_vis_raises_on_every_call_preexisting_defect()
+    test_power_supply_vis_ingests_a_recognized_payload()
     test_biologic_vis_ingests_recognized_columns_and_drops_string()
     test_gamry_vis_ingests_recognized_columns_and_drops_string()
     test_nidaqmx_vis_ingests_recognized_columns_and_drops_string()
