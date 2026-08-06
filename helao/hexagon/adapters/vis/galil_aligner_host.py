@@ -20,15 +20,25 @@ move here, to the vis/server layer:
 **NOT Linux-runtime-verifiable** (needs a live Bokeh session + an at-station
 plate-alignment dry-run). Construct-test tier only; see
 ``docs/superpowers/plans/2026-07-22-P3a-galil-slice4-aligner-extraction.md``.
-The heavy imports (``bokeh``, ``HelaoVis``, ``Aligner``) are kept lazy inside
-:meth:`GalilAlignerHost.start` so this module — and the action server that
-constructs the host — import without a Bokeh document context.
+The heavy imports (``HelaoVis``, ``Aligner``) are kept lazy inside
+:meth:`GalilAlignerHost._make_bokeh_app` so this module — and the action
+server that constructs the host — import without a Bokeh document context.
+
+**P7d (D6 generalized):** this module no longer constructs
+``bokeh.server.server.Server`` itself — that construction moved to
+``helao.hexagon.app.ui_host.BokehServerUiHost``, the one place in
+``helao/hexagon`` the boundary test (``test_boundaries.py``'s
+bokeh.server-outside-app/ rule) permits it. :class:`GalilAlignerHost` now
+takes a ``ui_host`` (``ports.ui_host.UiHostPort``) and calls
+``start_document_host``/``stop`` on it instead of importing ``bokeh``.
+Same host/port derivation as before (``bokeh_port`` config, else
+``server_cfg['port'] + 1000``) — only the construction site moved.
 """
 
-from functools import partial
 from typing import Any, Optional
 
 from helao.core.error import ErrorCodes
+from helao.hexagon.adapters.errors import UnwiredPortError
 
 __all__ = ["AlignerMotorContext", "GalilAlignerHost"]
 
@@ -115,34 +125,43 @@ class GalilAlignerHost:
         server_cfg: dict,
         server_name: str,
         config: Optional[dict] = None,
+        ui_host: Optional[Any] = None,
     ):
         self._driver = driver
         self._base = base
         self._server_cfg = server_cfg
         self._server_name = server_name
         self._config = config or {}
+        self._ui_host = ui_host
         self.context = AlignerMotorContext(driver, base)
         self.bokehapp: Any = None
 
     def start(self) -> None:
-        """Build and start the Bokeh ``Server`` hosting the ``/Aligner`` app.
+        """Start the document host serving the ``/Aligner`` app.
 
-        Relocated verbatim from the legacy ``Galil.start_aligner`` /
-        ``makeBokehApp`` (D6 removal) — same host/port derivation
-        (``bokeh_port`` config, else ``server_cfg['port'] + 1000``).
+        Same host/port derivation as the legacy ``Galil.start_aligner`` /
+        ``makeBokehApp`` (``bokeh_port`` config, else
+        ``server_cfg['port'] + 1000``) — P7d moved the ``Server``
+        construction itself behind the injected ``ui_host``
+        (``ports.ui_host.UiHostPort``); this module no longer imports
+        bokeh at all.
         """
-        from bokeh.server.server import Server
-
+        if self._ui_host is None:
+            raise UnwiredPortError(
+                "GalilAlignerHost.start() requires a ui_host adapter "
+                "(helao.hexagon.ports.ui_host.UiHostPort, e.g. "
+                "helao.hexagon.app.ui_host.BokehServerUiHost) — construct "
+                "one and pass it in before calling start()"
+            )
         serv_host = self._server_cfg["host"]
         serv_port = self._config.get("bokeh_port", self._server_cfg["port"] + 1000)
         serv_py = "Aligner"
-        self.bokehapp = Server(
-            {f"/{serv_py}": partial(self._make_bokeh_app)},
+        self.bokehapp = self._ui_host.start_document_host(
+            {f"/{serv_py}": self._make_bokeh_app},
+            host=serv_host,
             port=serv_port,
-            address=serv_host,
             allow_websocket_origin=[f"{serv_host}:{serv_port}"],
         )
-        self.bokehapp.start()
 
     def _make_bokeh_app(self, doc):
         """Bokeh document factory: attach an ``Aligner`` bound to the context.

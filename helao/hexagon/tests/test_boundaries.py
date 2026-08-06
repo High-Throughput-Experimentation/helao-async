@@ -323,3 +323,58 @@ def test_native_adapters_never_import_core_servers():
     files = sorted(d.rglob("*.py")) if d.is_dir() else []
     bad = [v for f in files for v in iter_violations(f)]
     assert not bad, f"native-adapter boundary violations: {bad}"
+
+
+# --------------------------------------------------------------------------
+# bokeh.server rule (P7d, D6 generalized): VENDOR_BANNED above is consulted
+# only for domain/ports (the LOCKED branch); adapters/ and app/ both return
+# before that check, so "bokeh" imports are otherwise legal everywhere in
+# the tree. That is exactly the D6 hole: galil_aligner_host.py constructed
+# bokeh.server.server.Server from adapters/vis/. The rule below is
+# independent of _allowed()/VENDOR_BANNED and is stricter than the general
+# per-layer allow-list -- it reaches tests/ too, since nothing genuinely
+# needs bokeh.server outside app/ui_host.py.
+# --------------------------------------------------------------------------
+
+
+def _bokeh_server_import_lines(pyfile: Path) -> list[int]:
+    return [
+        lineno
+        for lineno, module in _imported_modules(pyfile)
+        if module == "bokeh.server" or module.startswith("bokeh.server.")
+    ]
+
+
+def _hexagon_files_outside_app() -> list[Path]:
+    return sorted(
+        p
+        for p in HEXAGON_ROOT.rglob("*.py")
+        if p.resolve().relative_to(HEXAGON_ROOT).parts[0] != "app"
+    )
+
+
+def test_bokeh_server_only_in_app_layer():
+    """New rule (Amendment §6 D6 generalized): nothing outside the app
+    layer may construct a UI host. Importing ``bokeh.server`` (where
+    ``bokeh.server.server.Server`` lives) anywhere under helao/hexagon/
+    other than app/ is a violation -- every adapter that needs to host a
+    document goes through ports.ui_host.UiHostPort instead."""
+    bad = [
+        (f, lineno)
+        for f in _hexagon_files_outside_app()
+        for lineno in _bokeh_server_import_lines(f)
+    ]
+    assert not bad, f"bokeh.server imported outside app/: {bad}"
+
+
+def test_checker_flags_bokeh_server_outside_app(tmp_path):
+    """Mutation self-test (vacuity trap): calibrate the new rule directly
+    against a planted fixture before trusting it to find nothing. Lives
+    under tests/ on purpose -- the rule is stricter than the general
+    per-layer allow-list, which exempts tests/ entirely; this one does not."""
+    victim = HEXAGON_ROOT / "tests" / "_boundary_selftest_bokeh_server_tmp.py"
+    victim.write_text("from bokeh.server.server import Server\n")
+    try:
+        assert _bokeh_server_import_lines(victim) == [1]
+    finally:
+        victim.unlink()

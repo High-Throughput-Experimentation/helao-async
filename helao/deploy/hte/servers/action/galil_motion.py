@@ -61,6 +61,11 @@ from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion
 # not the driver (D6 fix). The server constructs the host after connect().
 from helao.hexagon.adapters.vis.galil_aligner_host import GalilAlignerHost
 
+# P7d: the host's Server construction is folded behind UiHostPort -- this
+# is the one adapter allowed to build a real bokeh.server.server.Server
+# (test_boundaries.py's bokeh.server-outside-app/ rule).
+from helao.hexagon.app.ui_host import BokehServerUiHost
+
 from ...drivers.motion.galil_motion_driver import (
     MoveModes,
     TransformationModes,
@@ -213,6 +218,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 server_cfg=app.base.server_cfg,
                 server_name=server_key,
                 config=app.server_params,
+                ui_host=BokehServerUiHost(),
             )
             app.aligner_host.start()
 
