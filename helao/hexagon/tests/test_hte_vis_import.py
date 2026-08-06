@@ -9,9 +9,16 @@ launched — the hosts mount them in-process via `vis_subscriber`, selected by t
 is that they import without hardware/vendor runtime. `data_browser` is a thin
 shim over the core builder.
 
-This sweep guards all 15 hte visualizer modules against a regression that makes
+This sweep guards every hte visualizer module against a regression that makes
 one un-importable (e.g. a driver reverting to a module-top vendor import that a
 vis module transitively pulls).
+
+`VIS_MODULES` is derived by globbing the directory, so a pinned total would
+record when the count was last edited rather than anything about the code. It
+was pinned at 15 and read 21 once `control_visualizer` and the five control
+panels landed — a red test that said nothing about importability. The guard that
+carries meaning is that the glob found something at all, plus the presence of
+the modules whose absence would mean a genuine structural change.
 """
 
 from __future__ import annotations
@@ -35,9 +42,20 @@ HEXAGON_VIS_HOSTS = [
 
 
 def test_vis_module_set_nonempty():
-    # 2 hosts + data_browser + 12 per-instrument *_vis = 15 (spec §8.1: 13
-    # config-selectable mount artifacts + the hosts).
-    assert len(VIS_MODULES) == 15, VIS_MODULES
+    """The glob found modules, and the structural members are among them.
+
+    A count would be a record of the last edit; these are the members whose
+    disappearance would mean the layout changed rather than the inventory grew.
+    """
+    on_disk = [
+        p.stem for p in sorted(VIS_DIR.glob("*.py")) if p.name != "__init__.py"
+    ]
+    assert on_disk, f"{VIS_DIR} matched no modules — the glob is inert"
+    assert len(VIS_MODULES) == len(on_disk), (VIS_MODULES, on_disk)
+
+    stems = {m.rsplit(".", 1)[1] for m in VIS_MODULES}
+    expected = {"action_visualizer", "live_visualizer", "control_visualizer"}
+    assert expected <= stems, sorted(expected - stems)
 
 
 @pytest.mark.parametrize("mod", VIS_MODULES)
