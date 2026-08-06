@@ -18,20 +18,20 @@ Build the frontend bundle on a development machine before deploying::
 
 __all__ = [
     "APP_NAME",
-    "wait_for_backend",
-    "port_holder",
     "BUNDLE_DIRNAME",
     "backend_port",
-    "resolve_bundle",
     "build_env",
-    "may_build_locally",
-    "parent_watch_target",
-    "parent_is_gone",
-    "process_start_time",
     "install_pdeathsig",
-    "watch_parent",
-    "terminate_tree",
+    "may_build_locally",
+    "parent_is_gone",
+    "parent_watch_target",
+    "port_holder",
+    "process_start_time",
+    "resolve_bundle",
     "signal_group",
+    "terminate_tree",
+    "wait_for_backend",
+    "watch_parent",
 ]
 
 import asyncio
@@ -500,7 +500,7 @@ if __name__ == "__main__":
         # socket works without the Proactor loop's missing add_reader family.
         asyncio.set_event_loop(asyncio.SelectorEventLoop())
 
-    from helao.core.version import hlo_version
+    from helao.core.version import get_hlo_version, hlo_version
     from helao.helpers import config_loader
     from helao.helpers import helao_logging as logging
     from helao.helpers.parent_death import arm_parent_death_signal, monitor_detached
@@ -550,6 +550,12 @@ if __name__ == "__main__":
         os.path.basename(os.path.dirname(os.path.dirname(config_path))),
     )
     CONFIG["hlo_version"] = hlo_version
+    deploy_git_path = os.path.join(helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git")
+    deploy_worktree_path = os.path.dirname(deploy_git_path)
+    if os.path.exists(deploy_git_path):
+        CONFIG["deployment_version"] = get_hlo_version(deploy_worktree_path)
+    else:
+        CONFIG["deployment_version"] = hlo_version
 
     bundle = resolve_bundle(helao_repo_root)
     if bundle is None:

@@ -59,7 +59,7 @@ from bokeh.server.server import Server
 # selector loop on Windows.
 if sys.platform == "win32":
     asyncio.set_event_loop(asyncio.SelectorEventLoop())
-from helao.core.version import hlo_version
+from helao.core.version import get_hlo_version, hlo_version
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.parent_death import arm_parent_death_signal
@@ -171,6 +171,12 @@ if __name__ == "__main__":
     # visualizers resolve per-server vis modules starting from the right place.
     CONFIG["deployment"] = server_config.get("deployment", detected_deployment)
     CONFIG["hlo_version"] = hlo_version
+    deploy_git_path = os.path.join(helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git")
+    deploy_worktree_path = os.path.dirname(deploy_git_path)
+    if os.path.exists(deploy_git_path):
+        CONFIG["deployment_version"] = get_hlo_version(deploy_worktree_path)
+    else:
+        CONFIG["deployment_version"] = hlo_version
 
     makeApp = import_module(
         f"helao.deploy.{app_deployment}.servers.{server_config['group']}.{server_config['bokeh']}"
