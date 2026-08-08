@@ -60,6 +60,17 @@ helao/core/servers/reflex/_app/CLAUDE.md
 helao/core/servers/reflex/_app/reflex.lock/
 helao/core/servers/reflex/_app/requirements.txt
 
+# Lock serializing concurrent frontend builds, which share this one `.web`
+# tree. Must stay ignored: `git status --porcelain` feeds the bundle staleness
+# stamp, so a tracked lockfile would make every build invalidate its own stamp.
+helao/core/servers/reflex/_app/.reflex-build.lock
+helao/core/servers/reflex/_app/.reflex-build.lock.owner
+
+# Probe written and deleted to find out whether this checkout is mounted
+# `noexec`. Ignored for the same reason as the lock: it must never reach a
+# `git status --porcelain` that the stamp hashes.
+.helao_exec_probe
+
 # Built Reflex frontend bundle. A local artifact of build_reflex_bundle.py,
 # rebuilt per station because it bakes that config's backend URL.
 .reflex-bundle/

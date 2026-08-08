@@ -11,7 +11,7 @@ __all__ = ["hlo_version", "get_hlo_version"]
 
 
 @lru_cache(maxsize=None)
-def get_branch_commithash() -> tuple:
+def get_branch_commithash(work_tree_path: str = ".") -> tuple:
     """Return ``(branch, short_commit_hash)`` of the working tree, or ``("", "")`` on failure.
 
     Cached for the life of the process: every ``hlo_version`` model default
@@ -25,13 +25,13 @@ def get_branch_commithash() -> tuple:
     try:
         command = ["git", "rev-parse", "--abbrev-ref", "HEAD"]
         branch = (
-            subprocess.check_output(command, stderr=subprocess.STDOUT)
+        subprocess.check_output(command, cwd=work_tree_path, stderr=subprocess.STDOUT)
             .decode("utf8")
             .strip()
         )
         command = ["git", "rev-parse", "--short", "HEAD"]
         commit_hash = (
-            subprocess.check_output(command, stderr=subprocess.STDOUT)
+            subprocess.check_output(command, cwd=work_tree_path, stderr=subprocess.STDOUT)
             .decode("utf8")
             .strip()
         )
@@ -66,14 +66,14 @@ def get_filehash(filename: str) -> str:
         return ""
 
 
-def get_hlo_version() -> str:
+def get_hlo_version(work_tree_path: str = ".") -> str:
     """Return the HELAO version string.
 
     Uses the current short git commit hash when available, falling back to
     ``{hostname}_{YYMMDD}``.
     """
     try:
-        return get_branch_commithash()[1]
+        return get_branch_commithash(work_tree_path)[1]
     except Exception:
         return f"{gethostname()}_{datetime.now().strftime('%y%m%d')}"
 

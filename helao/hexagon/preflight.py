@@ -14,7 +14,9 @@ adapters, on Linux, no server launch and no hardware:
    a server on the GENERIC `graft` shim declares a `legacy_module:` that
    resolves to a module on disk (the graft names nothing itself, so without
    that key it raises at launch — for a bokeh server, not until the first
-   browser session).
+   browser session). A `reflex:` server has no shim — its code key names a
+   BUNDLE, not a module — so hexagon routing points the Reflex entry module at
+   `helao/hexagon/app/reflex_host.py` (P7f) and that file is what is checked.
 3. **endpoint-checklist presence** — every hexagon ACTION server has a frozen
    legacy endpoint checklist under `helao/hexagon/tests/checklists/hte/` (the
    baseline the runtime `/openapi.json` diff is checked against at station).
@@ -172,13 +174,7 @@ def _shim_completeness(servers: dict) -> list[str]:
         if s.get("deployment") != HEXAGON:
             continue
         if "reflex" in s:
-            # Master spec D9: both UI stacks stay on legacy core through P0-P6 and
-            # migrate together in P7-UI, so there is no hexagon UI shim to find.
-            # Say that, rather than reporting a missing group/module.
-            issues.append(
-                f"{key}: reflex servers are not hexagon-composed (spec D9 — UI "
-                f"hosting is P7-UI); drop 'deployment: hexagon' from this server"
-            )
+            issues.extend(_reflex_host_issues(key))
             continue
         module = _server_module(s)
         group = s.get("group")
@@ -194,6 +190,54 @@ def _shim_completeness(servers: dict) -> list[str]:
         if module == "graft":
             issues.extend(_graft_target_issues(key, s, group))
     return issues
+
+
+def _reflex_host_issues(key: str) -> list[str]:
+    """Checks for a ``reflex:`` server declaring ``deployment: hexagon`` (P7f).
+
+    Until P7f this key was REJECTED here, citing spec D9 (both UI stacks stay
+    on legacy core through P0-P6). P7f lifts that: the key now routes the
+    Reflex entry module to the hexagon hosting facade, through
+    ``HELAO_REFLEX_APP_MODULE`` rather than through a ``servers/<group>/``
+    shim -- ``reflex:``'s value is a bundle name, so there is no module to
+    name there.
+
+    What is checked is therefore the facade itself. As with a ``graft``
+    target, the dotted path is resolved to a file on disk rather than assumed:
+    the launcher imports it in-process (for the loaded-modules snapshot and
+    the bundle stamp) and the backend child imports it again, so an absent
+    module is a ``ModuleNotFoundError`` in two processes at launch. Resolved
+    by path, never by import -- preflight runs offline and importing this
+    module would build a whole Reflex app.
+    """
+    dotted = _hexagon_reflex_app_module()
+    target = REPO_ROOT.joinpath(*dotted.split("."))
+    if target.with_suffix(".py").exists() or (target / "__init__.py").exists():
+        return []
+    return [
+        f"{key}: `deployment: hexagon` routes this reflex server to "
+        f"'{dotted}', which resolves to no module on disk (expected "
+        f"{'/'.join(dotted.split('.'))}.py under the repo root)"
+    ]
+
+
+def _hexagon_reflex_app_module() -> str:
+    """The module a hexagon-routed reflex server is served from.
+
+    Read from ``reflex_bundle`` -- the module that owns the routing and sets
+    the environment variable -- so preflight cannot pass while the launcher
+    routes somewhere else. ``reflex_bundle`` is a repo-root module, imported
+    lazily here for the same reason it imports ``launch`` lazily: neither is
+    importable until the repo root is on ``sys.path``, which is true wherever
+    a config is launched or a test is collected, and this keeps
+    ``helao.hexagon.preflight`` importable when it is not.
+    """
+    try:
+        from reflex_bundle import HEXAGON_APP_MODULE
+
+        return HEXAGON_APP_MODULE
+    except ImportError:  # pragma: no cover - repo root always on sys.path
+        return "helao.hexagon.app.reflex_host"
 
 
 def _graft_target_issues(key: str, server: dict, group: str) -> list[str]:
