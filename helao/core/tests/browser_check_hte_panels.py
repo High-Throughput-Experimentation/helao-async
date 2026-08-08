@@ -118,7 +118,15 @@ def check_action_page(page, problems) -> None:
     # through the ingest row store, which is the part that had to be added.
     if "Ewe_V" not in body:
         problems.append("the potentiostat axis selectors are empty")
-    if "voltage (previous action)" not in body:
+    # "previous action", not "voltage (previous action)": commit 89088363
+    # ("restore the previous-action plot as its own chart") changed the figure
+    # title from the channel label alone to `f"{label} {suffix}"`, where suffix
+    # is one of `_action.SEGMENT_LABELS`. A single potentiostat has an empty
+    # channel label, so its title is exactly "previous action". The old
+    # parenthesised form has been unmatchable since that commit, and this
+    # assertion has been failing ever since -- nothing runs this script in a
+    # gate, which is the gap `browser_parity/` exists to close.
+    if "previous action" not in body:
         problems.append("the previous-action figures did not render")
     checkboxes = page.get_by_role("checkbox").count()
     if checkboxes == 0:

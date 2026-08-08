@@ -1,0 +1,67 @@
+# P7j Q10 config: `goldenreflex.yml` plus a declared spec parser.
+#
+# Q10's answer is that a spec parser's absence is a gate failure **iff the gate
+# config declares `seqspec_parser_path`**. The instrument cannot tell "none
+# configured" from "the configured one is broken" -- both render the same note,
+# by design, because a deployment's parser is code this repo never sees. A gate
+# holds the config, so it can: `goldenreflex.yml` omits the key and must show
+# the note; this config declares it and must show specs instead.
+#
+# **Same ports as `goldenreflex.yml`, deliberately.** The exported Reflex
+# bundle bakes the backend URL, so a variant on a different port would need its
+# own bundle -- and would then be exercising a different build than the one the
+# rest of the lane measured, which is the opposite of what a paired config is
+# for. The two are never launched at once; the runner sequences them.
+#
+# The parser path is **relative, and that is deliberate too**: all eleven hte
+# configs that declare one write it relative (`helao\specifications\...`), and
+# a gate config that quietly used an absolute path would be testing a shape no
+# station ships. `spec_parser.load_parser` resolves it with `os.path.isfile`,
+# i.e. against the process's working directory -- which is the repo root for
+# the Bokeh operator's launcher and `_app/` for the Reflex backend. If those
+# two disagree the tab degrades on one stack and works on the other, and this
+# config is what makes that visible instead of arguable.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_reflexspec
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_panel
+    control_vis: digital_out_control
+    params:
+      dev_do:
+        gamry_aux: 1
+        Thorlab_led: 7
+        cell_valve: 2
+        purge_valve: 3
+  UI:
+    host: 127.0.0.1
+    port: 5010
+    group: visualizer
+    reflex: helao_ui
+    params:
+      pages:
+        - live
+        - action
+      orch_key: ORCH
+      poll_interval: 5
+      seqspec_parser_path: helao/deploy/test/specifications/fixture_spec.py
+      seqspec_folder_path: helao/deploy/test/specifications/specs

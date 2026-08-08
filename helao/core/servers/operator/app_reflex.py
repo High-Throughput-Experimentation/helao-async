@@ -526,15 +526,37 @@ def save_values(root: str, kind: str, name: str, params: dict, meta=None) -> boo
 
 
 def spec_parser_path(server_cfg: dict) -> str:
-    """Path of the deployment's spec parser, or ``""``."""
+    """Path of the deployment's spec parser, or ``""``.
+
+    Rooted against the repo root when the config writes it relative, which all
+    eleven declaring station configs do (``helao\\specifications\\...``).
+    Without that, ``load_parser``'s ``os.path.isfile`` resolves it against the
+    working directory -- the repo root for the Bokeh operator's launcher, but
+    ``_app/`` for the Reflex backend -- and the Reflex Specs tab reports "no
+    spec parser is configured for this station" on a station that configures
+    one. That failure is indistinguishable from the correct unconfigured
+    behaviour, which is exactly why the degrade path cannot be relied on to
+    surface it. Same class of bug as :func:`rooted_config`, one layer down.
+
+    Absolute paths pass through untouched, so a station naming
+    ``C:\\INST_hlo\\...`` is unaffected.
+    """
     params = (server_cfg or {}).get("params")
-    return (params.get("seqspec_parser_path") or "") if isinstance(params, dict) else ""
+    if not isinstance(params, dict):
+        return ""
+    return _rooted(params.get("seqspec_parser_path") or "")
 
 
 def spec_folder_path(server_cfg: dict) -> str:
-    """Folder holding the specification files, or ``""``."""
+    """Folder holding the specification files, or ``""``.
+
+    Rooted for the same reason as :func:`spec_parser_path`; the shipped configs
+    name this one absolutely, but a relative one would silently list nothing.
+    """
     params = (server_cfg or {}).get("params")
-    return (params.get("seqspec_folder_path") or "") if isinstance(params, dict) else ""
+    if not isinstance(params, dict):
+        return ""
+    return _rooted(params.get("seqspec_folder_path") or "")
 
 
 def parser_kwargs(server_cfg: dict) -> dict:

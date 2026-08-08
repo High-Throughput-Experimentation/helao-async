@@ -1,0 +1,8 @@
+{
+  "sequence_name": "TEST_consecutive_noblocking",
+  "sequence_params": {
+    "wait_time": 1.0,
+    "cycles": 2,
+    "plate_sample_no_list": [1, 2]
+  }
+}
