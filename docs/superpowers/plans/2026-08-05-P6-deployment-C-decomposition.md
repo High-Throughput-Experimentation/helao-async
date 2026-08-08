@@ -437,6 +437,25 @@ tests green; GM-C2 (the platemap-consuming converter) re-diffed green.
 
 ### P6g — ICPMS lineage port + recorded-fixture replay *(Linux)*
 
+> **Status correction, 2026-08-08 (owner).** This conversion family **has never been
+> exercised**: it is neither retired nor shipped, but **work in progress**. Confirmed against
+> the production source mount, where its drop / synced / failed trees are all empty while every
+> other family carries 70–216 converted sources. Two consequences for this phase, and they pull
+> in opposite directions from the rest of P6:
+>
+> - **There is no production behaviour to preserve, so there is no golden to capture.** The
+>   parity argument that governs every other family — reproduce byte-for-byte, fix nothing
+>   wire-visible — does not apply to code no run has depended on. Do not synthesise a golden
+>   for it; a diff against invented input proves only that the refactor preserved a fiction.
+> - **It is equally not dead code.** It stays wired into `JOB_MODULES` with a `/run_icpms`
+>   route, and the endpoint checklist keeps it. Do not delete it as unused surface.
+>
+> So P6g ports it for *structure* — the lineage port, parameterized SQL, no import-time
+> network — and its gate is the unit/fixture level only, explicitly not a golden diff. The
+> injection-shaped label quoting and the `LIMIT 2000` truncation may therefore be fixed
+> outright rather than preserved for parity, which is the one place in P6 where that is true.
+> Whoever finishes the family owns the first real capture.
+
 The mid-conversion live SQL becomes an explicit **lineage port** (label-set lookup + per-action
 JSON fetch — both levels), with the live implementation over P6f's repository and a recorded
 implementation over P6c's fixture. **The silent-shrink trap is closed at the gate, not by
