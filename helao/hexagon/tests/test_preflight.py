@@ -119,9 +119,8 @@ def test_reflex_backend_port_is_reserved():
     assert any("port + 1" in i for i in issues), issues
 
 
-def test_reflex_server_rejected_as_hexagon_composed():
-    """Spec D9: UI hosting is P7-UI, so there is no hexagon shim to find."""
-    servers = {
+def _hexagon_reflex_server():
+    return {
         "UI": {
             "host": "127.0.0.1",
             "port": 5010,
@@ -130,9 +129,57 @@ def test_reflex_server_rejected_as_hexagon_composed():
             "deployment": "hexagon",
         }
     }
-    issues = preflight._shim_completeness(servers)
-    assert any("not hexagon-composed" in i for i in issues)
-    assert not any("missing group/module" in i for i in issues)
+
+
+def test_reflex_server_may_be_hexagon_hosted():
+    """P7f lifts the D9 rejection this test used to pin.
+
+    Until P7f a `reflex:` server declaring `deployment: hexagon` was rejected
+    outright ("there is no hexagon UI shim to find"). It is now the supported
+    flip, and it is checked like any other hexagon server: nothing missing,
+    and in particular NOT reported as a missing group/module -- there is no
+    `servers/<group>/<module>.py` for a reflex server to have.
+    """
+    assert preflight._shim_completeness(_hexagon_reflex_server()) == []
+
+
+def test_hexagon_reflex_routing_target_is_resolved_to_a_file():
+    """Presence of the key is a weak gate; the module it routes to is the
+    real precondition. The launcher imports it in-process (for the
+    loaded-modules snapshot and the bundle stamp) and the backend child
+    imports it again, so an absent module is a launch-time
+    ModuleNotFoundError in two processes -- exactly what an offline gate is
+    for. Mirrors `_graft_target_issues`, path resolution and all.
+    """
+    dotted = preflight._hexagon_reflex_app_module()
+    target = preflight.REPO_ROOT.joinpath(*dotted.split("."))
+    assert target.with_suffix(".py").exists(), target
+
+    # and the check is not vacuous: point it at a module that does not exist
+    # and the same config becomes a finding naming it.
+    original = preflight._hexagon_reflex_app_module
+    preflight._hexagon_reflex_app_module = lambda: "helao.hexagon.app.no_such_host"
+    try:
+        issues = preflight._shim_completeness(_hexagon_reflex_server())
+    finally:
+        preflight._hexagon_reflex_app_module = original
+    assert len(issues) == 1
+    assert "no_such_host" in issues[0]
+    assert "resolves to no module on disk" in issues[0]
+
+
+def test_preflight_and_the_launcher_agree_on_the_routing_target():
+    """A preflight that passes while the launcher routes elsewhere is worse
+    than no preflight: it certifies a config that cannot start."""
+    import reflex_bundle
+
+    assert preflight._hexagon_reflex_app_module() == reflex_bundle.HEXAGON_APP_MODULE
+    assert preflight.HEXAGON == reflex_bundle.HEXAGON_DEPLOYMENT
+    # ...including the literal behind the ImportError fallback, which the
+    # equality above can never reach: it only runs when `reflex_bundle` is not
+    # importable, and then there is nothing to compare it against.
+    source = open(preflight.__file__, encoding="utf8").read()
+    assert f'return "{reflex_bundle.HEXAGON_APP_MODULE}"' in source
 
 
 def test_library_collision_detected():

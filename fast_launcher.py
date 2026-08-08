@@ -51,6 +51,7 @@ from uvicorn.config import LOGGING_CONFIG
 _LOOP_FACTORY = asyncio.SelectorEventLoop if sys.platform == "win32" else None
 
 
+from helao.core.version import get_hlo_version, hlo_version
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.parent_death import arm_parent_death_signal
@@ -151,6 +152,13 @@ if __name__ == "__main__":
                 f"Could not find deployment for {server_config['fast']} in {server_config['group']}"
             )
     CONFIG["deployment"] = deployment
+    CONFIG["hlo_version"] = hlo_version
+    deploy_git_path = os.path.join(helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git")
+    deploy_worktree_path = os.path.dirname(deploy_git_path)
+    if os.path.exists(deploy_git_path):
+        CONFIG["deployment_version"] = get_hlo_version(deploy_worktree_path)
+    else:
+        CONFIG["deployment_version"] = hlo_version
 
     # Launcher CLI override: `--restore` forces orchestrators to import their
     # saved queues on startup regardless of the config default. server_config is
