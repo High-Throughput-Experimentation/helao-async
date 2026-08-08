@@ -1,0 +1,87 @@
+# P7j BASELINE config: the legacy half of the rendered-parity pair.
+#
+# Byte-for-byte the same server shape, ports and params as
+# `goldenhexgraft.yml`, with every hexagon key removed: no `deployment:
+# hexagon`, no `bokeh: graft`, no `legacy_module:`. Each Bokeh server names its
+# legacy module directly, so this group is served entirely through the legacy
+# launcher path.
+#
+# It exists because the parity lane needs something to compare against. P7's
+# claim is that the graft moves the *hosting* and changes nothing rendered; a
+# claim of that shape is only checkable against a run of the same page hosted
+# the other way. `golden.yml` cannot serve as that baseline -- it declares a
+# data browser on 5003 where `goldenhexgraft.yml` declares an action
+# visualizer, so a diff of the two would report the config difference rather
+# than a hosting difference, which is exactly the kind of noise that gets a
+# diff ignored.
+#
+# Its own `root:`, so a run of the baseline and a run of the hexagon variant
+# never write into each other's tree.
+#
+# NOT a production config, and not a substrate config either -- it is one half
+# of a gate pair and has no other job. Keep it in sync with
+# `goldenhexgraft.yml`: `test_browser_parity.py` pins that the two declare the
+# same server keys on the same ports, so a drift fails a test rather than
+# quietly turning the diff into a comparison of two different groups.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_goldenvis
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
+  OPERATOR:
+    host: 127.0.0.1
+    port: 5001
+    group: operator
+    bokeh: standalone_operator
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (legacy baseline)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_live_vis
+    params: {}
+    hlo_postprocess_libs:
+      - hlo_to_csv
+  LIVE:
+    host: 127.0.0.1
+    port: 5002
+    group: visualizer
+    bokeh: live_visualizer
+    params:
+      doc_name: Websocket Live Visualizer
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5003
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: Action Visualizer
+  SYNC:
+    host: 127.0.0.1
+    port: 8010
+    group: action
+    fast: sim_db_server
+    params:
+      aws_bucket: helao-sim
+      s3_record: true
