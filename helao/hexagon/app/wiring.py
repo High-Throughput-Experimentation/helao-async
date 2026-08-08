@@ -31,6 +31,7 @@ __all__ = [
     "ORCH_REQUIRED",
     "PortWiring",
     "UnwiredPortError",
+    "VIS_REQUIRED",
 ]
 
 
@@ -55,6 +56,18 @@ ACTION_REQUIRED = (
     # a missing adapter must abort startup, never fall through to legacy
     "artifact_store",
     "data_sink",
+)
+# P7e: a Bokeh UI-hosting composition (makeVisApp). Deliberately SHORT — the
+# set names what this composition genuinely consumes, so the gate stays
+# meaningful rather than vacuous: `config`/`logging` are read while the
+# composition is built, and `ui_host` (P7d) is the port that makes it a UI
+# host at all. The write-path ports are pointedly NOT here: a read-only UI
+# process has no business owning an artifact store, and requiring one would
+# make the gate assert something untrue about the process.
+VIS_REQUIRED = (
+    "config",
+    "logging",
+    "ui_host",
 )
 
 

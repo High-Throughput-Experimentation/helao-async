@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from helao.hexagon import preflight
 
 # hte canary configs (P3a/P3e) were relocated out of helao/deploy/hte/configs/
@@ -19,8 +21,9 @@ def test_gamryhex_canary_passes():
 
 
 def test_goldenhex_configs_pass():
-    """P2's hexagon test configs also pass (deployment-aware checklist gate)."""
-    for cfg in ("goldenhex", "goldenhexvis", "goldenhexid"):
+    """P2's hexagon test configs also pass (deployment-aware checklist gate);
+    goldenhexgraft is P7e's, whose bokeh servers ride the generic graft."""
+    for cfg in ("goldenhex", "goldenhexvis", "goldenhexid", "goldenhexgraft"):
         assert preflight.preflight_config(cfg) == [], cfg
 
 
@@ -152,6 +155,101 @@ def test_samplegraft_generic_graft_passes():
     """The generic config-driven graft (fast: graft + legacy_module) passes
     every offline gate — its checklist resolves from the legacy module."""
     assert preflight.preflight_config(str(SMOKE_CONFIGS / "samplegraft.yml")) == []
+
+
+def _graft_server(code_key, group, **extra):
+    srv = {
+        "host": "127.0.0.1",
+        "port": 8001,
+        "group": group,
+        code_key: "graft",
+        "deployment": "hexagon",
+    }
+    srv.update(extra)
+    return {"G": srv}
+
+
+@pytest.mark.parametrize(
+    "code_key,group",
+    [("fast", "action"), ("bokeh", "visualizer"), ("bokeh", "operator")],
+)
+def test_graft_without_legacy_module_is_a_finding(code_key, group):
+    """A generic graft names nothing, so an absent `legacy_module:` leaves it
+    with no target at all. It raises only when the launcher calls the factory —
+    for a bokeh server, not until the first browser session — so this gate is
+    the only place it surfaces before a station notices a blank page."""
+    issues = preflight._shim_completeness(_graft_server(code_key, group))
+    assert len(issues) == 1, issues
+    assert "declares no `legacy_module:`" in issues[0]
+    assert f"{code_key}: graft" in issues[0]
+    assert f"servers.{group}.<module>" in issues[0]
+
+
+@pytest.mark.parametrize(
+    "code_key,group,legacy",
+    [
+        ("fast", "action", "helao.deploy.hte.servers.action.sample_server"),
+        (
+            "bokeh",
+            "visualizer",
+            "helao.deploy.hte.servers.visualizer.live_visualizer",
+        ),
+        (
+            "bokeh",
+            "operator",
+            "helao.deploy.hte.servers.operator.standalone_operator",
+        ),
+    ],
+)
+def test_graft_with_a_resolvable_legacy_module_passes(code_key, group, legacy):
+    assert (
+        preflight._shim_completeness(
+            _graft_server(code_key, group, legacy_module=legacy)
+        )
+        == []
+    )
+
+
+def test_graft_with_an_unresolvable_legacy_module_is_a_finding():
+    """Presence alone is a weak gate: a typo'd dotted path satisfies it and
+    then fails at launch with ModuleNotFoundError. Resolution is by PATH — the
+    validator is offline and must not import deployment code."""
+    issues = preflight._shim_completeness(
+        _graft_server(
+            "bokeh", "visualizer", legacy_module="helao.deploy.hte.servers.nope.typo"
+        )
+    )
+    assert len(issues) == 1, issues
+    assert "resolves to no module on disk" in issues[0]
+
+
+def test_explicit_hexagon_shims_are_not_graft_checked():
+    """The three explicit vis/operator shims name their target in code, so the
+    `legacy_module:` requirement must not fire on them."""
+    servers = {
+        "OPERATOR": {
+            "host": "127.0.0.1",
+            "port": 5001,
+            "group": "operator",
+            "bokeh": "standalone_operator",
+            "deployment": "hexagon",
+        },
+        "LIVE": {
+            "host": "127.0.0.1",
+            "port": 5002,
+            "group": "visualizer",
+            "bokeh": "live_visualizer",
+            "deployment": "hexagon",
+        },
+        "ACTVIS": {
+            "host": "127.0.0.1",
+            "port": 5003,
+            "group": "visualizer",
+            "bokeh": "action_visualizer",
+            "deployment": "hexagon",
+        },
+    }
+    assert preflight._shim_completeness(servers) == []
 
 
 def test_checklist_module_resolves_graft_from_legacy_module():
