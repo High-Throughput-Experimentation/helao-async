@@ -15,6 +15,19 @@ route names (measured, see docs/superpowers/plans/2026-08-05-P7-UI-both-stacks.m
   which calls ``msg.as_dict()`` before pickling for status/data (live stays a
   dict either way).
 
+A third *producer* -- not a third encoder family -- is
+:func:`encode_hexagon`: the hexagon composition's own publish path,
+``DispatcherStatusAdapter.publish_*`` -> ``WsPublishBridge`` -> the legacy
+fan-out queue -> the same ``WsPublisher.broadcast``. It is deliberately NOT a
+member of :data:`FAMILIES`, because it introduces no encoder of its own: the
+whole point of the bridge (``adapters/native/ws_publish.py``) is that frame
+bytes keep coming off the untouched legacy encoder. What it does introduce is
+a *dict-typed port boundary* -- ``StatusPort.publish_*`` takes dicts, and the
+bridge ``model_validate``s each one back to its channel's wire type -- so a
+frame produced this way has passed through one extra lossy-looking hop that
+the legacy path does not have. :data:`PRODUCERS` is the full set every
+:func:`frame` caller may name.
+
 Frames here are produced by driving the REAL production coroutines --
 ``WsPublisher.broadcast`` and ``StatusBroadcaster.ws_status``/``ws_data``/
 ``ws_live`` -- against a :class:`FakeWebSocket` that only fakes the transport
@@ -34,6 +47,8 @@ from __future__ import annotations
 __all__ = [
     "CHANNELS",
     "FAMILIES",
+    "HEXAGON",
+    "PRODUCERS",
     "ACTION_UUID",
     "NUMERIC_COLUMN",
     "NUMERIC_VALUES",
@@ -50,6 +65,7 @@ __all__ = [
     "FakeWebSocket",
     "encode_base_api",
     "encode_orch_api",
+    "encode_hexagon",
     "frame",
     "replay_server",
     "decode_via_wssubscriber",
@@ -78,7 +94,14 @@ HOST = "127.0.0.1"
 #: The three WS routes both producer families register under.
 CHANNELS = ("ws_status", "ws_data", "ws_live")
 #: The two independent encoders (siblings, not subclasses -- see module docstring).
+#: Membership is "distinct encoder", which is why `hexagon` is not here: it
+#: reuses base_api's. Callers iterating "the encodings a consumer may meet"
+#: want this; callers naming a producer want :data:`PRODUCERS`.
 FAMILIES = ("base_api", "orch_api")
+#: The hexagon composition's producer (:func:`encode_hexagon`).
+HEXAGON = "hexagon"
+#: Every value :func:`frame` accepts for ``family``.
+PRODUCERS = FAMILIES + (HEXAGON,)
 
 #: Fixed synthetic content shared by every canonical fixture, so the
 #: "identical inputs" byte-comparisons (base_api vs a hand-checked expectation)
@@ -185,12 +208,24 @@ class _FakeBase:
         self.live_q = MultisubscriberQueue()
 
 
-async def _drain_one(queue: MultisubscriberQueue, relay_coro, payload: Any) -> bytes:
+async def _drain_one(
+    queue: MultisubscriberQueue, relay_coro, payload: Any, put=None
+) -> bytes:
     """Run one real-encoder coroutine against a :class:`FakeWebSocket`.
 
     Waits for the coroutine to register a subscriber, puts ``payload`` once,
     waits for exactly one frame, then closes the queue so the coroutine's
     ``async for`` ends normally (no exception, no hung task).
+
+    Args:
+        queue: The fan-out queue the relay coroutine reads.
+        relay_coro: The production coroutine under exercise.
+        payload: The single message to publish.
+        put: Optional awaitable taking ``payload`` and placing it on
+            ``queue`` itself. :func:`encode_hexagon` passes the hexagon
+            composition's own ``publish_*`` here, so the put happens through
+            the production port -> bridge -> queue chain rather than being
+            short-circuited to ``queue.put``.
     """
     ws = FakeWebSocket()
     task = asyncio.ensure_future(relay_coro(ws))
@@ -199,7 +234,10 @@ async def _drain_one(queue: MultisubscriberQueue, relay_coro, payload: Any) -> b
             break
         await asyncio.sleep(0.01)
     assert queue.subscribers, "producer coroutine never subscribed to the queue"
-    await queue.put(payload)
+    if put is None:
+        await queue.put(payload)
+    else:
+        await put(payload)
     for _ in range(200):
         if ws.frames:
             break
@@ -271,7 +309,61 @@ async def encode_orch_api(channel: str, payload: Any = None) -> bytes:
     return await _drain_one(queue, relay_coro, payload)
 
 
-_ENCODERS = {"base_api": encode_base_api, "orch_api": encode_orch_api}
+async def encode_hexagon(channel: str, payload: Any = None) -> bytes:
+    """Encode one frame through the HEXAGON composition's producer stack.
+
+    The chain exercised here is the one ``makeActionApp`` builds at startup
+    (``helao/hexagon/app/factory.py``): a real
+    :class:`~helao.hexagon.adapters.legacy.status.DispatcherStatusAdapter`
+    with a real :class:`~helao.hexagon.adapters.native.ws_publish.WsPublishBridge`
+    bound into it, publishing onto the legacy fan-out queue that the untouched
+    legacy ``WsPublisher.broadcast`` encodes from. Nothing is stubbed but the
+    socket.
+
+    The ``StatusPort.publish_*`` members are dict-typed, so a typed fixture is
+    lowered with ``as_dict()`` on the way in -- exactly what a caller holding
+    an ``ActionModel``/``DataPackageModel`` has to do to reach this port. The
+    bridge then ``model_validate``s it back, which is the round trip this
+    producer adds over the legacy path (and the reason the resulting bytes are
+    only *equal* to a legacy frame whose payload was rebuilt the same way; see
+    ``test_ws_consumer_parity.py``).
+
+    Args:
+        channel: One of :data:`CHANNELS`.
+        payload: Override payload; defaults to the canonical fixture for
+            ``channel``. May be the typed model or the dict form.
+
+    Returns:
+        The exact bytes this action server would send over the wire.
+    """
+    if channel not in CHANNELS:
+        raise ValueError(f"unknown channel {channel!r}")
+    from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
+    from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
+
+    if payload is None:
+        payload = _PAYLOAD_BUILDERS[channel]()
+    body = payload if isinstance(payload, dict) else payload.as_dict()
+
+    queue = MultisubscriberQueue()
+    pub = WsPublisher(queue)
+    adapter = DispatcherStatusAdapter("HEXPRODUCER", own_host=HOST, own_port=0)
+    # One queue for all three channels: only `channel`'s publish_* is called,
+    # and a shared queue keeps the single WsPublisher above on the right one.
+    adapter.bind_publish_bridge(WsPublishBridge(queue, queue, queue))
+    publish = {
+        "ws_status": adapter.publish_status,
+        "ws_data": adapter.publish_data,
+        "ws_live": adapter.publish_live,
+    }[channel]
+    return await _drain_one(queue, pub.broadcast, body, put=publish)
+
+
+_ENCODERS = {
+    "base_api": encode_base_api,
+    "orch_api": encode_orch_api,
+    HEXAGON: encode_hexagon,
+}
 
 
 async def frame(channel: str, family: str, payload: Any = None) -> bytes:
@@ -279,14 +371,14 @@ async def frame(channel: str, family: str, payload: Any = None) -> bytes:
 
     Args:
         channel: One of :data:`CHANNELS`.
-        family: One of :data:`FAMILIES`.
+        family: One of :data:`PRODUCERS`.
         payload: Override payload; defaults to the canonical fixture.
 
     Returns:
-        Wire bytes produced by the real encoder for that family.
+        Wire bytes produced by the real encoder for that producer.
     """
-    if family not in FAMILIES:
-        raise ValueError(f"unknown family {family!r}")
+    if family not in PRODUCERS:
+        raise ValueError(f"unknown producer {family!r}")
     return await _ENCODERS[family](channel, payload)
 
 
