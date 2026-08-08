@@ -3,17 +3,21 @@
 Sibling of ``bokeh_launcher.py``. A Reflex server occupies two consecutive
 ports: the prebuilt static frontend is served on ``port`` by a small uvicorn +
 StaticFiles app defined here, and the Reflex backend runs on ``port + 1``.
-Serving the frontend ourselves means a lab station never needs Node or Bun at
-runtime — only the dev machine that produced the bundle does.
+
+The bundle is per ``(config, reflex server)`` and lives under the server root
+(``<root>/STATES/reflex-bundles/``), because a Reflex export bakes in both the
+backend URL and this config's panel selection. Each launch compares a freshly
+computed stamp against the one recorded beside the installed bundle; a
+difference rebuilds it in place when that is cheap, and refuses to serve when
+it is not. See ``reflex_bundle.py``.
 
 Usage:
     python reflex_launcher.py <config_file> <server_key>
 
-Build the frontend bundle on a development machine before deploying::
+To build the bundle ahead of a launch (or on a machine that has no warm
+``.web/node_modules`` yet)::
 
-    cd helao/core/servers/reflex/_app
-    reflex export --frontend-only
-    # then place the export under <repo_root>/.reflex-bundle/helao_ui/
+    python build_reflex_bundle.py <config_prefix_or_path> [--server KEY]
 """
 
 __all__ = [
@@ -22,6 +26,7 @@ __all__ = [
     "backend_port",
     "build_env",
     "install_pdeathsig",
+    "may_build_at_launch",
     "may_build_locally",
     "parent_is_gone",
     "parent_watch_target",
@@ -30,6 +35,7 @@ __all__ = [
     "resolve_bundle",
     "signal_group",
     "terminate_tree",
+    "usable_bundle",
     "wait_for_backend",
     "watch_parent",
 ]
@@ -47,14 +53,16 @@ import time
 import colorama
 import psutil
 
-#: Must match ``app_name`` in ``helao/core/servers/reflex/_app/rxconfig.py``.
-APP_NAME = "helao_ui"
-
-#: Gitignored directory under the repo root holding the exported frontend.
-BUNDLE_DIRNAME = ".reflex-bundle"
-
-#: Reflex project directory the CLI is invoked from.
-APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
+from reflex_bundle import (
+    APP_DIR,
+    APP_NAME,
+    ASSETS_DIR,
+    BUNDLE_DIRNAME,
+    api_url_for,
+    backend_port,
+    resolve_bundle,
+    usable_bundle,
+)
 
 #: Seconds allowed for the backend to exit on SIGTERM before escalating, and
 #: for the killed process to be reaped. These must add up to comfortably less
@@ -79,17 +87,6 @@ BACKEND_START_TIMEOUT = 30.0
 #: indefinitely for open connections, which would blow the same budget: a single
 #: browser tab left open on the panel page is enough.
 FRONTEND_SHUTDOWN_TIMEOUT = 2
-
-#: Reflex assets directory, served from the site root. xy's ESM client is
-#: copied here before the frontend build so the bundle ships it and the browser
-#: never reaches for a CDN.
-ASSETS_DIR = os.path.join(APP_DIR, "assets")
-
-
-def backend_port(port: int) -> int:
-    """Return the Reflex backend port for a server whose frontend is on ``port``."""
-    return int(port) + 1
-
 
 # --- Dying with the group ---------------------------------------------------
 #
@@ -295,29 +292,6 @@ def terminate_tree(
     return not still_alive
 
 
-def resolve_bundle(repo_root: str):
-    """Locate the exported frontend bundle.
-
-    Args:
-        repo_root: HELAO repository root.
-
-    Returns:
-        The bundle directory, or ``None`` when no usable bundle is present. A
-        directory without ``index.html`` is treated as absent — a half-written
-        export must not be served.
-    """
-    candidate = os.path.join(repo_root, BUNDLE_DIRNAME, APP_NAME)
-    index = os.path.join(candidate, "index.html")
-    if not (os.path.isdir(candidate) and os.path.isfile(index)):
-        return None
-    # A zero-byte index.html means an interrupted export or a partial copy.
-    # Serving it silently yields a blank page in the browser with nothing in
-    # the logs; treating it as absent routes into the loud failure path.
-    if os.path.getsize(index) == 0:
-        return None
-    return candidate
-
-
 def build_env(config_path: str, server_key: str, host: str, port: int, root):
     """Return the child environment for the Reflex backend process.
 
@@ -336,22 +310,44 @@ def build_env(config_path: str, server_key: str, host: str, port: int, root):
     env["HELAO_REFLEX_CONFIG"] = str(config_path)
     env["HELAO_REFLEX_FRONTEND_PORT"] = str(port)
     env["HELAO_REFLEX_BACKEND_PORT"] = str(backend_port(port))
-    env["HELAO_REFLEX_API_URL"] = f"http://{host}:{backend_port(port)}"
+    env["HELAO_REFLEX_API_URL"] = api_url_for(host, port)
     if root:
         env["HELAO_REFLEX_ROOT"] = str(root)
     return env
 
 
 def may_build_locally() -> bool:
-    """Whether a local frontend build is permitted in this environment.
+    """Whether a *cold* frontend build is permitted in this environment.
 
     Requires both the ``REFLEX_ALLOW_LOCAL_BUILD=1`` opt-in and a JavaScript
-    runtime on ``PATH``. Lab stations set neither, so they fail loudly on a
-    missing bundle instead of silently attempting a multi-minute network build.
+    runtime on ``PATH``. A cold build downloads ~270 MB of npm packages, which
+    must never happen unasked while an operator waits for an instrument UI.
     """
     if os.environ.get("REFLEX_ALLOW_LOCAL_BUILD") != "1":
         return False
     return bool(shutil.which("bun") or shutil.which("node"))
+
+
+def may_build_at_launch(repo_root: str) -> bool:
+    """Whether this launch may (re)build the bundle itself.
+
+    Two branches, split by what a build actually costs here:
+
+    * ``.web/node_modules`` already populated — an export takes 4-5 seconds, so
+      it happens silently at launch. That is the whole point: a station tracks
+      its own code and its bundle follows without anyone remembering to rebuild.
+    * not populated — the same command fetches ~270 MB before it starts, which
+      needs the ``REFLEX_ALLOW_LOCAL_BUILD=1`` opt-in.
+
+    Either branch still needs ``bun`` or ``node`` on ``PATH``.
+    """
+    from reflex_bundle import node_modules_present
+
+    if not (shutil.which("bun") or shutil.which("node")):
+        return False
+    if node_modules_present(repo_root):
+        return True
+    return may_build_locally()
 
 
 def port_holder(host: str, port: int) -> str:
@@ -550,47 +546,104 @@ if __name__ == "__main__":
         os.path.basename(os.path.dirname(os.path.dirname(config_path))),
     )
     CONFIG["hlo_version"] = hlo_version
-    deploy_git_path = os.path.join(helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git")
+    deploy_git_path = os.path.join(
+        helao_repo_root, "helao", "deploy", CONFIG["deployment"], ".git"
+    )
     deploy_worktree_path = os.path.dirname(deploy_git_path)
     if os.path.exists(deploy_git_path):
         CONFIG["deployment_version"] = get_hlo_version(deploy_worktree_path)
     else:
         CONFIG["deployment_version"] = hlo_version
 
-    bundle = resolve_bundle(helao_repo_root)
-    if bundle is None:
-        expected = os.path.join(helao_repo_root, BUNDLE_DIRNAME, APP_NAME)
-        if not may_build_locally():
+    # Import the app before anything reads sys.modules. The loaded-modules map
+    # is both this server's hot-reload snapshot and the bundle stamp's only
+    # record of which panel modules were compiled in, and those panels are
+    # resolved from config strings *inside* this import. Captured earlier the
+    # map is a stub that can never mismatch -- a bundle that is never rebuilt.
+    # Same reason bokeh_launcher refreshes its snapshot after mount_visualizers.
+    from helao.core.servers.reflex import app as _reflex_app  # noqa: F401
+
+    import reflex_bundle
+
+    config_prefix = os.path.splitext(os.path.basename(str(config_path)))[0]
+    api_url = api_url_for(servHost, servPort)
+    stamp = reflex_bundle.compute_stamp(
+        helao_repo_root, api_url, config_prefix, server_key
+    )
+    choice = resolve_bundle(helao_repo_root, root, config_prefix, server_key, stamp)
+    installed = reflex_bundle.install_dir(
+        helao_repo_root, root, config_prefix, server_key
+    )
+    build_cmd = f"python build_reflex_bundle.py {confArg} --server {server_key}"
+
+    if choice.source == "config":
+        bundle = choice.path
+    elif may_build_at_launch(helao_repo_root):
+        # Stale or absent, and building is cheap here. Say which field moved:
+        # "the port changed" and "a panel module changed" are read very
+        # differently by whoever is looking at this log.
+        LOGGER.info(f"rebuilding the Reflex bundle for {config_prefix}/{server_key}")
+        LOGGER.info(f"  reason: {choice.reason}")
+        try:
+            with reflex_bundle.build_lock(helao_repo_root, logger=LOGGER):
+                bundle = reflex_bundle.build_bundle(
+                    repo_root=helao_repo_root,
+                    config_arg=confArg,
+                    server_key=server_key,
+                    api_url=api_url,
+                    root=root,
+                    config_prefix=config_prefix,
+                    logger=LOGGER,
+                )
+        except Exception as exc:
+            # Never fall back to whatever is installed. A bundle built for
+            # another config renders a control UI that looks right and is
+            # silently disconnected; not coming up at all is the safer failure,
+            # and any Bokeh UIs this config declares are unaffected.
             LOGGER.error(
-                f"no Reflex frontend bundle at '{expected}'. Build one on a "
-                f"development machine with:\n"
-                f"    cd {APP_DIR} && reflex export --frontend-only\n"
-                f"then copy the export to that path. To build here instead, set "
-                f"REFLEX_ALLOW_LOCAL_BUILD=1 and install bun or node."
+                f"the Reflex frontend build failed and nothing was replaced at "
+                f"'{installed}'. This server will not start; run the build by "
+                f"hand to see the full output:\n    {build_cmd}\n{exc}"
             )
             sys.exit(1)
-        LOGGER.warning(f"no bundle at '{expected}'; building locally (dev only)")
-        from helao.core.servers.reflex.xy_component import copy_client_asset
-
-        asset = copy_client_asset(os.path.join(helao_repo_root, ASSETS_DIR))
-        LOGGER.info(f"copied xy ESM client to {asset}")
-        subprocess.run(
-            ["reflex", "export", "--frontend-only"],
-            cwd=os.path.join(helao_repo_root, APP_DIR),
-            env=build_env(confArg, server_key, servHost, servPort, root),
-            check=True,
-        )
-        bundle = resolve_bundle(helao_repo_root)
-        if bundle is None:
-            LOGGER.error("local build completed but produced no usable bundle")
+        LOGGER.info(f"built and installed {bundle}")
+    elif choice.source == "legacy":
+        # One-release grace so upgrading a station cannot brick its UI: the
+        # pre-STATES bundle at <repo>/.reflex-bundle/helao_ui is served, but
+        # only when it was built for this server's backend URL. Serving one
+        # baked for another port is worse than not starting -- the page renders
+        # and then every WebSocket is refused, with nothing in any log.
+        if choice.reason and choice.reason != api_url:
+            LOGGER.error(
+                f"the only bundle available is the pre-config one at "
+                f"'{choice.path}', and it was built for {choice.reason} while "
+                f"this server needs {api_url}. Serving it would render a page "
+                f"that silently refuses every WebSocket. Build the right one "
+                f"with:\n    {build_cmd}"
+            )
             sys.exit(1)
+        LOGGER.warning(
+            f"no bundle at '{installed}'; falling back to the pre-config bundle "
+            f"at '{choice.path}' (built for {choice.reason or 'an unreadable URL'}). "
+            f"This fallback is removed in a later release -- build the "
+            f"config-specific bundle with:\n    {build_cmd}"
+        )
+        bundle = choice.path
+    else:
+        LOGGER.error(
+            f"no usable Reflex frontend bundle for {config_prefix}/{server_key} "
+            f"at '{installed}' ({choice.reason}), and this machine cannot build "
+            f"one now. Build it with:\n    {build_cmd}\n"
+            f"A first build downloads ~270 MB of npm packages, so it is not run "
+            f"unasked at launch; once "
+            f"'{os.path.join(APP_DIR, '.web', 'node_modules')}' exists a rebuild "
+            f"takes a few seconds and happens automatically. To allow the first "
+            f"build here too, set REFLEX_ALLOW_LOCAL_BUILD=1 (bun or node must "
+            f"be on PATH)."
+        )
+        sys.exit(1)
 
     LOGGER.info(f"serving Reflex frontend bundle from {bundle}")
-
-    # Import the app before snapshotting so the loaded-modules map includes the
-    # panel modules resolved from config strings. Same reason bokeh_launcher
-    # refreshes its snapshot after mount_visualizers.
-    from helao.core.servers.reflex import app as _reflex_app  # noqa: F401
 
     if root is not None:
         from helao.helpers.loaded_modules import write_loaded_modules_snapshot
@@ -635,6 +688,11 @@ if __name__ == "__main__":
     #   the exact orphan this is meant to prevent, observed in testing.
     backend = subprocess.Popen(
         [
+            # `sys.executable -m reflex`, not bare `reflex`: launching this file
+            # by absolute interpreter path without the env on PATH otherwise dies
+            # with FileNotFoundError. build_reflex_bundle already spawns this way.
+            sys.executable,
+            "-m",
             "reflex",
             "run",
             "--env",
