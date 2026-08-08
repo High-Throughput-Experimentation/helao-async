@@ -1,6 +1,9 @@
 # P7-UI — Both UI Stacks onto Hexagon: Decomposition & Sequencing
 
-> **Status:** authored 2026-08-05; unstarted. Branch `feat/hexagon-p7-ui`. Locks sub-project
+> **Status:** authored 2026-08-05; **all slices P7a–P7k landed 2026-08-08** on branch
+> `feat/hexagon-p7-ui` (see the phase-close note at the end of this file for the measured
+> gate roll-up and the three plan claims the slices disproved). Only per-station rollout
+> windows remain, and they verify deployment mechanics rather than correctness. Locks sub-project
 > boundaries, dependency order, the Linux/at-station gate split, and the answers to open
 > questions Q8/Q9/Q10 for P7-UI of the hexagonal rewrite (master spec:
 > `docs/superpowers/specs/2026-07-16-framework-hexagonal-rewrite-design.md` §12 P7-UI, as added
@@ -987,3 +990,65 @@ palette sweep and the bundle consequence).
 station). Every gate item 1–4 is Linux-dischargeable; item 5 is runbook text. That is the
 inversion this phase enjoys over P3–P5: its subject renders in a headless browser, so the
 station windows verify deployment mechanics, not correctness.
+
+---
+
+## Phase-close note — 2026-08-08
+
+### Measured floor
+
+**1430 tests across 45 files, zero failures, run per-file.** The plan's floor of "1158 + P7
+additions" is superseded by that measurement, not adjusted toward it. The counted set is the
+UI-relevant suites — `helao/core/tests/test_{bokeh_section_sizing,bokeh_theme,browser_parity,
+io_control,io_control_vis,motion_control,motion_control_vis,operator_param_forms,
+operator_param_store,operator_spec_parser,palette,standalone_operator}.py`, all
+`helao/core/tests/test_reflex_*.py`, and the hexagon UI/port/gate suites
+(`test_{app_ui_host,boundaries,browser_source_port,control_surface_port,factory,
+galil_aligner_host,hte_vis_import,operator_backend_port,param_store_port,preflight,
+reflex_gate_config,reflex_host,spec_parser_port,status_consumer_faces,ui_host_port,
+vis_hexagon_producer_parity,ws_consumer_parity,ws_frames,db_gate_config}.py`) — stated so the
+number is reproducible rather than quotable.
+
+### Gate roll-up (Amendment §6)
+
+| # | Gate item | Named test(s) | State |
+|---|---|---|---|
+| 1 | Wire-consumer parity, both producer families | `test_ws_frames.py` (14), `test_ws_consumer_parity.py` (5), `test_vis_hexagon_producer_parity.py` (16), `test_status_consumer_faces.py` (11) | green |
+| 2 | Rendered parity: routes + Bokeh docs, computed styles + drawn content | `test_browser_parity.py` (30) + `run_browser_parity.py` lane | green |
+| 3 | Palette sweep over `helao/hexagon/` | `test_palette.py` (170), incl. `test_sweep_reaches_hexagon_tree` | green |
+| 4 | Row-15 negative assertion | `test_control_surface_port.py` (22) + `harness/control_negative.py` + `control_negative_check.py` | green |
+| 5 | Bundle-rebuild step in every affected runbook | `docs/superpowers/notes/2026-08-08-P7-station-rollout-runbook.md` | delivered, **rewritten** — see below |
+
+**Honesty item on the roll-up.** Two gate items had their vacuity checked directly while
+closing: `test_ws_globstat_is_dead` (it asserts the extractor found *something* in both API
+modules before asserting the absence, so an inert extractor fails rather than passes) and the
+new preflight negative control (it asserts the in-tree/scratch *difference*, since both
+return `[]`). The other items' tests are green and named but were not put through an
+independent adversarial vacuity pass; the audit that would have done so did not run. Recorded
+as a gap, not as a pass.
+
+### Three plan claims the slices disproved
+
+1. **P7k item 3's unconditional `build_reflex_bundle.py` step is obsolete.** The
+   bundle-from-STATES work stamps each `(config, server)` and rebuilds automatically — ~4–5 s
+   warm, an explicit refusal cold, never a silent stale serve. The runbook is written to the
+   measured behaviour and carries the correction at the top, because someone will otherwise
+   follow the stale instruction.
+2. **"The hte dev Reflex config flips the same way" — it cannot.** `htereflex.yml` has no
+   `bokeh:` and no `operator:` servers at all; all eleven non-UI entries are `fast:`. P7e's
+   graft route has nothing there to apply to, and two of its action servers have no hexagon
+   shim in any case. The flip is one key, for a different reason than `goldenhexreflex`'s.
+3. **P7f's "the seam itself forces no rebuild" is half true.** The emitted bundle is
+   byte-identical under both routings, but the *stamp* moves — so the flip forces one rebuild
+   and so does the rollback. Recorded in the runbook's rollback section, since a rollback on a
+   cold machine is a refusal.
+
+### Also landed under P7k
+
+The derived preflight pin (`test_every_hexagon_config_in_the_tree_preflights`) sweeps
+`helao/deploy/*/configs/` and the hte smoke config directory for `deployment: hexagon`. On a
+checkout carrying the private deployments that includes their hexagon configs — all three
+preflight clean as of 2026-08-08. **Consequence worth knowing:** this couples a parent-repo
+test's result to what is checked out beside it. That is the intent (a station config that
+stops preflighting should fail loudly), but it means the number of collected cases is not
+reproducible from the public repo alone.
