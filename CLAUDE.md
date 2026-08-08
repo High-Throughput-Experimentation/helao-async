@@ -51,30 +51,23 @@ An optional second UI stack, opt-in per config via a `reflex:` server key alongs
 
 A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the Reflex backend. `validateConfig` reserves both, so nothing else may claim `port + 1`. The frontend server proxies `/xy/buffers/*` through to the backend, because the chart-buffer route is registered on the backend while the browser resolves the payload's relative URL against the page origin.
 
-Stations never need Node. Build the frontend bundle on a development machine and ship it:
+**The bundle is per `(config, reflex server)`, lives under the server root, and rebuilds itself.** See `docs/superpowers/specs/2026-08-05-reflex-bundle-states-autobuild-design.md`; `reflex_bundle.py` is the whole mechanism, shared by `reflex_launcher.py` and `build_reflex_bundle.py`.
 
 ```
-python build_reflex_bundle.py <config_prefix_or_path> [--server KEY]
+<root>/STATES/reflex-bundles/<config_prefix>_<server_key>/
+    helao_ui/       # the export, 74 files / 3.0 MB
+    bundle.json     # the stamp it was built from
 ```
 
-`build_reflex_bundle.py` does the whole sequence: reads the config's Reflex
-server, bakes that server's backend URL in, stages the build off a `noexec`
-filesystem when it has to, and only replaces the installed bundle once the
-export has actually produced one. It needs `bun` or `node` on `PATH`, which is
-why `nodejs` is in the *development* environment files and not the station
-ones.
+Every launch computes a stamp (baked `api_url`; HEAD **and** `git status --porcelain` digest for the parent repo and each nested `helao/deploy/*` repo; a content-hash map of every `helao/` module the app imported; `rxconfig.py` and xy's ESM client; the `reflex`/`reflex-components-radix`/`xy` versions) and compares it to the recorded one. **Never mtime** — `git checkout` rewrites it on unchanged files and `cp -p` preserves it on changed ones. A mismatch logs which field moved and rebuilds. The manual build step is no longer required where `node_modules` is warm.
 
-**The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. Stage the `_app` directory somewhere executable (`/tmp` works), build there with `PYTHONPATH` pointed at the repo, and copy the resulting `frontend.zip` back. Only the *build* needs exec — the bundle is static files, and `StaticFiles` serves them from anywhere.
-
-**The exported bundle bakes the backend URL**, from `HELAO_REFLEX_API_URL` (default `http://127.0.0.1:5011`). A bundle built for one config's port serves a *blank, silently disconnected* page under a config on any other port — the panels render and then every WebSocket attempt is refused. Export with the port the target config uses:
-
-```
-HELAO_REFLEX_API_URL=http://127.0.0.1:<port+1> reflex export --frontend-only
-```
-
-`--name helao_ui` is required: `reflex init` derives the app name from the current directory and rejects `_app`'s leading underscore, ignoring the valid `app_name` already in `rxconfig.py`.
-
-`reflex_launcher.py` serves that bundle and exits non-zero if it is missing, unless `REFLEX_ALLOW_LOCAL_BUILD=1` is set *and* bun/node is on `PATH` — a silent multi-minute build on an instrument PC is worse than a clear error.
+- **Auto-build has two branches, split by measured cost.** With `.web/node_modules` populated an export takes ~4.3 s, so it happens silently at launch. Cold, it fetches ~270 MB of npm packages, so the launcher **refuses**, prints the exact `python build_reflex_bundle.py <prefix> --server <key>`, and requires `REFLEX_ALLOW_LOCAL_BUILD=1` to proceed anyway. Both branches need `bun` or `node` on `PATH`. **Neither `helao_dev_*.yml` has ever contained a JS toolchain** — `git log -S'nodejs'` on them is empty; a separate branch adds `bun`/`nodejs` to them.
+- **A build failure never falls back to what is installed.** The launcher exits non-zero and leaves the old bundle untouched: a control UI that renders wrong or silently disconnected is worse than one that visibly does not come up, and the config's Bokeh UIs are unaffected either way. `launch.py` surfaces that refusal — its spawn loop registered a pid and never checked it, so a dead server used to leave a launch reading clean; `supervise_early_exits` now watches for 90 s and reports any child that exits on its own.
+- **The stamp's module map must be captured *after* the Reflex app is imported.** It is read from `sys.modules` (that is how it sees panel modules resolved from config strings, which no static scan could find). Captured earlier it is a stub that never changes — a bundle that is never rebuilt, with every signal reading healthy. `validate_stamp` refuses to write such a stamp. The map is scoped to `helao/`, not the repo root: measured, including root scripts made `build_reflex_bundle.py` and `reflex_launcher.py` differ by exactly their own filenames and rebuild each other's bundle forever.
+- **`<repo>/.reflex-bundle/helao_ui` survives as a one-release fallback**, used only when no per-config bundle exists — never in place of a stale one. It carries no stamp, so its baked URL is read back out of the emitted JavaScript; if that is not this server's backend URL the launcher refuses rather than serving a page that renders and then refuses every WebSocket.
+- **The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. The build stages itself into `$XDG_CACHE_HOME/helao/reflex-build/<checkout digest>/_app` (override with `HELAO_REFLEX_BUILD_DIR`), which is **persistent** — staging into a fresh temp dir discarded `.web` with it, so every build on a `noexec` checkout was cold and the incremental branch was unreachable there. Only the *build* needs exec; the bundle is static files and `StaticFiles` serves them from anywhere.
+- **Concurrent builds share one `_app/.web` per checkout**, so the lock guards the build, not the bundle directory: `_app/.reflex-build.lock` (gitignored — a tracked lockfile would land in `git status --porcelain` and make every build invalidate its own stamp), with the holder's pid in a `.owner` sidecar so a timeout names it instead of hanging.
+- `--name helao_ui` is required when invoking `reflex init` by hand: it derives the app name from the current directory and rejects `_app`'s leading underscore, ignoring the valid `app_name` already in `rxconfig.py`.
 
 Layout and the two rules worth knowing before editing it:
 
@@ -125,7 +118,7 @@ Things that will bite you when editing it:
 
 - **Set `--chart-*` (and any `:root` CSS) via `head_components=[rx.el.style(...)]`, not `rx.App(style={":root": ...})`.** Reflex matches `App.style` keys against component types; an unmatched string key falls through to Emotion's nested-selector serialization and emits a *descendant* rule (`.css-XXXX *:root{…}`), which can never match `<html>`. It fails silently — nothing errors, the properties just resolve nowhere.
 - **Tailwind v4's palette is OKLCH-native**, so `bg-red-900` renders `rgb(130,24,26)` while `palette.py`'s `#7f1d1d` is `rgb(127,29,29)`. Unsaturated 50/100-level shades round-trip within a unit or two, but **saturated 600/700 shades diverge much further** — v4's `violet-700` renders `rgb(112,8,231)` against the pinned `#6d28d9` = `rgb(109,40,217)`, 32 units off in green. Contrast is *better*, not worse (that header measures 6.15 in-browser vs the published 5.98), but a computed-style check needs a per-shade-class tolerance, and the real assertion should be the contrast achieved on the measured pixels rather than a hex match.
-- **The bundle must be rebuilt whenever `class_name=` usage changes**, not just when a config's port changes — the compiled CSS only contains the utilities present at build time. A stale bundle renders new utilities **completely unstyled with no error on either side**, which is why the checks assert computed styles rather than grepping source. Treat `build_reflex_bundle.py` as "rebuild required", not "build once and ship".
+- **The bundle must be rebuilt whenever `class_name=` usage changes**, not just when a config's port changes — the compiled CSS only contains the utilities present at build time. A stale bundle renders new utilities **completely unstyled with no error on either side**, which is why the checks assert computed styles rather than grepping source. The bundle stamp is what now catches this: an edited module changes its content hash, so the next launch rebuilds. Do not rely on remembering.
 - **`class_name` on a Radix table lands on the wrapper, not the `<table>`.** `rx.table.root(class_name=...)` renders the class onto `div.rt-TableRoot`; the inner `table.rt-TableRootTable` never sees it. A border utility does apply — just not to the element a `table` selector finds, which reads as "the utility silently did nothing".
 - **`rx.data_table` cannot be styled with utilities at all, for two independent reasons.** It drops `class_name` before the class reaches the grid it renders, *and* gridjs ships `th.gridjs-th` as unlayered CSS while Tailwind v4 emits utilities into `@layer utilities` — which every unlayered rule outranks regardless of specificity. Both halves fail silently, leaving a stock grey header. The data browser's Table tab gets its hue from `palette.reflex_gridjs_header_css()`, injected through the same `head_components` seam as `--chart-*`, with selectors prefixed `.gridjs-container` so they win on specificity rather than on a source order `head_components` does not control. Authoring that CSS **in `palette.py`** is what keeps it legal: a `color:` declaration anywhere else is a sweeper finding.
 
