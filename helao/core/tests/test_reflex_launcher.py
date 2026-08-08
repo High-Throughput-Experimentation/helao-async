@@ -13,24 +13,58 @@ import pytest
 import reflex_launcher as rl
 
 
+def _believable_stamp():
+    """A stamp that passes ``validate_stamp``, for the resolution tests.
+
+    Its content is irrelevant here -- what matters is that a stamp compared
+    against an identical recorded one reports no mismatch, so these tests
+    exercise the *presence* guards rather than the staleness rule (which
+    ``test_reflex_bundle.py`` covers field by field).
+    """
+    import reflex_bundle as rb
+
+    return {
+        "schema": rb.STAMP_SCHEMA,
+        "api_url": "http://127.0.0.1:5011",
+        "config_prefix": "golden",
+        "server_key": "UI",
+        "git_revs": {".": "a" * 40},
+        "dirty_digests": {".": ""},
+        "extra_files": {"rxconfig.py": "b" * 40},
+        "tool_versions": {"reflex": "0.9.7"},
+        "modules": {
+            rb.APP_MODULE_REL: "c" * 40,
+            **{f"helao/core/servers/reflex/m{i}.py": "d" * 40 for i in range(20)},
+        },
+    }
+
+
 def test_backend_port_is_one_above_the_frontend_port():
     assert rl.backend_port(5010) == 5011
 
 
 def test_resolve_bundle_returns_none_when_absent(tmp_path):
-    assert rl.resolve_bundle(str(tmp_path)) is None
+    choice = rl.resolve_bundle(str(tmp_path), None, "golden", "UI", {})
+    assert choice.path == "" and choice.source is None
 
 
 def test_resolve_bundle_finds_an_exported_bundle(tmp_path):
-    bundle = tmp_path / ".reflex-bundle" / "helao_ui"
+    import reflex_bundle as rb
+
+    bundle = tmp_path / ".reflex-bundle" / "golden_UI" / "helao_ui"
     bundle.mkdir(parents=True)
     (bundle / "index.html").write_text("<html></html>")
-    assert rl.resolve_bundle(str(tmp_path)) == str(bundle)
+    rb.write_stamp(
+        rb.stamp_path(str(tmp_path), None, "golden", "UI"), _believable_stamp()
+    )
+    choice = rl.resolve_bundle(str(tmp_path), None, "golden", "UI", _believable_stamp())
+    assert choice.path == str(bundle) and choice.source == "config"
 
 
 def test_resolve_bundle_rejects_a_directory_without_index_html(tmp_path):
-    (tmp_path / ".reflex-bundle" / "helao_ui").mkdir(parents=True)
-    assert rl.resolve_bundle(str(tmp_path)) is None
+    (tmp_path / ".reflex-bundle" / "golden_UI" / "helao_ui").mkdir(parents=True)
+    choice = rl.resolve_bundle(str(tmp_path), None, "golden", "UI", {})
+    assert choice.path == ""
 
 
 def test_build_env_sets_the_ports_and_server_key():
@@ -67,16 +101,67 @@ def test_local_build_allowed_with_opt_in_and_runtime(monkeypatch):
     assert rl.may_build_locally() is True
 
 
+def test_a_warm_node_modules_lets_a_launch_rebuild_by_itself(monkeypatch):
+    """The point of the whole change: 4-5 seconds, so it just happens."""
+    import reflex_bundle as rb
+
+    monkeypatch.delenv("REFLEX_ALLOW_LOCAL_BUILD", raising=False)
+    monkeypatch.setattr(rl.shutil, "which", lambda name: "/usr/bin/bun")
+    monkeypatch.setattr(rb, "node_modules_present", lambda root: True)
+    assert rl.may_build_at_launch("/repo") is True
+
+
+def test_a_cold_build_is_refused_at_launch_without_the_opt_in(monkeypatch):
+    """~270 MB of npm packages must never be fetched unasked on a station.
+
+    An operator waiting on an instrument UI gets a clear error and the exact
+    command instead.
+    """
+    import reflex_bundle as rb
+
+    monkeypatch.delenv("REFLEX_ALLOW_LOCAL_BUILD", raising=False)
+    monkeypatch.setattr(rl.shutil, "which", lambda name: "/usr/bin/bun")
+    monkeypatch.setattr(rb, "node_modules_present", lambda root: False)
+    assert rl.may_build_at_launch("/repo") is False
+
+
+def test_a_cold_build_is_allowed_at_launch_with_the_opt_in(monkeypatch):
+    import reflex_bundle as rb
+
+    monkeypatch.setenv("REFLEX_ALLOW_LOCAL_BUILD", "1")
+    monkeypatch.setattr(rl.shutil, "which", lambda name: "/usr/bin/bun")
+    monkeypatch.setattr(rb, "node_modules_present", lambda root: False)
+    assert rl.may_build_at_launch("/repo") is True
+
+
+def test_no_javascript_runtime_means_no_build_however_warm(monkeypatch):
+    import reflex_bundle as rb
+
+    monkeypatch.setenv("REFLEX_ALLOW_LOCAL_BUILD", "1")
+    monkeypatch.setattr(rl.shutil, "which", lambda name: None)
+    monkeypatch.setattr(rb, "node_modules_present", lambda root: True)
+    assert rl.may_build_at_launch("/repo") is False
+
+
+def test_build_env_and_the_stamp_agree_on_the_backend_url():
+    """Two spellings of this string would make every bundle read as stale, or
+    -- worse -- a genuinely mismatched one read as current."""
+    import reflex_bundle as rb
+
+    env = rl.build_env("golden.yml", "UI", "station5", 5010, None)
+    assert env["HELAO_REFLEX_API_URL"] == rb.api_url_for("station5", 5010)
+
+
 def test_resolve_bundle_rejects_a_zero_byte_index_html(tmp_path):
     """An interrupted export leaves a truncated index.html.
 
     Serving it yields a blank browser page and a silent log; treating it as
     absent routes into the loud failure path instead.
     """
-    bundle = tmp_path / ".reflex-bundle" / "helao_ui"
+    bundle = tmp_path / ".reflex-bundle" / "golden_UI" / "helao_ui"
     bundle.mkdir(parents=True)
     (bundle / "index.html").write_text("")
-    assert rl.resolve_bundle(str(tmp_path)) is None
+    assert rl.resolve_bundle(str(tmp_path), None, "golden", "UI", {}).path == ""
 
 
 def test_cleanup_budget_fits_inside_the_orchestrator_kill_window():
@@ -146,8 +231,11 @@ def test_launcher_exits_nonzero_when_no_bundle_and_no_opt_in(tmp_path):
     )
     assert proc.returncode != 0, "launcher started without a frontend bundle"
     combined = proc.stdout + proc.stderr
-    assert "reflex export" in combined or "bundle" in combined.lower(), (
-        "failure did not name the bundle path or the build command:\n" + combined
+    assert "build_reflex_bundle.py" in combined, (
+        "the failure did not name the command that fixes it:\n" + combined
+    )
+    assert "--server UI" in combined, (
+        "the suggested command did not name this server:\n" + combined
     )
 
 
