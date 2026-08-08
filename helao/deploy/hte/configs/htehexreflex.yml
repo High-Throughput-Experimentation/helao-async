@@ -1,0 +1,165 @@
+# P7k: `htereflex.yml` with its Reflex server hexagon-hosted.
+#
+# DIFF FROM THE LEGACY SIBLING (`htereflex.yml`), in full: `deployment:
+# hexagon` on UI, and a distinct `root:`. ROLLBACK: delete the `deployment:`
+# key -- the launcher then sets no HELAO_REFLEX_APP_MODULE and the entry module
+# imports exactly what it always did. `root:` differs because a bundle and a
+# run tree are per (config, server); sharing htereflex's would have each launch
+# invalidate the other's bundle stamp.
+#
+# WHY NOTHING ELSE IS FLIPPED, measured rather than assumed:
+#   - There are no `bokeh:` or `operator:` servers in this config at all, so
+#     P7e's `bokeh: graft` + `legacy_module:` route has nothing here to apply
+#     to. (`htereflex.yml`'s eleven non-UI servers are all `fast:`.)
+#   - The action servers stay legacy deliberately, as in `goldenhexreflex.yml`:
+#     the seam under test is the Reflex hosting route, and a config that also
+#     flipped them would prove which half worked only by elimination. Two of
+#     them could not be flipped in any case -- `cpsim_server` has no shim under
+#     helao/deploy/hexagon/servers/action/ (only `ws_simulator` does).
+#
+# Like its legacy sibling this is a DEVELOPMENT config, not a station config:
+# the action servers are the test deployment's websocket/replay simulators
+# pointed at the column names the real hte drivers publish, which is how the
+# hte panels are exercised on a machine with no hardware.
+dummy: true
+simulation: true
+run_type: simulation
+# HELAO does not expand `~`; a tilde here creates a literal '~' directory
+# in the working directory, which for a dev launch is the repo itself.
+root: /tmp/helao-htehexreflex
+experiment_libraries: []
+sequence_libraries: []
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8101
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: false
+  CO2SENSOR:
+    host: 127.0.0.1
+    port: 8102
+    group: action
+    fast: ws_simulator
+    live_vis: co2_vis
+    params:
+      # The column the real SprintIR driver publishes; co2_vis means it.
+      columns:
+        co2_ppm: 400
+  MFC:
+    host: 127.0.0.1
+    port: 8103
+    group: action
+    fast: ws_simulator
+    live_vis: mfc_vis
+    params:
+      # `{device}__{field}`, as the mfc driver publishes. mfc_vis means the
+      # flow and pressure fields and leaves temperature alone.
+      columns:
+        CO2__mass_flow: 50
+        CO2__pressure: 15
+        CO2__temperature: 25
+  PRESSURE:
+    host: 127.0.0.1
+    port: 8104
+    group: action
+    fast: ws_simulator
+    live_vis: pressure_vis
+    params:
+      # Every analog input gets a mean, so both of these do.
+      columns:
+        pressure_psi_0: 15
+        pressure_psi_1: 30
+  TEMPERATURE:
+    host: 127.0.0.1
+    port: 8105
+    group: action
+    fast: ws_simulator
+    live_vis: temp_vis
+    params:
+      # temp_vis plots its channels raw; no means are computed.
+      columns:
+        cell_temp_0: 25
+        cell_temp_1: 40
+  NIDAQMX:
+    host: 127.0.0.1
+    port: 8106
+    group: action
+    fast: cpsim_server
+    action_vis: nidaqmx_vis
+    params:
+      plate_id: 2750
+      # The stored OER trace renamed to a column the NI-DAQmx server streams,
+      # so the panel's cell selector has a cell to offer and its per-action
+      # split runs on real measurement data. The trace carries only t_s and
+      # erhe_v, so this exercises the voltage figures; the current ones render
+      # empty, which is itself the "no columns for this pattern" path.
+      column_aliases:
+        erhe_v: Ecell1_V
+  POWERSUPPLY:
+    host: 127.0.0.1
+    port: 8107
+    group: action
+    fast: cpsim_server
+    action_vis: power_supply_vis
+    params:
+      plate_id: 2750
+      column_aliases:
+        erhe_v: current_a
+  GAMRY:
+    host: 127.0.0.1
+    port: 8108
+    group: action
+    fast: cpsim_server
+    action_vis: gamry_vis
+    params:
+      plate_id: 2750
+      # The stored trace under the Gamry server's own column names, so the
+      # panel's technique-driven axis defaults have something to select.
+      column_aliases:
+        erhe_v: Ewe_V
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8109
+    group: action
+    fast: cpsim_server
+    action_vis: biologic_vis
+    params:
+      plate_id: 2750
+      column_aliases:
+        erhe_v: Ewe_V
+  SPEC:
+    host: 127.0.0.1
+    port: 8110
+    group: action
+    fast: cpsim_server
+    action_vis: spec_vis
+    params:
+      plate_id: 2750
+      # The spectrometer panel reads ch_<n> columns, one per detector channel.
+      # The stored trace has one measurement column, so this stands in as a
+      # single-channel detector -- enough to prove the spectrum path renders.
+      column_aliases:
+        erhe_v: ch_0
+  SAMPLE:
+    host: 127.0.0.1
+    port: 8111
+    group: action
+    fast: cpsim_server
+    action_vis: sample_vis
+    params:
+      plate_id: 2750
+  UI:
+    host: 127.0.0.1
+    port: 5110
+    group: visualizer
+    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py), so
+    # unlike `fast:`/`bokeh:` it cannot name a hexagon module. The line below
+    # is what routes it, via HELAO_REFLEX_APP_MODULE.
+    reflex: helao_ui
+    deployment: hexagon
+    params:
+      pages:
+        - live
+        - action

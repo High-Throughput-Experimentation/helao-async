@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import re
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -14,17 +16,87 @@ from helao.hexagon import preflight
 # by full path.
 SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
 
+#: A server block declaring the hexagon deployment, in either config dialect:
+#: `deployment: hexagon` in YAML, `"deployment": "hexagon"` in a .py config.
+_DECLARES_HEXAGON = re.compile(
+    r"""["']?deployment["']?\s*[:=]\s*["']?%s\b""" % preflight.HEXAGON
+)
+
+#: Config suffixes `read_config` accepts.
+_CONFIG_SUFFIXES = (".yml", ".py")
+
+
+def _hexagon_configs() -> list[Path]:
+    """Every config in the tree that flips at least one server to hexagon.
+
+    DERIVED, not hand-listed: a hand list silently misses the next config
+    added, which is the failure mode this pin exists to prevent. Two roots,
+    because the hexagon configs live in two places -- the per-deployment
+    `configs/` directories, and the centralized hte smoke directory the P3a/P3e
+    canaries were relocated into (which is outside helao/deploy/ entirely).
+
+    Selection is by TEXT MATCH, deliberately: a `.py` config is executed by
+    `read_config`, and one belonging to an unrelated deployment can fail to
+    import on this platform (a Windows-only vendor SDK at module scope). That
+    must not turn "which configs exist" into a collection error for everyone
+    else. Loading is left to the preflight run itself, on the selected set.
+    """
+    candidates = sorted((preflight.REPO_ROOT / "helao" / "deploy").glob("*/configs/*"))
+    candidates += sorted(SMOKE_CONFIGS.glob("*"))
+    return [
+        p
+        for p in candidates
+        if p.is_file()
+        and p.suffix in _CONFIG_SUFFIXES
+        and p.name != "__init__.py"
+        and _DECLARES_HEXAGON.search(p.read_text(errors="ignore"))
+    ]
+
+
+#: Hexagon configs whose presence in the derived set is itself asserted. An
+#: inert glob (wrong root, renamed directory, regex drift) yields an empty
+#: parametrization, which pytest reports as PASSED -- so the derivation needs a
+#: floor it cannot pass without. Named by phase: P2's four, P7e's graft, P7f's
+#: Reflex flip, P7k's hte Reflex flip, and the two hte canaries.
+KNOWN_HEXAGON_CONFIGS = frozenset(
+    {
+        "goldenhex",
+        "goldenhexvis",
+        "goldenhexid",
+        "goldenhexconc",
+        "goldenhexgraft",
+        "goldenhexreflex",
+        "htehexreflex",
+        "gamryhex",
+        "samplegraft",
+    }
+)
+
 
 def test_gamryhex_canary_passes():
     """The hte hexagon canary config passes every offline gate."""
     assert preflight.preflight_config(str(SMOKE_CONFIGS / "gamryhex.yml")) == []
 
 
-def test_goldenhex_configs_pass():
-    """P2's hexagon test configs also pass (deployment-aware checklist gate);
-    goldenhexgraft is P7e's, whose bokeh servers ride the generic graft."""
-    for cfg in ("goldenhex", "goldenhexvis", "goldenhexid", "goldenhexgraft"):
-        assert preflight.preflight_config(cfg) == [], cfg
+def test_the_derived_hexagon_config_set_is_not_vacuous():
+    """The guard on the guard: an empty derived set parametrizes to nothing
+    and reports green. Assert both that it found something and that it found
+    the configs we know exist."""
+    stems = {p.stem for p in _hexagon_configs()}
+    assert stems, "no hexagon configs discovered — the glob is inert"
+    assert KNOWN_HEXAGON_CONFIGS <= stems, sorted(KNOWN_HEXAGON_CONFIGS - stems)
+
+
+@pytest.mark.parametrize("config", _hexagon_configs(), ids=lambda p: p.stem)
+def test_every_hexagon_config_in_the_tree_preflights(config):
+    """Every tracked hexagon-variant config passes every offline gate.
+
+    Covers P2's goldenhex family, P7e's generic graft, P7f's `goldenhexreflex`
+    and P7k's `htehexreflex`, and each per-family canary — and, on a checkout
+    that has them, any private deployment's hexagon configs, without this
+    public file naming one.
+    """
+    assert preflight.preflight_config(str(config)) == [], config.name
 
 
 def test_missing_shim_detected():
@@ -355,3 +427,47 @@ def test_checklist_dir_prefers_private_in_repo_then_central():
 
     assert preflight._checklist_dir(None) is None
     assert preflight._checklist_dir("no_such_deployment") is None
+
+
+def test_a_scratch_copy_of_a_config_does_not_exercise_the_checklist_gate(
+    tmp_path, monkeypatch
+):
+    """P4f's silent-pass trap, as a negative control on the pins above.
+
+    `preflight` infers the deployment from the config's PATH, so the very same
+    bytes preflight differently depending on where the file sits: in-tree the
+    checklist gate runs, in a scratch directory there is no deployment, hence
+    no checklist directory, hence nothing checked. Both return `[]`, so the
+    result alone cannot tell them apart — which is exactly why a preflight run
+    against a copied-out config certifies less than it appears to.
+
+    What is asserted is therefore the DIFFERENCE, measured three ways: the
+    inferred deployment, the checklist directory it resolves to, and — the
+    consequence that matters — that with the checklist set emptied the in-tree
+    config reports a real finding while the scratch copy stays clean.
+    """
+    src = SMOKE_CONFIGS / "gamryhex.yml"
+    scratch = tmp_path / src.name
+    shutil.copy2(src, scratch)
+
+    # 1. the deployment, which is the only thing the path carries
+    assert preflight._config_deployment(str(src)) == "hte"
+    assert preflight._config_deployment(str(scratch)) is None
+
+    # 2. and so the gate has no baseline directory to check against
+    assert preflight._checklist_dir(preflight._config_deployment(str(src))) is not None
+    assert preflight._checklist_dir(preflight._config_deployment(str(scratch))) is None
+
+    # 3. identical bytes, identical clean result, in-tree and out
+    assert preflight.preflight_config(str(src)) == []
+    assert preflight.preflight_config(str(scratch)) == []
+
+    # 4. now make the checklist gate bite: point it at an empty (but existing)
+    #    hte checklist set, so every hexagon action server is missing its
+    #    frozen baseline. The in-tree config notices; the scratch copy cannot.
+    empty = tmp_path / "checklists"
+    (empty / "hte").mkdir(parents=True)
+    monkeypatch.setattr(preflight, "CHECKLIST_ROOT", empty)
+    in_tree = preflight.preflight_config(str(src))
+    assert len(in_tree) == 1 and "frozen endpoint checklist missing" in in_tree[0]
+    assert preflight.preflight_config(str(scratch)) == []
