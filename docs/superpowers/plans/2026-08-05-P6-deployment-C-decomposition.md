@@ -82,8 +82,12 @@ whether it needs a master-spec amendment.
    all; its analysis records are produced later by the quantification analysis class running
    under the core analysis driver — i.e. they **already flow through writer 1**. The unification
    is core `sync_ana` + the XAFS converter's inline drifted copy; the port's only new adapter
-   consumer is that inline copy. **Needs a master-spec amendment** (it changes P6's §4.3.10
-   scope sentence); the phase proceeds on the measured scope meanwhile.
+   consumer is that inline copy. **Amendment landed** 2026-08-08 —
+   `docs/superpowers/specs/2026-08-08-hexagonal-rewrite-amendment-2.md` §2 amends the §4.3.10
+   scope sentence to two writers and puts the quantification converter's plain-HLO output
+   explicitly out of the port's scope (routing it through would be a behaviour change, not a
+   unification). The uuid7 divergence in item 2 below is recorded there too, at spec level,
+   because it is what makes a naive golden diff of that family non-deterministic.
 2. **The XAFS inline writer's parity-critical divergence is not in the spec's list:** it mints
    `analysis_uuid` from a **time-based uuid7**, not the content hash the server path uses
    (`BaseAnalysis.gen_uuid`, `helao/core/drivers/data/analyses/base_analysis.py:81-109`), so
