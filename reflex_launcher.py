@@ -678,6 +678,11 @@ if __name__ == "__main__":
     #   the exact orphan this is meant to prevent, observed in testing.
     backend = subprocess.Popen(
         [
+            # `sys.executable -m reflex`, not bare `reflex`: launching this file
+            # by absolute interpreter path without the env on PATH otherwise dies
+            # with FileNotFoundError. build_reflex_bundle already spawns this way.
+            sys.executable,
+            "-m",
             "reflex",
             "run",
             "--env",
