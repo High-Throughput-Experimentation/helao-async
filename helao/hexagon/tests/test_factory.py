@@ -25,6 +25,24 @@ def _world(tmp_path):
                 "fast": "ws_simulator",
                 "params": {},
             },
+            # P7e: makeVisApp composes for real now, so its tests need a server
+            # entry build_wiring can resolve.
+            "OPERATOR": {
+                "host": "127.0.0.1",
+                "port": 5901,
+                "group": "operator",
+                "bokeh": "standalone_operator",
+                "deployment": "hexagon",
+                "params": {},
+            },
+            "LIVE": {
+                "host": "127.0.0.1",
+                "port": 5902,
+                "group": "visualizer",
+                "bokeh": "live_visualizer",
+                "deployment": "hexagon",
+                "params": {},
+            },
         },
     }
 
@@ -97,10 +115,10 @@ def test_make_action_app_wraps_legacy_module(installed_config):
     assert "/SIM/acquire_data" in routes  # real legacy action route survived
 
 
-def test_make_vis_app_delegates_to_legacy_module(monkeypatch):
-    """P2d compat-facade: makeVisApp imports the named legacy module and
-    calls its makeBokehApp with the launcher-shaped args, attaching NOTHING
-    (HelaoBokehAPI self-configures from CONFIG; native vis ports = P3)."""
+def test_make_vis_app_delegates_to_legacy_module(installed_config, monkeypatch):
+    """Compat-facade: makeVisApp imports the named legacy module and calls its
+    makeBokehApp with the launcher-shaped args, leaving the RENDERING entirely
+    legacy (D1/D2)."""
     from bokeh.document import Document
 
     from helao.hexagon.app import factory
@@ -129,6 +147,81 @@ def test_make_vis_app_delegates_to_legacy_module(monkeypatch):
     assert out is doc
     assert calls["module"] == "helao.deploy.hte.servers.operator.standalone_operator"
     assert calls["args"] == (doc, "goldenhexvis", "OPERATOR", "/repo")
+
+
+def test_make_vis_app_wires_the_hosted_process(installed_config, monkeypatch):
+    """P7e: the hosted bokeh process is COMPOSED, not hexagon in name only.
+
+    Every VIS_REQUIRED port is wired, ui_host is the P7d BokehServerUiHost, and
+    the wiring rides the per-session Document the legacy module renders into.
+    """
+    from bokeh.document import Document
+
+    from helao.hexagon.app import factory
+    from helao.hexagon.app.ui_host import BokehServerUiHost
+    from helao.hexagon.app.wiring import VIS_REQUIRED
+
+    seen = {}
+
+    class FakeLegacy:
+        @staticmethod
+        def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
+            # the legacy app must be able to see the wiring while it builds
+            seen["wiring_at_render"] = getattr(doc, "hexagon_wiring", None)
+            return doc
+
+    monkeypatch.setattr(factory, "import_module", lambda name: FakeLegacy)
+    doc = Document()
+    factory.makeVisApp("legacy.mod", doc, "goldenhexvis", "LIVE", "/repo")
+
+    wiring = doc.hexagon_wiring  # type: ignore[attr-defined]
+    assert wiring is not None
+    assert seen["wiring_at_render"] is wiring
+    assert isinstance(wiring.ui_host, BokehServerUiHost)
+    for name in VIS_REQUIRED:
+        assert getattr(wiring, name) is not None, name
+    # ui_host is NOT a blanket requirement of the other compositions (P7d)
+    from helao.hexagon.app.wiring import ACTION_REQUIRED, ORCH_REQUIRED
+
+    assert "ui_host" not in ACTION_REQUIRED and "ui_host" not in ORCH_REQUIRED
+
+
+def test_make_vis_app_raises_on_an_unwired_required_port(installed_config, monkeypatch):
+    """Fail-loud composition (spec §4.5): an unwired VIS_REQUIRED port aborts
+    the session BEFORE the legacy module is imported — a half-composed page is
+    never rendered."""
+    import pytest as _pytest
+    from bokeh.document import Document
+
+    from helao.hexagon.app import factory
+    from helao.hexagon.app.wiring import PortWiring, UnwiredPortError
+    from helao.hexagon.adapters.legacy.config import from_global_config
+
+    imported = []
+    monkeypatch.setattr(factory, "import_module", lambda name: imported.append(name))
+    # config wired, logging deliberately absent
+    monkeypatch.setattr(
+        factory, "build_wiring", lambda key: PortWiring(config=from_global_config())
+    )
+    doc = Document()
+    with _pytest.raises(UnwiredPortError) as ei:
+        factory.makeVisApp("legacy.mod", doc, "goldenhexvis", "LIVE", "/repo")
+    assert "logging" in str(ei.value)
+    assert imported == []
+
+
+def test_make_vis_app_raises_without_an_installed_config(monkeypatch):
+    """No CONFIG at all is the other fail-loud leg: build_wiring raises rather
+    than composing a vis process against nothing."""
+    import pytest as _pytest
+    from bokeh.document import Document
+
+    from helao.helpers import config_loader
+    from helao.hexagon.app import factory
+
+    monkeypatch.setattr(config_loader, "CONFIG", None)
+    with _pytest.raises(RuntimeError):
+        factory.makeVisApp("legacy.mod", Document(), "goldenhexvis", "LIVE", "/repo")
 
 
 def test_launcher_shims_delegate():
@@ -289,7 +382,7 @@ async def test_status_adapter_unbound_is_fail_loud(installed_config):
         await a.publish_status({})
 
 
-def test_vis_shims_delegate(monkeypatch):
+def test_vis_shims_delegate(installed_config, monkeypatch):
     """P2d: each vis/operator shim exports the 4-arg makeBokehApp shape
     bokeh_launcher calls (doc positional; confPrefix/server_key/
     helao_repo_root as kwargs) and routes through factory.makeVisApp to
@@ -325,8 +418,9 @@ def test_vis_shims_delegate(monkeypatch):
         doc = Document()
         # the EXACT call shape bokeh_launcher.py:185-190 produces
         out = shim.makeBokehApp(
-            doc, confPrefix="goldenhexvis", server_key="X", helao_repo_root="/repo"
+            doc, confPrefix="goldenhexvis", server_key="LIVE", helao_repo_root="/repo"
         )
         assert out is doc
         assert calls["module"] == legacy_module
-        assert calls["args"] == (doc, "goldenhexvis", "X", "/repo")
+        assert calls["args"] == (doc, "goldenhexvis", "LIVE", "/repo")
+        assert doc.hexagon_wiring is not None  # type: ignore[attr-defined]

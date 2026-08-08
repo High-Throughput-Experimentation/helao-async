@@ -10,7 +10,11 @@ adapters, on Linux, no server launch and no hardware:
    backend), so the uniqueness check reserves `port + 1` for it as well.
 2. **shim completeness** — every `deployment: hexagon` server has a hexagon
    shim module at `helao/deploy/hexagon/servers/<group>/<fast|bokeh>.py`
-   (missing shim = `ModuleNotFoundError` at launch — must be caught here).
+   (missing shim = `ModuleNotFoundError` at launch — must be caught here), and
+   a server on the GENERIC `graft` shim declares a `legacy_module:` that
+   resolves to a module on disk (the graft names nothing itself, so without
+   that key it raises at launch — for a bokeh server, not until the first
+   browser session).
 3. **endpoint-checklist presence** — every hexagon ACTION server has a frozen
    legacy endpoint checklist under `helao/hexagon/tests/checklists/hte/` (the
    baseline the runtime `/openapi.json` diff is checked against at station).
@@ -186,7 +190,42 @@ def _shim_completeness(servers: dict) -> list[str]:
             issues.append(
                 f"{key}: hexagon shim missing — expected {shim.relative_to(REPO_ROOT)}"
             )
+            continue
+        if module == "graft":
+            issues.extend(_graft_target_issues(key, s, group))
     return issues
+
+
+def _graft_target_issues(key: str, server: dict, group: str) -> list[str]:
+    """Checks specific to a generic ``graft`` shim (`fast:`/`bokeh: graft`).
+
+    A graft shim names NOTHING — that indirection is what lets a PRIVATE
+    deployment flip a server without this public repo naming it — so its legacy
+    target comes from the server's own top-level ``legacy_module:`` key. Absent,
+    the shim raises only when the launcher calls its factory: for a bokeh
+    server that is on the FIRST BROWSER SESSION, long after the group reports
+    itself up, so nothing short of opening the page would reveal it.
+
+    The target is also resolved to a file on disk. Presence alone is a weak
+    gate: a typo'd dotted path satisfies it and then fails at launch with
+    ModuleNotFoundError. Resolution is by path, never by import — preflight
+    runs offline and must not execute deployment code.
+    """
+    code_key = "fast" if "fast" in server else "bokeh"
+    legacy = server.get("legacy_module")
+    if not legacy:
+        return [
+            f"{key}: `{code_key}: graft` declares no `legacy_module:` — add a "
+            f"top-level `legacy_module: helao.deploy.<deployment>.servers."
+            f"{group}.<module>` to this server block"
+        ]
+    target = REPO_ROOT.joinpath(*legacy.split("."))
+    if not target.with_suffix(".py").exists() and not (target / "__init__.py").exists():
+        return [
+            f"{key}: `legacy_module: {legacy}` resolves to no module on disk "
+            f"(expected {'/'.join(legacy.split('.'))}.py under the repo root)"
+        ]
+    return []
 
 
 def _checklist_presence(servers: dict, checklist_dir: Optional[Path]) -> list[str]:
