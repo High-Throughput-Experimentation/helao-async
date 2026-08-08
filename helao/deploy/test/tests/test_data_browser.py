@@ -38,6 +38,17 @@ class _FakeVis:
         pass
 
 
+class _RecordingVis(_FakeVis):
+    """A vis that keeps what the UI reported, so a silent skip is visible."""
+
+    def __init__(self, root, doc):
+        super().__init__(root, doc)
+        self.messages = []
+
+    def print_message(self, *a, **k):
+        self.messages.append(" ".join(str(x) for x in a))
+
+
 def _write_hlo(path):
     """Write a minimal HLO file (YAML header, %% marker, JSONL body)."""
     with open(path, "w") as f:
@@ -450,6 +461,80 @@ def test_plot_replot_and_clear_safe():
     print("test_plot_replot_and_clear_safe PASS")
 
 
+def test_plot_skips_a_non_numeric_column_and_says_so():
+    """A string column must not become a trace, and the skip must be reported.
+
+    HELAO datasets carry strings freely -- an orchestrator host, a status
+    message, a sample label sit beside the numeric traces. The Reflex browser
+    filtered them (``is_numeric``/``chart_series``, which lived in *its* module
+    rather than in the shared layer); the Bokeh browser handed the column
+    straight to ``build_trace`` and plotted it. Measured, that does not raise:
+    Bokeh accepts a list of strings in a ``ColumnDataSource`` and even renders
+    the document, so the operator got a renderer that draws nothing and no
+    message saying why. Both UIs now go through ``state.chart_series``.
+    """
+    from helao.core.servers.data_browser.app import _UI
+
+    with tempfile.TemporaryDirectory() as d:
+        vis = _RecordingVis(d, Document())
+        ui = _UI(vis, d, 50000)
+        ui.selected = [
+            _ds(
+                "a",
+                {
+                    "t_s": [0.0, 1.0],
+                    "Ewe_V": [0.1, 0.2],
+                    "orchestrator": ["127.0.0.1", "127.0.0.1"],
+                },
+            )
+        ]
+        ui._refresh_axes()
+        ui.x_sel.value, ui.y_sel.value = "t_s", "orchestrator"
+        vis.messages.clear()
+        ui._rebuild_plot()
+        assert ui.plot.renderers == [], ui.plot.renderers
+        assert any("not numeric" in m for m in vis.messages), vis.messages
+        # ...and the numeric pair from the same dataset still plots.
+        ui.y_sel.value = "Ewe_V"
+        ui._rebuild_plot()
+        assert len(ui.plot.renderers) == 1, ui.plot.renderers
+    print("test_plot_skips_a_non_numeric_column_and_says_so PASS")
+
+
+def test_plot_reports_a_dataset_missing_the_chosen_columns():
+    """Overlaying files from unrelated runs is normal; saying nothing is not."""
+    from helao.core.servers.data_browser.app import _UI
+
+    with tempfile.TemporaryDirectory() as d:
+        vis = _RecordingVis(d, Document())
+        ui = _UI(vis, d, 50000)
+        ui.selected = [
+            _ds("a", {"t_s": [0.0, 1.0], "Ewe_V": [0.1, 0.2]}),
+            _ds("b", {"q": [1.0, 2.0], "I": [3.0, 4.0]}),
+        ]
+        ui._refresh_axes()
+        ui.x_sel.value, ui.y_sel.value = "t_s", "Ewe_V"
+        vis.messages.clear()
+        ui._rebuild_plot()
+        assert len(ui.plot.renderers) == 1, ui.plot.renderers
+        assert any("b" in m and "t_s/Ewe_V" in m for m in vis.messages), vis.messages
+    print("test_plot_reports_a_dataset_missing_the_chosen_columns PASS")
+
+
+def test_both_browsers_share_one_numeric_guard():
+    """The guard lives in the shared layer, not in one UI.
+
+    ``is_numeric``/``chart_series`` were written in ``app_reflex`` -- a UI --
+    so the Bokeh browser could not call them. Pin the hoist: the Reflex names
+    must *be* the shared-layer objects, not copies that can drift apart.
+    """
+    from helao.core.servers.data_browser import app_reflex as dbx
+
+    assert dbx.is_numeric is dbstate.is_numeric
+    assert dbx.chart_series is dbstate.chart_series
+    print("test_both_browsers_share_one_numeric_guard PASS")
+
+
 def test_shims_expose_makebokehapp():
     import importlib
 
@@ -491,6 +576,9 @@ def run_all():
     test_plot_tab_builds_traces()
     test_table_tab_summary_and_rows()
     test_plot_replot_and_clear_safe()
+    test_plot_skips_a_non_numeric_column_and_says_so()
+    test_plot_reports_a_dataset_missing_the_chosen_columns()
+    test_both_browsers_share_one_numeric_guard()
     test_shims_expose_makebokehapp()
     print("ALL DATA_BROWSER TESTS PASS")
 

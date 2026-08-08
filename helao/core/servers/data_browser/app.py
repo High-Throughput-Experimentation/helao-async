@@ -229,19 +229,27 @@ class _UI:
         xcol, ycol = self.x_sel.value, self.y_sel.value
         if not xcol or not ycol:
             return
-        for i, ds in enumerate(self.selected):
-            tr = dbstate.build_trace(ds, xcol, ycol)
-            if tr is None:
-                continue
-            tr = dbstate.downsample(tr, self.max_points)
-            src = ColumnDataSource(data=tr)
+        # Through the shared guard, not straight at build_trace: a string
+        # column (an orchestrator host, a status message) is accepted by
+        # Bokeh without complaint and drawn as a renderer that shows nothing,
+        # so the operator saw an empty plot and was told nothing. The Reflex
+        # browser filtered the same case; the filter now lives under both.
+        series, skipped = dbstate.chart_series(
+            self.selected, xcol, ycol, self.max_points
+        )
+        for label, reason in skipped:
+            self.vis.print_message(f"data_browser cannot plot {label}: {reason}")
+        for i, tr in enumerate(series):
+            src = ColumnDataSource(data={"x": tr["x"], "y": tr["y"]})
             color = SERIES[i % len(SERIES)]
             if self.type_sel.value == "scatter":
                 self.plot.scatter(
-                    "x", "y", source=src, color=color, legend_label=ds.label
+                    "x", "y", source=src, color=color, legend_label=tr["label"]
                 )
             else:
-                self.plot.line("x", "y", source=src, color=color, legend_label=ds.label)
+                self.plot.line(
+                    "x", "y", source=src, color=color, legend_label=tr["label"]
+                )
         self.plot.xaxis.axis_label = xcol
         self.plot.yaxis.axis_label = ycol
 

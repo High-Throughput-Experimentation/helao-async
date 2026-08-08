@@ -30,7 +30,6 @@ __all__ = [
 
 import threading
 
-import numpy as np
 import reflex as rx
 
 from helao.core.servers.data_browser import sources
@@ -215,57 +214,13 @@ def axis_options(selected) -> list:
     return dbstate.available_columns(selected)
 
 
-def is_numeric(values) -> bool:
-    """Whether a column can be plotted.
-
-    HELAO datasets carry string columns freely -- an orchestrator host, a
-    status message, a sample label sit beside the numeric traces. Handing one
-    to the plot facade raises ``could not convert string to float`` from inside
-    the render, which takes down the whole chart rather than one trace.
-
-    Args:
-        values: A dataset column.
-
-    Returns:
-        bool: ``True`` when every value coerces to float.
-    """
-    try:
-        np.asarray(values, dtype=np.float64)
-    except (TypeError, ValueError):
-        return False
-    return True
-
-
-def chart_series(selected, xcol: str, ycol: str, max_points: int):
-    """Build :func:`plots.traces` input from the selected datasets.
-
-    Args:
-        selected: ``SelectedDataset`` list.
-        xcol: Chosen x column.
-        ycol: Chosen y column.
-        max_points: Downsampling cap per trace.
-
-    Returns:
-        tuple: ``(series, skipped)``. ``series`` is ``{"label", "x", "y"}`` per
-        plottable dataset; ``skipped`` is ``[(label, reason)]``. Datasets are
-        skipped for missing the chosen columns -- normal when overlaying files
-        from unrelated runs -- or for holding non-numeric values there, which
-        would otherwise abort the entire chart.
-    """
-    if not xcol or not ycol:
-        return [], []
-    series, skipped = [], []
-    for ds in selected:
-        trace = dbstate.build_trace(ds, xcol, ycol)
-        if trace is None:
-            skipped.append((ds.label, f"has no {xcol}/{ycol} columns"))
-            continue
-        if not is_numeric(trace["x"]) or not is_numeric(trace["y"]):
-            skipped.append((ds.label, f"{xcol}/{ycol} are not numeric"))
-            continue
-        trace = dbstate.downsample(trace, max_points)
-        series.append({"label": ds.label, "x": trace["x"], "y": trace["y"]})
-    return series, skipped
+#: The numeric guard and the trace builder are the *shared layer's*, re-exported
+#: under the names this page has always used. They were written here, in a UI,
+#: which is why the Bokeh browser could not call them and plotted string columns
+#: as empty renderers. Bound rather than wrapped: a wrapper is a second place to
+#: drift, and ``test_both_browsers_share_one_numeric_guard`` pins the identity.
+is_numeric = dbstate.is_numeric
+chart_series = dbstate.chart_series
 
 
 def summary_rows(selected, xcol: str, ycol: str) -> list:
