@@ -1,0 +1,71 @@
+# P7g row-15 negative gate: the /control surface, all five private routes,
+# on Linux with no hardware.
+#
+# Row 15 is a NEGATIVE artifact row -- a /control toggle drives hardware and
+# writes nothing -- and a negative passes trivially against a server that was
+# never reached. So this config exists to give the harness something it can
+# genuinely toggle: two `control_sim` servers answering all five routes from
+# an in-memory device, an ORCH so the "nothing queued, nothing recorded"
+# claim is made with the queueing machinery actually present, and a run root
+# of its own so a diff of that root is a diff of this group's behaviour.
+#
+# Two action servers, not one, because `control_vis` is singular per server:
+# a station declares `digital_out_control` on its IO server and
+# `motion_control_letter_scale` on its motion server. One combined server
+# would have had to drop a panel key and would no longer mirror any shipped
+# station.
+#
+# The IO block deliberately carries an UNREADABLE line. `unreadable_line`
+# maps to null, which `control_sim` treats as a line that accepts writes and
+# always reads back unknown -- the NI server's real behaviour (one-shot
+# tasks, no readback). Without one, every read is a bool and the tri-state is
+# untested at exactly the layer that exists to preserve it.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_controlneg
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8071
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+  # Ports in the 807x band, not the 800x one every other test config uses:
+  # this check is meant to be runnable beside another sim group without the
+  # two silently binding each other's ports.
+  IOSIM:
+    host: 127.0.0.1
+    port: 8072
+    group: action
+    fast: control_sim
+    control_vis: digital_out_control
+    params:
+      dev_do:
+        gamry_aux: 1
+        Thorlab_led: 7
+        cell_valve: 2
+        unreadable_line: null
+  MOTORSIM:
+    host: 127.0.0.1
+    port: 8073
+    group: action
+    fast: control_sim
+    control_vis: motion_control_letter_scale
+    params:
+      # `letter_scale`: axis_id maps a name to a controller letter and
+      # count_to_mm is keyed by that letter. Copied in shape (not in value)
+      # from the shipped station schema so discover_axes takes the same
+      # branch here as it does there.
+      axis_id:
+        x: A
+        y: B
+      count_to_mm:
+        A: 1.5628e-04
+        B: 1.5628e-04
