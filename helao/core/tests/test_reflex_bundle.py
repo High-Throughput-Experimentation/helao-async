@@ -467,6 +467,120 @@ def test_an_unbelievable_stamp_aborts_before_the_old_bundle_is_replaced(
         assert handle.read() == "<html>old</html>"
 
 
+# --- P7f: which app the export compiles -------------------------------------
+
+
+def _export_env(monkeypatch, **kwargs):
+    """Run a build with ``_run`` replaced by a spy, returning the export env."""
+    seen = {}
+    real = _fake_export()
+
+    def spy(command, cwd, env, what, logger=None):
+        if "export" in " ".join(str(c) for c in command):
+            seen.update(env)
+        return real(command, cwd, env, what, logger)
+
+    monkeypatch.setattr(rb, "_run", spy)
+    return seen
+
+
+def test_the_export_compiles_the_routed_app(buildable, tmp_path, monkeypatch):
+    """The export runs ``_app``'s entry module in a subprocess, and that
+    module resolves the app from this variable. A backend routed to the
+    hexagon host while the bundle was compiled from the legacy app would be a
+    mismatch of exactly the kind the stamp exists to catch -- and, if the two
+    ever diverge, invisible in the browser."""
+    seen = _export_env(monkeypatch)
+    rb.build_bundle(
+        buildable,
+        "golden.yml",
+        "UI",
+        "http://h:5011",
+        root=str(tmp_path / "data"),
+        app_module=rb.HEXAGON_APP_MODULE,
+    )
+    assert seen[rb.APP_MODULE_ENV] == rb.HEXAGON_APP_MODULE
+
+
+def test_the_export_is_unrouted_by_default(buildable, tmp_path, monkeypatch):
+    seen = _export_env(monkeypatch)
+    rb.build_bundle(
+        buildable, "golden.yml", "UI", "http://h:5011", root=str(tmp_path / "data")
+    )
+    assert rb.APP_MODULE_ENV not in seen
+
+
+def test_an_inherited_routing_variable_does_not_leak_into_a_legacy_export(
+    buildable, tmp_path, monkeypatch
+):
+    """``build_bundle`` copies ``os.environ``. A developer who exported the
+    variable in their shell would otherwise silently build every station's
+    bundle from the hexagon host."""
+    monkeypatch.setenv(rb.APP_MODULE_ENV, rb.HEXAGON_APP_MODULE)
+    seen = _export_env(monkeypatch)
+    rb.build_bundle(
+        buildable, "golden.yml", "UI", "http://h:5011", root=str(tmp_path / "data")
+    )
+    assert rb.APP_MODULE_ENV not in seen
+
+
+def test_routing_is_tracked_by_the_module_map_and_not_by_a_field_of_its_own():
+    """The P7f stamp decision, with its measurement.
+
+    Hexagon routing imports ``helao/hexagon/app/reflex_host.py`` and the
+    composition behind it, so the launcher's ``modules`` map gains those
+    entries (measured on ``goldenhexreflex``: 69 -> 125, nothing removed and
+    nothing changed). That is already a per-field, content-hashed record of
+    the routing AND of the facade's own source, so a dedicated ``app_module``
+    field would add a second reason to rebuild for the same edit and no
+    information. What it also means, and what no prose can soften: flipping
+    ``deployment: hexagon`` DOES make the installed bundle stale, once.
+    """
+    assert "app_module" not in rb.COMPARED_FIELDS
+    legacy = _stamp()
+    hexagon = _stamp(
+        modules={
+            **legacy["modules"],
+            "helao/hexagon/app/reflex_host.py": "a" * 40,
+            "helao/hexagon/app/wiring.py": "b" * 40,
+        }
+    )
+    reason = rb.stamp_mismatch(hexagon, legacy)
+    assert reason.startswith("modules ("), reason
+    assert "reflex_host.py" in reason
+    # and the reverse, so a rollback is caught too rather than silently
+    # serving a bundle compiled from the facade
+    assert rb.stamp_mismatch(legacy, hexagon).startswith("modules (")
+
+
+def test_a_hexagon_routed_capture_is_still_a_believable_stamp():
+    """The anti-stub guard must keep working under routing.
+
+    ``validate_stamp`` refuses a map captured before the app import, because
+    such a map can never mismatch. Routing changes WHICH module is imported,
+    and the facade re-exports the legacy app rather than replacing it -- so
+    the legacy app module is still in the map, which is what the guard keys
+    on. A facade that stopped importing it would produce a bundle that is
+    never rebuilt, and this is where that shows up.
+    """
+    hexagon = _stamp(
+        modules={
+            **_stamp()["modules"],
+            "helao/hexagon/app/reflex_host.py": "a" * 40,
+        }
+    )
+    rb.validate_stamp(hexagon)  # does not raise
+    assert rb.APP_MODULE_REL in hexagon["modules"]
+    with pytest.raises(rb.BundleStampError):
+        rb.validate_stamp({"modules": {"helao/hexagon/app/reflex_host.py": "a" * 40}})
+
+
+def test_app_module_for_reads_the_deployment_key():
+    assert rb.app_module_for({"deployment": "hexagon"}) == rb.HEXAGON_APP_MODULE
+    for entry in (None, {}, {"deployment": "hte"}, {"deployment": None}, "hexagon"):
+        assert rb.app_module_for(entry) == rb.LEGACY_APP_MODULE, entry
+
+
 def test_a_build_refuses_without_a_javascript_runtime(tmp_path, monkeypatch):
     monkeypatch.setattr(rb.shutil, "which", lambda name: None)
     with pytest.raises(SystemExit) as excinfo:

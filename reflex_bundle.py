@@ -33,9 +33,14 @@ a stamp.
 __all__ = [
     "APP_NAME",
     "APP_DIR",
+    "APP_MODULE_ENV",
     "ASSETS_DIR",
     "BUNDLE_DIRNAME",
     "BUNDLE_SUBDIR",
+    "HEXAGON_APP_MODULE",
+    "HEXAGON_DEPLOYMENT",
+    "LEGACY_APP_MODULE",
+    "app_module_for",
     "STAMP_NAME",
     "STAMP_SCHEMA",
     "COMPARED_FIELDS",
@@ -160,6 +165,51 @@ TRACKED_DISTRIBUTIONS = ("reflex", "reflex-components-radix", "xy")
 
 #: Matches a baked ``http(s)://host:port`` inside an exported bundle.
 _BAKED_URL_RE = re.compile(rb"https?://[A-Za-z0-9_.\-]+:\d{2,5}")
+
+# --- Which app the entry module serves (P7f) ---------------------------------
+#
+# ``reflex:`` is a BUNDLE name (``helao_ui``, read by ``resolve_bundle`` and
+# ``build_reflex_bundle.py``), never a module path, so unlike ``fast:``/
+# ``bokeh:`` it carries no routing seam. Hexagon hosting is selected instead by
+# the environment variable below, which ``_app/helao_ui/helao_ui.py`` reads.
+# The variable is set ONLY for a server declaring ``deployment: hexagon``:
+# absent, the entry module imports exactly the module it always did, so a
+# legacy server's import path is unchanged and rollback is deleting one config
+# key.
+
+#: Environment variable naming the module the Reflex entry point imports its
+#: ``app`` from. Duplicated as a literal in ``_app/helao_ui/helao_ui.py`` --
+#: that file must not import anything to decide what to import, or every
+#: legacy station's stamp would move for a module it does not use.
+#: ``test_reflex_entry_resolver.py`` pins the two spellings together.
+APP_MODULE_ENV = "HELAO_REFLEX_APP_MODULE"
+
+#: What the entry module imports when the variable is absent.
+LEGACY_APP_MODULE = "helao.core.servers.reflex.app"
+
+#: What it imports for a ``deployment: hexagon`` reflex server.
+HEXAGON_APP_MODULE = "helao.hexagon.app.reflex_host"
+
+#: The ``deployment:`` value that selects hexagon hosting, pinned to
+#: ``helao.hexagon.preflight.HEXAGON``.
+HEXAGON_DEPLOYMENT = "hexagon"
+
+
+def app_module_for(server_cfg) -> str:
+    """Return the entry module that will serve one ``reflex:`` server.
+
+    Args:
+        server_cfg: The server's config block, or ``None``.
+
+    Returns:
+        str: :data:`HEXAGON_APP_MODULE` when the entry declares
+        ``deployment: hexagon``, else :data:`LEGACY_APP_MODULE`.
+    """
+    if not isinstance(server_cfg, dict):
+        return LEGACY_APP_MODULE
+    if server_cfg.get("deployment") == HEXAGON_DEPLOYMENT:
+        return HEXAGON_APP_MODULE
+    return LEGACY_APP_MODULE
 
 
 class BundleStampError(RuntimeError):
@@ -905,6 +955,7 @@ def build_bundle(
     config_prefix: str = "",
     stamp=None,
     logger=None,
+    app_module: str = LEGACY_APP_MODULE,
 ) -> str:
     """Build and install the bundle for one ``(config, server)`` pair.
 
@@ -924,6 +975,12 @@ def build_bundle(
         stamp: Stamp to record. When ``None`` it is computed here, *after* the
             build, so the xy client asset the build itself writes is included.
         logger: Optional logger; progress goes to ``print`` without one.
+        app_module: Entry module the ``reflex export`` subprocess should serve
+            (:func:`app_module_for`). The export compiles whatever ``app``
+            object that module exposes, so a bundle built under one routing and
+            served under another would be a silent mismatch of exactly the kind
+            the stamp exists to prevent -- the caller that decides the routing
+            for the *backend* must decide it here too.
 
     Returns:
         str: The installed bundle directory.
@@ -948,6 +1005,14 @@ def build_bundle(
     env["HELAO_REFLEX_SERVER_KEY"] = server_key
     env["HELAO_REFLEX_API_URL"] = api_url
     env["PYTHONPATH"] = repo_root + os.pathsep + env.get("PYTHONPATH", "")
+    # Set only under hexagon routing, and *popped* otherwise: this process may
+    # have inherited the variable from a caller, and an export that silently
+    # compiled a different app than the one asked for is the failure the whole
+    # seam is built to avoid.
+    if app_module != LEGACY_APP_MODULE:
+        env[APP_MODULE_ENV] = app_module
+    else:
+        env.pop(APP_MODULE_ENV, None)
 
     target = install_dir(repo_root, root, config_prefix, server_key)
     with tempfile.TemporaryDirectory(prefix="helao-reflex-unpack-") as scratch:

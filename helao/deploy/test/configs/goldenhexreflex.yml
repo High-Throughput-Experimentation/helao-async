@@ -1,0 +1,84 @@
+# P7f GATE config: goldenreflex.yml with its Reflex server hexagon-hosted.
+#
+# The diff against goldenreflex.yml is ONE key -- `deployment: hexagon` on UI
+# -- and that is the point: it is the whole flip, and deleting it is the whole
+# rollback (the launcher then sets no HELAO_REFLEX_APP_MODULE and the entry
+# module imports exactly what it always did). Everything else is deliberately
+# left legacy: the seam under test is the Reflex hosting route, and a config
+# that also flipped the action servers would prove which half worked only by
+# elimination. `root:` differs so this config's bundle and run tree do not
+# share goldenreflex's -- a bundle is per (config, server).
+#
+# Not a production config -- a mechanism proof, the public stand-in for a
+# private deployment's Reflex flip.
+dummy: true
+simulation: true
+show_debug: true
+run_unit_tests: true
+experiment_libraries:
+  - simulatews_exp
+  - OERSIM_exp
+  - helao/deploy/test/experiments/TEST_exp.py
+sequence_libraries:
+  - OERSIM_seq
+  - helao/deploy/test/sequences/TEST_seq.py
+run_type: simulation
+root: /home/dan/INST_hlo_hexreflex
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8001
+    group: orchestrator
+    fast: async_orch2
+    params: {}
+  OPERATOR:
+    host: 127.0.0.1
+    port: 5001
+    group: operator
+    bokeh: standalone_operator
+    params:
+      orch_key: ORCH
+      doc_name: "Operator (bokeh, unchanged)"
+      poll_interval: 5
+  SIM:
+    host: 127.0.0.1
+    port: 8002
+    group: action
+    fast: ws_simulator
+    live_vis: wssim_panel
+    control_vis: digital_out_control
+    params:
+      dev_do:
+        gamry_aux: 1
+        Thorlab_led: 7
+        cell_valve: 2
+        purge_valve: 3
+  CPSIM:
+    host: 127.0.0.1
+    port: 8003
+    group: action
+    fast: cpsim_server
+    action_vis: oersim_panel
+    params:
+      plate_id: 2750
+  GPSIM:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: gpsim_server
+    live_vis: gpsim_panel
+    params:
+      random_seed: 12345
+  UI:
+    host: 127.0.0.1
+    port: 5010
+    group: visualizer
+    # `reflex:` names the BUNDLE (resolve_bundle / build_reflex_bundle.py), so
+    # unlike `fast:`/`bokeh:` it cannot name a hexagon module. The line below
+    # is what routes it, via HELAO_REFLEX_APP_MODULE.
+    reflex: helao_ui
+    deployment: hexagon
+    params:
+      pages:
+        - live
+        - action

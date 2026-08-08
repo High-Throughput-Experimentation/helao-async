@@ -152,6 +152,99 @@ def test_build_env_and_the_stamp_agree_on_the_backend_url():
     assert env["HELAO_REFLEX_API_URL"] == rb.api_url_for("station5", 5010)
 
 
+# --- P7f: hexagon hosting seam ----------------------------------------------
+
+
+def test_app_module_env_is_absent_for_a_legacy_reflex_server(monkeypatch):
+    """No config key, no variable -- the whole rollback story.
+
+    Asserted for both shapes a legacy entry takes: no ``deployment:`` at all,
+    and one naming its own deployment (which is what an hte station's reflex
+    server looks like once the launcher has resolved it).
+    """
+    import reflex_bundle as rb
+
+    monkeypatch.delenv(rb.APP_MODULE_ENV, raising=False)
+    for scfg in (None, {}, {"deployment": "test"}, {"deployment": "hte"}):
+        env = rl.build_env("golden.yml", "UI", "127.0.0.1", 5010, None, scfg)
+        assert rb.APP_MODULE_ENV not in env, scfg
+
+
+def test_app_module_env_is_set_for_a_hexagon_reflex_server():
+    import reflex_bundle as rb
+
+    env = rl.build_env(
+        "golden.yml", "UI", "127.0.0.1", 5010, None, {"deployment": "hexagon"}
+    )
+    assert env[rb.APP_MODULE_ENV] == "helao.hexagon.app.reflex_host"
+    assert env[rb.APP_MODULE_ENV] == rb.HEXAGON_APP_MODULE
+
+
+def test_an_inherited_app_module_variable_is_stripped_for_a_legacy_server(
+    monkeypatch,
+):
+    """This launcher's own environment can carry the variable -- a shell that
+    exported it, a parent that set it. Passing it through would hexagon-host a
+    server whose config says nothing of the kind, and the only visible symptom
+    would be a bundle that reads stale on every launch."""
+    import reflex_bundle as rb
+
+    monkeypatch.setenv(rb.APP_MODULE_ENV, rb.HEXAGON_APP_MODULE)
+    env = rl.build_env("golden.yml", "UI", "127.0.0.1", 5010, None, {})
+    assert rb.APP_MODULE_ENV not in env
+
+
+def test_snapshot_import_follows_the_same_routing_as_the_child():
+    """The loaded-modules snapshot and the bundle stamp are both read out of
+    THIS process's sys.modules, so the launcher must import what the backend
+    child will serve. Importing the legacy app while the child serves the
+    facade leaves the hot-reload watcher blind to the facade and the stamp
+    describing a bundle nobody built."""
+    seen: list = []
+
+    def _spy(name):
+        seen.append(name)
+        return name
+
+    assert rl.import_app_module({}, importer=_spy) == "helao.core.servers.reflex.app"
+    assert (
+        rl.import_app_module({"deployment": "hexagon"}, importer=_spy)
+        == "helao.hexagon.app.reflex_host"
+    )
+    assert seen == [
+        "helao.core.servers.reflex.app",
+        "helao.hexagon.app.reflex_host",
+    ]
+
+
+def test_the_launcher_hands_its_server_config_to_both_routing_calls():
+    """Routing degrades SILENTLY to legacy when the server block is not
+    passed: ``app_module_for(None)`` is the legacy module, so a call site that
+    forgets the argument produces a launch that logs nothing, serves the
+    legacy app, and looks entirely healthy under a ``deployment: hexagon``
+    config. Only the call sites can prove that did not happen, so they are
+    read here rather than trusted.
+    """
+    import ast
+
+    tree = ast.parse(open(rl.__file__, encoding="utf8").read())
+    calls = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name):
+            continue
+        if node.func.id not in ("build_env", "import_app_module", "app_module_for"):
+            continue
+        args = [a for a in node.args if isinstance(a, ast.Name)]
+        calls.setdefault(node.func.id, []).append([a.id for a in args])
+
+    # build_env's 6th positional argument is the server block
+    assert any(
+        len(a) >= 6 and a[5] == "server_config" for a in calls.get("build_env", [])
+    ), calls
+    assert ["server_config"] in calls.get("import_app_module", []), calls
+    assert ["server_config"] in calls.get("app_module_for", []), calls
+
+
 def test_resolve_bundle_rejects_a_zero_byte_index_html(tmp_path):
     """An interrupted export leaves a truncated index.html.
 
