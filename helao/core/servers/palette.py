@@ -521,6 +521,27 @@ def reflex_motion_move_class(state: str) -> str:
     return REFLEX_MOTION_MOVE_CLASSES[state]
 
 
+REFLEX_PSTAT_STOP_CLASS: Final[str] = "bg-red-700 text-white"
+"""Utilities for a potentiostat panel's stop-measurement button.
+
+``red-700`` is :data:`BUTTON_DANGER_BG`, which is exactly what the Bokeh
+potentiostat panels reach through ``button_type="danger"`` — so the two stacks'
+stop buttons are the same colour by construction rather than by coincidence.
+
+The same utilities as :data:`REFLEX_MOTION_STOP_CLASS`, and a separate constant
+on purpose: these are two different halts on two different pages (one aborts a
+measurement on ``/action``, the other stops a stage on ``/control``), and a
+shared constant would mean re-tinting one silently re-tints the other. Neither
+is the ESTOP red (:data:`ESTOP_BG`, ``red-900``): aborting one server's
+measurement is not the station-wide cascade, and painting it as one would claim
+an authority it does not have.
+
+White on it is 6.47, and it is 5.90 against the ``/action`` canvas
+(``violet-50``) and 6.07 against ``/live``'s ``sky-50`` — clear of the 3.0
+control floor on either page a potentiostat panel can be mounted on.
+"""
+
+
 def reflex_header_class(kind: str) -> str:
     """Return the Tailwind utilities for *kind*'s table header cells.
 

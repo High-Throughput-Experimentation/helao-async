@@ -10,7 +10,9 @@ __all__ = ["make_pstat_panel"]
 import numpy as np
 import reflex as rx
 
+from helao.core.servers.palette import REFLEX_PSTAT_STOP_CLASS
 from helao.core.servers.reflex import plots
+from helao.core.servers.reflex.ingest import get_registry
 from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import (
     MUTED_TEXT,
@@ -23,11 +25,36 @@ from helao.deploy.hte.servers.reflex._pstat import (
     channels_in,
     plottable_columns,
     select_channel,
+    server_address,
+    stop_measurement,
     xy_pair,
 )
+from helao.helpers import config_loader
 
 #: Plots drawn per channel. More would not fit side by side legibly.
 MAX_CHANNELS = 4
+
+#: Label of the stop button on a single-potentiostat panel before any action
+#: has been seen. The Bokeh panel names the running action once it knows it
+#: (``gamry_vis.py``'s ``Stop {action_name}``); until then there is nothing to
+#: name, and the button still has to be there.
+IDLE_STOP_LABEL = "Stop measurement"
+
+
+def world_config() -> dict:
+    """Return the world config this process was built from.
+
+    The ingest registry is asked first because it is the object actually
+    holding the config the panels were discovered from; the installed global is
+    the fallback for a process that has not started ingest yet, so a stop
+    button pressed on a freshly opened page still has an address to dispatch
+    to. Empty when neither exists, which
+    :func:`~helao.deploy.hte.servers.reflex._pstat.server_address` turns into a
+    visible "no address" rather than a dispatch to ``None``.
+    """
+    registry = get_registry()
+    from_registry = getattr(registry, "world_cfg", None) if registry else None
+    return from_registry or config_loader.CONFIG or {}
 
 
 def make_pstat_panel(
@@ -75,6 +102,43 @@ def make_pstat_panel(
         #: False until the operator picks an axis, after which the technique's
         #: default stops overriding their choice on the next action.
         _axes_chosen: bool = False
+
+        #: One ``[label, channel]`` pair per stop button, in render order. A
+        #: list of lists rather than of tuples or of a model: ``rx.foreach``
+        #: needs the element type annotated, and a bare ``list`` fails the
+        #: frontend *build* rather than anything importable here.
+        #:
+        #: A single-potentiostat panel carries exactly one, present from the
+        #: start, with the empty channel its ``stop_private`` takes no argument
+        #: for. A per-channel panel builds one per channel *seen on the wire*
+        #: -- the only place the channel count exists in this process, since a
+        #: Reflex panel is handed its action server's key and nothing else --
+        #: and never drops one, so a button does not disappear between actions
+        #: when the window empties.
+        stop_targets: list[list[str]] = [] if per_channel else [[IDLE_STOP_LABEL, ""]]
+        #: Outcome of the last stop press, rendered beside the buttons. A stop
+        #: that failed must be visible: the operator pressed it because the
+        #: instrument is doing something they want stopped.
+        stop_status: str = ""
+
+        @rx.event(background=True)
+        async def request_stop(self, channel: str = ""):
+            """Abort the measurement, exactly as the Bokeh button does.
+
+            The bare private ``stop_private`` route on this panel's own action
+            server -- not an action endpoint, so it does not queue behind
+            whatever the orchestrator is running.
+
+            Args:
+                channel: Channel to stop, empty for a single potentiostat.
+            """
+            async with self:
+                server_key = self.server_key
+                self.stop_status = "stopping..."
+            host, port = server_address(world_config(), server_key)
+            message = await stop_measurement(server_key, host, port, channel or None)
+            async with self:
+                self.stop_status = message or "stop requested"
 
         def panel_key(self) -> str:
             """Session-scoped buffer-store key; see VisPanelState.panel_key."""
@@ -132,6 +196,30 @@ def make_pstat_panel(
                     figures.append((f"{label} {suffix}".strip(), traces))
             return figures
 
+        def _update_stop_targets(self, snapshot: dict) -> None:
+            """Keep one stop button per thing this panel can stop.
+
+            Single potentiostat: one button, renamed after the running action
+            the way ``gamry_vis.py`` renames its own. Per channel: one button
+            per channel ever seen in this session, in numeric order.
+            """
+            if not per_channel:
+                label = (
+                    f"Stop {self.action_name}" if self.action_name else IDLE_STOP_LABEL
+                )
+                assign(self, "stop_targets", [[label, ""]])
+                return
+            known = {row[1] for row in self.stop_targets}
+            seen = {str(channel) for channel in channels_in(snapshot)}
+            if not seen - known:
+                # Nothing new. Assigning anyway would publish a delta per tick
+                # and rebuild every button with it; see state.assign.
+                return
+            self.stop_targets = [
+                [f"Stop channel {channel}", channel]
+                for channel in sorted(known | seen, key=int)
+            ]
+
         def pull(self, ingest) -> None:
             """Recompute every chart from the trailing window."""
             snapshot = ingest.buffer.snapshot(self.window_points)
@@ -145,6 +233,7 @@ def make_pstat_panel(
                 "action_name",
                 str(latest.get("action_name", "") or self.action_name),
             )
+            self._update_stop_targets(snapshot)
 
             present = plottable_columns(snapshot, columns)
             if present and not set(present) & set(columns):
@@ -236,6 +325,22 @@ def make_pstat_panel(
                         placeholder="window points",
                         width="10em",
                     ),
+                    rx.spacer(),
+                    # The Bokeh panels' stop buttons, on the stack that had
+                    # none: a Reflex-only station could watch a measurement
+                    # run but not abort it. Same route, same params, same
+                    # server -- see _pstat.stop_measurement.
+                    rx.foreach(
+                        state_cls.stop_targets,
+                        lambda target: rx.button(
+                            target[0],
+                            on_click=state_cls.request_stop(target[1]),
+                            class_name=REFLEX_PSTAT_STOP_CLASS,
+                            size="1",
+                        ),
+                    ),
+                    rx.text(state_cls.stop_status, size="1", class_name=MUTED_TEXT),
+                    width="100%",
                     spacing="3",
                     align="center",
                 ),
