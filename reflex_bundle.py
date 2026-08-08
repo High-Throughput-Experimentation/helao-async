@@ -475,9 +475,13 @@ def _xy_client_source() -> Optional[str]:
     ``shutil.copyfile``, so the two hashes are the same number.
     """
     try:
-        import xy.widget
+        # Ask the binding for the path rather than importing xy here: only the
+        # plot facade and that binding may touch the alpha xy API, and a test
+        # enforces it. Imported lazily so this module stays importable (and the
+        # stamp computable) without reflex installed.
+        from helao.core.servers.reflex.xy_component import client_asset_source
 
-        return os.path.join(os.path.dirname(xy.widget.__file__), "static", "index.js")
+        return str(client_asset_source())
     except Exception:
         return None
 
