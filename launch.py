@@ -1510,6 +1510,92 @@ def launch_server_groups(
 
 
 # ---------------------------------------------------------------------------
+# Early-exit supervision. The spawn loop above registers each child's pid and
+# never looks at its exit status, so a server that refuses to start -- the
+# Reflex UI declining to serve a bundle it knows is wrong is the case that
+# prompted this -- leaves nothing but a dead pid and an ERROR buried in the
+# scrolling multiplexed output, while the launch itself reads clean.
+# ---------------------------------------------------------------------------
+
+#: How long after launch to keep watching for a child that exits on its own.
+#: Long enough to cover a server that fails during startup (a Reflex launcher
+#: reaches its bundle decision several seconds in, after importing the app),
+#: short enough that it is over before anyone could act on it anyway.
+EARLY_EXIT_WINDOW = 90.0
+
+#: Poll interval for that watch. Cheap: `Popen.poll` is a non-blocking waitpid.
+EARLY_EXIT_INTERVAL = 1.0
+
+
+def early_exits(procs):
+    """Return ``[(server_key, returncode)]`` for children that have exited.
+
+    Args:
+        procs: ``{server_key: Popen}``, as ``Pidd.procs`` holds them.
+
+    Returns:
+        list: One entry per already-exited child, in key order.
+    """
+    out = []
+    for key in sorted(procs):
+        proc = procs[key]
+        try:
+            code = proc.poll()
+        except Exception:
+            continue
+        if code is not None:
+            out.append((key, code))
+    return out
+
+
+def supervise_early_exits(
+    procs,
+    report,
+    window=EARLY_EXIT_WINDOW,
+    interval=EARLY_EXIT_INTERVAL,
+    stop=None,
+    sleep=time.sleep,
+    monotonic=time.monotonic,
+):
+    """Report each child that exits within ``window`` seconds, once.
+
+    Polling rather than checking once right after ``Popen``: a refusal is a
+    decision the child reaches only after loading its config and importing its
+    app, which is seconds later, and blocking the spawn loop for that long to
+    find out would delay every launch to catch a case that almost never fires.
+
+    Args:
+        procs: ``{server_key: Popen}``. Read live, so servers registered after
+            this starts are covered too.
+        report: Called ``report(server_key, returncode)`` per exited child.
+        window: Seconds to keep watching.
+        interval: Seconds between polls.
+        stop: Predicate ending the watch early. Once a teardown or a CTRL-r
+            restart begins, a child exiting is expected, and reporting it as a
+            failed launch would be a lie.
+        sleep: Injected for tests.
+        monotonic: Injected for tests.
+
+    Returns:
+        list: The ``(server_key, returncode)`` pairs reported.
+    """
+    seen = set()
+    reported = []
+    deadline = monotonic() + window
+    while monotonic() < deadline:
+        if stop is not None and stop():
+            break
+        for key, code in early_exits(dict(procs)):
+            if key in seen:
+                continue
+            seen.add(key)
+            reported.append((key, code))
+            report(key, code)
+        sleep(interval)
+    return reported
+
+
+# ---------------------------------------------------------------------------
 # Hot-reload support (Phase 2): map pulled git changes to the idle servers that
 # must restart. See .omc/specs/deep-dive-hotreload-phase2.md. All helpers are
 # pure/read-only; the orchestration lives in main()'s thread_hotreload so it can
@@ -1519,14 +1605,18 @@ def launch_server_groups(
 
 def discover_git_repos(helao_repo_root):
     """Return git working-tree roots to watch: the parent helao-async repo plus
-    each nested ``helao/deploy/*`` deployment that is its own git repo."""
+    each nested ``helao/deploy/*`` deployment that is its own git repo.
+
+    ``exists``, not ``isdir``: in a linked worktree ``.git`` is a *file* naming
+    the real git directory, so an isdir test skips the parent repo entirely and
+    silently watches only the deployments."""
     repos = []
-    if os.path.isdir(os.path.join(helao_repo_root, ".git")):
+    if os.path.exists(os.path.join(helao_repo_root, ".git")):
         repos.append(helao_repo_root)
     for deploy_dir in sorted(
         glob(os.path.join(helao_repo_root, "helao", "deploy", "*"))
     ):
-        if os.path.isdir(os.path.join(deploy_dir, ".git")):
+        if os.path.exists(os.path.join(deploy_dir, ".git")):
             repos.append(deploy_dir)
     return repos
 
@@ -1894,6 +1984,38 @@ def main():
         cprint(f"\n{stale.report()}\n", "red", attrs=["bold"])
         sys.exit(1)
 
+    def report_early_exit(server_key, returncode):
+        """Surface a server that gave up on its own, rather than losing it.
+
+        Nothing else notices: the spawn loop only records the pid. The child's
+        own ERROR does reach the console, but it scrolls past inside every
+        other server's startup chatter, so the group reads as launched while
+        one member is already gone.
+        """
+        LAUNCH_LOGGER.error(
+            f"Server '{server_key}' exited on its own with code {returncode} "
+            f"shortly after launch; it is NOT running. Its own log names the "
+            f"reason."
+        )
+        cprint(
+            f"\n{server_key} did not start (exit code {returncode}). "
+            f"The rest of the group is running.\n",
+            "red",
+            attrs=["bold"],
+        )
+
+    #: Set the moment a stop is *asked for* -- teardown, CTRL-r, full relaunch.
+    #: After that a child exiting is the point, not a failure to report.
+    deliberate_stop = threading.Event()
+
+    threading.Thread(
+        target=supervise_early_exits,
+        args=(pidd.procs, report_early_exit),
+        kwargs={"stop": deliberate_stop.is_set},
+        name="early-exit-supervisor",
+        daemon=True,
+    ).start()
+
     def hotkey_msg():
         """
         Prints a message with hotkey instructions for terminating orchestration group,
@@ -1991,6 +2113,7 @@ def main():
             LAUNCH_LOGGER.info("Teardown already in progress; ignoring this request.")
             return False
         teardown_started.set()
+        deliberate_stop.set()
         # Orchestrators first (they detach subscribers and export non-empty
         # queues), then action servers. Visualizer/operator bokeh apps have no
         # /shutdown route, so pidd.close() signals those.
@@ -2020,6 +2143,9 @@ def main():
         Returns:
             bool: True if the relaunch sequence completed without error.
         """
+        # From here on a child exiting is intended, so the launch supervisor
+        # must stop calling it a failed start.
+        deliberate_stop.set()
         with pidd_lock:
             try:
                 codeKey = [
@@ -2122,6 +2248,8 @@ def main():
         Returns:
             bool: True if every server was torn down and the relaunch ran.
         """
+        # As in restart_server: every exit from here on is one we asked for.
+        deliberate_stop.set()
         with pidd_lock:
             LAUNCH_LOGGER.info("Full relaunch: shutting down all servers.")
             try:
