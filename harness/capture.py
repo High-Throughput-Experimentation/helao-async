@@ -31,7 +31,9 @@ import shutil
 import subprocess
 import sys
 import time
+import threading
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
@@ -48,6 +50,15 @@ from helao.helpers.time_utils import gen_uuid
 ORCH_HOST, ORCH_PORT = "127.0.0.1", 8001
 SIM_HOST, SIM_PORT = "127.0.0.1", 8002
 DB_HOST, DB_PORT = "127.0.0.1", 8010
+
+#: Which server key in a config's `servers:` block plays each capture role.
+#: These three reproduce the literals above for the public `golden` config,
+#: which is what makes the config-derived form a no-op for GM-1..GM-5.
+DEFAULT_ROLE_KEYS: dict[str, Optional[str]] = {
+    "orch": "ORCH",
+    "sim": "SIM",
+    "db": "SYNC",
+}
 
 # WsExec streams epoch_s + series_0..5 (ws_simulator.py); values are unseeded
 # np.random -> masked per §5.5 "unseeded sim data values", counts compared
@@ -104,6 +115,111 @@ def db_post(endpoint: str, params: Optional[dict] = None):
     r = requests.post(
         f"http://{DB_HOST}:{DB_PORT}/{endpoint}", params=params or {}, timeout=30
     )
+    r.raise_for_status()
+    return r.json()
+
+
+@dataclass(frozen=True)
+class Endpoint:
+    """One server's host and port, as the config declares them."""
+
+    host: str
+    port: int
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}"
+
+
+@dataclass(frozen=True)
+class CaptureEndpoints:
+    """The servers a capture scenario talks to, resolved from a config.
+
+    Ports were module constants (`ORCH 8001 / SIM 8002 / DB 8010`), which is
+    fine while every scenario runs against one config and wrong the moment a
+    second one exists: Deployment-C's capture config has no SIM at all and
+    adds a BATCH server, and a hardcoded port silently talks to whatever else
+    happens to be listening. Roles are optional by default because no config
+    carries all of them.
+    """
+
+    orch: Optional[Endpoint] = None
+    sim: Optional[Endpoint] = None
+    db: Optional[Endpoint] = None
+    batch: Optional[Endpoint] = None
+
+    @classmethod
+    def from_config(
+        cls,
+        config: dict,
+        roles: Optional[dict[str, Optional[str]]] = None,
+        optional: tuple[str, ...] = ("orch", "sim", "db", "batch"),
+    ) -> "CaptureEndpoints":
+        """Resolve each role to a server key in `config["servers"]`.
+
+        `roles` overrides or extends `DEFAULT_ROLE_KEYS`; mapping a role to
+        `None` declares it unused by this config (as opposed to missing from
+        it). A role absent from `optional` must resolve, so a scenario that
+        genuinely needs a server fails at resolution rather than at the first
+        request to a port nobody is serving.
+        """
+        keys: dict[str, Optional[str]] = dict(DEFAULT_ROLE_KEYS)
+        keys.update(roles or {})
+        servers = config.get("servers", {}) or {}
+        resolved: dict[str, Optional[Endpoint]] = {}
+        for role, key in keys.items():
+            if key is None:
+                resolved[role] = None
+                continue
+            entry = servers.get(key)
+            if entry is None:
+                if role in optional:
+                    resolved[role] = None
+                    continue
+                raise KeyError(
+                    f"capture role {role!r} needs server {key!r}, "
+                    f"which this config does not declare "
+                    f"(has: {sorted(servers)})"
+                )
+            resolved[role] = Endpoint(str(entry["host"]), int(entry["port"]))
+        return cls(**resolved)
+
+    def require(self, role: str) -> Endpoint:
+        endpoint = getattr(self, role, None)
+        if endpoint is None:
+            raise RuntimeError(
+                f"this scenario needs the {role!r} endpoint, which the "
+                f"capture config did not resolve"
+            )
+        return endpoint
+
+
+def resolve_endpoints(
+    config_prefix: str,
+    roles: Optional[dict[str, Optional[str]]] = None,
+) -> CaptureEndpoints:
+    """Resolve the capture roles from a config prefix and REBIND the globals.
+
+    The rebinding is what lets GM-1..GM-5 stay untouched: they reach the
+    servers through `orch_post`/`db_post`, which read the module constants.
+    Those constants are now the resolution's OUTPUT rather than its source,
+    so a second capture config moves them instead of being silently ignored.
+    """
+    global ORCH_HOST, ORCH_PORT, SIM_HOST, SIM_PORT, DB_HOST, DB_PORT
+    from helao.helpers.config_loader import read_config
+
+    endpoints = CaptureEndpoints.from_config(read_config(config_prefix), roles)
+    if endpoints.orch is not None:
+        ORCH_HOST, ORCH_PORT = endpoints.orch.host, endpoints.orch.port
+    if endpoints.sim is not None:
+        SIM_HOST, SIM_PORT = endpoints.sim.host, endpoints.sim.port
+    if endpoints.db is not None:
+        DB_HOST, DB_PORT = endpoints.db.host, endpoints.db.port
+    return endpoints
+
+
+def endpoint_post(endpoint: Endpoint, route: str, params: Optional[dict] = None):
+    r = requests.post(f"{endpoint.base_url}/{route}", params=params or {}, timeout=300)
     r.raise_for_status()
     return r.json()
 
@@ -296,6 +412,204 @@ def run_gm5(root: Path) -> tuple[str, dict]:
     )
 
 
+# --- batch-conversion scenarios ----------------------------------------------
+class UnsafeDropDirError(RuntimeError):
+    """A staging target outside every root the caller declared safe.
+
+    The batch converter RELOCATES what it converts (drop -> processing ->
+    completed), so a drop directory pointed at a production share does not
+    read data, it moves it. Staging refuses rather than trusting the caller.
+    """
+
+
+class VacuousQuiesceError(RuntimeError):
+    """The quiesce predicate was never observed false.
+
+    It therefore proves nothing: a predicate pointed at the wrong port, or at
+    a submission that silently errored, is true on its first poll and the rig
+    snapshots a half-written or empty tree with every other signal green.
+    """
+
+
+@dataclass(frozen=True)
+class QuiesceObservation:
+    polls: int
+    observed_busy: bool
+    settled: bool
+
+
+def observe_quiesce(
+    pred: Callable[[], bool],
+    settle_polls: int = 3,
+    poll_s: float = 2.0,
+    timeout_s: float = 1800.0,
+    sleep: Callable[[float], None] = time.sleep,
+    clock: Callable[[], float] = time.time,
+) -> QuiesceObservation:
+    """Poll `pred` until it holds `settle_polls` times in a row.
+
+    Unlike `wait_until`, this reports HOW it settled rather than only that it
+    did: `observed_busy` is the evidence the predicate can discriminate at
+    all. A late false resets the run, because work that resumes after a
+    quiet spell is exactly what a settle count exists to catch.
+    """
+    t0 = clock()
+    polls = 0
+    run = 0
+    observed_busy = False
+    while True:
+        if clock() - t0 > timeout_s:
+            return QuiesceObservation(polls, observed_busy, False)
+        polls += 1
+        if pred():
+            run += 1
+            if run >= settle_polls:
+                return QuiesceObservation(polls, observed_busy, True)
+        else:
+            observed_busy = True
+            run = 0
+        sleep(poll_s)
+
+
+def batch_quiesced(endpoints: CaptureEndpoints) -> bool:
+    """All three signals the batch path can still be working through.
+
+    Any one alone is insufficient: the watchdog reports itself idle while a
+    manually-submitted conversion runs, `/list_conversions` empties the
+    moment the converter hands off, and the converter POSTs its finished
+    `-seq.yml` to the DB server's `/finish_yml` -- so a tree snapshotted on
+    the converter's word alone is missing whatever the sync leg had not yet
+    written.
+    """
+    batch = endpoints.require("batch")
+    db = endpoints.require("db")
+    status = endpoint_post(batch, "watchdog_status")
+    if status.get("busy") or status.get("active_sources"):
+        return False
+    conversions = endpoint_post(batch, "list_conversions")
+    if conversions.get("count") or conversions.get("conversions"):
+        return False
+    if int(endpoint_post(db, "n_queue")):
+        return False
+    tasks = endpoint_post(db, "tasks")
+    return not tasks.get("running") and not tasks.get("num_queued")
+
+
+def stage_fixture(
+    fixture_dir: Path,
+    drop_dir: Path,
+    allowed_roots: list[Path],
+) -> Path:
+    """Copy a sanitized fixture into a drop folder, refusing unsafe targets.
+
+    Copy, never move: the fixtures are checked-in inputs every later slice
+    replays, and the converter consumes what it is given.
+    """
+    fixture_dir = Path(fixture_dir)
+    drop_dir = Path(drop_dir)
+    resolved = drop_dir.resolve()
+    roots = [Path(r).resolve() for r in allowed_roots]
+    if not any(resolved == r or resolved.is_relative_to(r) for r in roots):
+        raise UnsafeDropDirError(
+            f"refusing to stage into {drop_dir} -- outside every allowed root "
+            f"({[str(r) for r in roots]}). The converter RELOCATES sources."
+        )
+    staged = drop_dir / fixture_dir.name
+    if staged.exists():
+        raise FileExistsError(
+            f"{staged} already exists; a capture stages into a fresh tree so "
+            f"a rerun cannot inherit a previous run's half-moved sources"
+        )
+    drop_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(fixture_dir, staged)
+    return staged
+
+
+def make_batch_scenario(
+    family: str,
+    fixture_dir: Path,
+    drop_dir: Path,
+    poll_s: float = 2.0,
+    settle_polls: int = 3,
+    timeout_s: float = 1800.0,
+    require_observed_busy: bool = True,
+    allowed_roots: Optional[list[Path]] = None,
+) -> Callable[[Path, CaptureEndpoints], tuple[str, dict]]:
+    """Build the driver for one conversion family.
+
+    Submission is `/run_directory` on the staged path, never the filesystem
+    watchdog: the watchdog decides a folder is ready by a settle heuristic
+    over mtimes and sizes, which makes both WHEN a capture starts and WHETHER
+    it starts at all depend on the host's timing.
+    """
+
+    def driver(root: Path, endpoints: CaptureEndpoints) -> tuple[str, dict]:
+        batch = endpoints.require("batch")
+        endpoints.require("db")
+        staged = stage_fixture(
+            Path(fixture_dir), Path(drop_dir), allowed_roots or [Path(root)]
+        )
+
+        result: dict = {}
+
+        def _submit() -> None:
+            result["body"] = endpoint_post(
+                batch, "run_directory", params={"source_dir": str(staged)}
+            )
+
+        thread = threading.Thread(target=_submit, daemon=True)
+        thread.start()
+        # Arm the observation: poll until the conversion is visibly in flight
+        # or the request has already returned. Without this the settle run can
+        # complete on polls taken before the server ever saw the request, and
+        # a genuinely slow conversion would be recorded as vacuous.
+        while thread.is_alive() and batch_quiesced(endpoints):
+            time.sleep(poll_s)
+        observation = observe_quiesce(
+            lambda: batch_quiesced(endpoints),
+            settle_polls=settle_polls,
+            poll_s=poll_s,
+            timeout_s=timeout_s,
+        )
+        thread.join(timeout=timeout_s)
+        if thread.is_alive():
+            raise TimeoutError(f"/run_directory for {family} never returned")
+        if not observation.settled:
+            raise TimeoutError(
+                f"batch quiesce for {family} not reached in {timeout_s}s"
+            )
+
+        body = result.get("body") or {}
+        if body.get("error"):
+            raise RuntimeError(f"/run_directory failed: {body['error']}")
+        results = body.get("results") or {}
+        empty = [src for src, uuid in results.items() if not uuid]
+        if empty or not results:
+            raise RuntimeError(
+                f"{family}: {empty or [str(staged)]} produced no sequence "
+                f"(the converter returned no uuid, so there is nothing to "
+                f"snapshot and a diff against it would compare two nothings)"
+            )
+        if require_observed_busy and not observation.observed_busy:
+            raise VacuousQuiesceError(
+                f"batch quiesce for {family} was never observed false: the "
+                f"predicate settled on its first polls, so it discriminates "
+                f"nothing. Check the endpoints resolve to the running servers."
+            )
+        return f"batch__{family}", {
+            "family": family,
+            "fixture": str(fixture_dir),
+            "staged": str(staged),
+            "instrument": body.get("instrument"),
+            "source": body.get("source"),
+            "results": results,
+            "quiesce_polls": observation.polls,
+            "quiesce_observed_busy": observation.observed_busy,
+        }
+
+    return driver
+
+
 SCENARIOS: dict[str, Callable[[Path], tuple[str, dict]]] = {
     "GM-1": run_gm1,
     "GM-2": run_gm2,
@@ -390,9 +704,11 @@ def main(argv=None) -> int:
     parser.add_argument("--notes", default="")
     args = parser.parse_args(argv)
     assert_fresh(args.root)
-    wait_for_server(ORCH_HOST, ORCH_PORT)
-    wait_for_server(SIM_HOST, SIM_PORT)
-    wait_for_server(DB_HOST, DB_PORT)
+    endpoints = resolve_endpoints(args.config_prefix)
+    for role in ("orch", "sim", "db"):
+        endpoint = getattr(endpoints, role)
+        if endpoint is not None:
+            wait_for_server(endpoint.host, endpoint.port)
     seq_name, seq_params = SCENARIOS[args.scenario](args.root)
     masked, tolerance, content_masked = SCENARIO_MASKS[args.scenario]
     out = snapshot_capture(
