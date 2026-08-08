@@ -446,7 +446,12 @@ def test_only_plots_module_imports_xy():
     root = pathlib.Path(__file__).resolve().parents[3]
     offenders = []
     for path in root.rglob("*.py"):
-        if "/.git/" in str(path) or "site-packages" in str(path):
+        # `.claude/worktrees/` holds checkouts of other branches. Sweeping them
+        # judges this branch by another's code -- and reports a violation whose
+        # file the reader cannot find at the path given. run_tests.py skips the
+        # same directory for the same reason.
+        parts = path.parts
+        if "/.git/" in str(path) or "site-packages" in str(path) or ".claude" in parts:
             continue
         if path.name in (
             "plots.py",

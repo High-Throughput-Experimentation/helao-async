@@ -30,6 +30,7 @@ __all__ = [
     "encode_buffers",
     "make_buffer_router",
     "copy_client_asset",
+    "client_asset_source",
     "CLIENT_ASSET_NAME",
     "BUFFER_ROUTE_PREFIX",
 ]
@@ -59,6 +60,18 @@ CLIENT_ASSET_NAME = "xy-client.js"
 BUFFER_ROUTE_PREFIX = "/xy/buffers"
 
 
+def client_asset_source() -> pathlib.Path:
+    """Path of xy's bundled ESM client inside the installed package.
+
+    Exposed because the bundle stamp hashes this source rather than the copy
+    under ``assets/`` (the copy is made by the build, so hashing it would
+    record nothing before the first one). Callers outside this module must ask
+    for the path instead of importing ``xy`` themselves: only this module and
+    the plot facade may touch that alpha API, and a test enforces it.
+    """
+    return pathlib.Path(xy.widget.__file__).parent / "static" / "index.js"
+
+
 def copy_client_asset(dest_dir: str) -> str:
     """Copy xy's bundled ESM client into the Reflex assets directory.
 
@@ -75,7 +88,7 @@ def copy_client_asset(dest_dir: str) -> str:
     Raises:
         FileNotFoundError: If the wheel carries no bundled client.
     """
-    source = pathlib.Path(xy.widget.__file__).parent / "static" / "index.js"
+    source = client_asset_source()
     if not source.is_file():
         raise FileNotFoundError(
             f"xy's bundled ESM client is missing at '{source}'. A published "
