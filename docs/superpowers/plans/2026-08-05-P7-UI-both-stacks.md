@@ -267,14 +267,25 @@ so).
 **Measured problem.** `ports/status.py` is publish-side only (attach/detach/send/publish
 members); Amendment §8 requires the port to enumerate **three consumer faces**, and the
 Reflex face is keyed by `ws_path`, not uniform — with a real edge: a module's own `WS_PATH`
-wins over its config key (`app.declared_ws_path`, `reflex/app.py:128-149`;
-`hte/servers/reflex/nidaqmx_vis.py:28` sits under `live_vis` but reads `ws_data`), and
+wins over its config key (`app.declared_ws_path`, `reflex/app.py:128-149`). **Corrected
+during P7c:** `hte/servers/reflex/nidaqmx_vis.py:28` is *not* an instance of that override —
+it is declared `action_vis` in all ten tracked hte configs naming it, so its
+`WS_PATH = "ws_data"` agrees with the `action_vis→ws_data` default and overrides nothing. A
+sweep of every `WS_PATH` against every config naming its module found the only genuine
+divergence to be one panel in a private deployment (declared `live_vis`, `WS_PATH =
+"ws_data"`). The mechanism is real and load-bearing; this citation for it was not. And
 `IngestRegistry` (`ingest.py:391-412`) maps only `live_vis→ws_live`, `action_vis→ws_data` —
 **no Reflex consumer of `ws_status` exists** *(measured)*.
 
 **Design.** Add to `ports/status.py` two vendor-free Protocols: `StatusStreamPort`
 (subscribe to a channel on a server, yielding decoded payloads as `object`) and
-`ChannelNormalizerPort` (`__call__(payload: object, ws_path: str) -> object`). Ports may
+`ChannelNormalizerPort`. **Corrected during P7c:** the signature stated here as
+`__call__(payload: object, ws_path: str) -> object` is wrong — the real normalizers are
+`normalize(messages: list) -> tuple` and `normalize_data_package(messages: list) -> tuple`
+(`ingest.py:46,145`), taking one argument, with `ws_path` the *key into* `NORMALIZERS` and
+never a parameter. pyright rejects the shape above against the actual functions. It also
+matters conceptually: a `ws_path` parameter would imply one normalizer branching on channel,
+which is the single-normalizer bug Amendment §8 exists to prevent. Ports may
 import only domain/ports/`helao_driver` (`test_boundaries.py:78-82`), so all returns are
 opaque. Adapters: `adapters/vis/ws_consumer.py` wrapping `WsSubscriber` (legal —
 `adapters/` returns before `VENDOR_BANNED` at `test_boundaries.py:144-152`, and it is not
@@ -287,7 +298,9 @@ a conformance declaration that `ingest.NORMALIZERS`' two entries satisfy
    `test_three_faces_enumerated` (the port module names the three faces; `WsSubscriber`
    adapter and both ingest normalizers pass `isinstance` against the Protocols);
    `test_ws_path_override_edge` (a module with `WS_PATH` set is routed by it, not by its vis
-   key — fixture mirrors `nidaqmx_vis.py:28`); `test_registry_has_no_ws_status_consumer`
+   key — drive the real `declared_ws_path` with the key default the divergent case supplies,
+   rather than citing `nidaqmx_vis` as the instance; see the correction above);
+   `test_registry_has_no_ws_status_consumer`
    (pins the measured absence, so a future ws_status Reflex consumer is a deliberate
    addition with a test change, not drift).
 2. Conformance runs over the P7b frames (reuse, don't re-encode).
