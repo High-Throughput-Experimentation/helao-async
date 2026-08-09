@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import zipfile
 from collections.abc import Iterator
@@ -106,27 +107,75 @@ def explode_zips(root: Path, workdir: Path) -> Path:
     return dest
 
 
+def _analysis_tiebreak(row: ArtifactRow, doc, mapper: UuidMapper) -> str:
+    """Content key ordering ANALYSIS records whose blanked paths are identical.
+
+    Every analysis record of one conversion sits in the same directory and is
+    named only by its uuid, so all of them blank to the SAME sort key and the
+    order falls to the remaining tiebreak -- the raw uuid. That was
+    capture-independent only by accident: while analysis uuids were uuid7 they
+    sorted by creation order, which two captures of a scenario share. A
+    content-hash analysis uuid (spec §5 row 13) does not sort by anything, so
+    the two sides would assign the same ordinals to DIFFERENT records and every
+    record would then diff against the wrong counterpart -- reported as content
+    mismatches, with nothing pointing at the ordering as the cause.
+
+    Ordering by the record's own identity instead makes the assignment
+    capture-independent for either uuid scheme. Only ANALYSIS needs it: seq,
+    exp, act and prc uuids are minted in a deterministic order by the run
+    itself, so their existing path tiebreak already reproduces it.
+
+    The process the record describes is part of that identity, but its RAW uuid
+    is not usable here -- a post-hoc converter mints a fresh process identity
+    per conversion, so the raw value differs between two captures of the same
+    scenario. Its already-assigned ordinal does not, which is why the mapper is
+    consulted read-only (:meth:`UuidMapper.known`): PRC rows seed before
+    ANALYSIS, so the ordinal is normally present, and when it is not the key
+    simply contributes nothing rather than assigning an ordinal mid-sort.
+    """
+    if row is not ArtifactRow.ANALYSIS or not isinstance(doc, dict):
+        return ""
+    return json.dumps(
+        [
+            doc.get("analysis_name"),
+            doc.get("global_sample_label"),
+            doc.get("analysis_params"),
+            mapper.known(doc.get("process_uuid") or ""),
+        ],
+        sort_keys=True,
+        default=str,
+    )
+
+
 def seed_mapper(root: Path, mapper: UuidMapper) -> None:
     """Assign uuid ordinals in a capture-independent order (meta files first).
 
     The sort key blanks raw uuids out of the normalized path so ordering is
-    identical for two captures of the same scenario. prc ymls additionally
-    attempt the uuid5 derivation registration (spec §5.5 exception-with-
-    structure): register_derived is a checked no-op when the process uuid is
-    not derived.
+    identical for two captures of the same scenario; ANALYSIS rows, whose
+    blanked paths all collapse onto one another, are then ordered by record
+    identity (see :func:`_analysis_tiebreak`). prc ymls additionally attempt the
+    uuid5 derivation registration (spec §5.5 exception-with-structure):
+    register_derived is a checked no-op when the process uuid is not derived.
     """
     buckets: dict[ArtifactRow, list[tuple[str, Path]]] = {
         row: [] for row in ROW_SEED_ORDER
     }
+    docs: dict[Path, object] = {}
     for f in _iter_parity_files(root):
         rel = f.relative_to(root).as_posix()
         row = classify_file(rel)
         if row in buckets:
-            sort_key = RE_UUID.sub("UUID", normalize_relpath(rel))
-            buckets[row].append((sort_key, f))
+            docs[f] = load_yml_plain(f)
+            buckets[row].append((RE_UUID.sub("UUID", normalize_relpath(rel)), f))
     for row in ROW_SEED_ORDER:
-        for _, f in sorted(buckets[row]):
-            d = load_yml_plain(f)
+        # The tiebreak is evaluated per row, so ANALYSIS -- seeded last -- can
+        # consult the process ordinals the earlier rows have already assigned.
+        ordered = sorted(
+            (key, _analysis_tiebreak(row, docs[f], mapper), f)
+            for key, f in buckets[row]
+        )
+        for _, _, f in ordered:
+            d = docs[f]
             if not isinstance(d, dict):
                 continue
             if row is ArtifactRow.PRC_YML:

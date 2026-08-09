@@ -49,6 +49,16 @@ class UuidMapper:
             return True
         return False
 
+    def known(self, raw: str) -> str:
+        """Return the ordinal already assigned to ``raw``, or ``""``.
+
+        A pure lookup: unlike :meth:`map` it never assigns an ordinal, so it is
+        safe to call while DECIDING a seeding order -- assigning one there would
+        make the ordinal sequence depend on the very order being computed.
+        """
+        key = str(raw).lower()
+        return self._derived.get(key) or self._map.get(key, "")
+
     def map(self, raw: str) -> str:
         key = raw.lower()
         if key in self._derived:
