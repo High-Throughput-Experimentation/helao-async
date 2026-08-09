@@ -262,7 +262,11 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
     # `<x>items` enum built from that group.
     togglable = set()
     for m in re.finditer(
-        r"async def \w+\(\n\s+\w+: (dev_\w+)items = None,\n\s+on: bool", src
+        # The annotation may be wrapped: a typing sweep turned every one of
+        # these into Optional[...], which silently emptied this match until the
+        # assert below caught it.
+        r"async def \w+\(\n\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
+        src,
     ):
         togglable.add(m.group(1))
 

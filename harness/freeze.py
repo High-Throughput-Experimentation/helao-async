@@ -48,7 +48,12 @@ Two kinds of entry are not drift at all, and are recognized rather than reported
 * a route contributed by a **foreign registrar** (:data:`EXTERNAL_KEY`) — static
   extraction of this module cannot see it by construction, so it is checked
   against the module that registers it (:func:`verify_external`) instead of being
-  either reported or ignored.
+  either reported or ignored;
+* a route registered **dynamically by a call** rather than a decorator
+  (:data:`DYNAMIC_KEY`) — no decorator anywhere spells its path, in ANY module,
+  so :func:`verify_external`'s AST re-lookup can never confirm it either.
+  :func:`verify_dynamic` only confirms the named module still exists; actual
+  confirmation is left to a runtime test in the owning deployment's suite.
 """
 
 from __future__ import annotations
@@ -79,6 +84,29 @@ MANIFEST = "servers.json"
 #: delete them from the baseline or to learn to ignore the report. Both are worse
 #: than recording where they come from.
 EXTERNAL_KEY = "external_registrar"
+
+#: Per-route key like :data:`EXTERNAL_KEY`, for a route registered by a CALL
+#: rather than a literal decorator -- e.g. a loop that does
+#: ``app.post(f"/run_{name}", ...)(handler)`` instead of writing
+#: ``@app.post(...)`` above a function. Decorator-list AST extraction cannot
+#: see a route like that from ANY module, including the one that performs the
+#: call, so :func:`verify_external`'s strategy -- extract the named module and
+#: look the route up there -- provably cannot pass: nothing anywhere spells the
+#: path as a decorator. Marking such a route ``EXTERNAL_KEY`` therefore always
+#: reports it unconfirmed and blocks the freeze, which is the failure this key
+#: exists to avoid.
+#:
+#: ``DYNAMIC_KEY`` moves the burden instead of removing it. The freezer itself
+#: only confirms that the named module still exists (:func:`verify_dynamic`) --
+#: enough to catch the annotation pointing at a module that was deleted or
+#: renamed out from under it, but NOT a confirmation that the module still
+#: registers the route. That confirmation is pushed onto a runtime-extraction
+#: test in the deployment's own test suite (e.g. checking the registered app's
+#: real route list, or the module-level constant the registration loop
+#: iterates over) -- a dynamic-marked route with no such test is exactly as
+#: unverified as a route with no marker at all, so a deployment's content gate
+#: that uses this key MUST assert it.
+DYNAMIC_KEY = "dynamic_registration"
 
 
 def _route_key(route: dict) -> tuple[str, str]:
@@ -188,6 +216,43 @@ def verify_external(
                 f"{key[0]}: marked as registered by {module}, but that module no "
                 f"longer registers it"
             )
+    return ok, problems
+
+
+def dynamic_routes(frozen: list[dict]) -> dict[tuple[str, str], str]:
+    """``{(path, method): "module:callable"}`` for call-registered routes."""
+    return {_route_key(r): r[DYNAMIC_KEY] for r in frozen if r.get(DYNAMIC_KEY)}
+
+
+def verify_dynamic(frozen: list[dict]) -> tuple[list[str], list[str]]:
+    """Confirm each dynamic-marked route's named module still exists.
+
+    Unlike :func:`verify_external`, this does NOT attempt to re-find the route
+    by AST -- a route is marked ``DYNAMIC_KEY`` precisely because no decorator,
+    in any module, spells its path, so an AST lookup would always fail and
+    could never turn green; attempting it would just be a slower way to always
+    block. The only thing the freezer itself can assert is that the annotation
+    is not dangling. Confirming the route is still actually registered is left
+    to a runtime-extraction test elsewhere (see :data:`DYNAMIC_KEY`).
+
+    Returns ``(ok_notes, problems)``, mirroring :func:`verify_external`'s shape
+    so callers can treat the two markers uniformly.
+    """
+    ok: list[str] = []
+    problems: list[str] = []
+    exists: dict[str, bool] = {}
+    for key, ref in sorted(dynamic_routes(frozen).items()):
+        module = ref.split(":", 1)[0]
+        if module not in exists:
+            src = REPO_ROOT / (module.replace(".", "/") + ".py")
+            exists[module] = src.is_file()
+            if not exists[module]:
+                problems.append(
+                    f"{key[0]}: {DYNAMIC_KEY} names {module}, which is not a file "
+                    f"at {src.relative_to(REPO_ROOT) if src.is_absolute() else src}"
+                )
+        if exists[module]:
+            ok.append(key[0])
     return ok, problems
 
 
@@ -405,6 +470,19 @@ def freeze_deployment(
             )
             blockers.extend(f"{stem}: {p}" for p in problems)
 
+        # Routes registered by a CALL rather than a decorator cannot be
+        # AST-confirmed against any registrar (see DYNAMIC_KEY) -- only their
+        # named module's existence is checked here; actual confirmation is a
+        # runtime test's job elsewhere in the deployment's own suite.
+        dynamic = set(dynamic_routes(frozen))
+        if dynamic:
+            dyn_ok, dyn_problems = verify_dynamic(frozen)
+            lines.append(
+                f"  dynamic    {stem} ({len(dyn_ok)}/{len(dynamic)} routes' "
+                f"registrar module confirmed to exist)"
+            )
+            blockers.extend(f"{stem}: {p}" for p in dyn_problems)
+
         for d in drift:
             msg = f"{stem}: {d['kind']} {d['method'].upper()} {d['path']}"
             if d["kind"] == "changed":
@@ -414,6 +492,8 @@ def freeze_deployment(
                 # deleting a route stays a visible act.
                 lines.append(f"  ACCEPTED {msg}")
             elif d["kind"] == "missing" and (d["path"], d["method"]) in foreign:
+                continue
+            elif d["kind"] == "missing" and (d["path"], d["method"]) in dynamic:
                 continue
             elif d["kind"] == "missing":
                 # Say how, or the reader reaches for --accept-drift and finds it

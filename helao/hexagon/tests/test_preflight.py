@@ -191,6 +191,63 @@ def test_reflex_backend_port_is_reserved():
     assert any("port + 1" in i for i in issues), issues
 
 
+def test_aligner_explicit_bokeh_port_is_reserved():
+    """spec §8.3(3d): an explicit `params.bokeh_port` claim collides visibly.
+
+    `uvis4.yml`'s MOTOR server carries `params: {enable_aligner: true,
+    bokeh_port: 5003}`; nothing before this change reserved that port, so a
+    second server on 5003 preflighted clean and only failed at launch
+    (`WinError 10048`, documented as a config comment rather than a gate
+    finding).
+    """
+    servers = {
+        "MOTOR": {
+            "host": "127.0.0.1",
+            "port": 4003,
+            "fast": "galil_motion",
+            "params": {"enable_aligner": True, "bokeh_port": 5003},
+        },
+        "DATABROWSE": {"host": "127.0.0.1", "port": 5003, "bokeh": "data_browser"},
+    }
+    issues = preflight._config_sanity(servers)
+    assert any("127.0.0.1:5003" in i and "collides" in i for i in issues), issues
+    assert any("bokeh_port" in i for i in issues), issues
+
+
+def test_aligner_implicit_default_bokeh_port_is_reserved():
+    """The IMPLICIT default (`port + 1000`) is reserved too, not just an
+    explicit `bokeh_port` key -- it is the more invisible of the two shapes:
+    nothing in the config names it at all."""
+    servers = {
+        "MOTOR": {
+            "host": "127.0.0.1",
+            "port": 4003,
+            "fast": "galil_motion",
+            "params": {"enable_aligner": True},  # no bokeh_port -> port+1000
+        },
+        "OTHER": {"host": "127.0.0.1", "port": 5003, "bokeh": "data_browser"},
+    }
+    issues = preflight._config_sanity(servers)
+    assert any("127.0.0.1:5003" in i and "collides" in i for i in issues), issues
+    assert any("port + 1000" in i for i in issues), issues
+
+
+def test_aligner_without_enable_flag_claims_nothing():
+    """`bokeh_port` sitting in `params` with no `enable_aligner: true` is not
+    a live claim -- the aligner host is never constructed, so nothing binds
+    that port and reserving it would be a false positive."""
+    servers = {
+        "MOTOR": {
+            "host": "127.0.0.1",
+            "port": 4003,
+            "fast": "galil_motion",
+            "params": {"bokeh_port": 5003},
+        },
+        "OTHER": {"host": "127.0.0.1", "port": 5003, "bokeh": "data_browser"},
+    }
+    assert preflight._config_sanity(servers) == []
+
+
 def _hexagon_reflex_server():
     return {
         "UI": {
@@ -471,3 +528,29 @@ def test_a_scratch_copy_of_a_config_does_not_exercise_the_checklist_gate(
     in_tree = preflight.preflight_config(str(src))
     assert len(in_tree) == 1 and "frozen endpoint checklist missing" in in_tree[0]
     assert preflight.preflight_config(str(scratch)) == []
+def test_claimed_addresses_agrees_with_the_launcher_on_reflex():
+    """Two implementations of "what does this server claim" now exist.
+
+    `launch.py` reserves addresses via `reflex.discovery.reserved_addresses`;
+    preflight computes its own claims so it can add the aligner's invisible
+    Bokeh port, which the launcher does not know about. Nothing forces the two
+    to agree, and a preflight that under-reserves relative to the launcher would
+    pass a config the launcher then rejects. Pin the overlap: on the reflex
+    claim they must be identical.
+    """
+    from helao.core.servers.reflex.discovery import reserved_addresses
+
+    for server in (
+        {"host": "127.0.0.1", "port": 5010, "reflex": "helao_ui"},
+        {"host": "127.0.0.1", "port": 5010},  # no reflex -> own address only
+    ):
+        launcher = set(reserved_addresses(server))
+        ours = {addr for addr, _ in preflight._claimed_addresses(server)}
+        assert ours == launcher, (server, sorted(ours), sorted(launcher))
+
+
+def test_claimed_addresses_survives_a_port_less_entry():
+    """A config missing `port` is reported by the required-keys check; deriving
+    a secondary claim from it must not crash the sanity pass first."""
+    claims = preflight._claimed_addresses({"host": "127.0.0.1", "reflex": "helao_ui"})
+    assert [label for _, label in claims] == [""]

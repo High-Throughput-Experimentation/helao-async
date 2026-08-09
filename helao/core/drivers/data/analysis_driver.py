@@ -12,17 +12,27 @@ This module replaces the previously duplicated per-deployment drivers
 (``HelaoAnalysisSyncer`` / ``LocalAnalysisSyncer``). Analysis classes are loaded
 dynamically from ``helao.deploy.<deployment>.drivers.data.analyses`` and must
 follow the local-loader batch contract ``__init__(process_uuid, local_loader,
-analysis_params)``.
+analysis_params)``. Which ``<deployment>`` that is comes from
+:func:`resolve_analyses_package`, which survives a hexagon graft (see its
+docstring); a configured analysis that cannot be loaded raises
+:class:`AnalysisLoadError` rather than leaving the server short a route.
 """
 
-__all__ = ["AnalysisSyncer", "AnalysisExecutor", "make_analysis_app"]
+__all__ = [
+    "AnalysisSyncer",
+    "AnalysisExecutor",
+    "AnalysisLoadError",
+    "load_analysis_classes",
+    "make_analysis_app",
+    "resolve_analyses_package",
+]
 
 import asyncio
 import inspect
 import json
 import os
 from datetime import datetime
-from importlib import import_module
+from importlib import import_module, util as importlib_util
 from typing import Optional
 from uuid import UUID
 
@@ -62,23 +72,119 @@ def _write_json(obj: dict, path: str) -> None:
         json.dump(obj, f)
 
 
+class AnalysisLoadError(RuntimeError):
+    """A configured ``params.analyses`` entry could not be loaded.
+
+    Raised at app-build time (before the server binds its port) so a bad
+    ``analyses`` list aborts the analysis server instead of starting it with
+    ``analyze_*`` routes silently missing.
+    """
+
+
+#: Subpackage, under a deployment, that holds its analysis modules.
+_ANALYSES_SUBPKG = "drivers.data.analyses"
+
+
+def _analyses_package(deployment: str) -> str:
+    """Return the analyses package path for ``deployment``."""
+    return f"helao.deploy.{deployment}.{_ANALYSES_SUBPKG}"
+
+
+def _deployment_of_module(module_path: Optional[str]) -> Optional[str]:
+    """Return the deployment owning a ``helao.deploy.<dep>...`` module path."""
+    parts = (module_path or "").split(".")
+    if len(parts) > 2 and parts[0] == "helao" and parts[1] == "deploy":
+        return parts[2] or None
+    return None
+
+
+def _deployment_of_config(config_path: Optional[str]) -> Optional[str]:
+    """Return the deployment owning ``helao/deploy/<dep>/configs/<name>.yml``."""
+    if not config_path:
+        return None
+    dep_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_path)))
+    if os.path.basename(os.path.dirname(dep_dir)) != "deploy":
+        return None
+    return os.path.basename(dep_dir) or None
+
+
+def _package_importable(package: str) -> bool:
+    """Whether ``package`` can be located without importing it."""
+    try:
+        return importlib_util.find_spec(package) is not None
+    except Exception:
+        # A missing parent package raises rather than returning None.
+        return False
+
+
+def resolve_analyses_package(
+    deployment: Optional[str],
+    legacy_module: Optional[str] = None,
+    config_path: Optional[str] = None,
+) -> Optional[str]:
+    """Return the package to import this server's analysis modules from.
+
+    ``world_cfg["deployment"]`` alone is not enough: ``fast_launcher`` sets it
+    from the server's OWN ``deployment:`` value, so a server grafted onto the
+    hexagon composition (``deployment: hexagon``) would look for its analyses
+    under ``helao.deploy.hexagon.drivers.data.analyses``, which does not exist
+    — the graft would lose every ``analyze_*`` route. The graft nevertheless
+    carries the information, in two shapes, so candidates are tried in order:
+
+    1. the deployment owning ``legacy_module`` (the ``fast: graft`` shape, where
+       the config names the wrapped legacy module outright),
+    2. ``deployment`` — what this resolved to before, and what every
+       un-grafted server resolves to,
+    3. the deployment owning the loaded config file (the hardcoded-shim shape,
+       ``fast: <name>`` + ``deployment: hexagon``, where no ``legacy_module:``
+       key exists to read).
+
+    Each candidate must name an importable package to be chosen, which is what
+    keeps this backwards compatible: whenever the previous behaviour resolved a
+    package that exists, candidate 2 wins and the result is identical. The
+    order only takes effect where the old resolution imported nothing at all.
+
+    Returns the chosen package, or — when no candidate is importable — the
+    package ``deployment`` names, so the caller's error reports what was
+    configured. Returns ``None`` only when there is no deployment at all.
+    """
+    candidates = []
+    for candidate in (
+        _deployment_of_module(legacy_module),
+        deployment,
+        _deployment_of_config(config_path),
+    ):
+        if candidate and candidate not in candidates:
+            candidates.append(candidate)
+    for candidate in candidates:
+        package = _analyses_package(candidate)
+        if _package_importable(package):
+            if candidate != deployment:
+                LOGGER.info(
+                    f"Analyses package resolved to '{package}' (deployment "
+                    f"'{deployment}' has none); candidates tried: {candidates}."
+                )
+            return package
+    return _analyses_package(deployment) if deployment else None
+
+
 def _resolve_analysis_class(module, module_name: str, class_name: str):
     """Return the configured :class:`BaseAnalysis` subclass from ``module``.
 
     When ``class_name`` is given it is looked up directly; otherwise the module
     is scanned for the single :class:`BaseAnalysis` subclass defined in it.
-    Returns ``None`` (after logging) when no valid class is found.
+
+    Raises:
+        AnalysisLoadError: when no single valid class can be identified.
     """
     if class_name:
         ana_cls = getattr(module, class_name, None)
         if ana_cls is None or not (
             inspect.isclass(ana_cls) and issubclass(ana_cls, BaseAnalysis)
         ):
-            LOGGER.error(
-                f"'{class_name}' in '{module_name}' is not a BaseAnalysis "
-                "subclass; skipping."
+            raise AnalysisLoadError(
+                f"'{class_name}' in '{module_name}' is not a BaseAnalysis subclass."
             )
-            return None
         return ana_cls
     candidates = [
         obj
@@ -88,59 +194,94 @@ def _resolve_analysis_class(module, module_name: str, class_name: str):
         and obj.__module__ == module.__name__
     ]
     if not candidates:
-        LOGGER.error(f"No BaseAnalysis subclass found in '{module_name}'; skipping.")
-        return None
+        raise AnalysisLoadError(f"No BaseAnalysis subclass found in '{module_name}'.")
     if len(candidates) > 1:
-        LOGGER.error(
+        raise AnalysisLoadError(
             f"Multiple BaseAnalysis subclasses found in '{module_name}': "
             f"{[c.__name__ for c in candidates]}. Specify 'module:ClassName' "
-            "in config; skipping."
+            "in config."
         )
-        return None
     return candidates[0]
 
 
-def load_analysis_classes(analyses, deployment: Optional[str]) -> dict:
+def load_analysis_classes(
+    analyses,
+    deployment: Optional[str],
+    legacy_module: Optional[str] = None,
+    config_path: Optional[str] = None,
+) -> dict:
     """Import and map the analysis classes named in an ``analyses`` config list.
 
     Each entry is either a module name (e.g. ``"icpms_local"``) or an explicit
-    ``"module:ClassName"``. Modules are imported from
-    ``helao.deploy.<deployment>.drivers.data.analyses`` and the resolved
+    ``"module:ClassName"``. Modules are imported from the package
+    :func:`resolve_analyses_package` picks, and the resolved
     :class:`BaseAnalysis` subclass is mapped to the endpoint name
-    ``analyze_<module>``. Entries that fail to import or do not resolve to a
-    :class:`BaseAnalysis` subclass are logged and skipped.
+    ``analyze_<module>``.
+
+    Every configured entry must load. A miss used to be logged and skipped,
+    which let a server start clean with its ``analyze_*`` routes missing —
+    discovered only when an orchestrator dispatched to one mid-run and got a
+    404. Misses are still logged individually (so the log names each one), then
+    reported together as a single :class:`AnalysisLoadError`.
 
     Args:
         analyses: Iterable of module/class specifiers from the server config.
-        deployment: Deployment name used to locate the analyses package.
+        deployment: Deployment name from the world config.
+        legacy_module: This server's ``legacy_module:`` value, when it is a
+            hexagon graft.
+        config_path: Path of the loaded config file.
 
     Returns:
         Mapping from endpoint name (``analyze_<module>``) to analysis class.
+
+    Raises:
+        AnalysisLoadError: when any configured analysis cannot be loaded, or
+            when analyses are configured but no deployment is known.
     """
-    if not deployment:
-        LOGGER.error(
-            "No 'deployment' set in world config; cannot load analysis classes."
-        )
+    requested = list(analyses or [])
+    if not requested:
         return {}
-    base_pkg = f"helao.deploy.{deployment}.drivers.data.analyses"
+    base_pkg = resolve_analyses_package(deployment, legacy_module, config_path)
+    if base_pkg is None:
+        raise AnalysisLoadError(
+            "No 'deployment' set in world config; cannot load the configured "
+            f"analyses {requested}."
+        )
     loaded = {}
-    for entry in analyses or []:
+    failures = []
+    for entry in requested:
         module_name, _, class_name = entry.partition(":")
         try:
             module = import_module(f"{base_pkg}.{module_name}")
-        except Exception:
+        except Exception as exc:
             LOGGER.error(
                 f"Failed to import analysis module '{module_name}' from {base_pkg}.",
                 exc_info=True,
             )
+            failures.append(
+                f"'{entry}': import of '{base_pkg}.{module_name}' failed "
+                f"({type(exc).__name__}: {exc})"
+            )
             continue
-        ana_cls = _resolve_analysis_class(module, module_name, class_name)
-        if ana_cls is None:
+        try:
+            ana_cls = _resolve_analysis_class(module, module_name, class_name)
+        except AnalysisLoadError as exc:
+            LOGGER.error(str(exc))
+            failures.append(f"'{entry}': {exc}")
             continue
         endpoint_name = f"analyze_{module_name}"
         loaded[endpoint_name] = ana_cls
         LOGGER.info(
             f"Loaded analysis class {ana_cls.__name__} as endpoint '{endpoint_name}'."
+        )
+    if failures:
+        raise AnalysisLoadError(
+            f"{len(failures)} of {len(requested)} configured analyses could not "
+            f"be loaded from '{base_pkg}': "
+            + "; ".join(failures)
+            + ". Fix the server config's params.analyses list (or the analysis "
+            "module itself) — starting without these analyze_* routes would "
+            "fail later, at dispatch, instead of now."
         )
     return loaded
 
@@ -552,18 +693,30 @@ def make_analysis_app(server_key) -> BaseAPI:
 
     The analysis classes are resolved from the global ``CONFIG`` at app-build
     time (the driver instance is not created until the FastAPI ``startup``
-    event, so it cannot be queried here).
+    event, so it cannot be queried here). The server's ``legacy_module:`` and
+    the loaded config's path go to :func:`resolve_analyses_package` alongside
+    the world deployment, so a hexagon-grafted server still finds its own
+    deployment's analyses.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
         The configured :class:`BaseAPI` application.
+
+    Raises:
+        AnalysisLoadError: when a configured analysis cannot be loaded; the
+            server aborts rather than starting without that endpoint.
     """
     world_cfg = config_loader.CONFIG or {}
     server_cfg = world_cfg.get("servers", {}).get(server_key, {})
     analyses = server_cfg.get("params", {}).get("analyses", [])
-    analysis_classes = load_analysis_classes(analyses, world_cfg.get("deployment"))
+    analysis_classes = load_analysis_classes(
+        analyses,
+        world_cfg.get("deployment"),
+        legacy_module=server_cfg.get("legacy_module"),
+        config_path=world_cfg.get("loaded_config_path"),
+    )
 
     app = BaseAPI(
         server_key=server_key,
