@@ -669,14 +669,7 @@ def snapshot_capture(
     sha = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    config_path = (
-        Path(__file__).resolve().parents[1]
-        / "helao"
-        / "deploy"
-        / "test"
-        / "configs"
-        / f"{config_prefix}.yml"
-    )
+    config_path = resolve_config_path(config_prefix)
     ProvenanceManifest(
         scenario=scenario,
         config_prefix=config_prefix,
@@ -693,6 +686,35 @@ def snapshot_capture(
         notes=notes,
     ).save(out_dir)
     return out_dir
+
+
+def resolve_config_path(config_prefix: str) -> Path:
+    """The real on-disk config a capture ran against.
+
+    The manifest cites this path and never embeds a copy of the config (which
+    can carry station credentials), so it has to be the actual file. It was
+    hardcoded to the public test deployment's `configs/` directory, which is
+    wrong for every other deployment and appends a second `.yml` when the
+    caller passes a full path -- as the first Deployment-C capture did,
+    recording `…/privcap_legacy.yml.yml`.
+
+    A path is used as given; a bare prefix is globbed the way `read_config`
+    globs it. A prefix that resolves to nothing raises rather than returning a
+    plausible-looking path that does not exist, because a provenance manifest
+    naming a file nobody can open is worse than a failed capture.
+    """
+    candidate = Path(config_prefix)
+    if candidate.is_file():
+        return candidate.resolve()
+    repo = Path(__file__).resolve().parents[1]
+    matches = sorted(repo.glob(f"helao/deploy/*/configs/{config_prefix}.*"))
+    matches = [m for m in matches if m.suffix in (".yml", ".py")]
+    if not matches:
+        raise RuntimeError(
+            f"cannot resolve config {config_prefix!r} to a file for the "
+            f"provenance manifest; pass the path or a prefix that exists"
+        )
+    return matches[0].resolve()
 
 
 def load_scenario_module(dotted: str) -> tuple[dict, dict, dict]:
