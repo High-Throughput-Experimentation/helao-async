@@ -251,6 +251,41 @@ def test_verify_external_confirms_the_route_in_its_registrar():
     assert any("not a file" in p for p in problems)
 
 
+def _dynamic(path, ref):
+    r = _route(path)
+    r[freeze.DYNAMIC_KEY] = ref
+    return r
+
+
+def test_dynamic_routes_are_not_reported_missing():
+    """A call-registered route cannot be seen by extracting ANY module --
+    including the one that performs the call -- so it must not be dropped
+    just because the current extraction never produces it.
+    """
+    ref = "harness.endpoints:whatever"
+    frozen = [_dynamic("/K/from_a_loop", ref), _route("/K/local")]
+    merged, drift = freeze.merge_routes(frozen, [_route("/K/local")])
+    assert merged == frozen, "a dynamic route must not be dropped"
+    assert [d["path"] for d in drift] == ["/K/from_a_loop"]
+    assert freeze.dynamic_routes(frozen) == {("/K/from_a_loop", "post"): ref}
+
+
+def test_verify_dynamic_confirms_the_module_exists_but_not_the_route():
+    """Unlike `verify_external`, this can never re-find the route itself by
+    AST -- that is the whole reason `DYNAMIC_KEY` exists instead of
+    `EXTERNAL_KEY`. It can only confirm the named module is still there; a
+    module that still exists but no longer performs the call is NOT something
+    this function can catch (a runtime test in the owning deployment's own
+    suite is what has to catch that).
+    """
+    real_ref = "harness.endpoints:extract_routes"
+    ok, problems = freeze.verify_dynamic([_dynamic("/K/from_a_loop", real_ref)])
+    assert ok == ["/K/from_a_loop"] and problems == []
+
+    ok, problems = freeze.verify_dynamic([_dynamic("/K/x", "no.such.module:fn")])
+    assert ok == [] and any("not a file" in p for p in problems)
+
+
 def test_hte_freeze_is_clean_and_skips_nothing():
     """hte is the public regression case for the skip NOT firing.
 

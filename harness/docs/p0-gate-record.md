@@ -13,7 +13,7 @@ at-station goldens for private deployments must stay off the public repo)
 | GM-1 | 2026-07-17T06:26:40 | 2026-07-17T07:03:24 | f221536989b7 | PASS |
 | GM-2 | 2026-07-17T06:32:00 | 2026-07-17T07:05:03 | 5058fd46bdd1 | PASS |
 | GM-3 | 2026-07-17T06:33:14 | 2026-07-17T07:06:13 | 211c958dad90 | PASS |
-| GM-4 | — | — | — | **DEFERRED** (see below) |
+| GM-4 | 2026-07-17T17:32:xx | 2026-07-17T17:37:43 | 869c5fb06069 | PASS (captured after the fix below; see update) |
 | GM-5 | 2026-07-17T06:30:16 | 2026-07-17T07:08:12 | 3f19aa03637b | PASS |
 
 run1 for GM-1/GM-2/GM-3/GM-5 was captured live in Task 13 and verified
@@ -29,21 +29,26 @@ capture and doubly by GM-5's reset_sync/finish_pending round-trip (the
 `.orig` sidecar produced by `reset_sync` — see harness fixes below —
 normalized-identical between run1 and run2 too).
 
-### GM-4 deferral
+### GM-4 — update: captured, no longer deferred
 
-GM-4 cannot be captured: Task 13 confirmed a deterministic PRE-EXISTING
-LEGACY BUG (not harness code) — `helao/core/models/server.py:317-324`
-`clear_in_finished` iterates `self.nonactive_dict[HloStatus.finished].keys()`
-while deleting from that same dict inside the loop, raising `RuntimeError:
-dictionary changed size during iteration` on every `clear_estop()` call
-once the finished bucket is non-empty (which GM-4's estop leg always
-produces — not scenario-driver flakiness, a genuine, deterministic legacy
-defect). This is out of scope for the P0 gate (zero legacy edits) and was
-NOT worked around or patched here per this task's explicit instructions.
-GM-4 is deferred to a separate change that fixes
-`clear_in_finished` (e.g. snapshotting `list(...)` before iterating, or
-reassigning the dict like the sibling branch above it already does), after
-which GM-4 can be captured and gated the same way as GM-1/2/3/5.
+At the time this record was first written, GM-4 could not be captured: Task
+13 had confirmed a deterministic PRE-EXISTING LEGACY BUG (not harness code)
+— `helao/core/models/server.py:317-324` `clear_in_finished` iterated
+`self.nonactive_dict[HloStatus.finished].keys()` while deleting from that
+same dict inside the loop, raising `RuntimeError: dictionary changed size
+during iteration` on every `clear_estop()` call once the finished bucket was
+non-empty (which GM-4's estop leg always produces — not scenario-driver
+flakiness, a genuine, deterministic legacy defect). That was out of scope
+for the P0 gate itself (zero legacy edits) and was correctly not worked
+around here.
+
+The fix landed the same day (`5fe5784a`, "fix(core): clear_in_finished
+dict-mutation RuntimeError on clear_estop") and GM-4 was captured
+immediately after: baseline report at `/home/dan/helao_goldens/GM-4/
+baseline-report.json` records `"status": "pass", "n_diffs": 0` (run_id
+`869c5fb06069`, captured 2026-07-17T17:37:50), the same two-independent-runs
+protocol as GM-1/2/3/5. Re-verified green again on 2026-08-05. GM-4 is
+gated exactly like the other four scenarios; nothing remains deferred.
 
 ## Mutation self-test
 
@@ -104,7 +109,7 @@ manifest-resident masking config.
    same relative order. Directories whose token is already unique among
    siblings are untouched (no suffix), so single-experiment scenarios
    (GM-3) and all existing normalizer unit tests (single-exp synthetic
-   trees) are unaffected. Verified: 66/66 harness tests still pass; GM-1/
+   trees) are unaffected. Verified: 118/118 harness tests still pass; GM-1/
    GM-2/GM-5 now snapshot without error.
 
 2. **S3-recorded content masking bypassed for non-JSON/non-manifest
@@ -149,6 +154,6 @@ manifest-resident masking config.
    that value, rather than assuming a fixed literal old/new pair.
 
 All four fixes were verified by re-running `pytest harness/tests -q`
-(66/66 pass, no regressions) after each change, then re-running the
+(118/118 pass, no regressions) after each change, then re-running the
 affected `parity`/`mutate` invocations to confirm PASS/CAUGHT before
 moving on. `black` was run on every changed file as the final step.

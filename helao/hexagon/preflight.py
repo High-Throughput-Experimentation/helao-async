@@ -41,7 +41,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Optional
 
-from helao.core.servers.reflex.discovery import reserved_addresses
 from helao.helpers.config_loader import read_config
 
 #: The launcher's server code keys, pinned to ``launch.py``'s ``codeKeys``. A
@@ -132,13 +131,66 @@ def _checklist_dir(deployment: Optional[str]) -> Optional[Path]:
     return central if central.exists() else None
 
 
+#: Label suffixes for a server's SECONDARY port claims -- ones that appear
+#: nowhere in the config as their own key, so a collision message must name
+#: WHICH invisible claim it is or it reads as a plain typo.
+_REFLEX_BACKEND_LABEL = "reflex backend port, port + 1"
+_ALIGNER_BOKEH_LABEL = "aligner Bokeh port, params.bokeh_port or port + 1000"
+
+
+def _aligner_port(server: dict) -> Optional[int]:
+    """The extra Bokeh-aligner port a server claims, or ``None``.
+
+    Any server whose ``params.enable_aligner`` is truthy hosts a second Bokeh
+    server for the plate aligner (``GalilAlignerHost`` and its lila
+    equivalent both share this contract) on ``params.bokeh_port`` when set,
+    else ``server['port'] + 1000`` -- the fallback every aligner-host
+    implementation falls back to (spec §8.3(3d), §9.2 item 6: a station has
+    already shipped a control panel on the port a Galil aligner bound). The
+    IMPLICIT default is reserved too, not just an explicit ``bokeh_port``
+    key: it is the more invisible of the two shapes -- nothing in the config
+    names it at all -- and every tracked config that sets ``enable_aligner``
+    today writes ``bokeh_port`` explicitly anyway, so this costs nothing on
+    the configs that exist and closes the gap for the ones that don't.
+    """
+    params = server.get("params") or {}
+    if not params.get("enable_aligner"):
+        return None
+    port = server.get("port")
+    if port is None:
+        return None
+    return int(params.get("bokeh_port", int(port) + 1000))
+
+
+def _claimed_addresses(server: dict) -> list[tuple[str, str]]:
+    """(address, label) pairs one server entry claims.
+
+    ``label`` is ``""`` for the server's own ``host:port`` (an ordinary
+    collision there already reads fine unlabeled); a SECONDARY claim gets a
+    label identifying which invisible claim it is.
+    """
+    host, port = server.get("host"), server.get("port")
+    claims = [(f"{host}:{port}", "")]
+    # A missing/garbage port is reported by the required-keys check; deriving a
+    # secondary claim from it would crash here instead, so skip it — same guard
+    # `_aligner_port` already applies.
+    if server.get("reflex") and port is not None:
+        claims.append((f"{host}:{int(port) + 1}", _REFLEX_BACKEND_LABEL))
+    aligner_port = _aligner_port(server)
+    if aligner_port is not None:
+        claims.append((f"{host}:{aligner_port}", _ALIGNER_BOKEH_LABEL))
+    return claims
+
+
 def _config_sanity(servers: dict) -> list[str]:
     issues: list[str] = []
-    #: "host:port" -> the server key that claimed it. A reflex server claims two,
-    #: and the second one appears nowhere in the config -- which is exactly why it
-    #: has to be reserved here: a station has already shipped a control panel on a
-    #: port the Galil aligner binds, invisible to a per-entry check.
-    claimed: dict[str, str] = {}
+    #: "host:port" -> (server key, label) that claimed it. A reflex server
+    #: claims two addresses and an aligner-hosting server claims two more;
+    #: none of the SECOND ones appear anywhere in the config as their own
+    #: key -- which is exactly why they have to be reserved here: a station
+    #: has already shipped a control panel on a port the Galil aligner binds,
+    #: invisible to a per-entry check.
+    claimed: dict[str, tuple[str, str]] = {}
     for key, s in servers.items():
         declared = [k for k in CODE_KEYS if k in s]
         if len(declared) != 1:
@@ -149,22 +201,20 @@ def _config_sanity(servers: dict) -> list[str]:
         if s.get("host") is None or s.get("port") is None:
             issues.append(f"{key}: missing host/port")
             continue
-        for addr in reserved_addresses(s):
+        for addr, label in _claimed_addresses(s):
             if addr in claimed:
-                owner = claimed[addr]
+                owner, owner_label = claimed[addr]
                 detail = f"{key}: {addr} collides with {owner}"
                 # Name the invisible claim explicitly, or the message reads as a
                 # config typo when in fact one of the two entries never wrote
                 # that port down.
-                if addr != f"{s['host']}:{s['port']}":
-                    detail += f" ({key}'s reflex backend port, port + 1)"
-                elif (
-                    addr != f"{servers[owner].get('host')}:{servers[owner].get('port')}"
-                ):
-                    detail += f" ({owner}'s reflex backend port, port + 1)"
+                if label:
+                    detail += f" ({key}'s {label})"
+                elif owner_label:
+                    detail += f" ({owner}'s {owner_label})"
                 issues.append(detail)
             else:
-                claimed[addr] = key
+                claimed[addr] = (key, label)
     return issues
 
 

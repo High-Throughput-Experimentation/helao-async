@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 from harness.hlo_pass import (
@@ -187,6 +188,171 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> list[dict]:
                     "candidate": tn_s3,
                 }
             )
+    return diffs
+
+
+#: `ANALYSES/<yy.ww>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/` -- spec §5 row 13.
+ANALYSIS_DIR_RE = re.compile(r"^\d{6}__[^/]+$")
+
+#: `analysis/<uuid>_output_<group>.json`; the two groups `export_analysis`
+#: emits, split by `isinstance(v, list)` (base_analysis.py:139-143).
+OUTPUT_GROUPS = ("scalar", "array")
+_OUTPUT_JSON_RE = re.compile(r"^(?P<uuid>[0-9a-f-]{36})_output_(?P<group>\w+)$")
+
+
+def assert_s3_analysis_rules(disk_ana: dict, s3_ana: dict) -> list[dict]:
+    """The intentional on-disk-vs-S3 differences for an analysis record.
+
+    Measured 2026-08-08, and NOT what the P6c plan predicted: the analysis
+    model is uploaded as the very dict that was dumped to the yml
+    (`_calc_and_write_model` builds `model_dict`, writes `yml_dumps(model_dict)`,
+    and `sync_ana` hands that same object to `to_s3`), and it is produced by
+    `ana_model.clean_dict()` with the DEFAULT `strip_private=False`. So unlike
+    the act/exp/seq S3 copies there is no private-key stripping here and no
+    technique_name split: the two bodies are the SAME content, and equality is
+    the assertion. A future divergence between them is a defect, not a rule.
+
+    What IS asymmetric is inside the model: each `outputs[i].output` embeds
+    scalars only -- even for the array group, whose `output` is therefore
+    empty while the uploaded `_output_array.json` carries the arrays
+    (base_analysis.py:163-169 filters `if not isinstance(..., list)` for BOTH
+    groups). Pinned here so a later "fix" is a deliberate wire change.
+    """
+    diffs: list[dict] = []
+    for key in ("analysis_uuid", "analysis_name", "process_uuid"):
+        if disk_ana.get(key) != s3_ana.get(key):
+            diffs.append(
+                {
+                    "key": key,
+                    "golden": disk_ana.get(key),
+                    "candidate": s3_ana.get(key),
+                }
+            )
+    for index, output in enumerate(s3_ana.get("outputs", []) or []):
+        embedded = output.get("output", {}) or {}
+        arrays = [k for k, v in embedded.items() if isinstance(v, list)]
+        if arrays:
+            diffs.append(
+                {
+                    "key": f"outputs[{index}].output",
+                    "golden": "scalars only (arrays live in the output json)",
+                    "candidate": f"array-valued keys {sorted(arrays)}",
+                }
+            )
+    return diffs
+
+
+def internal_s3_analysis_checks(root: Path) -> list[dict]:
+    """Pair S3 analysis payloads with their on-disk ANALYSES tree.
+
+    `internal_s3_checks` covers the action row only. Deployment-C's capture
+    subject also emits analysis records, whose S3 keys (`analysis/<uuid>.json`
+    and `analysis/<uuid>_output_<group>.json`, `analysis_driver.py:410` and
+    `base_analysis.py:153-156`) have no action counterpart at all -- so
+    nothing in the rig looked at them.
+    """
+    diffs: list[dict] = []
+    s3_root = Path(root) / "S3_SIM"
+    if not s3_root.is_dir():
+        return diffs
+
+    ana_root = Path(root) / "ANALYSES"
+    on_disk: dict[str, Path] = {}
+    for yml in ana_root.rglob("*.yml"):
+        on_disk[yml.stem.lower()] = yml
+    local_outputs = {p.stem.lower(): p for p in ana_root.rglob("*.json")}
+
+    for payload in sorted(s3_root.glob("*/analysis/*.json")):
+        stem = payload.stem.lower()
+        body = json.loads(_load_bytes(payload))
+        output_match = _OUTPUT_JSON_RE.match(stem)
+        if output_match:
+            group = output_match.group("group")
+            if group not in OUTPUT_GROUPS:
+                diffs.append(
+                    {
+                        "key": f"S3 analysis output {payload.name}",
+                        "golden": f"group in {list(OUTPUT_GROUPS)}",
+                        "candidate": group,
+                    }
+                )
+            model = on_disk.get(output_match.group("uuid"))
+            if model is None:
+                diffs.append(
+                    {
+                        "key": f"S3 analysis output {payload.name}",
+                        "golden": "an on-disk analysis yml for its uuid",
+                        "candidate": "<absent>",
+                    }
+                )
+                continue
+            # The group's key set is declared by the model, so a payload that
+            # silently gained or lost a key is visible without knowing the
+            # analysis class.
+            disk_model = load_yml_plain(model) or {}
+            declared = {
+                tuple(sorted(o.get("output_keys", []) or []))
+                for o in (disk_model.get("outputs") or [])
+                if o.get("output_name") == group
+            }
+            actual = tuple(sorted(body))
+            if declared and actual not in declared:
+                diffs.append(
+                    {
+                        "key": f"{payload.name}:output_keys",
+                        "golden": sorted(declared)[0],
+                        "candidate": actual,
+                    }
+                )
+            if group == "array" and not any(isinstance(v, list) for v in body.values()):
+                diffs.append(
+                    {
+                        "key": f"{payload.name}:group",
+                        "golden": "at least one list-valued key",
+                        "candidate": "no arrays in the array group",
+                    }
+                )
+            if group == "scalar" and any(isinstance(v, list) for v in body.values()):
+                diffs.append(
+                    {
+                        "key": f"{payload.name}:group",
+                        "golden": "no list-valued keys",
+                        "candidate": "arrays in the scalar group",
+                    }
+                )
+            sibling = local_outputs.get(stem)
+            if sibling is None:
+                diffs.append(
+                    {
+                        "key": f"S3 analysis output {payload.name}",
+                        "golden": "a local json of the same name beside the yml",
+                        "candidate": "<absent>",
+                    }
+                )
+            continue
+
+        model = on_disk.get(stem)
+        if model is None:
+            diffs.append(
+                {
+                    "key": f"S3 analysis model {payload.name}",
+                    "golden": "matching on-disk <uuid>.yml under ANALYSES",
+                    "candidate": "<absent>",
+                }
+            )
+            continue
+        if not ANALYSIS_DIR_RE.match(model.parent.name):
+            diffs.append(
+                {
+                    "key": f"{payload.name}:directory",
+                    "golden": "<HHMMSS>__<name>[__<suffix>]",
+                    "candidate": model.parent.name,
+                }
+            )
+        disk_model = load_yml_plain(model) or {}
+        for d in assert_s3_analysis_rules(disk_model, body):
+            d["key"] = f"{payload.name}:{d['key']}"
+            diffs.append(d)
     return diffs
 
 

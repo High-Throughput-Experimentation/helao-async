@@ -43,6 +43,7 @@ dependencies:
   - mpltern
   - msgspec
   - munch
+  - nodejs>=22.12
   - ntplib
   - numpy
   - orjson
