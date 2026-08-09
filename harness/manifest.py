@@ -64,6 +64,20 @@ class ProvenanceManifest:
     hlo_row_count_tolerance: dict[str, int] = dataclasses.field(default_factory=dict)
     content_masked_files: dict[str, str] = dataclasses.field(default_factory=dict)
     masked_meta_keys: dict[str, list[str]] = dataclasses.field(default_factory=dict)
+    #: Legacy internal-consistency divergences this capture is KNOWN to carry,
+    #: each keyed to its MEASURED value: {"key_suffix": …, "candidate": …}.
+    #:
+    #: `internal_s3_checks` asserts invariants derived from the core syncer.
+    #: Some legacy conversion paths do not satisfy them -- the point of a
+    #: golden is to record what legacy does, so a capture from such a path
+    #: would otherwise be ungateable and every divergent family would have no
+    #: baseline at all. Listing one here does NOT mask it: the value is pinned,
+    #: so a later change that alters the divergence still fails, and an entry
+    #: that stops matching anything fails too rather than rotting into a mute
+    #: button. Same discipline as the palette's measured-contrast registry.
+    accepted_consistency_divergences: list[dict] = dataclasses.field(
+        default_factory=list
+    )
     notes: str = ""
 
     def save(self, golden_dir: Path) -> Path:

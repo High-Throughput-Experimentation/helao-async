@@ -142,3 +142,37 @@ def test_prc_yml_derived_uuid_end_to_end(tmp_path):
     report = run_parity(a, b)
     assert report["status"] == "pass"
     assert report["n_diffs"] == 0
+
+
+# --- accepted legacy divergences ---------------------------------------------
+def test_accepted_divergence_is_pinned_to_its_measured_value():
+    """Acceptance is not masking: the value is pinned, so a change to the
+    divergence resurfaces as an unaccepted finding."""
+    from harness.parity import partition_accepted
+
+    found = [{"key": "x.json:files[a].file_type", "candidate": "legacy_form"}]
+    spec = [{"key_suffix": "files[a].file_type", "candidate": "legacy_form"}]
+    unaccepted, accepted, stale = partition_accepted(found, spec)
+    assert (unaccepted, len(accepted), stale) == ([], 1, [])
+
+    drifted = [{"key": "x.json:files[a].file_type", "candidate": "something_else"}]
+    unaccepted, accepted, stale = partition_accepted(drifted, spec)
+    assert len(unaccepted) == 1 and not accepted and len(stale) == 1
+
+
+def test_an_acceptance_that_matches_nothing_is_stale_and_fails():
+    """Otherwise the list rots into a mute button once the divergence is
+    fixed, and the next regression of it would be silently accepted."""
+    from harness.parity import partition_accepted
+
+    spec = [{"key_suffix": "files[gone].file_type", "candidate": "legacy_form"}]
+    unaccepted, accepted, stale = partition_accepted([], spec)
+    assert not unaccepted and not accepted and len(stale) == 1
+    assert "matched nothing" in stale[0]["candidate"]
+
+
+def test_no_acceptances_leaves_every_finding_unaccepted():
+    from harness.parity import partition_accepted
+
+    found = [{"key": "k", "candidate": "v"}]
+    assert partition_accepted(found, []) == (found, [], [])

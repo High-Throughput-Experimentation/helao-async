@@ -24,7 +24,16 @@ from pathlib import Path
 from harness.parity import run_parity
 from harness.treepass import explode_zips
 
-_DURATION_RE = re.compile(r"duration: (\d+(?:\.\d+)?)")
+#: The first numeric leaf inside an ``action_params:`` block. The KEY NAME is
+#: deliberately not hardcoded. ``duration`` exists only in the public simulator
+#: trees, so keying on it made this mutation class silently inapplicable to
+#: every other deployment's goldens: it raised instead of mutating, which reads
+#: as a broken harness when it really means "this tree has different
+#: parameters". A conversion-family tree carries none of the sim param names.
+_PARAM_RE = re.compile(
+    r"^action_params:\n(?:[ \t]+.*\n)*?[ \t]+(?P<key>\w+): (?P<val>-?\d+(?:\.\d+)?)[ \t]*$",
+    re.MULTILINE,
+)
 
 
 def mutate_param_value(root: Path) -> str:
@@ -39,21 +48,21 @@ def mutate_param_value(root: Path) -> str:
     `data_duration: 4.0`, the synthetic single-action fixture in
     synthtree.py hardcodes 2.0), so a fixed literal target string is not
     general. Search every action file, in sorted order for capture-
-    independence, for the first `duration: <float>` occurrence and perturb
-    that value rather than assuming a fixed old/new literal pair.
+    independence, for the first NUMERIC action_params entry and perturb that
+    value rather than assuming a fixed key or a fixed old/new literal pair.
     """
     for act in sorted(root.rglob("*-act.yml")):
         text = act.read_text()
-        m = _DURATION_RE.search(text)
+        m = _PARAM_RE.search(text)
         if m:
-            old_val = m.group(1)
+            key, old_val = m.group("key"), m.group("val")
             new_val = str(float(old_val) + 0.5)
-            mutated = text[: m.start()] + f"duration: {new_val}" + text[m.end() :]
+            mutated = text[: m.start("val")] + new_val + text[m.end("val") :]
             act.write_text(mutated)
-            return (
-                f"mutated action_params.duration in {act.name} ({old_val} -> {new_val})"
-            )
-    raise RuntimeError(f"no 'duration: <float>' found in any -act.yml under {root}")
+            return f"mutated action_params.{key} in {act.name} ({old_val} -> {new_val})"
+    raise RuntimeError(
+        f"no numeric action_params entry found in any -act.yml under {root}"
+    )
 
 
 def mutate_drop_file(root: Path) -> str:

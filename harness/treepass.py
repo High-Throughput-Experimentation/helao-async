@@ -40,14 +40,30 @@ PARITY_TOPS = (
     "S3_SIM",
 )
 
+#: ANALYSIS is seeded LAST, deliberately. Appending leaves every existing
+#: ordinal for seq/exp/act/prc exactly where it was, so goldens captured before
+#: analysis records were seeded keep their mappings and need no re-capture.
 ROW_SEED_ORDER = (
     ArtifactRow.SEQ_YML,
     ArtifactRow.EXP_YML,
     ArtifactRow.ACT_YML,
     ArtifactRow.PRC_YML,
+    ArtifactRow.ANALYSIS,
 )
 
-SEED_UUID_KEYS = ("sequence_uuid", "experiment_uuid", "action_uuid", "process_uuid")
+#: `analysis_uuid` joined this list when a conversion family that writes
+#: analysis records inline was first captured. Its uuid is minted per run
+#: (uuid7, not the content hash the server path uses) AND appears in filenames
+#: -- `<uuid>.yml` beside `<uuid>_output_<group>.json` -- so without a seed the
+#: strict mapper raises on the name rather than diffing it. Every other row's
+#: uuids reach filenames only through directory names that carry them.
+SEED_UUID_KEYS = (
+    "sequence_uuid",
+    "experiment_uuid",
+    "action_uuid",
+    "process_uuid",
+    "analysis_uuid",
+)
 
 
 @dataclass
