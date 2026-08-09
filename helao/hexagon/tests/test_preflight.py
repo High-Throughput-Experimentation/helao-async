@@ -528,6 +528,8 @@ def test_a_scratch_copy_of_a_config_does_not_exercise_the_checklist_gate(
     in_tree = preflight.preflight_config(str(src))
     assert len(in_tree) == 1 and "frozen endpoint checklist missing" in in_tree[0]
     assert preflight.preflight_config(str(scratch)) == []
+
+
 def test_claimed_addresses_agrees_with_the_launcher_on_reflex():
     """Two implementations of "what does this server claim" now exist.
 
