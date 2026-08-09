@@ -37,12 +37,16 @@ What this face changes relative to the fork it replaces:
   ``None`` instead of raising when the action has ``save_act`` disabled.
 
 The face is synchronous because its callers are batch scripts; the async native
-primitives are driven through :func:`_run_sync`, which refuses to run inside an
-already-running event loop rather than deadlocking.
+primitives are driven through :func:`_run_sync`. Those callers are a MIX of
+shapes -- some ``make_*_processes`` are plain functions, others are ``async def``
+run under ``asyncio.run`` in a pool worker -- so ``_run_sync`` handles both, and
+drives the coroutine on a private loop in its own thread when one is already
+running rather than re-entering the caller's.
 """
 
 import asyncio
 import os
+import threading
 import shutil
 from typing import Any, Optional, Union
 
@@ -81,16 +85,41 @@ class RepeatWriteError(RuntimeError):
 
 
 def _run_sync(coro):
-    """Drive one coroutine to completion from synchronous code."""
+    """Drive one coroutine to completion from synchronous code.
+
+    The converters are a MIX of shapes and the face has to serve both: some
+    ``make_*_processes`` are plain functions, others are ``async def`` driven by
+    ``asyncio.run`` inside a pool worker. An earlier version refused outright
+    when a loop was already running, on the reasoning that calling a sync facade
+    from async code deadlocks. It does -- but only if the coroutine is driven on
+    the *calling* loop. Refusing instead broke every async converter at its
+    first write, which is how this was found: bruker (sync) converted while
+    xafs (async) raised.
+
+    So a running loop is handled by driving the coroutine on a private loop in
+    its own thread and blocking this one until it finishes. Nothing here is
+    bound to the caller's loop -- the writers touch plain models and do their
+    IO through the default executor -- so the work is loop-agnostic and the
+    calling loop is never re-entered.
+    """
     try:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(coro)
-    coro.close()
-    raise RuntimeError(
-        "PostHocRunWriter is synchronous and cannot be called from a running "
-        "event loop; await the native writers directly instead."
-    )
+    result: dict = {}
+
+    def _drive() -> None:
+        try:
+            result["value"] = asyncio.run(coro)
+        except BaseException as exc:  # re-raised on the calling thread below
+            result["error"] = exc
+
+    thread = threading.Thread(target=_drive, daemon=True)
+    thread.start()
+    thread.join()
+    if "error" in result:
+        raise result["error"]
+    return result.get("value")
 
 
 class _PostHocHelaoDirs:
