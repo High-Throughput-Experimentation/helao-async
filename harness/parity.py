@@ -101,6 +101,53 @@ def _resolve_root(path: Path) -> Path:
     return path / "root" if (path / "root").is_dir() else path
 
 
+def partition_accepted(
+    consistency: list[dict], accepted_spec: list[dict]
+) -> tuple[list, list, list]:
+    """Split consistency findings into unaccepted, accepted, and stale.
+
+    A legacy conversion path may not satisfy an invariant `internal_s3_checks`
+    derives from the core syncer. The golden's job is to record what legacy
+    does, so such a capture must still be gateable on determinism -- otherwise
+    every divergent family has no baseline at all and the refactor that follows
+    has nothing to diff against.
+
+    Acceptance is NOT masking, in two directions. Each entry pins the MEASURED
+    candidate value, so a change that alters the divergence surfaces as an
+    unaccepted finding; and an entry matching nothing comes back as STALE,
+    which fails, so the list cannot rot into a mute button after the divergence
+    is fixed.
+    """
+    unaccepted: list[dict] = []
+    accepted: list[dict] = []
+    matched: set[int] = set()
+    for finding in consistency:
+        key = str(finding.get("key", ""))
+        value = finding.get("candidate")
+        hit = None
+        for index, spec in enumerate(accepted_spec):
+            if key.endswith(str(spec.get("key_suffix", "\0"))) and value == spec.get(
+                "candidate"
+            ):
+                hit = index
+                break
+        if hit is None:
+            unaccepted.append(finding)
+        else:
+            matched.add(hit)
+            accepted.append(finding)
+    stale = [
+        {
+            "key": f"accepted_divergence[{i}]",
+            "golden": "an accepted divergence that still occurs",
+            "candidate": f"matched nothing: {spec}",
+        }
+        for i, spec in enumerate(accepted_spec)
+        if i not in matched
+    ]
+    return unaccepted, accepted, stale
+
+
 def run_parity(
     golden_set: Path,
     candidate: Path,
@@ -142,6 +189,10 @@ def run_parity(
                     ),
                 }
             )
+        consistency, accepted, stale = partition_accepted(
+            consistency, manifest.accepted_consistency_divergences
+        )
+        consistency.extend(stale)
     n_diffs = (
         len(tree_diffs) + sum(len(v) for v in file_diffs.values()) + len(consistency)
     )
@@ -157,6 +208,7 @@ def run_parity(
         "tree_diffs": tree_diffs,
         "file_diffs": file_diffs,
         "consistency_diffs": consistency,
+        "accepted_divergences": accepted,
     }
     if report_path is not None:
         Path(report_path).write_text(json.dumps(report, indent=2, default=str))
