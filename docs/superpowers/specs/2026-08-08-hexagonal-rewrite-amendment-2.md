@@ -70,6 +70,19 @@ Eleven divergences were measured in total and each is dispositioned in the P6 pl
 is called out at spec level because it is the one that makes a naive golden diff of that
 family non-deterministic.
 
+**Addendum, 2026-08-09, measured while P6e implemented the unification: adopting the content
+hash does NOT make the converter idempotent, and the sentence above must not be read as
+promising that it would.** `helpers.time_utils.gen_uuid(datetime)` seeds a uuid7's *timestamp*
+from the supplied value and leaves the low bits random, so a conversion mints fresh sequence,
+experiment and action uuids on every run, and the uuid5 process uuid derived from the
+experiment follows. `process_uuid` is one of the content hash's inputs, so the analysis uuid
+is fresh per run **after** the change too — verified across two candidate captures of one
+scenario. The server path is idempotent because *its* process uuid is stable, not because of
+the hash. What the unification buys is one derivation shared by both writers, and a uuid
+derived from its record rather than from the wall clock. Genuine converter idempotency would
+need content-derived *run* uuids, which touches every artifact row and every golden and is
+outside P6's scope.
+
 ---
 
 ## 3. §4.3.6 and §7.5 — two producer families, same route names, different payload types
