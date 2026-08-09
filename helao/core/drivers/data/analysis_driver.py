@@ -29,14 +29,21 @@ __all__ = [
 
 import asyncio
 import inspect
-import json
 import os
-from datetime import datetime
 from importlib import import_module, util as importlib_util
 from typing import Optional
 from uuid import UUID
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
+from helao.core.drivers.data.analysis_layout import (
+    analysis_dir,
+    analysis_root,
+    analysis_suffix,
+    parse_analysis_timestamp,
+    publish_outputs,
+    sequence_part_of,
+    write_model_yml,
+)
 from helao.core.drivers.data.loaders import pgs3
 from helao.core.drivers.data.loaders.localfs import LocalLoader
 from helao.core.drivers.data.sync_driver import HelaoSyncer
@@ -46,8 +53,6 @@ from helao.core.servers.base_api import BaseAPI
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
-from helao.helpers.time_utils import set_time
-from helao.helpers.yml_tools import yml_dumps
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -58,18 +63,6 @@ _PROCESS_METADATA_KEYS = (
     "campaign_name",
     "run_id",
 )
-
-
-def _write_json(obj: dict, path: str) -> None:
-    """Serialize ``obj`` to ``path``, creating its parent directory.
-
-    Split out as a plain function so :meth:`HelaoAnalysisSyncer.sync_ana` can
-    hand it to :func:`asyncio.to_thread` rather than serializing potentially
-    multi-megabyte array outputs on the event loop.
-    """
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(obj, f)
 
 
 class AnalysisLoadError(RuntimeError):
@@ -337,7 +330,7 @@ class AnalysisSyncer(HelaoSyncer):
             or os.environ.get("HELAO_CREDENTIALS", "thisfiledoesntexist.env")
         )
         self.config_dict["env_file"] = self.env_file
-        self.local_ana_root = os.path.join(self.world_config["root"], "ANALYSES")
+        self.local_ana_root = analysis_root(self.world_config["root"])
         self.max_tasks = self.config_dict.get("max_tasks", 1)
         # declare global loader for analysis models used by driver.batch_calc
         self.get_loader()
@@ -476,35 +469,24 @@ class AnalysisSyncer(HelaoSyncer):
         for pkey in _PROCESS_METADATA_KEYS:
             if process_dict.get(pkey, None) is not None:
                 model_dict[pkey] = process_dict[pkey]
-        ana_tsstr = model_dict.get(
-            "analysis_timestamp", set_time().strftime("%Y-%m-%d %H:%M:%S.%f")
-        )
-        ana_ts = datetime.strptime(ana_tsstr, "%Y-%m-%d %H:%M:%S.%f")
-        HMS = ana_ts.strftime("%H%M%S")
-        year_week = ana_ts.strftime("%y.%U")
-        analysis_day = ana_ts.strftime("%m%d")
-        analysis_suffix = ""
-        gsl = model_dict.get("global_sample_label", "")
+        # Layout grammar lives in analysis_layout, shared verbatim with the
+        # AnalysisArtifactPort adapter a post-hoc converter publishes through
+        # (spec §5 row 13: one writer). The stamp passed here is each analysis's
+        # own, which is what this server has always written -- see the module's
+        # note on why the choice of stamp is an argument.
         first_action_dir = process_dict["dispatched_actions_abbr"][0][
             "action_output_dir"
         ]
-        sequence_part = first_action_dir.split("/")[-3]
-        if len(sequence_part.split("__")) == 3:
-            sequence_label = sequence_part.split("__")[-1]
-            analysis_suffix = f"__{sequence_label}"
-        elif gsl.startswith("legacy__solid__"):
-            plate_id = gsl.split("legacy__solid__")[-1].split("_")[0]
-            checksum = sum([int(x) for x in plate_id]) % 10
-            analysis_suffix = f"__{plate_id}{checksum}"
-        local_ana_dir = os.path.join(
+        local_ana_dir = analysis_dir(
             self.local_ana_root,
-            year_week,
-            analysis_day,
-            f"{HMS}__{eua.analysis_name}{analysis_suffix}",
+            parse_analysis_timestamp(model_dict),
+            eua.analysis_name,
+            analysis_suffix(
+                sequence_part_of(first_action_dir),
+                model_dict.get("global_sample_label", ""),
+            ),
         )
-        os.makedirs(local_ana_dir, exist_ok=True)
-        with open(os.path.join(local_ana_dir, f"{eua.analysis_uuid}.yml"), "w") as f:
-            f.write(yml_dumps(model_dict))
+        write_model_yml(local_ana_dir, eua.analysis_uuid, model_dict)
 
         return eua, model_dict, output_dict, local_ana_dir
 
@@ -548,47 +530,13 @@ class AnalysisSyncer(HelaoSyncer):
             self._calc_and_write_model, calc_tup
         )
         if model_dict is not None:
-            s3_model_target = f"analysis/{eua.analysis_uuid}.json"
-
-            if not self.config_dict.get("local_only", False):
-                LOGGER.info("uploading analysis model to S3 bucket")
-                try:
-                    s3_model_success = await self.to_s3(model_dict, s3_model_target)
-                except Exception:
-                    LOGGER.error(
-                        f"Failed to upload analysis model {eua.analysis_uuid} to S3.",
-                        exc_info=True,
-                    )
-            else:
-                s3_model_success = True
-                LOGGER.info(
-                    "Analysis server config set to local_only, skipping S3/API push."
-                )
-
-            outputs = model_dict.get("outputs", [])
-            output_successes = []
-            for output in outputs:
-                s3_dict_keys = output["output_keys"]
-                s3_dict = {k: v for k, v in output_dict.items() if k in s3_dict_keys}
-                s3_output_target = output["analysis_output_path"]["key"]
-                local_json_out = os.path.join(
-                    local_ana_dir, os.path.basename(s3_output_target)
-                )
-                # Array outputs serialize to megabytes of JSON; keep that off
-                # the event loop for the same reason as the analysis itself.
-                await asyncio.to_thread(_write_json, s3_dict, local_json_out)
-                if not self.config_dict.get("local_only", False):
-                    s3_success = await self.to_s3(
-                        s3_dict, s3_output_target, compress=False
-                    )
-                else:
-                    s3_success = True
-                output_successes.append(s3_success)
-            s3_output_success = all(output_successes)
-
-            api_success = True
-
-            if s3_model_success and s3_output_success and api_success:
+            # `local_only` is expressed as "no uploader", which is what
+            # publish_outputs gates BOTH the model body and every output group
+            # on -- one switch, no way to leave one of the two ungated.
+            uploader = None if self.config_dict.get("local_only", False) else self.to_s3
+            if await publish_outputs(
+                model_dict, output_dict, local_ana_dir, uploader=uploader
+            ):
                 LOGGER.info(f"Successfully synced {eua.analysis_uuid}")
                 return True
 

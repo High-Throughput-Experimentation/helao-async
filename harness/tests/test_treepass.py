@@ -11,6 +11,26 @@ from harness.treepass import (
     snapshot,
 )
 from harness.uuidmap import UuidMapper
+from helao.helpers.yml_tools import yml_dumps
+
+
+def _write_analyses(root, records):
+    """Write ``records`` as one conversion's analysis ymls under ``root``."""
+    d = root / "ANALYSES" / "26.31" / "0808" / "181340__AN__lbl"
+    d.mkdir(parents=True)
+    for uuid_str, label, process_uuid in records:
+        (d / f"{uuid_str}.yml").write_text(
+            yml_dumps(
+                {
+                    "analysis_uuid": uuid_str,
+                    "analysis_name": "AN",
+                    "global_sample_label": label,
+                    "process_uuid": process_uuid,
+                    "analysis_params": {"a": 1},
+                }
+            )
+        )
+    return d
 
 
 def test_snapshot_normalizes_names_and_classifies(tmp_path):
@@ -91,3 +111,50 @@ def test_seeded_ordinals_are_capture_independent(tmp_path):
 
     assert ma.map(_u(1)) == mb.map(_u(501))  # sequence_uuid -> same ordinal
     assert ma.map(_u(3)) == mb.map(_u(503))  # action_uuid -> same ordinal
+
+
+def test_analysis_ordinals_follow_record_identity_not_uuid_order(tmp_path):
+    """Two captures of one conversion map the same RECORD to the same ordinal.
+
+    Analysis uuids are content hashes, so they sort arbitrarily; every record of
+    a conversion also blanks to the identical normalized path. Without an
+    identity tiebreak the two sides would pair record A's ordinal with record
+    B's file and report the mismatch as content diffs.
+    """
+    ga, gb = tmp_path / "a", tmp_path / "b"
+    # Same three records, uuids in DELIBERATELY opposite lexical order.
+    _write_analyses(
+        ga,
+        [
+            ("aaaaaaaa-0000-4000-8000-000000000001", "s1", "p1"),
+            ("bbbbbbbb-0000-4000-8000-000000000002", "s2", "p2"),
+            ("cccccccc-0000-4000-8000-000000000003", "s3", "p3"),
+        ],
+    )
+    _write_analyses(
+        gb,
+        [
+            ("cccccccc-0000-4000-8000-000000000013", "s1", "p1"),
+            ("bbbbbbbb-0000-4000-8000-000000000012", "s2", "p2"),
+            ("aaaaaaaa-0000-4000-8000-000000000011", "s3", "p3"),
+        ],
+    )
+    ma, mb = UuidMapper(), UuidMapper()
+    seed_mapper(ga, ma)
+    seed_mapper(gb, mb)
+    for a_uuid, b_uuid in (
+        (
+            "aaaaaaaa-0000-4000-8000-000000000001",
+            "cccccccc-0000-4000-8000-000000000013",
+        ),
+        (
+            "bbbbbbbb-0000-4000-8000-000000000002",
+            "bbbbbbbb-0000-4000-8000-000000000012",
+        ),
+        (
+            "cccccccc-0000-4000-8000-000000000003",
+            "aaaaaaaa-0000-4000-8000-000000000011",
+        ),
+    ):
+        assert ma.map(a_uuid) == mb.map(b_uuid)
+    assert diff_member_sets(snapshot(ga, ma), snapshot(gb, mb)) == []

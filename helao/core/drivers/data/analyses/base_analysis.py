@@ -2,16 +2,16 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydasher.serialization import hasher
-
+from helao.core.drivers.data.analysis_layout import (
+    analysis_output_models,
+    analysis_uuid_for,
+)
 from helao.core.models.analysis import (
     AnalysisInput,
     AnalysisModel,
     AnalysisOutput,
-    AnalysisOutputModel,
 )
 from helao.core.models.run_use import RunUse
-from helao.core.models.s3locator import S3Locator
 from helao.helpers.time_utils import set_time
 
 
@@ -98,15 +98,14 @@ class BaseAnalysis:
             ru_data = [x for x in input_data_models if x.run_use == RunUse.data]
             if ru_data:
                 global_sample_label = ru_data[0].global_sample_label
-        hash_rep = {
-            "analysis_name": self.analysis_name,
-            "analysis_params": self.analysis_params,
-            "process_uuid": self.process_uuid,
-            "global_sample_label": global_sample_label,
-            "analysis_codehash": self.analysis_codehash,
-            "run_use": self.run_use,
-        }
-        return UUID(hasher(hash_rep))
+        return analysis_uuid_for(
+            analysis_name=self.analysis_name,
+            analysis_params=self.analysis_params,
+            process_uuid=self.process_uuid,
+            global_sample_label=global_sample_label,
+            analysis_codehash=self.analysis_codehash,
+            run_use=self.run_use,
+        )
 
     def export_analysis(
         self,
@@ -137,40 +136,17 @@ class BaseAnalysis:
             if ru_data:
                 global_sample_label = ru_data[0].global_sample_label
 
-        scalar_outputs = [
-            k for k, v in self.outputs.model_dump().items() if not isinstance(v, list)
-        ]
-        array_outputs = [
-            k for k in self.outputs.model_dump().keys() if k not in scalar_outputs
-        ]
+        dumped = self.outputs.model_dump()
+        scalars = {k: v for k, v in dumped.items() if not isinstance(v, list)}
+        arrays = {k: v for k, v in dumped.items() if isinstance(v, list)}
 
-        output_data_models = []
-
-        for label, output_keys in [
-            ("scalar", scalar_outputs),
-            ("array", array_outputs),
-        ]:
-            if output_keys:
-                out_model = AnalysisOutputModel(
-                    analysis_output_path=S3Locator(
-                        bucket=bucket,
-                        key=f"analysis/{self.analysis_uuid}_output_{label}.json",
-                        region=region,
-                    ),
-                    content_type="application/json",
-                    # content_encoding="gzip",
-                    output_type=self.outputs.output_type,
-                    output_keys=output_keys,
-                    output_name=label,
-                    output={
-                        k: self.outputs.model_dump()[k]
-                        for k in output_keys
-                        if not isinstance(
-                            self.outputs.model_dump()[k], list
-                        )  # only scalars
-                    },
-                )
-                output_data_models.append(out_model)
+        output_data_models = analysis_output_models(
+            self.analysis_uuid,
+            bucket,
+            region,
+            self.outputs.output_type,
+            [("scalar", scalars), ("array", arrays)],
+        )
 
         if not output_data_models:
             print("!!! analysis does not contain any outputs")
