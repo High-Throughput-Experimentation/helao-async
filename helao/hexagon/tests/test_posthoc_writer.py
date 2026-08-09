@@ -618,18 +618,41 @@ def test_meta_writes_swap_a_complete_temp_file_into_place(run, monkeypatch):
     assert staged == _read(out)
 
 
-def test_the_face_refuses_to_run_inside_an_event_loop(run):
-    """The face is synchronous; driving its async primitives from inside a
-    running loop would deadlock, so it says so instead."""
+def test_the_face_works_when_called_from_inside_a_running_loop(run):
+    """Half the converters are ``async def`` driven by ``asyncio.run`` in a pool
+    worker, so the face is called from inside a running loop as a matter of
+    course.
+
+    An earlier version raised here, reasoning that a sync facade over async
+    primitives deadlocks. It does -- but only if the coroutine is driven on the
+    CALLING loop; a private loop on another thread does not re-enter it. The
+    refusal broke every async converter at its first write, which is how it was
+    found: the sync converter family captured cleanly while the async one died
+    with "produced no sequence".
+
+    Asserts the artifact, not merely the absence of an exception -- a face that
+    returned quietly without writing would satisfy a no-raise test.
+    """
     import asyncio
 
-    act, writer = run["act"], run["writer"]
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
 
     async def drive():
         return writer.write_act(act)
 
-    with pytest.raises(RuntimeError, match="synchronous"):
-        asyncio.run(drive())
+    written = asyncio.run(drive())
+    assert written is not None
+    assert os.path.isfile(written)
+    assert os.path.basename(written).endswith("-act.yml")
+    assert yaml.safe_load(_read(written))["action_uuid"] == str(act.action_uuid)
+
+
+def test_the_face_still_works_outside_a_loop(run):
+    """The guard on the test above: it would pass just as well if the face had
+    stopped caring about loops entirely and broken the ordinary sync path."""
+    act2 = _action(run["exp"])
+    written = run["writer"].write_act(act2)
+    assert written is not None and os.path.isfile(written)
 
 
 def test_write_act_with_save_act_false_returns_none_without_raising(run):
