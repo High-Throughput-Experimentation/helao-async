@@ -551,3 +551,32 @@ def test_default_role_keys_reproduce_the_previous_hardcoded_ports():
     assert eps.orch == Endpoint("127.0.0.1", 8001)
     assert eps.sim == Endpoint("127.0.0.1", 8002)
     assert eps.db == Endpoint("127.0.0.1", 8010)
+
+
+# --- provenance: the manifest must name a file that exists --------------------
+def test_a_full_config_path_is_used_as_given(tmp_path):
+    """Regression: the path was rebuilt as `<test deployment>/configs/
+    <prefix>.yml`, so passing a path recorded `…/x.yml.yml` -- a provenance
+    manifest naming a file nobody can open."""
+    from harness.capture import resolve_config_path
+
+    cfg = tmp_path / "privcap_legacy.yml"
+    cfg.write_text("dummy: true\n")
+    assert resolve_config_path(str(cfg)) == cfg.resolve()
+
+
+def test_a_bare_prefix_resolves_the_way_read_config_globs_it():
+    from harness.capture import resolve_config_path
+
+    resolved = resolve_config_path("golden")
+    assert resolved.is_file() and resolved.name == "golden.yml"
+    assert resolved.parent.name == "configs"
+
+
+def test_a_prefix_matching_nothing_raises_rather_than_guessing():
+    """A manifest citing a plausible path that does not exist is worse than a
+    failed capture: the failure is discovered when someone tries to reproduce."""
+    from harness.capture import resolve_config_path
+
+    with pytest.raises(RuntimeError, match="cannot resolve config"):
+        resolve_config_path("no_such_config_prefix_anywhere")
