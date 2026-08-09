@@ -365,6 +365,116 @@ def test_absent_optional_roles_are_none_and_required_roles_raise():
         CaptureEndpoints.from_config(config, {"batch": "BATCH"}, optional=())
 
 
+# --- the deployment scenario-table loader ------------------------------------
+def write_scenario_module(tmp_path: Path, name: str, body: str, monkeypatch) -> str:
+    (tmp_path / f"{name}.py").write_text(body)
+    monkeypatch.syspath_prepend(str(tmp_path))
+    return name
+
+
+def test_a_deployment_table_is_loaded_with_its_masks_and_roles(tmp_path, monkeypatch):
+    from harness.capture import load_scenario_module
+
+    mod = write_scenario_module(
+        tmp_path,
+        "scen_ok",
+        "SCENARIOS = {'GM-X1': lambda root, eps: ('n', {})}\n"
+        "SCENARIO_MASKS = {'GM-X1': ({}, {}, {})}\n"
+        "ROLE_KEYS = {'batch': 'BATCH', 'sim': None}\n",
+        monkeypatch,
+    )
+    scenarios, masks, roles = load_scenario_module(mod)
+    assert set(scenarios) == {"GM-X1"} and set(masks) == {"GM-X1"}
+    assert roles == {"batch": "BATCH", "sim": None}
+
+
+def test_a_table_that_redefines_a_builtin_scenario_is_refused(tmp_path, monkeypatch):
+    """A silent shadow would leave the built-in running under the name the
+    caller thought they had overridden."""
+    from harness.capture import load_scenario_module
+
+    mod = write_scenario_module(
+        tmp_path,
+        "scen_clash",
+        "SCENARIOS = {'GM-1': lambda root, eps: ('n', {})}\n"
+        "SCENARIO_MASKS = {'GM-1': ({}, {}, {})}\n",
+        monkeypatch,
+    )
+    with pytest.raises(RuntimeError, match="GM-1"):
+        load_scenario_module(mod)
+
+
+def test_a_scenario_without_a_mask_entry_is_refused(tmp_path, monkeypatch):
+    from harness.capture import load_scenario_module
+
+    mod = write_scenario_module(
+        tmp_path,
+        "scen_nomask",
+        "SCENARIOS = {'GM-X2': lambda root, eps: ('n', {})}\nSCENARIO_MASKS = {}\n",
+        monkeypatch,
+    )
+    with pytest.raises(RuntimeError, match="GM-X2"):
+        load_scenario_module(mod)
+
+
+def test_an_empty_table_is_refused(tmp_path, monkeypatch):
+    from harness.capture import load_scenario_module
+
+    mod = write_scenario_module(tmp_path, "scen_empty", "SCENARIOS = {}\n", monkeypatch)
+    with pytest.raises(RuntimeError, match="no SCENARIOS"):
+        load_scenario_module(mod)
+
+
+def test_builtin_and_deployment_drivers_are_dispatched_by_arity(tmp_path, monkeypatch):
+    """The two driver shapes coexist: built-ins take the root alone, a
+    deployment's take the endpoints too. Dispatch is on the signature, so a
+    deployment naming its scenarios anything at all still works."""
+    from harness import capture
+
+    seen = {}
+    mod = write_scenario_module(
+        tmp_path,
+        "scen_arity",
+        "import harness.tests.test_capture_batch as t\n"
+        "SCENARIOS = {'GM-X3': lambda root, eps: (t._record('two', root, eps))}\n"
+        "SCENARIO_MASKS = {'GM-X3': ({}, {}, {})}\n",
+        monkeypatch,
+    )
+    monkeypatch.setattr(capture, "assert_fresh", lambda root: None)
+    monkeypatch.setattr(capture, "wait_for_server", lambda host, port, **k: None)
+    monkeypatch.setattr(
+        capture,
+        "resolve_endpoints",
+        lambda prefix, roles=None: CaptureEndpoints(orch=Endpoint("127.0.0.1", 1)),
+    )
+    monkeypatch.setattr(
+        capture, "snapshot_capture", lambda **kw: seen.setdefault("kw", kw) and None
+    )
+    _CALLS.clear()
+    capture.main(
+        [
+            "--scenario",
+            "GM-X3",
+            "--root",
+            str(tmp_path / "r"),
+            "--out",
+            str(tmp_path / "o"),
+            "--scenarios",
+            mod,
+        ]
+    )
+    assert _CALLS and _CALLS[0][0] == "two"
+    assert isinstance(_CALLS[0][2], CaptureEndpoints)
+
+
+_CALLS: list = []
+
+
+def _record(shape, root, eps):
+    _CALLS.append((shape, root, eps))
+    return "seq", {}
+
+
 def test_resolve_endpoints_leaves_the_public_capture_config_where_it_was():
     """The refactor must not move GM-1..GM-5, which reach their servers
     through the module globals `resolve_endpoints` now writes."""

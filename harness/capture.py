@@ -27,6 +27,8 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import importlib
+import inspect
 import shutil
 import subprocess
 import sys
@@ -693,24 +695,85 @@ def snapshot_capture(
     return out_dir
 
 
+def load_scenario_module(dotted: str) -> tuple[dict, dict, dict]:
+    """Import a deployment's scenario table.
+
+    A deployment's scenarios name its own instrument families, drop-tree
+    layout and fixture paths — none of which belong in this repo, which is a
+    public remote. So the generic machinery lives here and the table lives
+    beside the deployment it describes, exposing:
+
+        SCENARIOS       {name: driver(root, endpoints) -> (seq_name, params)}
+        SCENARIO_MASKS  {name: (masked_hlo, tolerance, content_masked)}
+        ROLE_KEYS       {role: server key}   (optional; e.g. a BATCH server)
+
+    Names must not collide with the built-ins; a collision is an error rather
+    than a silent shadow, because the built-in would keep running under the
+    name the caller thought they were overriding.
+    """
+    module = importlib.import_module(dotted)
+    scenarios = dict(getattr(module, "SCENARIOS", {}))
+    masks = dict(getattr(module, "SCENARIO_MASKS", {}))
+    roles = dict(getattr(module, "ROLE_KEYS", {}))
+    if not scenarios:
+        raise RuntimeError(f"{dotted} defines no SCENARIOS")
+    clash = sorted(set(scenarios) & set(SCENARIOS))
+    if clash:
+        raise RuntimeError(f"{dotted} redefines built-in scenarios: {clash}")
+    missing = sorted(set(scenarios) - set(masks))
+    if missing:
+        raise RuntimeError(f"{dotted} declares no SCENARIO_MASKS for: {missing}")
+    return scenarios, masks, roles
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m harness.capture", description=__doc__
     )
-    parser.add_argument("--scenario", required=True, choices=sorted(SCENARIOS))
+    parser.add_argument("--scenario", required=True)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--config-prefix", default="golden")
+    parser.add_argument(
+        "--scenarios",
+        default="",
+        help="dotted module supplying a deployment's SCENARIOS/SCENARIO_MASKS",
+    )
     parser.add_argument("--notes", default="")
     args = parser.parse_args(argv)
+
+    scenarios: dict = dict(SCENARIOS)
+    masks: dict = dict(SCENARIO_MASKS)
+    roles: dict = {}
+    if args.scenarios:
+        extra, extra_masks, roles = load_scenario_module(args.scenarios)
+        scenarios.update(extra)
+        masks.update(extra_masks)
+    if args.scenario not in scenarios:
+        parser.error(
+            f"unknown scenario {args.scenario!r}; available: {sorted(scenarios)}"
+            + ("" if args.scenarios else " (pass --scenarios to add a deployment's)")
+        )
+
     assert_fresh(args.root)
-    endpoints = resolve_endpoints(args.config_prefix)
-    for role in ("orch", "sim", "db"):
+    # Roles come from the scenario module, so a deployment whose capture config
+    # has no SIM (or an extra BATCH) resolves what it actually declares rather
+    # than what the public golden config happens to.
+    endpoints = resolve_endpoints(args.config_prefix, roles or None)
+    for role in ("orch", "sim", "db", "batch"):
         endpoint = getattr(endpoints, role)
         if endpoint is not None:
             wait_for_server(endpoint.host, endpoint.port)
-    seq_name, seq_params = SCENARIOS[args.scenario](args.root)
-    masked, tolerance, content_masked = SCENARIO_MASKS[args.scenario]
+    driver = scenarios[args.scenario]
+    # Built-in scenarios predate config-derived endpoints and take the root
+    # alone; deployment scenarios take both. Dispatch on the signature rather
+    # than on a naming convention, which would break the first time someone
+    # names one differently.
+    if len(inspect.signature(driver).parameters) >= 2:
+        seq_name, seq_params = driver(args.root, endpoints)
+    else:
+        seq_name, seq_params = driver(args.root)
+    masked, tolerance, content_masked = masks[args.scenario]
     out = snapshot_capture(
         root=args.root,
         out_dir=args.out,
