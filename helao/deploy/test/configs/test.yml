@@ -35,7 +35,19 @@ servers:
     group: action
     fast: ws_simulator
     live_vis: wssim_live_vis
-    params: {}
+    # `control_vis` and `dev_do` for the same reason goldenreflex.yml carries
+    # them: without a server declaring a control panel, the control visualizer
+    # and the Reflex /control page render only their "none declared" note and
+    # are never exercised. The simulator has no digital-output endpoints, so
+    # every line opens unknown and a click reports a failed write -- the honest
+    # failure path, and the one a station hits when its IO server is down.
+    control_vis: digital_out_control
+    params:
+      dev_do:
+        gamry_aux: 1
+        Thorlab_led: 7
+        cell_valve: 2
+        purge_valve: 3
     hlo_postprocess_libs:
       - hlo_to_csv
   LIVE:
@@ -54,3 +66,20 @@ servers:
       doc_name: Data Browser
       max_points: 50000
       launch_browser: true
+  CONTROL:
+    host: 127.0.0.1
+    port: 5005
+    group: visualizer
+    bokeh: control_visualizer
+    params:
+      doc_name: Engineering Controls
+  UI:
+    host: 127.0.0.1
+    port: 5110          # frontend; 5111 is the backend
+    group: visualizer
+    reflex: helao_ui
+    params:
+      # No server here declares `action_vis`, so /action is omitted rather than
+      # mounted empty. /control, /operator and /browser are registered
+      # unconditionally by SHELL_ROUTES.
+      pages: [live, operator, browser]
