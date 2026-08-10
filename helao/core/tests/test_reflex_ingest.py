@@ -30,6 +30,49 @@ def test_normalize_flattens_sim_dict():
     assert cols["epoch"] == [5.0]
 
 
+def test_normalize_flattens_a_per_device_dict_under_a_prefixed_name():
+    # An MFC poller returns data={device: status_dict}, so ws_live carries a
+    # dict. Bokeh's mfc_vis flattens it to "{device}__{field}"; flattening only
+    # sim_dict left float(dict) raising, so the whole status went to mixed_rows
+    # and the panel drew an empty chart beside an empty table.
+    cols, rows = normalize([{"MFC_A": ({"mass_flow": 1.5, "pressure": 14.7}, 9.0)}])
+    assert cols["MFC_A__mass_flow"] == [1.5]
+    assert cols["MFC_A__pressure"] == [14.7]
+    assert cols["epoch"] == [9.0]
+    assert rows == []
+
+
+def test_normalize_keeps_a_dicts_non_numeric_fields_out_of_the_columns():
+    # A device's status block mixes numbers with strings ("gas", the control
+    # mode). The numbers must still become columns.
+    cols, rows = normalize([{"MFC_A": ({"mass_flow": 1.5, "gas": "N2"}, 9.0)}])
+    assert cols["MFC_A__mass_flow"] == [1.5]
+    assert "MFC_A__gas" not in cols
+    assert rows == [{"MFC_A__gas": "N2"}]
+
+
+def test_normalize_flattens_every_device_in_one_message():
+    cols, _ = normalize(
+        [{"MFC_A": ({"mass_flow": 1.0}, 9.0), "MFC_B": ({"mass_flow": 2.0}, 9.0)}]
+    )
+    assert cols["MFC_A__mass_flow"] == [1.0]
+    assert cols["MFC_B__mass_flow"] == [2.0]
+
+
+def test_normalize_extends_a_list_inside_a_flattened_dict():
+    cols, _ = normalize([{"dev": ({"v": [1.0, 2.0]}, 3.0)}])
+    assert cols["dev__v"] == [1.0, 2.0]
+    assert cols["epoch"] == [3.0, 3.0]
+
+
+def test_normalize_still_flattens_sim_dict_without_a_prefix():
+    # sim_dict is the one datalab whose fields keep their bare names, matching
+    # the Bokeh visualizers. Adding the prefixed branch must not change it.
+    cols, _ = normalize([{"sim_dict": ({"series_0": 1.0}, 5.0)}])
+    assert cols["series_0"] == [1.0]
+    assert "sim_dict__series_0" not in cols
+
+
 def test_normalize_extends_on_list_values():
     cols, _ = normalize([{"v": ([1.0, 2.0, 3.0], 7.0)}])
     assert cols["v"] == [1.0, 2.0, 3.0]

@@ -182,6 +182,126 @@ def test_panel_ids_are_distinct_per_panel_and_session():
     assert co2_vis.panel_id("CO2", "tok-a") != co2_vis.panel_id("CO2", "tok-b")
 
 
+# -- only write what changed, and not into a grid that rebuilds ---------------
+#
+# Reflex marks a var dirty on assignment, not on change, and `rx.data_table`
+# (gridjs) rebuilds its whole grid on *any* delta -- not only on a change to the
+# var it renders. Together those made every live panel's table rebuild at the
+# render cadence and change height as it did, which reads at the bench as the
+# panel bouncing. It did so even on a panel whose table was empty.
+
+
+class _RecordingPanel:
+    """Stand-in for a generated panel state that records what was written."""
+
+    writes: list
+
+    def __init__(self):
+        object.__setattr__(self, "writes", [])
+        self.window_points = 500
+        self.version = 0
+        self.chart_spec = {}
+        self.chart_url = ""
+        self.chart_layout = ""
+        self.table_rows = []
+        self.writes.clear()
+
+    def __setattr__(self, name, value):
+        self.writes.append(name)
+        object.__setattr__(self, name, value)
+
+    def panel_key(self):
+        return "recording-panel"
+
+
+class _FixedIngest:
+    """Ingest whose buffer always hands back the same snapshot."""
+
+    def __init__(self, snapshot):
+        self.buffer = type("_Buf", (), {"snapshot": lambda _self, n: snapshot})()
+
+
+def _pull_twice(snapshot, wants_mean=None):
+    state_base, _, _ = _live.make_live_panel(
+        "recording", "Y", wants_mean=wants_mean or _live.no_column
+    )
+    panel = _RecordingPanel()
+    ingest = _FixedIngest(snapshot)
+    state_base.pull(panel, ingest)
+    panel.writes.clear()
+    state_base.pull(panel, ingest)
+    return panel
+
+
+def test_a_second_pull_of_identical_data_does_not_rewrite_the_table():
+    panel = _pull_twice(_snap(epoch=[1.0, 2.0], co2_ppm=[400.0, 401.0]))
+    assert "table_rows" not in panel.writes
+    assert panel.table_rows == [["co2_ppm", "401"]]
+
+
+def test_a_second_pull_does_not_rewrite_the_layout():
+    """The layout is the same string for the life of the panel."""
+    panel = _pull_twice(_snap(epoch=[1.0], co2_ppm=[400.0]))
+    assert "chart_layout" not in panel.writes
+
+
+def test_an_empty_stream_does_not_rewrite_the_empty_table():
+    """The MFC case: a panel with no numeric columns still ticked, and rewriting
+    an empty table every tick bounced it just as a populated one."""
+    panel = _pull_twice({})
+    assert "table_rows" not in panel.writes
+    assert panel.table_rows == []
+
+
+def test_a_changed_value_is_written():
+    state_base, _, _ = _live.make_live_panel("changing", "Y")
+    panel = _RecordingPanel()
+    state_base.pull(panel, _FixedIngest(_snap(epoch=[1.0], v=[1.0])))
+    panel.writes.clear()
+    state_base.pull(panel, _FixedIngest(_snap(epoch=[1.0, 2.0], v=[1.0, 2.0])))
+    assert "table_rows" in panel.writes
+    assert panel.table_rows == [["v", "2"]]
+
+
+def test_the_live_panels_do_not_use_gridjs():
+    """`rx.data_table` cannot be held still and cannot be styled from here; see
+    sample_vis, which was ported to Radix for the same two reasons."""
+    import pathlib
+
+    # The call, not the name: the comment above the replacement says what was
+    # replaced and why, and must not fail the check it explains.
+    source = pathlib.Path(_live.__file__).read_text()
+    assert "rx.data_table(" not in source
+    assert "rx.table.root(" in source
+
+
+# -- a per-device dict reaches the panel as columns ---------------------------
+
+
+def test_an_mfc_status_dict_becomes_the_columns_the_panel_plots():
+    """End to end over the seam that was broken: the MFC poller publishes
+    `{device: status_dict}`, and this panel documents `{device}__{field}`
+    columns. Without the normalizer flattening a plain dict there were no
+    numeric columns at all -- an empty chart beside an empty table, while the
+    connection badge still read `live`."""
+    from helao.core.servers.reflex.ingest import normalize
+    from helao.core.servers.reflex.ringbuffer import RingBuffer
+
+    cols, _ = normalize(
+        [{"MFC0": ({"mass_flow": 1.5, "pressure": 14.7, "gas": "N2"}, 100.0)}]
+    )
+    buffer = RingBuffer(list(cols), capacity=16)
+    buffer.append(cols)
+
+    x, series = _live.series_for(
+        buffer.snapshot(500), wants_mean=_live.suffix_matcher("__mass_flow")
+    )
+    assert list(x) == [100.0]
+    assert "MFC0__mass_flow" in series
+    assert "MFC0__pressure" in series
+    assert _live.latest_rows(series) != []
+
+
 def test_no_panel_imports_xy_directly():
     """Only plots.py and xy_component.py may import xy."""
     import pathlib
