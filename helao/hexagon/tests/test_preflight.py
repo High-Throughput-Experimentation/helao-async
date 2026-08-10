@@ -16,10 +16,19 @@ from helao.hexagon import preflight
 # by full path.
 SMOKE_CONFIGS = preflight.HTE_SMOKE_CONFIGS
 
-#: A server block declaring the hexagon deployment, in either config dialect:
-#: `deployment: hexagon` in YAML, `"deployment": "hexagon"` in a .py config.
+#: A config that composes onto hexagon, in any of the three dialects: a
+#: literal `deployment: hexagon` server block (YAML), its `"deployment":
+#: "hexagon"` form (a .py config), or a DERIVED variant, which declares nothing
+#: literally and instead calls `hexagon_variant()` on its base.
+#:
+#: The derived leg is not redundant. Those files happen to contain the literal
+#: too -- inside the docstring that explains what they do -- so a
+#: literal-only pattern picks them up for the wrong reason and would drop them
+#: from this gate the moment someone reworded a comment. Matching the call is
+#: matching the mechanism.
 _DECLARES_HEXAGON = re.compile(
-    r"""["']?deployment["']?\s*[:=]\s*["']?%s\b""" % preflight.HEXAGON
+    r"""["']?deployment["']?\s*[:=]\s*["']?%s\b|hexagon_variant\s*\("""
+    % preflight.HEXAGON
 )
 
 #: Config suffixes `read_config` accepts.
@@ -69,6 +78,18 @@ KNOWN_HEXAGON_CONFIGS = frozenset(
         "htehexreflex",
         "gamryhex",
         "samplegraft",
+        # The fully-composed station variants (`<base>_hex`). Only the PUBLIC
+        # ones are pinned by name: a private deployment's config filenames may
+        # not appear in this repo, so its variants are covered by the derived
+        # glob and by `test_hexconfig.py`, which discovers them without naming
+        # them.
+        "test_hex",
+        "ccsi2_hex",
+        "anec_hex",
+        "clad_hex",
+        "adss3_hex",
+        "hispec_hex",
+        "eche10_hex",
     }
 )
 
