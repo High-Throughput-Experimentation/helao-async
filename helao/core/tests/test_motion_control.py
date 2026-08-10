@@ -57,7 +57,14 @@ HTE_CONFIG_GLOB = os.path.join(REPO_ROOT, "helao", "deploy", "hte", "configs", "
 #: The count is asserted rather than merely used, so that adding a station is a
 #: deliberate update to this file instead of a silent narrowing of the sweep
 #: that the property tests below rest on.
-TRACKED_SCALE_COUNT = 29
+#:
+#: Was 29 until 13 hte configs were relocated to `configs/archive/`, which the
+#: glob above does not reach. The 12 scales that left were `adss` (4), `eche6`,
+#: `eche7`, `eche8` and `uvis` (2 each) -- 17 + 12 = 29 exactly, which is what
+#: makes lowering the pin safe here: no *live* config quietly lost an axis, and
+#: that is the regression this number exists to catch. Verify the arithmetic
+#: closes before ever lowering it again.
+TRACKED_SCALE_COUNT = 17
 
 #: The largest N the round-trip property looks for a failure within. Measured
 #: across all tracked scales: the worst first-failing N is 255, so this is 4x
@@ -115,9 +122,9 @@ def _hte_server(config_name: str, server_key: str) -> dict:
 
 
 @pytest.fixture(scope="module")
-def adss_motor():
+def adss3_motor():
     """A four-axis letter-keyed station, including an Rz rotation axis."""
-    return _hte_server("adss.yml", "MOTOR")
+    return _hte_server("adss3.yml", "MOTOR")
 
 
 @pytest.fixture(scope="module")
@@ -172,8 +179,8 @@ SYNTHETIC_SPARSE_CFG = {
 # --------------------------------------------------------------------------
 
 
-def test_discovery_reads_the_letter_keyed_schema(adss_motor):
-    items = discover_axes(adss_motor, "letter_scale", server_key="MOTOR")
+def test_discovery_reads_the_letter_keyed_schema(adss3_motor):
+    items = discover_axes(adss3_motor, "letter_scale", server_key="MOTOR")
 
     assert [i.axis for i in items] == ["x", "y", "z", "Rz"]
     assert all(i.server_key == "MOTOR" for i in items)
@@ -320,13 +327,13 @@ def test_the_reciprocal_schema_is_inverted_not_passed_through(eche10_kmotor):
     print("test_the_reciprocal_schema_is_inverted_not_passed_through PASS")
 
 
-def test_the_letter_keyed_schema_resolves_through_the_controller_letter(adss_motor):
+def test_the_letter_keyed_schema_resolves_through_the_controller_letter(adss3_motor):
     # y maps to controller letter B; the scale must come from count_to_mm[B],
     # not from a count_to_mm["y"] that does not exist.
-    assert mm_per_count(adss_motor, "y", "letter_scale") == pytest.approx(
+    assert mm_per_count(adss3_motor, "y", "letter_scale") == pytest.approx(
         0.00015627999999717445, rel=1e-12
     )
-    assert mm_per_count(adss_motor, "Rz", "letter_scale") == pytest.approx(
+    assert mm_per_count(adss3_motor, "Rz", "letter_scale") == pytest.approx(
         0.0003169786106003353, rel=1e-12
     )
     print("test_the_letter_keyed_schema_resolves_through_the_controller_letter PASS")
@@ -427,7 +434,7 @@ def test_a_synthetic_sparse_config_disables_the_move_control_rather_than_raising
 # --------------------------------------------------------------------------
 
 
-def test_the_accessor_is_a_single_consistent_scalar(adss_motor, eche10_kmotor):
+def test_the_accessor_is_a_single_consistent_scalar(adss3_motor, eche10_kmotor):
     """Stated in terms of ``mm_per_count`` alone.
 
     There is deliberately no ``counts_to_mm`` / ``mm_to_counts`` pair to test
@@ -435,7 +442,7 @@ def test_the_accessor_is_a_single_consistent_scalar(adss_motor, eche10_kmotor):
     a scale, which is exactly what this layer forbids.
     """
     for cfg, source, axes in (
-        (adss_motor, "letter_scale", ("x", "y", "z", "Rz")),
+        (adss3_motor, "letter_scale", ("x", "y", "z", "Rz")),
         (eche10_kmotor, "inverse_scale", ("z",)),
     ):
         for axis in axes:
@@ -571,14 +578,14 @@ def test_a_millimetre_entry_needs_no_scale_at_all():
 
 
 def test_the_threshold_chain_resolves_in_order(
-    eche10_kmotor, hispec_kmotor, adss_motor
+    eche10_kmotor, hispec_kmotor, adss3_motor
 ):
     # The reciprocal schema already states how far the axis may travel, so the
     # threshold reuses it rather than making a station declare it twice.
     assert warn_threshold_mm(eche10_kmotor, "z", "inverse_scale") == 3.0
     assert warn_threshold_mm(hispec_kmotor, "z", "inverse_scale") == 5.0
     # No move_limit_mm on the letter-keyed schema, so the default applies.
-    assert warn_threshold_mm(adss_motor, "x", "letter_scale") == DEFAULT_WARN_ABOVE_MM
+    assert warn_threshold_mm(adss3_motor, "x", "letter_scale") == DEFAULT_WARN_ABOVE_MM
     # An explicit per-axis override wins over both.
     override = {
         "params": {"warn_above_mm": {"z": 1.5}, "axes": {"z": {"move_limit_mm": 3.0}}}
