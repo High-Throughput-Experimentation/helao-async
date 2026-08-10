@@ -322,7 +322,42 @@ def _graft_target_issues(key: str, server: dict, group: str) -> list[str]:
     return []
 
 
-def _checklist_presence(servers: dict, checklist_dir: Optional[Path]) -> list[str]:
+def _owning_deployment(server: dict, deployment: Optional[str]) -> Optional[str]:
+    """The deployment whose tree actually holds this server's module.
+
+    NOT the config's deployment. The launcher falls back to `hte` when a
+    deployment has no module of that name, so a config outside `hte` is
+    routinely served by an `hte` module -- and the frozen surface of that module
+    is `hte`'s, wherever the config naming it happens to live.
+
+    A `graft` server states its target outright in `legacy_module:`; anything
+    else is resolved by file existence in the launcher's own search order, so a
+    deployment carrying its OWN module of a colliding name resolves to itself
+    rather than to the fallback.
+    """
+    if _server_module(server) == "graft":
+        legacy = server.get("legacy_module") or ""
+        parts = legacy.split(".")
+        if len(parts) > 2 and parts[0] == "helao" and parts[1] == "deploy":
+            return parts[2]
+        return None
+    module = _server_module(server)
+    group = server.get("group") or "action"
+    for dep in (deployment, "hte", "test"):
+        if not dep:
+            continue
+        if (
+            REPO_ROOT / "helao" / "deploy" / dep / "servers" / group / f"{module}.py"
+        ).is_file():
+            return dep
+    return deployment
+
+
+def _checklist_presence(
+    servers: dict,
+    checklist_dir: Optional[Path],
+    deployment: Optional[str] = None,
+) -> list[str]:
     # Only enforced for deployments that have a frozen checklist set (hte). A
     # deployment with no checklist dir (e.g. test) is out of scope for this gate.
     if checklist_dir is None or not checklist_dir.exists():
@@ -332,7 +367,22 @@ def _checklist_presence(servers: dict, checklist_dir: Optional[Path]) -> list[st
         if s.get("deployment") != HEXAGON or s.get("group") != "action":
             continue
         module = _checklist_module(s)
-        if module and not (checklist_dir / f"{module}.json").exists():
+        if not module:
+            continue
+        # The config's own set first, then the set belonging to the deployment
+        # that actually owns the module. The second leg is what lets a config
+        # graft another deployment's server without a DUPLICATE of that
+        # server's frozen baseline being copied into its repo -- a second copy
+        # of a frozen surface is exactly the thing that drifts silently. This
+        # can only turn a "missing" into a "found"; a module frozen nowhere is
+        # still reported.
+        candidates = [checklist_dir]
+        owner = _owning_deployment(s, deployment)
+        if owner and owner != deployment:
+            owner_dir = _checklist_dir(owner)
+            if owner_dir is not None:
+                candidates.append(owner_dir)
+        if not any((d / f"{module}.json").exists() for d in candidates):
             issues.append(
                 f"{key}: frozen endpoint checklist missing for '{module}' "
                 f"(run harness.hte_freeze)"
@@ -411,7 +461,7 @@ def preflight_config(config: str) -> list[str]:
     issues: list[str] = []
     issues += _config_sanity(servers)
     issues += _shim_completeness(servers)
-    issues += _checklist_presence(servers, checklist_dir)
+    issues += _checklist_presence(servers, checklist_dir, deployment)
     issues += _library_collisions(cfg, deployment)
     return issues
 
