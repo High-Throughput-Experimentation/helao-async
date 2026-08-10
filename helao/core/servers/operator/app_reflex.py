@@ -168,6 +168,95 @@ EDITABLE_STATES = frozenset({"idle", "stopped"})
 #: Seconds between orchestrator polls when the config gives no `poll_interval`.
 DEFAULT_POLL_INTERVAL = 5.0
 
+#: The three queue kinds, in the order their tabs are shown.
+QUEUE_KINDS = ("sequence", "experiment", "action")
+
+#: Page sizes the pagers offer. Rendered as strings by ``rx.select`` and parsed
+#: back, so every entry has to survive a round trip through ``str``.
+PAGE_SIZES = (25, 50, 100, 200)
+
+#: Rows per page before the operator picks something else.
+DEFAULT_PAGE_SIZE = 50
+
+
+def clamp_offset(offset: int, total: int, page_size: int) -> int:
+    """Bound ``offset`` to a page that exists within ``total``.
+
+    An in-range offset is returned unchanged; only an offset past the end is
+    moved, and then to the first row of the last page. It does not re-align an
+    arbitrary offset to a page boundary -- every offset here comes from
+    :func:`paged_offset` or from zero, so it is aligned already, and silently
+    moving a caller's exact offset would be the more surprising behaviour.
+
+    A paged view outlives the data under it: a queue drains while the operator
+    is looking at page 9, and the next poll would otherwise fetch an empty
+    window and render a table that reads as "the queue is empty" -- the one lie
+    an operator must not be told. Clamping lands them on the last real page
+    instead.
+
+    Args:
+        offset: The requested first-row index.
+        total: How many rows exist now.
+        page_size: Rows per page.
+
+    Returns:
+        int: A page-aligned offset within ``[0, total)``, or 0 when empty.
+    """
+    if page_size <= 0 or total <= 0:
+        return 0
+    last_page = ((total - 1) // page_size) * page_size
+    return max(0, min(offset, last_page))
+
+
+def paged_offset(offset: int, total: int, page_size: int, action: str) -> int:
+    """The offset after one pager button.
+
+    Args:
+        offset: Current first-row index.
+        total: How many rows exist now.
+        page_size: Rows per page.
+        action: ``first``, ``prev``, ``next`` or ``last``. An unknown action
+            leaves the offset where it is -- these arrive as event arguments
+            from the client, so an unexpected one must not move the view.
+
+    Returns:
+        int: The clamped new offset.
+    """
+    if page_size <= 0:
+        return 0
+    current = clamp_offset(offset, total, page_size)
+    target = {
+        "first": 0,
+        "prev": current - page_size,
+        "next": current + page_size,
+        "last": max(0, total - 1),
+    }.get(action, current)
+    return clamp_offset(target, total, page_size)
+
+
+def page_label(offset: int, shown: int, total: int) -> str:
+    """The ``51-100 of 412`` line a pager shows.
+
+    Counts from 1 because it is read by a person, not indexed by one.
+    """
+    if total <= 0 or shown <= 0:
+        return f"0 of {max(0, total)}"
+    return f"{offset + 1}-{offset + shown} of {total}"
+
+
+def page_size_from(value: str) -> int:
+    """Parse a page-size select's value, falling back to the default.
+
+    The value crosses the wire as a string chosen by the client, so a value
+    outside :data:`PAGE_SIZES` is rejected rather than trusted: an arbitrary
+    integer here becomes an arbitrary ``limit`` on an orchestrator request.
+    """
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_PAGE_SIZE
+    return parsed if parsed in PAGE_SIZES else DEFAULT_PAGE_SIZE
+
 
 class BackendRegistry:
     """Per-session ``session_token -> OrchBackend`` map.
@@ -362,19 +451,53 @@ def poll_ms_for(interval: float) -> int:
     return int(max(interval, 0.0) * 1000) or int(DEFAULT_POLL_INTERVAL * 1000)
 
 
-async def refresh_tables(backend) -> dict:
-    """Read the orchestrator state and every queue in one pass.
+#: ``get_orch_state`` key carrying each queue's true depth. The orchestrator has
+#: shipped these since ``_queue_counts`` was added; they are what lets the tab
+#: titles report a depth the paged fetch cannot see.
+_TOTAL_KEYS = {
+    "sequence": "n_sequences",
+    "experiment": "n_experiments",
+    "action": "n_actions",
+}
+
+
+def queue_total(state: Optional[dict], kind: str, offset: int, shown: int) -> int:
+    """The queue's true depth, or a lower bound when the orchestrator omits it.
+
+    The fallback matters for a mixed-version group: an orchestrator without
+    ``_queue_counts`` would otherwise report 0, and a table with rows in it
+    would render under a pager claiming it was empty. ``offset + shown`` is
+    wrong but never *below* what is on screen, so the pager stays consistent
+    with the table it sits under.
+    """
+    value = (state or {}).get(_TOTAL_KEYS[kind])
+    try:
+        return max(0, int(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return offset + shown
+
+
+async def refresh_tables(backend, offsets: dict, page_size: int) -> dict:
+    """Read the orchestrator state and one page of every queue in one pass.
+
+    The state call goes first because the three queue depths ride on it, and
+    the depths are what bound the offsets: requesting a page without clamping
+    it would fetch a window past the end of a queue that drained since the
+    last poll.
 
     Args:
         backend: An ``OrchBackend``, or ``None`` when the page is not yet
             connected.
+        offsets: ``kind -> first-row index``, one per :data:`QUEUE_KINDS`.
+        page_size: Rows to request per queue.
 
     Returns:
-        dict: State var updates. On success this carries every row list. **On
-        failure it carries no row keys at all**, so the caller's last known
-        queues stay on screen while the status line reports the orchestrator
-        is unreachable. Blanking the tables would read as "the queue is
-        empty", which is the one lie an operator must not be told.
+        dict: State var updates. On success this carries every row list, the
+        three depths, and the clamped offsets. **On failure it carries no row
+        keys at all**, so the caller's last known queues stay on screen while
+        the status line reports the orchestrator is unreachable. Blanking the
+        tables would read as "the queue is empty", which is the one lie an
+        operator must not be told.
     """
     if backend is None:
         return {
@@ -385,9 +508,21 @@ async def refresh_tables(backend) -> dict:
         }
     try:
         state = await backend.get_orch_state()
-        sequences = await backend.list_sequences()
-        experiments = await backend.list_experiments()
-        actions = await backend.list_actions()
+        wanted = {
+            kind: clamp_offset(
+                int(offsets.get(kind, 0) or 0),
+                queue_total(state, kind, 0, 0),
+                page_size,
+            )
+            for kind in QUEUE_KINDS
+        }
+        sequences = await backend.list_sequences(
+            limit=page_size, offset=wanted["sequence"]
+        )
+        experiments = await backend.list_experiments(
+            limit=page_size, offset=wanted["experiment"]
+        )
+        actions = await backend.list_actions(limit=page_size, offset=wanted["action"])
         summary = await backend.get_status_summary()
     except Exception as exc:
         LOGGER.warning(f"operator poll failed: {exc}")
@@ -396,15 +531,33 @@ async def refresh_tables(backend) -> dict:
             "status": status_line(None, False),
             "error": str(exc),
         }
+    rows = {
+        "sequence": queue_rows(sequences, SEQ_COLS),
+        "experiment": queue_rows(experiments, EXP_COLS),
+        "action": queue_rows(actions, ACT_COLS),
+    }
     return {
         "reachable": True,
         "orch_state": (state or {}).get("orch_state", ""),
         "status": status_line(state, True),
         "error": "",
-        "seq_rows": queue_rows(sequences, SEQ_COLS),
-        "exp_rows": queue_rows(experiments, EXP_COLS),
-        "act_rows": queue_rows(actions, ACT_COLS),
+        "seq_rows": rows["sequence"],
+        "exp_rows": rows["experiment"],
+        "act_rows": rows["action"],
         "server_rows": server_rows(summary),
+        "seq_total": queue_total(
+            state, "sequence", wanted["sequence"], len(rows["sequence"])
+        ),
+        "exp_total": queue_total(
+            state, "experiment", wanted["experiment"], len(rows["experiment"])
+        ),
+        "act_total": queue_total(
+            state, "action", wanted["action"], len(rows["action"])
+        ),
+        # Echoed back so the caller can tell a clamp from a stale write. The
+        # caller only adopts these when its own offsets still match what it
+        # asked for; see `OperatorQueueState.poll_once`.
+        "requested_offsets": wanted,
     }
 
 
@@ -754,6 +907,23 @@ class OperatorQueueState(rx.State):
     act_rows: list[list[str]] = []
     server_rows: list[list[str]] = []
 
+    #: Rows per page, shared by all three queue tables. One setting rather than
+    #: three: the three tables are read together, and a per-table size would
+    #: have the operator setting the same number three times.
+    page_size: int = DEFAULT_PAGE_SIZE
+
+    #: First-row index of each queue table's current page.
+    seq_offset: int = 0
+    exp_offset: int = 0
+    act_offset: int = 0
+
+    #: Each queue's true depth, from `get_orch_state`. **Not** ``len(rows)``:
+    #: the rows are one page, so counting them would report the page size as
+    #: the queue depth.
+    seq_total: int = 0
+    exp_total: int = 0
+    act_total: int = 0
+
     orch_state: str = ""
     #: Tick cadence in milliseconds, read from the config on mount rather than
     #: baked into the exported bundle.
@@ -772,26 +942,107 @@ class OperatorQueueState(rx.State):
         """Whether the queue-editing controls are enabled."""
         return self.reachable and may_edit_queue(self.orch_state)
 
-    # Queue depths for the tab titles. Computed vars rather than
-    # ``seq_rows.length()`` at the call site: on the class those attributes are
-    # Vars, which pyright types as the annotated ``list[list[str]]`` and then
-    # rejects ``.length()`` on. A computed var reads as a plain ``int`` to both
-    # pyright and the template, and recomputes from the same rows the tab's own
-    # table renders, so the count cannot drift from the table.
+    # Queue depths for the tab titles. These are the orchestrator's own counts,
+    # not ``len(rows)``: the tables are paged, so counting the rendered rows
+    # would cap every title at the page size -- which is exactly the bug the
+    # old ``limit=10`` fetch produced, where a 400-deep queue read "[10]".
+    #
+    # Computed vars rather than reading the total at the call site: on the class
+    # those attributes are Vars, and a computed var reads as a plain ``int`` to
+    # both pyright and the template.
     @rx.var
     def seq_count(self) -> int:
         """Number of sequences in the orchestrator's sequence queue."""
-        return len(self.seq_rows)
+        return self.seq_total
 
     @rx.var
     def exp_count(self) -> int:
         """Number of experiments in the orchestrator's experiment queue."""
-        return len(self.exp_rows)
+        return self.exp_total
 
     @rx.var
     def act_count(self) -> int:
         """Number of actions in the orchestrator's action queue."""
-        return len(self.act_rows)
+        return self.act_total
+
+    @rx.var
+    def seq_page_label(self) -> str:
+        """``51-100 of 412`` for the sequence table's pager."""
+        return page_label(self.seq_offset, len(self.seq_rows), self.seq_total)
+
+    @rx.var
+    def exp_page_label(self) -> str:
+        """``51-100 of 412`` for the experiment table's pager."""
+        return page_label(self.exp_offset, len(self.exp_rows), self.exp_total)
+
+    @rx.var
+    def act_page_label(self) -> str:
+        """``51-100 of 412`` for the action table's pager."""
+        return page_label(self.act_offset, len(self.act_rows), self.act_total)
+
+    @rx.var
+    def page_size_value(self) -> str:
+        """The page-size select's value. ``rx.select`` options are strings."""
+        return str(self.page_size)
+
+    def _offset_for(self, kind: str) -> int:
+        """First-row index of one queue table's current page."""
+        return {
+            "sequence": self.seq_offset,
+            "experiment": self.exp_offset,
+            "action": self.act_offset,
+        }.get(kind, 0)
+
+    def _total_for(self, kind: str) -> int:
+        """One queue's true depth."""
+        return {
+            "sequence": self.seq_total,
+            "experiment": self.exp_total,
+            "action": self.act_total,
+        }.get(kind, 0)
+
+    def _set_offset(self, kind: str, offset: int) -> None:
+        """Move one queue table's page."""
+        attr = {
+            "sequence": "seq_offset",
+            "experiment": "exp_offset",
+            "action": "act_offset",
+        }.get(kind)
+        if attr is not None:
+            setattr(self, attr, offset)
+
+    @rx.event
+    def page(self, kind: str, action: str):
+        """Move one queue table to another page and refresh it now.
+
+        The refresh is chained rather than left to the next tick so the table
+        responds to the click. If a poll is already in flight the chained one
+        is dropped by ``poll_once``'s guard and the in-flight poll's result is
+        discarded for having the wrong offset, so the click lands on the tick
+        after -- late, never wrong.
+        """
+        if kind not in QUEUE_KINDS:
+            return
+        self._set_offset(
+            kind,
+            paged_offset(
+                self._offset_for(kind), self._total_for(kind), self.page_size, action
+            ),
+        )
+        return OperatorQueueState.poll_once("")
+
+    @rx.event
+    def set_page_size(self, value: str):
+        """Change the rows-per-page of all three queue tables.
+
+        Every offset returns to the top: a page-4-of-50 offset means a
+        different row under a different page size, so keeping it would scroll
+        the operator somewhere they did not ask to go.
+        """
+        self.page_size = page_size_from(value)
+        for kind in QUEUE_KINDS:
+            self._set_offset(kind, 0)
+        return OperatorQueueState.poll_once("")
 
     @rx.event(background=True)
     async def select_queue_row(self, kind: str, index: int):
@@ -805,17 +1056,24 @@ class OperatorQueueState(rx.State):
 
         Args:
             kind: ``sequence``, ``experiment`` or ``action``.
-            index: Row index within that queue.
+            index: Row index **within the rendered page**. The orchestrator
+                indexes its deques absolutely, so the page's offset is added
+                here rather than in the template: the browser then never has to
+                know where the page starts, and a click on page 2 cannot fetch
+                the object from page 1.
         """
         async with self:
             token = self.router.session.client_token
+            position = self._offset_for(kind) + index
         backend = session_backend(token)
         if backend is None:
             return
         try:
-            obj = await backend.get_queue_object(kind, index)
+            obj = await backend.get_queue_object(kind, position)
         except Exception as exc:
-            LOGGER.warning(f"operator could not read {kind} queue row {index}: {exc}")
+            LOGGER.warning(
+                f"operator could not read {kind} queue row {position}: {exc}"
+            )
             obj = None
         async with self:
             self.tree_header, self.tree_html = tree_for(kind, obj)
@@ -843,9 +1101,16 @@ class OperatorQueueState(rx.State):
 
         Only the keys present are assigned, which is what preserves the last
         known rows across an unreachable poll.
+
+        ``requested_offsets`` is not a var; it names the page the rows are
+        actually from, so it is applied through :meth:`_set_offset` rather than
+        ``setattr``. :meth:`poll_once` decides whether it is still current.
         """
+        requested = updates.pop("requested_offsets", None) or {}
         for key, value in updates.items():
             setattr(self, key, value)
+        for kind, offset in requested.items():
+            self._set_offset(kind, offset)
 
     @rx.event(background=True)
     async def poll_once(self, _tick: str = ""):
@@ -875,9 +1140,22 @@ class OperatorQueueState(rx.State):
                 return
             self.polling = True
             token = self.router.session.client_token
+            # The pages this poll is about to fetch. Captured now so the result
+            # can be checked against them: a pager click that lands while the
+            # fetch is in flight makes every row in that result the wrong page.
+            sent = {kind: self._offset_for(kind) for kind in QUEUE_KINDS}
+            size = self.page_size
         try:
-            updates = await refresh_tables(session_backend(token))
+            updates = await refresh_tables(session_backend(token), sent, size)
             async with self:
+                moved = any(self._offset_for(k) != sent[k] for k in QUEUE_KINDS)
+                if moved and "seq_rows" in updates:
+                    # The operator paged while this was in flight. Dropping the
+                    # whole result is right rather than merely skipping the
+                    # offsets: the rows belong to the page they left, and
+                    # showing them under the new page's label would be a table
+                    # that disagrees with its own pager.
+                    return
                 self._apply(updates)
         finally:
             # Cleared only after the updates are applied. Clearing first opens
@@ -912,12 +1190,19 @@ class OperatorQueueState(rx.State):
 
     @rx.event(background=True)
     async def move(self, kind: str, position: int, direction: str):
-        """Move a queue item, then let the next poll show the new order."""
+        """Move a queue item, then let the next poll show the new order.
+
+        ``position`` is page-local and ``length`` is the queue's true depth --
+        not the page's. Both matter: the orchestrator moves by absolute index,
+        and bounding the move by the page length would refuse to move the last
+        row of a page down into the next one, which is a legal move.
+        """
         async with self:
             token = self.router.session.client_token
-            length = len(self._rows_for(kind))
+            absolute = self._offset_for(kind) + position
+            length = self._total_for(kind)
         message = await dispatch_move(
-            session_backend(token), kind, position, direction, length
+            session_backend(token), kind, absolute, direction, length
         )
         async with self:
             self.error = message
@@ -927,8 +1212,9 @@ class OperatorQueueState(rx.State):
         """Remove a queue item, then let the next poll show the new queue."""
         async with self:
             token = self.router.session.client_token
-            length = len(self._rows_for(kind))
-        message = await dispatch_remove(session_backend(token), kind, position, length)
+            absolute = self._offset_for(kind) + position
+            length = self._total_for(kind)
+        message = await dispatch_remove(session_backend(token), kind, absolute, length)
         async with self:
             self.error = message
 
@@ -1746,15 +2032,35 @@ def _last_of(value):
 
 
 def history_entries(histories: Optional[dict], kind: str) -> list:
-    """Render one history table, keeping each row's source payload beside it.
+    """Render one whole history container from a ``get_histories`` payload.
+
+    Args:
+        histories: ``get_histories`` payload -- ``kind -> [(uuid, payload)]``.
+        kind: ``action``, ``experiment``, or ``sequence``.
+
+    Returns:
+        list[tuple[list[str], dict]]: See :func:`history_page_entries`.
+    """
+    return history_page_entries(((histories or {}).get(kind)) or [], kind)
+
+
+def history_page_entries(entries, kind: str) -> list:
+    """Render one page of history, keeping each row's source payload beside it.
 
     Rows and payloads come from one pass so their order cannot drift. They are
     indexed together -- the operator clicks row *n* and expects object *n* -- and
     two separately-sorted lists would put the wrong object in the tree without
     anything looking wrong.
 
+    The sort is by UUID descending, which is chronological here and not an
+    accident: ``gen_uuid`` returns a **uuid7**, whose leading bits are a
+    timestamp, so lexicographic order is time order. Sorting a server-supplied
+    page is a no-op on a page that already arrived newest-first -- a page is a
+    contiguous slice of one chronological sequence -- so the same renderer
+    serves the paged and whole-container paths.
+
     Args:
-        histories: ``get_histories`` payload -- ``kind -> [(uuid, payload)]``.
+        entries: ``(uuid, payload)`` pairs -- one page, or a whole container.
         kind: ``action``, ``experiment``, or ``sequence``.
 
     Returns:
@@ -1766,7 +2072,7 @@ def history_entries(histories: Optional[dict], kind: str) -> list:
     columns = HIST_COLS.get(kind)
     if columns is None:
         return []
-    entries = ((histories or {}).get(kind)) or []
+    entries = entries or []
     start_key, finish_key = _HIST_TIMES[kind]
     out = []
     for uuid, payload in sorted(entries, key=lambda x: x[0])[::-1]:
@@ -1808,6 +2114,26 @@ class OperatorPlanState(rx.State):
     experiment_history: list[list[str]] = []
     sequence_history: list[list[str]] = []
 
+    #: Rows per page across all three history tables.
+    hist_page_size: int = DEFAULT_PAGE_SIZE
+
+    #: First-row index of each history table's page, counting back from the
+    #: newest entry -- offset 0 is the most recent page, not the oldest.
+    action_offset: int = 0
+    experiment_offset: int = 0
+    sequence_offset: int = 0
+
+    #: Full length of each history container, from `get_history_page`.
+    action_total: int = 0
+    experiment_total: int = 0
+    sequence_total: int = 0
+
+    #: Guard against overlapping history refreshes, mirroring
+    #: ``OperatorQueueState.polling``. Both tick from the same interval, so a
+    #: slow orchestrator would otherwise accumulate refreshes that interleave
+    #: their writes and leave rows from one page under another page's label.
+    refreshing: bool = False
+
     #: Attribute tree for the row the operator last clicked, as the Bokeh
     #: operator shows beside these tables. Rendered HTML rather than the object,
     #: because the tree is markup either way and the raw payloads have no other
@@ -1830,6 +2156,95 @@ class OperatorPlanState(rx.State):
         Read by the flush button's label and by the Plan tab's title.
         """
         return len(self.plan_view)
+
+    # History depths for the subtab titles, and the pager labels beneath each
+    # table. The depths are the orchestrator's own totals, not ``len(rows)``:
+    # the tables show one page.
+    @rx.var
+    def sequence_count(self) -> int:
+        """Number of sequences in the orchestrator's sequence history."""
+        return self.sequence_total
+
+    @rx.var
+    def experiment_count(self) -> int:
+        """Number of experiments in the orchestrator's experiment history."""
+        return self.experiment_total
+
+    @rx.var
+    def action_count(self) -> int:
+        """Number of actions in the orchestrator's action history."""
+        return self.action_total
+
+    @rx.var
+    def sequence_page_label(self) -> str:
+        """``51-100 of 412`` for the sequence history's pager."""
+        return page_label(
+            self.sequence_offset, len(self.sequence_history), self.sequence_total
+        )
+
+    @rx.var
+    def experiment_page_label(self) -> str:
+        """``51-100 of 412`` for the experiment history's pager."""
+        return page_label(
+            self.experiment_offset, len(self.experiment_history), self.experiment_total
+        )
+
+    @rx.var
+    def action_page_label(self) -> str:
+        """``51-100 of 412`` for the action history's pager."""
+        return page_label(
+            self.action_offset, len(self.action_history), self.action_total
+        )
+
+    @rx.var
+    def hist_page_size_value(self) -> str:
+        """The history page-size select's value. ``rx.select`` uses strings."""
+        return str(self.hist_page_size)
+
+    def _hist_offset_for(self, kind: str) -> int:
+        """First-row index of one history table's page."""
+        return {
+            "sequence": self.sequence_offset,
+            "experiment": self.experiment_offset,
+            "action": self.action_offset,
+        }.get(kind, 0)
+
+    def _hist_total_for(self, kind: str) -> int:
+        """Full length of one history container."""
+        return {
+            "sequence": self.sequence_total,
+            "experiment": self.experiment_total,
+            "action": self.action_total,
+        }.get(kind, 0)
+
+    def _set_hist_offset(self, kind: str, offset: int) -> None:
+        """Move one history table's page."""
+        if kind in HIST_COLS:
+            setattr(self, f"{kind}_offset", offset)
+
+    @rx.event
+    def page_history(self, kind: str, action: str):
+        """Move one history table to another page and refresh it now."""
+        if kind not in HIST_COLS:
+            return
+        self._set_hist_offset(
+            kind,
+            paged_offset(
+                self._hist_offset_for(kind),
+                self._hist_total_for(kind),
+                self.hist_page_size,
+                action,
+            ),
+        )
+        return OperatorPlanState.refresh_history("")
+
+    @rx.event
+    def set_hist_page_size(self, value: str):
+        """Change the rows-per-page of all three history tables."""
+        self.hist_page_size = page_size_from(value)
+        for kind in HIST_COLS:
+            self._set_hist_offset(kind, 0)
+        return OperatorPlanState.refresh_history("")
 
     def _set_plan(self, plan: list) -> None:
         self._plan = plan
@@ -1937,39 +2352,82 @@ class OperatorPlanState(rx.State):
             self.status = "" if error else f"sent {len(plan)} sequence(s)"
 
     @rx.event(background=True)
-    async def refresh_history(self):
-        """Reload all three history tables."""
+    async def refresh_history(self, _tick: str = ""):
+        """Reload one page of each of the three history tables.
+
+        Bound to three things at once: the page's ``rx.moment`` interval, which
+        is what makes the history live; the manual Refresh button, which forces
+        one now; and the pager events, which refresh after moving. The interval
+        passes its value and the other two pass nothing, hence the default.
+
+        Args:
+            _tick: The interval component's value. Unused.
+        """
         async with self:
+            if self.refreshing:
+                # Same rule as the queue poll: a tick landing on an in-flight
+                # refresh is dropped, not queued.
+                return
+            self.refreshing = True
             token = self.router.session.client_token
-        backend = session_backend(token)
-        if backend is None:
-            return
+            sent = {kind: self._hist_offset_for(kind) for kind in HIST_COLS}
+            size = self.hist_page_size
         try:
-            histories = await backend.get_histories()
-        except Exception as exc:
-            LOGGER.warning(f"operator history refresh failed: {exc}")
+            backend = session_backend(token)
+            if backend is None:
+                return
+            try:
+                pages = {
+                    kind: await backend.get_history_page(
+                        kind, limit=size, offset=sent[kind]
+                    )
+                    for kind in HIST_COLS
+                }
+            except Exception as exc:
+                LOGGER.warning(f"operator history refresh failed: {exc}")
+                async with self:
+                    self.error = f"history unavailable: {exc}"
+                return
+            try:
+                totals = {k: int((v or {}).get("total") or 0) for k, v in pages.items()}
+                # Clamped *after* the fetch, not before: the total is only known
+                # once the page comes back, and a history that has not grown to
+                # the requested page yet must not leave the operator stranded on
+                # an empty one.
+                offsets = {k: clamp_offset(sent[k], totals[k], size) for k in pages}
+                entries = {
+                    kind: history_page_entries((page or {}).get("items"), kind)
+                    for kind, page in pages.items()
+                }
+                rendered = {k: [row for row, _ in v] for k, v in entries.items()}
+                objects = {k: [obj for _, obj in v] for k, v in entries.items()}
+            except Exception as exc:
+                # Rendering is outside the fetch's guard, and a payload shaped
+                # unlike (uuid, dict) pairs would otherwise escape the handler.
+                LOGGER.warning(f"operator could not render the histories: {exc}")
+                async with self:
+                    self.error = f"history could not be read: {exc}"
+                return
             async with self:
-                self.error = f"history unavailable: {exc}"
-            return
-        try:
-            entries = {
-                kind: history_entries(histories, kind)
-                for kind in ("action", "experiment", "sequence")
-            }
-            rendered = {k: [row for row, _ in v] for k, v in entries.items()}
-            objects = {k: [obj for _, obj in v] for k, v in entries.items()}
-        except Exception as exc:
-            # Rendering is outside the fetch's guard, and a payload shaped
-            # unlike (uuid, dict) pairs would otherwise escape the handler.
-            LOGGER.warning(f"operator could not render the histories: {exc}")
+                if any(self._hist_offset_for(k) != sent[k] for k in HIST_COLS):
+                    # Paged while this was in flight; these rows are the page
+                    # the operator just left.
+                    return
+                self.action_history = rendered["action"]
+                self.experiment_history = rendered["experiment"]
+                self.sequence_history = rendered["sequence"]
+                self.action_total = totals["action"]
+                self.experiment_total = totals["experiment"]
+                self.sequence_total = totals["sequence"]
+                for kind, offset in offsets.items():
+                    self._set_hist_offset(kind, offset)
+                self._hist_objs = objects
+                # `error` is deliberately *not* cleared here. It is shared with
+                # the plan buffer, and a tick every few seconds would wipe an
+                # enqueue failure off the screen before it could be read.
+        finally:
             async with self:
-                self.error = f"history could not be read: {exc}"
-            return
-        async with self:
-            self.action_history = rendered["action"]
-            self.experiment_history = rendered["experiment"]
-            self.sequence_history = rendered["sequence"]
-            self._hist_objs = objects
+                self.refreshing = False
 
     @rx.event
     def select_history_row(self, kind: str, index: int):
@@ -2267,6 +2725,7 @@ def _table(
     row_actions=None,
     on_row_click=None,
     hue: str | None = None,
+    pager=None,
 ):
     """A scrolling table over ``list[list[str]]`` rows.
 
@@ -2286,6 +2745,11 @@ def _table(
             is being shown as a queue or as history. The **body stays white**
             either way: saturating the cells behind the data is what makes a
             coloured table hard to read.
+        pager: Optional component placed directly under the table. Passed in
+            rather than built here so the table primitive stays a table: a
+            pager needs the owning state's offset, total and events, none of
+            which a table knows about. ``None`` leaves the previous bare-table
+            layout untouched, which is what the Servers and Plan tables get.
     """
 
     def render(row, index):
@@ -2306,7 +2770,7 @@ def _table(
     ]
     if row_actions is not None:
         headers.append(rx.table.column_header_cell("", class_name=header_class))
-    return rx.scroll_area(
+    scroller = rx.scroll_area(
         rx.table.root(
             rx.table.header(rx.table.row(*headers)),
             rx.table.body(rx.foreach(rows_var, render)),
@@ -2317,6 +2781,65 @@ def _table(
         type="auto",
         scrollbars="vertical",
         height=height,
+    )
+    if pager is None:
+        return scroller
+    return rx.vstack(scroller, pager, width="100%", spacing="1")
+
+
+def _pager(
+    *, label_var, offset_var, total_var, size_var, size_value_var, on_page, on_page_size
+):
+    """The row of controls under a paged table.
+
+    Args:
+        label_var: Var holding the ``51-100 of 412`` line.
+        offset_var: Var holding the page's first-row index. Read only to
+            disable the backwards controls.
+        total_var: Var holding the true row count.
+        size_var: Var holding the page size as an ``int``, for the bounds
+            comparison.
+        size_value_var: The same page size as a ``str``. Separate because
+            ``rx.select`` options are strings and its value has to match one
+            of them exactly, while the comparison above needs a number.
+        on_page: ``action -> EventSpec`` for ``first``/``prev``/``next``/``last``.
+        on_page_size: Handler for the page-size select.
+
+    The forward controls are disabled on ``offset + page_size >= total`` rather
+    than on the rendered row count, because the row count is only known after a
+    fetch: a pager that waited for it would enable Next for one tick on the
+    last page.
+    """
+    at_start = offset_var <= 0
+    at_end = offset_var + size_var >= total_var
+
+    def step(glyph: str, action: str, disabled):
+        return rx.button(
+            glyph,
+            size="1",
+            variant="soft",
+            disabled=disabled,
+            on_click=on_page(action),
+        )
+
+    return rx.hstack(
+        step("<<", "first", at_start),
+        step("<", "prev", at_start),
+        rx.text(label_var, size="1", class_name=_MUTED_TEXT),
+        step(">", "next", at_end),
+        step(">>", "last", at_end),
+        rx.spacer(),
+        rx.text("rows", size="1", class_name=_MUTED_TEXT),
+        rx.select(
+            [str(n) for n in PAGE_SIZES],
+            value=size_value_var,
+            on_change=on_page_size,
+            size="1",
+            width="5.5em",
+        ),
+        width="100%",
+        spacing="2",
+        align="center",
     )
 
 
@@ -2340,14 +2863,29 @@ def _tree_pane(header_var, html_var):
     )
 
 
-def _queue_tab(columns: list, rows_var, kind: str):
-    """One queue table with per-row reorder and remove controls."""
+def _queue_tab(columns: list, rows_var, kind: str, offset_var, total_var, label_var):
+    """One queue table with a pager and per-row reorder and remove controls.
+
+    The row index handed to every event stays **page-local**. The state adds
+    its own offset before it reaches the orchestrator, so nothing in the
+    browser has to know where the page starts -- and there is no place for a
+    template to forget to add it.
+    """
     return _table(
         columns,
         rows_var,
         # The queue kinds are exactly the hue keys, so the same object type is
         # the same colour here and in History.
         hue=kind,
+        pager=_pager(
+            label_var=label_var,
+            offset_var=offset_var,
+            total_var=total_var,
+            size_var=OperatorQueueState.page_size,
+            size_value_var=OperatorQueueState.page_size_value,
+            on_page=lambda action: OperatorQueueState.page(kind, action),
+            on_page_size=OperatorQueueState.set_page_size,
+        ),
         on_row_click=lambda row, index: OperatorQueueState.select_queue_row(
             kind, index
         ),
@@ -2786,15 +3324,36 @@ def _queue_panel():
                 rx.tabs.trigger("Servers", value="servers"),
             ),
             rx.tabs.content(
-                _queue_tab(SEQ_COLS, OperatorQueueState.seq_rows, "sequence"),
+                _queue_tab(
+                    SEQ_COLS,
+                    OperatorQueueState.seq_rows,
+                    "sequence",
+                    OperatorQueueState.seq_offset,
+                    OperatorQueueState.seq_total,
+                    OperatorQueueState.seq_page_label,
+                ),
                 value="sequence",
             ),
             rx.tabs.content(
-                _queue_tab(EXP_COLS, OperatorQueueState.exp_rows, "experiment"),
+                _queue_tab(
+                    EXP_COLS,
+                    OperatorQueueState.exp_rows,
+                    "experiment",
+                    OperatorQueueState.exp_offset,
+                    OperatorQueueState.exp_total,
+                    OperatorQueueState.exp_page_label,
+                ),
                 value="experiment",
             ),
             rx.tabs.content(
-                _queue_tab(ACT_COLS, OperatorQueueState.act_rows, "action"),
+                _queue_tab(
+                    ACT_COLS,
+                    OperatorQueueState.act_rows,
+                    "action",
+                    OperatorQueueState.act_offset,
+                    OperatorQueueState.act_total,
+                    OperatorQueueState.act_page_label,
+                ),
                 value="action",
             ),
             rx.tabs.content(
@@ -2842,52 +3401,92 @@ def _queue_panel():
     )
 
 
+def _history_tab(kind: str, rows_var, offset_var, total_var, label_var):
+    """One paged history table.
+
+    The row index stays page-local *and* is used page-locally: ``_hist_objs``
+    holds only the rendered page, so unlike the queue tables there is no offset
+    to add. Adding one here would index past the end of the cached payloads.
+    """
+    return _table(
+        HIST_COLS[kind],
+        rows_var,
+        hue=kind,
+        pager=_pager(
+            label_var=label_var,
+            offset_var=offset_var,
+            total_var=total_var,
+            size_var=OperatorPlanState.hist_page_size,
+            size_value_var=OperatorPlanState.hist_page_size_value,
+            on_page=lambda action: OperatorPlanState.page_history(kind, action),
+            on_page_size=OperatorPlanState.set_hist_page_size,
+        ),
+        on_row_click=lambda row, index: (
+            OperatorPlanState.select_history_row(kind, index)
+        ),
+    )
+
+
 def _history_panel():
-    """The three history tables."""
+    """The three history tables.
+
+    Ordered sequence-first with a count in each title, matching the Queues
+    subtabs: the two panels show the same three object kinds, and reading them
+    in a different order in each is what makes an operator check twice.
+    """
     return rx.vstack(
         rx.button(
-            "Refresh history", size="1", on_click=OperatorPlanState.refresh_history
+            "Refresh history",
+            size="1",
+            # The empty tick is passed explicitly, as `poll_once` is on mount:
+            # a button's `on_click` otherwise supplies a PointerEventInfo,
+            # which does not match the interval's string argument.
+            on_click=OperatorPlanState.refresh_history(""),
         ),
         rx.tabs.root(
             rx.tabs.list(
-                rx.tabs.trigger("Actions", value="action"),
-                rx.tabs.trigger("Experiments", value="experiment"),
-                rx.tabs.trigger("Sequences", value="sequence"),
-            ),
-            rx.tabs.content(
-                _table(
-                    HIST_COLS["action"],
-                    OperatorPlanState.action_history,
-                    hue="action",
-                    on_row_click=lambda row, index: (
-                        OperatorPlanState.select_history_row("action", index)
-                    ),
+                rx.tabs.trigger(
+                    f"Sequences [{OperatorPlanState.sequence_count}]", value="sequence"
                 ),
-                value="action",
+                rx.tabs.trigger(
+                    f"Experiments [{OperatorPlanState.experiment_count}]",
+                    value="experiment",
+                ),
+                rx.tabs.trigger(
+                    f"Actions [{OperatorPlanState.action_count}]", value="action"
+                ),
             ),
             rx.tabs.content(
-                _table(
-                    HIST_COLS["experiment"],
+                _history_tab(
+                    "sequence",
+                    OperatorPlanState.sequence_history,
+                    OperatorPlanState.sequence_offset,
+                    OperatorPlanState.sequence_total,
+                    OperatorPlanState.sequence_page_label,
+                ),
+                value="sequence",
+            ),
+            rx.tabs.content(
+                _history_tab(
+                    "experiment",
                     OperatorPlanState.experiment_history,
-                    hue="experiment",
-                    on_row_click=lambda row, index: (
-                        OperatorPlanState.select_history_row("experiment", index)
-                    ),
+                    OperatorPlanState.experiment_offset,
+                    OperatorPlanState.experiment_total,
+                    OperatorPlanState.experiment_page_label,
                 ),
                 value="experiment",
             ),
             rx.tabs.content(
-                _table(
-                    HIST_COLS["sequence"],
-                    OperatorPlanState.sequence_history,
-                    hue="sequence",
-                    on_row_click=lambda row, index: (
-                        OperatorPlanState.select_history_row("sequence", index)
-                    ),
+                _history_tab(
+                    "action",
+                    OperatorPlanState.action_history,
+                    OperatorPlanState.action_offset,
+                    OperatorPlanState.action_total,
+                    OperatorPlanState.action_page_label,
                 ),
-                value="sequence",
+                value="action",
             ),
-            default_value="action",
+            default_value="sequence",
             width="100%",
         ),
         _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
@@ -2946,9 +3545,15 @@ def build_page():
         # The tick lives in the tree, so it stops existing when the tab does.
         # A server-side poll loop would outlive the browser: on_unmount fires
         # on in-app navigation, never on a closed tab.
+        # Both refreshes hang off the one interval. The history used to move
+        # only when its button was pressed, which meant a page left open showed
+        # a history that had stopped at whatever moment it was last clicked.
         rx.moment(
             interval=OperatorQueueState.poll_ms,
-            on_change=OperatorQueueState.poll_once,
+            on_change=[
+                OperatorQueueState.poll_once,
+                OperatorPlanState.refresh_history,
+            ],
             display="none",
         ),
         width="100%",
@@ -2957,6 +3562,10 @@ def build_page():
         on_mount=[
             OperatorQueueState.on_mount,
             OperatorQueueState.poll_once(""),
+            # Primed on mount as well as ticked, so the History tab is
+            # populated the first time it is opened rather than one interval
+            # later.
+            OperatorPlanState.refresh_history(""),
             OperatorLibState.load_libraries,
             OperatorPlateState.on_mount,
             OperatorSpecState.on_mount,
