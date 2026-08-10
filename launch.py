@@ -61,9 +61,9 @@ from termcolor import cprint
 from helao.core.servers.reflex.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
+from helao.helpers import win_job
 from helao.helpers.config_loader import read_config
 from helao.helpers.helao_dirs import helao_dirs
-from helao.helpers import win_job
 from helao.helpers.parent_death import (
     DETACH_MARKER_ENV,
     PARENT_PID_ENV,
