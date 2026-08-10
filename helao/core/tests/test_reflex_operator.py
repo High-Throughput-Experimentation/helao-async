@@ -39,21 +39,39 @@ class FakeBackend:
         if self._fail:
             raise RuntimeError("orchestrator unreachable")
 
+    @staticmethod
+    def _page(items, limit, offset):
+        """Slice like the orchestrator's paged list endpoints do."""
+        start = max(0, offset)
+        stop = None if limit is None else start + max(0, limit)
+        return list(items)[start:stop]
+
     async def get_orch_state(self):
         self._boom()
-        return {"orch_state": self._state, "loop_state": "started"}
+        return {
+            "orch_state": self._state,
+            "loop_state": "started",
+            # The true depths the operator reads for its tab counts, exactly as
+            # `orch_api._queue_counts` supplies them.
+            "n_sequences": len(self._sequences),
+            "n_experiments": len(self._experiments),
+            "n_actions": len(self._actions),
+        }
 
-    async def list_sequences(self):
+    async def list_sequences(self, limit=None, offset=0):
         self._boom()
-        return self._sequences
+        self.calls.append(("list_sequences", limit, offset))
+        return self._page(self._sequences, limit, offset)
 
-    async def list_experiments(self):
+    async def list_experiments(self, limit=None, offset=0):
         self._boom()
-        return self._experiments
+        self.calls.append(("list_experiments", limit, offset))
+        return self._page(self._experiments, limit, offset)
 
-    async def list_actions(self):
+    async def list_actions(self, limit=None, offset=0):
         self._boom()
-        return self._actions
+        self.calls.append(("list_actions", limit, offset))
+        return self._page(self._actions, limit, offset)
 
     async def get_status_summary(self):
         self._boom()
@@ -309,6 +327,13 @@ def test_poll_interval_rejects_a_nonsense_value():
 
 # -- refresh -----------------------------------------------------------------
 
+#: Every queue on page one, at the default page size.
+_TOP = {kind: 0 for kind in opx.QUEUE_KINDS}
+
+
+def _refresh(backend, offsets=None, page_size=opx.DEFAULT_PAGE_SIZE):
+    return asyncio.run(opx.refresh_tables(backend, dict(offsets or _TOP), page_size))
+
 
 def test_refresh_tables_reads_every_queue_and_the_state():
     backend = FakeBackend(
@@ -317,7 +342,7 @@ def test_refresh_tables_reads_every_queue_and_the_state():
         actions=[{"action_name": "a1"}],
         summary={"srv": ("idle", "ok")},
     )
-    out = asyncio.run(opx.refresh_tables(backend))
+    out = _refresh(backend)
     assert out["reachable"] is True
     assert out["orch_state"] == "idle"
     assert out["seq_rows"][0][0] == "s1"
@@ -331,7 +356,7 @@ def test_refresh_tables_keeps_the_last_rows_when_the_orchestrator_goes_away():
     """The returned dict carries no row keys on failure, so the caller's last
     known queues stay on screen while the status line says it cannot reach the
     orchestrator. Blanking the tables would read as 'the queue is empty'."""
-    out = asyncio.run(opx.refresh_tables(FakeBackend(fail=True)))
+    out = _refresh(FakeBackend(fail=True))
     assert out["reachable"] is False
     assert "seq_rows" not in out
     assert "exp_rows" not in out
@@ -341,19 +366,108 @@ def test_refresh_tables_keeps_the_last_rows_when_the_orchestrator_goes_away():
 
 
 def test_refresh_tables_reports_the_failure_in_error():
-    out = asyncio.run(opx.refresh_tables(FakeBackend(fail=True)))
+    out = _refresh(FakeBackend(fail=True))
     assert "unreachable" in out["error"]
 
 
 def test_refresh_tables_without_a_backend_is_unreachable():
-    out = asyncio.run(opx.refresh_tables(None))
+    out = _refresh(None)
     assert out["reachable"] is False
     assert "seq_rows" not in out
 
 
 def test_refresh_tables_clears_a_stale_error_on_success():
-    out = asyncio.run(opx.refresh_tables(FakeBackend()))
+    out = _refresh(FakeBackend())
     assert out["error"] == ""
+
+
+# -- pagination --------------------------------------------------------------
+
+
+def _queue(n, prefix="s", key="sequence_name"):
+    return [{key: f"{prefix}{i}"} for i in range(n)]
+
+
+def test_refresh_tables_requests_only_one_page_per_queue():
+    """The whole point of the change: the operator asks for a window, not the
+    queue. Before this, `list_sequences()` went out bare and the orchestrator's
+    `limit=10` default silently truncated every table at ten rows."""
+    backend = FakeBackend(sequences=_queue(120))
+    out = _refresh(backend, page_size=50)
+    assert ("list_sequences", 50, 0) in backend.calls
+    assert len(out["seq_rows"]) == 50
+
+
+def test_refresh_tables_reports_the_true_depth_not_the_page_size():
+    """The tab counts read this. Counting the returned rows would cap every
+    title at the page size -- the same lie the old limit=10 fetch told."""
+    out = _refresh(FakeBackend(sequences=_queue(120)), page_size=50)
+    assert out["seq_total"] == 120
+
+
+def test_refresh_tables_returns_a_later_page():
+    backend = FakeBackend(sequences=_queue(120))
+    out = _refresh(backend, offsets={**_TOP, "sequence": 100}, page_size=50)
+    assert [row[0] for row in out["seq_rows"]] == [f"s{i}" for i in range(100, 120)]
+    assert out["requested_offsets"]["sequence"] == 100
+
+
+def test_refresh_tables_clamps_an_offset_past_a_drained_queue():
+    """A queue drains while the operator sits on page 9. Fetching the window
+    they asked for would return nothing and render a table that reads as 'the
+    queue is empty'."""
+    backend = FakeBackend(sequences=_queue(12))
+    out = _refresh(backend, offsets={**_TOP, "sequence": 400}, page_size=50)
+    assert out["requested_offsets"]["sequence"] == 0
+    assert len(out["seq_rows"]) == 12
+
+
+def test_refresh_tables_falls_back_to_a_lower_bound_without_queue_counts():
+    """An orchestrator that does not ship `_queue_counts` must not report a
+    total of zero under a table that has rows in it."""
+
+    class NoCounts(FakeBackend):
+        async def get_orch_state(self):
+            return {"orch_state": "idle", "loop_state": "started"}
+
+    out = _refresh(NoCounts(sequences=_queue(30)), page_size=50)
+    assert out["seq_total"] == len(out["seq_rows"]) > 0
+
+
+def test_clamp_offset_bounds_without_realigning():
+    assert opx.clamp_offset(999, 412, 50) == 400
+    assert opx.clamp_offset(37, 412, 50) == 37
+    assert opx.clamp_offset(10, 0, 50) == 0
+    assert opx.clamp_offset(-5, 412, 50) == 0
+
+
+def test_paged_offset_steps_and_stops_at_the_ends():
+    assert opx.paged_offset(0, 412, 50, "next") == 50
+    assert opx.paged_offset(0, 412, 50, "prev") == 0
+    assert opx.paged_offset(400, 412, 50, "next") == 400
+    assert opx.paged_offset(0, 412, 50, "last") == 400
+    assert opx.paged_offset(400, 412, 50, "first") == 0
+
+
+def test_paged_offset_ignores_an_unknown_action():
+    """The action arrives as an event argument from the client, so an
+    unexpected one must leave the view where it is rather than jump it."""
+    assert opx.paged_offset(50, 412, 50, "; drop table") == 50
+
+
+def test_page_label_counts_from_one_and_reports_an_empty_table():
+    assert opx.page_label(50, 50, 412) == "51-100 of 412"
+    assert opx.page_label(400, 12, 412) == "401-412 of 412"
+    assert opx.page_label(0, 0, 0) == "0 of 0"
+
+
+def test_page_size_rejects_a_value_that_is_not_offered():
+    """The value comes from the client, and it becomes a `limit` on an
+    orchestrator request."""
+    assert opx.page_size_from("100") == 100
+    assert opx.page_size_from("999999") == opx.DEFAULT_PAGE_SIZE
+    assert opx.page_size_from("nonsense") == opx.DEFAULT_PAGE_SIZE
+    assert opx.page_size_from("") == opx.DEFAULT_PAGE_SIZE
 
 
 # -- controls ----------------------------------------------------------------
@@ -1601,3 +1715,114 @@ def test_tree_for_falls_back_to_a_dash_when_there_is_no_name():
 def test_tree_for_escapes_object_values():
     _header, html = opx.tree_for("sequence", {"sequence_name": "<b>x</b>"})
     assert "&lt;b&gt;" in html
+
+
+# -- history paging ----------------------------------------------------------
+
+
+def _hist_page(n, kind="action", newest_first=True):
+    """A `get_history_page` payload with `n` entries, as the endpoint sends it."""
+    items = [(f"uuid{i:04d}", {"action_name": f"a{i}"}) for i in range(n)]
+    return {
+        "kind": kind,
+        "total": n,
+        "offset": 0,
+        "items": items[::-1] if newest_first else items,
+    }
+
+
+def test_history_page_entries_renders_a_server_page_newest_first():
+    """The page already arrives newest-first. The renderer's sort is by uuid7,
+    which is time-ordered, so sorting a contiguous page is a no-op rather than
+    a reshuffle -- which is what lets one renderer serve both paths."""
+    rows = [
+        row for row, _ in opx.history_page_entries(_hist_page(5)["items"], "action")
+    ]
+    assert [row[0] for row in rows] == [f"/a{i}" for i in range(4, -1, -1)]
+
+
+def test_history_page_entries_keeps_payloads_aligned_with_rows():
+    """The operator clicks row n and expects object n; `_hist_objs` is indexed
+    by the same position the table renders."""
+    for row, payload in opx.history_page_entries(_hist_page(4)["items"], "action"):
+        assert payload["action_name"] in row[0]
+
+
+def test_history_page_entries_survives_an_empty_or_missing_page():
+    assert opx.history_page_entries([], "action") == []
+    assert opx.history_page_entries(None, "action") == []
+
+
+def test_history_entries_still_reads_a_whole_get_histories_payload():
+    """The un-paged path still works, so a caller holding a `get_histories`
+    response is not broken by the paged one arriving."""
+    whole = {"action": _hist_page(3)["items"]}
+    assert len(opx.history_entries(whole, "action")) == 3
+
+
+def test_history_page_entries_rejects_an_unknown_kind():
+    assert opx.history_page_entries(_hist_page(3)["items"], "nonsense") == []
+
+
+# -- the rendered page -------------------------------------------------------
+
+
+def _rendered_page():
+    """Build and render the operator page.
+
+    Reflex validates event bindings at *render*, not import: an ``on_change``
+    list, a ``disabled=`` built from Var arithmetic, and a handler whose
+    argument does not match its trigger all pass import and fail here. Binding
+    the history refresh to a button raised ``EventHandlerArgTypeMismatchError``
+    this way and no other.
+    """
+    return str(opx.build_page().render())
+
+
+def test_the_page_renders_with_both_refreshes_on_one_tick():
+    """The history used to move only when its button was pressed, so a page
+    left open showed a history frozen at the last click."""
+    text = _rendered_page()
+    assert "poll_once" in text
+    assert "refresh_history" in text
+
+
+def test_the_history_subtabs_are_sequence_first_and_carry_counts():
+    """Matching the Queues subtabs. The two panels show the same three object
+    kinds, and reading them in a different order in each is what makes an
+    operator check twice."""
+    text = _rendered_page()
+    assert text.index("sequence_count") < text.index("experiment_count")
+    assert text.index("experiment_count") < text.index("action_count")
+
+
+def test_every_paged_table_renders_a_pager():
+    text = _rendered_page()
+    for var in (
+        "seq_page_label",
+        "exp_page_label",
+        "act_page_label",
+        "sequence_page_label",
+        "experiment_page_label",
+        "action_page_label",
+    ):
+        assert var in text, var
+
+
+def test_the_page_size_selects_offer_exactly_the_supported_sizes():
+    text = _rendered_page()
+    for size in opx.PAGE_SIZES:
+        assert f'"{size}"' in text, size
+
+
+# -- transport ---------------------------------------------------------------
+
+
+def test_the_backend_omits_limit_rather_than_sending_none():
+    """These go out as query parameters, where a ``None`` arrives as the string
+    ``"None"`` and fails the endpoint's int coercion. Omitting it lets the
+    endpoint's own default mean 'the whole queue'."""
+    from helao.core.servers.operator.orch_backend import _page
+
+    assert _page(None, 0) == {"offset": 0}
+    assert _page(50, 100) == {"offset": 100, "limit": 50}

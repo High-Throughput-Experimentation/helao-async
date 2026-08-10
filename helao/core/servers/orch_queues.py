@@ -30,6 +30,7 @@ imports this module at module top).
 
 import asyncio
 from copy import deepcopy
+from itertools import islice
 from typing import Optional
 from uuid import UUID
 
@@ -40,6 +41,33 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def _dq_page(dq, limit: Optional[int], offset: int, render):
+    """Render one window of a queue deque.
+
+    ``limit=None`` means "the whole queue from ``offset``", which is what a
+    caller that wants every row asks for. A negative or oversized ``offset``
+    yields an empty page rather than raising: the offset comes from a paged UI,
+    and the queue can drain between the render that produced it and the request
+    that uses it.
+
+    Uses :func:`itertools.islice` rather than ``dq[i]`` in a loop. Indexing a
+    deque is O(n) from the nearer end, so the loop this replaced cost
+    O(n * limit); one islice walk costs O(offset + limit).
+
+    Args:
+        dq: The deque to page.
+        limit: Maximum number of items, or ``None`` for all of them.
+        offset: Index of the first item to return.
+        render: Called on each item to produce its summary.
+
+    Returns:
+        list: The rendered items in queue order.
+    """
+    start = max(0, offset)
+    stop = None if limit is None else start + max(0, limit)
+    return [render(item) for item in islice(dq, start, stop)]
 
 
 class RunQueues:
@@ -375,21 +403,23 @@ class RunQueues:
             # LOGGER.info(f"experiment {D.experiment_name} appended to queue")
         return D.experiment_uuid
 
-    def list_sequences(self, limit=10) -> list:
-        """Return at most ``limit`` sequence summaries from the sequence deque."""
-        orch = self.orch
-        return [
-            orch.sequence_dq[i].get_seq()
-            for i in range(min(len(orch.sequence_dq), limit))
-        ]
+    def list_sequences(self, limit: Optional[int] = None, offset: int = 0) -> list:
+        """Return one page of sequence summaries from the sequence deque.
 
-    def list_experiments(self, limit=10) -> list:
-        """Return at most ``limit`` experiment summaries from the experiment deque."""
-        orch = self.orch
-        return [
-            orch.experiment_dq[i].get_exp()
-            for i in range(min(len(orch.experiment_dq), limit))
-        ]
+        Args:
+            limit: Page size, or ``None`` for every queued sequence.
+            offset: Index of the first sequence to return.
+        """
+        return _dq_page(self.orch.sequence_dq, limit, offset, lambda d: d.get_seq())
+
+    def list_experiments(self, limit: Optional[int] = None, offset: int = 0) -> list:
+        """Return one page of experiment summaries from the experiment deque.
+
+        Args:
+            limit: Page size, or ``None`` for every queued experiment.
+            offset: Index of the first experiment to return.
+        """
+        return _dq_page(self.orch.experiment_dq, limit, offset, lambda d: d.get_exp())
 
     def list_all_experiments(self) -> list:
         """Return ``(index, experiment_name)`` tuples for every queued experiment."""
@@ -435,12 +465,14 @@ class RunQueues:
             for uuid, statusmodel in orch.globalstatusmodel.active_dict.items()
         ]
 
-    def list_actions(self, limit=10) -> list:
-        """Return at most ``limit`` action summaries from the action deque."""
-        orch = self.orch
-        return [
-            orch.action_dq[i].get_act() for i in range(min(len(orch.action_dq), limit))
-        ]
+    def list_actions(self, limit: Optional[int] = None, offset: int = 0) -> list:
+        """Return one page of action summaries from the action deque.
+
+        Args:
+            limit: Page size, or ``None`` for every queued action.
+            offset: Index of the first action to return.
+        """
+        return _dq_page(self.orch.action_dq, limit, offset, lambda d: d.get_act())
 
     def supplement_error_action(self, check_uuid: UUID, sup_action: Action):
         """Retry an errored action by appending ``sup_action`` to the front of ``action_dq``.
