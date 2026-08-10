@@ -10,13 +10,25 @@ __all__ = ["WS_PATH", "STATE_BASE", "build", "extract", "panel_id"]
 import numpy as np
 import reflex as rx
 
+from helao.core.servers.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import LiveVisState
+from helao.core.servers.reflex.state import LiveVisState, assign
 
 WS_PATH = "ws_live"
 
 #: Column excluded from the plotted series set: it is the x axis.
 X_COLUMN = "epoch"
+
+#: Table hue, keyed by kind like every other Reflex table. ``server``: this is
+#: one action server's latest live values, read while nothing in particular is
+#: running.
+_TABLE_KIND = "server"
+_HEADER_CLASS = reflex_header_class(_TABLE_KIND)
+_TABLE_CLASS = reflex_table_class(_TABLE_KIND)
+
+#: Height of the latest-value scroll area, bounded so a stream that gains
+#: columns does not push the panels below it down the page as it grows.
+_TABLE_HEIGHT = "12em"
 
 
 def panel_id(server_key: str, session_token: str) -> str:
@@ -54,14 +66,24 @@ class _State(LiveVisState, mixin=True):
     chart_url: str = ""
     chart_layout: str = ""
     version: int = 0
-    table_rows: list = []
+    #: Annotated to its element type, not a bare ``list``: ``rx.foreach`` needs
+    #: one, and a bare ``list`` fails the *frontend build* with
+    #: ``ForeachVarError`` rather than at import -- so it looks fine until
+    #: ``reflex export`` runs.
+    table_rows: list[list[str]] = []
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see VisPanelState.panel_key."""
         return panel_id(self.server_key, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
-        """Recompute the chart payload and the latest-value table."""
+        """Recompute the chart payload and the latest-value table.
+
+        Every write goes through ``assign``. Reflex marks a var dirty on
+        assignment, not on change, so an unconditional write published a delta
+        on every tick with nothing new in it -- and ``chart_layout`` never
+        changes at all.
+        """
         cols = extract(ingest, self.window_points)
         self.version += 1
         payload = plots.time_series(
@@ -72,14 +94,18 @@ class _State(LiveVisState, mixin=True):
             panel_id=self.panel_key(),
             version=self.version,
         )
-        self.chart_spec = payload.spec
-        self.chart_url = payload.buffer_url
-        self.chart_layout = payload.layout
-        self.table_rows = [
-            [name, f"{values[-1]:.6g}"]
-            for name, values in cols["series"].items()
-            if values.size
-        ]
+        assign(self, "chart_spec", payload.spec)
+        assign(self, "chart_url", payload.buffer_url)
+        assign(self, "chart_layout", payload.layout)
+        assign(
+            self,
+            "table_rows",
+            [
+                [name, f"{values[-1]:.6g}"]
+                for name, values in cols["series"].items()
+                if values.size
+            ],
+        )
 
 
 STATE_BASE = _State
@@ -127,12 +153,42 @@ def build(server_key: str, state_cls):
                 state_cls.chart_layout,
                 height=320,
             ),
-            rx.data_table(
-                data=state_cls.table_rows,
-                columns=["name", "value"],
-                pagination=False,
-                search=False,
-                sort=False,
+            # A Radix ``rx.table``, not ``rx.data_table`` (gridjs): gridjs
+            # rebuilds its whole grid on *any* state delta, not only on a
+            # change to the var it renders. A chart panel publishes a fresh
+            # spec and buffer URL on every packet, so the table beside it
+            # rebuilt at the render cadence and changed height as it did --
+            # which reads at the bench as the panel bouncing. Radix also takes
+            # ``class_name``, so this picks up the stack's shared table
+            # styling; gridjs drops it.
+            rx.scroll_area(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            *[
+                                rx.table.column_header_cell(
+                                    col, class_name=_HEADER_CLASS
+                                )
+                                for col in ("name", "value")
+                            ]
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(
+                            state_cls.table_rows,
+                            lambda row: rx.table.row(
+                                rx.foreach(row, lambda cell: rx.table.cell(cell))
+                            ),
+                        )
+                    ),
+                    width="100%",
+                    size="1",
+                    class_name=_TABLE_CLASS,
+                ),
+                type="auto",
+                scrollbars="vertical",
+                height=_TABLE_HEIGHT,
+                width="100%",
             ),
             width="100%",
             spacing="3",
