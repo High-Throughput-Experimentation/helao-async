@@ -537,6 +537,28 @@ def _add_default_head_endpoints(app) -> None:
 def _register_utility_endpoints(fastapp) -> None:
     """Register the shared debug/private endpoints used by Base and Orch APIs."""
 
+    @fastapp.post("/loaded_modules", tags=["private"])
+    def loaded_modules():
+        """Return {repo_file_path: sha1} for every module this server process
+        has imported from the repository (transitive closure via sys.modules).
+
+        The hot-reload watcher intersects a pulled commit's changed files with
+        this set to decide whether this server must restart, and uses the
+        hashes to confirm the on-disk file actually differs from what was
+        loaded. Pure read; safe to call anytime.
+
+        Registered here rather than on ``BaseAPI`` so orchestrators expose it
+        too. ``OrchAPI`` is a sibling of ``BaseAPI``, not a subclass, so a route
+        defined on the latter is simply absent from the former -- and
+        ``server_loaded_files`` treats the resulting 404 as "no known mapping",
+        which fails closed: an orchestrator was never hot-reloaded no matter
+        what changed under it. It is also the only way to tell from outside
+        whether an orchestrator process is running the hexagon shim or the
+        legacy module, since neither launcher logs the deployment when it is
+        set explicitly.
+        """
+        return loaded_repo_modules()
+
     @fastapp.post("/_raise_exception", tags=["private"])
     def _raise_exception():
         """Raise a synchronous test exception for error-recovery debugging."""
@@ -713,18 +735,6 @@ class BaseAPI(HelaoFastAPI):
         def get_config():
             """Return the world configuration dictionary."""
             return self.base.world_cfg
-
-        @self.post("/loaded_modules", tags=["private"])
-        def loaded_modules():
-            """Return {repo_file_path: sha1} for every module this server process
-            has imported from the repository (transitive closure via sys.modules).
-
-            The hot-reload watcher intersects a pulled commit's changed files with
-            this set to decide whether this server must restart, and uses the
-            hashes to confirm the on-disk file actually differs from what was
-            loaded. Pure read; safe to call anytime.
-            """
-            return loaded_repo_modules()
 
         @self.post("/hotreload_busy", tags=["private"])
         def hotreload_busy():

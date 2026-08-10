@@ -2,7 +2,14 @@
 hooks, action-app wrap, vis deferral, launcher shim delegation. Construction
 level only — full lifecycle is the Task 12 launched smoke."""
 
+import inspect
+import os
+
 import pytest
+
+import helao
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(helao.__file__)))
 
 
 def _world(tmp_path):
@@ -102,6 +109,53 @@ def test_make_orch_app_constructs_with_graft_hooks(installed_config):
     ):
         assert path in routes, path
     assert app.rpc_dispatcher is not None  # co-located RPC registry exists
+
+
+def test_orchestrator_exposes_loaded_modules(installed_config):
+    """An orchestrator must answer /loaded_modules, like every other `fast:` server.
+
+    Two things depend on it, and both failed silently while it was missing.
+    `launch.py`'s `server_loaded_files` POSTs it for anything with a `fast:` key
+    and treats a non-200 as "no known mapping" -- which fails closed, so the
+    hot-reload watcher never restarted an orchestrator no matter what changed
+    under it. And it is the only external way to tell whether an orchestrator
+    process is running the hexagon shim or the legacy module, because neither
+    launcher logs the deployment when a config sets it explicitly.
+
+    `OrchAPI` is a sibling of `BaseAPI`, not a subclass, so this is asserted on
+    a real constructed app rather than on the shared registrar -- a registrar
+    test would still pass if `OrchAPI` stopped calling it.
+    """
+    from helao.core.servers.base_api import BaseAPI
+    from helao.hexagon.app.factory import makeOrchApp
+
+    app = makeOrchApp("ORCH")
+    routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
+    assert "/loaded_modules" in routes
+
+    # Registered exactly once. It used to live on BaseAPI's __init__ as well;
+    # hoisting it to the shared registrar without removing that would leave two
+    # handlers on one path, where FastAPI silently serves the first.
+    assert [r.path for r in app.routes].count("/loaded_modules") == 1  # type: ignore[attr-defined]
+    assert not any(
+        "/loaded_modules" in line
+        for line in inspect.getsource(BaseAPI.__init__).splitlines()
+    ), "duplicate /loaded_modules registration reintroduced on BaseAPI.__init__"
+
+    # The payload is the watcher's contract: {abs repo .py path: sha1}. An empty
+    # dict would satisfy a presence-only check while mapping nothing.
+    handler = next(
+        r.endpoint  # type: ignore[attr-defined]
+        for r in app.routes  # type: ignore[attr-defined]
+        if r.path == "/loaded_modules"  # type: ignore[attr-defined]
+    )
+    loaded = handler()
+    assert isinstance(loaded, dict) and loaded
+    assert __file__ in loaded, "this test's own module is loaded but unreported"
+    assert all(
+        p.startswith(str(REPO_ROOT)) and p.endswith(".py") for p in loaded
+    ), sorted(p for p in loaded if not p.endswith(".py"))[:5]
+    assert all(len(h) == 40 for h in loaded.values())
 
 
 def test_make_action_app_wraps_legacy_module(installed_config):
