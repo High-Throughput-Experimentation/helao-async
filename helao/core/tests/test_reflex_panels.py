@@ -375,14 +375,14 @@ def test_gpsim_table_does_not_re_append_the_same_batch():
     ing.status.message_count = 1
 
     class _P:
-        last_table_count = -1
+        _last_table_count = -1
         table_rows: list = []
 
     panel = _P()
     for _ in range(5):  # five render ticks, one published batch
         count = ing.status.message_count
-        if count != panel.last_table_count:
-            panel.last_table_count = count
+        if count != panel._last_table_count:
+            panel._last_table_count = count
             panel.table_rows = (panel.table_rows + gpsim_panel.extract_table_rows(ing))[
                 -20:
             ]
@@ -626,3 +626,60 @@ def test_the_bookkeeping_vars_are_backend_only():
     client_vars = set(VisPanelState.vars)
     assert "_last_seen" not in client_vars
     assert "_force_pull" not in client_vars
+
+
+# -- the test deployment's panels hold as still as the hte ones ---------------
+#
+# `rx.data_table` (gridjs) rebuilds its whole grid on *any* state delta, not
+# only on a change to the var it renders -- and a chart panel publishes a fresh
+# spec and buffer URL on every packet. A gridjs table under a live chart
+# therefore rebuilds at the render cadence and changes height as it does.
+
+
+@pytest.mark.parametrize("module_name", ["wssim_panel", "gpsim_panel"])
+def test_the_sim_panels_do_not_use_gridjs(module_name):
+    import importlib
+    import pathlib
+
+    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    # The call, not the name: the comment explaining the replacement must not
+    # fail the check it explains.
+    source = pathlib.Path(module.__file__).read_text()
+    assert "rx.data_table(" not in source
+    assert "rx.table.root(" in source
+
+
+@pytest.mark.parametrize("module_name", ["wssim_panel", "gpsim_panel"])
+def test_the_sim_panels_write_through_assign(module_name):
+    """Every per-tick chart write must be change-gated, not unconditional."""
+    import importlib
+    import inspect
+
+    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    source = inspect.getsource(module.STATE_BASE.pull)
+    for name in ("chart_spec", "chart_url", "chart_layout"):
+        assert f'assign(self, "{name}"' in source, name
+        assert f"self.{name} = " not in source, name
+
+
+@pytest.mark.parametrize("module_name", ["wssim_panel", "gpsim_panel"])
+def test_the_sim_panels_annotate_their_foreach_var(module_name):
+    """A bare `list` fails the frontend build with ForeachVarError rather than
+    at import, so it looks fine until `reflex export` runs."""
+    import importlib
+
+    module = importlib.import_module(f"helao.deploy.test.servers.reflex.{module_name}")
+    field = module.STATE_BASE.get_fields()["table_rows"]
+    assert field.outer_type_ == list[list[str]], module_name
+
+
+def test_gpsims_accumulators_are_backend_only():
+    """Nothing renders either one, and `_hist_samples` carries every plate's
+    whole sample array -- as a client var that crossed the wire every tick."""
+    from helao.deploy.test.servers.reflex import gpsim_panel
+
+    fields = gpsim_panel.STATE_BASE.get_fields()
+    assert "hist_samples" not in fields
+    assert "last_table_count" not in fields
+    assert "_hist_samples" in fields
+    assert "_last_table_count" in fields

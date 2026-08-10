@@ -21,10 +21,21 @@ __all__ = [
 
 import reflex as rx
 
+from helao.core.servers.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import LiveVisState
+from helao.core.servers.reflex.state import LiveVisState, assign
 
 WS_PATH = "ws_live"
+
+#: Table hue, keyed by kind like every other Reflex table. ``action``: these
+#: rows are acquisitions, one per plate step.
+_TABLE_KIND = "action"
+_HEADER_CLASS = reflex_header_class(_TABLE_KIND)
+_TABLE_CLASS = reflex_table_class(_TABLE_KIND)
+
+#: Height of the acquisitions scroll area. The table holds the last 20 rows, so
+#: an unbounded one would push the panels below it down as it fills.
+_TABLE_HEIGHT = "16em"
 
 #: Histogram range and bin count carried over from gpsim_live_vis.py.
 HIST_BINS = 100
@@ -127,30 +138,44 @@ class _State(LiveVisState, mixin=True):
     chart_url: str = ""
     chart_layout: str = ""
     version: int = 0
-    table_rows: list = []
+    #: Annotated to its element type, not a bare ``list``: ``rx.foreach`` needs
+    #: one, and a bare ``list`` fails the *frontend build* with
+    #: ``ForeachVarError`` rather than at import -- so it looks fine until
+    #: ``reflex export`` runs.
+    table_rows: list[list[str]] = []
     #: Accumulated per-plate samples. The driver runs plates concurrently and
     #: each pushes its own message, so a single drain batch holds only whichever
     #: plates happened to land in it. The Bokeh original kept a persistent
     #: per-plate dict for the same reason; without it the chart flickers between
     #: plates instead of showing them together.
-    hist_samples: dict = {}
+    #:
+    #: Backend-only, like ``_running``: nothing renders it, and as a client var
+    #: every plate's whole sample array crossed the wire on every tick.
+    _hist_samples: dict = {}
     #: message_count at the last table append. extract_table_rows reads the
     #: newest raw batch, but pull() runs on a timer while the driver publishes
     #: per acquisition -- without a watermark the same batch is re-appended
     #: every tick and "Last 20 acquisitions" collapses to one row repeated. The
     #: Bokeh original streamed once per websocket batch, being event-driven.
-    last_table_count: int = -1
+    #: Backend-only for the same reason as ``_hist_samples``.
+    _last_table_count: int = -1
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see VisPanelState.panel_key."""
         return panel_id(self.server_key, self.router.session.client_token)
 
     def pull(self, ingest) -> None:
-        """Recompute the histogram payload and the last 20 acquisition rows."""
+        """Recompute the histogram payload and the last 20 acquisition rows.
+
+        Every client-var write goes through ``assign``. Reflex marks a var
+        dirty on assignment, not on change, so an unconditional write published
+        a delta on every tick with nothing new in it -- and ``chart_layout``
+        never changes at all.
+        """
         self.version += 1
-        merged = dict(self.hist_samples)
+        merged = dict(self._hist_samples)
         merged.update(extract_histograms(ingest))
-        self.hist_samples = merged
+        self._hist_samples = merged
         payload = plots.histogram(
             merged,
             bins=HIST_BINS,
@@ -160,13 +185,17 @@ class _State(LiveVisState, mixin=True):
             panel_id=self.panel_key(),
             version=self.version,
         )
-        self.chart_spec = payload.spec
-        self.chart_url = payload.buffer_url
-        self.chart_layout = payload.layout
+        assign(self, "chart_spec", payload.spec)
+        assign(self, "chart_url", payload.buffer_url)
+        assign(self, "chart_layout", payload.layout)
         count = ingest.status.message_count
-        if count != self.last_table_count:
-            self.last_table_count = count
-            self.table_rows = (self.table_rows + extract_table_rows(ingest))[-20:]
+        if count != self._last_table_count:
+            self._last_table_count = count
+            assign(
+                self,
+                "table_rows",
+                (self.table_rows + extract_table_rows(ingest))[-20:],
+            )
 
 
 STATE_BASE = _State
@@ -209,12 +238,42 @@ def build(server_key: str, state_cls):
                 height=320,
             ),
             rx.heading("Last 20 acquisitions across all orchestrators", size="2"),
-            rx.data_table(
-                data=state_cls.table_rows,
-                columns=TABLE_COLUMNS,
-                pagination=False,
-                search=False,
-                sort=False,
+            # A Radix ``rx.table``, not ``rx.data_table`` (gridjs): gridjs
+            # rebuilds its whole grid on *any* state delta, not only on a
+            # change to the var it renders. A chart panel publishes a fresh
+            # spec and buffer URL on every packet, so the table beside it
+            # rebuilt at the render cadence and changed height as it did --
+            # which reads at the bench as the panel bouncing. The watermark on
+            # `table_rows` above does not save it, because the chart vars push
+            # a delta whether or not the table changed.
+            rx.scroll_area(
+                rx.table.root(
+                    rx.table.header(
+                        rx.table.row(
+                            *[
+                                rx.table.column_header_cell(
+                                    col, class_name=_HEADER_CLASS
+                                )
+                                for col in TABLE_COLUMNS
+                            ]
+                        )
+                    ),
+                    rx.table.body(
+                        rx.foreach(
+                            state_cls.table_rows,
+                            lambda row: rx.table.row(
+                                rx.foreach(row, lambda cell: rx.table.cell(cell))
+                            ),
+                        )
+                    ),
+                    width="100%",
+                    size="1",
+                    class_name=_TABLE_CLASS,
+                ),
+                type="auto",
+                scrollbars="vertical",
+                height=_TABLE_HEIGHT,
+                width="100%",
             ),
             width="100%",
             spacing="3",
