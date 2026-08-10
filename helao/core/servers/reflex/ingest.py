@@ -46,9 +46,12 @@ VIS_KEY_TO_WS_PATH = {"live_vis": "ws_live", "action_vis": "ws_data"}
 def normalize(messages: list) -> tuple:
     """Turn HELAO WebSocket payloads into numeric columns and mixed rows.
 
-    A payload is ``{datalab: (dataval, epochsec)}``. ``sim_dict`` payloads are
-    flattened one level. List values extend a column; scalars append one
-    element.
+    A payload is ``{datalab: (dataval, epochsec)}``. List values extend a
+    column; scalars append one element. A dict value is flattened one level,
+    exactly as the Bokeh visualizers flatten it: ``sim_dict`` to the bare
+    field name, anything else to ``{datalab}__{field}``. That second case is
+    not cosmetic -- a poller that publishes ``{device: status_dict}`` has no
+    numeric column at all without it.
 
     Row alignment is the whole job here. Every column advances by the same
     number of rows per message -- the longest value list in that message, or
@@ -95,6 +98,25 @@ def normalize(messages: list) -> tuple:
             if datalab == "sim_dict" and isinstance(dataval, dict):
                 for k, v in dataval.items():
                     pending.setdefault(k, []).append(v)
+                continue
+            if isinstance(dataval, dict):
+                # A dict payload is one sub-device's whole status block, and
+                # the Bokeh visualizers flatten it to ``{datalab}__{field}``
+                # (``visualizer/mfc_vis.py``'s ``add_points``). Matching that
+                # here is what makes the ``{device}__{field}`` columns
+                # ``mfc_vis`` documents exist at all: any driver whose poller
+                # returns ``data={device: status_dict}`` -- the MFC being the
+                # one at a bench, but the pumps and Galil IO the same shape --
+                # published a dict this function could not coerce, so the
+                # whole status landed in ``mixed_rows`` and the panel drew an
+                # empty chart beside an empty table while its badge still read
+                # ``live``.
+                for k, v in dataval.items():
+                    name = f"{datalab}__{k}"
+                    if isinstance(v, (list, tuple)):
+                        pending.setdefault(name, []).extend(v)
+                    else:
+                        pending.setdefault(name, []).append(v)
                 continue
             if isinstance(dataval, (list, tuple)):
                 pending.setdefault(datalab, []).extend(dataval)
