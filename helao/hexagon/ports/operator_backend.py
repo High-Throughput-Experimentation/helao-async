@@ -37,7 +37,7 @@ surface to keep aligned -- the failure this port exists to prevent.
 """
 
 from collections.abc import Callable
-from typing import Protocol, runtime_checkable
+from typing import Optional, Protocol, runtime_checkable
 
 __all__ = ["OperatorBackendPort"]
 
@@ -71,15 +71,25 @@ class OperatorBackendPort(Protocol):
         """Set one step-through flag ('actions'|'experiments'|'sequences')."""
         ...
 
-    async def list_sequences(self) -> list: ...
+    async def list_sequences(
+        self, limit: Optional[int] = None, offset: int = 0
+    ) -> list: ...
 
-    async def list_experiments(self) -> list: ...
+    async def list_experiments(
+        self, limit: Optional[int] = None, offset: int = 0
+    ) -> list: ...
 
-    async def list_actions(self) -> list: ...
+    async def list_actions(
+        self, limit: Optional[int] = None, offset: int = 0
+    ) -> list: ...
 
     async def get_queue_object(self, kind: str, idx: int) -> dict: ...
 
     async def get_histories(self) -> dict: ...
+
+    async def get_history_page(
+        self, kind: str, limit: Optional[int] = None, offset: int = 0
+    ) -> dict: ...
 
     async def get_status_summary(self) -> dict: ...
 

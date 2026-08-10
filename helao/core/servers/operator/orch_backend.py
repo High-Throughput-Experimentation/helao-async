@@ -46,19 +46,36 @@ class OrchBackend(ABC):
         """Set one step-through flag ('actions'|'experiments'|'sequences')."""
 
     @abstractmethod
-    async def list_sequences(self) -> list: ...
+    async def list_sequences(
+        self, limit: Optional[int] = None, offset: int = 0
+    ) -> list:
+        """One page of the sequence queue; ``limit=None`` is the whole queue."""
 
     @abstractmethod
-    async def list_experiments(self) -> list: ...
+    async def list_experiments(
+        self, limit: Optional[int] = None, offset: int = 0
+    ) -> list:
+        """One page of the experiment queue; ``limit=None`` is the whole queue."""
 
     @abstractmethod
-    async def list_actions(self) -> list: ...
+    async def list_actions(self, limit: Optional[int] = None, offset: int = 0) -> list:
+        """One page of the action queue; ``limit=None`` is the whole queue."""
 
     @abstractmethod
     async def get_queue_object(self, kind: str, idx: int) -> dict: ...
 
     @abstractmethod
     async def get_histories(self) -> dict: ...
+
+    @abstractmethod
+    async def get_history_page(
+        self, kind: str, limit: Optional[int] = None, offset: int = 0
+    ) -> dict:
+        """One newest-first page of one history container.
+
+        Returns ``kind``, ``total``, ``offset`` and ``items``. Separate from
+        :meth:`get_histories`, which returns all three containers whole.
+        """
 
     @abstractmethod
     async def get_status_summary(self) -> dict: ...
@@ -131,6 +148,20 @@ _SEQ_KEYS = [
     "campaign_uuid",
 ]
 _EXP_KEYS = ["experiment_name", "experiment_uuid"]
+
+
+def _page(limit: Optional[int], offset: int) -> dict:
+    """Query params for a paged listing endpoint.
+
+    ``limit`` is **omitted** rather than sent as ``None`` when the caller wants
+    everything: these go out as query parameters, where a ``None`` would arrive
+    as the string ``"None"`` and fail the endpoint's ``int`` coercion. Omitting
+    it lets the endpoint's own ``None`` default mean "the whole queue".
+    """
+    params = {"offset": offset}
+    if limit is not None:
+        params["limit"] = limit
+    return params
 
 
 class RemoteBackend(OrchBackend):
@@ -211,16 +242,20 @@ class RemoteBackend(OrchBackend):
         if resp is not None:
             self._step_flags[kind] = bool(value)
 
-    async def list_sequences(self):
-        resp = await self._call("list_sequences") or []
+    async def list_sequences(self, limit: Optional[int] = None, offset: int = 0):
+        resp = (
+            await self._call("list_sequences", params_dict=_page(limit, offset)) or []
+        )
         return [{k: row.get(k) for k in _SEQ_KEYS} for row in resp]
 
-    async def list_experiments(self):
-        resp = await self._call("list_experiments") or []
+    async def list_experiments(self, limit: Optional[int] = None, offset: int = 0):
+        resp = (
+            await self._call("list_experiments", params_dict=_page(limit, offset)) or []
+        )
         return [{k: row.get(k) for k in _EXP_KEYS} for row in resp]
 
-    async def list_actions(self):
-        resp = await self._call("list_actions") or []
+    async def list_actions(self, limit: Optional[int] = None, offset: int = 0):
+        resp = await self._call("list_actions", params_dict=_page(limit, offset)) or []
         out = []
         for row in resp:
             srv = row.get("action_server")
@@ -252,6 +287,18 @@ class RemoteBackend(OrchBackend):
     async def get_histories(self):
         resp = await self._call("get_histories")
         return resp or {"action": [], "experiment": [], "sequence": []}
+
+    async def get_history_page(
+        self, kind: str, limit: Optional[int] = None, offset: int = 0
+    ):
+        params = _page(limit, offset)
+        params["kind"] = kind
+        resp = await self._call("get_history_page", params_dict=params)
+        # An unreachable orchestrator reports an empty page rather than a
+        # missing one, so the caller can assign it without a shape check. The
+        # zero total is what collapses the pager instead of leaving it claiming
+        # pages that cannot be fetched.
+        return resp or {"kind": kind, "total": 0, "offset": 0, "items": []}
 
     async def get_status_summary(self):
         resp = await self._call("get_status_summary")
