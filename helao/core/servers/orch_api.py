@@ -44,6 +44,50 @@ def _histories_payload(orch) -> dict:
     }
 
 
+def _history_page_payload(orch, kind: str, limit: Optional[int], offset: int) -> dict:
+    """Return one page of a history container, newest first.
+
+    The reversal is done here rather than left to the caller because the page
+    boundary depends on it: ``offset=0`` has to mean the *newest* entries, and a
+    caller paging an oldest-first list would have to know the total to ask for
+    the newest page -- which it would then race against, since the history grows
+    under it.
+
+    The three history containers are ``DequeDict``s, i.e. insertion-ordered
+    dicts, so reversing their items is chronological. They are capped at 1000
+    entries each, so materializing the reversed list costs nothing worth paging
+    around.
+
+    Args:
+        orch: The orchestrator holding the history containers.
+        kind: ``action``, ``experiment`` or ``sequence``.
+        limit: Page size, or ``None`` for the whole history from ``offset``.
+        offset: Number of entries to skip, counting back from the newest.
+
+    Returns:
+        dict: ``kind``, the full ``total``, the clamped ``offset``, and the
+        page's ``(uuid, payload)`` ``items``. An unknown ``kind`` returns a
+        ``total`` of 0 and no items rather than raising: the kind comes from a
+        UI tab, and a typo there should not 500 the operator's poll.
+    """
+    history = {
+        "action": getattr(orch, "action_history", None),
+        "experiment": getattr(orch, "experiment_history", None),
+        "sequence": getattr(orch, "sequence_history", None),
+    }.get(kind)
+    if history is None:
+        return {"kind": kind, "total": 0, "offset": 0, "items": []}
+    newest_first = list(history.items())[::-1]
+    start = max(0, offset)
+    stop = None if limit is None else start + max(0, limit)
+    return {
+        "kind": kind,
+        "total": len(newest_first),
+        "offset": start,
+        "items": newest_first[start:stop],
+    }
+
+
 def _status_summary_payload(orch) -> dict:
     """Return {server: [server_status, driver_status]} from orch.status_summary."""
     return {k: list(v) for k, v in orch.status_summary.items()}
@@ -503,14 +547,22 @@ class OrchAPI(HelaoFastAPI):
             return {"experiment_uuid": exp_uuid}
 
         @self.post("/list_sequences", tags=["private"])
-        def list_sequences():
-            """Return the queued sequences."""
-            return self.orch.list_sequences()
+        def list_sequences(limit: Optional[int] = None, offset: int = 0):
+            """Return one page of the queued sequences.
+
+            ``limit=None`` returns the whole queue. Pair with the
+            ``n_sequences`` count in :func:`get_orch_state` to page it.
+            """
+            return self.orch.list_sequences(limit=limit, offset=offset)
 
         @self.post("/list_experiments", tags=["private"])
-        def list_experiments():
-            """Return the queued experiments."""
-            return self.orch.list_experiments()
+        def list_experiments(limit: Optional[int] = None, offset: int = 0):
+            """Return one page of the queued experiments.
+
+            ``limit=None`` returns the whole queue. Pair with the
+            ``n_experiments`` count in :func:`get_orch_state` to page it.
+            """
+            return self.orch.list_experiments(limit=limit, offset=offset)
 
         @self.post("/list_all_experiments", tags=["private"])
         def list_all_experiments():
@@ -539,9 +591,13 @@ class OrchAPI(HelaoFastAPI):
             return self.orch.get_experiment(last=True)
 
         @self.post("/list_actions", tags=["private"])
-        def list_actions():
-            """Return the queued actions."""
-            return self.orch.list_actions()
+        def list_actions(limit: Optional[int] = None, offset: int = 0):
+            """Return one page of the queued actions.
+
+            ``limit=None`` returns the whole queue. Pair with the ``n_actions``
+            count in :func:`get_orch_state` to page it.
+            """
+            return self.orch.list_actions(limit=limit, offset=offset)
 
         @self.post("/list_active_actions", tags=["private"])
         def list_active_actions():
@@ -582,6 +638,17 @@ class OrchAPI(HelaoFastAPI):
         def get_histories():
             """Return action/experiment/sequence history item lists."""
             return _histories_payload(self.orch)
+
+        @self.post("/get_history_page", tags=["private"])
+        def get_history_page(
+            kind: str, limit: Optional[int] = None, offset: int = 0
+        ) -> dict:
+            """Return one newest-first page of a single history container.
+
+            Beside ``get_histories`` rather than replacing it: that endpoint
+            returns all three containers whole and has callers of its own.
+            """
+            return _history_page_payload(self.orch, kind, limit, offset)
 
         @self.post("/get_status_summary", tags=["private"])
         def get_status_summary():

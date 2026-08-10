@@ -84,28 +84,29 @@ def test_the_port_and_the_abc_declare_the_same_members():
 
 
 def test_the_mirrored_surface_is_the_measured_one():
-    """28 abstract methods and 4 library attributes, counted not assumed.
+    """29 abstract methods and 4 library attributes, counted not assumed.
 
-    The plan and Q8 both say "25-method ABC"; measured, it is 28 abstract
+    The plan and Q8 both say "25-method ABC"; measured, it was 28 abstract
     methods (four of them synchronous) plus the four library dicts the class
-    annotates, for 32 members. Pinning the count as well as the names catches
-    a change that swaps one member for another -- the names would differ, but
+    annotates. ``get_history_page`` made it 29 / 33 when the operator's history
+    tables were paginated. Pinning the count as well as the names catches a
+    change that swaps one member for another -- the names would differ, but
     only the count says at a glance that the surface grew or shrank.
     """
-    assert len(OrchBackend.__abstractmethods__) == 28
+    assert len(OrchBackend.__abstractmethods__) == 29
     assert set(OrchBackend.__annotations__) == {
         "sequence_lib",
         "experiment_lib",
         "sequence_codehash",
         "experiment_codehash",
     }
-    assert len(protocol_members(OperatorBackendPort)) == 32
+    assert len(protocol_members(OperatorBackendPort)) == 33
 
 
 def test_each_mirrored_method_keeps_its_async_ness():
     """A name-set pin cannot see ``async``, and awaiting a sync method is a bug.
 
-    Four of the 28 are synchronous -- ``unpack_sequence``, ``get_step_flags``,
+    Four of the 29 are synchronous -- ``unpack_sequence``, ``get_step_flags``,
     ``subscribe``, ``close`` -- because they touch no transport. If the mirror
     declared one of them ``async`` (or made an awaited method sync), every name
     would still match while a caller written against the port would either
