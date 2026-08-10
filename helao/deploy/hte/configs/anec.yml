@@ -199,3 +199,13 @@ servers:
     bokeh: live_visualizer
     params:
       doc_name: Sensor Visualizer
+  UI:
+    host: hte-anec-03.htejcap.caltech.edu
+    port: 5110          # frontend; 5111 is the backend
+    group: visualizer
+    deployment: hte
+    reflex: helao_ui
+    params:
+      # No server here declares `live_vis` (the LIVE document above is empty for
+      # the same reason), so /live is omitted rather than mounted empty.
+      pages: [action, operator, browser]
