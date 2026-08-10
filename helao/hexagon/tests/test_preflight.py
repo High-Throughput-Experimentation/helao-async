@@ -90,6 +90,7 @@ KNOWN_HEXAGON_CONFIGS = frozenset(
         "adss3_hex",
         "hispec_hex",
         "eche10_hex",
+        "ecms1_hex",
     }
 )
 
