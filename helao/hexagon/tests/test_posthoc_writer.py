@@ -17,7 +17,9 @@ Each measurement is recorded in the docstring of the test that pins it:
 
 - ``test_probe1_*``  -- ``FileInfo`` serialization of ``nosync``.
 - ``test_probe4_*``  -- whether a repeat write to one filename is ever
-  exercised by the captured converter runs.
+  exercised by the captured converter runs. (The measurement stands; the
+  remedy changed on 2026-08-10 from raising to atomic overwrite, so that a
+  conversion which died partway can simply be re-run.)
 - ``test_probe8_*``  -- whether a ``None`` sample label ever reaches a write.
 """
 
@@ -318,7 +320,7 @@ def test_write_file_records_a_fileinfo_on_the_action(run):
 # --------------------------------------------------------------------------
 
 
-def test_probe4_repeat_write_raises_instead_of_appending(run):
+def test_probe4_repeat_write_overwrites_instead_of_appending(run, caplog):
     """PROBE 4 (measured 2026-08-08). Scanned all five GM-C golden captures,
     both runs each: 220 action records carrying a ``files`` list, 660 total
     ``files`` entries, 270 ``.hlo`` payloads. Duplicate ``file_name`` within one
@@ -328,11 +330,13 @@ def test_probe4_repeat_write_raises_instead_of_appending(run):
     detectors were calibrated against planted fixtures first and did fire on
     them, so the zero is a measurement and not a broken scan.
 
-    Repeat write is therefore never exercised, and the face raises. The fork
-    appended ``"\\n" + output_str`` with **no** ``%%`` separator, which makes a
-    reader parse two payloads as one body -- silent corruption. If this
-    assertion is ever flipped to "reproduce the grammar", the measurement above
-    has to be re-run first.
+    A second write to one filename within a run therefore still should not
+    happen, and it is logged at WARNING when it does. What changed (2026-08-10)
+    is the remedy: the face used to *raise*, which meant a converter that died
+    partway left artifacts that made every later attempt fail. It now replaces
+    the target. The corruption the raise guarded against came from appending
+    without a ``%%`` separator, and overwriting rules that out just as
+    completely -- the body below carries exactly one payload either way.
     """
     act, writer = run["act"], run["writer"]
     first = writer.write_file(
@@ -342,40 +346,153 @@ def test_probe4_repeat_write_raises_instead_of_appending(run):
         filenum=0,
         file_group=HloFileGroup.helao_files,
     )
-    before = _read(first)
-    with pytest.raises(RepeatWriteError) as excinfo:
-        writer.write_file(
+    with caplog.at_level("WARNING"):
+        second = writer.write_file(
             act,
             output_str='{"n": 2}',
             file_type="demo_helao__file",
             filenum=0,
             file_group=HloFileGroup.helao_files,
         )
-    assert "demo-0.0.0.0__0.hlo" in str(excinfo.value)
-    # the first payload must be untouched -- no append, no truncation
-    assert _read(first) == before == '%%\n{"n": 1}'
-    # and the rejected write must not have been recorded on the action
-    assert [f.file_name for f in act.files] == ["demo-0.0.0.0__0.hlo"]
+
+    assert second == first
+    # replaced, not appended: one payload, and it is the second one
+    assert _read(first) == '%%\n{"n": 2}'
+    assert _read(first).count("%%") == 1
+    # a same-run repeat is a converter bug, so it is still surfaced
+    assert "written twice in one run" in caplog.text
 
 
-def test_probe4_repeat_write_detection_covers_a_preexisting_file(run, tmp_path):
-    """A file left by an earlier run counts as a repeat write too: appending to
-    it produces exactly the same corrupted two-payload body."""
+def test_probe4_a_leftover_file_from_a_failed_run_is_replaced(run):
+    """The retry case, and the reason the raise had to go.
+
+    A batch conversion that dies partway leaves half-written artifacts under
+    ``RUNS_FINISHED``. Re-running the folder must simply overwrite them: the
+    previous behaviour raised on the first one, so a single interrupted run
+    poisoned the source folder until someone deleted the outputs by hand.
+    """
     act, writer, save_root = run["act"], run["writer"], run["save_root"]
     target_dir = os.path.join(save_root, str(act.action_output_dir))
     os.makedirs(target_dir, exist_ok=True)
     stale = os.path.join(target_dir, "demo-0.0.0.0__0.hlo")
     with open(stale, "w", encoding="utf-8") as f:
-        f.write("%%\n{}")
-    with pytest.raises(RepeatWriteError):
-        writer.write_file(
-            act,
-            output_str='{"n": 1}',
-            file_type="demo_helao__file",
-            filenum=0,
-            file_group=HloFileGroup.helao_files,
-        )
-    assert _read(stale) == "%%\n{}"
+        f.write("%%\n{}truncated-by-a-crash")
+
+    written = writer.write_file(
+        act,
+        output_str='{"n": 1}',
+        file_type="demo_helao__file",
+        filenum=0,
+        file_group=HloFileGroup.helao_files,
+    )
+
+    assert written == stale
+    assert _read(stale) == '%%\n{"n": 1}'
+    assert "truncated-by-a-crash" not in _read(stale)
+    assert [f.file_name for f in act.files] == ["demo-0.0.0.0__0.hlo"]
+
+
+def test_probe4_a_partial_run_can_be_reconverted_end_to_end(run):
+    """Writing the same set of files twice leaves exactly the second run's bytes.
+
+    The scenario the fix exists for: a converter writes some of its outputs,
+    fails, and is re-run over the same source folder.
+    """
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    for attempt in (1, 2):
+        for filenum in (0, 1):
+            writer.write_file(
+                act,
+                output_str=f'{{"attempt": {attempt}, "n": {filenum}}}',
+                file_type="demo_helao__file",
+                filenum=filenum,
+                file_group=HloFileGroup.helao_files,
+            )
+    target_dir = os.path.join(save_root, str(act.action_output_dir))
+    for filenum in (0, 1):
+        body = _read(os.path.join(target_dir, f"demo-0.0.0.0__{filenum}.hlo"))
+        assert body == f'%%\n{{"attempt": 2, "n": {filenum}}}'
+        assert body.count("%%") == 1
+
+
+def test_data_files_are_written_atomically(run):
+    """No temp file survives a successful write, and none is left beside it.
+
+    A stray dotfile in an action directory is indistinguishable from a real
+    artifact to anything that globs the tree (the syncer, ``move_dir``), so the
+    temp name has to be cleaned up on both paths.
+    """
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    writer.write_file(
+        act,
+        output_str='{"n": 1}',
+        file_type="demo_helao__file",
+        filenum=0,
+        file_group=HloFileGroup.helao_files,
+    )
+    target_dir = os.path.join(save_root, str(act.action_output_dir))
+    leftovers = [n for n in os.listdir(target_dir) if n.endswith(".tmp")]
+    assert leftovers == []
+    assert sorted(os.listdir(target_dir)) == ["demo-0.0.0.0__0.hlo"]
+
+
+def test_atomic_write_leaves_no_temp_file_when_the_write_fails(tmp_path):
+    """A failure mid-write removes the temp file rather than orphaning it."""
+    from helao.hexagon.adapters.native import posthoc_writer as module
+
+    target = tmp_path / "payload.hlo"
+    original = module.os.replace
+
+    def _explode(src, dst):
+        raise OSError("simulated failure during rename")
+
+    module.os.replace = _explode
+    try:
+        with pytest.raises(OSError):
+            module._atomic_write_text(str(target), "%%\n{}")
+    finally:
+        module.os.replace = original
+
+    assert not target.exists()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_track_file_replaces_a_leftover_copy_atomically(run, tmp_path):
+    """A tracked file is re-copied cleanly over debris from a failed attempt."""
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    source = tmp_path / "instrument.raw"
+    source.write_bytes(b"complete-payload")
+
+    target_dir = os.path.join(save_root, str(act.action_output_dir))
+    os.makedirs(target_dir, exist_ok=True)
+    stale = os.path.join(target_dir, "instrument.raw")
+    with open(stale, "wb") as f:
+        f.write(b"trunc")
+
+    writer.track_file(
+        act,
+        src_path=str(source),
+        file_type="demo_aux__file",
+        samples=[_sample()],
+    )
+
+    with open(stale, "rb") as f:
+        assert f.read() == b"complete-payload"
+    assert [n for n in os.listdir(target_dir) if n.endswith(".tmp")] == []
+
+
+def test_repeat_write_error_is_still_exported():
+    """The name survives the behaviour change.
+
+    ``RepeatWriteError`` is no longer raised, but it is in ``__all__`` and the
+    deployments that consume this face are separate private repositories this
+    one cannot grep, so removing it could break an import that is invisible
+    from here.
+    """
+    from helao.hexagon.adapters.native import posthoc_writer as module
+
+    assert "RepeatWriteError" in module.__all__
+    assert issubclass(RepeatWriteError, RuntimeError)
 
 
 # --------------------------------------------------------------------------
