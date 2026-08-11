@@ -232,7 +232,12 @@ class HelaoYml:
         #         pass
         # with self.filelock:
         #     self.meta = yml_load(self.target)
-        self.meta = yml_load(self.target)
+        # fast=True: run ymls are read as data and re-emitted from the pydantic
+        # models, never from the loaded object, so nothing here needs the
+        # round-trip containers -- and those containers are what made syncing a
+        # yml holding a long list quadratic (their __deepcopy__ is O(n^2), and
+        # HelaoDict.as_dict used to copy them).
+        self.meta = yml_load(self.target, fast=True)
 
     @property
     def parts(self) -> list:
@@ -537,9 +542,17 @@ class Progress:
         dict: In-memory copy of the progress dict.
     """
 
-    ymlpath: HelaoYml
+    # Path, not HelaoYml: ``__init__`` only ever assigns a Path here, and the
+    # ``yml`` property is what turns it into a HelaoYml. Declared as HelaoYml
+    # the attribute typed as its own ``exists`` property -- a bool -- so any
+    # ``self.ymlpath.exists()`` read as calling a bool.
+    ymlpath: Path
     prg: Path
     dict: dict
+    #: Last ``HelaoYml`` handed out by :attr:`yml`, and the ``(mtime_ns, size)``
+    #: of the file it parsed. Reused only while that stamp still holds.
+    _yml_cache: Optional[HelaoYml] = None
+    _yml_cache_stamp: tuple = ()
 
     def __init__(self, path: Union[Path, str]):
         """Resolve the yml/prg pair and load (or initialize) the progress dict.
@@ -613,8 +626,43 @@ class Progress:
 
     @property
     def yml(self) -> HelaoYml:
-        """Freshly-constructed ``HelaoYml`` for ``self.ymlpath``."""
-        return HelaoYml(self.ymlpath)
+        """``HelaoYml`` for ``self.ymlpath``, reused while the file is untouched.
+
+        Constructing a ``HelaoYml`` re-parses the yml from disk, and
+        ``sync_yml`` reads this property upwards of thirty times in a single
+        pass -- so an unconditionally fresh object made the parse cost of one
+        sync scale with the number of attribute reads, and dominated a sync
+        even for a yml carrying no bulk data at all.
+
+        The cached object is handed back only when re-constructing one would
+        demonstrably reproduce it: the resolved target must still exist,
+        unchanged in mtime and size, and must still be the file
+        ``HelaoYml.check_paths`` would land on. Anything else -- the yml moved
+        between RUNS_* trees, or was rewritten underneath us -- falls through
+        to a fresh parse, which is exactly what the uncached property did.
+        """
+        cached = getattr(self, "_yml_cache", None)
+        if cached is not None and (
+            cached.target == self.ymlpath or not self.ymlpath.exists()
+        ):
+            try:
+                stat = cached.target.stat()
+            except OSError:
+                stat = None
+            if stat is not None and (
+                stat.st_mtime_ns,
+                stat.st_size,
+            ) == self._yml_cache_stamp:
+                return cached
+        fresh = HelaoYml(self.ymlpath)
+        try:
+            stat = fresh.target.stat()
+            self._yml_cache_stamp = (stat.st_mtime_ns, stat.st_size)
+            self._yml_cache = fresh
+        except OSError:
+            # Nothing on disk to validate a cache entry against; never cache.
+            self._yml_cache = None
+        return fresh
 
     def list_unfinished_procs(self) -> tuple:
         """Return ``(s3_unfinished, api_unfinished)`` process-group indices.
@@ -638,7 +686,7 @@ class Progress:
 
     def read_dict(self):
         """Reload ``self.dict`` from the ``.prg`` file on disk."""
-        self.dict = yml_load(self.prg)
+        self.dict = yml_load(self.prg, fast=True)
 
     def write_dict(self, new_dict: Optional[dict] = None):
         """Persist the progress dict to the ``.prg`` file as YAML.
