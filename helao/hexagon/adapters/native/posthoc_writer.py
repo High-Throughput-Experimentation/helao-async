@@ -26,9 +26,10 @@ What this face changes relative to the fork it replaces:
 * ``file_group`` is **required**. The fork defaulted to ``helao_files`` and the
   core writer to ``aux_files``; neither default is safe to inherit, so the
   caller states which it wants.
-* A repeat write to a filename **raises** (:class:`RepeatWriteError`). The fork
+* Data files are written **atomically, and always overwrite** -- temp file in
+  the same directory plus ``os.replace``. They are never appended to. The fork
   appended the new payload with no ``%%`` separator, which makes a reader parse
-  two payloads as one body.
+  two payloads as one body; this face replaces the target instead.
 * Meta ymls are written atomically (temp file + ``os.replace``) with the
   default YAML dumper, matching the core writers.
 * ``track_file`` copies at call time -- post-hoc composition has no finalizer to
@@ -49,6 +50,7 @@ import os
 import threading
 import shutil
 from typing import Any, Optional, Union
+from uuid import uuid1
 
 from helao.core.models.file import FileInfo, HloFileGroup
 from helao.core.models.run_dir import RunDir
@@ -73,15 +75,93 @@ SampleUnion = Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSa
 
 
 class RepeatWriteError(RuntimeError):
-    """Raised when a write targets a filename that already exists.
+    """No longer raised. Retained because it is exported.
 
-    The forked writer this face replaces appended ``"\\n" + payload`` to an
-    existing file without emitting a ``%%`` separator first, so a reader saw the
-    two payloads as a single body -- corruption that surfaces only much later,
-    as unexplained values. The captured converter runs never exercised that path
-    (see ``test_posthoc_writer.test_probe4_*`` for the measurement), so the face
-    refuses the write instead of reproducing the grammar.
+    This face used to *refuse* a write whose target already existed, to avoid
+    reproducing the forked writer's habit of appending ``"\\n" + payload`` with
+    no ``%%`` separator (which makes a reader parse two payloads as one body).
+
+    Refusing turned out to be the wrong remedy. A batch conversion that dies
+    partway leaves half-written artifacts under ``RUNS_FINISHED``, and on the
+    next attempt every one of them made the converter raise here -- so a single
+    interrupted run poisoned the source folder until someone cleaned it by
+    hand. The corruption the guard existed to prevent came from *appending*;
+    :func:`_atomic_write_text` eliminates it directly by replacing the target,
+    which also makes a retry idempotent.
+
+    The name stays exported: ``__all__`` advertises it, and deployments outside
+    this repo are separate repositories that this one cannot grep.
     """
+
+
+def _atomic_write_text(output_file: str, content: str) -> None:
+    """Write ``content`` to ``output_file`` atomically, replacing any existing file.
+
+    Same technique as :mod:`meta_writer`: a uniquely-named temp file in the
+    *same directory* (so ``os.replace`` stays on one filesystem and is therefore
+    atomic), then a rename over the target.
+
+    Two properties matter here, and appending has neither. A reader or a crash
+    can never observe a partly-written file -- the rename either happened or it
+    did not -- and a rerun after a failed conversion replaces whatever the
+    previous attempt left behind instead of growing it. The batch converters
+    write each data file exactly once from a single process, so last-writer-wins
+    is the whole of the concurrency story.
+
+    Args:
+        output_file: Final path to create or replace.
+        content: Complete file body.
+    """
+    output_path = os.path.dirname(output_file)
+    os.makedirs(output_path, exist_ok=True)
+    tmp_file = os.path.join(
+        output_path,
+        f".{os.path.basename(output_file)}.{uuid1().hex}.tmp",
+    )
+    try:
+        with open(tmp_file, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_file, output_file)
+    except BaseException:
+        # Never leave a stray dotfile beside the payload; the next run would
+        # have no way to tell it from a real artifact.
+        try:
+            os.remove(tmp_file)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_copy(src_path: "str | os.PathLike[str]", dest_path: str) -> None:
+    """Copy ``src_path`` onto ``dest_path`` atomically, replacing any existing file.
+
+    ``shutil.copy`` straight onto the destination truncates it first and then
+    streams, so a conversion killed partway leaves a short file that looks like
+    a real artifact. Staging beside the destination and renaming means the
+    destination is either the previous file or the complete new one.
+
+    Args:
+        src_path: File to copy. Accepts ``PathLike`` because
+            ``action.aux_file_paths`` carries ``Path`` entries as well as
+            strings.
+        dest_path: Destination path, created or replaced.
+    """
+    dest_dir = os.path.dirname(dest_path)
+    os.makedirs(dest_dir, exist_ok=True)
+    tmp_path = os.path.join(
+        dest_dir, f".{os.path.basename(dest_path)}.{uuid1().hex}.tmp"
+    )
+    try:
+        shutil.copyfile(src_path, tmp_path)
+        os.replace(tmp_path, dest_path)
+    except BaseException:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _run_sync(coro):
@@ -183,6 +263,12 @@ class PostHocRunWriter:
 
     def __init__(self, save_root: str):
         self.save_root = str(save_root)
+        #: Data-file paths this writer has already written, used only to tell a
+        #: converter bug (same filename twice in one run) apart from the benign
+        #: case of replacing debris left by an earlier failed conversion. Both
+        #: overwrite; they differ in log level. Per-instance, and the batch jobs
+        #: build one writer per conversion, so it does not grow unboundedly.
+        self._written: set[str] = set()
 
     # -- internals ---------------------------------------------------------
 
@@ -248,11 +334,12 @@ class PostHocRunWriter:
             sample_str: Accepted for signature parity with the core writer,
                 which does not use it either.
 
+        The write is atomic and **always replaces** the target: a leftover file
+        from a conversion that died partway is overwritten, never appended to.
+        See :func:`_atomic_write_text`.
+
         Returns:
             The written path, or ``None`` when ``action.save_data`` is false.
-
-        Raises:
-            RepeatWriteError: The target filename already exists.
         """
         if filename is None:
             filename = self._generated_filename(action, filenum, file_group)
@@ -274,25 +361,40 @@ class PostHocRunWriter:
             )
             return None
 
-        _, _, _, output_file = resolved
-        if os.path.exists(output_file):
-            raise RepeatWriteError(
-                f"refusing to write {filename} twice: {output_file} already "
-                "exists. The forked writer appended the second payload with no "
-                "'%%' separator, which corrupts the file for any reader."
+        resolved_header, file_info, _, output_file = resolved
+
+        # Two different situations reach an existing target, and only one of
+        # them is benign. A file this writer has not written during this run is
+        # debris from an earlier, failed attempt -- expected on a retry, and the
+        # whole reason this overwrites. A file it *has* already written means a
+        # converter is emitting the same filename twice in one run and the first
+        # payload is being discarded, which is a bug in the converter.
+        if output_file in self._written:
+            LOGGER.warning(
+                f"{filename} written twice in one run for action "
+                f"'{action.action_name}' ({output_file}); the earlier payload is "
+                "being discarded. This is a converter bug -- each data file "
+                "should be written once."
+            )
+        elif os.path.exists(output_file):
+            LOGGER.info(
+                f"replacing pre-existing {output_file} (leftover from an earlier "
+                "conversion attempt)"
             )
 
-        return active.data_file_writer.write_file_nowait(
-            output_str=output_str,
-            file_type=file_type,
-            filename=filename,
-            file_group=file_group,
-            header=header,
-            sample_str=sample_str,
-            file_sample_label=file_sample_label,
-            json_data_keys=json_data_keys,
-            action=action,
+        body = (
+            f"{resolved_header}%%\n{output_str}"
+            if resolved_header
+            else f"%%\n{output_str}"
         )
+        _atomic_write_text(output_file, body)
+        self._written.add(output_file)
+
+        # Recorded only after the bytes are in place, so a failed write cannot
+        # leave a FileInfo advertising a file that is not there.
+        action.files.append(file_info)
+        LOGGER.info(f"wrote non stream data to: {output_file}")
+        return output_file
 
     def track_file(
         self,
@@ -307,6 +409,11 @@ class PostHocRunWriter:
         relocate at action end, this copies at call time: a post-hoc caller has
         no finalizer, so a queued path would simply never be moved.
         ``action.aux_file_paths`` is left as it was found.
+
+        The copy is atomic and replaces any existing destination, for the same
+        reason the data-file write is: a conversion killed mid-copy would
+        otherwise leave a truncated artifact that the next attempt has no way to
+        recognise as incomplete.
 
         Args:
             action: Action to attach the file to.
@@ -337,8 +444,7 @@ class PostHocRunWriter:
         for path in queued:
             new_path = os.path.join(dest_dir, os.path.basename(path))
             if path != new_path:
-                os.makedirs(dest_dir, exist_ok=True)
-                shutil.copy(path, new_path)
+                _atomic_copy(path, new_path)
 
         return action.files[-1]
 
