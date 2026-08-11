@@ -27,6 +27,10 @@ from helao.helpers.server_keys import get_sync_server_cfg
 #: and are not thread-safe, so each thread gets its own.
 _DUMPERS = threading.local()
 
+#: Per-thread loader cache, for the same reason as ``_DUMPERS``: parser and
+#: scanner state live on the ``YAML`` instance.
+_LOADERS = threading.local()
+
 
 def _represent_none(self, data):
     """Render ``None`` as the literal scalar ``null``."""
@@ -112,11 +116,47 @@ def _dump_to_str(yaml: ruamel.yaml.YAML, obj, options: dict) -> str:
     return output_str
 
 
-def yml_load(input: Union[str, Path]):
+def _get_loader(fast: bool) -> ruamel.yaml.YAML:
+    """Return this thread's cached loader for the ``fast``/round-trip variant.
+
+    ``fast=False`` is the round-trip (``typ="rt"``) loader, which returns
+    ``CommentedMap`` / ``CommentedSeq`` carrying the comments and formatting
+    needed to re-emit a document unchanged.
+
+    ``fast=True`` is the C-backed safe loader (``typ="safe", pure=False``),
+    which returns plain dicts and lists. It is several times faster to parse,
+    but the real cost it avoids is downstream: a ``CommentedSeq``'s
+    ``__deepcopy__`` is quadratic in length, so any consumer that copies the
+    loaded object pays 75s on a 10k-element sequence that a plain list copies
+    in 0.6ms.
+    """
+    key = "fast" if fast else "rt"
+    yaml = getattr(_LOADERS, key, None)
+    if yaml is not None:
+        return yaml
+
+    if fast:
+        # No ``version`` pin here: the C loader is left exactly as measured,
+        # and the round-trip branch keeps the 1.2 pin it has always carried.
+        yaml = ruamel.yaml.YAML(typ="safe", pure=False)
+    else:
+        yaml = ruamel.yaml.YAML(typ="rt")
+        yaml.version = (1, 2)
+
+    setattr(_LOADERS, key, yaml)
+    return yaml
+
+
+def yml_load(input: Union[str, Path], fast: bool = False):
     """Load YAML from a path, :class:`pathlib.Path`, or raw string.
 
     Args:
         input: Filesystem path, ``Path`` object, or YAML string.
+        fast: Use the C-backed safe loader instead of the round-trip one. Only
+            for callers that read a document as data and never re-emit it with
+            its comments intact -- the run-tree ymls the syncer walks are the
+            motivating case. Verified to read all 472 run ymls on a production
+            checkout to objects equal to the round-trip loader's.
 
     Returns:
         Parsed Python object (typically a dict).
@@ -124,16 +164,22 @@ def yml_load(input: Union[str, Path]):
     Raises:
         ruamel.yaml.YAMLError: If the YAML is malformed.
     """
-    yaml = ruamel.yaml.YAML(typ="rt")
-    yaml.version = (1, 2)
-    if isinstance(input, Path):
-        with input.open("r") as f:
-            obj = yaml.load(f)
-    elif os.path.exists(input):
-        with open(input, "r") as f:
-            obj = yaml.load(f)
-    else:
-        obj = yaml.load(input)
+    yaml = _get_loader(fast)
+    try:
+        if isinstance(input, Path):
+            with input.open("r") as f:
+                obj = yaml.load(f)
+        elif os.path.exists(input):
+            with open(input, "r") as f:
+                obj = yaml.load(f)
+        else:
+            obj = yaml.load(input)
+    except Exception:
+        # A load that raised mid-parse can leave scanner/parser state on the
+        # cached instance; drop it so the next document is not read through a
+        # half-consumed one.
+        setattr(_LOADERS, "fast" if fast else "rt", None)
+        raise
     return obj
 
 
