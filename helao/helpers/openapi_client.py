@@ -1,10 +1,17 @@
 """Lightweight dynamic HTTP clients driven by an OpenAPI JSON spec.
 
 ``OpenAPIClient`` (sync) and ``AsyncOpenAPIClient`` (async) fetch an
-``openapi.json`` document at construction time and, for each GET/POST
+``openapi.json`` document at construction time and, for each GET/POST/DELETE
 operation, attach an instance method whose name is derived from the
 operation's ``summary`` (or its ``operationId``). Path, query and request
 body parameters declared by the spec are taken as keyword arguments.
+
+DELETE is bound on the same terms as GET -- path and query parameters, no
+request body -- because a spec that declares a delete operation is declaring a
+callable operation, and a client that silently omits it forces its callers to
+hand-roll an ``httpx`` call and lose the spec-derived parameter checking. Only
+operations the spec actually declares are ever bound, so binding the method
+adds no capability the served API does not already offer.
 
 Both clients share ``_BaseOpenAPIClient``, which owns spec fetching, server
 base-URL resolution, request building, response/error handling, docstring
@@ -385,7 +392,7 @@ class _BaseOpenAPIClient:
         )
 
     def _create_methods(self):
-        """Bind one instance method per GET/POST operation in the spec.
+        """Bind one instance method per GET/POST/DELETE operation in the spec.
 
         Each generated method's name is derived from the operation's
         ``summary`` (lower-cased with spaces replaced) or ``operationId``.
@@ -396,7 +403,7 @@ class _BaseOpenAPIClient:
         api_call_base_url = self._get_api_server_base_url()
 
         for path_template, path_item_spec in self.spec["paths"].items():
-            for http_method_type in ["get", "post"]:
+            for http_method_type in ["get", "post", "delete"]:
                 if http_method_type not in path_item_spec:
                     continue
 
@@ -458,9 +465,9 @@ class OpenAPIClient(_BaseOpenAPIClient):
     """Synchronous httpx client that mirrors an OpenAPI spec's operations.
 
     On construction the spec is downloaded and an instance method is
-    generated for every GET/POST operation. The generated methods accept
-    path/query parameters and an optional ``request_body`` keyword. A single
-    ``httpx.Client`` is held open for the lifetime of this object.
+    generated for every GET/POST/DELETE operation. The generated methods accept
+    path/query parameters and an optional ``request_body`` keyword (POST only).
+    A single ``httpx.Client`` is held open for the lifetime of this object.
     """
 
     def _fetch_spec(self) -> dict:
@@ -474,6 +481,11 @@ class OpenAPIClient(_BaseOpenAPIClient):
         try:
             if http_method == "get":
                 return self._client.get(url, params=params)
+            if http_method == "delete":
+                # No body: OpenAPI allows one on DELETE but sending an
+                # unrequested ``json={}`` sets a content-type some servers
+                # reject outright.
+                return self._client.delete(url, params=params)
             return self._client.post(url, params=params, json=body)
         except httpx.RequestError as e:
             raise RuntimeError(
@@ -540,6 +552,9 @@ class AsyncOpenAPIClient(_BaseOpenAPIClient):
             async with httpx.AsyncClient(headers=self.headers, timeout=30) as client:
                 if http_method == "get":
                     return await client.get(url, params=params)
+                if http_method == "delete":
+                    # See the sync twin: no body on DELETE.
+                    return await client.delete(url, params=params)
                 return await client.post(url, params=params, json=body)
         except httpx.RequestError as e:
             raise RuntimeError(
