@@ -55,6 +55,36 @@ SPEC = {
             }
         },
         "/boom": {"get": {"operationId": "boom", "summary": "Boom", "responses": {}}},
+        # A delete shaped like the metadata API's ``delete_command``: path params
+        # plus an optional query flag, declared security, and no request body.
+        "/command/{entity_type}/{primary_id}": {
+            "delete": {
+                "operationId": "delete_command",
+                "summary": "Delete Command",
+                "security": [{"APIKeyHeader": []}],
+                "parameters": [
+                    {
+                        "name": "entity_type",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                    {
+                        "name": "primary_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "string"},
+                    },
+                    {
+                        "name": "delete_connected_processes",
+                        "in": "query",
+                        "required": False,
+                        "schema": {"type": "boolean"},
+                    },
+                ],
+                "responses": {"200": {"description": "Acknowledged."}},
+            }
+        },
         "/things": {
             "get": {
                 "operationId": "list_things",
@@ -97,6 +127,19 @@ def _handler(request: httpx.Request) -> httpx.Response:
         )
     if request.method == "GET" and path == "/loop":
         return httpx.Response(200, json={"items": [1], "next_cursor": "x"})
+    if request.method == "DELETE" and path.startswith("/command/"):
+        entity_type, primary_id = path.split("/")[2:4]
+        return httpx.Response(
+            200,
+            json={
+                "deleted": entity_type,
+                "id": primary_id,
+                "flag": dict(request.url.params).get("delete_connected_processes"),
+                # A DELETE must not carry a body: the client sends none, and a
+                # server that rejects one on this method has to see none.
+                "had_body": bool(request.content),
+            },
+        )
     return httpx.Response(404, json={"detail": "nope"})
 
 
@@ -192,6 +235,25 @@ def test_sync():
         "limit (" in (client.get_item.__doc__ or ""),
         "generated docstring documents the limit parameter",
     )
+    check(
+        client.delete_command(
+            entity_type="SEQUENCE",
+            primary_id="abc-123",
+            delete_connected_processes=True,
+        )
+        == {
+            "deleted": "SEQUENCE",
+            "id": "abc-123",
+            "flag": "true",
+            "had_body": False,
+        },
+        "sync DELETE resolves path params + query flag and sends no body",
+    )
+    expect_raises(
+        ValueError,
+        lambda: client.delete_command(entity_type="SEQUENCE"),
+        "sync DELETE missing required path param raises ValueError",
+    )
     client.close()
 
 
@@ -210,6 +272,17 @@ def test_async():
         check(
             "Get Item" in (client.get_item.__doc__ or ""),
             "async method has generated docstring from summary",
+        )
+        r3 = await client.delete_command(entity_type="SEQUENCE", primary_id="abc-123")
+        check(
+            r3
+            == {
+                "deleted": "SEQUENCE",
+                "id": "abc-123",
+                "flag": None,
+                "had_body": False,
+            },
+            "async DELETE resolves path params and omits an unset query flag",
         )
         client.close()
 
