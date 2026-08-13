@@ -16,20 +16,54 @@ analysis_params)``. Which ``<deployment>`` that is comes from
 :func:`resolve_analyses_package`, which survives a hexagon graft (see its
 docstring); a configured analysis that cannot be loaded raises
 :class:`AnalysisLoadError` rather than leaving the server short a route.
+
+**A queued analysis outlives the process that queued it.** The queue itself
+cannot: it is an ``asyncio.Queue`` of tuples holding a live
+:class:`~helao.core.drivers.data.loaders.localfs.LocalLoader`, so it is neither
+serialisable nor visible from outside the process, and the requesting action
+returns as soon as it has enqueued -- its own record already reads *done*. A
+restart therefore used to drop every queued analysis with no trace anywhere: no
+file, no log line, and an action history claiming the work was requested
+successfully. The fix is a **request journal**, one small json file per queued
+analysis under ``<root>/STATES/ana_pending/``, written *before* the item reaches
+the queue and deleted when its worker finishes with it. At startup the journal
+is swept and every surviving entry is re-enqueued (see
+:meth:`AnalysisSyncer.recover_journal`).
+
+Re-running a recovered analysis is an idempotent upsert rather than a duplicate,
+which is what makes the sweep safe to arm by default: an analysis uuid is the
+deterministic hash of its identity and inputs
+(:meth:`~helao.core.drivers.data.analyses.base_analysis.BaseAnalysis.gen_uuid`),
+so the second run lands on the same uuid, the same local ANALYSES path and the
+same S3 keys as the first. This is the opposite of a run uuid (``uuid7``, 48
+random bits), where re-running is what the batch converter's recovery goes to
+such lengths to avoid.
 """
 
 __all__ = [
+    "ANA_JOURNAL_SCHEMA",
+    "ANA_JOURNAL_SUBDIR",
+    "ANA_JOURNAL_SUFFIX",
     "AnalysisSyncer",
     "AnalysisExecutor",
     "AnalysisLoadError",
+    "analysis_journal_key",
+    "journal_entry_path",
+    "list_journal_entries",
     "load_analysis_classes",
     "make_analysis_app",
+    "read_journal_entry",
+    "remove_journal_entry",
     "resolve_analyses_package",
+    "write_journal_entry",
 ]
 
 import asyncio
+import hashlib
 import inspect
+import json
 import os
+import time
 from importlib import import_module, util as importlib_util
 from typing import Optional
 from uuid import UUID
@@ -55,6 +89,28 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def _alert(message: str, exc_info: bool = False) -> None:
+    """Raise an alert through the module logger, falling back to ``error``.
+
+    ``helao_logging`` installs ``alert`` with ``setattr(logging.Logger, "alert",
+    ...)`` at import (``helao_logging.py:70``), i.e. on the *class* -- so every
+    ``logging.Logger`` in a process that has loaded this module does carry it,
+    and the direct ``LOGGER.alert`` calls this replaces could not actually raise.
+    What the class patch does not reach is a logger that is not a
+    ``logging.Logger`` at all: a ``LoggerAdapter``, or a test's stub. Alerts here
+    are the mechanism by which a lost analysis stops being invisible, so an alert
+    must never itself be the thing that raises.
+
+    ``LOGGER`` is read at call time rather than bound as a default, so a test
+    that replaces the module logger is honoured. Also invisible to static
+    analysis, which is why pyright reports ``alert`` as unknown on ``Logger``;
+    resolving it through ``getattr`` keeps the type checker quiet as well.
+    """
+    emit = getattr(LOGGER, "alert", None) or LOGGER.error
+    emit(message, exc_info=exc_info)
+
 
 # metadata keys copied from the source process onto the analysis model when present
 _PROCESS_METADATA_KEYS = (
@@ -279,6 +335,151 @@ def load_analysis_classes(
     return loaded
 
 
+#: Subdirectory of ``<root>/STATES`` holding the pending-analysis journal.
+ANA_JOURNAL_SUBDIR = "ana_pending"
+
+#: Extension of one journal entry. Anything else in the directory (notably the
+#: ``.json.tmp`` an interrupted atomic write leaves behind) is not an entry.
+ANA_JOURNAL_SUFFIX = ".json"
+
+#: Schema version of a journal entry's payload. Bump when a field's meaning
+#: changes; a sweep refuses an entry from a newer schema rather than guessing at
+#: it, the way ``batch_converter``'s checkpoints do.
+ANA_JOURNAL_SCHEMA = 1
+
+
+def analysis_journal_key(target: str, process_uuid, analysis_class_name: str) -> str:
+    """Return the journal file name for one analysis request.
+
+    Derived from the three things that identify the request -- the loader
+    ``target`` (the zip or run tree being analysed), the process uuid, and the
+    analysis class -- so re-journalling the same request **overwrites** its entry
+    instead of accumulating a second one. That matters on the recovery path,
+    which re-enqueues an entry and thereby re-journals it.
+
+    The uuid leads the name, unhyphenated separator ``__``, because
+    :meth:`AnalysisSyncer.journal_clear_by_process` can only match on a process
+    uuid (see its docstring) and does so by this prefix. ``target`` is folded
+    into a short digest rather than spelled out: it is an absolute path, so it
+    carries separators and is far too long for a file name.
+
+    Args:
+        target: ``LocalLoader.target`` -- the absolute zip/tree path.
+        process_uuid: Process uuid the analysis runs on.
+        analysis_class_name: ``__name__`` of the :class:`BaseAnalysis` subclass.
+
+    Returns:
+        ``<process uuid>__<class name>__<12-hex digest>.json``.
+    """
+    digest = hashlib.sha1(
+        "\x1f".join([str(target), str(process_uuid), str(analysis_class_name)]).encode(
+            "utf8", errors="replace"
+        )
+    ).hexdigest()[:12]
+    return f"{process_uuid}__{analysis_class_name}__{digest}{ANA_JOURNAL_SUFFIX}"
+
+
+def journal_entry_path(journal_dir: str, key: str) -> str:
+    """Return the full path of journal entry ``key`` inside ``journal_dir``."""
+    return os.path.join(journal_dir, key)
+
+
+def list_journal_entries(journal_dir: Optional[str]) -> list:
+    """Return the sorted journal entry file names in ``journal_dir``.
+
+    Filters to :data:`ANA_JOURNAL_SUFFIX`, which excludes the ``.json.tmp``
+    files an interrupted atomic write leaves behind -- sweeping one of those as
+    an entry would parse a half-written payload. Returns ``[]`` for a missing or
+    unreadable directory, and for journalling being disabled altogether
+    (``journal_dir`` of ``None``).
+    """
+    if not journal_dir:
+        return []
+    try:
+        return sorted(
+            name
+            for name in os.listdir(journal_dir)
+            if name.endswith(ANA_JOURNAL_SUFFIX)
+        )
+    except FileNotFoundError:
+        # Not yet created (nothing has ever been queued on this root), which is
+        # not worth a warning -- it is the normal state of a fresh install.
+        return []
+    except OSError:
+        LOGGER.warning(f"could not list analysis journal dir {journal_dir}")
+        return []
+
+
+def read_journal_entry(path: str) -> Optional[dict]:
+    """Read one journal entry, or ``None`` when it carries no usable payload.
+
+    ``None`` covers "absent", "unreadable" and "not an object" together so the
+    sweep has exactly one no-information case. A corrupt entry is logged and
+    skipped rather than raised: taking a whole recovery sweep down over one bad
+    json file would strand every other queued analysis, which is precisely the
+    silent loss this journal exists to end.
+    """
+    try:
+        with open(path, "r", encoding="utf8") as handle:
+            entry = json.load(handle)
+    except FileNotFoundError:
+        return None
+    except Exception:
+        LOGGER.warning(f"unreadable analysis journal entry {path}; skipping it")
+        return None
+    if not isinstance(entry, dict):
+        LOGGER.warning(f"analysis journal entry {path} is not an object; skipping it")
+        return None
+    return entry
+
+
+def write_journal_entry(journal_dir: str, key: str, entry: dict) -> bool:
+    """Atomically write ``entry`` as journal file ``key``. Never raises.
+
+    ``tmp`` + :func:`os.replace`, so a concurrent sweep never reads a
+    half-written entry. Failure is logged and reported as ``False`` because
+    bookkeeping must never be the thing that breaks the real work: an analysis
+    whose journal write failed still runs, it merely stops being recoverable.
+
+    Args:
+        journal_dir: Directory to write into.
+        key: File name from :func:`analysis_journal_key`.
+        entry: Payload; ``schema`` and ``queued_at`` are filled in here.
+
+    Returns:
+        ``True`` on success, ``False`` if the write failed.
+    """
+    path = journal_entry_path(journal_dir, key)
+    payload = dict(entry)
+    payload["schema"] = ANA_JOURNAL_SCHEMA
+    payload["queued_at"] = time.time()
+    tmp = f"{path}.tmp"
+    try:
+        os.makedirs(journal_dir, exist_ok=True)
+        with open(tmp, "w", encoding="utf8") as handle:
+            json.dump(payload, handle, indent=2, default=str)
+        os.replace(tmp, path)
+        return True
+    except Exception:
+        LOGGER.error(f"could not write analysis journal entry {path}", exc_info=True)
+        try:
+            if os.path.exists(tmp):
+                os.remove(tmp)
+        except OSError:
+            pass
+        return False
+
+
+def remove_journal_entry(path: str) -> None:
+    """Delete one journal entry if it is there. Never raises."""
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+    except OSError:
+        LOGGER.warning(f"could not remove analysis journal entry {path}")
+
+
 class AnalysisSyncer(HelaoSyncer):
     """Queue-based worker that runs analyses and syncs outputs to S3.
 
@@ -304,6 +505,8 @@ class AnalysisSyncer(HelaoSyncer):
         task_set: Set of enqueued process UUIDs used to deduplicate.
         running_tasks: Mapping from process UUID string to worker task.
         syncer_loops: Mapping from worker index to its asyncio.Task.
+        journal_dir: Directory holding the durable request journal, or ``None``
+            when journalling is disabled (no resolvable ``STATES`` root).
         loader: S3/metadata loader shared with analysis classes via ``pgs3.LOADER``.
         s3: S3 client from the loader.
         s3r: S3 resource from the loader.
@@ -338,11 +541,315 @@ class AnalysisSyncer(HelaoSyncer):
         self.task_queue = asyncio.Queue()
         self.task_set = set()
         self.running_tasks = {}
+        self.journal_dir = self._resolve_journal_dir(action_serv)
 
         self.syncer_loops = {
             i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
             for i in range(self.max_tasks)
         }
+
+    @staticmethod
+    def _resolve_journal_dir(action_serv: Base) -> Optional[str]:
+        """Return ``<STATES>/ana_pending``, or ``None`` to disable journalling.
+
+        The ``STATES`` root is read off the action server's own
+        :class:`~helao.core.models.helaodirs.HelaoDirs` (``Base.helaodirs``,
+        built by :func:`~helao.helpers.helao_dirs.helao_dirs` from the world
+        config's ``root``) rather than re-resolved from the config here, so the
+        journal cannot end up under a different root than the rest of the
+        server's state.
+
+        Every field of ``HelaoDirs`` is ``None`` when the config carries no
+        ``root``, which is a supported construction (``Base`` itself only warns),
+        and a test double need not carry ``helaodirs`` at all. Either way the
+        answer is ``None``: journalling degrades to off with one WARNING and the
+        server keeps behaving exactly as it did before the journal existed.
+        """
+        states_root = getattr(
+            getattr(action_serv, "helaodirs", None), "states_root", None
+        )
+        if not states_root:
+            LOGGER.warning(
+                "No STATES root is available, so queued analyses will not be "
+                "journalled; a restart will silently drop whatever is queued."
+            )
+            return None
+        path = os.path.join(str(states_root), ANA_JOURNAL_SUBDIR)
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError:
+            LOGGER.warning(
+                f"Could not create the analysis journal dir {path}; queued "
+                "analyses will not be journalled.",
+                exc_info=True,
+            )
+            return None
+        LOGGER.info(f"Analysis request journal at {path}.")
+        return path
+
+    def _journal_key(self, calc_tup: tuple) -> Optional[str]:
+        """Return the journal file name for ``calc_tup``, or ``None`` if unknown.
+
+        A pure function of the tuple, which is the whole point: the completion
+        path can recompute the exact key from the tuple it just finished with,
+        so no queued-item-to-journal-path mapping has to be maintained anywhere
+        (and none can go stale). ``None`` when the loader carries no ``target``
+        -- a stand-in loader in a test, or a loader kind that is not
+        :class:`LocalLoader` -- since without a target there is nothing a
+        recovered entry could be rebuilt from.
+        """
+        target = getattr(calc_tup[1], "target", None)
+        if not target:
+            return None
+        ana_cls = calc_tup[3]
+        return analysis_journal_key(
+            str(target), calc_tup[0], getattr(ana_cls, "__name__", str(ana_cls))
+        )
+
+    def journal_write(self, calc_tup: tuple) -> Optional[str]:
+        """Record ``calc_tup`` in the journal. Returns the path, or ``None``.
+
+        Called by :meth:`enqueue_calc` **before** the item reaches the queue.
+        The order is the mechanism: a crash in the gap between the two leaves a
+        recoverable record on disk, whereas the reverse order leaves a queued
+        analysis with nothing written about it -- exactly the loss this journal
+        exists to end.
+
+        The entry records the loader's ``target`` rather than the loader, which
+        is what makes it serialisable at all: ``LocalLoader.__init__`` keeps the
+        absolute path on ``self.target``, so ``LocalLoader(target)`` rebuilds an
+        equivalent loader on the recovery path.
+
+        Never raises. A journal that cannot be written is a lost *recovery*
+        guarantee, not a lost analysis.
+        """
+        if not self.journal_dir:
+            return None
+        try:
+            key = self._journal_key(calc_tup)
+            if key is None:
+                LOGGER.warning(
+                    "Queued analysis has no loader target, so it cannot be "
+                    "journalled; a restart would drop it."
+                )
+                return None
+            process_uuid, data_loader, params, ana_cls, action_uuid = calc_tup
+            entry = {
+                "target": str(getattr(data_loader, "target", "")),
+                "process_uuid": str(process_uuid),
+                "params": params if isinstance(params, dict) else {},
+                # The class NAME, resolved back to a class at recovery time
+                # against the same ``analyses`` mapping make_analysis_app built
+                # -- a class object is not serialisable, and an import path
+                # would pin the entry to one deployment's module layout.
+                "analysis_class": getattr(ana_cls, "__name__", str(ana_cls)),
+                "analysis_module": getattr(ana_cls, "__module__", ""),
+                "analysis_action_uuid": (
+                    None if action_uuid is None else str(action_uuid)
+                ),
+            }
+            if write_journal_entry(self.journal_dir, key, entry):
+                return journal_entry_path(self.journal_dir, key)
+        except Exception:
+            LOGGER.error("Failed to journal a queued analysis.", exc_info=True)
+        return None
+
+    def journal_clear(self, calc_tup: tuple) -> None:
+        """Drop ``calc_tup``'s journal entry, its worker having finished with it.
+
+        Keyed by recomputing :meth:`_journal_key` from the tuple, so the entry
+        removed is exactly the one :meth:`journal_write` created -- see
+        :meth:`journal_clear_by_process` for why the task-name route cannot be
+        that precise.
+
+        Removed on **completion**, not on success: a failed analysis has already
+        been alerted by :meth:`syncer`, and keeping its entry would re-run a
+        permanently-failing analysis at every restart, forever. The journal's
+        job is to survive an *interruption* -- a crash, a kill, a graceful stop
+        -- which is exactly the case where no worker ever reaches here.
+        """
+        if not self.journal_dir:
+            return
+        try:
+            key = self._journal_key(calc_tup)
+            if key is not None:
+                remove_journal_entry(journal_entry_path(self.journal_dir, key))
+        except Exception:
+            LOGGER.warning("Failed to clear an analysis journal entry.", exc_info=True)
+
+    def journal_clear_by_process(self, process_uuid_str: str) -> None:
+        """Drop every journal entry for one process uuid. Best effort.
+
+        The seam for a caller that has only a task *name* -- which is the process
+        uuid, and therefore not the journal key: the key also carries the loader
+        target and the analysis class, so one process uuid can in principle own
+        several entries. Matching by the name prefix removes all of them, which
+        is a superset of what such a caller means. :meth:`syncer` uses the exact
+        :meth:`journal_clear` instead and does not go through here.
+        """
+        if not self.journal_dir:
+            return
+        prefix = f"{process_uuid_str}__"
+        for name in list_journal_entries(self.journal_dir):
+            if name.startswith(prefix):
+                remove_journal_entry(journal_entry_path(self.journal_dir, name))
+
+    def journal_pending_keys(self) -> list:
+        """Journal entry file names currently on disk, for the status endpoint."""
+        return list_journal_entries(self.journal_dir)
+
+    async def recover_journal(self, analysis_classes: dict) -> dict:
+        """Re-enqueue every analysis the journal still holds. Startup sweep.
+
+        An entry survives only when its worker never finished with it, so every
+        one found here is an analysis that was requested, reported as
+        successfully requested by its action, and then lost to a restart. The
+        sweep is what stops that from being silent: anything recovered is raised
+        as an alert, not merely logged.
+
+        Re-running is an idempotent upsert rather than a duplicate, which is why
+        this is armed by default and needs no delete-then-rerun dance:
+        ``BaseAnalysis.gen_uuid`` hashes the analysis name, params, process uuid,
+        sample label, codehash and run_use, so the recovered run mints the *same*
+        analysis uuid and writes the same local path and S3 keys as the run it is
+        repeating.
+
+        Four dispositions, all of which keep the sweep going:
+
+        * **re-enqueued** -- the zip is there and the analysis class is
+          configured on this host.
+        * **deleted** -- the loader ``target`` no longer exists. The entry can
+          never run again, so leaving it would alert on every restart forever;
+          it is removed and alerted once, naming the entry and the path.
+        * **left in place, unconfigured** -- the entry names an analysis class
+          this host does not serve. Another host in the group may own it (the
+          ``analyses`` list is per server), so deleting it here would destroy
+          another server's work. Logged, untouched.
+        * **left in place, unreadable** -- corrupt json, a missing field, or a
+          ``schema`` newer than this build's. Logged and skipped; a human decides.
+
+        Args:
+            analysis_classes: The endpoint-name-to-class mapping
+                :func:`make_analysis_app` built from ``params.analyses``.
+
+        Returns:
+            ``{"pending", "recovered", "dropped", "unconfigured", "failed"}``.
+        """
+        summary = {
+            "pending": 0,
+            "recovered": 0,
+            "dropped": 0,
+            "unconfigured": 0,
+            "failed": 0,
+        }
+        if not self.journal_dir:
+            LOGGER.info("Analysis journal is disabled; no recovery sweep to run.")
+            return summary
+
+        by_name = {cls.__name__: cls for cls in (analysis_classes or {}).values()}
+        names = list_journal_entries(self.journal_dir)
+        summary["pending"] = len(names)
+        if not names:
+            LOGGER.info("Analysis journal is empty; nothing to recover.")
+            return summary
+
+        # One loader per distinct zip, matching the live path, where batch_calc
+        # shares a single LocalLoader across every process of one sequence.
+        # Building one is a full index of the archive, so this is not a
+        # micro-optimisation on a plate with dozens of processes.
+        loaders: dict = {}
+        for name in names:
+            path = journal_entry_path(self.journal_dir, name)
+            entry = read_journal_entry(path)
+            if entry is None:
+                summary["failed"] += 1
+                continue
+            try:
+                schema = int(entry.get("schema", ANA_JOURNAL_SCHEMA))
+            except (TypeError, ValueError):
+                schema = ANA_JOURNAL_SCHEMA
+            if schema > ANA_JOURNAL_SCHEMA:
+                LOGGER.warning(
+                    f"Analysis journal entry {name} carries schema {schema}, newer "
+                    f"than this build's {ANA_JOURNAL_SCHEMA}; leaving it alone "
+                    "rather than guessing at its meaning."
+                )
+                summary["failed"] += 1
+                continue
+
+            target = str(entry.get("target") or "")
+            class_name = str(entry.get("analysis_class") or "")
+            if not target or not class_name or not entry.get("process_uuid"):
+                LOGGER.warning(
+                    f"Analysis journal entry {name} is missing target, "
+                    "analysis_class or process_uuid; leaving it alone."
+                )
+                summary["failed"] += 1
+                continue
+
+            ana_cls = by_name.get(class_name)
+            if ana_cls is None:
+                LOGGER.info(
+                    f"Analysis journal entry {name} names '{class_name}', which is "
+                    "not in this server's params.analyses; leaving it for whichever "
+                    "host serves that analysis."
+                )
+                summary["unconfigured"] += 1
+                continue
+
+            if not os.path.exists(target):
+                _alert(
+                    f"Analysis journal entry {name} cannot be recovered: its data "
+                    f"path {target} no longer exists. The analysis requested for "
+                    f"process {entry.get('process_uuid')} will never run; removing "
+                    "the entry."
+                )
+                remove_journal_entry(path)
+                summary["dropped"] += 1
+                continue
+
+            try:
+                process_uuid = UUID(str(entry["process_uuid"]))
+                action_uuid_raw = entry.get("analysis_action_uuid")
+                action_uuid = (
+                    None if not action_uuid_raw else UUID(str(action_uuid_raw))
+                )
+                params = entry.get("params")
+                if not isinstance(params, dict):
+                    params = {}
+                if target not in loaders:
+                    # Indexing a zip is blocking, so it does not belong on the
+                    # server's event loop -- this sweep runs while the server is
+                    # already answering requests.
+                    loaders[target] = await asyncio.to_thread(LocalLoader, target)
+            except Exception:
+                _alert(
+                    f"Could not rebuild the analysis in journal entry {name} from "
+                    f"{target}; leaving the entry in place.",
+                    exc_info=True,
+                )
+                summary["failed"] += 1
+                continue
+
+            await self.enqueue_calc(
+                (process_uuid, loaders[target], params, ana_cls, action_uuid)
+            )
+            summary["recovered"] += 1
+
+        message = (
+            f"Analysis journal recovery: {summary['pending']} entr(ies) on disk, "
+            f"{summary['recovered']} re-enqueued, {summary['dropped']} dropped as "
+            f"unrunnable, {summary['unconfigured']} for another host, "
+            f"{summary['failed']} unreadable."
+        )
+        if summary["recovered"]:
+            # An alert, because the restart that lost these was itself silent:
+            # each recovered analysis had already been reported as done by the
+            # action that requested it.
+            _alert(message)
+        else:
+            LOGGER.info(message)
+        return summary
 
     def has_pending_work(self) -> bool:
         """True while any analysis is queued for or actively running.
@@ -376,6 +883,23 @@ class AnalysisSyncer(HelaoSyncer):
     def sync_exit_callback(self, task: asyncio.Task):
         """Drop the completed ``task`` from ``running_tasks`` and ``task_set``.
 
+        **Not on this class's completion path, for two independent reasons.**
+        Nothing in the tree calls it -- :meth:`syncer` does its own ``finally``
+        cleanup instead, and clears the journal there by the exact key. And the
+        identifier it keys on could not match anyway: ``task.get_name()`` returns
+        the *asyncio task* name, which for the only tasks this class creates is
+        ``syncer_loop__<i>`` (set in :meth:`__init__`), while ``running_tasks`` is
+        keyed by **process uuid** -- ``syncer`` registers
+        ``asyncio.current_task()``, the long-lived worker loop, under the uuid of
+        whichever item it is handling. So the body below is inert here; it is the
+        inherited :class:`HelaoSyncer` seam, where tasks *are* named per uuid.
+
+        Kept, and taught to clear the journal, so that seam stays coherent if it
+        is ever wired: by process uuid, which is all a task name can offer, and
+        therefore a superset of one request (see
+        :meth:`journal_clear_by_process`). The precise clear lives in
+        :meth:`journal_clear`, which recomputes the key from the tuple itself.
+
         Args:
             task: The completed :class:`asyncio.Task` whose name is used as the
                 lookup key.
@@ -387,17 +911,24 @@ class AnalysisSyncer(HelaoSyncer):
                 self.task_set.remove(task_name)
             except KeyError:
                 pass
+            self.journal_clear_by_process(task_name)
 
     async def enqueue_calc(
         self,
         calc_tup: tuple[UUID, LocalLoader, dict, BaseAnalysis, Optional[UUID]],
     ):
-        """Push a single analysis tuple onto :attr:`task_queue`.
+        """Journal, then push, a single analysis tuple onto :attr:`task_queue`.
+
+        The journal write comes first and deliberately so: the queue is in-memory
+        and the requesting action returns as soon as this returns, so between the
+        write and the ``put`` a crash loses nothing, while in the other order it
+        loses the whole request. See :meth:`journal_write`.
 
         Args:
             calc_tup: ``(process_uuid, data_loader, ana_params, analysis_class,
                 analysis_action_uuid)`` describing one analysis to run.
         """
+        self.journal_write(calc_tup)
         self.task_set.add(calc_tup[0])
         await self.task_queue.put(calc_tup)
         LOGGER.info(f"Added {str(calc_tup[0])} to syncer queue.")
@@ -418,18 +949,35 @@ class AnalysisSyncer(HelaoSyncer):
                 LOGGER.debug(
                     f"{proc_uuid_str} ana sync is already in progress, skipping."
                 )
+                # The journal entry stays: this item's analysis genuinely did not
+                # run, so the next startup sweep should offer it again.
                 self.task_queue.task_done()
                 continue
             self.running_tasks[proc_uuid_str] = asyncio.current_task()
+            cancelled = False
             try:
                 await self.sync_ana(calc_tup)
+            except asyncio.CancelledError:
+                # A cancellation is an interruption, not an outcome: this is what
+                # a graceful shutdown does to an analysis that is still running,
+                # and its journal entry must survive so the next start re-enqueues
+                # it. Without this flag the ``finally`` below would clear the
+                # entry of the one analysis that certainly did NOT finish -- the
+                # in-flight one -- while every queued sibling was preserved.
+                # Re-raised so the worker loop still stops on cancellation.
+                cancelled = True
+                raise
             except Exception:
-                LOGGER.alert(
-                    f"Error in ana syncer worker for {proc_uuid_str}", exc_info=True
-                )
+                _alert(f"Error in ana syncer worker for {proc_uuid_str}", exc_info=True)
             finally:
                 self.running_tasks.pop(proc_uuid_str, None)
                 self.task_set.discard(calc_tup[0])
+                if not cancelled:
+                    # This worker is done with the item, success or failure, so
+                    # its durable record goes with it -- keyed off the tuple,
+                    # which is the only place the loader target and analysis
+                    # class are still known.
+                    self.journal_clear(calc_tup)
                 self.task_queue.task_done()
 
     def _calc_and_write_model(
@@ -581,8 +1129,27 @@ class AnalysisSyncer(HelaoSyncer):
             )
 
     def shutdown(self):
-        """Hook for graceful shutdown (no-op)."""
-        pass
+        """Report what a graceful stop is leaving behind for the next startup.
+
+        Nothing is drained or awaited here: an analysis takes seconds to minutes
+        and a shutdown hook is not the place to wait for one. The queue is
+        discarded, as it always was -- what changed is that it is no longer
+        discarded *silently*, because every queued item has a journal entry and
+        :meth:`recover_journal` re-enqueues it on the next launch.
+        """
+        pending = self.journal_pending_keys()
+        if pending:
+            LOGGER.warning(
+                f"Shutting down with {len(pending)} analysis request(s) still "
+                f"journalled in {self.journal_dir}; they will be re-enqueued at "
+                "the next startup."
+            )
+        elif self.task_set or self.running_tasks:
+            LOGGER.warning(
+                f"Shutting down with {len(self.task_set)} queued and "
+                f"{len(self.running_tasks)} running analysis task(s) and no journal "
+                "entries for them; these will be lost."
+            )
 
 
 class AnalysisExecutor(Executor):
@@ -637,7 +1204,8 @@ def make_analysis_app(server_key) -> BaseAPI:
     Constructs a :class:`BaseAPI` backed by :class:`AnalysisSyncer` and registers
     one ``analyze_<module>`` action endpoint per analysis class named in the
     server config ``params.analyses`` list, plus the private ``list_running_tasks``
-    and ``list_queued_tasks`` endpoints.
+    and ``list_queued_tasks`` endpoints, and arms the startup sweep that
+    re-enqueues whatever the request journal still holds.
 
     The analysis classes are resolved from the global ``CONFIG`` at app-build
     time (the driver instance is not created until the FastAPI ``startup``
@@ -705,9 +1273,27 @@ def make_analysis_app(server_key) -> BaseAPI:
         return list(app.driver.running_tasks.keys())
 
     @app.post("/list_queued_tasks", tags=["private"])
-    def list_queued_tasks() -> list:
-        """Return identifiers of analysis tasks queued but not yet running."""
-        return list(app.driver.task_set)
+    def list_queued_tasks() -> dict:
+        """Return the queued analyses, in memory and on disk.
+
+        The in-memory queue is under ``queued``, which is exactly what this
+        endpoint used to return as its whole body. The shape widened to an object
+        so the durable request journal is visible through the *existing* route
+        rather than a new one: ``journal_pending``/``journal_keys`` are what a
+        restart would re-enqueue, and their divergence from ``queued`` is how a
+        journal write failure or a disabled journal shows up from outside the
+        process. Nothing in the tree read the old body (checked: the only
+        occurrences of ``list_queued_tasks`` anywhere are its own definition and
+        priv's frozen route checklist, which pins the path and method, not the
+        response schema).
+        """
+        return {
+            "queued": [str(x) for x in app.driver.task_set],
+            "running": list(app.driver.running_tasks.keys()),
+            "journal_dir": app.driver.journal_dir,
+            "journal_keys": app.driver.journal_pending_keys(),
+            "journal_pending": len(app.driver.journal_pending_keys()),
+        }
 
     # Hot-reload safety: defer restart while an analysis is queued or running.
     # Both ``app.base`` and ``app.driver`` are created in BaseAPI's own startup
@@ -717,6 +1303,41 @@ def make_analysis_app(server_key) -> BaseAPI:
     def _wire_hotreload_busy():
         app.base.hotreload_busy_hook = lambda: (
             app.driver is not None and app.driver.has_pending_work()
+        )
+
+    @app.on_event("startup")
+    def _recover_journalled_analyses():
+        """Re-enqueue whatever a previous process left in the request journal.
+
+        Registered after BaseAPI's startup handler, so ``app.driver`` exists by
+        the time this runs. It launches a task rather than awaiting the sweep:
+        rebuilding a loader indexes a sequence zip, and holding up startup for
+        that would delay the port bind and every route with it.
+
+        Armed by default -- an unswept journal is the silent loss the journal
+        exists to end -- and suppressible per server with
+        ``params.analysis_recovery_on_startup: false``, matching the batch
+        server's ``recovery_on_startup`` knob. Suppressing it stops only this
+        pass; the entries stay on disk and stay visible through
+        ``/list_queued_tasks``, so a backlog can be inspected before anything
+        acts on it.
+        """
+        if app.driver is None:
+            LOGGER.warning(
+                "No analysis driver at startup; the request journal was not swept."
+            )
+            return
+        if not app.driver.config_dict.get("analysis_recovery_on_startup", True):
+            pending = len(app.driver.journal_pending_keys())
+            LOGGER.warning(
+                "analysis_recovery_on_startup is false, so the request journal was "
+                f"not swept; {pending} entr(ies) are waiting in "
+                f"{app.driver.journal_dir}."
+            )
+            return
+        app.driver.recovery_task = asyncio.create_task(
+            app.driver.recover_journal(analysis_classes),
+            name="ana_journal_recovery",
         )
 
     return app
