@@ -15,6 +15,13 @@ and re-run finish_yml). Three distinct defects are covered:
   4. Phantom groups: a ``process_order_groups`` entry with no contributing
      action on disk is dropped by ``sync_process`` so the experiment finishes,
      instead of looping forever on ``reset_sync`` + re-enqueue.
+  7. Unrebuildable groups: a group whose ``process_metas`` entry is gone while
+     ``process_actions_done`` still records its actions, and whose action ymls
+     have left every tree ``HelaoYml.children`` scans, must be parked rather
+     than retried forever. This is the same permanent loop as 4 reached from the
+     other side -- 4 has no contributing action recorded, so it is recognised as
+     phantom and dropped, while this one *is* recorded and falls through to a
+     ``continue`` that can never make progress.
 
 Hermetic: no AWS configured (``s3`` is None), so uploads are
 no-ops and nothing touches the network.
@@ -24,6 +31,7 @@ __all__ = ["sync_process_recovery_unit_test"]
 
 import asyncio
 import os
+import shutil
 import tempfile
 import traceback
 from datetime import datetime
@@ -325,6 +333,71 @@ async def _run_checks() -> dict:
                 t.cancel()
             await asyncio.gather(*drv.syncer_loops.values(), return_exceptions=True)
 
+    # --- 7. Unrebuildable group: meta gone AND its actions gone from disk ----
+    with tempfile.TemporaryDirectory() as tmp_root:
+        drv = _make_driver(tmp_root)
+        try:
+            from helao.core.drivers.data.sync_driver import HelaoYml
+
+            root = Path(tmp_root)
+            exp_yml = _make_exp_tree(
+                root,
+                RunDir.FINISHED.value,
+                _uuid(1006),
+                process_order_groups={0: [0, 1]},
+            )
+            a0 = _make_action(exp_yml, 0)
+            a1 = _make_action(exp_yml, 1, process_finish=True)
+
+            # Fold both actions the way a live sync would, so the .prg carries a
+            # complete record for group 0.
+            drv.update_process(HelaoYml(a0), _act_meta(0, False))
+            ep = drv.update_process(HelaoYml(a1), _act_meta(1, True))
+
+            # Now reproduce the state seen in production. Two things happened to
+            # this experiment, neither of them recoverable from the other:
+            #
+            #  * ``process_metas`` was lost while ``process_actions_done``
+            #    survived. A .prg written before the legacy-metas fix (scenario 1
+            #    above) is exactly this shape: the legacy branch recorded actions
+            #    as done without ever building their metas.
+            #  * the contributing actions left every tree ``HelaoYml.children``
+            #    scans -- they synced and were swept into the zipped sequence --
+            #    so there is nothing on disk to replay them from.
+            shutil.rmtree(a0.parent)
+            shutil.rmtree(a1.parent)
+            ep.dict["process_metas"] = {}
+            ep.write_dict()
+
+            ep = drv.get_progress(exp_yml)
+            ep = drv.reconcile_processes(ep)
+            # Precondition, not the defect: reconcile has nothing to replay, so
+            # the meta stays missing while the group still looks contributed-to.
+            out["unrebuildable_meta_absent"] = 0 not in ep.dict["process_metas"]
+            out["unrebuildable_actions_still_recorded"] = set(
+                ep.dict["process_actions_done"].keys()
+            ) == {0, 1}
+
+            ep = await drv.sync_process(ep, force=True)
+
+            # The defect: sync_process takes its "contributing actions exist but
+            # no process meta after reconcile" branch and ``continue``s, leaving
+            # the group in list_unfinished_procs forever. sync_yml then returns
+            # False and the experiment is re-queued by whatever touches it next
+            # -- the permanent reset+re-enqueue loop. An unrebuildable group must
+            # instead be parked (flagged done or dropped) with an alert, the way
+            # the phantom-group branch in scenario 4 already parks a group whose
+            # action was never dispatched.
+            out["unrebuildable_group_parked"] = (
+                0 not in ep.dict["process_groups"] or 0 in ep.dict["process_s3"]
+            )
+            s3_unf, api_unf = ep.list_unfinished_procs()
+            out["unrebuildable_experiment_completes"] = not s3_unf and not api_unf
+        finally:
+            for t in drv.syncer_loops.values():
+                t.cancel()
+            await asyncio.gather(*drv.syncer_loops.values(), return_exceptions=True)
+
     return out
 
 
@@ -388,6 +461,24 @@ def sync_process_recovery_unit_test() -> bool:
     reporter.check("both groups synced", lambda: res["overlap_both_synced"])
     reporter.check(
         "experiment completes (no stall)", lambda: res["overlap_experiment_completes"]
+    )
+
+    reporter.section("unrebuildable group (meta gone, contributing actions gone)")
+    reporter.check(
+        "precondition: meta absent after reconcile",
+        lambda: res["unrebuildable_meta_absent"],
+    )
+    reporter.check(
+        "precondition: actions still recorded done",
+        lambda: res["unrebuildable_actions_still_recorded"],
+    )
+    reporter.check(
+        "unrebuildable group parked, not retried forever",
+        lambda: res["unrebuildable_group_parked"],
+    )
+    reporter.check(
+        "experiment completes (no permanent re-enqueue loop)",
+        lambda: res["unrebuildable_experiment_completes"],
     )
 
     return reporter.success()
