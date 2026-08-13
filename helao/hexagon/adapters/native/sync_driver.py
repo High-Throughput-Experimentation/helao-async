@@ -698,14 +698,33 @@ class Progress:
         self.dict = yml_load(self.prg, fast=True)
 
     def write_dict(self, new_dict: Optional[dict] = None):
-        """Persist the progress dict to the ``.prg`` file as YAML.
+        """Persist the progress dict to the ``.prg`` file as YAML, atomically.
+
+        Written to a sibling ``.tmp`` and moved into place with
+        :func:`os.replace`, rather than truncating the live file. A plain
+        ``write_text`` leaves a window in which the ``.prg`` on disk is empty or
+        half-written, and this file is on a CIFS share where that window is not
+        small. Any reader landing in it gets either a parse error or -- worse --
+        a *partial* dict, which is one way an experiment ends up with
+        ``process_actions_done`` recording actions whose ``process_metas``
+        entries are absent: a divergence that cannot be rebuilt once the
+        contributing action ymls have moved on, and that used to leave the
+        experiment in a permanent re-enqueue loop (see
+        :meth:`SyncDriver.sync_process`).
+
+        The in-process hierarchical locks already serialize *writers* for one
+        experiment (an action holds its parent's mutex, see
+        :meth:`SyncDriver._acquire_hierarchy_locks`), so this is not about two
+        syncer tasks racing. It closes the reader-side window, and the
+        cross-process one that no asyncio lock can cover.
 
         Args:
             new_dict: Override dict to write. Defaults to ``self.dict``.
         """
         out_dict = self.dict if new_dict is None else new_dict
-        # with self.prglock:
-        self.prg.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
+        tmp = self.prg.with_suffix(self.prg.suffix + ".tmp")
+        tmp.write_text(str(yml_dumps(out_dict)), encoding="utf-8")
+        os.replace(tmp, self.prg)
 
     @property
     def s3_done(self) -> bool:
@@ -1743,14 +1762,53 @@ class SyncDriver:
                             exp_prog.dict["process_api"].append(pidx)
                         exp_prog.write_dict()
                         continue
-                    # Contributing actions exist but their meta is still missing
-                    # -- unexpected after reconcile. Skip this pass rather than
-                    # wiping and re-queuing the whole subtree.
-                    LOGGER.error(
-                        f"Process group {pidx} in {str(exp_prog.yml.target)} has "
-                        f"contributing actions {done_gids} but no process meta after "
-                        f"reconcile; skipping."
+                    # Contributing actions are recorded, but their meta is
+                    # missing after reconcile replayed everything on disk. Whether
+                    # that is retryable depends entirely on whether any of those
+                    # actions is still *readable*, because the action yml is the
+                    # only thing a meta can be rebuilt from.
+                    on_disk = {
+                        c.meta.get("action_order")
+                        for c in exp_prog.yml.children
+                        if c.type == "action"
+                    }
+                    if set(done_gids) & on_disk:
+                        # Rebuildable: an action is there and reconcile still did
+                        # not produce a meta, so something else went wrong on this
+                        # pass. Skip rather than wiping and re-queuing the whole
+                        # subtree; the next pass can legitimately succeed.
+                        LOGGER.error(
+                            f"Process group {pidx} in {str(exp_prog.yml.target)} has "
+                            f"contributing actions {done_gids} on disk but no process "
+                            f"meta after reconcile; skipping this pass."
+                        )
+                        continue
+                    # Unrebuildable: process_actions_done records actions whose
+                    # ymls have left every tree HelaoYml.children scans (they
+                    # synced and were swept into the zipped sequence), so no pass
+                    # will ever rebuild this meta. Leaving it unfinished is what
+                    # kept such experiments in a permanent re-enqueue loop --
+                    # sync_yml returns False forever and anything that touches the
+                    # experiment starts it again. Park it exactly as a phantom
+                    # group is parked, but alert rather than warn: a process that
+                    # existed is being written off, which is a data-completeness
+                    # loss a human needs to see, not a bookkeeping tidy-up.
+                    # ``alert`` is installed onto Logger by helao_logging with a
+                    # setattr, which static analysis cannot see.
+                    LOGGER.alert(  # type: ignore[attr-defined]
+                        f"Process group {pidx} in {str(exp_prog.yml.target)} records "
+                        f"contributing actions {done_gids} whose ymls are no longer on "
+                        f"disk and whose process meta is gone; it cannot be rebuilt. "
+                        f"Parking the group so the experiment can finish -- this "
+                        f"process will NOT be uploaded. Recover it by restoring the "
+                        f"action ymls to RUNS_FINISHED and re-running finish_yml."
                     )
+                    exp_prog.dict["process_groups"].pop(pidx, None)
+                    if pidx not in exp_prog.dict["process_s3"]:
+                        exp_prog.dict["process_s3"].append(pidx)
+                    if pidx not in exp_prog.dict["process_api"]:
+                        exp_prog.dict["process_api"].append(pidx)
+                    exp_prog.write_dict()
                     continue
                 meta = exp_prog.dict["process_metas"][pidx]
                 uuid_key = meta["process_uuid"]
@@ -1909,6 +1967,21 @@ class SyncDriver:
         For each pending yml, any existing ``.progress`` sibling under
         ``RUNS_SYNCED`` triggers :meth:`reset_sync` before the yml is queued.
 
+        **That reset is dead for anything this build writes, deliberately so.**
+        :class:`Progress` writes ``.prg``; ``.progress`` is the legacy sidecar
+        name, kept only in :meth:`reset_sync`'s and :meth:`unsync_dir`'s delete
+        filters. So a yml queued from here keeps its ``.prg`` and *resumes*.
+        Widening the test to ``.prg`` would invert that: every partially synced
+        run would be reset instead, discarding recorded S3/API progress and
+        re-uploading it all -- on a share holding a backlog of pending sequences
+        that is the expensive wrong answer, not a safety net.
+        Nor is it needed. The failure a reset was reached for -- a ``.prg`` whose
+        ``process_actions_done`` records actions whose ``process_metas`` entries
+        are gone -- is repaired in place by :meth:`sync_process`, which parks a
+        group it can no longer rebuild instead of retrying it forever. A diverged
+        sidecar therefore resolves on its next pass without anything being thrown
+        away.
+
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
             actions_first: When true, enqueue actions and experiments before
@@ -1919,7 +1992,11 @@ class SyncDriver:
         """
 
         async def reset_and_queue(pp, rank: int = 0):
-            """Reset any stale ``.progress`` sibling under ``RUNS_SYNCED`` and enqueue ``pp``."""
+            """Reset a stale legacy ``.progress`` sibling, then enqueue ``pp``.
+
+            Legacy artifacts only -- see the caller's docstring for why this does
+            not (and must not) look for ``.prg``.
+            """
             if os.path.exists(
                 pp.replace(RunDir.FINISHED.value, RunDir.SYNCED.value).replace(
                     ".yml", ".progress"
