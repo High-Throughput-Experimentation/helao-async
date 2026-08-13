@@ -242,3 +242,68 @@ async def test_overlapping_groups_both_built_and_synced(tmp_path):
         assert not s3_unf and not api_unf, "overlap_experiment_completes"
     finally:
         await teardown_driver(drv)
+
+
+# --- 7. Unrebuildable group: meta gone AND its actions gone from disk ------
+
+
+@pytest.mark.asyncio
+async def test_unrebuildable_group_parked_experiment_finishes(tmp_path):
+    """A group whose meta is gone and whose actions left disk must not loop.
+
+    Scenario 4 parks a group that has *no* contributing action recorded, by
+    recognising it as phantom. This is the same permanent loop reached from the
+    other side: the actions *are* recorded in ``process_actions_done``, so the
+    phantom test does not fire, and ``sync_process`` falls through to a
+    ``continue`` that can never make progress -- the group stays in
+    ``list_unfinished_procs`` forever, ``sync_yml`` keeps returning False, and the
+    experiment is re-queued by whatever touches it next.
+
+    Both halves of the state are reproduced because neither implies the other:
+    ``process_metas`` lost while ``process_actions_done`` survived (the shape a
+    .prg written before the scenario-1 legacy-metas fix has), and the
+    contributing action ymls gone from every tree ``HelaoYml.children`` scans
+    (they synced and were swept into the zipped sequence), so
+    ``reconcile_processes`` has nothing to replay.
+    """
+    import shutil
+
+    drv = make_sync_driver(str(tmp_path), NativeSyncDriver)
+    try:
+        root = Path(tmp_path)
+        exp_yml = make_exp_tree(
+            root,
+            RunDir.FINISHED.value,
+            mk_uuid(1006),
+            process_order_groups={0: [0, 1]},
+        )
+        a0 = make_action(exp_yml, 0)
+        a1 = make_action(exp_yml, 1, process_finish=True)
+
+        drv.update_process(HelaoYml(a0), act_meta(0, False))
+        ep = drv.update_process(HelaoYml(a1), act_meta(1, True))
+
+        shutil.rmtree(a0.parent)
+        shutil.rmtree(a1.parent)
+        ep.dict["process_metas"] = {}
+        ep.write_dict()
+
+        ep = drv.get_progress(exp_yml)
+        ep = drv.reconcile_processes(ep)
+        # Preconditions, not the defect: reconcile has nothing to replay, so the
+        # meta stays missing while the group still looks contributed-to.
+        assert 0 not in ep.dict["process_metas"], "unrebuildable_meta_absent"
+        assert set(ep.dict["process_actions_done"].keys()) == {
+            0,
+            1,
+        }, "unrebuildable_actions_still_recorded"
+
+        ep = await drv.sync_process(ep, force=True)
+
+        assert (
+            0 not in ep.dict["process_groups"] or 0 in ep.dict["process_s3"]
+        ), "unrebuildable_group_parked"
+        s3_unf, api_unf = ep.list_unfinished_procs()
+        assert not s3_unf and not api_unf, "unrebuildable_experiment_completes"
+    finally:
+        await teardown_driver(drv)
