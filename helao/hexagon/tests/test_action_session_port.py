@@ -89,3 +89,88 @@ def test_the_legacy_active_satisfies_the_port() -> None:
     # methods are checkable this way, which is what matters for the binding.
     missing = [m for m in missing if callable(getattr(ActionSessionPort, m, None))]
     assert missing == [], f"legacy Active lacks port members: {missing}"
+
+
+# ---------------------------------------------------------------------------
+# ActionSession against the port (B1 Task 5)
+# ---------------------------------------------------------------------------
+
+
+def _session_class():
+    from helao.hexagon.app.action_session import ActionSession
+
+    return ActionSession
+
+
+#: The 10 port members that are instance attributes assigned in __init__ rather
+#: than class attributes, so `hasattr(cls, ...)` is False for them by design.
+INSTANCE_ATTRS = {
+    "action",
+    "action_list",
+    "active_uuid",
+    "base",
+    "data_logger",
+    "file_conn_dict",
+    "finish_lock",
+    "listen_uuids",
+    "num_data_queued",
+    "num_data_written",
+}
+
+
+def test_action_session_implements_every_port_method() -> None:
+    """The 16 callable members the collaborators invoke."""
+    cls = _session_class()
+    methods = _protocol_members() - INSTANCE_ATTRS
+    missing = sorted(m for m in methods if not hasattr(cls, m))
+    assert missing == [], f"ActionSession is missing port methods: {missing}"
+
+
+def test_the_instance_attribute_split_is_exhaustive() -> None:
+    """Guards the exemption above: every port member is a method or in the set.
+
+    Without this, adding a member to INSTANCE_ATTRS would silently excuse a
+    genuinely missing method from the test above.
+    """
+    cls = _session_class()
+    unaccounted = sorted(
+        m
+        for m in _protocol_members()
+        if not hasattr(cls, m) and m not in INSTANCE_ATTRS
+    )
+    assert (
+        unaccounted == []
+    ), f"port members neither method nor known attr: {unaccounted}"
+
+
+def test_action_session_covers_the_deployment_facing_surface() -> None:
+    """The 18 members deployment code uses, minus those set in __init__."""
+    cls = _session_class()
+    deployment = {
+        "finish",
+        "enqueue_data_dflt",
+        "start_executor",
+        "append_sample",
+        "enqueue_data_nowait",
+        "get_realtime_nowait",
+        "finish_hlo_header",
+        "write_file",
+        "split",
+        "track_file",
+        "enqueue_data",
+        "write_file_nowait",
+        "set_estop",
+        "oneoff_executor",
+        "get_realtime",
+    }
+    missing = sorted(m for m in deployment if not hasattr(cls, m))
+    assert missing == [], f"ActionSession is missing deployment members: {missing}"
+
+
+def test_executor_entry_raises_rather_than_returning_none() -> None:
+    """Task 6 is outstanding; a None return would record an action that never ran."""
+    import pytest
+
+    session = _session_class().__new__(_session_class())
+    with pytest.raises(NotImplementedError, match="Task 6"):
+        session.start_executor(object())
