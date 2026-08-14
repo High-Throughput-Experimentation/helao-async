@@ -71,6 +71,10 @@ class ActionSession:
         self.num_data_written = 0
         self.data_logger = None
         self.finish_lock = asyncio.Lock()
+        #: Executor loop state, owned by the session and driven by the runner.
+        self.action_task = None
+        self.action_loop_running = False
+        self.manual_stop = False
 
         self.action.action_server = host.server
         self.action.dummy = host.world_cfg.get("dummy", False)
@@ -84,6 +88,10 @@ class ActionSession:
             activeparams.file_conn_params_dict or {}
         ).items():
             self.file_conn_dict[file_conn_key] = FileConn(params=file_conn_param)
+
+        from helao.hexagon.app.executor_runner import ExecutorRunner
+
+        self.executor_runner = ExecutorRunner(self)
 
         store = host.hexagon_wiring.artifact_store
         (
@@ -364,21 +372,35 @@ class ActionSession:
     async def finish_manual_action(self):
         return await self.action_finalizer.finish_manual_action()
 
-    # -- executor entry (B1 Task 6) ------------------------------------------
+    # -- executor entry ------------------------------------------------------
 
     def start_executor(self, executor) -> dict:
-        """Start an executor. Requires the native ``ExecutorRunner`` (Task 6).
-
-        Raises rather than returning None: a caller that got None would treat
-        the action as dispatched, then finish it, recording an action that never
-        ran.
-        """
-        raise NotImplementedError(
-            "ExecutorRunner is B1 Task 6; ActionSession cannot start executors " "yet."
-        )
+        """Schedule *executor*'s loop and return the action dict."""
+        return self.executor_runner.start_executor(executor)
 
     async def oneoff_executor(self, executor):
-        """Run a one-shot executor. Requires ``ExecutorRunner`` (Task 6)."""
-        raise NotImplementedError(
-            "ExecutorRunner is B1 Task 6; ActionSession cannot run executors yet."
+        """Run *executor* to completion inline."""
+        return await self.executor_runner.oneoff_executor(executor)
+
+    async def action_loop_task(self, executor):
+        """Drive one executor through its lifecycle."""
+        return await self.executor_runner.action_loop_task(executor)
+
+    def executor_done_callback(self, futr):
+        """Surface an exception raised by the action task."""
+        return self.executor_runner.executor_done_callback(futr)
+
+    def stop_action_task(self) -> None:
+        """Request the poll loop stop. Called via ``host.stop_executor_by_id``."""
+        return self.executor_runner.stop_action_task()
+
+    async def send_nonblocking_status(self, retry_limit: int = 3) -> None:
+        """Push this action's status to every attached client.
+
+        Delegates to the status port, which owns the client registry and the
+        retry policy -- legacy walked ``base.status_clients`` and called
+        ``base.send_nbstatuspackage`` itself.
+        """
+        return await self.base.hexagon_wiring.status.send_nonblocking_status(
+            self.action.get_act(), retry_limit=retry_limit
         )

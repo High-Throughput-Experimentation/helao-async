@@ -139,6 +139,12 @@ class ActionHost(HelaoFastAPI):
         self.fault_file = None
 
         self.live_buffer: dict = {}
+        #: Non-concurrent executors serialize through this queue, by action
+        #: uuid. Losing it lets two non-concurrent actions interleave on one
+        #: server -- a hardware-safety property, not a tidiness one.
+        self.local_action_task_queue: list = []
+        #: Captured at startup; the executor runner's create_task target.
+        self.aloop = None
         #: Running executors, keyed by executor id. Empty until Task 6.
         self.executors: dict = {}
         #: Live action sessions, keyed by action uuid. Empty until Task 5.
@@ -222,6 +228,32 @@ class ActionHost(HelaoFastAPI):
             "ActionSession is B1 Task 5; ActionHost cannot open an action "
             "session yet. Register action routes only after it lands."
         )
+
+    # -- live buffer -----------------------------------------------------------
+
+    @staticmethod
+    def _stamp_lbuf_dict(live_dict: dict) -> dict:
+        """Stamp each live value with its wall-clock epoch.
+
+        This is the ``{datalab: (value, epoch)}`` shape ws_live carries, and the
+        Reflex ingest normalizer is keyed to it -- a bare value here silently
+        yields a panel with no numeric columns.
+        """
+        from time import time
+
+        return {k: (v, time()) for k, v in live_dict.items()}
+
+    async def put_lbuf(self, live_dict: dict) -> None:
+        """Publish live values to the ws_live fan-out."""
+        await self.live_q.put(self._stamp_lbuf_dict(live_dict))
+
+    def put_lbuf_nowait(self, live_dict: dict) -> None:
+        """Non-awaiting form, for driver poll loops."""
+        self.live_q.put_nowait(self._stamp_lbuf_dict(live_dict))
+
+    def get_lbuf(self, live_key):
+        """Return the latest ``(value, epoch)`` for *live_key*."""
+        return self.live_buffer[live_key]
 
     # -- file connection keys ------------------------------------------------
 
@@ -537,6 +569,9 @@ class ActionHost(HelaoFastAPI):
         @self.on_event("startup")
         def startup_event():
             """Construct drivers, the poller, the fault dir, and late routes."""
+            # Captured here rather than at __init__: there is no running loop
+            # until the app starts, and the executor runner needs this one.
+            self.aloop = asyncio.get_running_loop()
             if self.root_dir is not None:
                 self.fault_dir = os.path.join(self.root_dir, "FAULTS")
                 os.makedirs(self.fault_dir, exist_ok=True)
