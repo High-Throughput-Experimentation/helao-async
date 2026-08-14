@@ -7,7 +7,7 @@ axis by editing that server's config block and restarting -- no panel module
 changes.
 
 Deliberately **not** a subclass of
-:class:`~helao.core.servers.io_control_vis.DigitalOutPanel`. The two panels sit
+:class:`~helao.ui.bokeh.io_control_vis.DigitalOutPanel`. The two panels sit
 side by side on the same document and answer to the same ``control_vis`` config
 key, but they share no rendering: a digital output is a boolean with a single
 button, an axis is a float with four widgets and a confirmation. Sharing a base

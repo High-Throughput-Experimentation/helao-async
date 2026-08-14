@@ -8,7 +8,7 @@ serves::
         z: {serial_no: ..., pos_scale: 1228800.0, vel_scale: ..., ...}
 
 Every key of ``axes`` becomes one axis row; the behaviour is entirely in
-:class:`~helao.core.servers.motion_control_vis.MotionPanel`.
+:class:`~helao.ui.bokeh.motion_control_vis.MotionPanel`.
 
 **The inversion is in the name on purpose.** ``pos_scale`` is *counts per
 millimetre*, the reciprocal of the ``count_to_mm`` the other two schemas
@@ -31,7 +31,7 @@ the config can.
 
 __all__ = ["C_vis"]
 
-from helao.core.servers.motion_control_vis import MotionPanel
+from helao.ui.bokeh.motion_control_vis import MotionPanel
 
 
 class C_vis(MotionPanel):

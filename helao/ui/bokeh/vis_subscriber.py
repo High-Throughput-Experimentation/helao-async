@@ -44,9 +44,9 @@ from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-from helao.core.servers.vis import Vis
+from helao.ui.bokeh.vis import Vis
 from helao.helpers import config_loader
-from helao.core.servers.reflex.discovery import (
+from helao.ui.shared.discovery import (
     deployment_search_order as _deployment_search_order,
 )
 from helao.helpers.loaded_modules import write_loaded_modules_snapshot

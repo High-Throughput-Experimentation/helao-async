@@ -16,7 +16,7 @@ which the panel shows rather than assuming off.
 
 __all__ = ["C_vis"]
 
-from helao.core.servers.io_control_vis import DigitalOutPanel
+from helao.ui.bokeh.io_control_vis import DigitalOutPanel
 from helao.deploy.hte.servers.action.nidaqmx_server import DO_GROUPS as SERVER_DO_GROUPS
 
 

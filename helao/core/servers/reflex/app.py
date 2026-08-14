@@ -51,7 +51,7 @@ from helao.ui.shared.palette import (
     reflex_gridjs_header_css,
     reflex_page_class,
 )
-from helao.core.servers.reflex.discovery import resolve_panel_module
+from helao.ui.shared.discovery import resolve_panel_module
 from helao.core.servers.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
     IngestRegistry,

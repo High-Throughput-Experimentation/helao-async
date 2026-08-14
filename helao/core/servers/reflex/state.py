@@ -1,8 +1,8 @@
 """Reflex state bases for HELAO visualizer panels.
 
 These are the Reflex analogues of
-:class:`~helao.core.servers.vis_subscriber.LiveVisualizer` and
-:class:`~helao.core.servers.vis_subscriber.ActionVisualizer`. The base owns
+:class:`~helao.ui.bokeh.vis_subscriber.LiveVisualizer` and
+:class:`~helao.ui.bokeh.vis_subscriber.ActionVisualizer`. The base owns
 render cadence, connection status, and error capture; a panel subclass supplies
 only :meth:`VisPanelState.pull`, which reads the shared ingest buffer and
 assigns the panel's own state vars.

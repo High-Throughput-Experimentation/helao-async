@@ -39,7 +39,7 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 #: Config key -> WebSocket path. Mirrors the mapping the Bokeh
 #: ``live_visualizer`` / ``action_visualizer`` apps use via
-#: :func:`helao.core.servers.vis_subscriber.mount_visualizers`.
+#: :func:`helao.ui.bokeh.vis_subscriber.mount_visualizers`.
 VIS_KEY_TO_WS_PATH = {"live_vis": "ws_live", "action_vis": "ws_data"}
 
 

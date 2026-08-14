@@ -22,8 +22,8 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.models.hlostatus import HloStatus
 from helao.ui.shared.palette import PANEL_BG, SERIES, panel_styles
 from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
-from helao.core.servers.vis import Vis
-from helao.core.servers.vis_subscriber import ActionVisualizer
+from helao.ui.bokeh.vis import Vis
+from helao.ui.bokeh.vis_subscriber import ActionVisualizer
 
 VALID_DATA_STATUS = (
     None,

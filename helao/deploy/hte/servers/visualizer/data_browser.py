@@ -5,8 +5,8 @@ The browser logic is deployment-agnostic and lives in
 ``makeBokehApp`` factory the bokeh launcher imports.
 """
 
-from helao.core.servers.data_browser import build_document
-from helao.core.servers.vis import HelaoVis
+from helao.ui.bokeh.data_browser import build_document
+from helao.ui.bokeh.vis import HelaoVis
 
 
 def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):

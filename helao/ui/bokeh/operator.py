@@ -86,7 +86,7 @@ from helao.ui.shared.palette import (
     SURFACE_WHITE,
     panel_styles,
 )
-from helao.core.servers.vis import Vis
+from helao.ui.bokeh.vis import Vis
 from helao.helpers.config_loader import is_ui_only_server
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Experiment, Sequence

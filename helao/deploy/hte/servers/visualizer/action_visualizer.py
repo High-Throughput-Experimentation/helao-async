@@ -8,8 +8,8 @@ from bokeh.models.widgets import Div
 
 from helao.ui.shared.palette import HEADING_TEXT
 from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
-from helao.core.servers.vis import HelaoVis
-from helao.core.servers.vis_subscriber import mount_visualizers
+from helao.ui.bokeh.vis import HelaoVis
+from helao.ui.bokeh.vis_subscriber import mount_visualizers
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -23,7 +23,7 @@ def makeBokehApp(doc, confPrefix, server_key, helao_repo_root):
     ``action_vis`` key (the ``*_vis.py`` module name). The mapping from action
     server to visualizer module lives in the config rather than this module, so
     this app is deployment-agnostic; see
-    :func:`helao.core.servers.vis_subscriber.mount_visualizers`.
+    :func:`helao.ui.bokeh.vis_subscriber.mount_visualizers`.
 
     Args:
         doc: Bokeh document supplied by the Bokeh server for this session.

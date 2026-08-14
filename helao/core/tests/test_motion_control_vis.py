@@ -21,7 +21,7 @@ from bokeh.models import Button, Div, NumericInput, Select
 from bokeh.server.callbacks import PeriodicCallback
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import motion_control_vis as mod
+from helao.ui.bokeh import motion_control_vis as mod
 from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
@@ -30,7 +30,7 @@ from helao.ui.shared.motion_control import (
     FOLLOWUP_INTERVAL_S,
     REFUSED_STATUS,
 )
-from helao.core.servers.motion_control_vis import MotionPanel
+from helao.ui.bokeh.motion_control_vis import MotionPanel
 
 SERVERS = {
     # Letter-keyed: `axis_id` maps a name to a controller letter and
@@ -930,7 +930,7 @@ def test_a_scaleless_axis_sends_nothing_even_if_clicked(transport):
 
 
 def test_an_absent_panel_module_raises_rather_than_degrading():
-    from helao.core.servers.vis_subscriber import import_vis_class
+    from helao.ui.bokeh.vis_subscriber import import_vis_class
 
     # Mandatory: the resolution cache is process-wide and never cleared, so a
     # module resolved earlier in this session would make the assertion below
@@ -949,7 +949,7 @@ def test_mount_visualizers_does_not_catch_that_import_error():
     # try/except is ever added here, the ordering rule needs restating.
     import inspect
 
-    from helao.core.servers import vis_subscriber
+    from helao.ui.bokeh import vis_subscriber
 
     source = inspect.getsource(vis_subscriber.mount_visualizers)
     assert "import_vis_class(module_name)" in source

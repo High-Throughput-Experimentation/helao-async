@@ -45,7 +45,7 @@ from helao.ui.shared.palette import (
     TW,
     panel_styles,
 )
-from helao.core.servers.vis import Vis
+from helao.ui.bokeh.vis import Vis
 from helao.helpers import helao_logging as logging
 from helao.helpers.plate_api import HTEPlateAPI
 

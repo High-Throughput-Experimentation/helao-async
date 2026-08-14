@@ -1,7 +1,7 @@
 """``wssim_panel`` under the name the Bokeh visualizer answers to.
 
 Panel discovery resolves a ``live_vis`` value to a module of exactly that name
-(:func:`helao.core.servers.reflex.discovery.resolve_panel_module` does no
+(:func:`helao.ui.shared.discovery.resolve_panel_module` does no
 suffix rewriting), and the Bokeh stack resolves the same key to
 ``servers/visualizer/wssim_live_vis.py``. A config that names ``wssim_panel``
 therefore has no Bokeh panel, and one that names ``wssim_live_vis`` -- as

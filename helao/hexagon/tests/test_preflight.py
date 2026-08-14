@@ -562,7 +562,7 @@ def test_claimed_addresses_agrees_with_the_launcher_on_reflex():
     pass a config the launcher then rejects. Pin the overlap: on the reflex
     claim they must be identical.
     """
-    from helao.core.servers.reflex.discovery import reserved_addresses
+    from helao.ui.shared.discovery import reserved_addresses
 
     for server in (
         {"host": "127.0.0.1", "port": 5010, "reflex": "helao_ui"},
