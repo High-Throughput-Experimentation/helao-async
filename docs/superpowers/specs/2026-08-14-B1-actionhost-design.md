@@ -139,7 +139,45 @@ station-local scripts, before a method is left out.
   and its current effect is to inject `action_version` into the request schema. It keeps that
   meaning; only its import moves.
 
-- **D-B1.3 — The session surface is the measured 18, plus whatever §2.2's disposition adds.**
+- **D-B1.3 — SUPERSEDED, measured 2026-08-14 while starting Task 5. The session surface is
+  37 members, not 18.** The 18 in §2.2 is the *deployment-facing* surface and remains correct
+  as far as it goes. It is not the whole contract: the three already-native write
+  collaborators (`adapters/native/{data_stream,data_file,finalizer}.py`) each hold a
+  back-reference to the session and read **26 members** off it, of which **19 appear nowhere
+  in the deployment-facing list**:
+
+  `_build_data_package`, `_finish`, `_get_action_for_file_conn_key`, `_resolve_output_path`,
+  `action_list`, `active_uuid`, `add_new_listen_uuid`, `add_status`, `assemble_data_msg`,
+  `data_logger`, `file_conn_dict`, `finish_lock`, `finish_manual_action`, `init_datafile`,
+  `listen_uuids`, `log_data_set_output_file`, `num_data_queued`, `num_data_written`,
+  `write_live_data`
+
+  The two sets overlap on seven (`action`, `base`, `enqueue_data`, `finish`, `get_realtime`,
+  `get_realtime_nowait`, `split`), giving a union of 37.
+
+  §2.2's claim that the unused `Active` methods are "either internal to the write path --
+  already native, called by the collaborators rather than by deployment code -- or genuinely
+  dead" was right about the category and wrong about the consequence: *called by the
+  collaborators* means the session must still provide them. A session built to the 18 would
+  import, register, serve, and then fail at the first `enqueue_data` — with a plain
+  `AttributeError` from inside a collaborator, at the point where an action is writing data.
+
+  **The premise that the native session is much smaller than `Active` is therefore false.**
+  The collaborators were written against `Active`'s interface, so the session is essentially
+  `Active`'s full surface. Task 5 has two options and must pick one explicitly:
+
+  1. **Implement all 37.** Honest about the coupling, no collaborator changes, and the
+     smallest diff — but it means B1 reproduces `Active` rather than replacing it.
+  2. **Narrow the collaborators onto a port.** The architecturally correct answer and what
+     the hexagon boundary rule implies: the collaborators should depend on a declared port,
+     not on whatever `Active` happens to expose. Larger, and it touches three already-parity-
+     tested native modules.
+
+  Recommend (2) scoped to a single `ActionSessionPort` Protocol carrying the 26
+  collaborator-facing members, so the coupling becomes explicit and checkable, with the
+  bodies unchanged. Do not start Task 5 before this is decided.
+
+- **D-B1.3-orig (superseded) — The session surface is the measured 18, plus whatever §2.2's disposition adds.**
   Adding a method to `ActionSession` later is cheap; shipping 18 unused ones is a maintenance
   claim B7 would have to re-litigate.
 
