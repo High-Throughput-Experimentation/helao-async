@@ -173,9 +173,20 @@ station-local scripts, before a method is left out.
      not on whatever `Active` happens to expose. Larger, and it touches three already-parity-
      tested native modules.
 
-  Recommend (2) scoped to a single `ActionSessionPort` Protocol carrying the 26
-  collaborator-facing members, so the coupling becomes explicit and checkable, with the
-  bodies unchanged. Do not start Task 5 before this is decided.
+  **DECIDED 2026-08-14: option (2).** Task 5 defines an `ActionSessionPort` Protocol carrying
+  the 26 collaborator-facing members and re-points `data_stream`, `data_file` and `finalizer`
+  at it. Their bodies do not change — only their declared dependency does — so the coupling
+  becomes explicit and checkable instead of implicit in whatever `Active` happened to expose.
+
+  Two consequences Task 5 must carry:
+
+  - **The three collaborators' existing parity tests join Task 5's gate.** They are already
+    tested against the grafted legacy `Active`; re-pointing them must leave those tests green,
+    which is the evidence that the Protocol captures the real interface rather than a guess at
+    it.
+  - **The Protocol is derived, not authored.** Its members come from the measured set above.
+    Adding one by hand later, because something failed at runtime, means the derivation was
+    incomplete — re-run it against all three modules rather than patching a member in.
 
 - **D-B1.3-orig (superseded) — The session surface is the measured 18, plus whatever §2.2's disposition adds.**
   Adding a method to `ActionSession` later is cheap; shipping 18 unused ones is a maintenance
