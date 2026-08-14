@@ -167,6 +167,7 @@ class ActionHost(HelaoFastAPI):
         # only part of it the session needs before any file is opened.
         self.meta_writer = wiring.artifact_store.meta_writer_for(self)
 
+        self._register_exception_handler()
         self._register_websockets()
         self._register_private_routes()
         self._register_utility_routes()
@@ -360,6 +361,36 @@ class ActionHost(HelaoFastAPI):
         return estopped
 
     # -- route registration --------------------------------------------------
+
+    def _register_exception_handler(self) -> None:
+        """E-stop in-flight work when an action route raises.
+
+        An exception escaping an action endpoint means the driver is in an
+        unknown state while hardware may still be moving. Legacy latches estop
+        on every live action and stops every executor before letting FastAPI
+        render the error; a bare 500 would leave both running.
+
+        Scoped to this server's own action paths -- a raising private route
+        (``/get_status`` and friends) must not estop the station.
+        """
+        from fastapi.exception_handlers import http_exception_handler
+        from starlette.exceptions import HTTPException as StarletteHTTPException
+
+        @self.exception_handler(StarletteHTTPException)
+        async def custom_http_exception_handler(request, exc):
+            """Estop live actions, then delegate to FastAPI's default."""
+            if request.url.path.strip("/").startswith(f"{self.server_key}/"):
+                LOGGER.error(f"Could not process request: {repr(exc)}")
+                for _, session in list(self.actives.items()):
+                    session.set_estop()
+                # list() on both: stop_action_task only sets flags, but the
+                # executor loop pops its own exec_id on completion, so a
+                # concurrent finish would mutate these mid-iteration. Legacy
+                # iterates them live -- an internal defect, invisible on disk
+                # and on the wire, so it is fixed here rather than reproduced.
+                for executor_id in list(self.executors):
+                    self.stop_executor(executor_id)
+            return await http_exception_handler(request, exc)
 
     def _register_websockets(self) -> None:
         """Register the three broadcast channels.

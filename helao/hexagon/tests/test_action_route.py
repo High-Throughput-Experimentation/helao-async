@@ -1,3 +1,5 @@
+import pytest
+
 """Action-route wrapping: the explicit context reaches the handler (B1 Task 3b).
 
 The two failure modes this guards are both silent. A ``ctx`` left in the exposed
@@ -150,3 +152,67 @@ def test_an_unbound_action_route_refuses_to_wrap() -> None:
         assert "bound host" in str(exc)
     else:
         raise AssertionError("unbound ActionRoute silently wrapped the endpoint")
+
+
+@pytest.mark.asyncio
+async def test_a_raising_action_route_estops_live_work():
+    """A bare 500 would leave the driver and its executors running."""
+    import httpx
+    from helao.hexagon.app.action_context import ActionContext
+
+    host = _host()
+
+    class _Session:
+        def __init__(self):
+            self.estopped = False
+
+        def set_estop(self):
+            self.estopped = True
+
+    class _Runner:
+        def __init__(self):
+            self.stopped = False
+
+        def stop_action_task(self):
+            self.stopped = True
+
+    session, runner = _Session(), _Runner()
+    host.actives["uuid-1"] = session
+    host.executors["exec-1"] = runner
+
+    @host.action()
+    async def boom(ctx: ActionContext):
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=500, detail="driver exploded")
+
+    transport = httpx.ASGITransport(app=host)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        await client.post("/SIM/boom", json={})
+
+    assert session.estopped, "a raising action route did not estop the live action"
+    assert runner.stopped, "a raising action route did not stop the executor"
+
+
+@pytest.mark.asyncio
+async def test_a_raising_private_route_does_not_estop():
+    """Scoped to action paths: /get_status failing must not stop the station."""
+    import httpx
+
+    host = _host()
+
+    class _Session:
+        def __init__(self):
+            self.estopped = False
+
+        def set_estop(self):
+            self.estopped = True
+
+    session = _Session()
+    host.actives["uuid-1"] = session
+
+    transport = httpx.ASGITransport(app=host)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        await client.post("/nonexistent_private_route", json={})
+
+    assert not session.estopped, "a private-route error estopped the station"
