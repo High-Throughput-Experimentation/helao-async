@@ -751,3 +751,48 @@ Parent repo only — B1 touches no private deployment. Merge after B0.
 
 `freeze/pre-legacy-removal_2608`, and the `deployment:` key: every legacy config still routes
 to `BaseAPI` until B7 deletes it, so a `test` station reverts by pointing at its legacy config.
+
+---
+
+## Execution status (2026-08-14)
+
+Branch `feat/legacy-separation-b1-actionhost`, cut from B0. **Tasks 1 and 2 complete and
+verified; Tasks 3–8 not started.**
+
+**Task 1 — done.** `harness/openapi_capture.py` captures a live server's route surface;
+`_baseapi_system_surface.json` frozen from a running SIM server on `goldenhex` (19 routes, 16
+private, all POST); the markdown checklist rewritten to hold only the behavioural contracts,
+with the drift documented so nobody restores the old list from history believing it correct.
+3 tests.
+
+**Task 2 — done.** `helao/hexagon/app/action_context.py`: explicit `ActionContext`,
+`build_action`, `collect_default_params`, `action_version`. No ContextVar, no shim. 10 tests.
+
+One behaviour measured while testing and worth knowing before Task 8: `get_filehash` shells
+out to `git log -n 1 -- <file>` and returns `""` for a file with no commit touching it yet, so
+**every action recorded from an uncommitted working file carries an empty
+`action_codehash`**. Legacy does the same and B1 preserves it — but it means Task 8's
+code-identity test must compare a *committed* file, or it will assert emptiness against
+emptiness and pass while proving nothing.
+
+**Task 3 — started, then parked deliberately.** A draft `ActionHost` is at
+`$CLAUDE_JOB_DIR/tmp/b1_wip/action_host.py.draft`. It is **not** on the branch, because it
+cannot be finished without pieces that belong to Tasks 4 and 5:
+
+- `estop_actives()` needs the session (Task 5) to finalize in-flight actions;
+- `attach_status_client` / `detach_status_client` / `actionservermodel` need the status port
+  bound the way Task 4 wires it;
+- `stop_executor_by_id` needs the executor registry (Task 6);
+- it references a `helao/hexagon/app/action_route.py` (the route class that builds the context
+  and hands it to the handler) which is Task 4's first deliverable.
+
+Leaving it on the branch would have meant committing a module that does not import, with five
+methods that do not exist — a stub that reads as progress. The draft is worth resuming rather
+than rewriting: the route surface, the WS registration with the frozen `BaseAPI`-family
+encodings, the dual-convention driver construction, the poller-before-disconnect shutdown
+ordering, and the estop route are all written against the measured legacy behaviour.
+
+**Task 3 should be re-planned as two tasks**, which is what the attempt showed: the host's
+*route surface* is separable from the host's *state* (`actionservermodel`, the client
+registry, the executor registry, the live buffer). The surface half can land and be gated on
+the captured JSON with no session at all; the state half belongs with Tasks 4–6.
