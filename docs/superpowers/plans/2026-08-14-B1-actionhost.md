@@ -1119,3 +1119,31 @@ preserves the wire surface rather than merely passing unit tests.
 **Still unproven:** WS frame parity, artifact parity (GM candidates), and the RPC mirror under
 load. The legacy GM baselines are on disk; producing candidates needs a native run driven
 through `harness.capture`, which is the next step.
+
+### Open: the native hosts outlived their launcher, and logged no shutdown
+
+Tearing down that first native launch with `kill -INT` on the launcher left **SIM (8002) and
+SYNC (8010) still serving**, while ORCH (8001, still legacy) exited cleanly. Recovery was
+`ss -lptn 'sport = :<port>'` then `kill -TERM`.
+
+`grep "action shutdown"` on the launch log returns **nothing** — `ActionHost._shutdown` never
+ran. That matters beyond tidiness: `_shutdown` is what stops the driver poller *before*
+disconnecting the driver, and on real hardware a poller left running against a closed handle
+is the failure this project has already fixed once.
+
+**Do not conclude it is a B1 defect yet.** The same teardown on the *legacy* stack during the
+GM capture run left the opposite set alive — ORCH survived while SIM and SYNC exited. An
+inconsistent survivor set points at a race in launcher teardown when it is signalled from a
+non-tty context, not at the host. Two candidate causes, and they are distinguishable:
+
+1. `launch.py`'s teardown POSTs `/shutdown` and then signals; if the POST is what normally
+   triggers `_shutdown`, a native host that answered it would have logged "action shutdown".
+   It did not, so either the POST never arrived or the route did not reach the handler.
+2. `PDEATHSIG` should have killed the children regardless. It did not, which is the same
+   symptom seen in the GM run and is documented in CLAUDE.md as something that *should not*
+   happen.
+
+**How to settle it:** tear down with `CTRL-x` in a real terminal (the sanctioned path) and see
+whether "action shutdown" appears. If it does, this is a harness artifact of `kill -INT` from
+a background job. If it does not, `ActionHost` is not wired to the launcher's shutdown route
+and that is a B1 blocker for any hardware station.
