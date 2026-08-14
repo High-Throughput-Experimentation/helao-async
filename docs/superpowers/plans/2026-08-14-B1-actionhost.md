@@ -893,3 +893,50 @@ active_data_stream,active_finalizer}.py`). Adding `active: ActionSessionPort` to
 
 Do **not** edit a pinned mirror to make a type annotation land. The pin exists because these
 bodies drifted from their legacy twins before, and the drift is what the parity tests catch.
+
+---
+
+## Task 6 — measured, not started (2026-08-14)
+
+`ExecutorRunner`'s five methods were extracted from `active_executor.py` and read. The loop
+body (`action_loop_task`, ~60 lines) is the only substantial one; the other four are short.
+**It requires nine session members and three host members, and four of them do not exist
+yet** — the same shape of gap that the port derivation and the construction test each caught
+one layer earlier.
+
+**On the session** (`self.active.*`): `base`, `action`, `enqueue_data_nowait`, `finish` — all
+present. Plus, **not present**:
+
+| member | kind | note |
+|---|---|---|
+| `action_task` | attribute | the created task handle |
+| `action_loop_running` | attribute | the poll loop's own flag |
+| `manual_stop` | attribute | set by `stop_action_task` |
+| `send_nonblocking_status` | async method | called twice for a nonblocking action; **it is in the "unused by deployments" list the spec excluded** |
+
+`action_loop_task`, `executor_done_callback` and `stop_action_task` are session methods that
+delegate to the runner, mirroring how `split`/`finish` delegate to the finalizer.
+
+**On the host** (`self.active.base.*`): `executors` — present. Plus, **not present**:
+
+| member | kind | note |
+|---|---|---|
+| `local_action_task_queue` | list | serializes non-concurrent executors by action uuid |
+| `aloop` | event loop | `create_task` target; legacy captures the running loop at startup |
+
+**One thing to get right, easy to get wrong:** `action_loop_task` registers
+`base.executors[executor.exec_id] = self.active` — the **session**, not the executor. So
+`ActionHost.stop_executor_by_id` calling `.stop_action_task()` on the dict value is correct,
+but the local variable naming there (`executor`) is misleading and should be renamed when
+Task 6 lands.
+
+**Also still missing on the host, for drivers rather than the runner:** `put_lbuf`,
+`put_lbuf_nowait`, `get_lbuf` and the `_stamp_lbuf_dict` helper they share.
+`ws_simulator`'s driver calls `self.base.put_lbuf(...)` in its poll loop and `WsExec` calls
+`self.active.base.get_lbuf(...)`, so Task 7 cannot port that module without them.
+
+**The recurring lesson, now three for three.** Each layer's requirement was only visible by
+measuring the layer above it: the collaborators' 26 were invisible from the deployment-facing
+18; the constructor's two host members were invisible from the class-level surface tests; and
+the runner's four are invisible from both. Measure the caller before implementing the callee —
+the spec's member lists are a floor, never a ceiling.
