@@ -1,0 +1,91 @@
+"""The session Protocol is derived from the collaborators, not authored.
+
+B1's spec first put the session's surface at the 18 members deployment code
+uses. That is the deployment-facing contract; it is not the whole one. The three
+native write collaborators were written against the legacy ``Active`` and reach
+for 26 members, 19 of which are not in the 18. A session built to 18 imports,
+registers, serves, and fails at the first ``enqueue_data`` with a bare
+``AttributeError`` from inside a collaborator, while an action is writing data.
+
+These tests re-run the derivation rather than trusting the Protocol's contents,
+so a member added to a collaborator without being added to the port fails here
+instead of at a station.
+"""
+
+import ast
+from pathlib import Path
+from typing import Final, get_type_hints
+
+from helao.hexagon.ports.action_session import ActionSessionPort
+
+REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
+COLLABORATORS: Final[tuple[str, ...]] = ("data_stream", "data_file", "finalizer")
+
+
+def _members_read_off_the_back_reference() -> set[str]:
+    """Every ``self.active.<name>`` the native collaborators touch."""
+    found: set[str] = set()
+    for mod in COLLABORATORS:
+        path = REPO_ROOT / "helao/hexagon/adapters/native" / f"{mod}.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            inner = node.value
+            if (
+                isinstance(inner, ast.Attribute)
+                and inner.attr == "active"
+                and isinstance(inner.value, ast.Name)
+                and inner.value.id == "self"
+            ):
+                found.add(node.attr)
+    return found
+
+
+def _protocol_members() -> set[str]:
+    annotated = set(get_type_hints(ActionSessionPort).keys())
+    callables = {
+        name
+        for name in vars(ActionSessionPort)
+        if not name.startswith("__") and callable(vars(ActionSessionPort)[name])
+    }
+    return annotated | callables
+
+
+def test_the_collaborators_still_read_exactly_what_the_port_declares() -> None:
+    """The derivation, re-run. This is the whole point of the file.
+
+    A member added to a collaborator without being added to the port shows up
+    here as `missing`; a port member no collaborator uses shows up as `extra`
+    and should be removed rather than kept "just in case" -- an unused member is
+    an obligation on every future session implementation.
+    """
+    derived = _members_read_off_the_back_reference()
+    declared = _protocol_members()
+    assert derived == declared, (
+        f"missing from ActionSessionPort: {sorted(derived - declared)}\n"
+        f"declared but unused by any collaborator: {sorted(declared - derived)}"
+    )
+
+
+def test_the_derivation_is_not_vacuous() -> None:
+    """A mis-rooted path would make the comparison above pass against nothing."""
+    derived = _members_read_off_the_back_reference()
+    assert len(derived) >= 20, f"only {len(derived)} members found; AST walk is inert"
+    assert "enqueue_data" in derived
+    assert "file_conn_dict" in derived
+
+
+def test_the_legacy_active_satisfies_the_port() -> None:
+    """The collaborators must keep working against a grafted legacy Active.
+
+    Until B7 the graft is what production runs, so re-pointing the collaborators
+    at the Protocol must not break the object they are bound to today.
+    """
+    from helao.core.servers.base import Active
+
+    missing = [m for m in _protocol_members() if not hasattr(Active, m)]
+    # Instance attributes set in __init__ are not class attributes; only the
+    # methods are checkable this way, which is what matters for the binding.
+    missing = [m for m in missing if callable(getattr(ActionSessionPort, m, None))]
+    assert missing == [], f"legacy Active lacks port members: {missing}"
