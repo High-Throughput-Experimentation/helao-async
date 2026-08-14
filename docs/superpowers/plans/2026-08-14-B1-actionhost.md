@@ -975,3 +975,35 @@ it needs only `actives`, `executors` and `stop_executor`, all of which now exist
 middleware should wait for the endpoint subsystem rather than being stubbed against a fake
 busy-check, because "is this endpoint busy" returning a constant is indistinguishable from
 working until two actions collide on a station.
+
+### Task 7 — ws_simulator ported; a config consequence to handle before the next module
+
+`helao/deploy/test/servers/action/ws_simulator.py` now builds an `ActionHost`, its two
+handlers take `ctx: ActionContext`, and it constructs no `BaseAPI`. 5 tests, including a
+source assertion that no legacy engine name survives and a full private-surface check.
+`WsSim` and `WsExec` bodies are unchanged apart from one type hint.
+
+**Porting a module breaks every config that routes it through the hexagon graft, and this
+was not anticipated in the plan.** `goldenhex.yml` carries `deployment: hexagon` on SIM, which
+resolves to `helao/deploy/hexagon/servers/action/ws_simulator.py` — the shim that calls
+`makeActionApp`, imports the module, and grafts `graft_active_write_path(app.base, wiring)`
+onto it at startup. `app.base` is now an `ActionHost`, which has no `contain_action`, so the
+graft raises at startup rather than at import.
+
+**Seventeen configs reference `ws_simulator`**, including two in private deployment repos.
+Those that route it *without* `deployment: hexagon` (`golden.yml`, `test.yml`, …) already work
+— the ported module is self-contained and serves the native host directly. Those that route it
+*with* the key need it removed for that server, because the module is hexagon now and does not
+want wrapping.
+
+**The GM-parity consequence is the important one.** `golden.yml` was the legacy baseline for
+this module; after the port it serves the native host too, so there is no longer a legacy
+`ws_simulator` to capture from. **GM baselines for any ported module must be captured from a
+pre-port commit** — `795c977a` (Task 1) is the last commit where `ws_simulator` still builds a
+`BaseAPI`. Capture GM-1…GM-5 there before porting further modules, or the gate has nothing to
+compare against.
+
+Not yet done for this module: removing `deployment: hexagon` from the configs that carry it,
+and a launched-server run. Nothing on this branch has yet served a request under uvicorn — the
+tests drive the host through ASGI transport, which exercises routing, middleware and context
+injection but not the RPC mirror, the WebSocket channels, or artifact writes to disk.

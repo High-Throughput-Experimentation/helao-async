@@ -27,8 +27,9 @@ from helao.core.models.sample import (
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base, Executor
-from helao.core.servers.base_api import BaseAPI
+from helao.helpers.executor import Executor
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 
 class WsSim:
@@ -48,7 +49,7 @@ class WsSim:
         polling_task: Background task running :meth:`poll_data_loop`.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Initialize the simulator and start the polling loop.
 
         Args:
@@ -133,9 +134,9 @@ class WsExec(Executor):
 
 
 def makeApp(server_key):
-    """Build the websocket-simulator FastAPI app.
+    """Build the websocket-simulator action server.
 
-    Wires :class:`WsSim` into a :class:`BaseAPI` and exposes the
+    Wires :class:`WsSim` into an :class:`ActionHost` and exposes the
     ``acquire_data`` action (driven by :class:`WsExec`) and
     ``cancel_acquire_data``.
 
@@ -143,9 +144,9 @@ def makeApp(server_key):
         server_key: Server name in the launched config.
 
     Returns:
-        Configured :class:`HelaoFastAPI` app.
+        Configured :class:`ActionHost`.
     """
-    app = BaseAPI(
+    host = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Websocket simulator",
@@ -153,8 +154,9 @@ def makeApp(server_key):
         driver_classes=[WsSim],
     )
 
-    @app.post(f"/{server_key}/acquire_data", tags=["action"])
+    @host.action()
     async def acquire_data(
+        ctx: ActionContext,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: list[
@@ -162,24 +164,22 @@ def makeApp(server_key):
         ] = Body([], embed=True),
     ):
         """Start a :class:`WsExec` that streams the simulator's live buffer."""
-        active = await app.base.setup_and_contain_action()
-        active.action.action_abbr = "WsSim"
+        session = await ctx.begin(action_abbr="WsSim")
         executor = WsExec(
-            active=active,
+            active=session,
             oneoff=False,
-            poll_rate=active.action.action_params["acquisition_rate"],
+            poll_rate=session.action.action_params["acquisition_rate"],
         )
-        active_action_dict = active.start_executor(executor)
-        return active_action_dict
+        return session.start_executor(executor)
 
-    @app.post(f"/{server_key}/cancel_acquire_data", tags=["action"])
-    async def cancel_acquire_data():
+    @host.action()
+    async def cancel_acquire_data(ctx: ActionContext):
         """Stop any running ``acquire_data`` executor."""
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        session = await ctx.begin()
+        for exec_id, running in host.executors.items():
             if exec_id.split()[0] == "acquire_data":
-                executor.stop_action_task()
-        finished_action = await active.finish()
+                running.stop_action_task()
+        finished_action = await session.finish()
         return finished_action.as_dict()
 
-    return app
+    return host
