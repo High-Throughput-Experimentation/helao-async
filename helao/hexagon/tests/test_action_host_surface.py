@@ -8,6 +8,7 @@ real surface so a host that under-builds it cannot pass.
 """
 
 import json
+import tempfile
 from pathlib import Path
 from typing import Final
 
@@ -75,3 +76,93 @@ def test_capture_normalizes_deterministically() -> None:
     }
     assert openapi_capture.normalize(doc) == openapi_capture.normalize(doc)
     assert [r["path"] for r in openapi_capture.normalize(doc)["routes"]] == ["/a", "/b"]
+
+
+# ---------------------------------------------------------------------------
+# The host's own surface (B1 Task 3a)
+# ---------------------------------------------------------------------------
+# Asserted against a constructed host rather than a launched one: this is the
+# gate that fails while the host is under-built, and it needs no server.
+
+
+def _host():
+    """Build an ActionHost against an injected config and wiring."""
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.wiring import PortWiring
+
+    cfg = {
+        # A real directory: HelaoFastAPI initializes the process logger under
+        # <root>/LOGS, so a None root fails in os.path.join before any route
+        # is registered.
+        "root": tempfile.mkdtemp(prefix="helao_surface_test_"),
+        "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+    }
+
+    class _Stub:
+        def __getattr__(self, name):
+            raise AssertionError(f"port member {name!r} used during construction")
+
+    wiring = PortWiring(
+        config=_Stub(),
+        logging=_Stub(),
+        clock=_Stub(),
+        transport=_Stub(),
+        state_persistence=_Stub(),
+        status=_Stub(),
+        health=_Stub(),
+        artifact_store=_Stub(),
+        data_sink=_Stub(),
+    )
+    return ActionHost(
+        server_key="SIM",
+        server_title="SIM",
+        description="surface test",
+        version=1.0,
+        wiring=wiring,
+        helao_cfg=cfg,
+    )
+
+
+def test_the_host_registers_every_private_route_captured_from_legacy() -> None:
+    host = _host()
+    got = {
+        r["path"]
+        for r in openapi_capture.normalize(host.openapi())["routes"]
+        if "private" in r["tags"]
+    }
+    assert got == EXPECTED_PRIVATE, (
+        f"missing: {sorted(EXPECTED_PRIVATE - got)}\n"
+        f"unexpected: {sorted(got - EXPECTED_PRIVATE)}"
+    )
+
+
+def test_every_host_route_is_a_post() -> None:
+    """Legacy registers no GET on an action server; the checklist claimed five."""
+    routes = openapi_capture.normalize(_host().openapi())["routes"]
+    assert {r["method"] for r in routes} == {"post"}
+
+
+def test_the_host_registers_its_estop_route() -> None:
+    routes = openapi_capture.normalize(_host().openapi())["routes"]
+    estop = [r for r in routes if r["path"] == "/SIM/estop"]
+    assert estop and estop[0]["tags"] == ["action"]
+
+
+def test_the_host_surface_matches_the_frozen_capture() -> None:
+    """The whole point: a host that under-builds the captured surface fails."""
+    frozen = {
+        r["path"]
+        for r in json.loads(FROZEN.read_text())["routes"]
+        if r["path"] != "/SIM/acquire_data"
+    }
+    frozen -= {"/SIM/cancel_acquire_data"}  # the sim's own action routes
+    got = {r["path"] for r in openapi_capture.normalize(_host().openapi())["routes"]}
+    assert (
+        got == frozen
+    ), f"missing: {sorted(frozen - got)}\nunexpected: {sorted(got - frozen)}"
+
+
+def test_base_is_the_host() -> None:
+    """21 hte modules reach app.base.<member>; both names are the same object."""
+    host = _host()
+    assert host.base is host
