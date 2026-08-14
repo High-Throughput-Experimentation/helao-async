@@ -29,7 +29,7 @@ import numpy as np
 import reflex as rx
 import scipy.ndimage as ndi
 
-from helao.core.servers.palette import reflex_header_class, reflex_table_class
+from helao.ui.shared.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.state import LiveVisState, assign
 

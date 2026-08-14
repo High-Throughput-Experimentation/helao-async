@@ -10,7 +10,7 @@ __all__ = ["make_pstat_panel"]
 import numpy as np
 import reflex as rx
 
-from helao.core.servers.palette import REFLEX_PSTAT_STOP_CLASS
+from helao.ui.shared.palette import REFLEX_PSTAT_STOP_CLASS
 from helao.core.servers.reflex import plots
 from helao.core.servers.reflex.ingest import get_registry
 from helao.core.servers.reflex.state import ActionVisState, assign

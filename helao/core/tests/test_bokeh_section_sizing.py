@@ -19,7 +19,7 @@ from bokeh.layouts import layout
 from bokeh.models import Button, Column, Div, Row, Spacer, TextInput
 from bokeh.plotting import figure
 
-from helao.core.servers.bokeh_theme import SECTION_MARGIN, stretch_section
+from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
 
 
 def _panel():

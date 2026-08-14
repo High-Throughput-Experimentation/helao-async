@@ -69,7 +69,7 @@ from helao.core.servers.motion_control import (
     should_follow_up,
     stop_motion,
 )
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     REFLEX_CONTROL_READ_CLASS,
     REFLEX_MOTION_INPUT_CLASS,
     REFLEX_MOTION_READOUT_CLASS,

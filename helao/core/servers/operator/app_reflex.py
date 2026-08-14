@@ -92,7 +92,7 @@ from helao.core.servers.operator.object_tree import (
     server_header_text,
     tree_header_text,
 )
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     reflex_header_class,
     reflex_muted_text_class,
     reflex_table_class,

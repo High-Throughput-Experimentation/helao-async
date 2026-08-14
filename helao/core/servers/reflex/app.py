@@ -45,7 +45,7 @@ from helao.core.servers.operator.app_reflex import (
 )
 from helao.core.servers.operator.app_reflex import build_page as operator_page
 from helao.core.servers.operator.app_reflex import configure as configure_operator
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     CHART_CHROME,
     reflex_font_css,
     reflex_gridjs_header_css,

@@ -18,7 +18,7 @@ from bokeh.events import ButtonClick
 from bokeh.layouts import Spacer, layout, row
 from bokeh.models import Button, Div
 
-from helao.core.servers.bokeh_theme import (
+from helao.ui.bokeh.theme import (
     SECTION_MARGIN,
     semantic_button_stylesheet,
     stretch_section,
@@ -31,7 +31,7 @@ from helao.core.servers.io_control import (
     set_digital_out,
     state_label,
 )
-from helao.core.servers.palette import BODY_TEXT, HEADING_TEXT, PANEL_BG, panel_styles
+from helao.ui.shared.palette import BODY_TEXT, HEADING_TEXT, PANEL_BG, panel_styles
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

@@ -59,7 +59,7 @@ from typing import Optional
 
 from playwright.sync_api import sync_playwright
 
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     REFLEX_PAGE_TINTS,
     REFLEX_TABLE_HUES,
     TW,

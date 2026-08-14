@@ -19,12 +19,12 @@ from bokeh.plotting import figure
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.bokeh_theme import (
+from helao.ui.bokeh.theme import (
     SECTION_MARGIN,
     semantic_button_stylesheet,
     stretch_section,
 )
-from helao.core.servers.palette import PANEL_BG, SERIES, panel_styles
+from helao.ui.shared.palette import PANEL_BG, SERIES, panel_styles
 from helao.core.servers.vis import Vis
 from helao.core.servers.vis_subscriber import LiveVisualizer
 

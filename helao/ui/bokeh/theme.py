@@ -66,7 +66,7 @@ from typing import Final
 from bokeh.models import Column, Div, GlobalInlineStyleSheet, InlineStyleSheet, Row
 from bokeh.themes import Theme
 
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     BODY_TEXT,
     BUTTON_DANGER_BG,
     BUTTON_LABEL,
@@ -356,7 +356,7 @@ def color_rule(selector: str, color: str, important: bool = False) -> str:
 
     Args:
         selector: CSS selector, e.g. ``".bk-input"``.
-        color: A colour from :mod:`helao.core.servers.palette`.
+        color: A colour from :mod:`helao.ui.shared.palette`.
         important: Append ``!important``. Needed when the rule has to beat a
             declaration Bokeh already applies to the same element.
     """
@@ -380,7 +380,7 @@ def color_declaration(color: str, important: bool = False, prop: str = "color") 
     for CSS text to live in the exempt module, not for the text to be disguised.
 
     Args:
-        color: A colour from :mod:`helao.core.servers.palette`.
+        color: A colour from :mod:`helao.ui.shared.palette`.
         important: Append ``!important``.
         prop: The CSS property. ``"color"`` (default) or ``"background-color"``.
     """
@@ -417,7 +417,7 @@ def estop_button_stylesheet() -> InlineStyleSheet:
 def marker_style_block() -> list[InlineStyleSheet]:
     """Return one fresh ``InlineStyleSheet`` per aligner marker chip.
 
-    Five sheets in :data:`~helao.core.servers.palette.MARKER_SWATCHES` order,
+    Five sheets in :data:`~helao.ui.shared.palette.MARKER_SWATCHES` order,
     to be attached to the five ``marker_buttonsel`` buttons in the same index
     order::
 

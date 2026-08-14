@@ -34,7 +34,7 @@ from pathlib import Path
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import palette
+from helao.ui.shared import palette
 from helao.core.servers.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
@@ -44,7 +44,7 @@ from helao.core.servers.motion_control import (
     REFUSED_STATUS,
     Units,
 )
-from helao.core.servers.palette import TW
+from helao.ui.shared.palette import TW
 from helao.core.servers.reflex import control as control_mod
 from helao.core.servers.reflex.control import (
     MOTION_ARM,
