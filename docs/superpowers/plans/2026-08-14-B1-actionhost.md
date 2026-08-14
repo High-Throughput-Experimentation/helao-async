@@ -15,7 +15,12 @@
 - **`PYTHONPATH` must be an absolute path**, not `.`. The Reflex backend and any child spawned with a different cwd resolve a relative entry against *their* cwd. Use `PYTHONPATH=/mnt/STORAGE/repos/helao/helao-async`.
 - **To launch anything, put the env on `PATH`**: `PATH=/home/dan/miniforge3/envs/helao/bin:$PATH python launch.py <prefix>`. `launch.py` spawns a bare `python`; invoking it by absolute path leaves every child on the OS interpreter and they die with `No module named 'uvicorn'` while the launcher itself looks fine.
 - **Never run the test tree as one pytest session** — it hangs and ignores SIGINT. Per file, or `run_tests.py`.
-- **Never `pkill -f` a pattern that appears in your own command line** — the shell wrapper contains it and kills itself.
+- **Never `pgrep -f` / `pkill -f` a pattern that appears in your own command line.** The
+  harness wraps each command in a shell whose command line contains the *entire script text*,
+  so the pattern matches the wrapper. This bit twice: `pkill -f "launch.py"` killed its own
+  shell, and later a wait-loop on `pgrep -f "gm_native.sh"` matched itself and blocked for its
+  full 40-minute timeout without ever running the parity step it was gating. Match on a pid
+  captured at spawn time, or on a marker file, not on a name the script itself mentions.
 - In zsh, **never use `path` as a loop variable**; it is tied to `PATH` and clobbers it.
 - `black` on changed files immediately before `git add`.
 - **Never name a private deployment in a tracked parent-repo file.** B1 touches only the public tree.
