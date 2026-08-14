@@ -34,7 +34,8 @@ import threading
 from pathlib import Path
 
 from helao.core.drivers.data.sync_driver import HelaoSyncer
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 
 class RecordingS3Client:
@@ -85,10 +86,10 @@ class SimHelaoSyncer(HelaoSyncer):
             self.s3 = RecordingS3Client(sim_root)
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the sim data-packaging FastAPI app (dbpack surface, sim syncer)."""
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Simulated data packaging server (golden capture)",

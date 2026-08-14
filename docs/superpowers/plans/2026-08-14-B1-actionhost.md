@@ -1074,8 +1074,15 @@ modules**.
 Do not "fix" the sync/async mismatch before establishing which. The swallow is legacy
 behaviour that a station may depend on, and the missing route may be unrelated to it.
 
-**Still to port:** `gpsim_server` (6 routes, held back deliberately — it carries the recorded
-percent-log hang, so failures there are likelier pre-existing than caused by the port) and
-`sim_db_server`, which the route survey missed because it declares **no** action routes yet
-still constructs a `BaseAPI`. That last one is a reminder that "modules with action routes" and
-"modules to port" are different sets.
+**All nine modules are now ported.** `gpsim_server` (6 action + 18 private) and
+`sim_db_server` (0 action + 24 private) both build as `ActionHost`s with `ctx` correctly
+hidden. `gpsim_server`'s recorded percent-log hang did not surface during the port; it is a
+runtime path, so it stays a watch item for the first launched run rather than a resolved one.
+
+`sim_db_server` was missed by the original survey because it declares no action routes while
+still constructing a `BaseAPI` — **"modules with action routes" and "modules to port" are
+different sets**, and only the second one matters. Count from `grep BaseAPI`, not from
+`tags=["action"]`.
+
+`grep BaseAPI` across `helao/deploy/test/servers/action/` now returns only explanatory prose in
+`control_sim`'s docstrings. The `deploy/test` suite is ALL GREEN.
