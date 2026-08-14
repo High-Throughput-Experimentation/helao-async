@@ -860,3 +860,36 @@ wrong about the consequence.
 
 Recommended: **2**, scoped to the Protocol only. Recorded in the spec as the supersession of
 D-B1.3.
+
+### Task 5 progress — the port is derived and landed; re-pointing is blocked
+
+**Done:** `helao/hexagon/ports/action_session.py` — `ActionSessionPort`, derived by AST walk
+from the three collaborators: 9 async methods, 7 sync methods, 10 attributes, 26 total, with
+`Active`'s own signatures so a legacy `Active` satisfies it structurally. Three tests
+**re-run the derivation** rather than trusting the file, so a member added to a collaborator
+without being added to the port fails in the suite; one guards against a mis-rooted AST walk
+passing vacuously; one asserts legacy `Active` still satisfies the port, since the graft is
+what production runs until B7.
+
+**Blocked:** re-pointing the collaborators' `active` parameter at the Protocol. All three are
+**verbatim re-bodies of their legacy twins** and are black force-excluded as a pair
+(`pyproject.toml` force-exclude covers `adapters/native/{meta_writer,data_file,data_stream,
+finalizer,sync_driver}.py` *and* `core/servers/{base_meta_writer,active_data_file,
+active_data_stream,active_finalizer}.py`). Adding `active: ActionSessionPort` to
+`__init__` edits one half of a pinned pair.
+
+**Resolve before editing them**, in this order:
+
+1. Establish what the pin actually enforces — a whole-file comparison against the legacy twin,
+   or a marked region. Grep found the "verbatim re-body" claim in the module and test
+   docstrings but no explicit region markers, so this is currently unknown, and the answer
+   decides everything below.
+2. If whole-file: annotate **without touching the pinned body** — a `TYPE_CHECKING`-guarded
+   module-level alias, or the annotation on the class attribute rather than the `__init__`
+   parameter. The Protocol's value is static checkability; it does not require the annotation
+   to sit on the parameter.
+3. If a marked region and `__init__` sits outside it: annotate the parameter directly, and
+   mirror into the legacy twin only if the pin compares both halves.
+
+Do **not** edit a pinned mirror to make a type annotation land. The pin exists because these
+bodies drifted from their legacy twins before, and the drift is what the parity tests catch.
