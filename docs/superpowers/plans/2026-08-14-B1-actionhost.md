@@ -775,7 +775,20 @@ out to `git log -n 1 -- <file>` and returns `""` for a file with no commit touch
 code-identity test must compare a *committed* file, or it will assert emptiness against
 emptiness and pass while proving nothing.
 
-**Task 3 — started, then parked deliberately.** A draft `ActionHost` is at
+**Task 3a — done (commit `e7809be9`).** `helao/hexagon/app/action_host.py`: construction,
+the 16 private routes, the 5 shared debug routes reimplemented natively rather than imported
+from the engine, 3 WS channels with the frozen `BaseAPI`-family encodings, `/{key}/estop`,
+dual-convention driver construction, poller-before-disconnect shutdown. 8 tests assert the
+**constructed** host's surface equals the live legacy capture — no launched server needed, so
+a host that under-builds the surface fails in the normal suite. Nothing stubbed: `executors`
+and `_actives` are real registries, empty until Tasks 5/6, and every route reading them is
+correct at both stages.
+
+**Task 3b — not started.** Action entry: the route class that builds an `ActionContext` and
+hands it to the handler, the session factory (`begin_session`), the queuing middleware, and
+the executor registry. This is what the parked draft was missing.
+
+**Original Task 3 note, kept for the record —** A draft `ActionHost` is at
 `$CLAUDE_JOB_DIR/tmp/b1_wip/action_host.py.draft`. It is **not** on the branch, because it
 cannot be finished without pieces that belong to Tasks 4 and 5:
 
