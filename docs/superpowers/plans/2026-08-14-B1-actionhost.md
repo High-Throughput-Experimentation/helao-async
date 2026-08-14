@@ -1120,7 +1120,7 @@ preserves the wire surface rather than merely passing unit tests.
 load. The legacy GM baselines are on disk; producing candidates needs a native run driven
 through `harness.capture`, which is the next step.
 
-### Open: the native hosts outlived their launcher, and logged no shutdown
+### RESOLVED: the native hosts outlived their launcher (launcher teardown, not ActionHost)
 
 Tearing down that first native launch with `kill -INT` on the launcher left **SIM (8002) and
 SYNC (8010) still serving**, while ORCH (8001, still legacy) exited cleanly. Recovery was
@@ -1147,3 +1147,25 @@ non-tty context, not at the host. Two candidate causes, and they are distinguish
 whether "action shutdown" appears. If it does, this is a harness artifact of `kill -INT` from
 a background job. If it does not, `ActionHost` is not wired to the launcher's shutdown route
 and that is a B1 blocker for any hardware station.
+
+**Resolved 2026-08-14 by probing the route directly**, which distinguishes the two candidates
+without needing a real terminal:
+
+```
+POST http://127.0.0.1:8002/shutdown   -> http=200
+log: SIM :: _shutdown @ action_host.py:829 - action shutdown
+SIM still serving afterwards
+```
+
+`ActionHost` **is** wired to the shutdown route and `_shutdown` does run. The process staying
+up is *correct and matches legacy exactly*: `base_api.py:834`'s `post_shutdown` also just
+`await shutdown_event()` and relies on the launcher to terminate the process afterwards.
+
+So the orphaned servers are a **launcher-teardown / PDEATHSIG** problem — the same class seen
+on the *legacy* stack during the GM capture run, where the opposite servers survived. Not a
+B1 defect, and not a hardware blocker for this branch. It remains worth chasing on its own,
+since CLAUDE.md documents PDEATHSIG as something that should make it impossible.
+
+*Correction to the first report of this probe: `grep -c "action shutdown"` returned 3, but that
+was counting this plan document's own prose alongside the log. The real log has one such line.
+Grep a log path, not a directory that contains the write-up about it.*
