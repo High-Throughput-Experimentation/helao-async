@@ -1051,3 +1051,31 @@ python -m harness.parity --golden /home/dan/helao_goldens/GM-1/legacy \
   rather than exiting through its own teardown path. Recovery was `ss -lptn 'sport = :8001'` to
   find the orphan and `kill -TERM` it. Worth knowing before blaming a port-in-use on a stale
   pid file.
+
+### Task 7 — six more modules ported; control_sim and two others outstanding
+
+Ported and verified building with the right route counts and `ctx` correctly hidden from the
+exposed signature: `analysis_simulator` (1 route), `archive_simulator` (3), `cpsim_server` (4),
+`motion_simulator` (2), `pstat_simulator` (1). With `ws_simulator` (2) that is **6 of 9
+modules**.
+
+**`control_sim` is ported but NOT verified.** It registers its action route from inside a
+`dyn_endpoints` callback, and with a driver present that callback still yields zero
+`/SRV/...` routes. Two things are tangled here and want separating before it is trusted:
+
+1. **`dyn_endpoints` is sync but `init_endpoint_status` awaits it** — in legacy *and* in the
+   port. Python calls it first (so registration happens) and then raises on `await None`.
+   Legacy hides this: `dyn_endpoints_init` wraps the call in an un-awaited `asyncio.gather`,
+   so the exception is discarded. The port reproduces both the call and the swallow, but any
+   direct `await init_endpoint_status(...)` surfaces it.
+2. Even so, no route appeared. Either `register_control_routes` registers under a different
+   prefix, or it registers nothing when the simulated driver exposes no `dev_do` entries.
+
+Do not "fix" the sync/async mismatch before establishing which. The swallow is legacy
+behaviour that a station may depend on, and the missing route may be unrelated to it.
+
+**Still to port:** `gpsim_server` (6 routes, held back deliberately — it carries the recorded
+percent-log hang, so failures there are likelier pre-existing than caused by the port) and
+`sim_db_server`, which the route survey missed because it declares **no** action routes yet
+still constructs a `BaseAPI`. That last one is a reminder that "modules with action routes" and
+"modules to port" are different sets.
