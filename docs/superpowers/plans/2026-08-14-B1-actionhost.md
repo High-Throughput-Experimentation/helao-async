@@ -1204,3 +1204,50 @@ the native one by reading its own `/loaded_modules` for `hexagon/app/action_host
 trusting that a launch had replaced what was listening. The route-surface IDENTICAL verdict
 survives that re-check. Future runs should assert identity from `/loaded_modules`, not from a
 port answering.
+
+### GM parity, first full run (2026-08-14)
+
+All five rigs came up with SIM and SYNC confirmed native via `/loaded_modules`. Four captured;
+GM-5 aborted with `RuntimeError: GM-5: no RUNS_SYNCED zip after quiesce`.
+
+| scenario | result |
+|---|---|
+| GM-1 | **FAIL — 91 diffs** |
+| GM-2 | **PASS — 0 diffs** |
+| GM-3 | **FAIL — 5 diffs** |
+| GM-4 | **FAIL — 154 diffs** |
+| GM-5 | no candidate (capture aborted) |
+
+**GM-2 passing with 0 diffs is real and reproducible** — it passed on the previous run too. The
+native write path produces byte-identical artifacts for that scenario.
+
+**Two distinct failure signatures:**
+
+1. **GM-3 (5 diffs): the entire `RUNS_DIAG` tree is absent from the candidate.** That is the
+   *manual action* path — `seq--acquire_data__manual`.
+2. **GM-1 and GM-4: diffs concentrated in `RUNS_SYNCED` (34/56), `S3_SIM` (25/40) and
+   `PROCESSES` (5/9)**, overwhelmingly "golden present, candidate absent", plus 9 files each
+   that exist only in the candidate. GM-5's abort — no RUNS_SYNCED zip — is the same leg.
+
+**Concrete suspected cause for signature 1, and probably a contributor to signature 2.**
+`action_context.build_action` ports `base_api._build_action_from_kwargs` faithfully but ports
+**none of `Base._get_action`'s additional processing** (`base.py:355-394`). Missing:
+
+- `action.action_name = action_name`
+- the `fast_samples_in` → `samples_in` conversion, including `object_to_sample` and the
+  `action_uuid` back-fill
+- `action.action_abbr` defaulting to `action_name`
+- **the `run_type is None` block that sets `orchestrator = MachineModel(server_name="MANUAL")`**
+  — which is what routes a manually-dispatched action to `RUNS_DIAG`
+
+Only the code-identity tail of `_get_action` was ported. `ActionSession.__init__` picked up
+`action_server`, `dummy` and `simulation`, which is why this looked complete.
+
+**Next step is to port the rest of `_get_action` into `build_action`**, then re-run. Do not
+assume it explains all 245 diffs — signature 2 may additionally be a sync-timing or
+sync-completeness problem, and GM-5's abort should be re-tested separately after the action
+record is correct, since missing `samples_in` plausibly changes what the syncer has to ship.
+
+**Note on the golden directory**: `/home/dan/helao_goldens/` also holds `GM-C1__ORBIS_QUANT`,
+`GM-C2__XRDS`, `GM-C3__EASYXAFS_GAIA`, `mutation-work` and `p6-fixtures` from earlier phases.
+Only `GM-1`…`GM-5` belong to B1.
