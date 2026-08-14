@@ -49,6 +49,7 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
+from helao.helpers.zdeque import zdeque
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -143,6 +144,15 @@ class ActionHost(HelaoFastAPI):
         #: uuid. Losing it lets two non-concurrent actions interleave on one
         #: server -- a hardware-safety property, not a tidiness one.
         self.local_action_task_queue: list = []
+        #: Actions that arrived while busy, awaiting redispatch. DISTINCT from
+        #: local_action_task_queue above: that one serializes executors inside
+        #: one action's loop, this one holds whole actions the middleware
+        #: parked. Conflating them deadlocks or double-dispatches.
+        self.local_action_queue = zdeque([])
+        #: Per-endpoint parking, keyed by endpoint name.
+        self.endpoint_queues: dict = {}
+        #: Route descriptors; populated by init_endpoint_status at startup.
+        self.fast_urls: list = []
         #: Captured at startup; the executor runner's create_task target.
         self.aloop = None
         #: Running executors, keyed by executor id. Empty until Task 6.
@@ -167,6 +177,14 @@ class ActionHost(HelaoFastAPI):
         # only part of it the session needs before any file is opened.
         self.meta_writer = wiring.artifact_store.meta_writer_for(self)
 
+        from helao.hexagon.app.endpoint_manager import (
+            ActionQueueDispatcher,
+            EndpointManager,
+        )
+
+        self.endpoint_mgr = EndpointManager(self)
+        self.action_queue = ActionQueueDispatcher(self)
+
         self._register_exception_handler()
         self._register_websockets()
         self._register_private_routes()
@@ -180,17 +198,6 @@ class ActionHost(HelaoFastAPI):
     def base(self) -> "ActionHost":
         """``app.base`` and ``app`` are the same object here."""
         return self
-
-    @property
-    def fast_urls(self) -> list:
-        """The endpoints registered on this server."""
-        from fastapi.routing import APIRoute
-
-        return [
-            {"path": r.path, "name": r.name, "tags": list(r.tags or [])}
-            for r in self.routes
-            if isinstance(r, APIRoute)
-        ]
 
     # -- action entry --------------------------------------------------------
 
@@ -230,6 +237,32 @@ class ActionHost(HelaoFastAPI):
             "ActionSession is B1 Task 5; ActionHost cannot open an action "
             "session yet. Register action routes only after it lands."
         )
+
+    # -- endpoint registration -------------------------------------------------
+
+    def dyn_endpoints_init(self) -> None:
+        """Register endpoint status, invoking ``dyn_endpoints`` first."""
+        return self.endpoint_mgr.dyn_endpoints_init()
+
+    async def init_endpoint_status(self, dyn_endpoints=None) -> None:
+        """Register every action endpoint for status monitoring."""
+        return await self.endpoint_mgr.init_endpoint_status(dyn_endpoints)
+
+    def endpoint_queues_init(self) -> None:
+        """Create a per-endpoint action queue for every action route."""
+        return self.endpoint_mgr.endpoint_queues_init()
+
+    def get_endpoint_urls(self) -> list:
+        """Return a path/name/params descriptor for every route."""
+        return self.endpoint_mgr.get_endpoint_urls()
+
+    async def process_unified_queue(self) -> None:
+        """Dispatch the next queued action when concurrency is disallowed."""
+        return await self.action_queue.process_unified_queue()
+
+    async def process_endpoint_queue(self, status_msg) -> None:
+        """Dispatch the next queued action for the endpoint that just freed up."""
+        return await self.action_queue.process_endpoint_queue(status_msg)
 
     # -- live buffer -----------------------------------------------------------
 
@@ -642,8 +675,10 @@ class ActionHost(HelaoFastAPI):
                 self.drivers = Drivers(**built)
                 self.driver = self.drivers[0]
 
-            if self._dyn_endpoints is not None:
-                self._dyn_endpoints(app=self)
+            # Endpoint status registration also invokes dyn_endpoints, so it
+            # replaces the direct call: registering before late routes exist
+            # would leave them unmonitored and unqueueable.
+            self.dyn_endpoints_init()
 
         @self.on_event("shutdown")
         async def shutdown_event():
