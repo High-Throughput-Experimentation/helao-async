@@ -147,8 +147,9 @@ class ActionHost(HelaoFastAPI):
         self.aloop = None
         #: Running executors, keyed by executor id. Empty until Task 6.
         self.executors: dict = {}
-        #: Live action sessions, keyed by action uuid. Empty until Task 5.
-        self._actives: dict = {}
+        #: Live action sessions, keyed by action uuid. Named `actives` because the
+        #: legacy estop handler and deployment code both use that spelling.
+        self.actives: dict = {}
         self.last_10_active: list = []
         self.hotreload_busy_hook: Optional[Callable] = None
 
@@ -321,6 +322,10 @@ class ActionHost(HelaoFastAPI):
             client_servkey, client_host, client_port
         )
 
+    def stop_executor(self, executor_id: str) -> dict:
+        """Legacy's spelling; the estop handler and clients both use it."""
+        return self.stop_executor_by_id(executor_id)
+
     def stop_executor_by_id(self, executor_id: str) -> dict:
         """Signal one executor to stop its polling loop.
 
@@ -328,11 +333,14 @@ class ActionHost(HelaoFastAPI):
         the orchestrator calls this during teardown, when an executor may
         already have finished on its own.
         """
-        executor = self.executors.get(executor_id)
-        if executor is None:
+        # The value is the SESSION, not the Executor: action_loop_task
+        # registers `base.executors[exec_id] = self.active`, and the session is
+        # what carries stop_action_task.
+        session = self.executors.get(executor_id)
+        if session is None:
             LOGGER.warning(f"no running executor '{executor_id}' to stop")
             return {"success": False, "executor_id": executor_id}
-        executor.stop_action_task()
+        session.stop_action_task()
         return {"success": True, "executor_id": executor_id}
 
     async def estop_actives(self) -> list:
@@ -343,7 +351,7 @@ class ActionHost(HelaoFastAPI):
         correct outcome and is what an idle legacy server does too.
         """
         estopped = []
-        for action_uuid, session in list(self._actives.items()):
+        for action_uuid, session in list(self.actives.items()):
             try:
                 await session.set_estop()
                 estopped.append(str(action_uuid))
