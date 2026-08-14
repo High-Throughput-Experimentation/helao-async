@@ -109,6 +109,15 @@ class ActionHost(HelaoFastAPI):
             version=str(version),
             helao_cfg=helao_cfg,
         )
+        # HelaoFastAPI installs the legacy ActionAPIRoute; replace it with a
+        # subclass bound to THIS host before any route is registered, so no
+        # legacy wrapping is ever applied and two hosts in one process do not
+        # share a binding. See the module docstring for the B7 follow-up on the
+        # import itself, which still runs.
+        from helao.hexagon.app.action_route import bind_action_route
+
+        self.router.route_class = bind_action_route(self)
+
         if wiring is None:
             from helao.hexagon.app.factory import build_wiring
 
@@ -169,6 +178,45 @@ class ActionHost(HelaoFastAPI):
             for r in self.routes
             if isinstance(r, APIRoute)
         ]
+
+    # -- action entry --------------------------------------------------------
+
+    def action(self, **route_kwargs) -> Callable:
+        """Register an action endpoint.
+
+        The handler declares ``ctx: ActionContext`` and receives the request's
+        action explicitly; there is no ContextVar. The route class strips ``ctx``
+        from the FastAPI-visible signature and injects it at call time.
+
+        Args:
+            **route_kwargs: Forwarded to ``self.post``. ``path`` defaults to
+                ``/<server_key>/<function name>``, matching the legacy form.
+
+        Returns:
+            The registering decorator.
+        """
+
+        def decorate(func: Callable) -> Callable:
+            path = route_kwargs.pop("path", f"/{self.server_key}/{func.__name__}")
+            tags = route_kwargs.pop("tags", ["action"])
+            self.post(path, tags=tags, **route_kwargs)(func)
+            return func
+
+        return decorate
+
+    async def begin_session(self, action: Action, **kwargs):
+        """Open the action's session — the ``Active`` equivalent (Task 5).
+
+        Raises:
+            NotImplementedError: Until Task 5 lands ``ActionSession``. This is a
+                hard failure by design: a host that silently returned ``None``
+                here would let a ported action module import, register, and
+                serve, and only fail once an action was actually dispatched.
+        """
+        raise NotImplementedError(
+            "ActionSession is B1 Task 5; ActionHost cannot open an action "
+            "session yet. Register action routes only after it lands."
+        )
 
     # -- state the routes operate on -----------------------------------------
 
