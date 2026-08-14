@@ -59,9 +59,17 @@ imports are `BaseAPI` (46 sites), `action_version`, `Base`/`Active`/`Executor` (
 `OrchAPI` (1). Everything else those modules import from `helao/core/servers/` is UI —
 `vis` (28), `vis_subscriber` (22) — which survives the program.
 
-The contract a replacement must satisfy is already frozen and checked in:
-`helao/hexagon/tests/checklists/hte/_member_surface.md`,
-`_baseapi_system_surface.md`, and 7,128 lines of per-server route JSON.
+The contract a replacement must satisfy is checked in at
+`helao/hexagon/tests/checklists/hte/_member_surface.md`, `_baseapi_system_surface.md`, and
+7,128 lines of per-server route JSON.
+
+**One of those three is not trustworthy, measured 2026-08-14 while speccing B1.**
+`_baseapi_system_surface.md` lists 9 routes and marks 5 of them `GET`. A live capture from a
+running action server shows **19 routes, every one `POST`** — it omits eight and mis-states
+the method on five. Its own note says the runtime `/openapi.json` cross-check was "deferred to
+P3b/P3e"; that deferral never closed. **Every phase gate in this program diffs a live
+`/openapi.json`, not that file**, and each phase re-freezes it from its own capture. The
+per-server route JSON and `_member_surface.md` are AST- and grep-derived and are not affected.
 
 ## 3. Decisions
 
@@ -103,8 +111,8 @@ which is their first real consumer.
 | # | sub-project | scope | gate |
 |---|---|---|---|
 | **B0** | UI re-home | the survivors listed in D-S3 move to `helao/ui/`; 122 parent files / 452 occurrences, plus 6 / 9 / 8 files in Deployment-A/B/C | Linux: full suite, palette sweep, bundle rebuild, headless render |
-| **B1** | Registration API + `ActionHost` | the native replacement for `BaseAPI.__init__(server_key, server_title, description, version, driver_classes, dyn_endpoints, poller_class)` and the `action_version` route decorator, built from ports and domain | `_baseapi_system_surface.md` + `_member_surface.md` parity on a sim server; harness GM diff |
-| **B2** | Native `Active`/`Executor` | `Active` is the object every driver and executor calls (`base.py:1149-1459` delegators); a native session over the already-native artifact store and data sink | GM artifact diff; existing hexagon adapter tests |
+| **B1** | `ActionHost` + registration API + native action session | the native replacement for `BaseAPI`/`Base` and for `Active`, plus the explicit-context registration API and a native `ExecutorRunner`; ports the `test` deployment as its proof. **Absorbs the sub-project this table originally listed as B2** — `setup_and_contain_action` is a host method returning an `Active`, so the seam would have run through the middle of one contract. See `2026-08-14-B1-actionhost-design.md` | live `/openapi.json` diff (**not** the hand-written checklist — measured stale, see below); WS frame parity; GM-1…GM-6; concurrency suite |
+| ~~B2~~ | *retired* | folded into B1 | — |
 | **B3** | `OrchHost` | replace `OrchAPI` + `Orch` over the existing reducer (`app/dispatch_loop.py`, `app/orch_effects.py`, `domain/orchestration.py`). Largest single item: `orch_dispatch` 1337 + `orch_api` 1015 + `orch` 879 + 7 satellites | concurrency suite; orch route checklist; GM-1…GM-6 |
 | **B4** | port `test` deployment | 9 action + 4 visualizer modules onto the new API; goldens re-baseline here | Linux, full harness, no hardware |
 | **B5** | port hte | 24 action + 16 visualizer + orchestrator + operator, station by station | per station: route checklist, smoke sequence, on-station golden diff |
