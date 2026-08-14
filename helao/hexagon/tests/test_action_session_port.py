@@ -13,6 +13,7 @@ instead of at a station.
 """
 
 import ast
+import pytest
 from pathlib import Path
 from typing import Final, get_type_hints
 
@@ -249,4 +250,66 @@ def test_a_session_can_actually_be_constructed(tmp_path) -> None:
     assert session.data_file_writer is not None
     assert session.action_finalizer is not None
     # and the host is tracking it
+    assert host.actives[session.action.action_uuid] is session
+
+
+@pytest.mark.asyncio
+async def test_ctx_begin_opens_a_session_through_the_host(tmp_path) -> None:
+    """Go through ctx.begin(), not around it.
+
+    The construction test above calls ActionSession.open(host, ...) directly and
+    passed for a whole task while ActionHost.begin_session still raised the
+    Task-5 placeholder -- the session existed, the host was never wired to it,
+    and no unit test crossed that seam. It surfaced only as a 500 on
+    /SIM/acquire_data during a golden-master capture.
+
+    This test exercises the seam the handler actually uses.
+    """
+    from helao.hexagon.adapters.native.artifact_store import (
+        NativeArtifactStoreAdapter,
+    )
+    from helao.hexagon.app.action_context import ActionContext
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.action_session import ActionSession
+    from helao.hexagon.app.wiring import PortWiring
+    from helao.helpers.premodels import Action
+
+    class _Clock:
+        def now_ns(self):
+            return 0
+
+        def offset(self):
+            return 0.0
+
+    class _Stub:
+        def __getattr__(self, name):
+            raise AssertionError(f"port member {name!r} used unexpectedly")
+
+    store = NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock())
+    host = ActionHost(
+        server_key="SIM",
+        server_title="SIM",
+        description="begin seam",
+        version=1.0,
+        wiring=PortWiring(
+            config=_Stub(),
+            logging=_Stub(),
+            clock=_Clock(),
+            transport=_Stub(),
+            state_persistence=_Stub(),
+            status=_Stub(),
+            health=_Stub(),
+            artifact_store=store,
+            data_sink=_Stub(),
+        ),
+        helao_cfg={
+            "root": str(tmp_path),
+            "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+        },
+    )
+    ctx = ActionContext(action=Action(action_name="acquire_data"), host=host)
+    session = await ctx.begin(action_abbr="WsSim")
+
+    assert isinstance(session, ActionSession)
+    assert session.action.action_abbr == "WsSim"
     assert host.actives[session.action.action_uuid] is session

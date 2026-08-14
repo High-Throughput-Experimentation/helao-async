@@ -254,18 +254,19 @@ class ActionHost(HelaoFastAPI):
         return decorate
 
     async def begin_session(self, action: Action, **kwargs):
-        """Open the action's session — the ``Active`` equivalent (Task 5).
+        """Open the action's session — the ``Active`` equivalent.
 
-        Raises:
-            NotImplementedError: Until Task 5 lands ``ActionSession``. This is a
-                hard failure by design: a host that silently returned ``None``
-                here would let a ported action module import, register, and
-                serve, and only fail once an action was actually dispatched.
+        Args:
+            action: The action this session tracks.
+            **kwargs: ``json_data_keys``, ``action_abbr``, ``file_type``,
+                ``hloheader`` — forwarded to :meth:`ActionSession.open`.
+
+        Returns:
+            The :class:`ActionSession` now tracking *action*.
         """
-        raise NotImplementedError(
-            "ActionSession is B1 Task 5; ActionHost cannot open an action "
-            "session yet. Register action routes only after it lands."
-        )
+        from helao.hexagon.app.action_session import ActionSession
+
+        return await ActionSession.open(self, action, **kwargs)
 
     # -- endpoint registration -------------------------------------------------
 
