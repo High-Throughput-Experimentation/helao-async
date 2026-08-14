@@ -99,6 +99,12 @@ def _host():
     }
 
     class _Stub:
+        # meta_writer_for IS used during construction -- the host owns the
+        # native meta writer so the session can derive the default file-conn
+        # key. Every other port member must stay untouched.
+        def meta_writer_for(self, base):
+            return object()
+
         def __getattr__(self, name):
             raise AssertionError(f"port member {name!r} used during construction")
 

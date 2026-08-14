@@ -155,6 +155,11 @@ class ActionHost(HelaoFastAPI):
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
 
+        # The meta writer is already native; the host owns it rather than
+        # having it grafted on, and the file-conn key derivation below is the
+        # only part of it the session needs before any file is opened.
+        self.meta_writer = wiring.artifact_store.meta_writer_for(self)
+
         self._register_websockets()
         self._register_private_routes()
         self._register_utility_routes()
@@ -217,6 +222,50 @@ class ActionHost(HelaoFastAPI):
             "ActionSession is B1 Task 5; ActionHost cannot open an action "
             "session yet. Register action routes only after it lands."
         )
+
+    # -- file connection keys ------------------------------------------------
+
+    def new_file_conn_key(self, key: str):
+        """Derive a file-connection UUID from *key* (md5, via the meta writer)."""
+        return self.meta_writer.new_file_conn_key(key)
+
+    def dflt_file_conn_key(self):
+        """The default file connection's key: ``new_file_conn_key(str(None))``.
+
+        A constant, not the action uuid -- an action's default HLO file is keyed
+        independently of it, and using the action uuid here silently produces a
+        different on-disk layout.
+        """
+        return self.meta_writer.dflt_file_conn_key()
+
+    # -- clock ---------------------------------------------------------------
+
+    def get_realtime_nowait(
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
+    ) -> int:
+        """Return NTP-corrected time in nanoseconds.
+
+        Reproduces ``LiveBufferManager.get_realtime_nowait`` over the clock port
+        instead of a cached ``ntp_offset``: an explicit *offset* wins, otherwise
+        the port's, otherwise zero. Stamped onto every HLO header and every data
+        message, so a drift here is a wire-visible artifact difference.
+        """
+        import math
+
+        clock = self.hexagon_wiring.clock
+        if offset is None:
+            port_offset = clock.offset()
+            offset_ns = int(math.floor(port_offset * 1e9)) if port_offset else 0
+        else:
+            offset_ns = int(math.floor(offset * 1e9))
+        base_ns = clock.now_ns() if epoch_ns is None else epoch_ns
+        return int(math.floor(base_ns + offset_ns))
+
+    async def get_realtime(
+        self, epoch_ns: Optional[int] = None, offset: Optional[float] = None
+    ) -> int:
+        """Async form; legacy delegates straight to the sync one, as here."""
+        return self.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
 
     # -- state the routes operate on -----------------------------------------
 

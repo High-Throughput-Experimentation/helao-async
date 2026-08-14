@@ -117,7 +117,7 @@ class ActionSession:
         if hloheader is None:
             hloheader = HloHeaderModel(epoch_ns=host.get_realtime_nowait())
 
-        dflt = action.action_uuid
+        dflt = host.dflt_file_conn_key()
         params = ActiveParams(
             action=action,
             file_conn_params_dict={
