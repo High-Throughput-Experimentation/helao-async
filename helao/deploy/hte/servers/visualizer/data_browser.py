@@ -1,7 +1,7 @@
 """hte deployment shim for the data browser visualizer.
 
 The browser logic is deployment-agnostic and lives in
-``helao.core.servers.data_browser``; this module only provides the
+``helao.ui.shared.data_browser``; this module only provides the
 ``makeBokehApp`` factory the bokeh launcher imports.
 """
 

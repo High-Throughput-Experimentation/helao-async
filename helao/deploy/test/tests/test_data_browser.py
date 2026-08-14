@@ -528,7 +528,7 @@ def test_both_browsers_share_one_numeric_guard():
     so the Bokeh browser could not call them. Pin the hoist: the Reflex names
     must *be* the shared-layer objects, not copies that can drift apart.
     """
-    from helao.ui.shared.data_browser import app_reflex as dbx
+    from helao.ui.reflex import data_browser as dbx
 
     assert dbx.is_numeric is dbstate.is_numeric
     assert dbx.chart_series is dbstate.chart_series
