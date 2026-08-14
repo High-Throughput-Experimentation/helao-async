@@ -1086,3 +1086,36 @@ different sets**, and only the second one matters. Count from `grep BaseAPI`, no
 
 `grep BaseAPI` across `helao/deploy/test/servers/action/` now returns only explanatory prose in
 `control_sim`'s docstrings. The `deploy/test` suite is ALL GREEN.
+
+### Config cleanup done, and the native stack launches (2026-08-14)
+
+`deployment: hexagon` removed from SIM (`ws_simulator`) and SYNC (`sim_db_server`) in
+`goldenhex`, `goldenhexconc`, `goldenhexgraft`, `goldenhexid` and `goldenhexvis`. Those
+modules are hexagon now; grafting onto them would call `makeActionApp` and reach for
+`app.base.contain_action`, which an `ActionHost` does not have.
+
+The key **stays** where it is still correct: on `async_orch2` (the orchestrator is legacy until
+B3) and on the bokeh UI servers. `goldenhexgraft`'s purpose is unaffected — it proves the
+*bokeh* generic graft as a public stand-in for a private deployment's flip, and that mechanism
+is still needed for B4–B6.
+
+**First launched run of the native stack.** `python launch.py goldenhex --no-hot-reload`:
+all three servers up in ~28 s, **0 early exits**. The ERROR lines in the log are
+`run_unit_tests.py`, which `launch.py` runs pre-launch and which exercises dispatcher error
+paths deliberately.
+
+**Gate item 1 passes on a live server:**
+
+```
+native SIM routes : 19
+frozen legacy     : 19
+missing: []   extra: []   VERDICT: IDENTICAL
+```
+
+The native `ActionHost` serves the same 19 routes, with the same methods and tags, as the
+legacy `BaseAPI` capture taken from `795c977a`. This is the first evidence that the port
+preserves the wire surface rather than merely passing unit tests.
+
+**Still unproven:** WS frame parity, artifact parity (GM candidates), and the RPC mirror under
+load. The legacy GM baselines are on disk; producing candidates needs a native run driven
+through `harness.capture`, which is the next step.
