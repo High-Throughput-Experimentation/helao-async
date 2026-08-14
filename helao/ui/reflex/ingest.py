@@ -4,7 +4,7 @@ The Bokeh visualizers open one :class:`~helao.helpers.ws_utils.WsSubscriber`
 per browser session per action server, so N open tabs against M servers hold
 N x M connections and N x M independent rolling buffers. This module inverts
 that: one :class:`WsIngest` per ``(server_key, ws_path)`` for the whole
-process, writing into a shared :class:`~helao.core.servers.reflex.ringbuffer.RingBuffer`
+process, writing into a shared :class:`~helao.ui.reflex.ringbuffer.RingBuffer`
 that every browser session reads.
 
 The second consequence matters as much as the first. Ingest runs at WebSocket
@@ -31,7 +31,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Optional
 
-from helao.core.servers.reflex.ringbuffer import RingBuffer, RowBuffer
+from helao.ui.reflex.ringbuffer import RingBuffer, RowBuffer
 from helao.helpers import helao_logging as logging
 from helao.helpers.ws_utils import WsSubscriber
 

@@ -34,17 +34,17 @@ from fastapi import FastAPI
 # class is what registers its event handlers, and `--backend-only` never
 # evaluates a page callable. No cycle -- app_reflex reaches back only as far as
 # `plots`, which knows nothing about this module.
-from helao.core.servers.data_browser.app_reflex import BrowserState
-from helao.core.servers.data_browser.app_reflex import build_page as browser_page
-from helao.core.servers.operator.app_reflex import (
+from helao.ui.reflex.data_browser import BrowserState
+from helao.ui.reflex.data_browser import build_page as browser_page
+from helao.ui.reflex.operator import (
     OperatorLibState,
     OperatorPlanState,
     OperatorPlateState,
     OperatorQueueState,
     OperatorSpecState,
 )
-from helao.core.servers.operator.app_reflex import build_page as operator_page
-from helao.core.servers.operator.app_reflex import configure as configure_operator
+from helao.ui.reflex.operator import build_page as operator_page
+from helao.ui.reflex.operator import configure as configure_operator
 from helao.ui.shared.palette import (
     CHART_CHROME,
     reflex_font_css,
@@ -52,19 +52,19 @@ from helao.ui.shared.palette import (
     reflex_page_class,
 )
 from helao.ui.shared.discovery import resolve_panel_module
-from helao.core.servers.reflex.ingest import (
+from helao.ui.reflex.ingest import (
     VIS_KEY_TO_WS_PATH,
     IngestRegistry,
     set_registry,
 )
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.control import (
+from helao.ui.reflex import plots
+from helao.ui.reflex.control import (
     ControlState,
     configure_control,
     control_page,
 )
-from helao.core.servers.reflex.state import make_panel_state
-from helao.core.servers.reflex.xy_component import make_buffer_router
+from helao.ui.reflex.state import make_panel_state
+from helao.ui.reflex.xy_component import make_buffer_router
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 

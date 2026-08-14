@@ -36,8 +36,8 @@ import sys
 
 import reflex as rx
 
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.ingest import get_registry
+from helao.ui.reflex import plots
+from helao.ui.reflex.ingest import get_registry
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -343,7 +343,7 @@ class VisPanelState(rx.State, mixin=True):
         """Free this panel's buffer.
 
         Releases this panel's entry from :data:`plots.STORE` through
-        :meth:`~helao.core.servers.reflex.xy_component.BufferStore.drop`, so a
+        :meth:`~helao.ui.reflex.xy_component.BufferStore.drop`, so a
         closed session's frame does not linger under a key nothing will ever
         refetch. The tick itself stops with the component that drives it.
         """

@@ -1,6 +1,6 @@
 """Operator-backend port (P7h; Q8 answer 3).
 
-``helao/core/servers/operator/orch_backend.py``'s ``OrchBackend`` is **already
+``helao/ui/shared/operator/orch_backend.py``'s ``OrchBackend`` is **already
 a port in all but name**: a 25-method async ABC with one implementation
 (``RemoteBackend``), constructor-injected into both UIs -- ``BokehOperator(vis,
 backend)`` and a per-session build for the Reflex page. So this module is a

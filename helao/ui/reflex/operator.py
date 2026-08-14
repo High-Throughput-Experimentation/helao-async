@@ -97,7 +97,7 @@ from helao.ui.shared.palette import (
     reflex_muted_text_class,
     reflex_table_class,
 )
-from helao.core.servers.reflex import plots
+from helao.ui.reflex import plots
 from helao.helpers import helao_logging as logging
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.import_autolibs import deployment_from_config_path

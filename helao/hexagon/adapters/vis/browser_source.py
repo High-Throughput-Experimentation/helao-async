@@ -2,7 +2,7 @@
 
 :class:`BrowserSource` satisfies
 :class:`~helao.hexagon.ports.browser_source.BrowserSourcePort` by **delegating
-to the two shared modules** ``helao/core/servers/data_browser/readers.py`` and
+to the two shared modules** ``helao/ui/shared/data_browser/readers.py`` and
 ``sources.py``. One class over two modules, matching the port: they are the two
 faces of one boundary -- find the files, then read one -- and a caller needs
 both or neither.

@@ -60,7 +60,7 @@ def test_the_facade_app_is_the_legacy_app_object_itself(hosted):
     mint a second ``rx.App`` and a second set of state classes, while the
     browser's bundle was compiled against the first -- every panel then sits
     at "connecting" with a handler-not-found KeyError in the backend."""
-    from helao.core.servers.reflex import app as legacy
+    from helao.ui.reflex import app as legacy
 
     assert hosted.app is legacy.app
 
@@ -88,7 +88,7 @@ def test_the_facade_registers_panel_handlers_before_any_page(hosted):
 
 
 def test_the_facade_serves_every_shell_route(hosted):
-    from helao.core.servers.reflex.app import SHELL_ROUTES
+    from helao.ui.reflex.app import SHELL_ROUTES
 
     registered = set(hosted.app._unevaluated_pages or hosted.app._pages)
     for path in SHELL_ROUTES:

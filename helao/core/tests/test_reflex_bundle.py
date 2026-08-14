@@ -113,7 +113,7 @@ def _stamp(**overrides):
         "tool_versions": {"reflex": "0.9.7", "reflex-components-radix": "0.9.6"},
         "modules": {
             rb.APP_MODULE_REL: "e" * 40,
-            **{f"helao/core/servers/reflex/m{i}.py": "f" * 40 for i in range(20)},
+            **{f"helao/ui/reflex/m{i}.py": "f" * 40 for i in range(20)},
         },
         "js_runtime": "bun 1.3.14",
         "built_at": "2026-08-08T00:00:00-0700",
@@ -172,8 +172,8 @@ def test_the_reason_names_the_module_that_changed():
     """ "a panel changed" and "the port changed" want different reactions."""
     current = _stamp()
     recorded = _stamp()
-    recorded["modules"]["helao/core/servers/reflex/m3.py"] = "9" * 40
-    assert "helao/core/servers/reflex/m3.py" in rb.stamp_mismatch(current, recorded)
+    recorded["modules"]["helao/ui/reflex/m3.py"] = "9" * 40
+    assert "helao/ui/reflex/m3.py" in rb.stamp_mismatch(current, recorded)
 
 
 def test_every_differing_field_is_reported_not_only_the_first():
@@ -221,7 +221,7 @@ def test_a_stamp_captured_before_the_app_import_is_refused():
 
 
 def test_a_stub_sized_module_map_is_refused():
-    tiny = {rb.APP_MODULE_REL: "0" * 40, "helao/core/servers/reflex/x.py": "1" * 40}
+    tiny = {rb.APP_MODULE_REL: "0" * 40, "helao/ui/reflex/x.py": "1" * 40}
     with pytest.raises(rb.BundleStampError) as excinfo:
         rb.validate_stamp(_stamp(modules=tiny))
     assert str(len(tiny)) in str(excinfo.value)

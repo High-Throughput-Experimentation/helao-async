@@ -19,5 +19,5 @@ import os
 from importlib import import_module
 
 app = import_module(
-    os.environ.get("HELAO_REFLEX_APP_MODULE") or "helao.core.servers.reflex.app"
+    os.environ.get("HELAO_REFLEX_APP_MODULE") or "helao.ui.reflex.app"
 ).app

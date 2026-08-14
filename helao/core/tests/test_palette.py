@@ -946,7 +946,7 @@ def test_reflex_page_tints_cover_the_shell_routes() -> None:
     guards for the Bokeh canvas: nothing fails, every contrast row passes, and
     the signal the colour exists to carry is simply gone.
     """
-    from helao.core.servers.reflex.app import SHELL_ROUTES
+    from helao.ui.reflex.app import SHELL_ROUTES
 
     assert set(palette.REFLEX_PAGE_TINTS) == set(SHELL_ROUTES)
     assert len(set(palette.REFLEX_PAGE_TINTS.values())) == len(SHELL_ROUTES)
@@ -1071,9 +1071,7 @@ def test_gridjs_hover_does_not_reintroduce_a_grey_header() -> None:
 
 
 REFLEX_STACK_GLOBS: Final[tuple[str, ...]] = (
-    "helao/core/servers/reflex/**/*.py",
-    "helao/core/servers/operator/app_reflex.py",
-    "helao/core/servers/data_browser/app_reflex.py",
+    "helao/ui/reflex/**/*.py",
     "helao/deploy/*/servers/reflex/**/*.py",
 )
 

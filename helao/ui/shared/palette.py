@@ -929,7 +929,7 @@ CHART_CHROME: Final[Mapping[str, str]] = {
 """Nineteen of the 22 CSS custom properties ``xy-client.js`` reads.
 
 Delivered as one ``:root`` block through ``head_components`` in
-``helao/core/servers/reflex/app.py`` — **not** ``rx.App(style=...)``, which
+``helao/ui/reflex/app.py`` — **not** ``rx.App(style=...)``, which
 serializes a string key into a descendant selector that can never match
 ``<html>`` and so fails silently.
 

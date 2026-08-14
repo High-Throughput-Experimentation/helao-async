@@ -23,7 +23,7 @@ and the Reflex ingest layer is exactly that.
 import asyncio
 import contextlib
 
-from helao.core.servers.reflex.ingest import normalize, normalize_data_package
+from helao.ui.reflex.ingest import normalize, normalize_data_package
 from helao.helpers.ws_utils import WsSubscriber
 from helao.hexagon.ports.status import (
     CHANNELS,

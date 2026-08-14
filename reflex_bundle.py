@@ -91,11 +91,11 @@ import time
 import zipfile
 from typing import NamedTuple, Optional
 
-#: Must match ``app_name`` in ``helao/core/servers/reflex/_app/rxconfig.py``.
+#: Must match ``app_name`` in ``helao/ui/reflex/_app/rxconfig.py``.
 APP_NAME = "helao_ui"
 
 #: Reflex project directory the CLI is invoked from, relative to the repo root.
-APP_DIR = os.path.join("helao", "core", "servers", "reflex", "_app")
+APP_DIR = os.path.join("helao", "ui", "reflex", "_app")
 
 #: Reflex assets directory, served from the site root. xy's ESM client is
 #: copied here before the frontend build so the bundle ships it and the browser
@@ -139,7 +139,7 @@ MIN_TRACKED_MODULES = 10
 #: Repo-relative path that must appear in a believable ``modules`` map. Its
 #: absence means the map was captured before the Reflex app was imported, which
 #: is the failure that would make every later comparison pass vacuously.
-APP_MODULE_REL = "helao/core/servers/reflex/app.py"
+APP_MODULE_REL = "helao/ui/reflex/app.py"
 
 #: Marker Reflex writes into the export.
 INDEX_NAME = "index.html"
@@ -185,7 +185,7 @@ _BAKED_URL_RE = re.compile(rb"https?://[A-Za-z0-9_.\-]+:\d{2,5}")
 APP_MODULE_ENV = "HELAO_REFLEX_APP_MODULE"
 
 #: What the entry module imports when the variable is absent.
-LEGACY_APP_MODULE = "helao.core.servers.reflex.app"
+LEGACY_APP_MODULE = "helao.ui.reflex.app"
 
 #: What it imports for a ``deployment: hexagon`` reflex server.
 HEXAGON_APP_MODULE = "helao.hexagon.app.reflex_host"
@@ -479,7 +479,7 @@ def _xy_client_source() -> Optional[str]:
         # plot facade and that binding may touch the alpha xy API, and a test
         # enforces it. Imported lazily so this module stays importable (and the
         # stamp computable) without reflex installed.
-        from helao.core.servers.reflex.xy_component import client_asset_source
+        from helao.ui.reflex.xy_component import client_asset_source
 
         return str(client_asset_source())
     except Exception:
@@ -931,7 +931,7 @@ def _copy_client_asset(dest_dir: str) -> str:
     stays lazy -- it pulls in reflex and xy -- and so a test can drive the whole
     install path without either.
     """
-    from helao.core.servers.reflex.xy_component import copy_client_asset
+    from helao.ui.reflex.xy_component import copy_client_asset
 
     return copy_client_asset(dest_dir)
 

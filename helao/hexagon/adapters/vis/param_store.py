@@ -2,7 +2,7 @@
 
 :class:`ParamStore` satisfies
 :class:`~helao.hexagon.ports.param_store.ParamStorePort` by **delegating to
-the shared module** ``helao/core/servers/operator/param_store.py``. Nothing is
+the shared module** ``helao/ui/shared/operator/param_store.py``. Nothing is
 reimplemented, and that is the design: the store is one file that two UIs and
 two processes read and write, so a second implementation would be a second
 opinion about the same bytes on disk. The tolerant-read behaviour in

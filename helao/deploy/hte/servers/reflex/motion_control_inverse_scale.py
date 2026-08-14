@@ -31,7 +31,7 @@ distinguishes.** The vendor cannot discriminate between the two; the shape of
 the config can.
 
 All this module contributes is *which* schema the axes are declared in. The
-rendering and the endpoint calls are in ``helao.core.servers.reflex.control``
+rendering and the endpoint calls are in ``helao.ui.reflex.control``
 and ``helao.ui.shared.motion_control``, shared with the Bokeh half.
 """
 

@@ -12,8 +12,8 @@ __all__ = ["WS_PATH", "STATE_BASE", "X_COLUMN", "build", "panel_id"]
 import numpy as np
 import reflex as rx
 
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import ActionVisState
+from helao.ui.reflex import plots
+from helao.ui.reflex.state import ActionVisState
 from helao.deploy.hte.servers.reflex._action import (
     CURRENT_PATTERN,
     MUTED_TEXT,

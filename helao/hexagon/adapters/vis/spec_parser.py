@@ -2,7 +2,7 @@
 
 :class:`SpecParserGateway` satisfies
 :class:`~helao.hexagon.ports.spec_parser.SpecParserPort` by **delegating to
-the shared module** ``helao/core/servers/operator/spec_parser.py``.
+the shared module** ``helao/ui/shared/operator/spec_parser.py``.
 
 Delegation matters more here than anywhere else in P7h. The module does not
 merely read files -- it ``exec_module``s one named by a config key, i.e. it
