@@ -167,13 +167,25 @@ def test_action_session_covers_the_deployment_facing_surface() -> None:
     assert missing == [], f"ActionSession is missing deployment members: {missing}"
 
 
-def test_executor_entry_raises_rather_than_returning_none() -> None:
-    """Task 6 is outstanding; a None return would record an action that never ran."""
-    import pytest
+def test_executor_entry_delegates_to_the_runner() -> None:
+    """Task 6 landed: these delegate to ExecutorRunner instead of raising.
 
-    session = _session_class().__new__(_session_class())
-    with pytest.raises(NotImplementedError, match="Task 6"):
-        session.start_executor(object())
+    Superseded the earlier assertion that they raise NotImplementedError --
+    that pinned the placeholder, and leaving it would have made Task 6 look
+    like a regression.
+    """
+    from helao.hexagon.app.executor_runner import ExecutorRunner
+
+    cls = _session_class()
+    for name in (
+        "start_executor",
+        "oneoff_executor",
+        "action_loop_task",
+        "executor_done_callback",
+        "stop_action_task",
+    ):
+        assert hasattr(cls, name), f"session lost {name}"
+        assert hasattr(ExecutorRunner, name), f"runner lacks {name}"
 
 
 def test_a_session_can_actually_be_constructed(tmp_path) -> None:
