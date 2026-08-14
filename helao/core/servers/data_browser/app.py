@@ -20,8 +20,8 @@ from bokeh.models import (
 from bokeh.plotting import figure
 
 from helao.ui.bokeh.theme import semantic_button_stylesheet
-from helao.core.servers.data_browser import sources
-from helao.core.servers.data_browser import state as dbstate
+from helao.ui.shared.data_browser import sources
+from helao.ui.shared.data_browser import state as dbstate
 from helao.ui.shared.palette import (
     BROWSER_FAILURE_TEXT,
     BROWSER_HEADER_TEXT,

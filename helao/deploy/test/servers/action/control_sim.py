@@ -51,7 +51,7 @@ from typing import Optional
 from helao.core.error import ErrorCodes
 from helao.core.servers.base import Base
 from helao.core.servers.base_api import BaseAPI
-from helao.core.servers.motion_control import Units
+from helao.ui.shared.motion_control import Units
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

@@ -2,8 +2,8 @@
 
 The Bokeh halves are ``io_control_vis.DigitalOutPanel`` and
 ``motion_control_vis.MotionPanel``. Both stacks render the same items and drive
-the same private endpoints through :mod:`helao.core.servers.io_control` and
-:mod:`helao.core.servers.motion_control`, which is where the behaviour lives —
+the same private endpoints through :mod:`helao.ui.shared.io_control` and
+:mod:`helao.ui.shared.motion_control`, which is where the behaviour lives —
 this module is a page and a state class, nothing more. Adding a rule to one UI
 and not the other is the failure mode those layers exist to prevent, so nothing
 here decides when to confirm a move, what a scale is, or what an unread
@@ -32,7 +32,7 @@ tab is closed, so a ``while True`` in a background handler would go on polling
 a station's motion servers forever after the browser is gone, logging a delta
 to a disconnected client on every pass. A component stops existing with its
 tab. When and for how long to keep reading is
-:func:`~helao.core.servers.motion_control.should_follow_up`'s decision, not
+:func:`~helao.ui.shared.motion_control.should_follow_up`'s decision, not
 this page's, so the two stacks cannot come to refresh differently — the same
 rule that keeps the confirmation threshold out of here.
 """
@@ -45,7 +45,7 @@ from dataclasses import dataclass
 import reflex as rx
 
 from helao.core.servers.reflex.discovery import resolve_panel_module
-from helao.core.servers.io_control import (
+from helao.ui.shared.io_control import (
     discover_do_items,
     group_do_items,
     group_heading,
@@ -53,7 +53,7 @@ from helao.core.servers.io_control import (
     set_digital_out,
     state_label,
 )
-from helao.core.servers.motion_control import (
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
     FOLLOWUP_CEILING_S,
@@ -104,7 +104,7 @@ UNIT_NAMES = [unit.value for unit in Units]
 #: The page's tick while a command is being followed up, in milliseconds. The
 #: shared cadence converted once, rather than a number chosen here: a page that
 #: picked its own would be the drift between the two stacks that
-#: :mod:`~helao.core.servers.motion_control` exists to prevent.
+#: :mod:`~helao.ui.shared.motion_control` exists to prevent.
 FOLLOWUP_TICK_MS = int(FOLLOWUP_INTERVAL_S * 1000)
 
 #: The page's tick when nothing is being followed up.
@@ -148,8 +148,8 @@ class ControlTarget:
         host: Its host.
         port: Its HTTP port.
         title: Heading for its block of controls.
-        items: The :class:`~helao.core.servers.io_control.DoItem` list.
-        axes: The :class:`~helao.core.servers.motion_control.AxisItem` list.
+        items: The :class:`~helao.ui.shared.io_control.DoItem` list.
+        axes: The :class:`~helao.ui.shared.motion_control.AxisItem` list.
             Defaulted, so a deployment's existing three-line digital-output
             panel module keeps working with no edit.
         axis_source: The panel module's ``AXIS_SOURCE``, or ``""``. Kept
@@ -345,7 +345,7 @@ def _motion_row(target: ControlTarget, item, position, previous=None) -> list:
 
     Args:
         target: The server the axis belongs to.
-        item: The :class:`~helao.core.servers.motion_control.AxisItem`.
+        item: The :class:`~helao.ui.shared.motion_control.AxisItem`.
         position: What the server reported for this axis, or ``{}``.
         previous: This axis's current row, when there is one.
     """
@@ -700,7 +700,7 @@ class ControlState(rx.State):
         was granted under is a confirmation for a move nobody is watching.
 
         Whether a move is large enough to ask about is
-        :func:`~helao.core.servers.motion_control.exceeds_warn_threshold`'s
+        :func:`~helao.ui.shared.motion_control.exceeds_warn_threshold`'s
         decision, not this page's, so the two stacks cannot come to disagree --
         and a UI that quietly stopped asking would look identical to one that
         never needed to.
@@ -843,7 +843,7 @@ class ControlState(rx.State):
 
         Returns:
             dict: What the server reported, as
-            :func:`~helao.core.servers.motion_control.read_axis_positions`
+            :func:`~helao.ui.shared.motion_control.read_axis_positions`
             returns it, or ``{}``. Returned rather than only rendered because
             the follow-up has to ask the shared policy whether to read again,
             and that question is asked of the *reply* — the rows have already
@@ -890,7 +890,7 @@ class ControlState(rx.State):
         issues no request to any instrument.
 
         Whether to read *again* is
-        :func:`~helao.core.servers.motion_control.should_follow_up`'s decision.
+        :func:`~helao.ui.shared.motion_control.should_follow_up`'s decision.
         Two things it encodes and this must not defeat: the read that follows a
         dispatch can honestly answer ``moving: False`` because the stage has
         not started yet, which is why the first seconds are read regardless;

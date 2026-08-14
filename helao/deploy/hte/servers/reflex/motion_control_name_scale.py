@@ -31,7 +31,7 @@ motion panels, so the trio stays readable side by side.
 
 All this module contributes is *which* schema the axes are declared in. The
 rendering and the endpoint calls are in ``helao.core.servers.reflex.control``
-and ``helao.core.servers.motion_control``, shared with the Bokeh half.
+and ``helao.ui.shared.motion_control``, shared with the Bokeh half.
 """
 
 __all__ = ["DO_GROUPS", "AXIS_SOURCE", "TITLE"]

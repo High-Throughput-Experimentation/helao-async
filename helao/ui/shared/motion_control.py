@@ -12,7 +12,7 @@ Three things are shared:
 * **Which axes a station has, and how its scale is declared.** Three shipped
   config schemas differ in where the axes are listed and how the scale is keyed
   and oriented, so :func:`discover_axes` takes the schema name from the caller
-  exactly as :func:`~helao.core.servers.io_control.discover_do_items` takes its
+  exactly as :func:`~helao.ui.shared.io_control.discover_do_items` takes its
   group names. The panel module contributes only *which*, never *how*.
 * **When a move is large enough to ask about.** One threshold rule, evaluated
   once, so the two stacks cannot disagree about when to confirm -- a UI that
@@ -201,7 +201,7 @@ def discover_axes(server_config: dict, axis_source, *, server_key: str = "") -> 
     """Enumerate a server's movable axes from its config.
 
     Positionally this mirrors
-    :func:`~helao.core.servers.io_control.discover_do_items` exactly --
+    :func:`~helao.ui.shared.io_control.discover_do_items` exactly --
     ``(server_config, selector)`` -- so the two discovery functions are one
     contract and a later port wraps one pattern rather than two. The schema is
     passed in, **not** sniffed from the config: two of the three schemas key

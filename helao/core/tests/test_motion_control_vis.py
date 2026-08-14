@@ -22,7 +22,7 @@ from bokeh.server.callbacks import PeriodicCallback
 
 from helao.core.error import ErrorCodes
 from helao.core.servers import motion_control_vis as mod
-from helao.core.servers.motion_control import (
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
     FOLLOWUP_CEILING_S,

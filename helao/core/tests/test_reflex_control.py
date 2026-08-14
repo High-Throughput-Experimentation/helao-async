@@ -2,7 +2,7 @@
 
 The behaviour these assert is the same behaviour ``test_io_control_vis.py``
 asserts for the Bokeh panel, deliberately — the two UIs share
-``helao.core.servers.io_control`` precisely so a rule cannot hold in one and
+``helao.ui.shared.io_control`` precisely so a rule cannot hold in one and
 not the other, and a pair of test files is what keeps that honest.
 
 Reflex event handlers are exercised directly rather than through a browser: the
@@ -15,7 +15,7 @@ import json
 
 import pytest
 
-from helao.core.servers import io_control
+from helao.ui.shared import io_control
 from helao.core.servers.reflex import control as control_mod
 from helao.core.servers.reflex.control import ControlState, control_targets
 

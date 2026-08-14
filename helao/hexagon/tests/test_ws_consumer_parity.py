@@ -204,7 +204,7 @@ def test_operator_ws_face_is_shape_blind():
     truthiness only -- so it fires on_change identically no matter which
     producer family's ws_status frame arrived. Documented so nobody cites the
     operator as evidence of ws_status parity between the two families."""
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 

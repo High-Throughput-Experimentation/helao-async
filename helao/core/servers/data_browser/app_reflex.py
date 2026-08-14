@@ -32,8 +32,8 @@ import threading
 
 import reflex as rx
 
-from helao.core.servers.data_browser import sources
-from helao.core.servers.data_browser import state as dbstate
+from helao.ui.shared.data_browser import sources
+from helao.ui.shared.data_browser import state as dbstate
 from helao.core.servers.data_browser.app import FILTER_COLS, INDEX_TABLE_COLS
 from helao.ui.shared.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex import plots

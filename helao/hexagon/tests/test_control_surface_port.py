@@ -22,8 +22,8 @@ import inspect
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import io_control, motion_control
-from helao.core.servers.motion_control import Units
+from helao.ui.shared import io_control, motion_control
+from helao.ui.shared.motion_control import Units
 from helao.hexagon.adapters.vis.control_surface import ControlSurface
 from helao.hexagon.ports.control_surface import CONTROL_ROUTES, ControlSurfacePort
 

@@ -20,7 +20,7 @@ Under ``adapters/vis/`` because ``adapters/native/`` may not import
 
 from typing import Optional
 
-from helao.core.servers.operator import param_store as legacy
+from helao.ui.shared.operator import param_store as legacy
 
 __all__ = ["ParamStore"]
 

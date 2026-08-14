@@ -27,7 +27,7 @@ Under ``adapters/vis/`` because ``adapters/native/`` may not import
 ``helao.core.servers.*`` (test_boundaries.py:131-143).
 """
 
-from helao.core.servers.operator import spec_parser as legacy
+from helao.ui.shared.operator import spec_parser as legacy
 
 __all__ = ["SpecParserGateway"]
 

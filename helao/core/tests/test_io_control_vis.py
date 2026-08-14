@@ -14,7 +14,7 @@ import pytest
 from bokeh.document import Document
 from bokeh.models import Button, Div
 
-from helao.core.servers import io_control
+from helao.ui.shared import io_control
 from helao.core.servers.io_control_vis import DigitalOutPanel
 
 SERVERS = {

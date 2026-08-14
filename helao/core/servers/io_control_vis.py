@@ -7,7 +7,7 @@ loses a control by editing that server's config block and restarting — no pane
 module changes.
 
 The Reflex half renders the same items from the same
-:mod:`helao.core.servers.io_control` layer; behaviour belongs there, not here.
+:mod:`helao.ui.shared.io_control` layer; behaviour belongs there, not here.
 """
 
 __all__ = ["DigitalOutPanel"]
@@ -23,7 +23,7 @@ from helao.ui.bokeh.theme import (
     semantic_button_stylesheet,
     stretch_section,
 )
-from helao.core.servers.io_control import (
+from helao.ui.shared.io_control import (
     discover_do_items,
     group_do_items,
     group_heading,
@@ -192,7 +192,7 @@ class DigitalOutPanel:
         label and colour instead, and always reports what the server last said.
 
         Args:
-            item: The :class:`~helao.core.servers.io_control.DoItem` to render.
+            item: The :class:`~helao.ui.shared.io_control.DoItem` to render.
 
         Returns:
             Button: The control, already registered in ``self.buttons``.
