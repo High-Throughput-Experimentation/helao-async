@@ -22,6 +22,9 @@ def _host():
     from helao.hexagon.app.wiring import PortWiring
 
     class _Stub:
+        def meta_writer_for(self, base):
+            return object()
+
         def __getattr__(self, name):
             raise AssertionError(f"port member {name!r} used unexpectedly")
 

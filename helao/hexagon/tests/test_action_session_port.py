@@ -174,3 +174,67 @@ def test_executor_entry_raises_rather_than_returning_none() -> None:
     session = _session_class().__new__(_session_class())
     with pytest.raises(NotImplementedError, match="Task 6"):
         session.start_executor(object())
+
+
+def test_a_session_can_actually_be_constructed(tmp_path) -> None:
+    """Surface coverage is not construction. This is the difference.
+
+    The class-level checks above passed while ``__init__`` still reached for
+    ``host.get_realtime_nowait`` and ``host.dflt_file_conn_key``, neither of
+    which existed. Only building one caught that.
+    """
+    import asyncio
+
+    from helao.hexagon.adapters.native.artifact_store import (
+        NativeArtifactStoreAdapter,
+    )
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.action_session import ActionSession
+    from helao.hexagon.app.wiring import PortWiring
+    from helao.helpers.premodels import Action
+
+    class _Clock:
+        def now_ns(self):
+            return 0
+
+        def offset(self):
+            return 0.0
+
+    class _Stub:
+        def __getattr__(self, name):
+            raise AssertionError(f"port member {name!r} used unexpectedly")
+
+    store = NativeArtifactStoreAdapter(config=_Stub(), clock=_Clock())
+    host = ActionHost(
+        server_key="SIM",
+        server_title="SIM",
+        description="session construction",
+        version=1.0,
+        wiring=PortWiring(
+            config=_Stub(),
+            logging=_Stub(),
+            clock=_Clock(),
+            transport=_Stub(),
+            state_persistence=_Stub(),
+            status=_Stub(),
+            health=_Stub(),
+            artifact_store=store,
+            data_sink=_Stub(),
+        ),
+        helao_cfg={
+            "root": str(tmp_path),
+            "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+        },
+    )
+    session = asyncio.run(ActionSession.open(host, Action(action_name="acquire_data")))
+
+    assert isinstance(session, ActionSessionPort), "session does not satisfy the port"
+    # the default file connection is keyed independently of the action uuid
+    assert list(session.file_conn_dict) == [host.dflt_file_conn_key()]
+    assert session.base is host
+    # the native collaborators were constructed, not grafted on afterwards
+    assert session.data_stream is not None
+    assert session.data_file_writer is not None
+    assert session.action_finalizer is not None
+    # and the host is tracking it
+    assert host._actives[session.action.action_uuid] is session
