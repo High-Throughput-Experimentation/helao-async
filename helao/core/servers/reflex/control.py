@@ -44,7 +44,7 @@ from dataclasses import dataclass
 
 import reflex as rx
 
-from helao.core.servers.reflex.discovery import resolve_panel_module
+from helao.ui.shared.discovery import resolve_panel_module
 from helao.ui.shared.io_control import (
     discover_do_items,
     group_do_items,

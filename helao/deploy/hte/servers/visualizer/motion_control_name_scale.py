@@ -8,7 +8,7 @@ serves::
       count_to_mm:  {x: 3.4e-05, ...}      # keyed by the AXIS NAME
 
 Every key of ``axis_id`` becomes one axis row; the behaviour is entirely in
-:class:`~helao.core.servers.motion_control_vis.MotionPanel`.
+:class:`~helao.ui.bokeh.motion_control_vis.MotionPanel`.
 
 **Same vendor as** ``motion_control_inverse_scale`` -- both are Thorlabs
 Kinesis stages -- **but a different config schema, and the schema is what this
@@ -31,7 +31,7 @@ motion panels, so the trio stays readable side by side.
 
 __all__ = ["C_vis"]
 
-from helao.core.servers.motion_control_vis import MotionPanel
+from helao.ui.bokeh.motion_control_vis import MotionPanel
 
 
 class C_vis(MotionPanel):

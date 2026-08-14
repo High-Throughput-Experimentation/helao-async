@@ -92,7 +92,7 @@ def test_validate_rejects_a_server_colliding_with_the_reflex_backend_port():
 
 
 def test_reserved_addresses_claims_two_ports_for_reflex():
-    from helao.core.servers.reflex.discovery import reserved_addresses
+    from helao.ui.shared.discovery import reserved_addresses
 
     assert reserved_addresses(
         {"host": "127.0.0.1", "port": 5010, "reflex": "helao_ui"}
@@ -100,7 +100,7 @@ def test_reserved_addresses_claims_two_ports_for_reflex():
 
 
 def test_reserved_addresses_claims_one_port_for_bokeh():
-    from helao.core.servers.reflex.discovery import reserved_addresses
+    from helao.ui.shared.discovery import reserved_addresses
 
     assert reserved_addresses(
         {"host": "127.0.0.1", "port": 5002, "bokeh": "live_visualizer"}
@@ -109,7 +109,7 @@ def test_reserved_addresses_claims_one_port_for_bokeh():
 
 def test_discovery_search_order_puts_configured_deployment_first():
     from helao.helpers import config_loader
-    from helao.core.servers.reflex.discovery import deployment_search_order
+    from helao.ui.shared.discovery import deployment_search_order
 
     saved = config_loader.CONFIG
     try:
@@ -122,14 +122,14 @@ def test_discovery_search_order_puts_configured_deployment_first():
 
 
 def test_vis_subscriber_reuses_the_shared_search_order():
-    from helao.core.servers import vis_subscriber
-    from helao.core.servers.reflex import discovery
+    from helao.ui.bokeh import vis_subscriber
+    from helao.ui.shared import discovery
 
     assert vis_subscriber._deployment_search_order is discovery.deployment_search_order
 
 
 def test_resolve_panel_module_raises_a_clear_error_for_an_unknown_module():
-    from helao.core.servers.reflex.discovery import resolve_panel_module
+    from helao.ui.shared.discovery import resolve_panel_module
 
     with pytest.raises(ModuleNotFoundError) as exc:
         resolve_panel_module("no_such_panel_module")
@@ -358,7 +358,7 @@ def test_deployment_search_order_finds_every_deployment():
     and every Reflex panel resolved to "module not found" at runtime.
     """
     from helao.helpers import config_loader
-    from helao.core.servers.reflex.discovery import deployment_search_order
+    from helao.ui.shared.discovery import deployment_search_order
 
     saved = config_loader.CONFIG
     try:
@@ -422,7 +422,7 @@ def test_the_backend_child_process_resolves_its_panels():
             sys.executable,
             "-c",
             "from helao.core.servers.reflex.app import app\n"
-            "from helao.core.servers.reflex.discovery import resolve_panel_module\n"
+            "from helao.ui.shared.discovery import resolve_panel_module\n"
             "resolve_panel_module('wssim_panel')\n"
             "resolve_panel_module('oersim_panel')\n"
             "print('RESOLVED')",

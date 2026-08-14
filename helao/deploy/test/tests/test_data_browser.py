@@ -385,7 +385,7 @@ def test_summary_row():
 
 
 def test_build_document_smoke():
-    from helao.core.servers.data_browser.app import build_document
+    from helao.ui.bokeh.data_browser import build_document
 
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
@@ -397,7 +397,7 @@ def test_build_document_smoke():
 
 
 def test_plot_tab_builds_traces():
-    from helao.core.servers.data_browser.app import _UI
+    from helao.ui.bokeh.data_browser import _UI
 
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
@@ -417,7 +417,7 @@ def test_plot_tab_builds_traces():
 
 
 def test_table_tab_summary_and_rows():
-    from helao.core.servers.data_browser.app import _UI
+    from helao.ui.bokeh.data_browser import _UI
 
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
@@ -439,7 +439,7 @@ def test_table_tab_summary_and_rows():
 
 
 def test_plot_replot_and_clear_safe():
-    from helao.core.servers.data_browser.app import _UI
+    from helao.ui.bokeh.data_browser import _UI
 
     with tempfile.TemporaryDirectory() as d:
         _make_finished_tree(d)
@@ -473,7 +473,7 @@ def test_plot_skips_a_non_numeric_column_and_says_so():
     the document, so the operator got a renderer that draws nothing and no
     message saying why. Both UIs now go through ``state.chart_series``.
     """
-    from helao.core.servers.data_browser.app import _UI
+    from helao.ui.bokeh.data_browser import _UI
 
     with tempfile.TemporaryDirectory() as d:
         vis = _RecordingVis(d, Document())
@@ -503,7 +503,7 @@ def test_plot_skips_a_non_numeric_column_and_says_so():
 
 def test_plot_reports_a_dataset_missing_the_chosen_columns():
     """Overlaying files from unrelated runs is normal; saying nothing is not."""
-    from helao.core.servers.data_browser.app import _UI
+    from helao.ui.bokeh.data_browser import _UI
 
     with tempfile.TemporaryDirectory() as d:
         vis = _RecordingVis(d, Document())

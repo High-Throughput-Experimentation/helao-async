@@ -22,8 +22,8 @@ from helao.core.models.data import DataPackageModel
 from helao.core.models.hlostatus import HloStatus
 from helao.ui.shared.palette import PANEL_BG, panel_styles
 from helao.ui.bokeh.theme import SECTION_MARGIN, stretch_section
-from helao.core.servers.vis import Vis
-from helao.core.servers.vis_subscriber import ActionVisualizer
+from helao.ui.bokeh.vis import Vis
+from helao.ui.bokeh.vis_subscriber import ActionVisualizer
 from helao.helpers.dispatcher import async_private_dispatcher
 
 valid_data_status = (

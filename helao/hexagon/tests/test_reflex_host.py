@@ -110,7 +110,7 @@ def test_panels_still_resolve_with_the_deployment_key_set_to_hexagon(hosted):
     panel on a hexagon-hosted page becomes an error card and nothing else in
     this suite would notice.
     """
-    from helao.core.servers.reflex.discovery import (
+    from helao.ui.shared.discovery import (
         deployment_search_order,
         resolve_panel_module,
     )

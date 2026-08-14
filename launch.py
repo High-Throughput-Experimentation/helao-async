@@ -58,7 +58,7 @@ import requests
 from pyfiglet import figlet_format
 from termcolor import cprint
 
-from helao.core.servers.reflex.discovery import reserved_addresses
+from helao.ui.shared.discovery import reserved_addresses
 from helao.core.version import get_hlo_version
 from helao.helpers import helao_logging as logging
 from helao.helpers import win_job

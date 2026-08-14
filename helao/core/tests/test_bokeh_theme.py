@@ -371,7 +371,7 @@ def test_helao_vis_themes_its_document():
 
     from helao.helpers import config_loader
 
-    from helao.core.servers.vis import HelaoVis
+    from helao.ui.bokeh.vis import HelaoVis
 
     config = {
         "root": tempfile.mkdtemp(),

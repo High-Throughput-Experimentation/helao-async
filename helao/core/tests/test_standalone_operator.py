@@ -213,7 +213,7 @@ def test_remote_backend_dispatch_and_serialize():
 def test_operator_accepts_backend():
     import inspect
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     params = list(inspect.signature(BokehOperator.__init__).parameters)
     assert params == ["self", "vis_serv", "backend"], params
@@ -340,7 +340,7 @@ class _MockBackend:
 def test_operator_tables_from_backend():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     doc = Document()
     vis = _FakeVisOp(doc)
@@ -359,7 +359,7 @@ def test_operator_tables_from_backend():
 def test_plate_api_disabled_by_default():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     assert op.dataAPI is None  # no plate_api param -> disabled
@@ -378,7 +378,7 @@ def test_plate_callbacks_noop_when_plate_api_disabled():
     from bokeh.document import Document
     from bokeh.models import TextInput
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     assert op.dataAPI is None
@@ -598,7 +598,7 @@ def test_remote_backend_prepend():
 def test_plan_buffer_append_and_wrap():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"
@@ -618,7 +618,7 @@ def test_plan_buffer_append_and_wrap():
 def test_plan_buffer_order():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Sequence
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
@@ -635,7 +635,7 @@ def test_plan_buffer_order():
 def test_plan_metadata_capture_at_insert():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"
@@ -652,7 +652,7 @@ def test_plan_metadata_capture_at_insert():
 def test_flush_add_dispatches_per_sequence():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Sequence
 
     be = _MockBackend()
@@ -667,7 +667,7 @@ def test_flush_add_dispatches_per_sequence():
 def test_plan_table_rows():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Experiment, Sequence
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
@@ -694,7 +694,7 @@ def test_plan_table_rows():
 def test_plan_reorder_and_remove():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Sequence
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
@@ -717,7 +717,7 @@ def test_plan_reorder_and_remove():
 def test_queue_controls_enable_gate():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
@@ -764,7 +764,7 @@ def test_queue_button_dispatch_routing():
     """The single unified button set targets the backend matching the active tab."""
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
@@ -809,7 +809,7 @@ def test_stop_callback_forwards_reset_run_id():
     """The reset-run_id checkbox forwards its state to backend.stop()."""
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
@@ -831,7 +831,7 @@ def test_stop_callback_forwards_reset_run_id():
 def test_prepend_plan_callback_clears_and_dispatches():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Sequence
 
     be = _MockBackend()
@@ -849,7 +849,7 @@ def test_prepend_plan_callback_clears_and_dispatches():
 def test_prepend_button_enable_gate():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     be = _MockBackend()
     op = BokehOperator(_FakeVisOp(Document()), be)
@@ -1026,7 +1026,7 @@ def test_remote_backend_stop_reset_run_id():
 def test_uuid_truncation_in_queue_tables():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     asyncio.run(op.get_sequences())
@@ -1044,7 +1044,7 @@ def test_uuid_truncation_in_queue_tables():
 def test_param_key_uses_name_not_title():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"  # already selected in __init__; param is "x"
@@ -1061,7 +1061,7 @@ def test_find_input_matches_name():
     from bokeh.document import Document
     from bokeh.models.widgets.inputs import TextInput
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     probe = TextInput(value="", title="", name="solid_sample_no")
@@ -1074,7 +1074,7 @@ def test_find_input_matches_name():
 def test_operator_label_sanitize_callback():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     # pure sanitizer used by the on_change callback
@@ -1122,7 +1122,7 @@ def _drain_callbacks(doc, iterations=20):
 def test_save_restore_label_campaign():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     # drain __init__ next-tick callbacks (async get_sequences/history etc.)
@@ -1159,7 +1159,7 @@ def test_save_restore_label_campaign():
 def test_param_label_enumeration():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequence_dropdown.value = "seq0"  # selected in __init__; single param "x"
@@ -1188,7 +1188,7 @@ def test_param_label_enumeration():
 
 
 def test_object_to_html():
-    from helao.core.servers.operator.bokeh_operator import _object_to_html
+    from helao.ui.bokeh.operator import _object_to_html
 
     obj = {
         "sequence_name": "CA_led",
@@ -1209,7 +1209,7 @@ def test_object_to_html():
 
 
 def test_parse_arg_docs():
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     doc = (
         "Plan a thing.\n\n"
@@ -1235,7 +1235,7 @@ def test_parse_arg_docs():
 
 
 def test_tree_header_text():
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         _server_header_text,
         _tree_header_text,
     )
@@ -1279,7 +1279,7 @@ def test_remote_backend_get_queue_object():
 def test_history_objects_retained():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     class _BE(_MockBackend):
         async def get_histories(self):
@@ -1312,7 +1312,7 @@ def test_history_objects_retained():
 def test_planhistory_tree_render_plan():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.helpers.premodels import Sequence
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
@@ -1335,7 +1335,7 @@ def test_planhistory_tree_render_plan():
 def test_queue_tree_render_action_server():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     vis = _FakeVisOp(Document())
     vis.world_cfg["servers"]["MOTOR"] = {
@@ -1364,7 +1364,7 @@ def test_queue_tree_render_action_server():
 def test_queue_tree_render_lazy_sequence():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     fetched = {}
 
@@ -1392,7 +1392,7 @@ def test_queue_tree_render_lazy_sequence():
 def test_queue_tree_lazy_empty_clears():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     class _BE(_MockBackend):
         async def get_queue_object(self, kind, idx):
@@ -1415,7 +1415,7 @@ def test_queue_tree_lazy_empty_clears():
 def test_layout_is_stretch_width():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     assert op.dynamic_col.sizing_mode == "stretch_width"
@@ -1444,7 +1444,7 @@ def test_bool_param_renders_a_radio_group():
     from bokeh.document import Document
     from bokeh.models import RadioButtonGroup
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         BOOL_LABELS,
         BokehOperator,
         param_widget_value,
@@ -1475,7 +1475,7 @@ def test_bool_param_without_a_bool_default_keeps_its_text_field():
     from bokeh.document import Document
     from bokeh.models import RadioButtonGroup
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     # A radio group has no third position for None, and defaulting it to False
@@ -1490,7 +1490,7 @@ def test_bool_param_without_a_bool_default_keeps_its_text_field():
 def test_radio_group_round_trips_through_the_restore_setter():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         BokehOperator,
         param_widget_value,
     )
@@ -1516,7 +1516,7 @@ def test_param_cells_render_two_to_a_row():
     from bokeh.document import Document
     from bokeh.layouts import Spacer
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         PARAM_CELL_NAME,
         BokehOperator,
     )
@@ -1545,7 +1545,7 @@ def test_param_cells_render_two_to_a_row():
 def test_param_description_becomes_the_input_tooltip():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     # The mock library's lambda has no docstring, so give the selected entry
@@ -1573,7 +1573,7 @@ def test_bool_param_tooltip_reaches_the_radio_group():
     from bokeh.document import Document
     from bokeh.models import RadioButtonGroup
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     op.sequences[0]["doc"] = "Do a thing.\n\nArgs:\n    flag: Whether to flag.\n"
@@ -1589,7 +1589,7 @@ def test_bool_param_tooltip_reaches_the_radio_group():
 def test_param_form_is_one_contiguous_field():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         PARAM_CELL_NAME,
         PARAM_FIELD_MARGIN,
         PARAM_HEADING_MARGIN,
@@ -1620,7 +1620,7 @@ def test_param_form_is_one_contiguous_field():
 def test_selection_tabs_stretch_to_full_width():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     # A Tabs sizes to its widest panel and clips the panels to it, so the
@@ -1633,7 +1633,7 @@ def test_selection_tabs_stretch_to_full_width():
 def test_sections_stretch_and_carry_a_margin():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         SECTION_MARGIN,
         BokehOperator,
     )
@@ -1657,7 +1657,7 @@ def test_sections_stretch_and_carry_a_margin():
 def test_tree_views_are_bordered():
     from bokeh.document import Document
 
-    from helao.core.servers.operator.bokeh_operator import BokehOperator
+    from helao.ui.bokeh.operator import BokehOperator
     from helao.ui.shared.palette import PANEL_BORDER
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
@@ -1748,7 +1748,7 @@ def test_the_sample_list_load_button_shares_its_parameter_cell():
     from bokeh.document import Document
     from bokeh.models.widgets import FileInput
 
-    from helao.core.servers.operator.bokeh_operator import (
+    from helao.ui.bokeh.operator import (
         PARAM_CELL_NAME,
         BokehOperator,
     )
