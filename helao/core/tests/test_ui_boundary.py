@@ -18,9 +18,10 @@ from typing import Final
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 UI_ROOT: Final[Path] = REPO_ROOT / "helao" / "ui"
 
-#: Raised to the real module count by later B0 tasks. Its only job is to make an
-#: empty or mis-rooted glob fail loudly instead of passing by reaching nothing.
-MIN_UI_MODULES: Final[int] = 6
+#: Measured after the B0 move. A drop below this means a module was lost or the
+#: glob was mis-rooted -- either way the boundary assertion would start passing
+#: by reaching nothing, exactly as it did on the first run before helao/ui/ existed.
+MIN_UI_MODULES: Final[int] = 38
 
 BANNED_PREFIX: Final[str] = "helao.core.servers"
 

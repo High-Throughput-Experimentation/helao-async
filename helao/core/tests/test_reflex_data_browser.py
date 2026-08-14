@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from helao.ui.shared.data_browser import app_reflex as dbx
+from helao.ui.reflex import data_browser as dbx
 
 
 def _write_hlo(path):

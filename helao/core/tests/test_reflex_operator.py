@@ -12,7 +12,7 @@ import os
 import pytest
 from pydantic import BaseModel
 
-from helao.ui.shared.operator import app_reflex as opx
+from helao.ui.reflex import operator as opx
 
 
 class FakeBackend:
