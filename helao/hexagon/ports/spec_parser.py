@@ -1,6 +1,6 @@
 """Spec-parser port (P7h; Q8 -- fs *and* arbitrary code execution).
 
-Mirrors ``helao/core/servers/operator/spec_parser.py``. This is the heaviest
+Mirrors ``helao/ui/shared/operator/spec_parser.py``. This is the heaviest
 boundary of the four P7h ports and the only one that is not merely I/O:
 ``load_parser`` runs ``spec.loader.exec_module`` on a file named by a config
 key (``spec_parser.py:67``). It is a **plugin loader**. The parser is a

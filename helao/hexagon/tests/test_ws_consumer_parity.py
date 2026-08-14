@@ -29,7 +29,7 @@ import pytest
 
 from harness import ws_frames as wf
 from harness.endpoints import extract_routes
-from helao.core.servers.reflex.ingest import normalize, normalize_data_package
+from helao.ui.reflex.ingest import normalize, normalize_data_package
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge

@@ -25,8 +25,10 @@ import pytest
 import reflex_bundle
 
 _ENTRY = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "servers",
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    ),  # repo root: helao/core/tests -> helao/core -> helao
+    "ui",
     "reflex",
     "_app",
     "helao_ui",

@@ -9,7 +9,7 @@ import pyzstd
 import pytest
 import websockets
 
-from helao.core.servers.reflex.ingest import (
+from helao.ui.reflex.ingest import (
     IngestRegistry,
     WsIngest,
     normalize,

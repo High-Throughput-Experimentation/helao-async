@@ -31,7 +31,7 @@ from typing import Any
 import numpy as np
 
 from helao.ui.shared.palette import SERIES
-from helao.core.servers.reflex.xy_component import (
+from helao.ui.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
     BufferStore,
     xy_chart,

@@ -7,7 +7,7 @@ validates shapes, isolates xy — not xy's rendering, which is xy's concern.
 import numpy as np
 import pytest
 
-from helao.core.servers.reflex import plots
+from helao.ui.reflex import plots
 
 
 def test_time_series_returns_a_chart_payload():

@@ -1,8 +1,8 @@
 """Control-surface port (P7g; Amendment §4.3, §6 gate item 4).
 
 One seam over **both** halves of the engineering control panel: the digital
-outputs (``helao/core/servers/io_control.py``, 2 routes) and the motion axes
-(``helao/core/servers/motion_control.py``, 3 routes). Five methods, one port,
+outputs (``helao/ui/shared/io_control.py``, 2 routes) and the motion axes
+(``helao/ui/shared/motion_control.py``, 3 routes). Five methods, one port,
 because the two shared modules were deliberately written to the same shape --
 their discovery functions were aligned (``discover_do_items(config, groups)``
 / ``discover_axes(config, axis_source)``) so that a single port could wrap

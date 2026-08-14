@@ -2,7 +2,7 @@
 
 The ``reflex`` CLI requires a project directory containing ``rxconfig.py`` and
 a same-named app package. ``reflex_launcher.py`` runs the CLI from this
-directory; the app itself lives in ``helao.core.servers.reflex.app`` so it is
+directory; the app itself lives in ``helao.ui.reflex.app`` so it is
 importable and testable as ordinary repository code.
 
 Ports come from the environment because they are per-config, not per-project:

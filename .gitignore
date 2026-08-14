@@ -48,23 +48,23 @@ C:*
 
 # xy's ESM render client, copied out of the installed wheel at build time.
 # Generated artifact, ~411 KB — never tracked.
-helao/core/servers/reflex/_app/assets/xy-client.js
+helao/ui/reflex/_app/assets/xy-client.js
 
 # Reflex's own build directory and the artifacts `reflex init` generates.
 # AGENTS.md/CLAUDE.md are excluded deliberately: a nested CLAUDE.md is loaded as
 # project instructions, and a generated one would inject unrelated guidance.
-helao/core/servers/reflex/_app/.web/
-helao/core/servers/reflex/_app/.gitignore
-helao/core/servers/reflex/_app/AGENTS.md
-helao/core/servers/reflex/_app/CLAUDE.md
-helao/core/servers/reflex/_app/reflex.lock/
-helao/core/servers/reflex/_app/requirements.txt
+helao/ui/reflex/_app/.web/
+helao/ui/reflex/_app/.gitignore
+helao/ui/reflex/_app/AGENTS.md
+helao/ui/reflex/_app/CLAUDE.md
+helao/ui/reflex/_app/reflex.lock/
+helao/ui/reflex/_app/requirements.txt
 
 # Lock serializing concurrent frontend builds, which share this one `.web`
 # tree. Must stay ignored: `git status --porcelain` feeds the bundle staleness
 # stamp, so a tracked lockfile would make every build invalidate its own stamp.
-helao/core/servers/reflex/_app/.reflex-build.lock
-helao/core/servers/reflex/_app/.reflex-build.lock.owner
+helao/ui/reflex/_app/.reflex-build.lock
+helao/ui/reflex/_app/.reflex-build.lock.owner
 
 # Probe written and deleted to find out whether this checkout is mounted
 # `noexec`. Ignored for the same reason as the lock: it must never reach a
@@ -81,4 +81,4 @@ helao/core/servers/reflex/_app/.reflex-build.lock.owner
 
 # Reflex's own per-session state pickles, written under the app directory when
 # the backend runs. Runtime state, never source.
-helao/core/servers/reflex/_app/.states/
+helao/ui/reflex/_app/.states/

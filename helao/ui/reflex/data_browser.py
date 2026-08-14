@@ -36,7 +36,7 @@ from helao.ui.shared.data_browser import sources
 from helao.ui.shared.data_browser import state as dbstate
 from helao.ui.bokeh.data_browser import FILTER_COLS, INDEX_TABLE_COLS
 from helao.ui.shared.palette import reflex_header_class, reflex_table_class
-from helao.core.servers.reflex import plots
+from helao.ui.reflex import plots
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

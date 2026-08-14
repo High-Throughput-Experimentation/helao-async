@@ -503,7 +503,7 @@ def _serve_frontend(bundle_dir: str, host: str, port: int):
     from fastapi import FastAPI
     from fastapi.staticfiles import StaticFiles
 
-    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+    from helao.ui.reflex.xy_component import BUFFER_ROUTE_PREFIX
 
     static_app = FastAPI()
     static_app.add_route(

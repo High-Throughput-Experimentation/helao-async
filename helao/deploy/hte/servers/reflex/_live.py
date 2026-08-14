@@ -30,8 +30,8 @@ import reflex as rx
 import scipy.ndimage as ndi
 
 from helao.ui.shared.palette import reflex_header_class, reflex_table_class
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import LiveVisState, assign
+from helao.ui.reflex import plots
+from helao.ui.reflex.state import LiveVisState, assign
 
 #: Table hue, keyed by kind like every other Reflex table. ``server`` rather
 #: than ``action``: this is one action server's latest live values, read on

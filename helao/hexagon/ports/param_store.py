@@ -1,6 +1,6 @@
 """Saved-parameter store port (P7h; Q8 -- fs read+write).
 
-Mirrors ``helao/core/servers/operator/param_store.py``, whose whole substance
+Mirrors ``helao/ui/shared/operator/param_store.py``, whose whole substance
 is one file: ``<root>/STATES/previous_params.json`` (written at ``:125``, read
 at ``:57``, located at ``:38``). It is a **cross-UI, cross-session artifact** --
 a station's operator may save it from Bokeh and load it back in Reflex -- which

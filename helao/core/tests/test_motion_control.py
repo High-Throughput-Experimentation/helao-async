@@ -373,7 +373,7 @@ def test_only_the_accessor_subscripts_the_scale_keys():
     must hold is that *here* -- where a mistake reaches a confirmation dialog
     and makes it stop appearing -- there is one accessor and no other reader.
     """
-    path = os.path.join(REPO_ROOT, "helao", "core", "servers", "motion_control.py")
+    path = os.path.join(REPO_ROOT, "helao", "ui", "shared", "motion_control.py")
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
 
@@ -919,7 +919,7 @@ def test_the_shared_layer_imports_neither_ui_stack():
     -- consume one module. An import of either would make the module a member
     of one stack and force the other to fork the rules.
     """
-    path = os.path.join(REPO_ROOT, "helao", "core", "servers", "motion_control.py")
+    path = os.path.join(REPO_ROOT, "helao", "ui", "shared", "motion_control.py")
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
 

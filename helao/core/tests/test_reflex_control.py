@@ -16,8 +16,8 @@ import json
 import pytest
 
 from helao.ui.shared import io_control
-from helao.core.servers.reflex import control as control_mod
-from helao.core.servers.reflex.control import ControlState, control_targets
+from helao.ui.reflex import control as control_mod
+from helao.ui.reflex.control import ControlState, control_targets
 
 WORLD = {
     "servers": {
@@ -285,7 +285,7 @@ def test_load_is_guarded_against_firing_twice(page):
 
 
 def test_the_control_page_route_is_registered():
-    from helao.core.servers.reflex.app import SHELL_ROUTES
+    from helao.ui.reflex.app import SHELL_ROUTES
 
     assert "/control" in SHELL_ROUTES
     print("test_the_control_page_route_is_registered PASS")

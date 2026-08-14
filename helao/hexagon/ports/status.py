@@ -18,7 +18,7 @@ distinguishes payloads the first two do not:
    model there (``OrchAPI`` is a sibling of ``BaseAPI``, not a subclass).
    Faces 1 and 2 therefore share one seam, :class:`StatusStreamPort`.
 3. ``reflex_ingest_normalizer`` -- the Reflex stack's
-   ``helao/core/servers/reflex/ingest.py`` normalizers, selected **by
+   ``helao/ui/reflex/ingest.py`` normalizers, selected **by
    ``ws_path``, not uniformly across channels**: ``ws_live`` relays a
    ``{datalab: (value, epoch)}`` dict while ``ws_data`` carries a pickled
    ``DataPackageModel`` whose samples sit at ``.datamodel.data[key][column]``.
