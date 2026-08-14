@@ -221,11 +221,17 @@ All Linux, no hardware:
   a station-local script would not appear. Mitigation: the disposition list is checked against
   all four repos, and `ActionSession` raises `AttributeError` with a message naming B1 rather
   than silently returning `None`.
-- **`setup_and_contain_action`'s implicit context is load-bearing in ways the signature hides.**
-  It resolves `action_codehash`/`action_codepath`/`action_funcname` by walking the calling
-  frame (`base.py:385-394`). An explicit context must reproduce those three fields or every
-  action record changes — a wire-visible diff that GM parity would catch, but only if the
-  goldens include them.
+- **`action_codehash`/`action_codepath`/`action_funcname` are invisible to every existing
+  gate.** They are derived from the endpoint function's `__code__` (`base.py:385-394`) and
+  written into every action record — and `harness/yaml_pass.py:45` lists
+  `("_codehash", "_codepath", "_funcname")` in `DROP_KEY_SUFFIXES`, so the normalizer strips
+  them before any GM diff. **GM parity therefore cannot catch a regression in these three
+  fields**, and neither can the route-surface diff. B1 adds a dedicated test asserting all
+  three against a legacy-hosted capture; without it, the explicit-context port could silently
+  blank or shift them in every action record ever written afterwards.
+  (The mechanism itself is easy — `_get_action` already takes `endpoint_func` as a parameter
+  rather than walking the stack, so the decorator can hand it to `ActionContext` directly.
+  The hazard is purely that nothing would notice if it did not.)
 - **The queuing middleware is a behaviour, not a route.** Nothing in an OpenAPI diff sees it.
   Its test must drive colliding POSTs and assert serialization order.
 - **A missing RPC mirror is silent and slow, not loud.** Without a co-located ZMQ RPC server
