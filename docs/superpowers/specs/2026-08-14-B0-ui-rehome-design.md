@@ -89,9 +89,11 @@ deliberately:
     (`test_exemption_list_holds_exactly_two_entries`) pins the tuple, so both the tuple and
     the assertion move together. New values: `helao/ui/shared/palette.py` and
     `helao/ui/bokeh/theme.py`.
-  - `SWEEP_EXEMPT_SITES` — a frozenset of `(path, lineno)` pairs. **Line numbers are
-    re-derived from the moved files, never translated**, because a rename that shifts a line
-    silently converts an exemption into an un-exempted literal or vice versa.
+  - `SWEEP_EXEMPT_SITES` — a frozenset of `(path, lineno)` pairs. **Measured: both entries
+    name `helao/deploy/hte/servers/visualizer/spec_vis.py`, which does not move, so B0 leaves
+    this frozenset untouched.** Recorded because the general rule still applies to any future
+    move: line numbers are re-derived from the moved file, never translated, since a shift
+    silently converts an exemption into an un-exempted literal or the reverse.
   - `REFLEX_STACK_GLOBS` — four entries, three of which name the old paths. They collapse to
     `helao/ui/reflex/**/*.py` plus the unchanged `helao/deploy/*/servers/reflex/**/*.py`,
     because the renamed `operator.py` and `data_browser.py` now sit inside
