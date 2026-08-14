@@ -209,7 +209,7 @@ def start_host(root: str):
 
 def measure(measurement, page) -> None:
     """Load the aligner document and assert it built and was themed."""
-    from helao.core.servers.palette import PAGE_BG
+    from helao.ui.shared.palette import PAGE_BG
     from helao.core.tests.browser_parity.probe import to_srgb
 
     page.goto(

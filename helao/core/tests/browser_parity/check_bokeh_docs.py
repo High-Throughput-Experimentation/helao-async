@@ -41,7 +41,7 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     BUTTON_DANGER_BG,
     BUTTON_PRIMARY_BG,
     BUTTON_SUCCESS_BG,

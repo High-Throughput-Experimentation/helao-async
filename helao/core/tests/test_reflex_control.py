@@ -292,7 +292,7 @@ def test_the_control_page_route_is_registered():
 
 
 def test_every_state_key_has_a_button_class():
-    from helao.core.servers.palette import reflex_control_button_class
+    from helao.ui.shared.palette import reflex_control_button_class
 
     # The three the rows can carry, and nothing else -- an unmapped key would
     # render a control whose colour says nothing about the line it drives.
@@ -342,7 +342,7 @@ def test_reread_restores_unknown_for_a_server_that_stops_answering(page):
 
 
 def test_the_read_button_colour_is_not_a_line_state_colour():
-    from helao.core.servers.palette import (
+    from helao.ui.shared.palette import (
         REFLEX_CONTROL_READ_CLASS,
         REFLEX_CONTROL_STATE_CLASSES,
     )

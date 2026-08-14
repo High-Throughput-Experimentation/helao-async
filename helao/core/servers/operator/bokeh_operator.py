@@ -45,7 +45,7 @@ from pybase64 import b64decode
 from pydantic import BaseModel
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.bokeh_theme import (
+from helao.ui.bokeh.theme import (
     SECTION_MARGIN,
     color_rule,
     estop_button_stylesheet,
@@ -70,7 +70,7 @@ from helao.core.servers.operator.param_forms import (
     resolve_campaign_uuid,
     version_hint_parts,
 )
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     BODY_TEXT,
     ESTOP_BG,
     ESTOP_HOVER_BG,

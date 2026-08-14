@@ -34,11 +34,11 @@ from bokeh.plotting import figure
 
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
-from helao.core.servers.bokeh_theme import (
+from helao.ui.bokeh.theme import (
     marker_style_block,
     semantic_button_stylesheet,
 )
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     BODY_TEXT,
     MARKER_SWATCHES,
     PANEL_BG,

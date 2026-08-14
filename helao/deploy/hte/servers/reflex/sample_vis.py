@@ -13,7 +13,7 @@ __all__ = ["WS_PATH", "STATE_BASE", "build", "panel_id"]
 
 import reflex as rx
 
-from helao.core.servers.palette import reflex_header_class, reflex_table_class
+from helao.ui.shared.palette import reflex_header_class, reflex_table_class
 from helao.core.servers.reflex.state import ActionVisState, assign
 from helao.deploy.hte.servers.reflex._action import latest_action_uuid
 from helao.deploy.hte.servers.reflex._samples import (

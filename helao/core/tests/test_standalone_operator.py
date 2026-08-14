@@ -1658,7 +1658,7 @@ def test_tree_views_are_bordered():
     from bokeh.document import Document
 
     from helao.core.servers.operator.bokeh_operator import BokehOperator
-    from helao.core.servers.palette import PANEL_BORDER
+    from helao.ui.shared.palette import PANEL_BORDER
 
     op = BokehOperator(_FakeVisOp(Document()), _MockBackend())
     for tree in (op.planhistory_tree_div, op.queue_tree_div):
