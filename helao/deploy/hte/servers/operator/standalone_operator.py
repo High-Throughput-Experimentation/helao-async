@@ -1,7 +1,7 @@
 __all__ = ["makeBokehApp"]
 
 from helao.core.servers.operator.bokeh_operator import BokehOperator
-from helao.core.servers.operator.orch_backend import RemoteBackend
+from helao.ui.shared.operator.orch_backend import RemoteBackend
 from helao.core.servers.vis import HelaoVis
 from helao.helpers import helao_logging as logging
 

@@ -53,8 +53,8 @@ from helao.ui.bokeh.theme import (
     semantic_button_stylesheet,
     stretch_section,
 )
-from helao.core.servers.operator import param_store, spec_parser
-from helao.core.servers.operator.object_tree import (
+from helao.ui.shared.operator import param_store, spec_parser
+from helao.ui.shared.operator.object_tree import (
     doc_to_html,
     open_keys_for,
     object_to_html,
@@ -63,7 +63,7 @@ from helao.core.servers.operator.object_tree import (
     tree_header_text,
     truncate_uuid,
 )
-from helao.core.servers.operator.param_forms import (
+from helao.ui.shared.operator.param_forms import (
     BUILTIN_TYPES,
     build_lib,
     parse_arg_docs,
@@ -1246,7 +1246,7 @@ class BokehOperator:
         """Inspect ``lib`` and return ``(items, select_list)`` for the dropdowns.
 
         Thin wrapper: the logic lives in
-        :func:`~helao.core.servers.operator.param_forms.build_lib`, shared with
+        :func:`~helao.ui.shared.operator.param_forms.build_lib`, shared with
         the Reflex operator.
         """
         return build_lib(

@@ -134,7 +134,7 @@ def test_endpoint_helpers_shapes():
 
 def test_remote_backend_dispatch_and_serialize():
     from helao.core.error import ErrorCodes
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 
@@ -564,7 +564,7 @@ def test_prepend_sequences_helper():
 
 def test_remote_backend_prepend():
     from helao.core.error import ErrorCodes
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 
@@ -967,7 +967,7 @@ def test_orch_stop_reset_run_id():
 
 def test_remote_backend_move_remove():
     from helao.core.error import ErrorCodes
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 
@@ -1000,7 +1000,7 @@ def test_remote_backend_move_remove():
 
 def test_remote_backend_stop_reset_run_id():
     from helao.core.error import ErrorCodes
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 
@@ -1254,7 +1254,7 @@ def test_tree_header_text():
 
 def test_remote_backend_get_queue_object():
     from helao.core.error import ErrorCodes
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 

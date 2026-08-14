@@ -26,7 +26,7 @@ which is precisely where both wrapper modules live.
 
 from typing import Optional
 
-from helao.core.servers import io_control, motion_control
+from helao.ui.shared import io_control, motion_control
 from helao.hexagon.ports.control_surface import ControlSurfacePort
 
 __all__ = ["ControlSurface"]

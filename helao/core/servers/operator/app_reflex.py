@@ -85,7 +85,7 @@ from typing import Optional
 
 import reflex as rx
 
-from helao.core.servers.operator.object_tree import (
+from helao.ui.shared.operator.object_tree import (
     doc_to_html,
     object_to_html,
     open_keys_for,
@@ -653,14 +653,14 @@ def config_root() -> str:
 
 def _last_meta() -> dict:
     """The label/campaign block last saved by either operator."""
-    from helao.core.servers.operator import param_store
+    from helao.ui.shared.operator import param_store
 
     return param_store.read_last_meta(config_root())
 
 
 def saved_values(root: str, kind: str, name: str) -> dict:
     """Parameters last saved for one library item, as form strings."""
-    from helao.core.servers.operator import param_store
+    from helao.ui.shared.operator import param_store
 
     key = store_kind(kind)
     if not key:
@@ -670,7 +670,7 @@ def saved_values(root: str, kind: str, name: str) -> dict:
 
 def save_values(root: str, kind: str, name: str, params: dict, meta=None) -> bool:
     """Remember the parameters used for one library item."""
-    from helao.core.servers.operator import param_store
+    from helao.ui.shared.operator import param_store
 
     key = store_kind(kind)
     if not key:
@@ -721,7 +721,7 @@ def parser_kwargs(server_cfg: dict) -> dict:
 
 def _build_spec(parser, path, backend, params, kwargs):
     """Parse one spec file. Split out so the state handler stays assignment."""
-    from helao.core.servers.operator import spec_parser
+    from helao.ui.shared.operator import spec_parser
 
     return spec_parser.build_spec_sequence(parser, path, backend, params, kwargs)
 
@@ -826,7 +826,7 @@ def make_backend(world_cfg: dict, server_key: str, orch_key: Optional[str] = Non
     experiment and sequence libraries, and this module is imported by the app
     builder well before a page is served.
     """
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     return RemoteBackend(
         _VisShim(world_cfg, server_key),
@@ -1275,7 +1275,7 @@ def fields_for_item(item: dict, options_map: Optional[dict] = None) -> list:
         ``help``, ``options``, and ``argtype`` (kept for coercion, and the
         reason these are dicts rather than the flattened rows the UI binds).
     """
-    from helao.core.servers.operator.param_forms import parse_arg_docs
+    from helao.ui.shared.operator.param_forms import parse_arg_docs
 
     options_map = options_map or {}
     args = list(item.get("args") or [])
@@ -1352,7 +1352,7 @@ def coerce_params(fields: list, values: dict) -> tuple:
         a sequence with a default the operator did not choose is worse than
         not running it, and the caller refuses to enqueue while errors exist.
     """
-    from helao.core.servers.operator.param_forms import BUILTIN_TYPES
+    from helao.ui.shared.operator.param_forms import BUILTIN_TYPES
     from helao.helpers.to_json import parse_bokeh_input
 
     params = {}
@@ -1374,7 +1374,7 @@ def coerce_params(fields: list, values: dict) -> tuple:
 
 def version_text(item: dict) -> str:
     """Version and codehash of a library item, as one line of plain text."""
-    from helao.core.servers.operator.param_forms import version_hint_parts
+    from helao.ui.shared.operator.param_forms import version_hint_parts
 
     return " · ".join(version_hint_parts(item))
 
@@ -1399,7 +1399,7 @@ def library_items(backend, kind: str, world_cfg: dict) -> tuple:
         kind is unknown -- the page renders an empty selector rather than
         failing, since a backend can be absent for a whole poll cycle.
     """
-    from helao.core.servers.operator.param_forms import LibItem, build_lib
+    from helao.ui.shared.operator.param_forms import LibItem, build_lib
 
     spec = LIBRARY_KINDS.get(kind)
     if backend is None or spec is None:
@@ -1448,7 +1448,7 @@ def _stamp_campaign(sequence, campaign: str, campaign_uuid: str) -> None:
     campaign name into a deterministic UUID so two runs of one campaign group
     together, and a malformed entry is hashed rather than raising.
     """
-    from helao.core.servers.operator.param_forms import resolve_campaign_uuid
+    from helao.ui.shared.operator.param_forms import resolve_campaign_uuid
 
     if not campaign:
         return
@@ -3607,7 +3607,7 @@ class OperatorSpecState(rx.State):
         return (world_cfg.get("servers") or {}).get(server_key) or {}
 
     def _parser(self):
-        from helao.core.servers.operator import spec_parser
+        from helao.ui.shared.operator import spec_parser
 
         return spec_parser.load_parser(spec_parser_path(self._server_cfg()))
 
@@ -3624,7 +3624,7 @@ class OperatorSpecState(rx.State):
 
     def _refresh(self, parser) -> None:
         """Re-read the spec folder."""
-        from helao.core.servers.operator import spec_parser
+        from helao.ui.shared.operator import spec_parser
 
         folder = spec_folder_path(self._server_cfg())
         paths = spec_parser.spec_files(parser, folder)
@@ -3641,7 +3641,7 @@ class OperatorSpecState(rx.State):
 
     def _select(self, parser, name: str) -> None:
         """Rebuild the parameter form for one spec file."""
-        from helao.core.servers.operator import spec_parser
+        from helao.ui.shared.operator import spec_parser
 
         path = self._paths.get(name, "")
         if not path:

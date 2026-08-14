@@ -13,7 +13,7 @@ key, but they share no rendering: a digital output is a boolean with a single
 button, an axis is a float with four widgets and a confirmation. Sharing a base
 would put the 15 digital-output tests at risk on every motion change, and those
 tests are the backward-compatibility gate. What the two *do* share is their
-backend -- :mod:`helao.core.servers.motion_control`, which is also what the
+backend -- :mod:`helao.ui.shared.motion_control`, which is also what the
 Reflex half renders from. Behaviour belongs there, not here.
 """
 
@@ -32,7 +32,7 @@ from helao.ui.bokeh.theme import (
     semantic_button_stylesheet,
     stretch_section,
 )
-from helao.core.servers.motion_control import (
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FOLLOWUP_INTERVAL_S,
     REFUSED_STATUS,
@@ -83,8 +83,8 @@ def _now() -> float:
     """Return a monotonic timestamp, for arm expiry and follow-up elapsion.
 
     Wrapped in a function of its own so both can be exercised without sleeping
-    through :data:`~helao.core.servers.motion_control.ARM_TIMEOUT_S` or
-    :data:`~helao.core.servers.motion_control.FOLLOWUP_CEILING_S`.
+    through :data:`~helao.ui.shared.motion_control.ARM_TIMEOUT_S` or
+    :data:`~helao.ui.shared.motion_control.FOLLOWUP_CEILING_S`.
     """
     return time.monotonic()
 
@@ -98,7 +98,7 @@ class MotionPanel:
 
     Attributes:
         AXIS_SOURCE: The config schema this server's axes are declared in, one
-            of :data:`~helao.core.servers.motion_control.AXIS_SOURCES`.
+            of :data:`~helao.ui.shared.motion_control.AXIS_SOURCES`.
         TITLE: Heading shown above the controls.
     """
 
@@ -235,7 +235,7 @@ class MotionPanel:
         """Build one axis's widgets and wire their callbacks.
 
         Args:
-            item: The :class:`~helao.core.servers.motion_control.AxisItem` to
+            item: The :class:`~helao.ui.shared.motion_control.AxisItem` to
                 render.
 
         Returns:
@@ -517,13 +517,13 @@ class MotionPanel:
         from a loop inside a callback: a ``while`` here would hold the document
         for the whole of the move, and a page whose document is held renders
         blank, which is the same reason
-        :data:`~helao.core.servers.motion_control.CALL_TIMEOUT` is as short as
+        :data:`~helao.ui.shared.motion_control.CALL_TIMEOUT` is as short as
         it is.
 
         **A second command extends the running poller, it never starts a
         second.** Otherwise N moves on one open panel means N concurrent
         pollers, all reading the same server every
-        :data:`~helao.core.servers.motion_control.FOLLOWUP_INTERVAL_S` and each
+        :data:`~helao.ui.shared.motion_control.FOLLOWUP_INTERVAL_S` and each
         holding its own copy of the ceiling. Resetting the start time is the
         right extension: the newest command is the one whose arrival the panel
         is now waiting on, so it gets a full grace window and a full ceiling.
@@ -561,7 +561,7 @@ class MotionPanel:
         """Re-read once, and decide whether to keep following up.
 
         The decision is
-        :func:`~helao.core.servers.motion_control.should_follow_up`'s, not this
+        :func:`~helao.ui.shared.motion_control.should_follow_up`'s, not this
         module's: the cadence, the grace window and the ceiling are shared with
         the Reflex panel precisely so that a station cannot behave differently
         depending on which UI an engineer happened to open.

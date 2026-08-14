@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from helao.core.servers.data_browser import app_reflex as dbx
+from helao.ui.shared.data_browser import app_reflex as dbx
 
 
 def _write_hlo(path):
@@ -45,7 +45,7 @@ def run_tree(tmp_path):
 
 
 def test_source_options_follow_the_selected_group():
-    from helao.core.servers.data_browser import sources
+    from helao.ui.shared.data_browser import sources
 
     assert dbx.options_for_group("RUNS") == sources.GROUPS["RUNS"]
     assert dbx.options_for_group("DERIVED") == sources.GROUPS["DERIVED"]
@@ -211,7 +211,7 @@ def test_chart_series_with_no_axes_chosen_is_empty(run_tree):
 
 
 def test_summary_rows_match_the_shared_summary_columns(run_tree):
-    from helao.core.servers.data_browser import state as dbstate
+    from helao.ui.shared.data_browser import state as dbstate
 
     selected, _ = _one_dataset(run_tree)
     rows = dbx.summary_rows(selected, "t_s", "Ewe_V")

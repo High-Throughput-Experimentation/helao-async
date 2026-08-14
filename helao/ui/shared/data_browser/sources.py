@@ -13,7 +13,7 @@ import pandas as pd
 import yaml
 
 from helao.core.models.run_dir import RunDir
-from helao.core.servers.data_browser.readers import make_zip_locator
+from helao.ui.shared.data_browser.readers import make_zip_locator
 
 INDEX_COLUMNS = [
     "source",

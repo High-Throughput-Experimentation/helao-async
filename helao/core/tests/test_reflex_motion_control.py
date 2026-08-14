@@ -1,7 +1,7 @@
 """The Reflex motion controls on ``/control``: discovery, arming, and unknown.
 
 The page is the thin half of this feature by design -- every behavioural rule
-lives in :mod:`helao.core.servers.motion_control`, which
+lives in :mod:`helao.ui.shared.motion_control`, which
 ``test_motion_control.py`` gates -- so what is asserted here is that the page
 *routes through* those rules rather than reimplementing them, and that its two
 row storages stay independent.
@@ -35,7 +35,7 @@ import pytest
 
 from helao.core.error import ErrorCodes
 from helao.ui.shared import palette
-from helao.core.servers.motion_control import (
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
     FOLLOWUP_CEILING_S,

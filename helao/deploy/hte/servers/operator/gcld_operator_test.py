@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from gcld_operator import gen_ts, num_uploads, seq_constructor, wait_for_orch
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.operator.helao_operator import HelaoOperator
+from helao.ui.shared.operator.helao_operator import HelaoOperator
 from helao.helpers.config_loader import read_config
 from helao.helpers.server_keys import SYNC_SERVER_KEY, resolve_sync_server_key
 

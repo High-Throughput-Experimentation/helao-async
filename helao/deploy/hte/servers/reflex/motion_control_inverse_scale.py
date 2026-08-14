@@ -18,7 +18,7 @@ declare, and both are plain positive floats -- so an inversion dropped or
 wrongly added yields a perfectly ordinary-looking number that is wrong by the
 square of the scale, on a control that drives real hardware. Naming the module
 for the reciprocal means nobody opens this file without meeting that fact.
-:func:`~helao.core.servers.motion_control.mm_per_count` is the one place the
+:func:`~helao.ui.shared.motion_control.mm_per_count` is the one place the
 inversion is performed; do not read ``pos_scale`` anywhere else.
 
 The keying is *not* what discriminates here -- ``axes`` is name-keyed, which it
@@ -32,7 +32,7 @@ the config can.
 
 All this module contributes is *which* schema the axes are declared in. The
 rendering and the endpoint calls are in ``helao.core.servers.reflex.control``
-and ``helao.core.servers.motion_control``, shared with the Bokeh half.
+and ``helao.ui.shared.motion_control``, shared with the Bokeh half.
 """
 
 __all__ = ["DO_GROUPS", "AXIS_SOURCE", "TITLE"]

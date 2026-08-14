@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from helao.core.servers.data_browser.readers import read_dataset
+from helao.ui.shared.data_browser.readers import read_dataset
 
 SUMMARY_COLS = [
     "source",

@@ -12,7 +12,7 @@ import os
 import pytest
 from pydantic import BaseModel
 
-from helao.core.servers.operator import app_reflex as opx
+from helao.ui.shared.operator import app_reflex as opx
 
 
 class FakeBackend:
@@ -267,7 +267,7 @@ def test_queue_columns_are_keys_the_backend_actually_returns():
     column name does not raise -- it silently produces a blank column that
     looks like missing data from the orchestrator.
     """
-    from helao.core.servers.operator import orch_backend as ob
+    from helao.ui.shared.operator import orch_backend as ob
 
     assert set(opx.SEQ_COLS) <= set(ob._SEQ_KEYS)
     assert set(opx.EXP_COLS) <= set(ob._EXP_KEYS)
@@ -674,7 +674,7 @@ def test_fields_for_item_select_default_falls_back_to_the_first_option():
 def test_fields_for_item_drops_the_framework_injected_argument():
     """Experiment functions take an Experiment the operator must not prompt
     for. build_lib filters it; this asserts the pair works end to end."""
-    from helao.core.servers.operator import param_forms as pf
+    from helao.ui.shared.operator import param_forms as pf
 
     class Marker:
         pass
@@ -843,7 +843,7 @@ class LibBackend(FakeBackend):
 
 
 def _fresh_libs():
-    from helao.core.servers.operator import param_forms as pf
+    from helao.ui.shared.operator import param_forms as pf
 
     pf.clear_lib_cache()
 
@@ -1484,7 +1484,7 @@ def test_the_page_ticks_from_a_component_not_a_server_loop():
 def test_store_kind_maps_the_library_kind_to_the_file_key():
     """The store's keys are the Bokeh operator's 'seq'/'exp', and the file is
     shared between the two UIs, so the mapping cannot drift."""
-    from helao.core.servers.operator import param_store as ps
+    from helao.ui.shared.operator import param_store as ps
 
     assert opx.store_kind("sequence") == "seq"
     assert opx.store_kind("experiment") == "exp"
@@ -1512,7 +1512,7 @@ def test_config_root_without_configuration_is_empty():
 def test_saved_values_round_trip_through_the_shared_store(tmp_path):
     """What the Reflex form saves is what the Bokeh operator would read, and
     comes back as strings the form's inputs can hold."""
-    from helao.core.servers.operator import param_store as ps
+    from helao.ui.shared.operator import param_store as ps
 
     root = str(tmp_path)
     ps.write_params(root, "seq", "seq_a", {"alpha": 4})
@@ -1563,7 +1563,7 @@ def test_parser_kwargs_ignores_a_non_mapping_value():
 
 def test_spec_fields_coerce_through_the_same_path_as_library_params():
     """spec_fields returns the same field shape, so one coercion serves both."""
-    from helao.core.servers.operator import spec_parser as sp
+    from helao.ui.shared.operator import spec_parser as sp
 
     class Parser:
         PARAM_TYPES = {"plate_id": int}
@@ -1580,7 +1580,7 @@ def test_spec_fields_coerce_through_the_same_path_as_library_params():
 def test_a_spec_parameter_left_empty_is_reported():
     """Spec parameters are required and start empty, so an untouched one must
     fail loudly rather than reaching the parser as an empty string."""
-    from helao.core.servers.operator import spec_parser as sp
+    from helao.ui.shared.operator import spec_parser as sp
 
     class Parser:
         PARAM_TYPES = {"plate_id": int}
@@ -1822,7 +1822,7 @@ def test_the_backend_omits_limit_rather_than_sending_none():
     """These go out as query parameters, where a ``None`` arrives as the string
     ``"None"`` and fails the endpoint's int coercion. Omitting it lets the
     endpoint's own default mean 'the whole queue'."""
-    from helao.core.servers.operator.orch_backend import _page
+    from helao.ui.shared.operator.orch_backend import _page
 
     assert _page(None, 0) == {"offset": 0}
     assert _page(50, 100) == {"offset": 100, "limit": 50}

@@ -28,7 +28,7 @@ __all__ = [
 import html as _html
 import re
 
-from helao.core.servers.operator.param_forms import parse_arg_docs
+from helao.ui.shared.operator.param_forms import parse_arg_docs
 
 #: Section headers that end an ``Args:`` block in a Google-style docstring.
 _ARGS_HEADER = re.compile(r"^\s*(Args|Arguments|Parameters)\s*:\s*$", re.I)

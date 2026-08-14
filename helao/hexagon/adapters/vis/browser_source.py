@@ -31,7 +31,7 @@ Under ``adapters/vis/`` because ``adapters/native/`` may not import
 
 from typing import Optional
 
-from helao.core.servers.data_browser import readers, sources
+from helao.ui.shared.data_browser import readers, sources
 
 __all__ = ["BrowserSource"]
 

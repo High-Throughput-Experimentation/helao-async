@@ -46,7 +46,7 @@ import numpy as np
 from helao.core.error import ErrorCodes
 from helao.core.models.file import FileConnParams
 from helao.core.servers.base_api import BaseAPI
-from helao.core.servers.motion_control import Units
+from helao.ui.shared.motion_control import Units
 from helao.helpers import helao_logging as logging
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.make_str_enum import make_str_enum

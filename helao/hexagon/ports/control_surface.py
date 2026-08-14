@@ -37,7 +37,7 @@ Ports may import only ``helao.hexagon.domain.*``/``helao.hexagon.ports.*``/
 command methods return a bare ``tuple`` -- ``(error_code, payload)`` at every
 call site, so unpacking is part of the contract while the code's *type* stays
 the legacy layer's business. It equally excludes
-``helao.core.servers.motion_control``, so ``units`` and ``mode`` are ``object``
+``helao.ui.shared.motion_control``, so ``units`` and ``mode`` are ``object``
 rather than that module's enums, and ``units`` carries **no default**: a
 defaulted unit would have to be a bare string invented here, and ``"counts"``
 mistaken for ``"mm"`` executes a 10 000-*count* move as 10 000 *millimetres*.
