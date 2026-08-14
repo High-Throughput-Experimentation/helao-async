@@ -784,9 +784,18 @@ a host that under-builds the surface fails in the normal suite. Nothing stubbed:
 and `_actives` are real registries, empty until Tasks 5/6, and every route reading them is
 correct at both stages.
 
-**Task 3b — not started.** Action entry: the route class that builds an `ActionContext` and
-hands it to the handler, the session factory (`begin_session`), the queuing middleware, and
-the executor registry. This is what the parked draft was missing.
+**Task 3b — core done (commit `df3bb19d`), remainder open.**
+`helao/hexagon/app/action_route.py`: strips `ctx` from the FastAPI-visible signature,
+synthesizes `action`/`action_version` when absent, injects an `ActionContext` at call time,
+and binds to its host via a per-host subclass (a module global would have several hosts in
+one process building contexts against the wrong server). `ActionHost.action()` registers
+routes; `begin_session` raises `NotImplementedError` until Task 5 rather than returning None,
+so a ported module cannot import, register and serve only to fail on first dispatch.
+8 tests.
+
+**Still open in 3b:** the queuing middleware and estop exception handler (originally Task 4)
+and the executor registry (Task 6) — both need to land before an action route can actually
+serve traffic.
 
 **Original Task 3 note, kept for the record —** A draft `ActionHost` is at
 `$CLAUDE_JOB_DIR/tmp/b1_wip/action_host.py.draft`. It is **not** on the branch, because it
