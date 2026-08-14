@@ -30,9 +30,15 @@ structurally and the collaborators keep working against either.
 from typing import Optional, Protocol, runtime_checkable
 from uuid import UUID
 
-from helao.core.models.data import DataModel, DataPackageModel
-from helao.core.models.file import FileConnParams, HloFileGroup
-from helao.helpers.premodels import Action
+# Domain re-exports, not the core.models originals: the ports layer may import
+# only domain and stdlib (test_boundaries.test_ports_import_only_domain_and_stdlib).
+from helao.hexagon.domain.models import (
+    Action,
+    DataModel,
+    DataPackageModel,
+    FileConnParams,
+    HloFileGroup,
+)
 
 __all__ = ["ActionSessionPort"]
 
