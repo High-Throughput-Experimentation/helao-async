@@ -1,0 +1,137 @@
+{
+ "routes": [
+  {
+   "method": "post",
+   "path": "/SIM/acquire_data",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/SIM/cancel_acquire_data",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/SIM/estop",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/_raise_async_exception",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/_raise_exception",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/attach_client",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/detach_client",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/endpoints",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/get_config",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/get_lbuf",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/get_status",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/hotreload_busy",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/list_executors",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/loaded_modules",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/resend_active",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/shutdown",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/stop_executor",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/test_alert",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "path": "/test_receive",
+   "tags": [
+    "private"
+   ]
+  }
+ ]
+}
