@@ -46,6 +46,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Action
 from helao.helpers.to_json import hlo_json_dumps
+from helao.hexagon.ports.action_session import ActionSessionPort
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -57,7 +58,16 @@ class NativeDataStreamer:
 
     Holds only the ``active`` back-reference (never cached queue/counter/uuid
     state), per the call-time state resolution rule -- see module docstring.
+
+    The back-reference is declared at class level rather than annotated on the
+    ``__init__`` parameter: ``__init__`` is byte-pinned against its legacy twin
+    by ``assert_source_parity`` (see ``native_fixtures``), and an annotation in
+    the signature would change ``inspect.getsource(__init__)`` and break the
+    pin. A class-level annotation gives static checking without touching the
+    pinned method source.
     """
+
+    active: ActionSessionPort
 
     def __init__(self, active):
         self.active = active
