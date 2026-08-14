@@ -1007,3 +1007,47 @@ Not yet done for this module: removing `deployment: hexagon` from the configs th
 and a launched-server run. Nothing on this branch has yet served a request under uvicorn — the
 tests drive the host through ASGI transport, which exercises routing, middleware and context
 injection but not the RPC mirror, the WebSocket channels, or artifact writes to disk.
+
+### GM legacy baselines captured (2026-08-14)
+
+All five captured from `795c977a` — the last commit where `ws_simulator` still builds a
+`BaseAPI`, and therefore the last point at which a legacy baseline for the `test` deployment
+can be produced at all.
+
+| set | files | size | location |
+|---|---|---|---|
+| GM-1 | 30 | 304K | `/home/dan/helao_goldens/GM-1/legacy` |
+| GM-2 | 16 | 216K | `/home/dan/helao_goldens/GM-2/legacy` |
+| GM-3 | 6 | 68K | `/home/dan/helao_goldens/GM-3/legacy` |
+| GM-4 | 78 | 692K | `/home/dan/helao_goldens/GM-4/legacy` |
+| GM-5 | 31 | 340K | `/home/dan/helao_goldens/GM-5/legacy` |
+
+Each carries a `provenance.yml` recording `legacy_git_sha: 795c977acea1…`, the launch command,
+the masked WsSim columns (`epoch_s`, `series_0..5` — the simulator's random values), the
+`*WsSim*.hlo` row-count tolerance of 3, and the scenario's sequence params. Content includes
+the S3 payloads the recording sink captured, the raw `.hlo`/`.csv` bodies, and the
+action/process/experiment records — these are real runs, not empty trees.
+
+**These live outside the repo** (`/home/dan/helao_goldens/`), consistent with the master spec's
+Q2 note that goldens are repo-adjacent rather than tracked. They are not backed up; re-creating
+them requires checking out `795c977a` again, which stays possible as long as that commit is
+reachable — one more reason not to rebase this branch.
+
+Task 8 compares against these with:
+
+```bash
+python -m harness.parity --golden /home/dan/helao_goldens/GM-1/legacy \
+                         --candidate /home/dan/helao_goldens/GM-1/b1
+```
+
+**Two operational notes from the capture run**, both likely to recur:
+
+- The capture rig **refuses a root containing prior run artifacts**, so every scenario needs
+  `rm -rf` on the root and its own launch. One scenario per launch is a rig constraint, not a
+  preference.
+- `kill -INT` on the launcher left **ORCH still holding port 8001** after the harness timed out
+  a foreground loop mid-scenario. The launcher exited while a child survived, which is what
+  `PDEATHSIG` is supposed to prevent — plausibly because the launcher was killed by the harness
+  rather than exiting through its own teardown path. Recovery was `ss -lptn 'sport = :8001'` to
+  find the orphan and `kill -TERM` it. Worth knowing before blaming a port-in-use on a stale
+  pid file.
