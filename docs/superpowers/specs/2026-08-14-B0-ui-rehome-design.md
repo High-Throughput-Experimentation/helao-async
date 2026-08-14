@@ -36,6 +36,7 @@ helao/ui/shared/
     palette.py
     io_control.py
     motion_control.py
+    discovery.py
     operator/{orch_backend,param_forms,param_store,spec_parser,object_tree,helao_operator}.py
     data_browser/{readers,sources,state}.py
 
@@ -49,7 +50,7 @@ helao/ui/bokeh/
     data_browser.py          <- data_browser/app.py
 
 helao/ui/reflex/
-    app.py control.py discovery.py ingest.py plots.py ringbuffer.py
+    app.py control.py ingest.py plots.py ringbuffer.py
     state.py xy_component.py
     _app/
     operator.py              <- operator/app_reflex.py
