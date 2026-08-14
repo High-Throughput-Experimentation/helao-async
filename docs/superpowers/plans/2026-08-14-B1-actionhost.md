@@ -818,3 +818,45 @@ ordering, and the estop route are all written against the measured legacy behavi
 *route surface* is separable from the host's *state* (`actionservermodel`, the client
 registry, the executor registry, the live buffer). The surface half can land and be gated on
 the captured JSON with no session at all; the state half belongs with Tasks 4–6.
+
+---
+
+## Task 5 — blocked on a decision (2026-08-14)
+
+Step 1 (re-derive the member list) ran and **confirmed the deployment-facing 18 exactly**,
+across all four repos, with the same three artifacts excluded. Implementation did **not**
+start, because Step 1 also surfaced something that invalidates the task's premise.
+
+**The three already-native write collaborators read 26 members off their session
+back-reference, 19 of which are not in the 18.** Measured from
+`adapters/native/{data_stream,data_file,finalizer}.py`:
+
+```
+_build_data_package  _finish              _get_action_for_file_conn_key  _resolve_output_path
+action_list          active_uuid          add_new_listen_uuid           add_status
+assemble_data_msg    data_logger          file_conn_dict                finish_lock
+finish_manual_action init_datafile        listen_uuids                  log_data_set_output_file
+num_data_queued      num_data_written     write_live_data
+```
+
+Union with the deployment-facing 18 (overlapping on `action`, `base`, `enqueue_data`,
+`finish`, `get_realtime`, `get_realtime_nowait`, `split`) is **37 members**.
+
+A session built to 18 would import, register, serve, and fail at the first `enqueue_data`
+with a bare `AttributeError` raised from inside a collaborator, at the moment an action is
+writing data. The spec said these were "internal to the write path — already native, called
+by the collaborators rather than by deployment code", which was right about the category and
+wrong about the consequence.
+
+**The decision Task 5 needs, before any code:**
+
+1. **Implement all 37.** No collaborator changes, smallest diff, honest about the coupling —
+   but B1 then reproduces `Active` rather than replacing it, and D-B1.3's "much smaller than
+   `Active`" premise is simply dropped.
+2. **Narrow the collaborators onto an `ActionSessionPort` Protocol** carrying the 26
+   collaborator-facing members, bodies unchanged. Makes the coupling explicit and checkable
+   and is what the hexagon boundary rule implies — but it edits three modules that are
+   already parity-tested, so their tests become part of Task 5's gate.
+
+Recommended: **2**, scoped to the Protocol only. Recorded in the spec as the supersession of
+D-B1.3.
