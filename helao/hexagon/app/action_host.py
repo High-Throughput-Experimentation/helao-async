@@ -45,6 +45,7 @@ from websockets.exceptions import ConnectionClosedOK
 from helao.core.drivers.helao_driver import DriverPoller, DriverStatus, HelaoDriver
 from helao.core.models.server import ActionServerModel
 from helao.helpers import helao_logging as logging
+from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
@@ -187,6 +188,10 @@ class ActionHost(HelaoFastAPI):
         self.hotreload_busy_hook: Optional[Callable] = None
 
         self.actionservermodel = ActionServerModel(action_server=self.server)
+        # Resolved output directories. In the frozen member surface and read by
+        # HelaoSyncer.__init__ (sync_driver.py:2203) among others -- its absence
+        # is a startup crash for any driver that writes, not a lazy failure.
+        self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
 
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()

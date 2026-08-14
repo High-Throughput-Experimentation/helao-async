@@ -1169,3 +1169,33 @@ since CLAUDE.md documents PDEATHSIG as something that should make it impossible.
 *Correction to the first report of this probe: `grep -c "action shutdown"` returned 3, but that
 was counting this plan document's own prose alongside the log. The real log has one such line.
 Grep a log path, not a directory that contains the write-up about it.*
+
+### Defect found by the GM candidate run: ActionHost lacked `helaodirs`
+
+All five native captures reported RIG DID NOT COME UP. Cause, from the launch log:
+
+```
+File "helao/core/drivers/data/sync_driver.py", line 2203, in __init__
+  super().__init__(self.config_dict, self.base.helaodirs)
+AttributeError: 'ActionHost' object has no attribute 'helaodirs'
+```
+
+`helaodirs` **is in the frozen `_member_surface.md` list**
+(`base.(helaodirs|world_cfg|server_cfg|actionservermodel|dflt|aloop|put_lbuf|fast_urls)`). I
+ported six of those eight and missed this one and `dflt`. Fixed by resolving it exactly as
+legacy does — `helao_dirs(self.world_cfg, self.server.server_name)` at construction.
+`dflt` is still outstanding.
+
+**The more important lesson is how it stayed hidden.** An earlier launch was reported here as
+"all three servers up in ~28 s, 0 early exits". That was almost certainly an **orphaned SYNC
+from a previous run still holding port 8010** — the readiness probe counted a live port and
+called the group healthy while the new SYNC had already crashed. This is precisely the hazard
+CLAUDE.md documents: stale servers hold the ports and a new group "silently keeps serving the
+*old* processes' code".
+
+**A port check is not a health check.** Re-verified afterwards on a rig proven fresh (SYNC
+started, zero `Application startup failed`), and additionally proved the server under test was
+the native one by reading its own `/loaded_modules` for `hexagon/app/action_host` rather than
+trusting that a launch had replaced what was listening. The route-surface IDENTICAL verdict
+survives that re-check. Future runs should assert identity from `/loaded_modules`, not from a
+port answering.
