@@ -138,7 +138,7 @@ class ActionSession:
             },
         )
         session = cls(host, params)
-        host._actives[action.action_uuid] = session
+        host.actives[action.action_uuid] = session
         return session
 
     # -- real logic (the four members that are not delegation) ---------------

@@ -940,3 +940,38 @@ measuring the layer above it: the collaborators' 26 were invisible from the depl
 18; the constructor's two host members were invisible from the class-level surface tests; and
 the runner's four are invisible from both. Measure the caller before implementing the callee —
 the spec's member lists are a floor, never a ceiling.
+
+---
+
+## 3b remainder — measured, blocked on a subsystem (2026-08-14)
+
+`_make_app_entry_middleware` and `_make_http_exception_handler` were extracted and read.
+The exception handler is four lines and is unblocked. **The queuing middleware is not**: it
+depends on an endpoint-status subsystem the host does not have.
+
+**What the middleware reads that does not exist yet:**
+
+| member | source in legacy | note |
+|---|---|---|
+| `actionservermodel.endpoints[endpoint].active_dict` | `base_endpoints.py` (121 lines) | the per-endpoint busy check — the middleware's entire branch condition |
+| `endpoint_queues[endpoint]` | `base_action_queue.py` (77 lines) | where a colliding action is parked |
+| `local_action_queue` | `base_action_queue.py` | **distinct from `local_action_task_queue`**, which Task 6 added — one queues *actions* awaiting dispatch, the other serializes *executors*. Two similarly-named queues with different jobs; conflating them would deadlock or double-dispatch |
+
+So 3b's remainder is really "port `base_endpoints.py` + `base_action_queue.py`", ~200 lines
+plus the endpoint registration that populates them at startup (`init_endpoint_status`,
+`endpoint_queues_init`, and `get_endpoint_urls`, which `/endpoints` already returns a
+different shape for).
+
+**Done in this pass**, because it was safe and the reading surfaced it:
+
+- `host.actives` renamed from `_actives` — legacy's estop handler iterates `srv.actives`, and
+  a private name would have quietly failed to match when the handler lands.
+- `host.stop_executor` added as legacy's spelling, delegating to `stop_executor_by_id`.
+- `stop_executor_by_id`'s local renamed `executor` → `session`, with a comment: the dict holds
+  the **session**, which is what carries `stop_action_task`. The old name actively misled.
+
+**Sequencing note for whoever picks this up.** The exception handler can land immediately —
+it needs only `actives`, `executors` and `stop_executor`, all of which now exist. The
+middleware should wait for the endpoint subsystem rather than being stubbed against a fake
+busy-check, because "is this endpoint busy" returning a constant is indistinguishable from
+working until two actions collide on a station.

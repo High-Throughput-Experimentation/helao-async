@@ -249,4 +249,4 @@ def test_a_session_can_actually_be_constructed(tmp_path) -> None:
     assert session.data_file_writer is not None
     assert session.action_finalizer is not None
     # and the host is tracking it
-    assert host._actives[session.action.action_uuid] is session
+    assert host.actives[session.action.action_uuid] is session
