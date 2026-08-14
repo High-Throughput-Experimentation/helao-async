@@ -12,8 +12,8 @@ from typing import Optional
 
 import pandas as pd
 
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -34,7 +34,7 @@ class MotionSim:
         pmdf: Platemap dataframe with sample positions and codes.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Load the platemap CSV.
 
         Args:
@@ -124,7 +124,7 @@ def makeApp(server_key):
     Returns:
         Configured :class:`HelaoFastAPI` app.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Motion simulator",
@@ -132,26 +132,28 @@ def makeApp(server_key):
         driver_classes=[MotionSim],
     )
 
-    @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
+    @app.action()
     async def solid_get_samples_xy(
+        ctx: ActionContext,
         plate_id: Optional[int] = None,
         sample_no: Optional[int] = None,
     ):
         """Look up the platemap coordinates for a sample and stamp them on the action."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         platexy = app.driver.solid_get_samples_xy(**active.action.action_params)
         active.action.action_params.update({"_platexy": platexy})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/move", tags=["action"])
+    @app.action()
     async def move(
+        ctx: ActionContext,
         d_mm: list[float] = [0, 0],
         axis: list[str] = ["x", "y"],
         speed: Optional[int] = None,
     ):
         """Simulate axis motion by sleeping for a fixed 3 seconds."""
-        active = await app.base.setup_and_contain_action(action_abbr="move")
+        active = await ctx.begin(action_abbr="move")
         await asyncio.sleep(3)
         finished_action = await active.finish()
         return finished_action.as_dict()

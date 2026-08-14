@@ -10,8 +10,8 @@ __all__ = ["makeApp"]
 
 import pandas as pd
 
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 
 class AnalysisSim:
@@ -32,7 +32,7 @@ class AnalysisSim:
             element fractions.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Load the CSV archive and precompute plate descriptors.
 
         Args:
@@ -116,7 +116,7 @@ def makeApp(server_key):
     Returns:
         Configured :class:`HelaoFastAPI` app.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Analysis simulator",
@@ -124,15 +124,16 @@ def makeApp(server_key):
         driver_classes=[AnalysisSim],
     )
 
-    @app.post(f"/{server_key}/calc_cpfom", tags=["action"])
+    @app.action()
     async def calc_cpfom(
+        ctx: ActionContext,
         plate_id: int = 0,
         sample_no: int = 0,
         ph: int = 0,
         jmacm2: int = 3,
     ):
         """Look up Eta vs O2/H2O for the queried sample and return the action."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         eta = app.driver.calc_cpfom(**active.action.action_params)
         active.action.action_params.update({f"_eta": eta})
         finished_action = await active.finish()

@@ -11,7 +11,8 @@ __all__ = ["makeApp"]
 
 
 from helao.core.error import ErrorCodes
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
 from ...drivers.pstat.cpsim_driver import CPSim, CPSimExec
@@ -33,7 +34,7 @@ def makeApp(server_key):
     Returns:
         Configured :class:`HelaoFastAPI` app.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="OER CP simulator",
@@ -41,8 +42,9 @@ def makeApp(server_key):
         driver_classes=[CPSim],
     )
 
-    @app.post(f"/{server_key}/measure_cp", tags=["action"])
+    @app.action()
     async def measure_cp(
+        ctx: ActionContext,
         comp_vec: list[int] = [],
         acquisition_rate: float = 0.2,
     ):
@@ -52,7 +54,7 @@ def makeApp(server_key):
         non-scalar annotation to the request body, so a query-string comp_vec
         is dropped and the ``[]`` default is used instead.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CPSIM"
         try:
             executor = CPSimExec(
@@ -74,20 +76,20 @@ def makeApp(server_key):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_measure_cp", tags=["action"])
-    async def cancel_measure_cp():
+    @app.action()
+    async def cancel_measure_cp(ctx: ActionContext):
         """Stop any running ``measure_cp`` executor."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         for exec_id, executor in app.base.executors.items():
             if exec_id.split()[0] == "measure_cp":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/get_loaded_plate", tags=["action"])
-    async def get_loaded_plate():
+    @app.action()
+    async def get_loaded_plate(ctx: ActionContext):
         """Return the loaded plate id plus the requesting orchestrator's coords."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         plate_id = app.driver.loaded_plate
         data_dict = {
             "loaded_plate_id": plate_id,
@@ -100,12 +102,13 @@ def makeApp(server_key):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/change_plate", tags=["action"])
+    @app.action()
     async def change_plate(
+        ctx: ActionContext,
         plate_id: int = 0,
     ):
         """Switch the simulator to a different plate."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         app.driver.change_plate(active.action.action_params["plate_id"])
         loaded_plate_id = app.driver.loaded_plate
         active.action.action_params["_loaded_plate_id"] = loaded_plate_id
