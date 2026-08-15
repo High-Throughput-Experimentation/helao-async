@@ -81,41 +81,22 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
 #: The real remaining work. Frozen: porting one means deleting it from here.
 NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
     {
-        # status fan-out to attached clients
-        "attach_client",
-        "detach_client",
-        "detach_subscribers",
+        # The status-broadcaster family. These are NOT a mechanical port:
+        # legacy delegates each to a StatusBroadcaster collaborator the host
+        # does not have, and the hexagon equivalent is the status PORT, whose
+        # signatures differ (send_status / send_nonblocking_status). Porting
+        # them means deciding how the host's fan-out maps onto that port, not
+        # copying a body.
         "send_statuspackage",
         "send_nbstatuspackage",
         "status_clients",
-        # NOTE: the host currently spells the first two
-        # attach_status_client/detach_status_client. Legacy -- and therefore
-        # every caller -- says attach_client/detach_client. Porting these means
-        # renaming, not adding.
-        # clock
-        "ntp_offset",
-        "ntp_last_sync",
-        # action/executor surface deployment code reaches for
-        "get_main_error",
-        "stop_all_executor_prefix",
-        "replace_status",
-        "get_active_info",
-        # background tasks
+        "detach_subscribers",
+        # Long-lived background loops legacy starts from myinit(). The host has
+        # no equivalent lifecycle hook yet, and starting them from the FastAPI
+        # startup event needs the same care the poller shutdown ordering needed.
         "live_buffer_task",
         "log_status_task",
         "regular_status_task",
-        # shutdown: the host has _shutdown; Base's public name is shutdown
-        "shutdown",
-        # hlo postprocessing
-        "hlo_postprocess_libs",
-        "hlo_postprocessors",
-        "import_postprocessors",
-        # orchestrator identity, set from config
-        "orch_key",
-        "orch_host",
-        "orch_port",
-        # misc legacy state
-        "history",
     }
 )
 

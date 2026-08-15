@@ -45,9 +45,13 @@ from websockets.exceptions import ConnectionClosedOK
 from helao.core.drivers.helao_driver import DriverPoller, DriverStatus, HelaoDriver
 from helao.core.models.server import ActionServerModel
 from helao.helpers import helao_logging as logging
+from helao.helpers.processors import HloPostProcessor
+from helao.core.error import ErrorCodes
+from helao.helpers.dequedict import DequeDict
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+from helao.helpers.time_utils import read_saved_offset
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.ws_utils import WsPublisher
@@ -197,6 +201,45 @@ class ActionHost(HelaoFastAPI):
         rt = self.world_cfg.get("run_type")
         self.run_type = rt.lower() if isinstance(rt, str) else None
 
+        # Orchestrator identity, resolved from the config's server groups. The
+        # dispatcher and the status fan-out both read these.
+        servers_cfg = self.world_cfg.get("servers", {}) or {}
+        orch_keys = [
+            k
+            for k, v in servers_cfg.items()
+            if (v or {}).get("group") == "orchestrator"
+        ]
+        if orch_keys:
+            self.orch_key = orch_keys[0]
+            self.orch_host = servers_cfg[self.orch_key].get("host")
+            self.orch_port = servers_cfg[self.orch_key].get("port")
+        else:
+            self.orch_key = None
+            self.orch_host = None
+            self.orch_port = None
+
+        #: Recently contained actions, newest first. Bounded exactly as legacy.
+        self.history = DequeDict(maxlen=200)
+
+        self.hlo_postprocessors: list = []
+        self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
+        self.import_postprocessors(
+            self.hlo_postprocess_libs, self.hlo_postprocessors, HloPostProcessor
+        )
+
+        # Legacy declares these defaults (base.py:210-211) and then overwrites
+        # them from the saved offset file. The read raises when the file does
+        # not exist, which is the normal state of a fresh root, so the defaults
+        # have to survive that.
+        self.ntp_offset: float = 0.0
+        self.ntp_last_sync = None
+        try:
+            self.ntp_last_sync, self.ntp_offset = read_saved_offset(
+                os.path.join(self.helaodirs.log_root, "ntpLastSync.txt")
+            )
+        except FileNotFoundError:
+            LOGGER.info("no saved NTP offset yet; using 0.0 until first sync")
+
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
         self.live_q = MultisubscriberQueue()
@@ -324,6 +367,84 @@ class ActionHost(HelaoFastAPI):
         """Return the latest ``(value, epoch)`` for *live_key*."""
         return self.live_buffer[live_key]
 
+    # -- status and error helpers ----------------------------------------------
+
+    def get_active_info(self, action_uuid):
+        """Return the live action's dict for *action_uuid*, or None."""
+        if action_uuid in self.actives:
+            return self.actives[action_uuid].action.as_dict()
+        LOGGER.error(f"Specified action uuid {str(action_uuid)} was not found.")
+        return None
+
+    def get_main_error(self, errors):
+        """Reduce a list of error codes to the first non-``none``.
+
+        Deployment code (hte's galil_motion among others) calls this on a list
+        of per-axis results, so the list form is the one that matters.
+        """
+        ret_error = ErrorCodes.none
+        if isinstance(errors, list):
+            for error in errors:
+                if error != ErrorCodes.none:
+                    ret_error = error
+                    break
+        else:
+            ret_error = errors
+        return ret_error
+
+    def replace_status(self, status_list, old_status, new_status):
+        """Swap one status for another in place, guarding an absent old value."""
+        from helao.core.servers.base_status import guarded_replace
+
+        return guarded_replace(status_list, old_status, new_status)
+
+    def stop_all_executor_prefix(self, action_name: str, match_vars: dict = {}):
+        """Stop every executor whose id starts with *action_name*.
+
+        ``match_vars`` narrows further by comparing attributes on the executor,
+        which is how a driver stops just the executors bound to one channel.
+        """
+        matching_execs = [k for k in self.executors if k.startswith(action_name)]
+        if match_vars:
+            matching_execs = [
+                ek
+                for ek, ex in self.executors.items()
+                if any(vars(ex).get(vk, "") == vv for vk, vv in match_vars.items())
+                and ek in matching_execs
+            ]
+        for exec_key in matching_execs:
+            self.stop_executor(exec_key)
+
+    def import_postprocessors(self, name_list, class_list, proc_class) -> None:
+        """Load HLO post-processors named by ``hlo_postprocess_libs``.
+
+        A deployment names these by path in its config; the module is loaded by
+        file, so a missing or broken one must not take the server down.
+        """
+        import os as _os
+        from importlib.machinery import SourceFileLoader
+
+        proc_class_type = (
+            proc_class.__name__.split("Post")[0].split("Processor")[0].lower()
+        )
+        for pplib in name_list or []:
+            if not (pplib.endswith(".py") and _os.path.exists(pplib)):
+                LOGGER.warning(f"post-processor path does not exist: {pplib}")
+                continue
+            mod_name = _os.path.basename(pplib).split(".py")[0]
+            LOGGER.info(f"Loading {proc_class_type} post-processor from {pplib}")
+            try:
+                module = SourceFileLoader(mod_name, pplib).load_module()
+                for attr in vars(module).values():
+                    if (
+                        isinstance(attr, type)
+                        and issubclass(attr, proc_class)
+                        and attr is not proc_class
+                    ):
+                        class_list.append(attr())
+            except Exception:
+                LOGGER.error(f"failed to load post-processor {pplib}", exc_info=True)
+
     # -- meta files ------------------------------------------------------------
 
     async def write_act(self, action) -> None:
@@ -390,7 +511,7 @@ class ActionHost(HelaoFastAPI):
 
     # -- state the routes operate on -----------------------------------------
 
-    async def attach_status_client(
+    async def attach_client(
         self,
         client_servkey: str,
         client_host: str,
@@ -402,7 +523,7 @@ class ActionHost(HelaoFastAPI):
             client_servkey, client_host, client_port, retry_limit=retry_limit
         )
 
-    async def detach_status_client(
+    async def detach_client(
         self, client_servkey: str, client_host: str, client_port: int
     ):
         """Remove a remote client from this server's status subscribers."""
@@ -670,18 +791,14 @@ class ActionHost(HelaoFastAPI):
             client_servkey: str, client_host: str, client_port: int
         ):
             """Subscribe a remote client to this server's status updates."""
-            return await self.attach_status_client(
-                client_servkey, client_host, client_port
-            )
+            return await self.attach_client(client_servkey, client_host, client_port)
 
         @self.post("/detach_client", tags=["private"])
         async def detach_client(
             client_servkey: str, client_host: str, client_port: int
         ):
             """Remove a client from this server's status subscribers."""
-            return await self.detach_status_client(
-                client_servkey, client_host, client_port
-            )
+            return await self.detach_client(client_servkey, client_host, client_port)
 
         @self.post("/stop_executor", tags=["private"])
         def stop_executor(executor_id: str):
@@ -714,7 +831,7 @@ class ActionHost(HelaoFastAPI):
         @self.post("/shutdown", tags=["private"])
         async def post_shutdown():
             """Trigger the shutdown handler over HTTP."""
-            await self._shutdown()
+            await self.shutdown()
 
     def _register_utility_routes(self) -> None:
         """Register the five debug endpoints shared with the orchestrator.
@@ -846,9 +963,9 @@ class ActionHost(HelaoFastAPI):
         @self.on_event("shutdown")
         async def shutdown_event():
             """Shut the host down and run the driver's shutdown hooks."""
-            await self._shutdown()
+            await self.shutdown()
 
-    async def _shutdown(self) -> dict:
+    async def shutdown(self) -> dict:
         """Stop the poller, run driver shutdown hooks, close the fault log.
 
         The poller stops **before** the driver disconnects: it loops on
