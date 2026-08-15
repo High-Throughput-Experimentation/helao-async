@@ -1322,3 +1322,78 @@ touch, which is a larger set and was never enumerated. Enumerate it, port it, th
 The same script that produced the list is worth keeping as a test: assert `ActionHost` covers
 every non-underscore `Base` member, with an explicit, justified exclusion list. That converts
 43 future crashes into one red test.
+
+### The ratchet's first two turns: 43 gaps to none
+
+The coverage test landed and immediately paid for itself twice. Its first run reported three
+gaps that do not exist — `server`, `server_cfg`, `server_params` are assigned by
+`HelaoFastAPI.__init__`, so they appear neither in `dir()` (instance attributes) nor in
+`action_host.py` (set by the parent). The extraction now walks the parent class. The
+hand-written script that produced the original list of 43 had hardcoded around exactly that,
+which is why nobody noticed.
+
+Then it refused to pass until `NOT_YET_PORTED` was narrowed, first from 21 to 7 and then to
+empty. That edit is the mechanism: a member cannot be quietly forgotten, because the list is
+what the test reads.
+
+**16 ported mechanically**, including two renames to legacy's spelling
+(`attach_status_client`/`detach_status_client` → `attach_client`/`detach_client`, `_shutdown` →
+`shutdown`), which is what callers actually use. One defect introduced and caught by the suite
+rather than by a launch: `read_saved_offset` raises `FileNotFoundError` on a fresh root, and
+legacy declares `ntp_offset = 0.0` / `ntp_last_sync = None` **before** attempting the read. With
+only the read, every host constructed against a fresh root died.
+
+### The last seven were one thing, not seven
+
+The remaining members are the server's **status spine**, and porting them separately would
+have been wrong:
+
+* `send_statuspackage` / `send_nbstatuspackage` — the two wire pushes. The `regular_task` flag
+  and the filtered-vs-full payload are not interchangeable: the receiving orchestrator branches
+  on the flag, so a filtered payload sent as a regular task tells it every other endpoint went
+  idle.
+* `attach_client` / `detach_client` — **rewritten native over a host-owned `status_clients`
+  set.** They had been delegating to the status port adapter, which keeps its own client list
+  for the graft compositions. A host that registered subscribers there while fanning out over
+  its own set accepts every subscription and broadcasts to nobody, with both halves logging
+  success. One registry, on the host — which is also what the ratchet already recorded when it
+  listed `status_broadcaster` as deliberately absent.
+* `detach_subscribers`, `live_buffer_task`, `log_status_task`, `regular_status_task` — started
+  from the FastAPI startup event, cancelled in `shutdown` after the poller stops and the
+  subscribers drain.
+
+`log_status_task` is the load-bearing one, and it is not a logger. It folds each status message
+into `actionservermodel`, fans it out to subscribers, and **drains the endpoint and unified
+queues on the transition that freed the endpoint**. Without it an orchestrated run dispatches
+its first action and then waits forever while the action itself completes normally — which is
+exactly the shape of the GM-1 and GM-4 captures (one process yml against four; only the ORCH
+`wait` action reaching `RUNS_SYNCED`; one S3 action json against eight).
+
+`live_buffer_task`'s absence was quieter and worth recording: `put_lbuf` still published and
+`/ws_live` still streamed, so every signal read healthy, but `live_buffer` stayed empty —
+`/get_lbuf` returned `{}` and every poller-backed visualizer rendered nothing.
+
+### Fallout found on the way: the graft ran against native hosts
+
+Fifteen failures across five test files, all dating from the commit that dropped
+`deployment: hexagon` from the ported servers. Two causes:
+
+1. **`makeActionApp` grafted the write path onto an `ActionHost`.** A ported module has no
+   `contain_action` to rebind and already writes through the native runtime. The graft's
+   `AttributeError` fires *inside the FastAPI startup event*, where uvicorn reports it only as
+   `SystemExit(3)` — the server never binds and nothing in the output names the cause. Any
+   config with `deployment: hexagon` on a ported action server was affected, so this was a live
+   defect and not test-only noise.
+2. **Two gate tests asserted the shim key that ported servers no longer carry.** The claim
+   inverts rather than disappears: SYNC and SIM must now carry *no* `deployment` key, since
+   re-adding one routes a native host back through the graft. That is what they assert now. The
+   S3 params stay pinned — they are the GM-5 leg's contract, and they are config, not code.
+
+### A capture run lost to a GET
+
+The first re-capture attempt reported "RIG DID NOT COME UP" for all five scenarios against a
+group that was **perfectly healthy** — its own log shows ORCH subscribing to SIM and SYNC
+successfully. The readiness probe used `urlopen(url)`, a GET; every HELAO private route is a
+POST, so `/loaded_modules` answered 405, and the probe's `except Exception` reported that as
+down. Five minutes of waiting, then a healthy rig torn down. A port check is not a health
+check — and neither is a health check aimed at the wrong verb.
