@@ -64,21 +64,38 @@ def _decorator_route(dec: ast.expr, handler_name: str) -> Optional[dict]:
 
     * ``@app.post(f"/{server_key}/acquire_data", tags=["action"])`` -- legacy,
       path spelled out in the decorator.
-    * ``@host.action()`` -- native. The path is **not in the source**: the
-      ActionHost derives it from the handler's own name, and the method and
-      tag are fixed. Extracting only the first form silently yields an empty
+    * ``@host.action()`` -- native. The path is usually **not in the source**:
+      the ActionHost derives it from the handler's own name, and the method and
+      tag default. Extracting only the first form silently yields an empty
       route set for a ported module, which reads as "this server has no
       action routes" rather than as an unsupported decorator.
+
+    ``action()`` forwards ``path`` and ``tags`` to ``self.post`` when given,
+    and both must be honoured here. A handful of legacy routes were declared
+    at a path that does NOT match their handler's name -- ``get_positions``
+    served ``/SAMPLE/get_loaded_positions`` -- so their ports must pass
+    ``path=`` explicitly to keep the route where it was. Deriving the path
+    from the handler name regardless would report those correct ports as a
+    ``missing``/``extra`` pair.
     """
     if not isinstance(dec, ast.Call):
         return None
     func = dec.func
     if isinstance(func, ast.Attribute) and func.attr == "action":
-        return {
-            "path": f"/{{server_key}}/{handler_name}",
-            "method": "post",
-            "tags": ["action"],
-        }
+        path = f"/{{server_key}}/{handler_name}"
+        tags = ["action"]
+        for kw in dec.keywords:
+            if kw.arg == "path":
+                explicit = _path_str(kw.value)
+                if explicit is not None:
+                    path = explicit
+            elif kw.arg == "tags" and isinstance(kw.value, ast.List):
+                tags = [
+                    e.value
+                    for e in kw.value.elts
+                    if isinstance(e, ast.Constant) and isinstance(e.value, str)
+                ]
+        return {"path": path, "method": "post", "tags": tags}
     if not (isinstance(func, ast.Attribute) and func.attr in HTTP_METHODS):
         return None
     if not dec.args:
