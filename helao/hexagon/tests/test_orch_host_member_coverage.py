@@ -108,44 +108,19 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "print_message",
         # Legacy lifecycle internal: OrchHost uses FastAPI's startup event.
         "myinit",
+        # Assigned by the DISPATCH RUNNER at runtime (orch_dispatch.py:1170),
+        # not by construction, on legacy Orch exactly as on OrchHost. A
+        # static scan cannot see them on either, so tracking them as
+        # outstanding work would keep this list permanently non-empty for
+        # something that is already correct.
+        "exp_model",
+        "seq_model",
     }
 )
 
 #: The remaining work. Porting a member means DELETING it from here; that
 #: edit is the point. B3b's members stay listed until B3b lands.
-NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
-    {
-        # --- B3b: the dispatch loop -------------------------------------
-        "loop_task_dispatch_action",
-        "loop_task_dispatch_experiment",
-        "loop_task_dispatch_sequence",
-        "orch_wait_for_all_actions",
-        "wait_for_interrupt",
-        "start",
-        "stop",
-        "skip",
-        "stop_loop",
-        "estop_loop",
-        "estop_actions",
-        "estop_finish_active",
-        "intend_stop",
-        "intend_none",
-        "clear_error",
-        "clear_estop",
-        "clear_actions",
-        # --- B3b: status ingestion + monitors ---------------------------
-        "update_status",
-        "update_nonblocking",
-        "clear_nonblocking",
-        "register_obj_uuid",
-        "register_action_uuid",
-        "track_action_uuid",
-        # Assigned by the dispatch loop itself (orch_dispatch.py:1170), not
-        # by construction -- so they arrive with B3b, not here.
-        "exp_model",
-        "seq_model",
-    }
-)
+NOT_YET_PORTED: Final[frozenset[str]] = frozenset(set())
 
 
 def _host_members() -> set[str]:
