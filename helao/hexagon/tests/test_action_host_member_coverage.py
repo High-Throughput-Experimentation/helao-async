@@ -75,6 +75,15 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "dyn_endpoints",
         # -- legacy logging helper --------------------------------------------
         "print_message",
+        # -- contractual privates the host answers a different way ------------
+        # _dispatch_queued_action lives on the native ActionQueueDispatcher
+        # (endpoint_manager.py), which the host holds as `action_queue`;
+        # _ws_relay has no host equivalent because the WS routes are
+        # registered directly rather than delegated. Both are listed here
+        # rather than dropped from the scan, so a collaborator that starts
+        # calling base._ws_relay fails loudly instead of silently.
+        "_dispatch_queued_action",
+        "_ws_relay",
     }
 )
 
@@ -87,8 +96,23 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
 NOT_YET_PORTED: Final[frozenset[str]] = frozenset()
 
 
+#: Underscore-prefixed ``Base`` members that a COLLABORATOR calls back through
+#: ``self.base.<name>``. Private by name, contractual in fact -- and invisible
+#: to a public-members-only scan, which is how ``_write_meta_atomic`` was
+#: missed: every ``write_act`` raised AttributeError inside a caught block, so
+#: an action returned 200 and wrote no meta file. Derived by grepping
+#: ``self\.base\._`` across helao/core/servers and helao/hexagon.
+CONTRACTUAL_PRIVATE: Final[frozenset[str]] = frozenset(
+    {
+        "_write_meta_atomic",
+        "_dispatch_queued_action",
+        "_ws_relay",
+    }
+)
+
+
 def _base_public_members() -> set[str]:
-    """Every public method and ``self.x = ...`` attribute on legacy ``Base``."""
+    """Every public method, contractual private, and ``self.x`` on ``Base``."""
     tree = ast.parse(BASE_PY.read_text(encoding="utf-8"))
     members: set[str] = set()
     for node in ast.walk(tree):
@@ -96,7 +120,7 @@ def _base_public_members() -> set[str]:
             continue
         for item in node.body:
             if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if not item.name.startswith("_"):
+                if not item.name.startswith("_") or item.name in CONTRACTUAL_PRIVATE:
                     members.add(item.name)
         for sub in ast.walk(node):
             if (
