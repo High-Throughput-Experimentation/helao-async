@@ -429,34 +429,76 @@ class ActionHost(HelaoFastAPI):
             self.stop_executor(exec_key)
 
     def import_postprocessors(self, name_list, class_list, proc_class) -> None:
-        """Load HLO post-processors named by ``hlo_postprocess_libs``.
+        """Load post-processors named by ``hlo_postprocess_libs`` (base.py:817).
 
-        A deployment names these by path in its config; the module is loaded by
-        file, so a missing or broken one must not take the server down.
+        A config names these **either** by path **or** by bare name, and the
+        bare-name form is the one production uses (``hlo_to_csv``). Resolution
+        order is the deployment's own ``processors/``, then hte's, then any
+        deployment's -- which is how a test-deployment config picks up hte's
+        ``hlo_to_csv``.
+
+        The list collects **classes, not instances**: the finalizer calls
+        ``hpp(action, save_root)`` per action. Appending instances here yields
+        a TypeError inside the finalizer's caught block, i.e. a run that
+        silently produces no ``.csv``, which is exactly what a path-only
+        version of this method did -- GM-1 matched legacy on all 26 members of
+        the synced zip except the four csv files.
         """
-        import os as _os
+        from glob import glob
         from importlib.machinery import SourceFileLoader
+        from importlib.util import module_from_spec, spec_from_file_location
+
+        from helao.helpers import config_loader
 
         proc_class_type = (
             proc_class.__name__.split("Post")[0].split("Processor")[0].lower()
         )
         for pplib in name_list or []:
-            if not (pplib.endswith(".py") and _os.path.exists(pplib)):
-                LOGGER.warning(f"post-processor path does not exist: {pplib}")
+            mod_name = os.path.basename(pplib).split(".py")[0]
+            if pplib.endswith(".py") and os.path.exists(pplib):
+                LOGGER.info(f"Loading {proc_class_type} post-processor from {pplib}")
+                ppclass = SourceFileLoader(mod_name, pplib).load_module().PostProcess
+                if issubclass(ppclass, proc_class):
+                    class_list.append(ppclass)
                 continue
-            mod_name = _os.path.basename(pplib).split(".py")[0]
-            LOGGER.info(f"Loading {proc_class_type} post-processor from {pplib}")
-            try:
-                module = SourceFileLoader(mod_name, pplib).load_module()
-                for attr in vars(module).values():
-                    if (
-                        isinstance(attr, type)
-                        and issubclass(attr, proc_class)
-                        and attr is not proc_class
-                    ):
-                        class_list.append(attr())
-            except Exception:
-                LOGGER.error(f"failed to load post-processor {pplib}", exc_info=True)
+
+            LOGGER.info(f"Looking for {pplib} post-processor in deployments")
+            # `.get`, not `[...]`: legacy indexes CONFIG["deployment"], which
+            # the launcher injects. A config loaded any other way (a test, a
+            # tool) would KeyError before reaching the fallbacks below.
+            deployment = (config_loader.CONFIG or {}).get("deployment", "")
+            candidates = [
+                (
+                    os.path.join(
+                        "helao", "deploy", deployment, "processors", f"{pplib}.py"
+                    )
+                    if deployment
+                    else ""
+                ),
+                os.path.join("helao", "deploy", "hte", "processors", f"{pplib}.py"),
+            ]
+            script_path = next((p for p in candidates if p and os.path.exists(p)), None)
+            if script_path is None:
+                any_paths = glob(
+                    os.path.join("helao", "deploy", "*", "processors", f"{pplib}.py")
+                )
+                script_path = any_paths[0] if any_paths else None
+            if script_path is None:
+                LOGGER.info(
+                    f"Post-processor {pplib} was not found in processors module"
+                )
+                continue
+
+            LOGGER.info(
+                f"Loading {proc_class_type} post-processor from {pplib} "
+                "processors module"
+            )
+            proc_spec = spec_from_file_location(mod_name, script_path)
+            proc_mod = module_from_spec(proc_spec)
+            proc_spec.loader.exec_module(proc_mod)
+            ppclass = proc_mod.PostProcess
+            if issubclass(ppclass, proc_class):
+                class_list.append(ppclass)
 
     # -- meta files ------------------------------------------------------------
 
