@@ -1285,3 +1285,40 @@ about what a diff implied. The first two were right; this one was right about th
 wrong about the cause. The step that actually produced information here was listing the
 candidate directory — one file versus six — which took seconds and would have redirected the
 work before the fix was written. **Look at the artifact before theorising about the writer.**
+
+### D1 diagnosis: ActionHost is missing 43 of Base's members
+
+Chasing D1 by reproducing GM-3's POST directly found three real defects in a row, each
+revealed only after fixing the previous one:
+
+1. **`ActionSession` never called `action.init_act()`** — so `action_uuid`,
+   `action_timestamp` and `action_output_dir` were all `None` and nothing could be written.
+   Fixed, and the session's `__init__` reordered to match legacy (`base.py:895-975`): the data
+   streamer is constructed *before* `init_act`, because `add_new_listen_uuid` routes through
+   it; `active_uuid` is read *after*, because before it the uuid does not exist.
+2. **`file_conn_keys` was never registered on the action** (`base.py:951`) — the session built
+   `file_conn_dict` but the action carried no keys, so the writers had no connection.
+3. **`write_act`/`write_exp`/`write_seq` did not exist on the host** — the finalizer catches
+   the error, logs "Failed to write act meta file", and the run completes having written
+   nothing.
+
+All three are fixed and the manual action now mints a correct uuid, timestamp and
+`__manual`-shaped output dir. **It still writes no artifacts**, and the one-at-a-time chase is
+the wrong method.
+
+**Measured systematically instead: `ActionHost` lacks 43 of `Base`'s members.** Many are
+internal (`bufferer`, `dumper`, `status_logger`, `live_buffer_mgr`), but the load-bearing ones
+include `contain_action`, `get_main_error`, `attach_client`/`detach_client` (**the host named
+these `attach_status_client`/`detach_status_client` — legacy's own spelling is what callers
+use**), `send_statuspackage`, `send_nbstatuspackage`, `status_clients`, `ntp_offset`,
+`stop_all_executor_prefix`, `replace_status`, `get_active_info`, `myinit`, `shutdown`, `app`,
+`hlo_postprocessors`, `import_postprocessors`, `dyn_endpoints`.
+
+**This is the real remaining scope of B1's host work**, and it should be closed from the list
+rather than from successive runtime failures. The `_member_surface.md` checklist covers only
+what *deployment code* touches; this is what `Base`'s own collaborators and the write path
+touch, which is a larger set and was never enumerated. Enumerate it, port it, then re-run.
+
+The same script that produced the list is worth keeping as a test: assert `ActionHost` covers
+every non-underscore `Base` member, with an explicit, justified exclusion list. That converts
+43 future crashes into one red test.

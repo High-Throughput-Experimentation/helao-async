@@ -324,6 +324,26 @@ class ActionHost(HelaoFastAPI):
         """Return the latest ``(value, epoch)`` for *live_key*."""
         return self.live_buffer[live_key]
 
+    # -- meta files ------------------------------------------------------------
+
+    async def write_act(self, action) -> None:
+        """Write the action's ``-act.yml`` via the native meta writer.
+
+        Reached from the finalizer at the end of every action. Its absence was
+        silent in the suite and fatal on disk: the finalizer catches the error,
+        logs "Failed to write act meta file", and the run completes having
+        written nothing.
+        """
+        await self.meta_writer.write_act(action)
+
+    async def write_exp(self, experiment) -> None:
+        """Write the experiment's ``-exp.yml``."""
+        await self.meta_writer.write_exp(experiment)
+
+    async def write_seq(self, sequence) -> None:
+        """Write the sequence's ``-seq.yml``."""
+        await self.meta_writer.write_seq(sequence)
+
     # -- file connection keys ------------------------------------------------
 
     def new_file_conn_key(self, key: str):
