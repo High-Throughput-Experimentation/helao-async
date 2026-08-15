@@ -1,0 +1,3724 @@
+"""Reflex rendering of the standalone operator.
+
+A second UI over the same orchestrator seam the Bokeh operator uses:
+``orch_backend.OrchBackend`` is an async ABC of 25 methods, and this page is a
+consumer of it, not a second implementation. That module is not changed to suit
+this one -- ``bokeh_operator.py`` is still live beside it, named by 32 configs.
+
+Two structural choices worth knowing before editing:
+
+* **The logic that can be wrong lives in module-level functions**, because
+  ``rx.State`` cannot be instantiated outside a running app. The state classes
+  are var assignment and cadence only, which is what makes any of this testable.
+* **State is split per tab group**, not one state for the page. Reflex
+  re-renders on any var change within a state, so a single page-wide state would
+  make a keystroke in a parameter field re-push every queue table. The states
+  never reference each other's vars; they communicate through the backend, and
+  the next poll shows the result.
+"""
+
+__all__ = [
+    "BackendRegistry",
+    "BACKENDS",
+    "queue_rows",
+    "server_rows",
+    "status_line",
+    "may_edit_queue",
+    "moved_index",
+    "poll_interval_for",
+    "poll_ms_for",
+    "refresh_tables",
+    "dispatch_control",
+    "dispatch_move",
+    "dispatch_remove",
+    "configure",
+    "reset_settings",
+    "make_backend",
+    "session_backend",
+    "repo_root",
+    "rooted_config",
+    "store_kind",
+    "config_root",
+    "saved_values",
+    "save_values",
+    "align_defaults",
+    "field_kind",
+    "fields_for_item",
+    "flatten_fields",
+    "field_options",
+    "coerce_params",
+    "version_text",
+    "library_items",
+    "item_by_name",
+    "enqueue_sequence",
+    "build_sequence",
+    "build_manual_sequence",
+    "custom_positions",
+    "options_map_for",
+    "plan_rows",
+    "plan_moved",
+    "plan_removed",
+    "dispatch_plan",
+    "history_rows",
+    "HIST_COLS",
+    "plate_api_for",
+    "platemap_points",
+    "nearest_sample",
+    "composition_text",
+    "sample_summary",
+    "OperatorQueueState",
+    "OperatorLibState",
+    "OperatorPlanState",
+    "OperatorPlateState",
+    "OperatorSpecState",
+    "spec_parser_path",
+    "spec_folder_path",
+    "parser_kwargs",
+    "SEQ_COLS",
+    "EXP_COLS",
+    "ACT_COLS",
+]
+
+import os
+import threading
+from typing import Optional
+
+import reflex as rx
+
+from helao.ui.shared.operator.object_tree import (
+    doc_to_html,
+    object_to_html,
+    open_keys_for,
+    server_header_text,
+    tree_header_text,
+)
+from helao.ui.shared.palette import (
+    reflex_header_class,
+    reflex_muted_text_class,
+    reflex_table_class,
+)
+from helao.ui.reflex import plots
+from helao.helpers import helao_logging as logging
+from helao.helpers.helao_dirs import helao_dirs
+from helao.helpers.import_autolibs import deployment_from_config_path
+from helao.helpers.import_autolibs import repo_path as _autolib_repo_path
+from helao.helpers.import_autolibs import repo_root as _autolib_repo_root
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Muted text, resolved once at module scope per ``palette``'s second rule. It
+#: is ``slate-600``, not the ``slate-500`` that serves the same role on white:
+#: across the five route tints ``slate-500`` measures 4.34--4.59, failing the
+#: 4.5 body floor on two of them and clearing it by 0.02 on a third.
+_MUTED_TEXT = reflex_muted_text_class()
+
+#: Width of the ``[n]`` parameter-index column in the Build form, reserved twice
+#: over: once by the index text itself and once by an empty box in the label row
+#: above it, so the parameter name still starts flush with the input below it.
+#: An em rather than a px so it tracks the 12px input font instead of drifting
+#: when the type scale moves; 2.5em holds ``[99]`` right-aligned, which is past
+#: any parameter count a sequence has. The Bokeh operator reserves 35px for the
+#: same decoration.
+_PARAM_INDEX_WIDTH = "2.5em"
+
+#: Columns shown in each queue table, mirroring the Bokeh operator's tables.
+#: These are a contract with ``RemoteBackend``'s list methods, which project
+#: each queue item down to a fixed key set. ``queue_rows`` renders an unknown
+#: column as an empty cell rather than raising, so a name that drifts from that
+#: key set produces a blank column that reads as missing orchestrator data --
+#: which is why a test asserts these against the backend's own key constants.
+SEQ_COLS = [
+    "sequence_name",
+    "sequence_label",
+    "sequence_uuid",
+    "campaign_name",
+    "campaign_uuid",
+]
+EXP_COLS = ["experiment_name", "experiment_uuid"]
+ACT_COLS = ["action_name", "action_server", "action_uuid"]
+
+#: Controls the page may invoke, by ``OrchBackend`` method name. Reflex event
+#: arguments arrive from the client, so this is an allow-list rather than a
+#: convenience: without it a crafted event would reach any coroutine on the
+#: backend, ``close`` included.
+CONTROL_METHODS = frozenset(
+    {
+        "start",
+        "stop",
+        "estop",
+        "skip",
+        "clear_sequences",
+        "clear_experiments",
+        "clear_actions",
+    }
+)
+
+#: Queue kind -> (move method, remove method) on the backend.
+QUEUE_METHODS = {
+    "sequence": ("move_sequence", "remove_sequence"),
+    "experiment": ("move_experiment", "remove_experiment"),
+    "action": ("move_action", "remove_action"),
+}
+
+#: Orchestrator states in which queue reordering is safe. Editing a queue the
+#: orchestrator is actively dispatching from races it, which is why the Bokeh
+#: operator gates its buttons the same way.
+EDITABLE_STATES = frozenset({"idle", "stopped"})
+
+#: Seconds between orchestrator polls when the config gives no `poll_interval`.
+DEFAULT_POLL_INTERVAL = 5.0
+
+#: The three queue kinds, in the order their tabs are shown.
+QUEUE_KINDS = ("sequence", "experiment", "action")
+
+#: Page sizes the pagers offer. Rendered as strings by ``rx.select`` and parsed
+#: back, so every entry has to survive a round trip through ``str``.
+PAGE_SIZES = (25, 50, 100, 200)
+
+#: Rows per page before the operator picks something else.
+DEFAULT_PAGE_SIZE = 50
+
+
+def clamp_offset(offset: int, total: int, page_size: int) -> int:
+    """Bound ``offset`` to a page that exists within ``total``.
+
+    An in-range offset is returned unchanged; only an offset past the end is
+    moved, and then to the first row of the last page. It does not re-align an
+    arbitrary offset to a page boundary -- every offset here comes from
+    :func:`paged_offset` or from zero, so it is aligned already, and silently
+    moving a caller's exact offset would be the more surprising behaviour.
+
+    A paged view outlives the data under it: a queue drains while the operator
+    is looking at page 9, and the next poll would otherwise fetch an empty
+    window and render a table that reads as "the queue is empty" -- the one lie
+    an operator must not be told. Clamping lands them on the last real page
+    instead.
+
+    Args:
+        offset: The requested first-row index.
+        total: How many rows exist now.
+        page_size: Rows per page.
+
+    Returns:
+        int: A page-aligned offset within ``[0, total)``, or 0 when empty.
+    """
+    if page_size <= 0 or total <= 0:
+        return 0
+    last_page = ((total - 1) // page_size) * page_size
+    return max(0, min(offset, last_page))
+
+
+def paged_offset(offset: int, total: int, page_size: int, action: str) -> int:
+    """The offset after one pager button.
+
+    Args:
+        offset: Current first-row index.
+        total: How many rows exist now.
+        page_size: Rows per page.
+        action: ``first``, ``prev``, ``next`` or ``last``. An unknown action
+            leaves the offset where it is -- these arrive as event arguments
+            from the client, so an unexpected one must not move the view.
+
+    Returns:
+        int: The clamped new offset.
+    """
+    if page_size <= 0:
+        return 0
+    current = clamp_offset(offset, total, page_size)
+    target = {
+        "first": 0,
+        "prev": current - page_size,
+        "next": current + page_size,
+        "last": max(0, total - 1),
+    }.get(action, current)
+    return clamp_offset(target, total, page_size)
+
+
+def page_label(offset: int, shown: int, total: int) -> str:
+    """The ``51-100 of 412`` line a pager shows.
+
+    Counts from 1 because it is read by a person, not indexed by one.
+    """
+    if total <= 0 or shown <= 0:
+        return f"0 of {max(0, total)}"
+    return f"{offset + 1}-{offset + shown} of {total}"
+
+
+def page_size_from(value: str) -> int:
+    """Parse a page-size select's value, falling back to the default.
+
+    The value crosses the wire as a string chosen by the client, so a value
+    outside :data:`PAGE_SIZES` is rejected rather than trusted: an arbitrary
+    integer here becomes an arbitrary ``limit`` on an orchestrator request.
+    """
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_PAGE_SIZE
+    return parsed if parsed in PAGE_SIZES else DEFAULT_PAGE_SIZE
+
+
+class BackendRegistry:
+    """Per-session ``session_token -> OrchBackend`` map.
+
+    The backend holds sockets and a poll task, so it cannot ride a Reflex var
+    (which is serialised to JSON) and it must be closed when its page goes
+    away rather than merely dereferenced.
+    """
+
+    def __init__(self):
+        """Create an empty registry."""
+        self._lock = threading.Lock()
+        self._backends: dict = {}
+
+    def put(self, token: str, backend) -> None:
+        """Store a session's backend."""
+        with self._lock:
+            self._backends[token] = backend
+
+    def get(self, token: str):
+        """Return a session's backend, or ``None``."""
+        with self._lock:
+            return self._backends.get(token)
+
+    def drop(self, token: str) -> None:
+        """Close and forget a session's backend.
+
+        Never raises: this runs on page unmount, where an exception would leave
+        the entry in the registry forever and leak the session it holds.
+        """
+        with self._lock:
+            backend = self._backends.pop(token, None)
+        if backend is None:
+            return
+        close = getattr(backend, "close", None)
+        if close is None:
+            return
+        try:
+            close()
+        except Exception as exc:
+            LOGGER.warning(f"operator backend close failed: {exc}")
+
+
+#: Process-wide registry the page reads through.
+BACKENDS = BackendRegistry()
+
+
+def queue_rows(items: list, columns: list) -> list:
+    """Render backend queue objects as table rows.
+
+    Every cell is a string. Reflex serialises state to JSON, and a UUID, a
+    ``None``, or a nested dict reaches the browser as garbage or breaks the
+    encoder outright.
+
+    Args:
+        items: Queue objects from the backend.
+        columns: Column names to project, in display order.
+
+    Returns:
+        list[list[str]]: One row per item; a missing column renders empty
+        rather than dropping the row, so a queue item is never invisible
+        because one field is absent.
+    """
+    return [
+        [("" if item.get(col) is None else str(item.get(col))) for col in columns]
+        for item in items
+    ]
+
+
+def status_line(orch_state: Optional[dict], reachable: bool) -> str:
+    """One line describing the orchestrator.
+
+    ``reachable`` is tracked separately from the state because ``RemoteBackend``
+    polls over HTTP and a station's orchestrator restarting mid-session is
+    routine -- reporting that as "idle" would be a lie about it, and "idle" is
+    exactly the state an operator reads as "safe to enqueue".
+
+    Args:
+        orch_state: The ``get_orch_state`` payload, or ``None``.
+        reachable: Whether the last poll reached the orchestrator.
+
+    Returns:
+        str: The status line.
+    """
+    if not reachable:
+        return "cannot reach the orchestrator"
+    state = (orch_state or {}).get("orch_state", "unknown")
+    loop = (orch_state or {}).get("loop_state", "")
+    return f"orchestrator {state}" + (f" (loop {loop})" if loop else "")
+
+
+def may_edit_queue(orch_state: str) -> bool:
+    """Whether queue reordering and removal are safe right now.
+
+    Args:
+        orch_state: The orchestrator's reported state.
+
+    Returns:
+        bool: ``True`` only when the orchestrator is not dispatching.
+    """
+    return orch_state in EDITABLE_STATES
+
+
+def moved_index(position: int, direction: str, length: int):
+    """Target index for a queue move, or ``None`` when the move is impossible.
+
+    Returning ``None`` rather than clamping matters: clamping turns "move the
+    first item up" into a no-op the backend is still asked to perform, and the
+    orchestrator would reorder nothing while the UI claimed it had.
+
+    Args:
+        position: Current index.
+        direction: ``"up"`` or ``"down"``.
+        length: Queue length.
+
+    Returns:
+        int | None: The target index, or ``None`` if out of range or at an end.
+    """
+    if position < 0 or position >= length:
+        return None
+    target = position - 1 if direction == "up" else position + 1
+    if target < 0 or target >= length:
+        return None
+    return target
+
+
+def server_rows(summary: Optional[dict]) -> list:
+    """Render the action-server status summary as table rows.
+
+    Sorted by server name so the table keeps a fixed row order regardless of
+    the unordered dict the backend returns -- the same reason the Bokeh
+    operator sorts it.
+
+    Args:
+        summary: ``{server_name: (status, driver_status)}`` from the backend.
+
+    Returns:
+        list[list[str]]: One ``[server, status, driver]`` row per server. A
+        malformed entry still gets a row: dropping it would hide a server that
+        is misbehaving, which is the case the table exists for.
+    """
+    rows = []
+    for name, value in sorted((summary or {}).items()):
+        if isinstance(value, (list, tuple)) and len(value) >= 2:
+            status, driver = value[0], value[1]
+        else:
+            status, driver = value, ""
+        rows.append(
+            [
+                str(name),
+                "" if status is None else str(status),
+                "" if driver is None else str(driver),
+            ]
+        )
+    return rows
+
+
+def _server_params(world_cfg: dict, server_key: str) -> dict:
+    """One server's ``params`` block, or ``{}`` when it is malformed.
+
+    ``build_app`` runs at import time, so a config whose ``params`` is a list
+    rather than a mapping would take down the module -- the same hazard
+    ``app.as_dict`` guards for the rest of the config.
+    """
+    servers = (world_cfg or {}).get("servers")
+    if not isinstance(servers, dict):
+        return {}
+    server = servers.get(server_key)
+    if not isinstance(server, dict):
+        return {}
+    params = server.get("params")
+    return params if isinstance(params, dict) else {}
+
+
+def poll_interval_for(world_cfg: dict, server_key: str) -> float:
+    """Poll cadence for this server, in seconds.
+
+    A non-numeric or non-positive value falls back to the default rather than
+    being honoured: a typo'd YAML value must not turn into a zero-delay loop
+    hammering the orchestrator.
+    """
+    params = _server_params(world_cfg, server_key)
+    try:
+        interval = float(params.get("poll_interval", DEFAULT_POLL_INTERVAL))
+    except (TypeError, ValueError):
+        return DEFAULT_POLL_INTERVAL
+    return interval if interval > 0 else DEFAULT_POLL_INTERVAL
+
+
+def poll_ms_for(interval: float) -> int:
+    """Poll cadence in milliseconds, for a client-side interval component."""
+    return int(max(interval, 0.0) * 1000) or int(DEFAULT_POLL_INTERVAL * 1000)
+
+
+#: ``get_orch_state`` key carrying each queue's true depth. The orchestrator has
+#: shipped these since ``_queue_counts`` was added; they are what lets the tab
+#: titles report a depth the paged fetch cannot see.
+_TOTAL_KEYS = {
+    "sequence": "n_sequences",
+    "experiment": "n_experiments",
+    "action": "n_actions",
+}
+
+
+def queue_total(state: Optional[dict], kind: str, offset: int, shown: int) -> int:
+    """The queue's true depth, or a lower bound when the orchestrator omits it.
+
+    The fallback matters for a mixed-version group: an orchestrator without
+    ``_queue_counts`` would otherwise report 0, and a table with rows in it
+    would render under a pager claiming it was empty. ``offset + shown`` is
+    wrong but never *below* what is on screen, so the pager stays consistent
+    with the table it sits under.
+    """
+    value = (state or {}).get(_TOTAL_KEYS[kind])
+    try:
+        return max(0, int(value))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return offset + shown
+
+
+async def refresh_tables(backend, offsets: dict, page_size: int) -> dict:
+    """Read the orchestrator state and one page of every queue in one pass.
+
+    The state call goes first because the three queue depths ride on it, and
+    the depths are what bound the offsets: requesting a page without clamping
+    it would fetch a window past the end of a queue that drained since the
+    last poll.
+
+    Args:
+        backend: An ``OrchBackend``, or ``None`` when the page is not yet
+            connected.
+        offsets: ``kind -> first-row index``, one per :data:`QUEUE_KINDS`.
+        page_size: Rows to request per queue.
+
+    Returns:
+        dict: State var updates. On success this carries every row list, the
+        three depths, and the clamped offsets. **On failure it carries no row
+        keys at all**, so the caller's last known queues stay on screen while
+        the status line reports the orchestrator is unreachable. Blanking the
+        tables would read as "the queue is empty", which is the one lie an
+        operator must not be told.
+    """
+    if backend is None:
+        return {
+            "reachable": False,
+            "orch_state": "",
+            "status": status_line(None, False),
+            "error": "",
+        }
+    try:
+        state = await backend.get_orch_state()
+        wanted = {
+            kind: clamp_offset(
+                int(offsets.get(kind, 0) or 0),
+                queue_total(state, kind, 0, 0),
+                page_size,
+            )
+            for kind in QUEUE_KINDS
+        }
+        sequences = await backend.list_sequences(
+            limit=page_size, offset=wanted["sequence"]
+        )
+        experiments = await backend.list_experiments(
+            limit=page_size, offset=wanted["experiment"]
+        )
+        actions = await backend.list_actions(limit=page_size, offset=wanted["action"])
+        summary = await backend.get_status_summary()
+    except Exception as exc:
+        LOGGER.warning(f"operator poll failed: {exc}")
+        return {
+            "reachable": False,
+            "status": status_line(None, False),
+            "error": str(exc),
+        }
+    rows = {
+        "sequence": queue_rows(sequences, SEQ_COLS),
+        "experiment": queue_rows(experiments, EXP_COLS),
+        "action": queue_rows(actions, ACT_COLS),
+    }
+    return {
+        "reachable": True,
+        "orch_state": (state or {}).get("orch_state", ""),
+        "status": status_line(state, True),
+        "error": "",
+        "seq_rows": rows["sequence"],
+        "exp_rows": rows["experiment"],
+        "act_rows": rows["action"],
+        "server_rows": server_rows(summary),
+        "seq_total": queue_total(
+            state, "sequence", wanted["sequence"], len(rows["sequence"])
+        ),
+        "exp_total": queue_total(
+            state, "experiment", wanted["experiment"], len(rows["experiment"])
+        ),
+        "act_total": queue_total(
+            state, "action", wanted["action"], len(rows["action"])
+        ),
+        # Echoed back so the caller can tell a clamp from a stale write. The
+        # caller only adopts these when its own offsets still match what it
+        # asked for; see `OperatorQueueState.poll_once`.
+        "requested_offsets": wanted,
+    }
+
+
+async def dispatch_control(backend, name: str) -> str:
+    """Run one orchestrator control.
+
+    Args:
+        backend: An ``OrchBackend``, or ``None``.
+        name: A member of :data:`CONTROL_METHODS`.
+
+    Returns:
+        str: Empty on success, else a message for the page's error line.
+    """
+    if name not in CONTROL_METHODS:
+        LOGGER.warning(f"operator refused control '{name}'")
+        return f"unknown control '{name}'"
+    if backend is None:
+        return "no orchestrator connection"
+    try:
+        await getattr(backend, name)()
+    except Exception as exc:
+        LOGGER.warning(f"operator control {name} failed: {exc}")
+        return f"{name} failed: {exc}"
+    return ""
+
+
+async def dispatch_move(backend, kind: str, position: int, direction: str, length: int):
+    """Move one queue item up or down.
+
+    A move that cannot happen -- the first item up, the last item down --
+    returns success without calling the backend, so an impossible move never
+    becomes a round trip that reorders nothing while the UI implies it worked.
+
+    Returns:
+        str: Empty on success or on a no-op, else a message.
+    """
+    methods = QUEUE_METHODS.get(kind)
+    if methods is None:
+        return f"unknown queue '{kind}'"
+    if backend is None:
+        return "no orchestrator connection"
+    target = moved_index(position, direction, length)
+    if target is None:
+        return ""
+    try:
+        await getattr(backend, methods[0])(position, target)
+    except Exception as exc:
+        LOGGER.warning(f"operator move {kind} failed: {exc}")
+        return f"move failed: {exc}"
+    return ""
+
+
+async def dispatch_remove(backend, kind: str, position: int, length: int) -> str:
+    """Remove one queue item.
+
+    The bounds check is not paranoia: a position comes from a rendered row
+    index, and a poll can shorten the queue between render and click.
+
+    Returns:
+        str: Empty on success, else a message.
+    """
+    methods = QUEUE_METHODS.get(kind)
+    if methods is None:
+        return f"unknown queue '{kind}'"
+    if backend is None:
+        return "no orchestrator connection"
+    if position < 0 or position >= length:
+        return "that queue item is no longer there; the queue has changed"
+    try:
+        await getattr(backend, methods[1])(position)
+    except Exception as exc:
+        LOGGER.warning(f"operator remove {kind} failed: {exc}")
+        return f"remove failed: {exc}"
+    return ""
+
+
+#: Library kind -> the key the shared parameter store uses. The file is
+#: written by both operators, so this mapping cannot drift from
+#: ``param_store.PARAM_KINDS``.
+STORE_KINDS = {"sequence": "seq", "experiment": "exp"}
+
+
+def store_kind(kind: str) -> str:
+    """The saved-parameter store's key for a library kind, or ``""``."""
+    return STORE_KINDS.get(kind, "")
+
+
+def config_root() -> str:
+    """The configured output root, or ``""`` before the app is configured."""
+    with _SETTINGS_LOCK:
+        return (_SETTINGS.get("world_cfg") or {}).get("root", "")
+
+
+def _last_meta() -> dict:
+    """The label/campaign block last saved by either operator."""
+    from helao.ui.shared.operator import param_store
+
+    return param_store.read_last_meta(config_root())
+
+
+def saved_values(root: str, kind: str, name: str) -> dict:
+    """Parameters last saved for one library item, as form strings."""
+    from helao.ui.shared.operator import param_store
+
+    key = store_kind(kind)
+    if not key:
+        return {}
+    return param_store.form_values(param_store.read_params(root, key, name))
+
+
+def save_values(root: str, kind: str, name: str, params: dict, meta=None) -> bool:
+    """Remember the parameters used for one library item."""
+    from helao.ui.shared.operator import param_store
+
+    key = store_kind(kind)
+    if not key:
+        return False
+    return param_store.write_params(root, key, name, params, meta=meta)
+
+
+def spec_parser_path(server_cfg: dict) -> str:
+    """Path of the deployment's spec parser, or ``""``.
+
+    Rooted against the repo root when the config writes it relative, which all
+    eleven declaring station configs do (``helao\\specifications\\...``).
+    Without that, ``load_parser``'s ``os.path.isfile`` resolves it against the
+    working directory -- the repo root for the Bokeh operator's launcher, but
+    ``_app/`` for the Reflex backend -- and the Reflex Specs tab reports "no
+    spec parser is configured for this station" on a station that configures
+    one. That failure is indistinguishable from the correct unconfigured
+    behaviour, which is exactly why the degrade path cannot be relied on to
+    surface it. Same class of bug as :func:`rooted_config`, one layer down.
+
+    Absolute paths pass through untouched, so a station naming
+    ``C:\\INST_hlo\\...`` is unaffected.
+    """
+    params = (server_cfg or {}).get("params")
+    if not isinstance(params, dict):
+        return ""
+    return _rooted(params.get("seqspec_parser_path") or "")
+
+
+def spec_folder_path(server_cfg: dict) -> str:
+    """Folder holding the specification files, or ``""``.
+
+    Rooted for the same reason as :func:`spec_parser_path`; the shipped configs
+    name this one absolutely, but a relative one would silently list nothing.
+    """
+    params = (server_cfg or {}).get("params")
+    if not isinstance(params, dict):
+        return ""
+    return _rooted(params.get("seqspec_folder_path") or "")
+
+
+def parser_kwargs(server_cfg: dict) -> dict:
+    """Extra keyword arguments the config passes to the spec parser."""
+    params = (server_cfg or {}).get("params")
+    kwargs = params.get("parser_kwargs") if isinstance(params, dict) else None
+    return kwargs if isinstance(kwargs, dict) else {}
+
+
+def _build_spec(parser, path, backend, params, kwargs):
+    """Parse one spec file. Split out so the state handler stays assignment."""
+    from helao.ui.shared.operator import spec_parser
+
+    return spec_parser.build_spec_sequence(parser, path, backend, params, kwargs)
+
+
+#: Re-exported so this page and ``import_autolibs`` cannot disagree about
+#: where the repo root is; both need it for the same reason.
+repo_root = _autolib_repo_root
+_rooted = _autolib_repo_path
+
+
+def rooted_config(world_cfg: dict) -> dict:
+    """A copy of the config whose library paths do not depend on the cwd.
+
+    ``import_autolibs`` resolves every library path relative to the working
+    directory, and the Reflex process runs from its app directory rather than
+    the repo root -- so the libraries come back **empty with only an ERROR in
+    the log**, and the operator renders with nothing to select. The Bokeh
+    operator never hits this because its launcher runs from the repo root.
+
+    Bare module names are left alone: they are names, not paths, and are
+    resolved against the library directory, which this makes absolute.
+
+    Returns:
+        dict: A shallow copy. The world config is shared with every other
+        server in the process and must not be mutated.
+    """
+    rooted = dict(world_cfg or {})
+    loaded = rooted.get("loaded_config_path")
+    if not loaded:
+        return rooted
+    # Only a config under helao/deploy/<deployment>/configs/ names a deployment
+    # by position. Reading it as "two directories up" answered `DATA` for a
+    # config copied into USER_CONFIG, and every library path then pointed into
+    # a deployment that has never existed. With no deployment, set no library
+    # directory at all and let import_autolibs run its own cascade -- it
+    # resolves against the repo root now, not the cwd.
+    deployment = deployment_from_config_path(loaded)
+    for lib_type in ("experiment", "sequence"):
+        key = f"{lib_type}_path"
+        configured = rooted.get(key)
+        if configured:
+            rooted[key] = _rooted(configured)
+        elif deployment:
+            rooted[key] = _rooted(
+                os.path.join("helao", "deploy", deployment, f"{lib_type}s")
+            )
+        libraries = rooted.get(f"{lib_type}_libraries")
+        if libraries:
+            rooted[f"{lib_type}_libraries"] = [
+                _rooted(entry) if entry.endswith(".py") else entry
+                for entry in libraries
+            ]
+    return rooted
+
+
+class _VisShim:
+    """The two attributes ``RemoteBackend`` reads off a Bokeh ``Vis``.
+
+    ``RemoteBackend`` predates this page and was written against the Bokeh
+    visualizer object, but it touches only ``world_cfg`` and ``helaodirs``.
+    Supplying those is cheaper and less coupled than either importing Bokeh
+    here or widening the backend's constructor for a second UI.
+    """
+
+    def __init__(self, world_cfg: dict, server_key: str):
+        self.world_cfg = rooted_config(world_cfg)
+        self.helaodirs = helao_dirs(world_cfg, server_key)
+
+
+#: Config needed to mint a backend, set once by :func:`configure`.
+_SETTINGS: dict = {}
+_SETTINGS_LOCK = threading.Lock()
+
+
+def configure(world_cfg: dict, server_key: str, orch_key: Optional[str] = None) -> None:
+    """Record what :func:`session_backend` needs to build a backend.
+
+    Called when the app is built, not at import: the state class exists before
+    any config is loaded.
+    """
+    with _SETTINGS_LOCK:
+        _SETTINGS.update(
+            {
+                "world_cfg": world_cfg,
+                "server_key": server_key,
+                "orch_key": orch_key,
+                "poll_interval": poll_interval_for(world_cfg, server_key),
+            }
+        )
+
+
+def reset_settings() -> None:
+    """Forget the configuration. For tests."""
+    with _SETTINGS_LOCK:
+        _SETTINGS.clear()
+
+
+def make_backend(world_cfg: dict, server_key: str, orch_key: Optional[str] = None):
+    """Build a ``RemoteBackend`` for the group's orchestrator.
+
+    Imported here rather than at module scope: ``orch_backend`` pulls in the
+    experiment and sequence libraries, and this module is imported by the app
+    builder well before a page is served.
+    """
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
+
+    return RemoteBackend(
+        _VisShim(world_cfg, server_key),
+        orch_key=orch_key,
+        poll_interval=poll_interval_for(world_cfg, server_key),
+    )
+
+
+#: Shown by both tree panes until a row is clicked, matching the Bokeh operator.
+TREE_EMPTY_HEADER = "select a row"
+
+
+def tree_for(kind: str, obj) -> tuple:
+    """Header and HTML for one selected object, or the empty state.
+
+    Args:
+        kind: ``sequence``, ``experiment`` or ``action`` -- picks which
+            ``<kind>_name``/``<kind>_uuid`` pair titles the tree.
+        obj: The object, or anything falsy for "nothing selected".
+
+    Returns:
+        tuple: ``(header, html)``.
+    """
+    if not obj:
+        return TREE_EMPTY_HEADER, ""
+    header = tree_header_text(kind, obj).strip()
+    return (header or "—"), object_to_html(obj, open_keys=open_keys_for(obj))
+
+
+def session_backend(token: str):
+    """Return this session's backend, building it on first use.
+
+    Returns ``None`` when the app has not been configured or the backend
+    cannot be built -- a poll that fires first must degrade to "cannot reach
+    the orchestrator", not raise inside a background event.
+    """
+    backend = BACKENDS.get(token)
+    if backend is not None:
+        return backend
+    with _SETTINGS_LOCK:
+        settings = dict(_SETTINGS)
+    if not settings.get("world_cfg"):
+        return None
+    try:
+        backend = make_backend(
+            settings["world_cfg"], settings["server_key"], settings.get("orch_key")
+        )
+    except Exception as exc:
+        LOGGER.warning(f"operator backend could not be built: {exc}")
+        return None
+    BACKENDS.put(token, backend)
+    return backend
+
+
+def session_poll_interval() -> float:
+    """Configured poll cadence, or the default when unconfigured."""
+    with _SETTINGS_LOCK:
+        return _SETTINGS.get("poll_interval", DEFAULT_POLL_INTERVAL)
+
+
+class OperatorQueueState(rx.State):
+    """Queue tables, orchestrator status, and the controls that act on them.
+
+    One state per tab group, not one per page: Reflex re-renders every
+    component bound to a state when any of its vars change, so folding the
+    parameter forms in here would re-push all four tables on every keystroke.
+
+    Rows are never edited locally. A control calls the backend and lets the
+    next poll show the result -- the orchestrator owns the queues, and a local
+    edit the next poll contradicts is worse than a slower update.
+    """
+
+    # Element types are annotated rather than bare `list`: rx.foreach cannot
+    # iterate a var whose element type is unknown, and that failure surfaces
+    # in the frontend build, not at import.
+    seq_rows: list[list[str]] = []
+    exp_rows: list[list[str]] = []
+    act_rows: list[list[str]] = []
+    server_rows: list[list[str]] = []
+
+    #: Rows per page, shared by all three queue tables. One setting rather than
+    #: three: the three tables are read together, and a per-table size would
+    #: have the operator setting the same number three times.
+    page_size: int = DEFAULT_PAGE_SIZE
+
+    #: First-row index of each queue table's current page.
+    seq_offset: int = 0
+    exp_offset: int = 0
+    act_offset: int = 0
+
+    #: Each queue's true depth, from `get_orch_state`. **Not** ``len(rows)``:
+    #: the rows are one page, so counting them would report the page size as
+    #: the queue depth.
+    seq_total: int = 0
+    exp_total: int = 0
+    act_total: int = 0
+
+    orch_state: str = ""
+    #: Tick cadence in milliseconds, read from the config on mount rather than
+    #: baked into the exported bundle.
+    poll_ms: int = int(DEFAULT_POLL_INTERVAL * 1000)
+    status: str = "connecting to the orchestrator..."
+    reachable: bool = False
+    error: str = ""
+    polling: bool = False
+
+    #: Attribute tree for the queue row the operator last clicked.
+    tree_header: str = TREE_EMPTY_HEADER
+    tree_html: str = ""
+
+    @rx.var
+    def can_edit_queue(self) -> bool:
+        """Whether the queue-editing controls are enabled."""
+        return self.reachable and may_edit_queue(self.orch_state)
+
+    # Queue depths for the tab titles. These are the orchestrator's own counts,
+    # not ``len(rows)``: the tables are paged, so counting the rendered rows
+    # would cap every title at the page size -- which is exactly the bug the
+    # old ``limit=10`` fetch produced, where a 400-deep queue read "[10]".
+    #
+    # Computed vars rather than reading the total at the call site: on the class
+    # those attributes are Vars, and a computed var reads as a plain ``int`` to
+    # both pyright and the template.
+    @rx.var
+    def seq_count(self) -> int:
+        """Number of sequences in the orchestrator's sequence queue."""
+        return self.seq_total
+
+    @rx.var
+    def exp_count(self) -> int:
+        """Number of experiments in the orchestrator's experiment queue."""
+        return self.exp_total
+
+    @rx.var
+    def act_count(self) -> int:
+        """Number of actions in the orchestrator's action queue."""
+        return self.act_total
+
+    @rx.var
+    def seq_page_label(self) -> str:
+        """``51-100 of 412`` for the sequence table's pager."""
+        return page_label(self.seq_offset, len(self.seq_rows), self.seq_total)
+
+    @rx.var
+    def exp_page_label(self) -> str:
+        """``51-100 of 412`` for the experiment table's pager."""
+        return page_label(self.exp_offset, len(self.exp_rows), self.exp_total)
+
+    @rx.var
+    def act_page_label(self) -> str:
+        """``51-100 of 412`` for the action table's pager."""
+        return page_label(self.act_offset, len(self.act_rows), self.act_total)
+
+    @rx.var
+    def page_size_value(self) -> str:
+        """The page-size select's value. ``rx.select`` options are strings."""
+        return str(self.page_size)
+
+    def _offset_for(self, kind: str) -> int:
+        """First-row index of one queue table's current page."""
+        return {
+            "sequence": self.seq_offset,
+            "experiment": self.exp_offset,
+            "action": self.act_offset,
+        }.get(kind, 0)
+
+    def _total_for(self, kind: str) -> int:
+        """One queue's true depth."""
+        return {
+            "sequence": self.seq_total,
+            "experiment": self.exp_total,
+            "action": self.act_total,
+        }.get(kind, 0)
+
+    def _set_offset(self, kind: str, offset: int) -> None:
+        """Move one queue table's page."""
+        attr = {
+            "sequence": "seq_offset",
+            "experiment": "exp_offset",
+            "action": "act_offset",
+        }.get(kind)
+        if attr is not None:
+            setattr(self, attr, offset)
+
+    @rx.event
+    def page(self, kind: str, action: str):
+        """Move one queue table to another page and refresh it now.
+
+        The refresh is chained rather than left to the next tick so the table
+        responds to the click. If a poll is already in flight the chained one
+        is dropped by ``poll_once``'s guard and the in-flight poll's result is
+        discarded for having the wrong offset, so the click lands on the tick
+        after -- late, never wrong.
+        """
+        if kind not in QUEUE_KINDS:
+            return
+        self._set_offset(
+            kind,
+            paged_offset(
+                self._offset_for(kind), self._total_for(kind), self.page_size, action
+            ),
+        )
+        return OperatorQueueState.poll_once("")
+
+    @rx.event
+    def set_page_size(self, value: str):
+        """Change the rows-per-page of all three queue tables.
+
+        Every offset returns to the top: a page-4-of-50 offset means a
+        different row under a different page size, so keeping it would scroll
+        the operator somewhere they did not ask to go.
+        """
+        self.page_size = page_size_from(value)
+        for kind in QUEUE_KINDS:
+            self._set_offset(kind, 0)
+        return OperatorQueueState.poll_once("")
+
+    @rx.event(background=True)
+    async def select_queue_row(self, kind: str, index: int):
+        """Show the attribute tree for a clicked queue row.
+
+        Queue objects are fetched on demand through ``get_queue_object`` rather
+        than cached, exactly as the Bokeh operator does: the queue changes under
+        the operator as the orchestrator drains it, and a cache would show a row
+        that has already run. Rapid clicks race and the last response wins,
+        which is acceptable for a single-operator UI.
+
+        Args:
+            kind: ``sequence``, ``experiment`` or ``action``.
+            index: Row index **within the rendered page**. The orchestrator
+                indexes its deques absolutely, so the page's offset is added
+                here rather than in the template: the browser then never has to
+                know where the page starts, and a click on page 2 cannot fetch
+                the object from page 1.
+        """
+        async with self:
+            token = self.router.session.client_token
+            position = self._offset_for(kind) + index
+        backend = session_backend(token)
+        if backend is None:
+            return
+        try:
+            obj = await backend.get_queue_object(kind, position)
+        except Exception as exc:
+            LOGGER.warning(
+                f"operator could not read {kind} queue row {position}: {exc}"
+            )
+            obj = None
+        async with self:
+            self.tree_header, self.tree_html = tree_for(kind, obj)
+
+    @rx.event
+    def select_server_row(self, name: str):
+        """Show the config tree for a clicked action-server row.
+
+        Keyed by server name rather than row index: the server table is local
+        config, not orchestrator state, and the name is already in the row --
+        so this cannot drift out of step with the table's sort order the way an
+        index would.
+        """
+        with _SETTINGS_LOCK:
+            servers = ((_SETTINGS.get("world_cfg") or {}).get("servers")) or {}
+        cfg = servers.get(name)
+        if cfg is None:
+            self.tree_header, self.tree_html = TREE_EMPTY_HEADER, ""
+            return
+        self.tree_header = server_header_text(name, cfg)
+        self.tree_html = object_to_html(cfg, open_keys=["params"])
+
+    def _apply(self, updates: dict) -> None:
+        """Assign a :func:`refresh_tables` result.
+
+        Only the keys present are assigned, which is what preserves the last
+        known rows across an unreachable poll.
+
+        ``requested_offsets`` is not a var; it names the page the rows are
+        actually from, so it is applied through :meth:`_set_offset` rather than
+        ``setattr``. :meth:`poll_once` decides whether it is still current.
+        """
+        requested = updates.pop("requested_offsets", None) or {}
+        for key, value in updates.items():
+            setattr(self, key, value)
+        for kind, offset in requested.items():
+            self._set_offset(kind, offset)
+
+    @rx.event(background=True)
+    async def poll_once(self, _tick: str = ""):
+        """Refresh every table once.
+
+        Driven by a client-side interval, **not** a server-side loop. A
+        ``while True`` in a background event keeps running after the browser
+        tab closes -- ``on_unmount`` fires on in-app navigation but not on a
+        closed tab -- so every abandoned tab left a loop polling the
+        orchestrator forever and logging "Attempting to send delta to
+        disconnected client". A ticking component simply stops existing.
+
+        Background because the refresh is five HTTP round trips: a foreground
+        handler would hold the state lock for all of them and freeze every
+        control on the page.
+
+        Args:
+            _tick: The interval component's value. Unused; present because
+                ``on_change`` passes one.
+        """
+        async with self:
+            if self.polling:
+                # A tick that lands while the previous refresh is still in
+                # flight is dropped rather than queued: a slow orchestrator
+                # would otherwise accumulate overlapping polls that interleave
+                # their writes.
+                return
+            self.polling = True
+            token = self.router.session.client_token
+            # The pages this poll is about to fetch. Captured now so the result
+            # can be checked against them: a pager click that lands while the
+            # fetch is in flight makes every row in that result the wrong page.
+            sent = {kind: self._offset_for(kind) for kind in QUEUE_KINDS}
+            size = self.page_size
+        try:
+            updates = await refresh_tables(session_backend(token), sent, size)
+            async with self:
+                moved = any(self._offset_for(k) != sent[k] for k in QUEUE_KINDS)
+                if moved and "seq_rows" in updates:
+                    # The operator paged while this was in flight. Dropping the
+                    # whole result is right rather than merely skipping the
+                    # offsets: the rows belong to the page they left, and
+                    # showing them under the new page's label would be a table
+                    # that disagrees with its own pager.
+                    return
+                self._apply(updates)
+        finally:
+            # Cleared only after the updates are applied. Clearing first opens
+            # a window where the next tick starts, fetches fresher data, and
+            # applies it -- and then this tick writes its older data on top.
+            async with self:
+                self.polling = False
+
+    @rx.event
+    def on_mount(self):
+        """Set the tick cadence from the config, before the first tick."""
+        self.poll_ms = poll_ms_for(session_poll_interval())
+
+    @rx.event
+    def stop_polling(self):
+        """Drop this session's backend.
+
+        The tick stops on its own with the component; this only releases the
+        sockets the backend holds.
+        """
+        self.polling = False
+        BACKENDS.drop(self.router.session.client_token)
+
+    @rx.event(background=True)
+    async def control(self, name: str):
+        """Run one orchestrator control and report any failure."""
+        async with self:
+            token = self.router.session.client_token
+        message = await dispatch_control(session_backend(token), name)
+        async with self:
+            self.error = message
+
+    @rx.event(background=True)
+    async def move(self, kind: str, position: int, direction: str):
+        """Move a queue item, then let the next poll show the new order.
+
+        ``position`` is page-local and ``length`` is the queue's true depth --
+        not the page's. Both matter: the orchestrator moves by absolute index,
+        and bounding the move by the page length would refuse to move the last
+        row of a page down into the next one, which is a legal move.
+        """
+        async with self:
+            token = self.router.session.client_token
+            absolute = self._offset_for(kind) + position
+            length = self._total_for(kind)
+        message = await dispatch_move(
+            session_backend(token), kind, absolute, direction, length
+        )
+        async with self:
+            self.error = message
+
+    @rx.event(background=True)
+    async def remove(self, kind: str, position: int):
+        """Remove a queue item, then let the next poll show the new queue."""
+        async with self:
+            token = self.router.session.client_token
+            absolute = self._offset_for(kind) + position
+            length = self._total_for(kind)
+        message = await dispatch_remove(session_backend(token), kind, absolute, length)
+        async with self:
+            self.error = message
+
+    def _rows_for(self, kind: str) -> list:
+        """Currently rendered rows for one queue kind."""
+        return {
+            "sequence": self.seq_rows,
+            "experiment": self.exp_rows,
+            "action": self.act_rows,
+        }.get(kind, [])
+
+
+# -- parameter forms ---------------------------------------------------------
+
+
+def align_defaults(args: list, defaults: list) -> list:
+    """Pad ``defaults`` at the front so it lines up with ``args``.
+
+    Python puts parameters without defaults first, so the shorter defaults
+    list belongs at the *end*. Padding the other end would hand every field
+    its neighbour's default -- which the Bokeh operator avoids the same way.
+    """
+    padded = list(defaults)
+    for _ in range(len(args) - len(padded)):
+        padded.insert(0, "")
+    return padded
+
+
+def field_kind(argtype, options: list) -> str:
+    """Input kind for one parameter: ``select``, ``bool``, ``number``, ``text``.
+
+    ``text`` is the fallback for anything without a usable annotation, and for
+    containers -- a list or dict has no typed input, so it is edited as its
+    repr and parsed back on enqueue, exactly as the Bokeh operator does.
+    """
+    if options:
+        return "select"
+    # bool before int: bool is a subclass of int, so the number test would
+    # claim every checkbox.
+    if argtype is bool:
+        return "bool"
+    if argtype in (int, float):
+        return "number"
+    return "text"
+
+
+def fields_for_item(item: dict, options_map: Optional[dict] = None) -> list:
+    """Describe every input the selected library item needs.
+
+    Args:
+        item: One entry from :func:`param_forms.build_lib`. The framework-
+            injected ``Experiment`` argument is already filtered out there.
+        options_map: Optional ``arg name -> options`` for the parameters that
+            render as a dropdown (the station's custom positions).
+
+    Returns:
+        list[dict]: ``name``, ``kind``, ``default`` (a string, as shown),
+        ``help``, ``options``, and ``argtype`` (kept for coercion, and the
+        reason these are dicts rather than the flattened rows the UI binds).
+    """
+    from helao.ui.shared.operator.param_forms import parse_arg_docs
+
+    options_map = options_map or {}
+    args = list(item.get("args") or [])
+    defaults = align_defaults(args, list(item.get("defaults") or []))
+    argtypes = list(item.get("argtypes") or [])
+    descriptions = parse_arg_docs(item.get("doc", ""))
+
+    fields = []
+    for idx, name in enumerate(args):
+        argtype = argtypes[idx] if idx < len(argtypes) else "unspecified"
+        options = [str(o) for o in (options_map.get(name) or [])]
+        shown = str(defaults[idx])
+        kind = field_kind(argtype, options)
+        if kind == "select" and shown not in options:
+            # Bokeh picks the first option rather than leaving a dropdown
+            # displaying a value it cannot offer.
+            shown = options[0]
+        fields.append(
+            {
+                "name": name,
+                "kind": kind,
+                "default": shown,
+                "help": descriptions.get(name, ""),
+                "options": options,
+                "argtype": argtype,
+            }
+        )
+    return fields
+
+
+def flatten_fields(fields: list) -> list:
+    """Flatten field descriptors to the rows the UI iterates.
+
+    ``rx.foreach`` needs a concrete element type and cannot iterate dicts with
+    heterogeneous value types, so the rendered form binds
+    ``list[list[str]]`` -- ``[name, kind, default, help]`` -- while the typed
+    descriptors stay server-side for coercion.
+    """
+    return [[f["name"], f["kind"], f["default"], f["help"]] for f in fields]
+
+
+def field_options(fields: list) -> list:
+    """Dropdown options per field, index-parallel to :func:`flatten_fields`."""
+    return [list(f["options"]) for f in fields]
+
+
+def _to_bool(raw):
+    """Read a checkbox value.
+
+    ``str(False)`` is ``"False"`` and ``bool("False")`` is ``True``, so routing
+    a checkbox through the plain builtin cast inverts every unchecked box.
+    """
+    if isinstance(raw, bool):
+        return raw
+    text = str(raw).strip().lower()
+    if text in ("true", "1", "yes", "on"):
+        return True
+    if text in ("false", "0", "no", "off"):
+        return False
+    raise ValueError(f"'{raw}' is not a yes/no value")
+
+
+def coerce_params(fields: list, values: dict) -> tuple:
+    """Turn entered text into typed parameters.
+
+    Args:
+        fields: Descriptors from :func:`fields_for_item`.
+        values: ``name -> entered value``. A field the operator did not touch
+            falls back to its default.
+
+    Returns:
+        tuple: ``(params, errors)``. A value that will not convert is
+        **reported and omitted from params**, never silently dropped: running
+        a sequence with a default the operator did not choose is worse than
+        not running it, and the caller refuses to enqueue while errors exist.
+    """
+    from helao.ui.shared.operator.param_forms import BUILTIN_TYPES
+    from helao.helpers.to_json import parse_bokeh_input
+
+    params = {}
+    errors = []
+    for field in fields:
+        name = field["name"]
+        raw = values.get(name, field["default"])
+        try:
+            if field["kind"] == "bool":
+                params[name] = _to_bool(raw)
+                continue
+            value = parse_bokeh_input(raw) if isinstance(raw, str) else raw
+            argtype = field["argtype"]
+            params[name] = argtype(value) if argtype in BUILTIN_TYPES else value
+        except Exception as exc:
+            errors.append(f"{name}: {exc}")
+    return params, errors
+
+
+def version_text(item: dict) -> str:
+    """Version and codehash of a library item, as one line of plain text."""
+    from helao.ui.shared.operator.param_forms import version_hint_parts
+
+    return " · ".join(version_hint_parts(item))
+
+
+# -- libraries ---------------------------------------------------------------
+
+#: Library kind -> (backend lib attribute, codehash attribute, config section,
+#: name field). The experiment library additionally filters out the framework's
+#: injected ``Experiment`` argument, which is resolved in `library_items`
+#: because importing the model at module scope is not worth the load cost.
+LIBRARY_KINDS = {
+    "sequence": ("sequence_lib", "sequence_codehash", "sequence_params"),
+    "experiment": ("experiment_lib", "experiment_codehash", "experiment_params"),
+}
+
+
+def library_items(backend, kind: str, world_cfg: dict) -> tuple:
+    """Introspect one of the backend's libraries into selectable items.
+
+    Returns:
+        tuple: ``(items, names)``, both empty when there is no backend or the
+        kind is unknown -- the page renders an empty selector rather than
+        failing, since a backend can be absent for a whole poll cycle.
+    """
+    from helao.ui.shared.operator.param_forms import LibItem, build_lib
+
+    spec = LIBRARY_KINDS.get(kind)
+    if backend is None or spec is None:
+        if spec is None:
+            LOGGER.warning(f"operator asked for unknown library kind '{kind}'")
+        return [], []
+    lib_attr, hash_attr, config_key = spec
+    filter_type = None
+    if kind == "experiment":
+        from helao.helpers.premodels import Experiment
+
+        filter_type = Experiment
+    try:
+        return build_lib(
+            getattr(backend, lib_attr, {}) or {},
+            filter_type,
+            config_key,
+            world_cfg or {},
+            (world_cfg or {}).get("loaded_config_path", ""),
+            LibItem,
+            f"{kind}_name",
+            codehash_map=getattr(backend, hash_attr, {}) or {},
+        )
+    except Exception as exc:
+        LOGGER.exception(f"operator could not build the {kind} library: {exc}")
+        return [], []
+
+
+def item_by_name(items: list, kind: str, name: str):
+    """Find a library item by its name, or ``None``.
+
+    ``None`` is a real case, not a guard: a library reload can drop the item
+    the selector is still showing.
+    """
+    field = f"{kind}_name"
+    for item in items or []:
+        if item.get(field) == name:
+            return item
+    return None
+
+
+def _stamp_campaign(sequence, campaign: str, campaign_uuid: str) -> None:
+    """Stamp the campaign onto a sequence, resolving its UUID.
+
+    The UUID rule is shared with the Bokeh operator: an empty entry hashes the
+    campaign name into a deterministic UUID so two runs of one campaign group
+    together, and a malformed entry is hashed rather than raising.
+    """
+    from helao.ui.shared.operator.param_forms import resolve_campaign_uuid
+
+    if not campaign:
+        return
+    sequence.campaign_name = campaign
+    sequence.campaign_uuid = resolve_campaign_uuid(campaign, campaign_uuid)
+
+
+def build_sequence(
+    backend,
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
+) -> tuple:
+    """Unpack the selected sequence with the entered parameters.
+
+    Returns:
+        tuple: ``(sequence, error)``. Exactly one is meaningful. Building is
+        separate from dispatching because the plan tab buffers sequences
+        client-side before any of them reach the orchestrator.
+    """
+    from helao.helpers.premodels import Sequence
+
+    if item is None:
+        return None, "no sequence is selected"
+    if backend is None:
+        return None, "no orchestrator connection"
+    name = item.get("sequence_name", "")
+    params, errors = coerce_params(fields, values)
+    if errors:
+        return None, "; ".join(errors)
+    try:
+        planned = backend.unpack_sequence(sequence_name=name, sequence_params=params)
+    except Exception as exc:
+        # Named, because the alternative the operator sees is a button that
+        # does nothing.
+        LOGGER.exception(f"operator could not unpack sequence '{name}': {exc}")
+        return None, f"{name} could not be unpacked: {exc}"
+    sequence = Sequence(
+        sequence_name=name,
+        sequence_params=params,
+        sequence_label=label or None,
+        planned_experiments=planned,
+    )
+    _stamp_campaign(sequence, campaign, campaign_uuid)
+    return sequence, ""
+
+
+def build_manual_sequence(
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
+) -> tuple:
+    """Wrap one experiment as a single-experiment ``manual_orch_seq``.
+
+    The orchestrator's queue takes sequences, so this is how a bare experiment
+    reaches it -- the same wrapper the Bokeh operator's "append experiment"
+    builds, ``manual_action`` included.
+
+    Returns:
+        tuple: ``(sequence, error)``.
+    """
+    from helao.helpers.premodels import Experiment, Sequence
+
+    if item is None:
+        return None, "no experiment is selected"
+    name = item.get("experiment_name", "")
+    params, errors = coerce_params(fields, values)
+    if errors:
+        return None, "; ".join(errors)
+    sequence = Sequence(
+        sequence_name="manual_orch_seq",
+        sequence_label=label or None,
+        planned_experiments=[
+            Experiment(experiment_name=name, experiment_params=params)
+        ],
+        manual_action=True,
+    )
+    _stamp_campaign(sequence, campaign, campaign_uuid)
+    return sequence, ""
+
+
+async def enqueue_sequence(
+    backend,
+    item,
+    fields: list,
+    values: dict,
+    label: str = "",
+    campaign: str = "",
+    campaign_uuid: str = "",
+) -> tuple:
+    """Unpack the selected sequence and enqueue it directly.
+
+    Returns:
+        tuple: ``(message, error)``. Exactly one is non-empty. Nothing reaches
+        the orchestrator while a parameter will not convert.
+    """
+    sequence, error = build_sequence(
+        backend,
+        item,
+        fields,
+        values,
+        label=label,
+        campaign=campaign,
+        campaign_uuid=campaign_uuid,
+    )
+    if error:
+        return "", error
+    name = sequence.sequence_name
+    try:
+        await backend.add_sequence(sequence)
+    except Exception as exc:
+        LOGGER.warning(f"operator could not enqueue sequence '{name}': {exc}")
+        return "", f"{name} could not be enqueued: {exc}"
+    return (
+        f"enqueued {name} ({len(sequence.planned_experiments)} experiment(s))",
+        "",
+    )
+
+
+#: Parameters the Bokeh operator renders as a dropdown of the PAL's configured
+#: custom positions. Both read the same list.
+CUSTOM_POSITION_PARAMS = ("solid_custom_position", "liquid_custom_position")
+
+
+def custom_positions(world_cfg: dict) -> list:
+    """Names of the PAL server's configured custom positions.
+
+    Empty for a station with no PAL, which is most of them -- those params
+    then render as plain text, exactly as they do in the Bokeh operator when
+    its custom-item list is empty.
+    """
+    servers = (world_cfg or {}).get("servers") or {}
+    for config in servers.values():
+        if (config or {}).get("fast", "") != "pal_server":
+            continue
+        positions = ((config.get("params") or {}).get("positions") or {}).get(
+            "custom", {}
+        )
+        return list(positions)
+    return []
+
+
+def options_map_for(world_cfg: dict) -> dict:
+    """Dropdown options keyed by parameter name, for :func:`fields_for_item`."""
+    positions = custom_positions(world_cfg)
+    if not positions:
+        return {}
+    return {name: list(positions) for name in CUSTOM_POSITION_PARAMS}
+
+
+class OperatorLibState(rx.State):
+    """Library selection and the dynamic parameter form.
+
+    Separate from :class:`OperatorQueueState` on purpose: Reflex re-renders
+    every component bound to a state when any of its vars change, and a
+    keystroke in a parameter field would otherwise re-push all four queue
+    tables.
+
+    Entered values live in ``_values``, keyed by ``(kind, item name)``, so
+    switching tabs or items and coming back does not silently discard what was
+    typed.
+    """
+
+    mode: str = "sequence"
+    seq_names: list[str] = []
+    exp_names: list[str] = []
+    selected_sequence: str = ""
+    selected_experiment: str = ""
+
+    #: ``[name, kind, current value, help]`` per field. Flattened to strings
+    #: because rx.foreach needs a concrete element type and cannot iterate
+    #: heterogeneous dicts.
+    param_rows: list[list[str]] = []
+    #: Options for every ``select`` field. One list serves them all: the only
+    #: dropdown params are the two custom positions, and both read the PAL's
+    #: single list.
+    position_options: list[str] = []
+
+    doc: str = ""
+    version_hint: str = ""
+    sequence_label: str = ""
+    campaign_name: str = ""
+    campaign_uuid: str = ""
+    #: Whether an enqueue also remembers its parameters. Mirrors the Bokeh
+    #: operator's "save seq params" checkbox, on by default as it is there.
+    save_params: bool = True
+    status: str = ""
+    error: str = ""
+
+    #: Typed field descriptors and entered values, server-side only.
+    _fields: list = []
+    _values: dict = {}
+    _items: dict = {}
+
+    @rx.var
+    def selected_name(self) -> str:
+        """Name selected in the active tab."""
+        return (
+            self.selected_sequence
+            if self.mode == "sequence"
+            else self.selected_experiment
+        )
+
+    @rx.var
+    def doc_html(self) -> str:
+        """The selected item's docstring, ``Args:`` block collapsed.
+
+        Rendered here rather than stored, so the raw docstring stays the single
+        piece of state. See :mod:`object_tree` -- the Bokeh operator renders the
+        same string into a ``Div``.
+        """
+        return doc_to_html(self.doc)
+
+    @rx.var
+    def item_names(self) -> list[str]:
+        """Selectable names for the active tab."""
+        return self.seq_names if self.mode == "sequence" else self.exp_names
+
+    def _world_cfg(self) -> dict:
+        with _SETTINGS_LOCK:
+            return _SETTINGS.get("world_cfg") or {}
+
+    def _remember(self, kind: str, name: str, fields=None) -> None:
+        """Save the parameters that were just used, if saving is enabled.
+
+        Coerces once more rather than reading them back off the built model,
+        so both the plan path and the direct-enqueue path save the same thing.
+        Coercion is pure, and what is stored is the typed values -- matching
+        what the Bokeh operator writes into the same file.
+
+        Args:
+            kind: Library kind the parameters belong to.
+            name: Library item the parameters belong to.
+            fields: The descriptors captured with ``name``. Passed explicitly
+                because an enqueue is a background event: by the time it
+                returns, ``self._fields`` may describe a different item the
+                operator selected meanwhile, and those fields would be saved
+                under this name.
+        """
+        if not self.save_params:
+            return
+        values = dict(self._values.get((kind, name), {}))
+        params, errors = coerce_params(
+            self._fields if fields is None else fields, values
+        )
+        if errors:
+            return
+        save_values(
+            config_root(),
+            kind,
+            name,
+            params,
+            meta={
+                "sequence_label": self.sequence_label,
+                "campaign_name": self.campaign_name,
+                "campaign_uuid": self.campaign_uuid,
+            },
+        )
+
+    def _select(self, kind: str, name: str) -> None:
+        """Rebuild the form for one library item."""
+        item = item_by_name(self._items.get(kind, []), kind, name)
+        if item is None:
+            self._fields = []
+            self.param_rows = []
+            self.doc = ""
+            self.version_hint = ""
+            return
+        world_cfg = self._world_cfg()
+        self._fields = fields_for_item(item, options_map_for(world_cfg))
+        entered = self._values.get((kind, name), {})
+        self.param_rows = [
+            [f["name"], f["kind"], entered.get(f["name"], f["default"]), f["help"]]
+            for f in self._fields
+        ]
+        self.doc = item.get("doc", "")
+        self.version_hint = version_text(item)
+
+    @rx.event(background=True)
+    async def load_libraries(self):
+        """Introspect both libraries off the backend.
+
+        Background because the first call imports every experiment and
+        sequence module the config names, which on a station takes seconds.
+        """
+        async with self:
+            token = self.router.session.client_token
+            world_cfg = self._world_cfg()
+        backend = session_backend(token)
+        libraries = {
+            kind: library_items(backend, kind, world_cfg)
+            for kind in ("sequence", "experiment")
+        }
+        async with self:
+            self._items = {kind: items for kind, (items, _) in libraries.items()}
+            self.seq_names = libraries["sequence"][1]
+            self.exp_names = libraries["experiment"][1]
+            self.position_options = custom_positions(world_cfg)
+            if self.seq_names and self.selected_sequence not in self.seq_names:
+                self.selected_sequence = self.seq_names[0]
+            if self.exp_names and self.selected_experiment not in self.exp_names:
+                self.selected_experiment = self.exp_names[0]
+            self._select(self.mode, self.selected_name)
+            if not self.seq_names and not self.exp_names:
+                self.error = "no sequence or experiment library is loaded"
+
+    @rx.event
+    def set_mode(self, mode: str):
+        """Switch between the sequence and experiment tabs."""
+        if mode not in LIBRARY_KINDS:
+            return
+        self.mode = mode
+        self._select(mode, self.selected_name)
+
+    @rx.event
+    def select_item(self, name: str):
+        """Choose a library item in the active tab."""
+        if self.mode == "sequence":
+            self.selected_sequence = name
+        else:
+            self.selected_experiment = name
+        self._select(self.mode, name)
+
+    def _record_param(self, name: str, value: str) -> None:
+        """Store one edited parameter and update its rendered row."""
+        key = (self.mode, self.selected_name)
+        entered = dict(self._values.get(key, {}))
+        entered[name] = value
+        self._values = {**self._values, key: entered}
+        self.param_rows = [
+            [row[0], row[1], value, row[3]] if row[0] == name else row
+            for row in self.param_rows
+        ]
+
+    @rx.event
+    def set_label(self, value: str):
+        """Set the label applied to sequences built from this selection."""
+        self.sequence_label = value
+
+    @rx.event
+    def set_campaign(self, value: str):
+        """Set the campaign name applied to sequences built from this selection."""
+        self.campaign_name = value
+
+    @rx.event
+    def set_param(self, name: str, value: str):
+        """Record one edited parameter.
+
+        Kept in ``_values`` as well as the rendered row so the entry survives
+        switching items or tabs and switching back.
+        """
+        self._record_param(name, value)
+
+    @rx.event
+    def set_param_bool(self, name: str, value: bool):
+        """Record one edited checkbox.
+
+        Separate from ``set_param`` because a checkbox sends a JSON bool while
+        the rendered rows are all strings, and a str-annotated handler would
+        reject it.
+        """
+        self._record_param(name, str(value))
+
+    @rx.event
+    def set_campaign_uuid(self, value: str):
+        """Set the campaign uuid applied to sequences built from this selection."""
+        self.campaign_uuid = value
+
+    @rx.event
+    def set_save_params(self, value: bool):
+        """Toggle whether an enqueue remembers its parameters."""
+        self.save_params = value
+
+    @rx.event
+    def load_last_params(self):
+        """Fill the form from the parameters last saved for this selection.
+
+        Shared with the Bokeh operator through ``param_store``: values saved
+        from one UI load in the other. Only fields the current library item
+        still declares are filled -- a saved parameter the function no longer
+        takes would be passed straight through to it.
+        """
+        kind, name = self.mode, self.selected_name
+        saved = saved_values(config_root(), kind, name)
+        if not saved:
+            self.status = f"nothing saved for {name}"
+            return
+        known = {f["name"] for f in self._fields}
+        for field_name, value in saved.items():
+            if field_name in known:
+                self._record_param(field_name, value)
+        meta = _last_meta()
+        self.sequence_label = meta.get("sequence_label", self.sequence_label)
+        self.campaign_name = meta.get("campaign_name", self.campaign_name)
+        self.campaign_uuid = meta.get("campaign_uuid", self.campaign_uuid)
+        skipped = sorted(set(saved) - known)
+        self.status = f"loaded last parameters for {name}"
+        if skipped:
+            # Named rather than dropped: a parameter that no longer exists is
+            # usually a renamed one, and silence makes it look like it loaded.
+            self.status += f" (ignored {', '.join(skipped)}: no longer a parameter)"
+
+    @rx.event
+    def reset_params(self):
+        """Drop every edit and return the form to the library defaults."""
+        self._values = {
+            k: v
+            for k, v in self._values.items()
+            if k != (self.mode, self.selected_name)
+        }
+        self._select(self.mode, self.selected_name)
+
+    @rx.event(background=True)
+    async def enqueue(self):
+        """Enqueue the selected sequence with the entered parameters."""
+        async with self:
+            token = self.router.session.client_token
+            kind, name = self.mode, self.selected_name
+            item = item_by_name(self._items.get(kind, []), kind, name)
+            fields = list(self._fields)
+            values = dict(self._values.get((kind, name), {}))
+            label, campaign = self.sequence_label, self.campaign_name
+            campaign_uuid = self.campaign_uuid
+            self.status = ""
+            self.error = ""
+        if kind != "sequence":
+            # Experiments reach the orchestrator inside a sequence; the plan
+            # tab builds that, so enqueueing one directly is not offered.
+            async with self:
+                self.error = "select a sequence to enqueue"
+            return
+        message, error = await enqueue_sequence(
+            session_backend(token),
+            item,
+            fields,
+            values,
+            label=label,
+            campaign=campaign,
+            campaign_uuid=campaign_uuid,
+        )
+        async with self:
+            self.status = message
+            self.error = error
+            if not error:
+                self._remember(kind, name, fields)
+
+
+# -- plan buffer -------------------------------------------------------------
+
+#: Columns of the plan table, matching the Bokeh operator's.
+PLAN_COLS = ["sequence_name", "sequence_label", "num_experiments"]
+
+#: How a buffered plan reaches the orchestrator.
+PLAN_MODES = ("append", "split", "prepend")
+
+
+def plan_rows(plan: list) -> list:
+    """Render the buffered sequences as table rows."""
+    return [
+        [
+            str(sequence.sequence_name or ""),
+            str(sequence.sequence_label or ""),
+            str(len(sequence.planned_experiments or [])),
+        ]
+        for sequence in plan or []
+    ]
+
+
+def plan_moved(plan: list, index: int, direction: str):
+    """Plan buffer with one entry moved, or ``None`` when the move cannot happen.
+
+    Returns a new list rather than mutating: the handler assigns it to a state
+    var, and mutating the existing list in place would change what Reflex is
+    holding without telling it.
+    """
+    target = moved_index(index, direction, len(plan or []))
+    if target is None:
+        return None
+    moved = list(plan)
+    moved[index], moved[target] = moved[target], moved[index]
+    return moved
+
+
+def plan_removed(plan: list, index: int):
+    """Plan buffer without one entry, or ``None`` when the index is not in it."""
+    if index < 0 or index >= len(plan or []):
+        return None
+    remaining = list(plan)
+    remaining.pop(index)
+    return remaining
+
+
+async def dispatch_plan(backend, plan: list, mode: str) -> str:
+    """Send the buffered plan to the orchestrator.
+
+    ``prepend`` hands over the whole list in one call. Prepending one sequence
+    at a time would reverse the buffer's order at the head of the queue.
+
+    Returns:
+        str: Empty on success, else a message naming the sequence that failed.
+        A partial flush is the dangerous case -- some queued, some not -- so
+        the message says where it stopped rather than that "something" failed.
+    """
+    if mode not in PLAN_MODES:
+        LOGGER.warning(f"operator refused plan mode '{mode}'")
+        return f"unknown plan mode '{mode}'"
+    if not plan:
+        return ""
+    if backend is None:
+        return "no orchestrator connection"
+    if mode == "prepend":
+        try:
+            await backend.prepend_sequences(list(plan))
+        except Exception as exc:
+            LOGGER.warning(f"operator could not prepend the plan: {exc}")
+            return f"the plan could not be prepended: {exc}"
+        return ""
+    method = backend.add_sequence if mode == "append" else backend.add_split_sequences
+    for sequence in plan:
+        try:
+            await method(sequence)
+        except Exception as exc:
+            name = sequence.sequence_name
+            LOGGER.warning(f"operator could not enqueue '{name}': {exc}")
+            return f"stopped at {name}: {exc}"
+    return ""
+
+
+# -- history -----------------------------------------------------------------
+
+#: Columns per history table, in the Bokeh operator's order.
+HIST_COLS = {
+    "action": [
+        "action_endpoint",
+        "action_status",
+        "action_uuid",
+        "experiment_name",
+        "sequence_label",
+        "start",
+        "finish",
+    ],
+    "experiment": [
+        "experiment_name",
+        "experiment_uuid",
+        "experiment_status",
+        "sequence_label",
+        "campaign_name",
+        "start",
+        "finish",
+    ],
+    "sequence": [
+        "sequence_name",
+        "sequence_uuid",
+        "sequence_status",
+        "sequence_label",
+        "campaign_name",
+        "start",
+        "finish",
+    ],
+}
+
+#: Per kind, the payload keys holding the start and finish timestamps.
+_HIST_TIMES = {
+    "action": ("action_timestamp", "action_finished_timestamp"),
+    "experiment": ("experiment_timestamp", "experiment_finished_timestamp"),
+    "sequence": ("sequence_timestamp", "sequence_finished_timestamp"),
+}
+
+
+def _last_of(value):
+    """Status fields arrive as a list of transitions; the current one is last."""
+    if isinstance(value, list):
+        return value[-1] if value else ""
+    return "" if value is None else value
+
+
+def history_entries(histories: Optional[dict], kind: str) -> list:
+    """Render one whole history container from a ``get_histories`` payload.
+
+    Args:
+        histories: ``get_histories`` payload -- ``kind -> [(uuid, payload)]``.
+        kind: ``action``, ``experiment``, or ``sequence``.
+
+    Returns:
+        list[tuple[list[str], dict]]: See :func:`history_page_entries`.
+    """
+    return history_page_entries(((histories or {}).get(kind)) or [], kind)
+
+
+def history_page_entries(entries, kind: str) -> list:
+    """Render one page of history, keeping each row's source payload beside it.
+
+    Rows and payloads come from one pass so their order cannot drift. They are
+    indexed together -- the operator clicks row *n* and expects object *n* -- and
+    two separately-sorted lists would put the wrong object in the tree without
+    anything looking wrong.
+
+    The sort is by UUID descending, which is chronological here and not an
+    accident: ``gen_uuid`` returns a **uuid7**, whose leading bits are a
+    timestamp, so lexicographic order is time order. Sorting a server-supplied
+    page is a no-op on a page that already arrived newest-first -- a page is a
+    contiguous slice of one chronological sequence -- so the same renderer
+    serves the paged and whole-container paths.
+
+    Args:
+        entries: ``(uuid, payload)`` pairs -- one page, or a whole container.
+        kind: ``action``, ``experiment``, or ``sequence``.
+
+    Returns:
+        list[tuple[list[str], dict]]: ``(row, payload)`` most recent first. Every
+        row carries every column even when the payload lacks the key: ragged
+        rows are what made the Bokeh table refuse to render, and here they would
+        silently shift cells under the wrong headers.
+    """
+    columns = HIST_COLS.get(kind)
+    if columns is None:
+        return []
+    entries = entries or []
+    start_key, finish_key = _HIST_TIMES[kind]
+    out = []
+    for uuid, payload in sorted(entries, key=lambda x: x[0])[::-1]:
+        payload = payload or {}
+        derived = dict(payload)
+        derived[f"{kind}_uuid"] = str(uuid)[-8:]
+        derived["start"] = payload.get(start_key)
+        derived["finish"] = payload.get(finish_key)
+        if kind == "action":
+            derived["action_endpoint"] = (
+                f"{payload.get('action_server', '')}/{payload.get('action_name', '')}"
+            )
+        row = [str(_last_of(derived.get(col))) for col in columns]
+        # The full payload, not the derived copy: the tree should show what the
+        # orchestrator actually holds, with the uuid unabbreviated.
+        out.append((row, payload))
+    return out
+
+
+def history_rows(histories: Optional[dict], kind: str) -> list:
+    """The table rows from :func:`history_entries`, without the payloads."""
+    return [row for row, _ in history_entries(histories, kind)]
+
+
+class OperatorPlanState(rx.State):
+    """The client-side plan buffer and the history tables.
+
+    The buffer is the one piece of operator state the orchestrator does not
+    own: sequences are assembled and reordered here, and only reach the
+    orchestrator when the operator flushes them. That is why these rows are
+    edited locally, unlike the queue tables.
+    """
+
+    plan_view: list[list[str]] = []
+    status: str = ""
+    error: str = ""
+
+    action_history: list[list[str]] = []
+    experiment_history: list[list[str]] = []
+    sequence_history: list[list[str]] = []
+
+    #: Rows per page across all three history tables.
+    hist_page_size: int = DEFAULT_PAGE_SIZE
+
+    #: First-row index of each history table's page, counting back from the
+    #: newest entry -- offset 0 is the most recent page, not the oldest.
+    action_offset: int = 0
+    experiment_offset: int = 0
+    sequence_offset: int = 0
+
+    #: Full length of each history container, from `get_history_page`.
+    action_total: int = 0
+    experiment_total: int = 0
+    sequence_total: int = 0
+
+    #: Guard against overlapping history refreshes, mirroring
+    #: ``OperatorQueueState.polling``. Both tick from the same interval, so a
+    #: slow orchestrator would otherwise accumulate refreshes that interleave
+    #: their writes and leave rows from one page under another page's label.
+    refreshing: bool = False
+
+    #: Attribute tree for the row the operator last clicked, as the Bokeh
+    #: operator shows beside these tables. Rendered HTML rather than the object,
+    #: because the tree is markup either way and the raw payloads have no other
+    #: use in the browser.
+    tree_header: str = TREE_EMPTY_HEADER
+    tree_html: str = ""
+
+    #: Payloads behind the history rows, index-aligned with them by
+    #: `history_entries`. A backend var: only the rendered tree crosses the wire.
+    _hist_objs: dict = {}
+
+    #: Buffered Sequence models. A backend var: these are pydantic models, not
+    #: JSON, and the browser only ever needs `plan_view`.
+    _plan: list = []
+
+    @rx.var
+    def plan_count(self) -> int:
+        """How many sequences are buffered.
+
+        Read by the flush button's label and by the Plan tab's title.
+        """
+        return len(self.plan_view)
+
+    # History depths for the subtab titles, and the pager labels beneath each
+    # table. The depths are the orchestrator's own totals, not ``len(rows)``:
+    # the tables show one page.
+    @rx.var
+    def sequence_count(self) -> int:
+        """Number of sequences in the orchestrator's sequence history."""
+        return self.sequence_total
+
+    @rx.var
+    def experiment_count(self) -> int:
+        """Number of experiments in the orchestrator's experiment history."""
+        return self.experiment_total
+
+    @rx.var
+    def action_count(self) -> int:
+        """Number of actions in the orchestrator's action history."""
+        return self.action_total
+
+    @rx.var
+    def sequence_page_label(self) -> str:
+        """``51-100 of 412`` for the sequence history's pager."""
+        return page_label(
+            self.sequence_offset, len(self.sequence_history), self.sequence_total
+        )
+
+    @rx.var
+    def experiment_page_label(self) -> str:
+        """``51-100 of 412`` for the experiment history's pager."""
+        return page_label(
+            self.experiment_offset, len(self.experiment_history), self.experiment_total
+        )
+
+    @rx.var
+    def action_page_label(self) -> str:
+        """``51-100 of 412`` for the action history's pager."""
+        return page_label(
+            self.action_offset, len(self.action_history), self.action_total
+        )
+
+    @rx.var
+    def hist_page_size_value(self) -> str:
+        """The history page-size select's value. ``rx.select`` uses strings."""
+        return str(self.hist_page_size)
+
+    def _hist_offset_for(self, kind: str) -> int:
+        """First-row index of one history table's page."""
+        return {
+            "sequence": self.sequence_offset,
+            "experiment": self.experiment_offset,
+            "action": self.action_offset,
+        }.get(kind, 0)
+
+    def _hist_total_for(self, kind: str) -> int:
+        """Full length of one history container."""
+        return {
+            "sequence": self.sequence_total,
+            "experiment": self.experiment_total,
+            "action": self.action_total,
+        }.get(kind, 0)
+
+    def _set_hist_offset(self, kind: str, offset: int) -> None:
+        """Move one history table's page."""
+        if kind in HIST_COLS:
+            setattr(self, f"{kind}_offset", offset)
+
+    @rx.event
+    def page_history(self, kind: str, action: str):
+        """Move one history table to another page and refresh it now."""
+        if kind not in HIST_COLS:
+            return
+        self._set_hist_offset(
+            kind,
+            paged_offset(
+                self._hist_offset_for(kind),
+                self._hist_total_for(kind),
+                self.hist_page_size,
+                action,
+            ),
+        )
+        return OperatorPlanState.refresh_history("")
+
+    @rx.event
+    def set_hist_page_size(self, value: str):
+        """Change the rows-per-page of all three history tables."""
+        self.hist_page_size = page_size_from(value)
+        for kind in HIST_COLS:
+            self._set_hist_offset(kind, 0)
+        return OperatorPlanState.refresh_history("")
+
+    def _set_plan(self, plan: list) -> None:
+        self._plan = plan
+        self.plan_view = plan_rows(plan)
+
+    async def _add(self, prepend: bool):
+        """Build a sequence from the library tab's selection and buffer it."""
+        lib = await self.get_state(OperatorLibState)
+        kind, name = lib.mode, lib.selected_name
+        item = item_by_name(lib._items.get(kind, []), kind, name)
+        fields = list(lib._fields)
+        values = dict(lib._values.get((kind, name), {}))
+        label, campaign = lib.sequence_label, lib.campaign_name
+        campaign_uuid = lib.campaign_uuid
+        if kind == "sequence":
+            backend = session_backend(self.router.session.client_token)
+            sequence, error = build_sequence(
+                backend,
+                item,
+                fields,
+                values,
+                label=label,
+                campaign=campaign,
+                campaign_uuid=campaign_uuid,
+            )
+        else:
+            sequence, error = build_manual_sequence(
+                item,
+                fields,
+                values,
+                label=label,
+                campaign=campaign,
+                campaign_uuid=campaign_uuid,
+            )
+        if error:
+            self.error = error
+            return
+        self.error = ""
+        # The Bokeh operator saves in populate_sequence -- i.e. when the item
+        # is buffered, not only when it is enqueued -- so this does too.
+        lib._remember(kind, name, fields)
+        plan = list(self._plan)
+        if prepend:
+            plan.insert(0, sequence)
+        else:
+            plan.append(sequence)
+        self._set_plan(plan)
+        self.status = f"buffered {sequence.sequence_name}"
+
+    @rx.event
+    async def append_selection(self):
+        """Add the current selection to the end of the buffer."""
+        await self._add(prepend=False)
+
+    @rx.event
+    async def prepend_selection(self):
+        """Add the current selection to the front of the buffer."""
+        await self._add(prepend=True)
+
+    @rx.event
+    def move_row(self, index: int, direction: str):
+        """Move one buffered row.
+
+        Per-row buttons rather than a table selection: every row carries its
+        own index, so there is no selection to keep in step with a buffer that
+        changes under it.
+        """
+        moved = plan_moved(self._plan, index, direction)
+        if moved is None:
+            return
+        self._set_plan(moved)
+
+    @rx.event
+    def remove_row(self, index: int):
+        """Drop one row from the buffer."""
+        remaining = plan_removed(self._plan, index)
+        if remaining is None:
+            return
+        self._set_plan(remaining)
+
+    @rx.event
+    def clear_plan(self):
+        """Empty the buffer without sending anything."""
+        self._set_plan([])
+        self.status = ""
+
+    @rx.event(background=True)
+    async def flush(self, mode: str):
+        """Send the buffer to the orchestrator.
+
+        The buffer is emptied *before* the first await. A flush that cleared
+        afterwards would let a second click dispatch the same sequences again
+        while the first was still in flight -- the same reason the Bokeh
+        operator clears synchronously and dispatches on the next tick.
+        """
+        async with self:
+            plan = list(self._plan)
+            token = self.router.session.client_token
+            self._set_plan([])
+            self.error = ""
+            self.status = f"sending {len(plan)} sequence(s)..." if plan else ""
+        error = await dispatch_plan(session_backend(token), plan, mode)
+        async with self:
+            self.error = error
+            self.status = "" if error else f"sent {len(plan)} sequence(s)"
+
+    @rx.event(background=True)
+    async def refresh_history(self, _tick: str = ""):
+        """Reload one page of each of the three history tables.
+
+        Bound to three things at once: the page's ``rx.moment`` interval, which
+        is what makes the history live; the manual Refresh button, which forces
+        one now; and the pager events, which refresh after moving. The interval
+        passes its value and the other two pass nothing, hence the default.
+
+        Args:
+            _tick: The interval component's value. Unused.
+        """
+        async with self:
+            if self.refreshing:
+                # Same rule as the queue poll: a tick landing on an in-flight
+                # refresh is dropped, not queued.
+                return
+            self.refreshing = True
+            token = self.router.session.client_token
+            sent = {kind: self._hist_offset_for(kind) for kind in HIST_COLS}
+            size = self.hist_page_size
+        try:
+            backend = session_backend(token)
+            if backend is None:
+                return
+            try:
+                pages = {
+                    kind: await backend.get_history_page(
+                        kind, limit=size, offset=sent[kind]
+                    )
+                    for kind in HIST_COLS
+                }
+            except Exception as exc:
+                LOGGER.warning(f"operator history refresh failed: {exc}")
+                async with self:
+                    self.error = f"history unavailable: {exc}"
+                return
+            try:
+                totals = {k: int((v or {}).get("total") or 0) for k, v in pages.items()}
+                # Clamped *after* the fetch, not before: the total is only known
+                # once the page comes back, and a history that has not grown to
+                # the requested page yet must not leave the operator stranded on
+                # an empty one.
+                offsets = {k: clamp_offset(sent[k], totals[k], size) for k in pages}
+                entries = {
+                    kind: history_page_entries((page or {}).get("items"), kind)
+                    for kind, page in pages.items()
+                }
+                rendered = {k: [row for row, _ in v] for k, v in entries.items()}
+                objects = {k: [obj for _, obj in v] for k, v in entries.items()}
+            except Exception as exc:
+                # Rendering is outside the fetch's guard, and a payload shaped
+                # unlike (uuid, dict) pairs would otherwise escape the handler.
+                LOGGER.warning(f"operator could not render the histories: {exc}")
+                async with self:
+                    self.error = f"history could not be read: {exc}"
+                return
+            async with self:
+                if any(self._hist_offset_for(k) != sent[k] for k in HIST_COLS):
+                    # Paged while this was in flight; these rows are the page
+                    # the operator just left.
+                    return
+                self.action_history = rendered["action"]
+                self.experiment_history = rendered["experiment"]
+                self.sequence_history = rendered["sequence"]
+                self.action_total = totals["action"]
+                self.experiment_total = totals["experiment"]
+                self.sequence_total = totals["sequence"]
+                for kind, offset in offsets.items():
+                    self._set_hist_offset(kind, offset)
+                self._hist_objs = objects
+                # `error` is deliberately *not* cleared here. It is shared with
+                # the plan buffer, and a tick every few seconds would wipe an
+                # enqueue failure off the screen before it could be read.
+        finally:
+            async with self:
+                self.refreshing = False
+
+    @rx.event
+    def select_history_row(self, kind: str, index: int):
+        """Show the attribute tree for a clicked history row.
+
+        Args:
+            kind: ``action``, ``experiment`` or ``sequence``.
+            index: Row index, aligned with the payloads cached by
+                :meth:`refresh_history`.
+        """
+        objs = self._hist_objs.get(kind) or []
+        obj = objs[index] if 0 <= index < len(objs) else None
+        self.tree_header, self.tree_html = tree_for(kind, obj)
+
+    @rx.event
+    def select_plan_row(self, index: int):
+        """Show the attribute tree for a clicked row of the plan buffer.
+
+        The plan holds pydantic Sequences rather than payload dicts, so this
+        dumps the model. A history refresh replacing the cache cannot affect it.
+        """
+        obj = None
+        if 0 <= index < len(self._plan):
+            try:
+                obj = self._plan[index].as_dict()
+            except Exception as exc:
+                LOGGER.warning(f"operator could not read plan row {index}: {exc}")
+        self.tree_header, self.tree_html = tree_for("sequence", obj)
+
+
+# -- plate map ---------------------------------------------------------------
+
+#: Composition fraction keys on a platemap entry, in display order.
+FRACTION_KEYS = ("A", "B", "C", "D", "E", "F", "G", "H")
+
+#: Plate APIs the operator knows how to build, by config value.
+PLATE_APIS = ("HTEPlateAPI",)
+
+_PLATE_API_CACHE: dict = {}
+
+
+def plate_api_for(server_cfg: dict):
+    """Build the configured plate API, or ``None`` when there is none.
+
+    Opt-in, as in the Bokeh operator: most stations have no plate API, and an
+    unknown name is ignored rather than imported, so a typo cannot pull in
+    something arbitrary.
+    """
+    params = (server_cfg or {}).get("params")
+    name = params.get("plate_api") if isinstance(params, dict) else None
+    if name not in PLATE_APIS:
+        if name:
+            LOGGER.warning(f"operator ignoring unknown plate_api '{name}'")
+        return None
+    cached = _PLATE_API_CACHE.get(name)
+    if cached is not None:
+        return cached
+    try:
+        from helao.helpers.plate_api import HTEPlateAPI
+
+        cached = HTEPlateAPI()
+    except Exception as exc:
+        LOGGER.warning(f"operator could not build plate API '{name}': {exc}")
+        return None
+    _PLATE_API_CACHE[name] = cached
+    return cached
+
+
+def _as_number(value):
+    """Read one coordinate, or ``None`` when it is not a number."""
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def platemap_points(pmdata: Optional[list]) -> tuple:
+    """Split a platemap into plottable coordinates and sample numbers.
+
+    A row whose coordinates will not convert is dropped whole. Handing a
+    non-numeric value to ``plots`` raises from inside the render and takes the
+    entire chart down, and dropping only one of the pair would leave x and y
+    at different lengths, which ``scatter_map`` rejects.
+
+    Returns:
+        tuple: ``(xs, ys, sample_nos)``, all the same length. Sample numbers
+        are 1-based, matching the plate's own numbering.
+    """
+    xs, ys, samples = [], [], []
+    for index, entry in enumerate(pmdata or []):
+        x = _as_number((entry or {}).get("x"))
+        y = _as_number((entry or {}).get("y"))
+        if x is None or y is None:
+            continue
+        xs.append(x)
+        ys.append(y)
+        samples.append(index + 1)
+    return xs, ys, samples
+
+
+def nearest_sample(pmdata: Optional[list], x: float, y: float):
+    """Sample number nearest a clicked point, or ``None`` on an empty map.
+
+    Matched against the plottable rows only: a click lands on the rendered
+    map, which does not contain the rows that were dropped, so matching
+    against them could return a sample the operator cannot see.
+    """
+    xs, ys, samples = platemap_points(pmdata)
+    if not xs:
+        return None
+    best = min(range(len(xs)), key=lambda i: (xs[i] - x) ** 2 + (ys[i] - y) ** 2)
+    return samples[best]
+
+
+def composition_text(entry: Optional[dict]) -> str:
+    """Composition fractions of one platemap entry, as one line.
+
+    A dash when there are none: an empty readout reads as a failure to load
+    rather than a plate with no composition.
+    """
+    entry = entry or {}
+    parts = [
+        f"{key}_{entry[key]}" for key in FRACTION_KEYS if entry.get(key) is not None
+    ]
+    return " ".join(parts) if parts else "-"
+
+
+def sample_summary(pmdata: Optional[list], sample_no: int) -> dict:
+    """Code and composition for one sample number.
+
+    Args:
+        pmdata: The platemap.
+        sample_no: 1-based sample number. ``0`` is rejected rather than
+            treated as an index, which would silently return the last sample
+            on the plate.
+
+    Returns:
+        dict: ``sample_no``, ``code``, ``composition``, and ``error``.
+    """
+    blank = {"sample_no": str(sample_no), "code": "", "composition": ""}
+    entries = pmdata or []
+    if sample_no < 1 or sample_no > len(entries):
+        return {**blank, "error": f"sample {sample_no} is not on this plate"}
+    entry = entries[sample_no - 1] or {}
+    return {
+        "sample_no": str(sample_no),
+        "code": "" if entry.get("code") is None else str(entry["code"]),
+        "composition": composition_text(entry),
+        "error": "",
+    }
+
+
+class OperatorPlateState(rx.State):
+    """The plate map: a scatter of a plate's samples, selectable by click.
+
+    Opt-in. Without ``plate_api`` in the server params there is no plate data
+    to draw, and the tab says so rather than rendering an empty chart that
+    looks broken -- the same gate the Bokeh operator applies, which its suite
+    covers in ``test_plate_api_disabled_by_default``.
+    """
+
+    plate_id: str = ""
+    sample_no: str = ""
+    code: str = ""
+    composition: str = ""
+    enabled: bool = False
+    status: str = ""
+    error: str = ""
+
+    chart_spec: dict = {}
+    chart_url: str = ""
+    chart_layout: str = ""
+    version: int = 0
+
+    #: The loaded platemap. A backend var: it is a list of dicts per sample and
+    #: the browser needs only the rendered points.
+    _pmdata: list = []
+
+    def panel_key(self) -> str:
+        """Session-scoped buffer-store key.
+
+        The store holds one frame per key while ``version`` is per-session
+        state, so a shared key would 404 two tabs into frozen charts.
+        """
+        return f"plate-{self.router.session.client_token}"
+
+    def _plate_api(self):
+        with _SETTINGS_LOCK:
+            world_cfg = _SETTINGS.get("world_cfg") or {}
+            server_key = _SETTINGS.get("server_key", "")
+        server_cfg = (world_cfg.get("servers") or {}).get(server_key) or {}
+        return plate_api_for(server_cfg)
+
+    @rx.event
+    def on_mount(self):
+        """Report whether this station has a plate API at all."""
+        self.enabled = self._plate_api() is not None
+        if not self.enabled:
+            self.status = "no plate API is configured for this station"
+
+    def _redraw(self) -> None:
+        xs, ys, samples = platemap_points(self._pmdata)
+        self.version += 1
+        payload = plots.scatter_map(
+            xs,
+            ys,
+            values=samples or None,
+            x_label="x (mm)",
+            y_label="y (mm)",
+            panel_id=self.panel_key(),
+            version=self.version,
+        )
+        self.chart_spec = payload.spec
+        self.chart_url = payload.buffer_url
+        self.chart_layout = payload.layout
+
+    @rx.event(background=True)
+    async def load_plate(self):
+        """Fetch and draw the platemap for the entered plate id."""
+        async with self:
+            api = self._plate_api()
+            raw = self.plate_id.strip()
+            self.error = ""
+        if api is None:
+            async with self:
+                self.error = "no plate API is configured for this station"
+            return
+        try:
+            plateid = int(raw)
+        except ValueError:
+            async with self:
+                self.error = f"'{raw}' is not a plate id"
+            return
+        try:
+            pmdata = api.get_platemap_plateid(plateid)
+        except Exception as exc:
+            LOGGER.warning(f"operator could not load plate {plateid}: {exc}")
+            async with self:
+                self.error = f"plate {plateid} could not be loaded: {exc}"
+            return
+        async with self:
+            self._pmdata = list(pmdata or [])
+            if not self._pmdata:
+                self.status = f"plate {plateid} has no platemap"
+                return
+            self.status = f"plate {plateid}: {len(self._pmdata)} samples"
+            self._redraw()
+
+    @rx.event
+    def on_select(self, payload: dict):
+        """Snap to the sample nearest a click on the map."""
+        x = _as_number((payload or {}).get("x"))
+        y = _as_number((payload or {}).get("y"))
+        if x is None or y is None:
+            return
+        sample = nearest_sample(self._pmdata, x, y)
+        if sample is None:
+            return
+        self.set_sample(str(sample))
+
+    @rx.event
+    def set_plate_id(self, value: str):
+        """Set the plate id to load."""
+        self.plate_id = value
+
+    @rx.event
+    def set_sample(self, value: str):
+        """Set the sample number and refresh its readouts."""
+        self.sample_no = value
+        try:
+            sample = int(value)
+        except (TypeError, ValueError):
+            self.code = ""
+            self.composition = ""
+            return
+        summary = sample_summary(self._pmdata, sample)
+        self.code = summary["code"]
+        self.composition = summary["composition"]
+        self.error = summary["error"]
+
+
+# -- page --------------------------------------------------------------------
+
+
+def _error_text(var):
+    """Render an error line only when there is one."""
+    return rx.cond(var != "", rx.text(var, class_name="text-red-600", size="1"))
+
+
+def _table(
+    columns: list,
+    rows_var,
+    *,
+    height: str = "14em",
+    row_actions=None,
+    on_row_click=None,
+    hue: str | None = None,
+    pager=None,
+):
+    """A scrolling table over ``list[list[str]]`` rows.
+
+    Args:
+        columns: Header labels.
+        rows_var: State var holding the rows.
+        height: Scroll-area height.
+        row_actions: Optional ``(row, index) -> rx.Component`` for a trailing
+            per-row control cell.
+        on_row_click: Optional ``(row, index) -> EventSpec`` fired when a row is
+            clicked, which is how the attribute tree is selected. Bokeh gets row
+            selection from its ``ColumnDataSource``; an ``rx.table`` has none, so
+            the click goes on the row itself.
+        hue: Optional key of ``REFLEX_TABLE_HUES`` naming what kind of object
+            the rows are. Colours the header row and puts a 3px marker down the
+            table's left edge, so the same object type reads the same whether it
+            is being shown as a queue or as history. The **body stays white**
+            either way: saturating the cells behind the data is what makes a
+            coloured table hard to read.
+        pager: Optional component placed directly under the table. Passed in
+            rather than built here so the table primitive stays a table: a
+            pager needs the owning state's offset, total and events, none of
+            which a table knows about. ``None`` leaves the previous bare-table
+            layout untouched, which is what the Servers and Plan tables get.
+    """
+
+    def render(row, index):
+        cells: list = [rx.foreach(row, lambda cell: rx.table.cell(cell))]
+        if row_actions is not None:
+            cells.append(rx.table.cell(row_actions(row, index)))
+        if on_row_click is None:
+            return rx.table.row(*cells)
+        return rx.table.row(
+            *cells,
+            on_click=on_row_click(row, index),
+            cursor="pointer",
+        )
+
+    header_class = reflex_header_class(hue) if hue else ""
+    headers = [
+        rx.table.column_header_cell(col, class_name=header_class) for col in columns
+    ]
+    if row_actions is not None:
+        headers.append(rx.table.column_header_cell("", class_name=header_class))
+    scroller = rx.scroll_area(
+        rx.table.root(
+            rx.table.header(rx.table.row(*headers)),
+            rx.table.body(rx.foreach(rows_var, render)),
+            width="100%",
+            size="1",
+            class_name=reflex_table_class(hue) if hue else "",
+        ),
+        type="auto",
+        scrollbars="vertical",
+        height=height,
+    )
+    if pager is None:
+        return scroller
+    return rx.vstack(scroller, pager, width="100%", spacing="1")
+
+
+def _pager(
+    *, label_var, offset_var, total_var, size_var, size_value_var, on_page, on_page_size
+):
+    """The row of controls under a paged table.
+
+    Args:
+        label_var: Var holding the ``51-100 of 412`` line.
+        offset_var: Var holding the page's first-row index. Read only to
+            disable the backwards controls.
+        total_var: Var holding the true row count.
+        size_var: Var holding the page size as an ``int``, for the bounds
+            comparison.
+        size_value_var: The same page size as a ``str``. Separate because
+            ``rx.select`` options are strings and its value has to match one
+            of them exactly, while the comparison above needs a number.
+        on_page: ``action -> EventSpec`` for ``first``/``prev``/``next``/``last``.
+        on_page_size: Handler for the page-size select.
+
+    The forward controls are disabled on ``offset + page_size >= total`` rather
+    than on the rendered row count, because the row count is only known after a
+    fetch: a pager that waited for it would enable Next for one tick on the
+    last page.
+    """
+    at_start = offset_var <= 0
+    at_end = offset_var + size_var >= total_var
+
+    def step(glyph: str, action: str, disabled):
+        return rx.button(
+            glyph,
+            size="1",
+            variant="soft",
+            disabled=disabled,
+            on_click=on_page(action),
+        )
+
+    return rx.hstack(
+        step("<<", "first", at_start),
+        step("<", "prev", at_start),
+        rx.text(label_var, size="1", class_name=_MUTED_TEXT),
+        step(">", "next", at_end),
+        step(">>", "last", at_end),
+        rx.spacer(),
+        rx.text("rows", size="1", class_name=_MUTED_TEXT),
+        rx.select(
+            [str(n) for n in PAGE_SIZES],
+            value=size_value_var,
+            on_change=on_page_size,
+            size="1",
+            width="5.5em",
+        ),
+        width="100%",
+        spacing="2",
+        align="center",
+    )
+
+
+def _tree_pane(header_var, html_var):
+    """The attribute tree beside a set of tables.
+
+    Mirrors the Bokeh operator's header Div plus tree Div. The HTML is nested
+    ``<details>``, so expanding a node needs no round trip.
+    """
+    return rx.vstack(
+        rx.text(header_var, weight="bold", size="1"),
+        rx.scroll_area(
+            rx.html(html_var),
+            type="auto",
+            scrollbars="vertical",
+            height="14em",
+        ),
+        width="100%",
+        spacing="1",
+        font_size="0.8em",
+    )
+
+
+def _queue_tab(columns: list, rows_var, kind: str, offset_var, total_var, label_var):
+    """One queue table with a pager and per-row reorder and remove controls.
+
+    The row index handed to every event stays **page-local**. The state adds
+    its own offset before it reaches the orchestrator, so nothing in the
+    browser has to know where the page starts -- and there is no place for a
+    template to forget to add it.
+    """
+    return _table(
+        columns,
+        rows_var,
+        # The queue kinds are exactly the hue keys, so the same object type is
+        # the same colour here and in History.
+        hue=kind,
+        pager=_pager(
+            label_var=label_var,
+            offset_var=offset_var,
+            total_var=total_var,
+            size_var=OperatorQueueState.page_size,
+            size_value_var=OperatorQueueState.page_size_value,
+            on_page=lambda action: OperatorQueueState.page(kind, action),
+            on_page_size=OperatorQueueState.set_page_size,
+        ),
+        on_row_click=lambda row, index: OperatorQueueState.select_queue_row(
+            kind, index
+        ),
+        row_actions=lambda row, index: rx.hstack(
+            rx.button(
+                "^",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.move(kind, index, "up"),
+            ),
+            rx.button(
+                "v",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.move(kind, index, "down"),
+            ),
+            rx.button(
+                "x",
+                size="1",
+                class_name="text-red-600",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.remove(kind, index),
+            ),
+            spacing="1",
+        ),
+    )
+
+
+def _param_field(row, state, options, index=None):
+    """One parameter input, by kind.
+
+    ``row`` is ``[name, kind, value, help]``. The kinds are compared on the
+    var rather than resolved in Python: the row is only known in the browser.
+
+    Args:
+        row: The flattened field row.
+        state: State owning ``set_param``. Defaults to the library form.
+        options: Var holding the select options, when the form has any.
+        index: Position of this parameter in the form, rendered as a faint
+            ``[n]`` to the left of the control — the same decoration the Bokeh
+            operator carries (``index_div``, right-aligned in a 35px column).
+            ``None`` omits it *and* the column that reserves its width, so a
+            caller that passes no index gets the previous full-width layout
+            unchanged.
+    """
+
+    # An empty `rx.text` at the same `size`, not an `rx.box`: `2.5em` resolves
+    # against the element's *own* font size, and only the text carries
+    # `size="1"`. A box inherited the Radix default instead, so the label row
+    # reserved 40px (2.5 x 16) against the index column's 30px (2.5 x 12) and
+    # every parameter name sat right of its input. Measured 17px of offset,
+    # 10 of it from that and the rest from the two rows' `spacing` differing —
+    # which is why the spacing below is now stated on both rows rather than
+    # left to the default on one.
+    indent = (
+        []
+        if index is None
+        else [rx.text("", size="1", width=_PARAM_INDEX_WIDTH, flex_shrink="0")]
+    )
+    return rx.vstack(
+        rx.hstack(
+            *indent,
+            rx.text(row[0], size="1", weight="medium"),
+            rx.spacer(),
+            rx.text(row[3], size="1", class_name=_MUTED_TEXT),
+            width="100%",
+            spacing="1",
+        ),
+        rx.hstack(
+            *(
+                []
+                if index is None
+                else [
+                    rx.text(
+                        f"[{index}]",
+                        size="1",
+                        class_name=_MUTED_TEXT,
+                        width=_PARAM_INDEX_WIDTH,
+                        flex_shrink="0",
+                        text_align="right",
+                    )
+                ]
+            ),
+            # The control sits in a growing box rather than directly in the
+            # hstack: `rx.cond` takes no layout props of its own, so without a
+            # wrapper the field would size to its content and leave the rest of
+            # the row empty once the index column is beside it. `min_width="0"`
+            # is what lets it shrink inside a narrow grid cell instead of
+            # forcing the column wider than its share.
+            rx.box(
+                rx.cond(
+                    row[1] == "bool",
+                    rx.checkbox(
+                        checked=row[2].lower() == "true",
+                        on_change=lambda value: OperatorLibState.set_param_bool(
+                            row[0], value
+                        ),
+                    ),
+                    rx.cond(
+                        row[1] == "select",
+                        rx.select(
+                            options,
+                            value=row[2],
+                            on_change=lambda value: state.set_param(row[0], value),
+                            width="100%",
+                            size="2",
+                        ),
+                        rx.input(
+                            value=row[2],
+                            on_change=lambda value: state.set_param(row[0], value),
+                            width="100%",
+                            size="2",
+                        ),
+                    ),
+                ),
+                flex_grow="1",
+                min_width="0",
+            ),
+            width="100%",
+            spacing="1",
+            align="center",
+        ),
+        width="100%",
+        spacing="1",
+    )
+
+
+def _library_panel():
+    """Selector, parameter form, and the buttons that act on the selection."""
+    return rx.vstack(
+        rx.hstack(
+            rx.select(
+                ["sequence", "experiment"],
+                value=OperatorLibState.mode,
+                on_change=OperatorLibState.set_mode,
+                width="10em",
+            ),
+            rx.select(
+                OperatorLibState.item_names,
+                value=OperatorLibState.selected_name,
+                on_change=OperatorLibState.select_item,
+                width="20em",
+            ),
+            rx.text(OperatorLibState.version_hint, size="1", class_name=_MUTED_TEXT),
+            rx.button(
+                "Reload libraries", size="1", on_click=OperatorLibState.load_libraries
+            ),
+            spacing="3",
+            align="center",
+            width="100%",
+        ),
+        # The selected item's docstring, as the Bokeh operator shows it: prose
+        # verbatim, the Args: block collapsed behind a disclosure so a long
+        # parameter list does not push the form off screen.
+        rx.cond(
+            OperatorLibState.doc_html != "",
+            rx.box(
+                rx.html(OperatorLibState.doc_html),
+                width="100%",
+                padding="0.5em 0.75em",
+                border_radius="var(--radius-2)",
+                class_name="bg-slate-50",
+                font_size="0.8em",
+            ),
+        ),
+        rx.hstack(
+            rx.input(
+                placeholder="sequence label",
+                value=OperatorLibState.sequence_label,
+                on_change=OperatorLibState.set_label,
+                width="14em",
+            ),
+            rx.input(
+                placeholder="campaign name",
+                value=OperatorLibState.campaign_name,
+                on_change=OperatorLibState.set_campaign,
+                width="14em",
+            ),
+            rx.input(
+                placeholder="campaign uuid",
+                value=OperatorLibState.campaign_uuid,
+                on_change=OperatorLibState.set_campaign_uuid,
+                width="14em",
+            ),
+            spacing="3",
+        ),
+        rx.hstack(
+            rx.button(
+                "Load last parameters",
+                size="1",
+                variant="soft",
+                on_click=OperatorLibState.load_last_params,
+            ),
+            rx.checkbox(
+                "save parameters",
+                checked=OperatorLibState.save_params,
+                on_change=OperatorLibState.set_save_params,
+            ),
+            spacing="3",
+            align="center",
+        ),
+        rx.scroll_area(
+            # Two columns, so a sequence with many parameters needs half the
+            # scrolling. `rx.grid` rather than a wrapping flex: the fields then
+            # share one column width and their inputs line up down the page,
+            # which a wrap would only do when every label happened to be the
+            # same length. The index passed here is what draws the faint `[n]`.
+            rx.grid(
+                rx.foreach(
+                    OperatorLibState.param_rows,
+                    lambda row, index: _param_field(
+                        row,
+                        OperatorLibState,
+                        OperatorLibState.position_options,
+                        index=index,
+                    ),
+                ),
+                columns="2",
+                spacing="3",
+                width="100%",
+            ),
+            type="auto",
+            scrollbars="vertical",
+            height="18em",
+        ),
+        rx.hstack(
+            rx.button("Add to plan", on_click=OperatorPlanState.append_selection),
+            rx.button(
+                "Prepend to plan",
+                variant="soft",
+                on_click=OperatorPlanState.prepend_selection,
+            ),
+            rx.button("Enqueue now", variant="soft", on_click=OperatorLibState.enqueue),
+            rx.button(
+                "Reset parameters",
+                variant="soft",
+                on_click=OperatorLibState.reset_params,
+            ),
+            spacing="3",
+        ),
+        _error_text(OperatorLibState.error),
+        rx.text(OperatorLibState.status, size="1"),
+        # The plan state's feedback is repeated here because "Add to plan"
+        # lives on this tab: an operator who buffers a sequence and sees
+        # nothing has no way to tell it worked without changing tabs.
+        _error_text(OperatorPlanState.error),
+        rx.text(OperatorPlanState.status, size="1"),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _plan_panel():
+    """The client-side plan buffer and the three ways to flush it."""
+    return rx.vstack(
+        _table(
+            PLAN_COLS,
+            OperatorPlanState.plan_view,
+            on_row_click=lambda row, index: OperatorPlanState.select_plan_row(index),
+            row_actions=lambda row, index: rx.hstack(
+                rx.button(
+                    "^",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorPlanState.move_row(index, "up"),
+                ),
+                rx.button(
+                    "v",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorPlanState.move_row(index, "down"),
+                ),
+                rx.button(
+                    "x",
+                    size="1",
+                    class_name="text-red-600",
+                    variant="soft",
+                    on_click=OperatorPlanState.remove_row(index),
+                ),
+                spacing="1",
+            ),
+        ),
+        rx.hstack(
+            rx.button(
+                "Add plan [",
+                OperatorPlanState.plan_count,
+                "]",
+                on_click=OperatorPlanState.flush("append"),
+            ),
+            rx.button(
+                "Add split",
+                variant="soft",
+                on_click=OperatorPlanState.flush("split"),
+            ),
+            rx.button(
+                "Prepend plan",
+                variant="soft",
+                on_click=OperatorPlanState.flush("prepend"),
+            ),
+            rx.button(
+                "Clear plan",
+                variant="soft",
+                class_name="text-red-600",
+                on_click=OperatorPlanState.clear_plan,
+            ),
+            spacing="3",
+        ),
+        # The same pane the history tables use, reading the same two vars: the
+        # Bokeh operator has one tree serving its plan and history tabs, and
+        # selecting in either shows here. Without it the plan rows were wired to
+        # select_plan_row and had nowhere to render.
+        _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
+        _error_text(OperatorPlanState.error),
+        rx.text(OperatorPlanState.status, size="1"),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _plate_panel():
+    """The plate map, or a note when this station has no plate API."""
+    return rx.cond(
+        OperatorPlateState.enabled,
+        rx.vstack(
+            rx.hstack(
+                rx.input(
+                    placeholder="plate id",
+                    value=OperatorPlateState.plate_id,
+                    on_change=OperatorPlateState.set_plate_id,
+                    width="10em",
+                ),
+                rx.button("Load plate", on_click=OperatorPlateState.load_plate),
+                rx.input(
+                    placeholder="sample no",
+                    value=OperatorPlateState.sample_no,
+                    on_change=OperatorPlateState.set_sample,
+                    width="8em",
+                ),
+                rx.text("code ", OperatorPlateState.code, size="1"),
+                rx.text(OperatorPlateState.composition, size="1"),
+                spacing="3",
+                align="center",
+            ),
+            plots.chart(
+                OperatorPlateState.chart_spec,
+                OperatorPlateState.chart_url,
+                OperatorPlateState.chart_layout,
+                height=420,
+                on_select=OperatorPlateState.on_select,
+            ),
+            _error_text(OperatorPlateState.error),
+            rx.text(OperatorPlateState.status, size="1"),
+            width="100%",
+            spacing="3",
+        ),
+        rx.text(OperatorPlateState.status, size="1", class_name=_MUTED_TEXT),
+    )
+
+
+def _spec_panel():
+    """The spec-file tab, or a note when this station has no parser."""
+    return rx.cond(
+        OperatorSpecState.enabled,
+        rx.vstack(
+            rx.hstack(
+                rx.select(
+                    OperatorSpecState.spec_names,
+                    value=OperatorSpecState.selected_spec,
+                    on_change=OperatorSpecState.select_spec,
+                    width="22em",
+                ),
+                rx.button(
+                    "Reload specs",
+                    size="1",
+                    variant="soft",
+                    on_click=OperatorSpecState.reload_specs,
+                ),
+                spacing="3",
+                align="center",
+            ),
+            rx.text(OperatorSpecState.parser_note, size="1", class_name=_MUTED_TEXT),
+            rx.text("Required sequence parameters:", size="1", weight="medium"),
+            rx.scroll_area(
+                rx.vstack(
+                    rx.foreach(
+                        OperatorSpecState.param_rows,
+                        # The spec form has no dropdown params, so it binds an
+                        # empty options list rather than the PAL's positions.
+                        lambda row: _param_field(row, OperatorSpecState, []),
+                    ),
+                    width="100%",
+                    spacing="2",
+                ),
+                type="auto",
+                scrollbars="vertical",
+                height="16em",
+            ),
+            rx.button("Enqueue spec sequence", on_click=OperatorSpecState.enqueue),
+            _error_text(OperatorSpecState.error),
+            rx.text(OperatorSpecState.status, size="1"),
+            width="100%",
+            spacing="3",
+        ),
+        rx.text(OperatorSpecState.status, size="1", class_name=_MUTED_TEXT),
+    )
+
+
+def _queue_panel():
+    """The three orchestrator queues and the action-server status table."""
+    return rx.vstack(
+        rx.tabs.root(
+            rx.tabs.list(
+                # Each queue's depth in its own tab title, so the operator can
+                # read it without selecting the tab. The count comes off the
+                # same var the tab's table renders, which is what keeps the two
+                # from disagreeing -- a separately-tracked counter would drift
+                # the moment a refresh replaced the rows.
+                #
+                # "Servers" is deliberately left bare: it is a status table, not
+                # a queue, so a number beside it would read as a backlog.
+                rx.tabs.trigger(
+                    f"Sequences [{OperatorQueueState.seq_count}]",
+                    value="sequence",
+                ),
+                rx.tabs.trigger(
+                    f"Experiments [{OperatorQueueState.exp_count}]",
+                    value="experiment",
+                ),
+                rx.tabs.trigger(
+                    f"Actions [{OperatorQueueState.act_count}]",
+                    value="action",
+                ),
+                rx.tabs.trigger("Servers", value="servers"),
+            ),
+            rx.tabs.content(
+                _queue_tab(
+                    SEQ_COLS,
+                    OperatorQueueState.seq_rows,
+                    "sequence",
+                    OperatorQueueState.seq_offset,
+                    OperatorQueueState.seq_total,
+                    OperatorQueueState.seq_page_label,
+                ),
+                value="sequence",
+            ),
+            rx.tabs.content(
+                _queue_tab(
+                    EXP_COLS,
+                    OperatorQueueState.exp_rows,
+                    "experiment",
+                    OperatorQueueState.exp_offset,
+                    OperatorQueueState.exp_total,
+                    OperatorQueueState.exp_page_label,
+                ),
+                value="experiment",
+            ),
+            rx.tabs.content(
+                _queue_tab(
+                    ACT_COLS,
+                    OperatorQueueState.act_rows,
+                    "action",
+                    OperatorQueueState.act_offset,
+                    OperatorQueueState.act_total,
+                    OperatorQueueState.act_page_label,
+                ),
+                value="action",
+            ),
+            rx.tabs.content(
+                _table(
+                    ["server", "status", "driver"],
+                    OperatorQueueState.server_rows,
+                    hue="server",
+                    # By name, not index: the row already carries it.
+                    on_row_click=lambda row, index: (
+                        OperatorQueueState.select_server_row(row[0])
+                    ),
+                ),
+                value="servers",
+            ),
+            default_value="sequence",
+            width="100%",
+        ),
+        _tree_pane(OperatorQueueState.tree_header, OperatorQueueState.tree_html),
+        rx.hstack(
+            rx.button(
+                "Clear sequences",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_sequences"),
+            ),
+            rx.button(
+                "Clear experiments",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_experiments"),
+            ),
+            rx.button(
+                "Clear actions",
+                size="1",
+                variant="soft",
+                disabled=~OperatorQueueState.can_edit_queue,
+                on_click=OperatorQueueState.control("clear_actions"),
+            ),
+            spacing="3",
+        ),
+        width="100%",
+        spacing="3",
+    )
+
+
+def _history_tab(kind: str, rows_var, offset_var, total_var, label_var):
+    """One paged history table.
+
+    The row index stays page-local *and* is used page-locally: ``_hist_objs``
+    holds only the rendered page, so unlike the queue tables there is no offset
+    to add. Adding one here would index past the end of the cached payloads.
+    """
+    return _table(
+        HIST_COLS[kind],
+        rows_var,
+        hue=kind,
+        pager=_pager(
+            label_var=label_var,
+            offset_var=offset_var,
+            total_var=total_var,
+            size_var=OperatorPlanState.hist_page_size,
+            size_value_var=OperatorPlanState.hist_page_size_value,
+            on_page=lambda action: OperatorPlanState.page_history(kind, action),
+            on_page_size=OperatorPlanState.set_hist_page_size,
+        ),
+        on_row_click=lambda row, index: (
+            OperatorPlanState.select_history_row(kind, index)
+        ),
+    )
+
+
+def _history_panel():
+    """The three history tables.
+
+    Ordered sequence-first with a count in each title, matching the Queues
+    subtabs: the two panels show the same three object kinds, and reading them
+    in a different order in each is what makes an operator check twice.
+    """
+    return rx.vstack(
+        rx.button(
+            "Refresh history",
+            size="1",
+            # The empty tick is passed explicitly, as `poll_once` is on mount:
+            # a button's `on_click` otherwise supplies a PointerEventInfo,
+            # which does not match the interval's string argument.
+            on_click=OperatorPlanState.refresh_history(""),
+        ),
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger(
+                    f"Sequences [{OperatorPlanState.sequence_count}]", value="sequence"
+                ),
+                rx.tabs.trigger(
+                    f"Experiments [{OperatorPlanState.experiment_count}]",
+                    value="experiment",
+                ),
+                rx.tabs.trigger(
+                    f"Actions [{OperatorPlanState.action_count}]", value="action"
+                ),
+            ),
+            rx.tabs.content(
+                _history_tab(
+                    "sequence",
+                    OperatorPlanState.sequence_history,
+                    OperatorPlanState.sequence_offset,
+                    OperatorPlanState.sequence_total,
+                    OperatorPlanState.sequence_page_label,
+                ),
+                value="sequence",
+            ),
+            rx.tabs.content(
+                _history_tab(
+                    "experiment",
+                    OperatorPlanState.experiment_history,
+                    OperatorPlanState.experiment_offset,
+                    OperatorPlanState.experiment_total,
+                    OperatorPlanState.experiment_page_label,
+                ),
+                value="experiment",
+            ),
+            rx.tabs.content(
+                _history_tab(
+                    "action",
+                    OperatorPlanState.action_history,
+                    OperatorPlanState.action_offset,
+                    OperatorPlanState.action_total,
+                    OperatorPlanState.action_page_label,
+                ),
+                value="action",
+            ),
+            default_value="sequence",
+            width="100%",
+        ),
+        _tree_pane(OperatorPlanState.tree_header, OperatorPlanState.tree_html),
+        width="100%",
+        spacing="2",
+    )
+
+
+def build_page():
+    """Render the operator page.
+
+    Returns:
+        rx.Component: The page body.
+    """
+    controls = rx.hstack(
+        rx.text(OperatorQueueState.status, size="1", weight="medium"),
+        rx.spacer(),
+        rx.button("Start", on_click=OperatorQueueState.control("start")),
+        rx.button("Stop", variant="soft", on_click=OperatorQueueState.control("stop")),
+        rx.button("Skip", variant="soft", on_click=OperatorQueueState.control("skip")),
+        rx.button(
+            "E-STOP",
+            class_name="bg-red-900 hover:bg-red-950 text-white",
+            on_click=OperatorQueueState.control("estop"),
+        ),
+        spacing="3",
+        align="center",
+        width="100%",
+    )
+    return rx.vstack(
+        controls,
+        _error_text(OperatorQueueState.error),
+        rx.tabs.root(
+            rx.tabs.list(
+                rx.tabs.trigger("Build", value="build"),
+                # How many sequences the Build tab has assembled but not yet
+                # flushed. The plan buffer is the one piece of operator state the
+                # orchestrator does not own, so this count is the only place it
+                # is visible without opening the tab. Mirrors the Bokeh
+                # operator's "Add plan [n]" button label.
+                rx.tabs.trigger(f"Plan [{OperatorPlanState.plan_count}]", value="plan"),
+                rx.tabs.trigger("Queues", value="queues"),
+                rx.tabs.trigger("History", value="history"),
+                rx.tabs.trigger("Specs", value="specs"),
+                rx.tabs.trigger("Plate", value="plate"),
+            ),
+            rx.tabs.content(_library_panel(), value="build"),
+            rx.tabs.content(_plan_panel(), value="plan"),
+            rx.tabs.content(_queue_panel(), value="queues"),
+            rx.tabs.content(_history_panel(), value="history"),
+            rx.tabs.content(_spec_panel(), value="specs"),
+            rx.tabs.content(_plate_panel(), value="plate"),
+            default_value="build",
+            width="100%",
+        ),
+        # The tick lives in the tree, so it stops existing when the tab does.
+        # A server-side poll loop would outlive the browser: on_unmount fires
+        # on in-app navigation, never on a closed tab.
+        # Both refreshes hang off the one interval. The history used to move
+        # only when its button was pressed, which meant a page left open showed
+        # a history that had stopped at whatever moment it was last clicked.
+        rx.moment(
+            interval=OperatorQueueState.poll_ms,
+            on_change=[
+                OperatorQueueState.poll_once,
+                OperatorPlanState.refresh_history,
+            ],
+            display="none",
+        ),
+        width="100%",
+        spacing="4",
+        padding_x="1em",
+        on_mount=[
+            OperatorQueueState.on_mount,
+            OperatorQueueState.poll_once(""),
+            # Primed on mount as well as ticked, so the History tab is
+            # populated the first time it is opened rather than one interval
+            # later.
+            OperatorPlanState.refresh_history(""),
+            OperatorLibState.load_libraries,
+            OperatorPlateState.on_mount,
+            OperatorSpecState.on_mount,
+        ],
+        on_unmount=OperatorQueueState.stop_polling,
+    )
+
+
+class OperatorSpecState(rx.State):
+    """The spec-file tab: enqueue a sequence described by a deployment file.
+
+    Opt-in, like the plate map. Without ``seqspec_parser_path`` and
+    ``seqspec_folder_path`` in the server params there is nothing to read, and
+    the tab says so rather than rendering an empty selector. The parser is
+    deployment code loaded at runtime, so every failure here disables the tab
+    instead of taking the page down.
+    """
+
+    spec_names: list[str] = []
+    selected_spec: str = ""
+    #: ``[name, kind, current value, help]``, the same shape the library form
+    #: binds, so one renderer serves both.
+    param_rows: list[list[str]] = []
+    enabled: bool = False
+    parser_note: str = ""
+    status: str = ""
+    error: str = ""
+
+    #: Full spec paths by base name, the typed field descriptors, and the
+    #: entered values. Server-side: the browser needs only the rendered rows.
+    _paths: dict = {}
+    _fields: list = []
+    _values: dict = {}
+
+    def _server_cfg(self) -> dict:
+        with _SETTINGS_LOCK:
+            world_cfg = _SETTINGS.get("world_cfg") or {}
+            server_key = _SETTINGS.get("server_key", "")
+        return (world_cfg.get("servers") or {}).get(server_key) or {}
+
+    def _parser(self):
+        from helao.ui.shared.operator import spec_parser
+
+        return spec_parser.load_parser(spec_parser_path(self._server_cfg()))
+
+    @rx.event
+    def on_mount(self):
+        """Report whether this station has a spec parser, and list the specs."""
+        parser = self._parser()
+        self.enabled = parser is not None
+        if not self.enabled:
+            self.status = "no spec parser is configured for this station"
+            return
+        self.parser_note = spec_parser_path(self._server_cfg())
+        self._refresh(parser)
+
+    def _refresh(self, parser) -> None:
+        """Re-read the spec folder."""
+        from helao.ui.shared.operator import spec_parser
+
+        folder = spec_folder_path(self._server_cfg())
+        paths = spec_parser.spec_files(parser, folder)
+        self._paths = {os.path.basename(p): p for p in paths}
+        self.spec_names = list(self._paths)
+        if self.spec_names and self.selected_spec not in self.spec_names:
+            self.selected_spec = self.spec_names[0]
+        self.status = (
+            f"{len(self.spec_names)} specification file(s) in {folder}"
+            if self.spec_names
+            else f"no specification files in {folder}"
+        )
+        self._select(parser, self.selected_spec)
+
+    def _select(self, parser, name: str) -> None:
+        """Rebuild the parameter form for one spec file."""
+        from helao.ui.shared.operator import spec_parser
+
+        path = self._paths.get(name, "")
+        if not path:
+            self._fields = []
+            self.param_rows = []
+            return
+        backend = session_backend(self.router.session.client_token)
+        self._fields = spec_parser.spec_fields(parser, path, backend)
+        entered = self._values.get(name, {})
+        self.param_rows = [
+            [f["name"], f["kind"], entered.get(f["name"], f["default"]), f["help"]]
+            for f in self._fields
+        ]
+
+    @rx.event
+    def reload_specs(self):
+        """Re-read the folder, picking up files added since the page loaded."""
+        parser = self._parser()
+        if parser is None:
+            return
+        self._refresh(parser)
+
+    @rx.event
+    def select_spec(self, name: str):
+        """Choose a specification file."""
+        self.selected_spec = name
+        parser = self._parser()
+        if parser is not None:
+            self._select(parser, name)
+
+    @rx.event
+    def set_param(self, name: str, value: str):
+        """Record one edited spec parameter."""
+        entered = dict(self._values.get(self.selected_spec, {}))
+        entered[name] = value
+        self._values = {**self._values, self.selected_spec: entered}
+        self.param_rows = [
+            [row[0], row[1], value, row[3]] if row[0] == name else row
+            for row in self.param_rows
+        ]
+
+    @rx.event(background=True)
+    async def enqueue(self):
+        """Parse the selected spec file and enqueue the sequence it describes."""
+        async with self:
+            token = self.router.session.client_token
+            name = self.selected_spec
+            path = self._paths.get(name, "")
+            fields = list(self._fields)
+            values = dict(self._values.get(name, {}))
+            kwargs = parser_kwargs(self._server_cfg())
+            self.status = ""
+            self.error = ""
+        params, errors = coerce_params(fields, values)
+        if errors:
+            async with self:
+                self.error = "; ".join(errors)
+            return
+        parser = self._parser()
+        sequence, error = _build_spec(
+            parser, path, session_backend(token), params, kwargs
+        )
+        if error:
+            async with self:
+                self.error = error
+            return
+        backend = session_backend(token)
+        if backend is None:
+            async with self:
+                self.error = "no orchestrator connection"
+            return
+        try:
+            await backend.add_sequence(sequence)
+        except Exception as exc:
+            LOGGER.warning(f"operator could not enqueue spec '{name}': {exc}")
+            async with self:
+                self.error = f"{name} could not be enqueued: {exc}"
+            return
+        async with self:
+            self.status = f"enqueued {name}"

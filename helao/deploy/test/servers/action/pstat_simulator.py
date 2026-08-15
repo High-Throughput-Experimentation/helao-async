@@ -13,8 +13,8 @@ from typing import Optional
 
 import pandas as pd
 
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 
 class PstatSim:
@@ -34,7 +34,7 @@ class PstatSim:
         platespaces: List of per-plate descriptors.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Load the archive CSV and precompute plate descriptors.
 
         Args:
@@ -95,7 +95,7 @@ def makeApp(server_key):
     Returns:
         Configured :class:`HelaoFastAPI` app.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="PSTAT simulator",
@@ -103,8 +103,9 @@ def makeApp(server_key):
         driver_classes=[PstatSim],
     )
 
-    @app.post(f"/{server_key}/run_CP", tags=["action"])
+    @app.action()
     async def run_CP(
+        ctx: ActionContext,
         Ival: float = 0.0,
         Tval__s: float = 10.0,
         AcqInterval__s: Optional[
@@ -112,7 +113,7 @@ def makeApp(server_key):
         ] = 1.0,  # Time between data acquisition samples in seconds.
     ):
         """Simulate a chronopotentiometry run by sleeping ``Tval__s`` seconds."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CP"
         await asyncio.sleep(active.action.action_params["Tval__s"])
         finished_action = await active.finish()

@@ -29,7 +29,7 @@ import pytest
 
 from harness import ws_frames as wf
 from harness.endpoints import extract_routes
-from helao.core.servers.reflex.ingest import normalize, normalize_data_package
+from helao.ui.reflex.ingest import normalize, normalize_data_package
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
@@ -204,7 +204,7 @@ def test_operator_ws_face_is_shape_blind():
     truthiness only -- so it fires on_change identically no matter which
     producer family's ws_status frame arrived. Documented so nobody cites the
     operator as evidence of ws_status parity between the two families."""
-    from helao.core.servers.operator.orch_backend import RemoteBackend
+    from helao.ui.shared.operator.orch_backend import RemoteBackend
 
     calls = []
 

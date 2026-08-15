@@ -4,7 +4,7 @@ import pytest
 
 from types import SimpleNamespace
 
-from helao.core.servers.reflex.state import (
+from helao.ui.reflex.state import (
     ActionVisState,
     DEFAULT_UPDATE_RATE,
     DEFAULT_WINDOW_POINTS,
@@ -180,7 +180,7 @@ def test_make_panel_state_keys_the_cache_on_the_base_class_not_its_name():
     class LiveVisState(VisPanelState, mixin=True):  # type: ignore[call-arg]  # shadows
         ws_path: str = "ws_live"
 
-    from helao.core.servers.reflex import state as state_mod
+    from helao.ui.reflex import state as state_mod
 
     real = make_panel_state("dup_panel", "SIM", state_mod.LiveVisState, "ws_live")
     impostor = make_panel_state("dup_panel", "SIM", LiveVisState, "ws_live")
@@ -223,7 +223,7 @@ def test_panel_state_declares_the_chart_binding_vars(name):
 def test_wssim_extract_reads_series_columns_from_the_buffer():
     import numpy as np
 
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -237,7 +237,7 @@ def test_wssim_extract_reads_series_columns_from_the_buffer():
 
 
 def test_wssim_extract_skips_the_epoch_column_in_the_series_set():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -246,7 +246,7 @@ def test_wssim_extract_skips_the_epoch_column_in_the_series_set():
 
 
 def test_wssim_extract_on_an_empty_buffer_returns_empty_not_none():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import wssim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -280,7 +280,7 @@ def test_every_panel_scopes_its_buffer_key_by_session():
 
 
 def test_gpsim_histograms_are_extracted_from_raw_batches():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -303,7 +303,7 @@ def test_oersim_plots_t_s_as_x_not_epoch():
     """ws_data packets carry no epoch column; looking for one plots nothing."""
     import numpy as np
 
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import oersim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_data")
@@ -315,7 +315,7 @@ def test_oersim_plots_t_s_as_x_not_epoch():
 
 
 def test_oersim_surfaces_the_streamed_action_uuid():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import oersim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_data")
@@ -328,7 +328,7 @@ def test_gpsim_table_includes_the_numeric_columns():
 
     Reading the table from .rows left three of five columns permanently blank.
     """
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -357,7 +357,7 @@ def test_gpsim_table_does_not_re_append_the_same_batch():
     Without a watermark the newest raw batch is re-appended every tick and the
     "Last 20 acquisitions" table collapses to one row repeated.
     """
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     ing = WsIngest("127.0.0.1", 1, "ws_live")
@@ -390,14 +390,14 @@ def test_gpsim_table_does_not_re_append_the_same_batch():
 
 
 def test_gpsim_table_rows_on_an_empty_raw_deque_is_empty():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     assert gpsim_panel.extract_table_rows(WsIngest("127.0.0.1", 1, "ws_live")) == []
 
 
 def test_gpsim_histograms_on_an_empty_raw_deque_is_empty():
-    from helao.core.servers.reflex.ingest import WsIngest
+    from helao.ui.reflex.ingest import WsIngest
     from helao.deploy.test.servers.reflex import gpsim_panel
 
     assert gpsim_panel.extract_histograms(WsIngest("127.0.0.1", 1, "ws_live")) == {}
@@ -435,7 +435,7 @@ def test_panels_tick_from_a_component_not_a_server_loop():
     import ast
     import inspect
 
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
 
     # The AST, not the text: the docstring explaining this says "while True".
     tree = ast.parse(inspect.getsource(VisPanelState))
@@ -445,7 +445,7 @@ def test_panels_tick_from_a_component_not_a_server_loop():
 def test_render_loop_still_exists_for_panels_outside_this_repo():
     """Panel modules in private deployments bind on_mount=render_loop. The
     name is kept so they keep working; it now primes one frame."""
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
 
     assert hasattr(VisPanelState, "render_loop")
     assert hasattr(VisPanelState, "render_tick")
@@ -453,7 +453,7 @@ def test_render_loop_still_exists_for_panels_outside_this_repo():
 
 def test_priming_sets_the_tick_cadence_from_the_update_rate():
     """The prime step derives tick_ms rather than trusting the class default."""
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
     import inspect
 
     assert "tick_ms = int(self.update_rate" in inspect.getsource(
@@ -469,7 +469,7 @@ def test_panel_bases_take_their_cadence_from_a_named_constant():
     allowed -- live telemetry deliberately runs slower than action data -- but it
     has to come from a named constant, so raising either one takes effect.
     """
-    from helao.core.servers.reflex.state import (
+    from helao.ui.reflex.state import (
         ActionVisState,
         DEFAULT_LIVE_UPDATE_RATE,
         DEFAULT_UPDATE_RATE,
@@ -492,14 +492,14 @@ def test_the_in_flight_flag_is_backend_only():
     is a state delta per tick per panel, forever, whether or not anything
     changed -- which a table-based panel redraws on, so it flashes with no
     action running. Nothing renders it."""
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
 
     assert "running" not in VisPanelState.get_fields()
     assert "_running" in VisPanelState.get_fields()
 
 
 def test_the_flag_is_not_a_client_var():
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
 
     client_vars = set(VisPanelState.vars)
     assert "running" not in client_vars
@@ -530,7 +530,7 @@ class _TickPanel(_StubPanel):
 
 
 def test_assign_writes_only_when_the_value_differs():
-    from helao.core.servers.reflex.state import assign
+    from helao.ui.reflex.state import assign
 
     panel = _StubPanel()
     assert assign(panel, "connection", "live") is True
@@ -540,7 +540,7 @@ def test_assign_writes_only_when_the_value_differs():
 
 def test_assign_writes_a_first_falsy_value():
     """An empty string is a real value, not a no-op, when nothing was set."""
-    from helao.core.servers.reflex.state import assign
+    from helao.ui.reflex.state import assign
 
     panel = SimpleNamespace()
     assert assign(panel, "error", "") is True
@@ -621,7 +621,7 @@ def test_a_panel_stub_without_the_bookkeeping_still_pulls():
 
 
 def test_the_bookkeeping_vars_are_backend_only():
-    from helao.core.servers.reflex.state import VisPanelState
+    from helao.ui.reflex.state import VisPanelState
 
     client_vars = set(VisPanelState.vars)
     assert "_last_seen" not in client_vars

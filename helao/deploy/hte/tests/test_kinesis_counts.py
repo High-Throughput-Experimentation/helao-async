@@ -144,7 +144,7 @@ def test_the_shared_units_enum_drives_both_branches(make_driver):
     The driver stays free of a ``helao.core.servers`` import, so this is the
     test that proves the two halves actually agree on what "counts" means.
     """
-    from helao.core.servers.motion_control import Units
+    from helao.ui.shared.motion_control import Units
 
     counts = make_driver()
     counts.move("z", MoveModes.relative, 13, units=Units.counts)

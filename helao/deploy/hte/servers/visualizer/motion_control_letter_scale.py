@@ -8,7 +8,7 @@ serves::
       count_to_mm:  {C: 1.5628e-04, ...}        # keyed by that LETTER
 
 Every key of ``axis_id`` becomes one axis row; the behaviour is entirely in
-:class:`~helao.core.servers.motion_control_vis.MotionPanel`.
+:class:`~helao.ui.bokeh.motion_control_vis.MotionPanel`.
 
 Deliberately named for the *shape of the config* rather than for a driver,
 matching ``digital_out_control``. Here the discriminator is how the scale is
@@ -25,7 +25,7 @@ name.
 
 __all__ = ["C_vis"]
 
-from helao.core.servers.motion_control_vis import MotionPanel
+from helao.ui.bokeh.motion_control_vis import MotionPanel
 
 
 class C_vis(MotionPanel):

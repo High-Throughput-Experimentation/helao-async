@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from helao.core.servers.operator import spec_parser as legacy
+from helao.ui.shared.operator import spec_parser as legacy
 from helao.hexagon.adapters.vis.spec_parser import SpecParserGateway
 from helao.hexagon.ports.spec_parser import SpecParserPort
 from helao.hexagon.tests.mirror_pin import module_functions, protocol_members

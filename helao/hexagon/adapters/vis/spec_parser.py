@@ -2,7 +2,7 @@
 
 :class:`SpecParserGateway` satisfies
 :class:`~helao.hexagon.ports.spec_parser.SpecParserPort` by **delegating to
-the shared module** ``helao/core/servers/operator/spec_parser.py``.
+the shared module** ``helao/ui/shared/operator/spec_parser.py``.
 
 Delegation matters more here than anywhere else in P7h. The module does not
 merely read files -- it ``exec_module``s one named by a config key, i.e. it
@@ -27,7 +27,7 @@ Under ``adapters/vis/`` because ``adapters/native/`` may not import
 ``helao.core.servers.*`` (test_boundaries.py:131-143).
 """
 
-from helao.core.servers.operator import spec_parser as legacy
+from helao.ui.shared.operator import spec_parser as legacy
 
 __all__ = ["SpecParserGateway"]
 

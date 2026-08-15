@@ -14,8 +14,8 @@ import pytest
 from bokeh.document import Document
 from bokeh.models import Button, Div
 
-from helao.core.servers import io_control
-from helao.core.servers.io_control_vis import DigitalOutPanel
+from helao.ui.shared import io_control
+from helao.ui.bokeh.io_control_vis import DigitalOutPanel
 
 SERVERS = {
     "IO": {
@@ -79,7 +79,7 @@ def transport(monkeypatch):
     monkeypatch.setattr(io_control, "read_digital_outs", _read)
     monkeypatch.setattr(io_control, "set_digital_out", _write)
     # The panel imported the names directly, so patch them there too.
-    import helao.core.servers.io_control_vis as mod
+    import helao.ui.bokeh.io_control_vis as mod
 
     monkeypatch.setattr(mod, "read_digital_outs", _read)
     monkeypatch.setattr(mod, "set_digital_out", _write)

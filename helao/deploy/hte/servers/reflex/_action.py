@@ -35,7 +35,7 @@ import re
 
 import numpy as np
 
-from helao.core.servers.palette import reflex_muted_text_class
+from helao.ui.shared.palette import reflex_muted_text_class
 
 #: Muted-caption Tailwind utility, resolved once at module scope per
 #: ``palette``'s second rule. ``slate-600``, not the ``slate-500`` that clears

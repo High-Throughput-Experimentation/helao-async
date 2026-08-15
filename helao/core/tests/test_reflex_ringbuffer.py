@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from helao.core.servers.reflex.ringbuffer import RingBuffer, RowBuffer
+from helao.ui.reflex.ringbuffer import RingBuffer, RowBuffer
 
 
 def test_append_then_snapshot_returns_what_went_in():

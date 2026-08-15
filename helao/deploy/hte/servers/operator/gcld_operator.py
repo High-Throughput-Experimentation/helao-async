@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.operator.helao_operator import HelaoOperator
+from helao.ui.shared.operator.helao_operator import HelaoOperator
 from helao.helpers.config_loader import read_config
 from helao.helpers.dispatcher import private_dispatcher
 from helao.helpers.premodels import Sequence

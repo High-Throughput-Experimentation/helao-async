@@ -27,8 +27,8 @@ import pytest
 import yaml
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import motion_control
-from helao.core.servers.motion_control import (
+from helao.ui.shared import motion_control
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     AXIS_SOURCES,
     DEFAULT_WARN_ABOVE_MM,
@@ -236,7 +236,7 @@ def test_discovery_keeps_the_same_positional_shape_as_the_digital_out_twin():
     """
     import inspect
 
-    from helao.core.servers.io_control import discover_do_items
+    from helao.ui.shared.io_control import discover_do_items
 
     do_positional = [
         p.name
@@ -373,7 +373,7 @@ def test_only_the_accessor_subscripts_the_scale_keys():
     must hold is that *here* -- where a mistake reaches a confirmation dialog
     and makes it stop appearing -- there is one accessor and no other reader.
     """
-    path = os.path.join(REPO_ROOT, "helao", "core", "servers", "motion_control.py")
+    path = os.path.join(REPO_ROOT, "helao", "ui", "shared", "motion_control.py")
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
 
@@ -919,7 +919,7 @@ def test_the_shared_layer_imports_neither_ui_stack():
     -- consume one module. An import of either would make the module a member
     of one stack and force the other to fork the rules.
     """
-    path = os.path.join(REPO_ROOT, "helao", "core", "servers", "motion_control.py")
+    path = os.path.join(REPO_ROOT, "helao", "ui", "shared", "motion_control.py")
     with open(path, encoding="utf-8") as handle:
         source = handle.read()
 
@@ -943,7 +943,7 @@ def test_importing_the_module_pulls_in_neither_ui_stack():
         [
             sys.executable,
             "-c",
-            "import sys; import helao.core.servers.motion_control; "
+            "import sys; import helao.ui.shared.motion_control; "
             "print(sorted(m for m in sys.modules if m in ('bokeh', 'reflex')))",
         ],
         capture_output=True,

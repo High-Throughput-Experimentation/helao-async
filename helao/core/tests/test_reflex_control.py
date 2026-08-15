@@ -2,7 +2,7 @@
 
 The behaviour these assert is the same behaviour ``test_io_control_vis.py``
 asserts for the Bokeh panel, deliberately — the two UIs share
-``helao.core.servers.io_control`` precisely so a rule cannot hold in one and
+``helao.ui.shared.io_control`` precisely so a rule cannot hold in one and
 not the other, and a pair of test files is what keeps that honest.
 
 Reflex event handlers are exercised directly rather than through a browser: the
@@ -15,9 +15,9 @@ import json
 
 import pytest
 
-from helao.core.servers import io_control
-from helao.core.servers.reflex import control as control_mod
-from helao.core.servers.reflex.control import ControlState, control_targets
+from helao.ui.shared import io_control
+from helao.ui.reflex import control as control_mod
+from helao.ui.reflex.control import ControlState, control_targets
 
 WORLD = {
     "servers": {
@@ -285,14 +285,14 @@ def test_load_is_guarded_against_firing_twice(page):
 
 
 def test_the_control_page_route_is_registered():
-    from helao.core.servers.reflex.app import SHELL_ROUTES
+    from helao.ui.reflex.app import SHELL_ROUTES
 
     assert "/control" in SHELL_ROUTES
     print("test_the_control_page_route_is_registered PASS")
 
 
 def test_every_state_key_has_a_button_class():
-    from helao.core.servers.palette import reflex_control_button_class
+    from helao.ui.shared.palette import reflex_control_button_class
 
     # The three the rows can carry, and nothing else -- an unmapped key would
     # render a control whose colour says nothing about the line it drives.
@@ -342,7 +342,7 @@ def test_reread_restores_unknown_for_a_server_that_stops_answering(page):
 
 
 def test_the_read_button_colour_is_not_a_line_state_colour():
-    from helao.core.servers.palette import (
+    from helao.ui.shared.palette import (
         REFLEX_CONTROL_READ_CLASS,
         REFLEX_CONTROL_STATE_CLASSES,
     )

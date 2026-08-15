@@ -12,7 +12,7 @@ import os
 
 import pytest
 
-from helao.core.servers.operator import param_store as legacy
+from helao.ui.shared.operator import param_store as legacy
 from helao.hexagon.adapters.vis.param_store import ParamStore
 from helao.hexagon.ports.param_store import PARAM_KINDS, ParamStorePort
 from helao.hexagon.tests.mirror_pin import module_functions, protocol_members

@@ -17,8 +17,8 @@ import pytest
 import yaml
 
 from helao.core.models.run_dir import RunDir
-from helao.core.servers.data_browser import readers, sources
-from helao.core.servers.data_browser import state as dbstate
+from helao.ui.shared.data_browser import readers, sources
+from helao.ui.shared.data_browser import state as dbstate
 from helao.hexagon.adapters.vis.browser_source import BrowserSource
 from helao.hexagon.ports.browser_source import BrowserSourcePort
 from helao.hexagon.tests.mirror_pin import module_functions, protocol_members

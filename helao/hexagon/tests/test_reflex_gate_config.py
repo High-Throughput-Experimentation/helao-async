@@ -113,7 +113,7 @@ def test_the_backend_port_is_reserved_by_the_gate_config(path):
     port is computed from the config rather than written down twice -- a
     second copy of it here would be the same invisible claim the check is
     about."""
-    from helao.core.servers.reflex.discovery import reserved_addresses
+    from helao.ui.shared.discovery import reserved_addresses
 
     servers = _load(path)["servers"]
     ui = servers["UI"]

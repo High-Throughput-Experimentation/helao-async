@@ -38,7 +38,7 @@ def test_goldenreflex_keeps_the_bokeh_operator_alongside_reflex(reflex_cfg):
 
 
 def test_app_builds_and_registers_every_shell_route(reflex_cfg):
-    from helao.core.servers.reflex.app import SHELL_ROUTES, build_app
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
 
     application = build_app(reflex_cfg, "UI")
     # Reflex 0.9.7 exposes registered-but-not-yet-compiled routes only via the
@@ -71,7 +71,7 @@ def test_build_app_registers_panel_handlers_without_compiling_pages(reflex_cfg):
     """
     from reflex_base.registry import RegistrationContext
 
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.app import build_app
 
     build_app(reflex_cfg, "UI")
     registered = set(RegistrationContext.get().event_handlers)
@@ -87,7 +87,7 @@ def test_build_app_registers_panel_handlers_without_compiling_pages(reflex_cfg):
 
 
 def test_route_map_splits_live_and_action_panels(reflex_cfg):
-    from helao.core.servers.reflex.app import route_map
+    from helao.ui.reflex.app import route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
     assert sorted(t.server_key for t in routes["/live"]) == ["GPSIM", "SIM"]
@@ -102,7 +102,7 @@ def test_ingest_registry_discovers_every_panel_target(reflex_cfg):
     touches it. GPSIM is what lets CPSIM produce any data at all: every OERSIM
     experiment routes through it, and measure_cp needs a composition it picks.
     """
-    from helao.core.servers.reflex.ingest import IngestRegistry
+    from helao.ui.reflex.ingest import IngestRegistry
 
     assert sorted(IngestRegistry(reflex_cfg).targets()) == [
         ("CPSIM", "ws_data"),
@@ -133,7 +133,7 @@ def test_every_server_in_this_config_can_actually_be_imported(reflex_cfg):
             if not module:
                 continue
             if code == "reflex":
-                candidates = ["helao.core.servers.reflex.app"]
+                candidates = ["helao.ui.reflex.app"]
             else:
                 hits = glob(
                     os.path.join(
@@ -204,14 +204,14 @@ def test_calc_eta_does_not_drag_in_the_gp_stack():
 
 
 def test_every_panel_module_is_reachable_from_this_config(reflex_cfg):
-    from helao.core.servers.reflex.app import panel_targets
+    from helao.ui.reflex.app import panel_targets
 
     modules = sorted(t.module_name for t in panel_targets(reflex_cfg))
     assert modules == ["gpsim_panel", "oersim_panel", "wssim_panel"]
 
 
 def test_every_panel_on_every_route_renders(reflex_cfg):
-    from helao.core.servers.reflex.app import _render_panel, route_map
+    from helao.ui.reflex.app import _render_panel, route_map
 
     routes = route_map(reflex_cfg, ["live", "action"])
     for path, targets in routes.items():
@@ -222,9 +222,9 @@ def test_every_panel_on_every_route_renders(reflex_cfg):
 def test_browser_route_is_the_real_page_not_a_stub(reflex_cfg):
     """The stub said the browser was unimplemented. Once it is implemented, a
     passing route test that still renders the stub is worse than no test."""
-    from helao.core.servers.data_browser import app_reflex
+    from helao.ui.reflex import data_browser as app_reflex
 
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.app import build_app
 
     build_app(reflex_cfg, "UI")
     assert app_reflex.BrowserState.__name__ == "BrowserState"
@@ -237,8 +237,8 @@ def test_browser_state_handlers_are_registered_without_compiling_pages(reflex_cf
     control on the page silently does nothing."""
     from reflex_base.registry import RegistrationContext
 
-    from helao.core.servers.data_browser.app_reflex import BrowserState
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.data_browser import BrowserState
+    from helao.ui.reflex.app import build_app
 
     build_app(reflex_cfg, "UI")
     registered = set(RegistrationContext.get().event_handlers)
@@ -256,9 +256,9 @@ def test_browser_state_handlers_are_registered_without_compiling_pages(reflex_cf
 def test_operator_route_is_the_real_page_not_a_stub(reflex_cfg):
     """The stub said the operator was unimplemented. A passing route test that
     still renders the stub is worse than no test."""
-    from helao.core.servers.operator import app_reflex
+    from helao.ui.reflex import operator as app_reflex
 
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.app import build_app
 
     build_app(reflex_cfg, "UI")
     assert callable(app_reflex.build_page)
@@ -271,14 +271,14 @@ def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_c
     add_page callable."""
     from reflex_base.registry import RegistrationContext
 
-    from helao.core.servers.operator.app_reflex import (
+    from helao.ui.reflex.operator import (
         OperatorLibState,
         OperatorPlanState,
         OperatorPlateState,
         OperatorQueueState,
         OperatorSpecState,
     )
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.app import build_app
 
     build_app(reflex_cfg, "UI")
     registered = set(RegistrationContext.get().event_handlers)
@@ -300,9 +300,9 @@ def test_operator_state_handlers_are_registered_without_compiling_pages(reflex_c
 def test_operator_backend_is_configured_at_build(reflex_cfg):
     """Without this the page renders but can never reach an orchestrator: the
     per-session backend is built from the config recorded here."""
-    from helao.core.servers.operator import app_reflex
+    from helao.ui.reflex import operator as app_reflex
 
-    from helao.core.servers.reflex.app import build_app
+    from helao.ui.reflex.app import build_app
 
     app_reflex.reset_settings()
     build_app(reflex_cfg, "UI")

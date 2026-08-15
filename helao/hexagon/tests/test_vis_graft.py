@@ -353,6 +353,6 @@ async def test_operator_graft_builds_the_real_legacy_document(real_config, tmp_p
         loaded = {os.path.relpath(p, REPO_ROOT) for p in json.loads(snap.read_text())}
         assert "helao/deploy/hexagon/servers/operator/graft.py" in loaded
         assert "helao/deploy/hte/servers/operator/standalone_operator.py" in loaded
-        assert "helao/core/servers/operator/bokeh_operator.py" in loaded
+        assert "helao/ui/bokeh/operator.py" in loaded
     finally:
         await _cancel_new_tasks(before)

@@ -4,8 +4,6 @@ startup hook LAST (Starlette preserves registration order, so it runs after
 BaseAPI's own startup has bound app.base + the legacy driver). Construction
 level only — full lifecycle is the Task 4 launched GM-5 gate."""
 
-from types import SimpleNamespace
-
 import pytest
 
 
@@ -76,9 +74,10 @@ async def test_db_shim_startup_hook_calls_graft_with_base_params(
 
     monkeypatch.setattr(shim, "graft_native_sync", fake_graft)
     app = shim.makeApp("SYNC")
-    app.base = SimpleNamespace(
-        server_cfg={"params": {"aws_bucket": "helao-sim", "s3_record": True}}
-    )
+    # No injected base: the legacy DB module is ported, so makeApp returns an
+    # ActionHost whose `base` is a read-only property (base is app) and whose
+    # server_cfg already carries the fixture's SYNC params. The assertions
+    # below check the same thing against the real object.
     hook = [
         h for h in app.router.on_startup if h.__name__ == "_hexagon_sync_graft_startup"
     ][0]
@@ -100,7 +99,6 @@ async def test_db_shim_shutdown_hook_closes_graft(installed_config, monkeypatch)
 
     monkeypatch.setattr(shim, "graft_native_sync", lambda b, p: FakeHandle())
     app = shim.makeApp("SYNC")
-    app.base = SimpleNamespace(server_cfg={"params": {}})
     startup = [
         h for h in app.router.on_startup if h.__name__ == "_hexagon_sync_graft_startup"
     ][0]

@@ -55,7 +55,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from helao.core.error import ErrorCodes
-from helao.core.servers.motion_control import Units
+from helao.ui.shared.motion_control import Units
 from helao.deploy.hte.drivers.motion import kinesis_driver as kd
 from helao.deploy.hte.drivers.motion.kinesis_driver import KinesisMotor
 from helao.hexagon.adapters.native.galil_motion_native import NativeGalilMotion

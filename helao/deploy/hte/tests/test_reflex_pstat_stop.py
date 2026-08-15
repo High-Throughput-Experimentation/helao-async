@@ -25,8 +25,8 @@ import pytest
 from bokeh.document import Document
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import palette
-from helao.core.servers.reflex.state import make_panel_state
+from helao.ui.shared import palette
+from helao.ui.reflex.state import make_panel_state
 from helao.deploy.hte.servers.reflex import _pstat, _pstat_panel
 
 SERV_KEY = "PSTAT"

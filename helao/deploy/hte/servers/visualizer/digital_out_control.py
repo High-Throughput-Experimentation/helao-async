@@ -2,7 +2,7 @@
 
 Declared as ``control_vis: digital_out_control``. Every key in that server's
 ``dev_do`` block becomes one toggle; the behaviour is entirely in
-:class:`~helao.core.servers.io_control_vis.DigitalOutPanel`.
+:class:`~helao.ui.bokeh.io_control_vis.DigitalOutPanel`.
 
 Deliberately named for the *shape of the config* rather than for a driver, and
 so it serves the Galil IO server here and the Advantech IO server in its own
@@ -16,7 +16,7 @@ panel shows real state when it opens, including a line a running sequence set.
 
 __all__ = ["C_vis"]
 
-from helao.core.servers.io_control_vis import DigitalOutPanel
+from helao.ui.bokeh.io_control_vis import DigitalOutPanel
 
 
 class C_vis(DigitalOutPanel):

@@ -26,9 +26,9 @@ from typing import Any
 import pytest
 
 from harness import ws_frames as wf
-from helao.core.servers.reflex import ingest
-from helao.core.servers.reflex.app import declared_ws_path
-from helao.core.servers.reflex.ingest import (
+from helao.ui.reflex import ingest
+from helao.ui.reflex.app import declared_ws_path
+from helao.ui.reflex.ingest import (
     NORMALIZERS,
     VIS_KEY_TO_WS_PATH,
     IngestRegistry,

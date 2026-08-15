@@ -209,7 +209,7 @@ def test_the_shared_units_enum_drives_both_branches():
     adapter should not depend on the server layer to know what "counts"
     means -- so this is the test that proves the two halves actually agree.
     """
-    from helao.core.servers.motion_control import Units
+    from helao.ui.shared.motion_control import Units
 
     d, ch = _connected()
     asyncio.run(d._motor_move([13], ["x"], None, "relative", "motorxy", Units.counts))
