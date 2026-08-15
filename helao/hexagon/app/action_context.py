@@ -140,10 +140,66 @@ def _apply_code_identity(action: Action, endpoint_func: Optional[Callable]) -> N
     action.action_funcname = code.co_name
 
 
+def _apply_host_context(action: Action, endpoint_func, host) -> None:
+    """Apply the processing legacy does in ``Base._get_action`` (base.py:355-394).
+
+    Ported after a golden-master run showed its absence: without the
+    ``run_type is None`` branch below, a manually dispatched action never gets
+    ``orchestrator = MANUAL`` and therefore never lands in ``RUNS_DIAG`` -- GM-3
+    diffed as an entire missing tree. ``build_action`` originally ported only
+    ``_build_action_from_kwargs`` plus the code-identity tail, and
+    ``ActionSession.__init__`` happened to cover ``action_server``, so the gap
+    looked closed.
+    """
+    from socket import gethostname
+
+    from helao.core.models.machine import MachineModel
+    from helao.core.models.sample import object_to_sample
+
+    if host is None:
+        return
+
+    # The route's own name, not the function's, so a route registered under a
+    # different path records the dispatched name.
+    if endpoint_func is not None:
+        try:
+            urlname = host.url_path_for(endpoint_func.__name__)
+            action_name = urlname.strip("/").split("/")[-1]
+        except Exception:
+            action_name = endpoint_func.__name__
+    else:
+        action_name = action.action_name or ""
+
+    server_key = host.server.server_name
+    action.action_server = MachineModel(
+        server_name=server_key, machine_name=gethostname().lower()
+    )
+    action.action_name = action_name
+
+    if action.action_params is not None and "fast_samples_in" in action.action_params:
+        tmp_fast_samples_in = action.action_params.get("fast_samples_in", [])
+        del action.action_params["fast_samples_in"]
+        for sample in tmp_fast_samples_in:
+            sample_obj = object_to_sample(sample)
+            if not getattr(sample_obj, "action_uuid", []):
+                sample_obj.action_uuid = [action.action_uuid]
+            action.samples_in.append(sample_obj)
+
+    if action.action_abbr is None:
+        action.action_abbr = action.action_name
+
+    if action.run_type is None:
+        action.run_type = getattr(host, "run_type", None)
+        action.orchestrator = MachineModel(
+            server_name="MANUAL", machine_name=gethostname().lower()
+        )
+
+
 def build_action(
     kwargs: dict,
     default_params: Optional[dict] = None,
     endpoint_func: Optional[Callable] = None,
+    host: Any = None,
 ) -> Action:
     """Build the ``Action`` for one action-endpoint invocation.
 
@@ -206,6 +262,7 @@ def build_action(
             continue
         action.action_params[name] = val
 
+    _apply_host_context(action, endpoint_func, host)
     _apply_code_identity(action, endpoint_func)
     return action
 

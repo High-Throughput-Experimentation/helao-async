@@ -121,3 +121,85 @@ def test_collect_default_params_skips_the_context_parameter() -> None:
         return None
 
     assert collect_default_params(inspect.signature(handler)) == {"duration": -1}
+
+
+def test_a_manual_action_is_marked_MANUAL_and_gets_a_run_type() -> None:
+    """Without this, a manual action never reaches RUNS_DIAG.
+
+    GM-3 diffed as an entire missing RUNS_DIAG tree because build_action ported
+    _build_action_from_kwargs but not Base._get_action's run_type branch.
+    """
+
+    class _Host:
+        run_type = "simulation"
+
+        class server:
+            server_name = "SIM"
+
+        def url_path_for(self, name):
+            return f"/SIM/{name}"
+
+    def acquire_data():
+        return None
+
+    got = build_action({}, {}, acquire_data, _Host())
+    assert got.orchestrator.server_name == "MANUAL"
+    assert got.run_type == "simulation"
+
+
+def test_the_action_name_comes_from_the_route_not_the_function() -> None:
+    class _Host:
+        run_type = None
+
+        class server:
+            server_name = "SIM"
+
+        def url_path_for(self, name):
+            return "/SIM/renamed_route"
+
+    def acquire_data():
+        return None
+
+    assert build_action({}, {}, acquire_data, _Host()).action_name == "renamed_route"
+
+
+def test_action_abbr_defaults_to_the_action_name() -> None:
+    class _Host:
+        run_type = None
+
+        class server:
+            server_name = "SIM"
+
+        def url_path_for(self, name):
+            return f"/SIM/{name}"
+
+    def acquire_data():
+        return None
+
+    assert build_action({}, {}, acquire_data, _Host()).action_abbr == "acquire_data"
+
+
+def test_fast_samples_in_is_converted_into_samples_in() -> None:
+    """The conversion also back-fills action_uuid on samples that lack one."""
+
+    class _Host:
+        run_type = None
+
+        class server:
+            server_name = "SIM"
+
+        def url_path_for(self, name):
+            return f"/SIM/{name}"
+
+    def acquire_data():
+        return None
+
+    got = build_action(
+        {"fast_samples_in": [{"global_label": "x", "sample_type": "liquid"}]},
+        {},
+        acquire_data,
+        _Host(),
+    )
+    assert "fast_samples_in" not in got.action_params
+    assert len(got.samples_in) == 1
+    assert got.samples_in[0].action_uuid == [got.action_uuid]

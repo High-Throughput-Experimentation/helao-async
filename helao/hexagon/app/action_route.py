@@ -133,7 +133,7 @@ def wrap_action_endpoint(fn: Callable, host) -> Callable:
         return {k: v for k, v in kwargs.items() if k in accepted_names}
 
     def _context(kwargs: dict) -> ActionContext:
-        action = build_action(kwargs, default_params, fn)
+        action = build_action(kwargs, default_params, fn, host)
         return ActionContext(action=action, endpoint_func=fn, host=host)
 
     if asyncio.iscoroutinefunction(fn):
