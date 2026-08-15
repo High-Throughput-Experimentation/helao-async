@@ -1251,3 +1251,37 @@ record is correct, since missing `samples_in` plausibly changes what the syncer 
 **Note on the golden directory**: `/home/dan/helao_goldens/` also holds `GM-C1__ORBIS_QUANT`,
 `GM-C2__XRDS`, `GM-C3__EASYXAFS_GAIA`, `mutation-work` and `p6-fixtures` from earlier phases.
 Only `GM-1`…`GM-5` belong to B1.
+
+### Re-run after porting `_get_action`: diff counts UNCHANGED (91 / 0 / 5 / 154)
+
+**The prediction recorded before this run was wrong.** GM-3 did not go to zero; nothing moved.
+
+The fix itself *is* live and correct — a GM-1 candidate `-act.yml` now carries
+`run_type: simulation`, which it could not have before. So `_get_action`'s missing processing
+was a genuine gap worth closing, but it was **not the cause of any observed diff**.
+
+What the run actually established, by looking at the candidates rather than the counts:
+
+1. **GM-3's candidate contains exactly one file — `provenance.yml`.** The legacy set has six.
+   The native manual-action scenario produces **no artifacts at all**. Its "5 diffs" were never
+   a partial mismatch; they are its entire expected output missing. This is a distinct defect
+   from anything diagnosed so far, and the MANUAL/`RUNS_DIAG` routing hypothesis did not
+   explain it — a manual action that writes nothing never reaches the routing decision.
+2. **GM-1 and GM-4 write action records correctly** but diverge in `RUNS_SYNCED`, `S3_SIM` and
+   `PROCESSES`, unchanged at 91 and 154. GM-5 still aborts with no RUNS_SYNCED zip. These three
+   are one family: the **sync/S3 leg**, untouched by anything B1 has fixed.
+
+**Two open defects, now cleanly separated:**
+
+- **D1 — the manual-action path writes nothing** (GM-3). Start by establishing whether the
+  action is dispatched at all under `goldenhex`, whether it completes, and whether `save_act`
+  survives the port — not by reasoning about routing.
+- **D2 — the sync/S3 leg is incomplete** (GM-1, GM-4, GM-5). Overwhelmingly "golden present,
+  candidate absent", so the syncer ships less than legacy did. GM-5's abort is the cleanest
+  reproduction and the smallest scenario, so diagnose there first.
+
+**Method note.** Three consecutive fixes were guided by reading legacy source and reasoning
+about what a diff implied. The first two were right; this one was right about the code and
+wrong about the cause. The step that actually produced information here was listing the
+candidate directory — one file versus six — which took seconds and would have redirected the
+work before the fix was written. **Look at the artifact before theorising about the writer.**
