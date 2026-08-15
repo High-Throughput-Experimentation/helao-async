@@ -75,3 +75,35 @@ def test_snapshot_capture_layout_and_freshness(tmp_path):
             tolerance={},
             content_masked={},
         )
+
+
+def test_assert_fresh_rejects_a_root_holding_only_a_manual_run(tmp_path):
+    """RUNS_DIAG counts. A manual action lands ONLY there.
+
+    This is the case that produced a bad golden: the GM-4 legacy baseline
+    was captured on a root still holding GM-3's manual action, because the
+    freshness check looked at RUNS_FINISHED and RUNS_SYNCED only. Those
+    three stale artifacts mint three uuids before GM-4's own first
+    sequence, so every downstream uuid index shifts -- 365 diffs against a
+    candidate that was byte-identical everywhere the scenario wrote.
+    """
+    import pytest
+
+    from harness.capture import assert_fresh
+
+    diag = tmp_path / "RUNS_DIAG" / "26.32" / "0814" / "TS__seq--acquire_data__manual"
+    diag.mkdir(parents=True)
+    (diag / "260814.132716737675-seq.yml").write_text("sequence_uuid: x\n")
+
+    with pytest.raises(RuntimeError, match="RUNS_DIAG"):
+        assert_fresh(tmp_path)
+
+
+def test_assert_fresh_accepts_a_root_with_empty_run_trees(tmp_path):
+    """Empty directories are what a launched-but-unused rig leaves."""
+    from harness.capture import assert_fresh
+
+    for tree in ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG"):
+        (tmp_path / tree / "26.32").mkdir(parents=True)
+
+    assert_fresh(tmp_path)  # must not raise

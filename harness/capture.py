@@ -631,16 +631,44 @@ SCENARIO_MASKS: dict[str, tuple] = {
 
 
 # --- snapshot ----------------------------------------------------------------
+#: Every run tree a previous capture can leave behind. RUNS_DIAG is the one
+#: that used to be missed, and it is the expensive one to miss: a manual
+#: action lands ONLY there, touching neither RUNS_FINISHED nor RUNS_SYNCED,
+#: so a root holding a whole GM-3 run reads as fresh. That is not
+#: hypothetical -- the GM-4 legacy baseline was captured on a root still
+#: holding GM-3's manual action, and because those three artifacts mint three
+#: UUIDs before GM-4's own first sequence, every downstream uuid index shifted
+#: by one to three. The result was 365 diffs, none of them real, against a
+#: candidate that was byte-identical everywhere the scenario actually wrote.
+_RUN_TREES: tuple[str, ...] = (
+    "RUNS_ACTIVE",
+    "RUNS_FINISHED",
+    "RUNS_SYNCED",
+    "RUNS_DIAG",
+)
+
+
 def assert_fresh(root: Path) -> None:
-    finished = Path(root) / "RUNS_FINISHED"
-    if finished.is_dir() and next(finished.rglob("*.yml"), None) is not None:
+    """Refuse a root that holds artifacts from an earlier run.
+
+    Checks every run tree for ANY file rather than each tree for the file
+    type it usually holds: the previous version looked for ``*.yml`` under
+    RUNS_FINISHED and anything under RUNS_SYNCED, which is a per-tree
+    allowlist that silently grows a hole each time a scenario writes
+    somewhere new.
+    """
+    dirty = []
+    for tree in _RUN_TREES:
+        path = Path(root) / tree
+        if path.is_dir() and next((p for p in path.rglob("*") if p.is_file()), None):
+            dirty.append(tree)
+    if dirty:
         raise RuntimeError(
-            f"{root} already contains run artifacts; captures require a fresh "
-            "root (rm -rf it, then re-launch)"
+            f"{root} already contains run artifacts in {', '.join(dirty)}; "
+            "captures require a fresh root (rm -rf it, then re-launch). A "
+            "contaminated root does not fail loudly later -- it shifts every "
+            "uuid index in the capture and reads as hundreds of diffs."
         )
-    synced = Path(root) / "RUNS_SYNCED"
-    if synced.is_dir() and next(synced.rglob("*"), None) is not None:
-        raise RuntimeError(f"{root}/RUNS_SYNCED is not empty; use a fresh root")
 
 
 def snapshot_capture(
