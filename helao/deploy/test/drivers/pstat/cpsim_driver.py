@@ -16,7 +16,11 @@ from helao.helpers import helao_logging as logging
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base import Base
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # Runtime type: ActionHost constructs this driver, not Base.
+    from helao.hexagon.app.action_host import ActionHost
 from helao.helpers.executor import Executor
 from helao.helpers.file_utils import unzpickle
 
@@ -39,7 +43,7 @@ class CPSim:
         data: View of ``all_data`` restricted to the loaded plate.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: "ActionHost"):
         """Load the OER dataset and select the initial plate.
 
         Args:
