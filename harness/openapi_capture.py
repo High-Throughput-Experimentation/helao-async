@@ -43,10 +43,55 @@ def normalize(doc: dict[str, Any]) -> dict[str, Any]:
                     "path": path,
                     "method": method.lower(),
                     "tags": sorted((op or {}).get("tags") or []),
+                    "params": _params(op or {}),
                 }
             )
     routes.sort(key=lambda r: (r["path"], r["method"]))
     return {"routes": routes}
+
+
+def _params(op: dict[str, Any]) -> list[dict[str, Any]]:
+    """The query/path parameters a route accepts, reduced to what callers see.
+
+    Paths and methods alone are too weak a gate for a host replacement: a
+    route can be present with the right tag and still reject every request
+    its predecessor accepted, because a parameter was renamed, lost its
+    default, or changed type. That is invisible to a path-set comparison
+    and immediate to a caller.
+
+    Only ``name``/``in``/``required``/``type``/``default`` are kept. The
+    full JSON Schema carries generated ``title`` strings derived from the
+    handler's own function name, which differ between two correct
+    implementations and would make every route diff.
+    """
+    out = []
+    for prm in op.get("parameters") or []:
+        schema = prm.get("schema") or {}
+        entry = {
+            "name": prm.get("name"),
+            "in": prm.get("in"),
+            "required": bool(prm.get("required", False)),
+            "type": schema.get("type") or _any_of_type(schema),
+        }
+        if "default" in schema:
+            entry["default"] = schema["default"]
+        out.append(entry)
+    out.sort(key=lambda p: (str(p["in"]), str(p["name"])))
+    return out
+
+
+def _any_of_type(schema: dict[str, Any]) -> Any:
+    """The type of an ``anyOf`` schema, which is how Optional[...] renders.
+
+    ``Optional[int]`` becomes ``anyOf: [{type: integer}, {type: null}]`` with
+    no top-level ``type``; reading only ``schema["type"]`` reports None for
+    every optional parameter and makes them all compare equal.
+    """
+    variants = schema.get("anyOf")
+    if not variants:
+        return None
+    types = sorted(v.get("type") for v in variants if v.get("type"))
+    return types[0] if len(types) == 1 else types or None
 
 
 def capture(base_url: str, timeout: float = 10.0) -> dict[str, Any]:

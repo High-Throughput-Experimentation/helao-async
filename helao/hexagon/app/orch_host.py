@@ -191,6 +191,7 @@ class OrchHost(ActionHost):
         self._init_orch_collaborators()
         self._register_orch_routes()
         self._register_orch_payload_routes()
+        self._register_orch_family_overrides()
         self._register_orch_action_routes()
         self._register_orch_loop_routes()
 
@@ -715,3 +716,39 @@ class OrchHost(ActionHost):
         # checkcond is imported so conditional_exp's signature keeps legacy's
         # enum type on the wire; the parameter schema is part of the gate.
         _ = checkcond
+
+    def _replace_inherited_route(self, path: str) -> None:
+        """Drop a route ActionHost registered, so this host can re-register it.
+
+        FastAPI matches in registration order and ActionHost's routes are
+        registered first (in ``super().__init__``), so simply adding a
+        second copy leaves the inherited one serving every request while
+        the override sits shadowed -- and every path-level surface check
+        still passes.
+
+        Needed because the two API families are NOT the same contract, the
+        way the two WS encoding families are not. ``/stop_executor`` is the
+        measured case: ``BaseAPI`` declares ``executor_id: str`` (required),
+        ``OrchAPI`` declares ``executor_id: str = ""`` and returns an error
+        dict when it is blank. Inheriting the action family's version makes
+        the orchestrator 422 a request legacy answered.
+        """
+        self.router.routes = [
+            r for r in self.router.routes if getattr(r, "path", None) != path
+        ]
+
+    def _register_orch_family_overrides(self) -> None:
+        """Routes whose ORCH-family contract differs from the action family."""
+        self._replace_inherited_route("/stop_executor")
+
+        @self.post("/stop_executor", tags=["private"])
+        def stop_executor(executor_id: str = ""):
+            """Stop one executor, or report that none was named.
+
+            ``executor_id`` is OPTIONAL here and required on an action
+            server -- the orchestrator answers a blank one with an error
+            dict rather than a 422.
+            """
+            if executor_id == "":
+                return {"error": "executor_id was not specified"}
+            return self.stop_executor(executor_id)
