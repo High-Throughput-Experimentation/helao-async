@@ -32,5 +32,10 @@ async def test_live_group_runs_one_experiment_to_finished(tmp_path):
         assert finished, "sequence yml missing from RUNS_FINISHED"
         exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.yml", timeout_s=60.0)
         assert len(exp_ymls) == 1
-        # the graft is live: the runtime is the drainer's runtime
-        assert g.runtime is g.orch_app.hexagon_graft.runtime
+        # B3b: the HOST is the drainer, so its own runtime is the one the
+        # loop runs on. There is no graft to look through any more -- and
+        # asserting there is none is the point, because two runtimes over
+        # one set of queues is exactly what the single-drainer property
+        # forbids.
+        assert g.runtime is g.orch_app._hex_runtime
+        assert getattr(g.orch_app, "hexagon_graft", None) is None

@@ -59,7 +59,7 @@ __all__ = [
 
 @dataclass
 class LiveGroup:
-    orch: Any  # legacy Orch — untyped (Any) to avoid import cycles in tests
+    orch: Any  # the OrchHost — untyped (Any) to avoid import cycles in tests
     runtime: Any  # HexRuntime — untyped to avoid import cycles in tests
     orch_app: Any
     sim_app: Any
@@ -146,26 +146,34 @@ async def live_group(tmp_root: str, ntp_offset_s: float = 0.0):
     if helao_logging.LOGGER is None:
         helao_logging.LOGGER = make_logger("hexlive", log_dir=log_dir)
 
+    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import (
+        makeApp as orch_makeApp,
+    )
     from helao.deploy.test.servers.action.sim_db_server import makeApp as db_makeApp
-    from helao.hexagon.app.factory import makeActionApp, makeOrchApp
+    from helao.hexagon.app.factory import makeActionApp
 
     sim_app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
     db_app = db_makeApp("SYNC")
     sim_server, sim_task = await _serve(sim_app, SIM_HOST, SIM_PORT)
     db_server, db_task = await _serve(db_app, DB_HOST, DB_PORT)
-    orch_app = makeOrchApp("ORCH")
+    # B3b: the native OrchHost, not makeOrchApp's grafted legacy Orch. The
+    # suite exists to check single-drainer semantics, so it has to exercise
+    # whatever actually drains -- and after the cut-over that is the host's
+    # own reducer. Pointing it at the graft would leave the shipped loop
+    # untested while reporting green.
+    orch_app = orch_makeApp("ORCH")
     orch_server, orch_task = await _serve(orch_app, ORCH_HOST, ORCH_PORT)
     try:
-        graft = None
-        for _ in range(200):  # graft lands on the startup event, after app.orch
-            graft = getattr(orch_app, "hexagon_graft", None)
-            if graft is not None:
+        runtime = None
+        for _ in range(200):  # the host builds it in __init__; serve is async
+            runtime = getattr(orch_app, "_hex_runtime", None)
+            if runtime is not None:
                 break
             await asyncio.sleep(0.05)
-        assert graft is not None, "hexagon graft never installed at startup"
+        assert runtime is not None, "OrchHost never built its reducer runtime"
         yield LiveGroup(
-            orch=orch_app.orch,
-            runtime=graft.runtime,
+            orch=orch_app,
+            runtime=runtime,
             orch_app=orch_app,
             sim_app=sim_app,
             db_app=db_app,

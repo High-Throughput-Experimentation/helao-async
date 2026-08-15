@@ -279,6 +279,8 @@ def test_make_vis_app_raises_without_an_installed_config(monkeypatch):
 
 
 def test_launcher_shims_delegate():
+    import inspect
+
     import helao.deploy.hexagon.servers.action.ws_simulator as sim_shim
     import helao.deploy.hexagon.servers.orchestrator.async_orch2 as orch_shim
     from helao.hexagon.app import factory
@@ -288,7 +290,18 @@ def test_launcher_shims_delegate():
         == "helao.deploy.hexagon.servers.orchestrator.async_orch2"
     )
     assert sim_shim.LEGACY_MODULE == "helao.deploy.test.servers.action.ws_simulator"
-    assert orch_shim.FACTORY is factory.makeOrchApp
+
+    # B3b: the orchestrator shim no longer delegates to makeOrchApp. It
+    # builds an OrchHost directly, because the host owns the reducer and
+    # makeOrchApp's job was to graft it onto a legacy Orch that no longer
+    # gets constructed here. The assertion inverts rather than disappears:
+    # going back through the factory would wrap the engine again.
+    assert not hasattr(orch_shim, "FACTORY")
+    assert "OrchHost" in inspect.getsource(orch_shim.makeApp)
+    # scoped to makeApp, not the module: the docstring names makeOrchApp
+    # precisely to explain why it is no longer called.
+    assert "makeOrchApp" not in inspect.getsource(orch_shim.makeApp)
+    assert callable(factory.makeOrchApp)  # still there for unported compositions
 
 
 def test_build_wiring_status_port_carries_own_identity(installed_config):

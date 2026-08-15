@@ -497,10 +497,46 @@ class ActionSession:
     async def send_nonblocking_status(self, retry_limit: int = 3) -> None:
         """Push this action's status to every attached client.
 
-        Delegates to the status port, which owns the client registry and the
-        retry policy -- legacy walked ``base.status_clients`` and called
-        ``base.send_nbstatuspackage`` itself.
+        Ported from ``Active.send_nonblocking_status`` (base.py:1463): walk
+        ``base.status_clients`` and call ``send_nbstatuspackage`` per client,
+        retrying each.
+
+        It previously called the status PORT instead, whose
+        ``send_nonblocking_status`` takes
+        ``(client_servkey, client_host, client_port, server_key, exec_id,
+        act_uuid, status)`` -- so handing it a single positional
+        ``action.get_act()`` bound an ActionModel to ``client_servkey``. The
+        symptom is not a crash at the call site: nothing ever reaches
+        ``/update_nonblocking``, so ``orch.nonblocking`` stays empty, and a
+        nonblocking action looks like it simply never reported. Found by the
+        concurrency suite's full-lifecycle test once a native OrchHost ran
+        it end to end.
         """
-        return await self.base.hexagon_wiring.status.send_nonblocking_status(
-            self.action.get_act(), retry_limit=retry_limit
-        )
+        from helao.core.error import ErrorCodes
+
+        for combo_key in self.base.status_clients:
+            client_servkey, client_host, client_port = combo_key
+            LOGGER.info(
+                f"executor trying to send non-blocking status to {client_servkey}."
+            )
+            success = False
+            for _ in range(retry_limit):
+                response, error_code = await self.base.send_nbstatuspackage(
+                    client_servkey=client_servkey,
+                    client_host=client_host,
+                    client_port=client_port,
+                    actionmodel=self.action.get_act(),
+                )
+                if response.get("success", False) and error_code == ErrorCodes.none:
+                    success = True
+                    break
+            if success:
+                LOGGER.info(
+                    f"Attached {client_servkey} to status ws on "
+                    f"{self.base.server.server_name}."
+                )
+            else:
+                LOGGER.error(
+                    f"failed to attach {client_servkey} to status ws on "
+                    f"{self.base.server.server_name} after {retry_limit} attempts."
+                )
