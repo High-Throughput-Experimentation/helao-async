@@ -1,13 +1,30 @@
 # B5 station gate runbook
 
-**Branch:** `feat/legacy-separation-b5-hte`
+**Merged to `unstable`** 2026-08-15, on Linux evidence alone.
 **Spec:** `docs/superpowers/specs/2026-08-15-B5-hte-port-design.md` §5
 **Status:** every Linux gate is green; **no station has run this yet.**
 
 B5 ported all 23 hte action modules, the orchestrator entrypoint, and three
 driver modules from `BaseAPI`/`OrchAPI`/`Base`/`Active` to the native
-`ActionHost`/`OrchHost`. Nothing above this document proves it on hardware, and
-seven stations have to. This is the procedure for each.
+`ActionHost`/`OrchHost`. Nothing proves it on hardware.
+
+**This is a first-launch checklist, not a campaign.** The decision was to merge
+on the Linux gates and let each station gate itself the next time it is used,
+rather than hold the branch for a seven-station sweep. So the work below is
+what to do the *first* time each station comes up on this code — by whoever is
+already using it, not by someone making a special trip.
+
+Two consequences of that choice, worth being clear-eyed about:
+
+* a station can now meet a defect during real work rather than during a drill,
+  so the failure modes in "Read this first" matter more, not less;
+* the pre-change capture in step 1 needs a revision **before** the B5 merge.
+  Once a station has pulled, its own history no longer contains one. Use the
+  merge's first parent, or `freeze/pre-legacy-removal_2608`.
+
+Do steps 3, 4 and 5 every first launch. Steps 1 and 6 (the golden diff) need
+planning ahead — if that is not practical for a given station, say so in the
+table rather than leaving the row ambiguous.
 
 ---
 
@@ -67,7 +84,9 @@ Every server listed is changed — B5 ported all of them. The orchestrator
 | `ecms1` | CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI, ORCH, PSTAT (gamry), SAMPLE, SYNC |
 | `hispec` | ANDOR, CALC, IO, KMOTOR, MOTOR, ORCH, PSTAT (**biologic**), SAMPLE, SYNC |
 
-**Order: `ccsi2`, `eche10`, `anec`, `adss3`, `clad`, `ecms1`, `hispec`.**
+**Preferred order, where there is a choice: `ccsi2`, `eche10`, `anec`, `adss3`,
+`clad`, `ecms1`, `hispec`.** Stations will come up in whatever order work
+demands; this is only what to prefer when two are equally convenient.
 
 `ccsi2` first because its unique modules (`co2sensor_server`, `diapump_server`)
 are the smallest ports in the phase and it runs no motion or PAL. `hispec` last
@@ -112,11 +131,11 @@ Readiness probes must POST. Every HELAO private route is a POST, so a GET to
 that cost a whole five-scenario run once, against a group whose own log showed
 it healthy.
 
-### 2. Switch to the branch
+### 2. Pull
 
 ```
 git status --short --branch          # confirm a clean tree first
-git checkout feat/legacy-separation-b5-hte
+git pull                             # unstable now carries B5
 ```
 
 If the station's deployment directory is a nested private repo, it is not
@@ -206,10 +225,11 @@ rejecting with `in_progress` and leaving no artifacts is the case to see once.
 ### 9. Rollback if anything fails
 
 ```
-git checkout unstable
+git checkout freeze/pre-legacy-removal_2608
 ```
 
-Record what failed, on which server, with the log excerpt — not a summary.
+`unstable` carries B5 now, so it is no longer the rollback. The freeze branch
+is. Record what failed, on which server, with the log excerpt — not a summary.
 
 ---
 
@@ -225,5 +245,7 @@ Record what failed, on which server, with the log excerpt — not a summary.
 | `ecms1` | | | | | | |
 | `hispec` | | | | | | |
 
-B5 merges to `unstable` when all seven rows are complete. B6 (the private
-deployments) and B7 (the deletion) are gated behind that merge.
+B5 is already on `unstable`; this table is the record of hardware confirmation
+accumulating behind it. **B7 (the deletion) should not start until it is
+full** — that is the phase which removes the engine these rows are evidence
+against. B6 (the private deployments) is independent and can proceed.
