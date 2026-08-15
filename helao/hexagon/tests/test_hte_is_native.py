@@ -34,13 +34,7 @@ NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
     {
         "HTEdata_server",
         "analysis_server",
-        "andor_server",
         "calc_server",
-        "diapump_server",
-        "mfc_server",
-        "pal_server",
-        "spec_server",
-        "syringe_server",
         "tec_server",
     }
 )
