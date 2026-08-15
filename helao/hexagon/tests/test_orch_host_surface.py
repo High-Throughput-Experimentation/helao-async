@@ -219,3 +219,59 @@ def test_the_ws_routes_use_the_ORCH_family_encoding_not_the_action_one():
             f"{path} registered {len(matches)} times -- ActionHost registers "
             "first, so a duplicate leaves the action-family handler serving"
         )
+
+
+def test_the_host_owns_the_reducer_rather_than_being_grafted():
+    """D-B3.2: OrchHost drives the reducer; the graft is retired.
+
+    The control methods must route through the runtime, not through the
+    legacy collaborators. Checked by source rather than by calling them,
+    because calling start() would start a real loop.
+    """
+    import inspect
+
+    from helao.hexagon.app.orch_host import OrchHost
+
+    host = _host()
+    for name in ("_hex_runtime", "_hex_loop", "_hex_ingestion", "_hex_health"):
+        assert getattr(host, name, None) is not None, f"{name} not built"
+
+    for method, event in (
+        (OrchHost.start, "StartRequested"),
+        (OrchHost.stop, "StopRequested"),
+        (OrchHost.skip, "SkipRequested"),
+        (OrchHost.estop_loop, "EstopRequested"),
+        (OrchHost.clear_estop, "ClearEstopRequested"),
+        (OrchHost.clear_error, "ClearErrorRequested"),
+    ):
+        src = inspect.getsource(method)
+        assert event in src, f"{method.__name__} does not raise {event}"
+        assert "_hex_runtime" in src, f"{method.__name__} bypasses the reducer"
+
+
+def test_estop_wakes_the_interrupt_queue():
+    """DD-5 item 6, and it is not decorative.
+
+    Legacy's estop_loop calls intend_none(), which posts to interrupt_q.
+    The reducer's none->none intent delta skips that call, so without an
+    explicit wake a dispatch effect parked in wait_for_interrupt never
+    re-checks and never observes the E-STOP -- it sits blocked while the
+    orchestrator believes it has stopped.
+    """
+    import inspect
+
+    from helao.hexagon.app.orch_host import OrchHost
+
+    src = inspect.getsource(OrchHost.estop_loop)
+    assert "interrupt_q.put" in src, "estop_loop must wake the interrupt queue"
+
+
+def test_a_native_orch_host_is_not_grafted():
+    """Two dispatch loops on one set of queues would break the
+    single-drainer property the reducer exists to guarantee."""
+    import inspect
+
+    from helao.hexagon.app import factory
+
+    src = inspect.getsource(factory.makeOrchApp)
+    assert "_is_native_host" in src, "makeOrchApp must skip the graft for a native host"

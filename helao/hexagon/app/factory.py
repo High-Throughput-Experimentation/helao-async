@@ -38,7 +38,12 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 def _is_native_host(app) -> bool:
-    """True when ``app`` is an ``ActionHost`` rather than a legacy BaseAPI.
+    """True when ``app`` is a native host rather than a legacy API object.
+
+    Covers ``OrchHost`` too, because it subclasses ``ActionHost`` the way
+    legacy ``Orch`` subclasses ``Base``. One check answers both grafts:
+    neither the write-path graft nor the loop graft has anything to rebind
+    on a host that already owns the behaviour.
 
     Imported inside the function: ``action_host`` imports this module's
     siblings, and a module-level import here closes that cycle.
@@ -92,6 +97,17 @@ def makeOrchApp(server_key: str):
     # registration order): the graft sees the live legacy Orch.
     @app.on_event("startup")
     async def _hexagon_graft_startup():
+        # An OrchHost drives the reducer itself (D-B3.2) -- it built the
+        # runtime in __init__ and starts the loop in its own startup hook.
+        # Grafting on top would rebind nine methods that are already the
+        # reducer's, and start a SECOND dispatch loop against the same
+        # queues: the single-drainer property the reducer exists to
+        # guarantee is exactly what a double graft breaks.
+        if _is_native_host(app):
+            LOGGER.info(
+                f"{server_key}: native OrchHost, skipping the hexagon loop graft"
+            )
+            return
         app.hexagon_graft = graft_hexagon_loop(app.orch, wiring)  # type: ignore[attr-defined]
 
     @app.on_event("shutdown")
