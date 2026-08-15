@@ -34,19 +34,30 @@ def test_config_validates(prefix):
 
 
 @pytest.mark.parametrize("prefix", _FAMILY)
-def test_db_routes_through_hexagon_shim(prefix):
+def test_db_is_native_and_keeps_the_s3_leg(prefix):
+    """Was ``test_db_routes_through_hexagon_shim``.
+
+    The shim existed to graft hexagon behaviour onto a legacy BaseAPI. Now
+    that ``sim_db_server`` builds an ``ActionHost`` directly there is nothing
+    to graft, so the gate's claim inverts: SYNC must carry NO ``deployment``
+    key. Re-adding it would route a native host back through the graft, whose
+    startup hook then fails on a ``contain_action`` the host does not have —
+    and uvicorn reports that only as ``SystemExit(3)``.
+
+    The S3 params stay asserted here: they are the GM-5 leg's contract, and
+    they are config, not code.
+    """
     conf = _load(prefix)
     db = conf["servers"]["SYNC"]
-    assert db["deployment"] == "hexagon"
+    assert "deployment" not in db
     assert db["fast"] == "sim_db_server"
     assert db["group"] == "action"
     # the GM-5 S3 leg records via the injected RecordingS3Client
     assert db["params"]["s3_record"] is True
     assert db["params"]["aws_bucket"] == "helao-sim"
-    modpath = f"helao.deploy.{db['deployment']}.servers.{db['group']}.{db['fast']}"
-    mod = import_module(modpath)  # fast_launcher module-path shape
+    # fast_launcher's module-path shape for a server with no deployment key
+    mod = import_module(f"helao.deploy.test.servers.action.{db['fast']}")
     assert callable(mod.makeApp)
-    assert mod.LEGACY_MODULE == "helao.deploy.test.servers.action.sim_db_server"
 
 
 def test_ws_demo_retired():
