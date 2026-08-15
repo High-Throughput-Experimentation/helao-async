@@ -63,7 +63,6 @@ class ActionSession:
 
         self.base = host
         self.driver = host.driver
-        self.active_uuid = activeparams.action.action_uuid
         self.action: Action = activeparams.action
         self.action_list = [self.action]
         self.listen_uuids: list = []
@@ -76,29 +75,57 @@ class ActionSession:
         self.action_loop_running = False
         self.manual_stop = False
 
-        self.action.action_server = host.server
-        self.action.dummy = host.world_cfg.get("dummy", False)
-        self.action.simulation = host.world_cfg.get("simulation", False)
-
-        for aux_uuid in getattr(activeparams, "aux_listen_uuids", []):
-            self.add_new_listen_uuid(aux_uuid)
-
         self.file_conn_dict: dict = {}
         for file_conn_key, file_conn_param in (
             activeparams.file_conn_params_dict or {}
         ).items():
             self.file_conn_dict[file_conn_key] = FileConn(params=file_conn_param)
+            # Register the key ON THE ACTION too (base.py:951). Without this the
+            # action carries no file_conn_keys, the writers have no connection
+            # to write through, and the run produces no hlo output at all.
+            self.action.file_conn_keys.append(file_conn_key)
 
         from helao.hexagon.app.executor_runner import ExecutorRunner
 
         self.executor_runner = ExecutorRunner(self)
 
+        # Collaborators BEFORE init_act, matching legacy ordering (base.py:902):
+        # add_new_listen_uuid routes through the data streamer and is called
+        # during this __init__, so the streamer has to exist first.
         store = host.hexagon_wiring.artifact_store
         (
             self.data_stream,
             self.data_file_writer,
             self.action_finalizer,
         ) = store.collaborators_for(self)
+
+        self.action.action_server = host.server
+        self.action.dummy = host.world_cfg.get("dummy", False)
+        self.action.simulation = host.world_cfg.get("simulation", False)
+
+        # Mints action_uuid, action_timestamp and action_output_dir when they
+        # are None -- which is the manual case; under the orchestrator they are
+        # already set. WITHOUT THIS the action has no uuid and no output dir, so
+        # nothing is ever written: GM-3's candidate contained one file where
+        # legacy wrote six.
+        self.action.init_act(time_offset=host.hexagon_wiring.clock.offset() or 0)
+        self.add_new_listen_uuid(self.action.action_uuid)
+
+        # Read AFTER init_act -- before it, action_uuid is still None.
+        self.active_uuid = self.action.action_uuid
+
+        for aux_uuid in getattr(activeparams, "aux_listen_uuids", []):
+            self.add_new_listen_uuid(aux_uuid)
+
+        if self.action.manual_action:
+            LOGGER.info("Manual Action.")
+
+        if not host.helaodirs.save_root:
+            LOGGER.info(
+                "Root save directory not specified, cannot save action results."
+            )
+            self.action.save_data = False
+            self.action.save_act = False
 
     @classmethod
     async def open(cls, host, action: Action, **kwargs) -> "ActionSession":
