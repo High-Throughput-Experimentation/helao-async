@@ -27,7 +27,6 @@ teaches people to ignore it.
 """
 
 import ast
-import re
 from pathlib import Path
 from typing import Final
 
@@ -141,53 +140,10 @@ NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
         "register_obj_uuid",
         "register_action_uuid",
         "track_action_uuid",
-        # --- B3a, filled in by Tasks 2-6 (delete as you go) -------------
-        "dispatch_wait_task",
-        "verify_plate_in_params",
-        "use_sync",
-        "syncer",
+        # Assigned by the dispatch loop itself (orch_dispatch.py:1170), not
+        # by construction -- so they arrive with B3b, not here.
         "exp_model",
         "seq_model",
-        "experiment_lib",
-        "sequence_lib",
-        "experiment_codehash_lib",
-        "sequence_codehash_lib",
-        "experiment_codepath_lib",
-        "sequence_codepath_lib",
-        "unpack_sequence",
-        "seq_unpacker",
-        "add_sequence",
-        "add_split_sequences",
-        "add_experiment",
-        "prepend_sequences",
-        "move_sequence",
-        "move_experiment",
-        "move_action",
-        "remove_sequence",
-        "remove_experiment",
-        "remove_action",
-        "clear_sequences",
-        "clear_experiments",
-        "drop_experiment_inds",
-        "list_sequences",
-        "list_experiments",
-        "list_all_experiments",
-        "list_actions",
-        "list_active_actions",
-        "get_experiment",
-        "get_sequence",
-        "finish_active_experiment",
-        "finish_active_sequence",
-        "write_active_experiment_exp",
-        "write_active_sequence_seq",
-        "export_queues",
-        "import_queues",
-        "_ensure_run_id",
-        "_resolve_active_run_id",
-        "_prep_sequence_meta",
-        "_rebuild_action_dq",
-        "_rebuild_experiment_dq",
-        "_rebuild_sequence_dq",
     }
 )
 
@@ -207,16 +163,37 @@ def _host_members() -> set[str]:
         "helao/hexagon/app/action_host.py",
         "helao/helpers/server_api.py",
     ):
-        src = (REPO_ROOT / rel).read_text(encoding="utf-8")
-        # `[^=\n]*` spans an optional annotation: `self.live_buffer: dict = {}`
-        # is an assignment, and a pattern anchored straight to `=` misses
-        # every annotated attribute. That read as ActionHost not providing
-        # live_buffer, active_experiment, active_sequence or active_run_id --
-        # all four of which it or OrchHost plainly assign.
-        members |= set(
-            re.findall(r"self\.([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^=\n]*)?=", src)
-        )
+        members |= _self_assigned(REPO_ROOT / rel)
     return members
+
+
+def _self_assigned(path: Path) -> set[str]:
+    """Every ``self.x`` assigned in *path*, by AST rather than by regex.
+
+    A regex was tried twice and was wrong twice, in the same direction
+    both times -- reporting a member as ABSENT while the source plainly
+    assigns it, which in a coverage ratchet means work that looks
+    outstanding after it is done:
+
+    * anchored straight to ``=``, it missed every ANNOTATED assignment
+      (``self.live_buffer: dict = {}``);
+    * widened for annotations, it still missed every TUPLE-unpacked one
+      (``(self.experiment_lib, self.experiment_codehash_lib, ...) = ...``),
+      catching only the final target before the ``=``.
+
+    ``ast.Store`` covers all of it -- plain, annotated, tuple, augmented,
+    walrus -- and cannot drift as syntax varies.
+    """
+    found: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "self"
+            and isinstance(node.ctx, ast.Store)
+        ):
+            found.add(node.attr)
+    return found
 
 
 def test_the_contract_extraction_is_not_vacuous() -> None:
