@@ -201,6 +201,53 @@ the only module with no Linux build gate).
 - **The `_hex` and `.yml` configs converge for action servers as B5 proceeds.** This is D-S4 arriving early. B5 renames nothing; B7 does.
 - **`helao/hexagon/app/orch_*.py` still imports helpers from `helao/core/servers/orch*`** — `move_dir`, `PLATE_API`, `async_action_dispatcher`, `sanitize_sequence_label`, `WaitExec`, `checkcond`, `orch_global_params`. These are engine-file residue that B7 must extract or relocate. B5 neither adds to nor removes from that list; it is recorded here so B7 does not discover it late.
 
+## 6b. What executing it actually found
+
+Recorded because the spec predicted a uniform mechanical transform and three
+things were not.
+
+**Three endpoints are two-step, not one.** `MOTOR /run_aligner`,
+`NI /cellIV` and `SPEC_T /acquire_spec_extrig` need the Action *without*
+opening a session, because a precheck can reject and must answer with an error
+code and no artifacts on disk. PAL adds fifteen more of the same shape through
+a shared `_pal_start` helper. `ctx.action` is legacy's `setup_action()` and
+`ctx.begin(...)` is its `contain_action`, so the port is faithful — but it is
+not something a decorator rewrite produces.
+
+**The native session factory was missing one field.** Two of those endpoints
+set `sample_global_labels` per file connection, stamping the measured sample
+onto its own `.hlo`. Legacy's `setup_and_contain_action` never exposed it —
+that is precisely why they dropped to `contain_action` — and the explicit
+context has no lower level to drop to. `ActionSession.open` now accepts it,
+defaulting to the empty list `FileConnParams` itself declares. Without it the
+labels would silently be `[]`: a provenance loss invisible to the route
+surface, the wire, and the golden diff of anything that does not measure a
+sample.
+
+**`ActionSessionPort` is the collaborator contract, not the deployment
+contract.** Ten of the fifteen deployment-facing session members are absent
+from it, `write_file` among them. Its docstring says it is derived from what
+the three native write collaborators read and warns against hand-adding
+members — so `archive_driver` annotates against the concrete `ActionSession`
+instead. The existing test that checks the fifteen-member deployment surface
+checks the *implementation*, which is why the gap had not surfaced.
+
+**The route extractor did not honour `@host.action(path=...)`.** Three routes
+were served at a path that did not match their handler's name
+(`get_positions` → `/SAMPLE/get_loaded_positions`, `archive_tray_new` →
+`/SAMPLE/archive_tray_new_position`, and every config-declared analysis
+endpoint, whose handler is named `_analyze` when the decorator runs). Their
+ports must pass `path=` to keep both the route and the operation_id where they
+were, and the extractor reported those correct ports as missing/extra pairs
+until it learned to read the kwarg.
+
+**Six modules finish B5 without a station gate**, and no later station adds
+one: `analysis_server`, `HTEdata_server`, `o2sensor_server`,
+`power_supply_server`, `tec_server` (no live hte config) and `pdu_server`
+(live only in a private deployment, so B6's gate). `analysis_server` also has
+no route checklist — its endpoints are built at runtime — leaving the ratchet
+and the build probe as its whole gate.
+
 ## 7. What B5 does not change
 
 - No route path, method, tag, or parameter — that is precisely what the frozen checklist gate forbids.
