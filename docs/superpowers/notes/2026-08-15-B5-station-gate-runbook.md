@@ -20,9 +20,30 @@ no-op on a native host and the plain `.yml` never had a graft. So both configs
 serve the native host on this branch. **Rollback is `git checkout unstable`,
 or `freeze/pre-legacy-removal_2608` if `unstable` has moved.**
 
-**Capture the golden BEFORE checking the branch out.** Once a module builds a
-native host there is no legacy build of it left on this working copy to capture
-from. B1 learned this the expensive way.
+**Capture the golden BEFORE checking the branch out, and understand why.**
+The reference for this phase is a **git revision**, not a config key. On
+`unstable` hte's action modules still build a legacy `BaseAPI`; on this branch
+they build an `ActionHost`. So the only legacy-vs-native comparison available
+is "capture on `unstable`, checkout, capture again, diff". Once the branch is
+checked out there is no legacy build of these modules left on this working copy
+to capture from — B1 learned that the expensive way.
+
+**The per-family canaries under `helao/hexagon/tests/smoke/` no longer prove
+anything about this port, and a green run from them is not evidence.** Each is
+a config pair — `<family>.yml` with `deployment: hte` against `<family>hex.yml`
+with `deployment: hexagon` — built for P3a to compare the two compositions. The
+`hexagon` side routes through a shim whose `LEGACY_MODULE` names the *same* hte
+module the `hte` side imports directly, and B5 ported that module. Measured:
+**29 of the 31 config pairs now build an `ActionHost` on both sides** (the two
+exceptions are the biologic pair, which raises the same Windows-only import
+error on both sides and would self-compare at hispec too). `co2_diff.bat PASS`
+means a native host was diffed against itself and could not have failed.
+`helao/hexagon/tests/test_hte_canary_reference_is_gone.py` pins this.
+
+They remain useful for one thing: the **openapi canary** half still catches a
+route-surface regression against the frozen per-server checklists, because that
+comparison is against a checked-in file rather than against the other side of
+the pair.
 
 **A bad outcome here does not look like a crash at launch.** The route surface
 is proven identical, so servers come up and answer. What a hardware fault would
@@ -68,17 +89,28 @@ otherwise.
 
 Substitute `<station>` throughout.
 
-### 1. Capture the pre-change golden — before touching the branch
+### 1. Capture the pre-change golden — on `unstable`, before touching the branch
+
+**Not `harness.capture --scenario GM-1`.** The built-in GM scenarios post to
+`/SIM/acquire_data` — `ws_simulator`, from the `test` deployment — and no hte
+station runs a SIM server. `harness/capture.py` takes `--scenarios <dotted
+module>` for a deployment's own table, and hte has none, which is why the
+capture here is of the station's *own* smoke sequence rather than a GM
+scenario.
+
+With `unstable` checked out, launch the station normally, run the smoke
+sequence from step 5, let it drain, then snapshot the run tree:
 
 ```
-python -m harness.capture --scenario GM-1 \
-    --root <the station's configured root> \
-    --out <goldens>/<station>/pre \
-    --config-prefix <station>_hex
+git rev-parse HEAD                       # record it in the sign-off table
+cp -a <root>/RUNS_FINISHED  <goldens>/<station>/pre/RUNS_FINISHED
+cp -a <root>/RUNS_SYNCED    <goldens>/<station>/pre/RUNS_SYNCED   # if this station syncs
 ```
 
 Readiness probes must POST. Every HELAO private route is a POST, so a GET to
-`/loaded_modules` returns 405, which a naive probe reports as "server down".
+`/loaded_modules` returns 405, which a naive probe reports as "server down" —
+that cost a whole five-scenario run once, against a group whose own log showed
+it healthy.
 
 ### 2. Switch to the branch
 
@@ -121,18 +153,25 @@ Queue the sequence this station is normally exercised with and let it drain to
   is a fault everywhere;
 - the sequence reaches `RUNS_SYNCED` if this station syncs.
 
-### 6. Golden diff
+### 6. Golden diff — the branch's tree against `unstable`'s
+
+Snapshot the run tree the step-5 sequence produced, exactly as in step 1:
 
 ```
-python -m harness.capture --scenario GM-1 \
-    --root <the station's configured root> \
-    --out <goldens>/<station>/post \
-    --config-prefix <station>_hex
+cp -a <root>/RUNS_FINISHED  <goldens>/<station>/post/RUNS_FINISHED
+cp -a <root>/RUNS_SYNCED    <goldens>/<station>/post/RUNS_SYNCED
 python -m harness.parity --golden <goldens>/<station>/pre \
                          --candidate <goldens>/<station>/post
 ```
 
-Expect **0 diffs**. Capture on a fresh root, as the rig requires.
+`harness.parity` accepts a bare capture root as the candidate, so the two
+snapshots compare directly. Expect **0 diffs** beyond the normalizations the
+differ already applies (uuids, timestamps, host names).
+
+Both sides must come from the **same sequence on the same hardware**, run once
+on `unstable` and once on the branch. A difference in what was submitted makes
+the diff unreadable, and this is the only genuinely legacy-vs-native evidence
+the phase gets.
 
 ### 7. E-stop drill
 
@@ -176,15 +215,15 @@ Record what failed, on which server, with the log excerpt — not a summary.
 
 ## Sign-off
 
-| station | date | golden diff | smoke | e-stop | by |
-|---|---|---|---|---|---|
-| `ccsi2` | | | | | |
-| `eche10` | | | | | |
-| `anec` | | | | | |
-| `adss3` | | | | | |
-| `clad` | | | | | |
-| `ecms1` | | | | | |
-| `hispec` | | | | | |
+| station | date | `unstable` rev captured | golden diff | smoke | e-stop | by |
+|---|---|---|---|---|---|---|
+| `ccsi2` | | | | | | |
+| `eche10` | | | | | | |
+| `anec` | | | | | | |
+| `adss3` | | | | | | |
+| `clad` | | | | | | |
+| `ecms1` | | | | | | |
+| `hispec` | | | | | | |
 
 B5 merges to `unstable` when all seven rows are complete. B6 (the private
 deployments) and B7 (the deletion) are gated behind that merge.
