@@ -32,8 +32,9 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
 from helao.helpers.yml_tools import yml_dumps
@@ -597,7 +598,7 @@ class GamryEisExec(Executor):
         return {"error": error}
 
 
-async def gamry_dyn_endpoints(app: BaseAPI):
+async def gamry_dyn_endpoints(app: ActionHost):
     """Register all Gamry technique endpoints once the driver is ready.
 
     Blocks until ``app.driver.ready`` is true, disables concurrent actions,
@@ -606,10 +607,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     (LSV, CA, CP, CV, OCV, RCA, PEIS, GEIS).
 
     Args:
-        app: The :class:`BaseAPI` instance being configured.
+        app: The :class:`ActionHost` instance being configured.
     """
-    server_key = app.base.server.server_name
-    app.base.server_params["allow_concurrent_actions"] = False
+    server_key = app.server.server_name
+    app.server_params["allow_concurrent_actions"] = False
 
     # P3a gamry COM cut-over: GamryComAdapter is disconnected-construct (the COM
     # thread + wrapped driver are built here, not in __init__), so connect at
@@ -622,9 +623,10 @@ async def gamry_dyn_endpoints(app: BaseAPI):
 
     model_ierange = app.driver.model.ierange
 
-    @app.post(f"/{server_key}/run_LSV", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_LSV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -692,15 +694,16 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "LSV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_LSV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CA", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_CA(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -757,15 +760,16 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CA"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CP", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_CP(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -822,15 +826,16 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CP"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CP)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CV", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_CV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -896,15 +901,16 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_OCV", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_OCV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -955,15 +961,16 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "OCV"
         executor = GamryExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_RCA", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_RCA(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1010,7 +1017,7 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
 
         # custom signal array can't be done with mapping, generate array here
         Vinit = active.action.action_params["Vinit__V"]
@@ -1031,8 +1038,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_PEIS", tags=["action"])
+    @app.action()
     async def run_PEIS(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1075,14 +1083,15 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "PEIS"
         executor = GamryEisExec(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_GEIS", tags=["action"])
+    @app.action()
     async def run_GEIS(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -1119,14 +1128,14 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "GEIS"
         executor = GamryEisExec(active=active, oneoff=False)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/get_meas_status", tags=["action"])
-    async def get_meas_status():
+    @app.action()
+    async def get_meas_status(ctx: ActionContext):
         """Report the dtaq sink's current state.
 
         Use together with the eta-driven sleep loop to poll for completion.
@@ -1138,13 +1147,13 @@ async def gamry_dyn_endpoints(app: BaseAPI):
             The finished action dictionary containing ``status`` (typically
             ``'idle'`` or ``'measuring'``).
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         await active.enqueue_data_dflt(datadict={"status": app.driver.dtaqsink.status})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop():
+    @app.action()
+    async def stop(ctx: ActionContext):
         """Stop every active executor on the server in a controlled way.
 
         Args:
@@ -1154,9 +1163,9 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
-        for exec_key in app.base.executors:
-            app.base.stop_executor(exec_key)
+        active = await ctx.begin(action_abbr="stop")
+        for exec_key in app.executors:
+            app.stop_executor(exec_key)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -1164,8 +1173,8 @@ async def gamry_dyn_endpoints(app: BaseAPI):
     async def stop_private() -> list:
         """Stop every active executor and return the list of stopped keys."""
         stopped_keys = []
-        for exec_key in app.base.executors:
-            app.base.stop_executor(exec_key)
+        for exec_key in app.executors:
+            app.stop_executor(exec_key)
             stopped_keys.append(exec_key)
         return stopped_keys
 
@@ -1200,20 +1209,20 @@ async def gamry_dyn_endpoints(app: BaseAPI):
         return state
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the Gamry potentiostat.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the Gamry potentiostat.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with technique endpoints attached
+        The configured ActionHost instance with technique endpoints attached
         via :func:`gamry_dyn_endpoints` plus action-level ``get_meas_status``
         and ``stop`` endpoints and private state/measurement helpers.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Gamry instrument/action server",

@@ -283,10 +283,14 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
     # `<x>items` enum built from that group.
     togglable = set()
     for m in re.finditer(
-        # The annotation may be wrapped: a typing sweep turned every one of
-        # these into Optional[...], which silently emptied this match until the
-        # assert below caught it.
-        r"async def \w+\(\n\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
+        # Two ways this match has been silently emptied, both caught only by
+        # the assert below. A typing sweep wrapped every annotation in
+        # Optional[...]; and B5's port inserted `ctx: ActionContext` as the
+        # FIRST parameter of every action handler, pushing the group argument
+        # off the line after the paren. Both are tolerated here.
+        r"async def \w+\(\n"
+        r"(?:\s+ctx: ActionContext,\n)?"
+        r"\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
         src,
     ):
         togglable.add(m.group(1))
