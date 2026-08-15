@@ -56,15 +56,15 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
         "live_buffer_mgr",
         "status_broadcaster",
         # -- legacy lifecycle internals --------------------------------------
-        # ActionHost uses FastAPI's startup event; these are Base's own task
-        # handles and locks, not part of any caller's contract.
+        # ActionHost starts its background loops from FastAPI's startup event
+        # instead of myinit(); the aiodebug hang inspector and the Base-wide
+        # lock have no hexagon equivalent. (The three task HANDLES legacy
+        # keeps -- bufferer/status_logger/regular_updater -- are NOT here:
+        # the host owns them too, because shutdown has to cancel them.)
         "myinit",
         "aiolock",
-        "bufferer",
         "dumper",
         "dumper_task",
-        "status_logger",
-        "regular_updater",
         # -- legacy config wrappers ------------------------------------------
         # The host reads world_cfg/server_cfg directly.
         "typed_cfg",
@@ -79,26 +79,12 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
 )
 
 #: The real remaining work. Frozen: porting one means deleting it from here.
-NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
-    {
-        # The status-broadcaster family. These are NOT a mechanical port:
-        # legacy delegates each to a StatusBroadcaster collaborator the host
-        # does not have, and the hexagon equivalent is the status PORT, whose
-        # signatures differ (send_status / send_nonblocking_status). Porting
-        # them means deciding how the host's fan-out maps onto that port, not
-        # copying a body.
-        "send_statuspackage",
-        "send_nbstatuspackage",
-        "status_clients",
-        "detach_subscribers",
-        # Long-lived background loops legacy starts from myinit(). The host has
-        # no equivalent lifecycle hook yet, and starting them from the FastAPI
-        # startup event needs the same care the poller shutdown ordering needed.
-        "live_buffer_task",
-        "log_status_task",
-        "regular_status_task",
-    }
-)
+#:
+#: Empty as of the status-spine port. Keep the set (and this comment) rather
+#: than deleting the mechanism: the ratchet's value is that the next member
+#: to fall behind lands here with a reason attached, and an empty frozenset
+#: is a working ratchet, not a dead one.
+NOT_YET_PORTED: Final[frozenset[str]] = frozenset()
 
 
 def _base_public_members() -> set[str]:

@@ -36,6 +36,7 @@ import faulthandler
 import json
 import os
 import time
+import traceback
 from collections import namedtuple
 from typing import Annotated, Any, Callable, Optional
 
@@ -43,11 +44,12 @@ from fastapi import Body, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedOK
 
 from helao.core.drivers.helao_driver import DriverPoller, DriverStatus, HelaoDriver
-from helao.core.models.server import ActionServerModel
+from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.helpers import helao_logging as logging
 from helao.helpers.processors import HloPostProcessor
 from helao.core.error import ErrorCodes
 from helao.helpers.dequedict import DequeDict
+from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
@@ -246,6 +248,17 @@ class ActionHost(HelaoFastAPI):
         self.status_publisher = WsPublisher(self.status_q)
         self.data_publisher = WsPublisher(self.data_q)
         self.live_publisher = WsPublisher(self.live_q)
+        #: Remote status subscribers, as (server_key, host, port) tuples.
+        #: ONE registry, on the host. The status *port* adapter keeps its own
+        #: client list for the graft compositions; routing the host's
+        #: attach_client through that adapter while log_status_task fans out
+        #: over this set would mean a server that accepts every subscription
+        #: and broadcasts to nobody, with both halves logging success.
+        self.status_clients: set = set()
+        #: Background loop handles, created at startup (legacy: Base.myinit).
+        self.bufferer: Optional[asyncio.Task] = None
+        self.status_logger: Optional[asyncio.Task] = None
+        self.regular_updater: Optional[asyncio.Task] = None
 
         # The meta writer is already native; the host owns it rather than
         # having it grafted on, and the file-conn key derivation below is the
@@ -511,6 +524,67 @@ class ActionHost(HelaoFastAPI):
 
     # -- state the routes operate on -----------------------------------------
 
+    async def send_statuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        action_name: Optional[str] = None,
+    ) -> tuple:
+        """POST this server's action-server model to one remote subscriber.
+
+        ``action_name=None`` means the whole model and sets ``regular_task``;
+        a named endpoint sends only that endpoint's slice. The receiving
+        orchestrator branches on that flag, so the two are not
+        interchangeable — a filtered payload sent as a regular task makes the
+        orchestrator believe every other endpoint went idle.
+        """
+        json_dict = {
+            "actionservermodel": self.actionservermodel.get_fastapi_json(
+                action_name=action_name,
+            ),
+        }
+        response, error_code = await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_status",
+            params_dict={"regular_task": "true" if action_name is None else "false"},
+            json_dict=json_dict,
+        )
+        return response, error_code
+
+    async def send_nbstatuspackage(
+        self,
+        client_servkey: str,
+        client_host: str,
+        client_port: int,
+        actionmodel: Action,
+    ) -> tuple:
+        """POST one non-blocking action's status to a remote subscriber.
+
+        The reporting server's own host/port travel as query params, not in
+        the body: the orchestrator keys its non-blocking bookkeeping on them.
+        """
+        json_dict = {
+            "actionmodel": actionmodel.as_dict(),
+        }
+        params_dict = {
+            "server_host": self.server_cfg["host"],
+            "server_port": self.server_cfg["port"],
+        }
+        LOGGER.info(f"sending non-blocking status: {json_dict}")
+        response, error_code = await async_private_dispatcher(
+            server_key=client_servkey,
+            host=client_host,
+            port=client_port,
+            private_action="update_nonblocking",
+            params_dict=params_dict,
+            json_dict=json_dict,
+        )
+        LOGGER.info(f"update_nonblocking request got response: {response}")
+        return response, error_code
+
     async def attach_client(
         self,
         client_servkey: str,
@@ -518,18 +592,207 @@ class ActionHost(HelaoFastAPI):
         client_port: int,
         retry_limit: int = 5,
     ) -> bool:
-        """Subscribe a remote client to this server's status updates."""
-        return await self.hexagon_wiring.status.attach_client(
-            client_servkey, client_host, client_port, retry_limit=retry_limit
-        )
+        """Subscribe a remote client and push it an initial full snapshot.
+
+        The client joins ``status_clients`` *before* the snapshot is
+        attempted, and stays even if every attempt fails: legacy does the
+        same, and the subsequent ``log_status_task`` push is what recovers a
+        subscriber whose first snapshot was lost.
+        """
+        success = False
+        combo_key = (client_servkey, client_host, client_port)
+        LOGGER.info("attaching status subscriber")
+
+        if combo_key in self.status_clients:
+            LOGGER.info(
+                f"Client {combo_key} is already subscribed to "
+                f"{self.server.server_name} status updates."
+            )
+        self.status_clients.add(combo_key)
+
+        for _ in range(retry_limit):
+            response, error_code = await self.send_statuspackage(
+                client_servkey=client_servkey,
+                client_host=client_host,
+                client_port=client_port,
+                action_name=None,
+            )
+            if response is not None and error_code == ErrorCodes.none:
+                LOGGER.info(
+                    f"Added {combo_key} to {self.server.server_name} "
+                    "status subscriber list."
+                )
+                success = True
+                break
+            LOGGER.error(
+                f"Failed to add {combo_key} to {self.server.server_name} "
+                "status subscriber list."
+            )
+
+        if not success:
+            LOGGER.error(
+                f"failed to attach {combo_key} to status ws on "
+                f"{self.server.server_name} after {retry_limit} attempts."
+            )
+        return success
 
     async def detach_client(
         self, client_servkey: str, client_host: str, client_port: int
     ):
         """Remove a remote client from this server's status subscribers."""
-        return await self.hexagon_wiring.status.detach_client(
-            client_servkey, client_host, client_port
-        )
+        combo_key = (client_servkey, client_host, client_port)
+        if combo_key in self.status_clients:
+            self.status_clients.remove(combo_key)
+            LOGGER.info(f"Client {combo_key} will no longer receive status updates.")
+        else:
+            LOGGER.info(f"Client {combo_key} is not subscribed.")
+
+    async def detach_subscribers(self) -> None:
+        """Terminate the status and data queue subscriptions, then drain.
+
+        The sleep is not politeness: the WS relays and ``log_status_task``
+        each need a scheduling turn to observe ``StopAsyncIteration`` and
+        unwind before the process goes away.
+        """
+        await self.status_q.put(StopAsyncIteration)
+        await self.data_q.put(StopAsyncIteration)
+        await asyncio.sleep(1)
+
+    # -- background loops (legacy starts these from Base.myinit) -------------
+
+    async def live_buffer_task(self) -> None:
+        """Fold every published live message into ``live_buffer``.
+
+        Without this loop ``put_lbuf`` still publishes to ``live_q`` and the
+        ``/ws_live`` relay still streams, but ``live_buffer`` stays empty
+        forever — so ``/get_lbuf`` returns ``{}`` and every poller-backed
+        visualizer reads healthy and renders nothing.
+        """
+        LOGGER.info(f"{self.server.server_name} live buffer task created.")
+        async for live_msg in self.live_q.subscribe():
+            self.live_buffer.update(live_msg)
+
+    async def regular_status_task(
+        self, delay: float = 10, retry_limit: int = 5
+    ) -> None:
+        """Periodically push the full status model to every subscriber."""
+        while True:
+            for combo_key in self.status_clients.copy():
+                client_servkey, client_host, client_port = combo_key
+                for _ in range(retry_limit):
+                    response, error_code = await self.send_statuspackage(
+                        action_name=None,
+                        client_servkey=client_servkey,
+                        client_host=client_host,
+                        client_port=client_port,
+                    )
+                    if response and error_code == ErrorCodes.none:
+                        break
+            await asyncio.sleep(delay)
+
+    async def log_status_task(self, retry_limit: int = 5) -> None:
+        """Drain ``status_q``: fold into the model, fan out, drive the queues.
+
+        This is the server's status spine, not a logger. Every status message
+        an action emits arrives here, and three separate things depend on it:
+        ``actionservermodel`` is how ``/get_status`` and the estop path see
+        the server's own state; subscribers (the orchestrator above all)
+        learn an action finished only from the fan-out; and the endpoint /
+        unified queues are drained *here*, on the transition that freed the
+        endpoint. Without this loop an orchestrated run dispatches its first
+        action and then waits forever, with the action itself completing
+        normally.
+        """
+        LOGGER.info(f"{self.server.server_name} status log task created.")
+
+        try:
+            async for status_msg in self.status_q.subscribe():
+                if status_msg.action_name not in self.actionservermodel.endpoints:
+                    # an endpoint became available
+                    self.actionservermodel.endpoints[status_msg.action_name] = (
+                        EndpointModel(endpoint_name=status_msg.action_name)
+                    )
+                self.actionservermodel.endpoints[
+                    status_msg.action_name
+                ].active_dict.update({status_msg.action_uuid: status_msg})
+                self.actionservermodel.last_action_uuid = status_msg.action_uuid
+
+                # sort the status (nonactive_dict is empty at this point)
+                self.actionservermodel.endpoints[status_msg.action_name].sort_status()
+                LOGGER.info(
+                    f"log_status_task sending status {status_msg.action_status} for "
+                    f"action {status_msg.action_name} with uuid "
+                    f"{status_msg.action_uuid} on "
+                    f"{status_msg.action_server.disp_name()} to subscribers "
+                    f"({self.status_clients})."
+                )
+                if len(self.status_clients) == 0 and self.orch_key is not None:
+                    await self.attach_client(
+                        self.orch_key, self.orch_host, self.orch_port
+                    )
+
+                for combo_key in self.status_clients.copy():
+                    client_servkey, client_host, client_port = combo_key
+                    LOGGER.debug(
+                        f"log_status_task trying to send status to {client_servkey}."
+                    )
+                    success = False
+                    for _ in range(retry_limit):
+                        response, error_code = await self.send_statuspackage(
+                            action_name=status_msg.action_name,
+                            client_servkey=client_servkey,
+                            client_host=client_host,
+                            client_port=client_port,
+                        )
+                        if response and error_code == ErrorCodes.none:
+                            success = True
+                            break
+
+                    if success:
+                        LOGGER.info(f"Pushed status message to {client_servkey}.")
+                    else:
+                        LOGGER.error(
+                            f"Failed to push status message to {client_servkey} "
+                            f"after {retry_limit} attempts."
+                        )
+                    # Blocking, and deliberately so until parity is signed
+                    # off: legacy paces subscribers with time.sleep here, and
+                    # swapping in asyncio.sleep reorders this loop against
+                    # every other coroutine on the server.
+                    time.sleep(0.3)
+
+                # delete errored and finished statuses only after every
+                # subscriber has been sent them
+                self.actionservermodel.endpoints[
+                    status_msg.action_name
+                ].clear_finished()
+                LOGGER.debug("all log_status_task messages sent.")
+
+                active_nonqueued = {
+                    endpoint: [
+                        auuid
+                        for auuid, act in endmod.active_dict.items()
+                        if not act.action_params.get("queued_on_actserv", False)
+                        or act.action_params.get("queued_launch", False)
+                    ]
+                    for endpoint, endmod in self.actionservermodel.endpoints.items()
+                }
+                active_nq = [x for y in active_nonqueued.values() for x in y]
+
+                if not self.server_params.get("allow_concurrent_actions", True):
+                    if len(self.local_action_queue) > 0 and not active_nq:
+                        await self.process_unified_queue()
+                else:
+                    if len(
+                        self.endpoint_queues[status_msg.action_name]
+                    ) > 0 and not active_nonqueued.get(status_msg.action_name, []):
+                        await self.process_endpoint_queue(status_msg)
+
+            LOGGER.info("log_status_task done.")
+
+        except Exception as e:
+            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+            LOGGER.error(f"status logger task was cancelled with error: {repr(e), tb,}")
 
     def stop_executor(self, executor_id: str) -> dict:
         """Legacy's spelling; the estop handler and clients both use it."""
@@ -960,6 +1223,17 @@ class ActionHost(HelaoFastAPI):
             # would leave them unmonitored and unqueueable.
             self.dyn_endpoints_init()
 
+            # The three background loops. Started here rather than in
+            # __init__ for the same reason aloop is captured here: they are
+            # tasks, and there is no running loop until the app starts.
+            self.bufferer = self.aloop.create_task(self.live_buffer_task())
+            self.status_logger = self.aloop.create_task(self.log_status_task())
+            if self.server_cfg.get("regular_update", False):
+                regular_delay = self.server_cfg.get("regular_update_delay", 10)
+                self.regular_updater = self.aloop.create_task(
+                    self.regular_status_task(regular_delay)
+                )
+
         @self.on_event("shutdown")
         async def shutdown_event():
             """Shut the host down and run the driver's shutdown hooks."""
@@ -977,6 +1251,14 @@ class ActionHost(HelaoFastAPI):
         if isinstance(self.poller, DriverPoller):
             LOGGER.info("stopping driver poller before disconnect")
             await self.poller.stop()
+
+        # Subscribers before drivers, producers before consumers: the poller
+        # is already stopped, so nothing new reaches the queues, and the
+        # relays get their turn to unwind before the loops are cancelled.
+        await self.detach_subscribers()
+        for task in (self.status_logger, self.bufferer, self.regular_updater):
+            if task is not None:
+                task.cancel()
 
         retvals: dict = {}
         shutdown = getattr(self.driver, "shutdown", None)
