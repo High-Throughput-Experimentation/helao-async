@@ -18,25 +18,26 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.sensor.sprintir_driver import CO2MonExec, SprintIR, SprintIRPoller
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the CO2 sensor FastAPI app.
+def makeApp(server_key) -> ActionHost:
+    """Build the CO2 sensor action server.
 
-    Constructs a :class:`BaseAPI` backed by :class:`SprintIR` and registers the
-    ``acquire_co2`` and ``cancel_acquire_co2`` endpoints.
+    Constructs an :class:`ActionHost` backed by :class:`SprintIR` and registers
+    the ``acquire_co2`` and ``cancel_acquire_co2`` endpoints.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Sensor server",
@@ -45,8 +46,9 @@ def makeApp(server_key) -> BaseAPI:
         poller_class=SprintIRPoller,
     )
 
-    @app.post(f"/{server_key}/acquire_co2", tags=["action"])
+    @app.action()
     async def acquire_co2(
+        ctx: ActionContext,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: list[
@@ -58,8 +60,7 @@ def makeApp(server_key) -> BaseAPI:
         Starts a :class:`CO2MonExec` polling at ``acquisition_rate`` Hz for up
         to ``duration`` seconds (``-1`` runs until cancelled).
         """
-        active = await app.base.setup_and_contain_action()
-        active.action.action_abbr = "CO2"
+        active = await ctx.begin(action_abbr="CO2")
         executor = CO2MonExec(
             active=active,
             oneoff=False,
@@ -68,11 +69,11 @@ def makeApp(server_key) -> BaseAPI:
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_acquire_co2", tags=["action"])
-    async def cancel_acquire_co2():
+    @app.action()
+    async def cancel_acquire_co2(ctx: ActionContext):
         """Stop any active ``acquire_co2`` executors on this server."""
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        active = await ctx.begin()
+        for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "acquire_co2":
                 executor.stop_action_task()
         finished_action = await active.finish()

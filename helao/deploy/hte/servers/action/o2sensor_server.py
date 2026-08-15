@@ -18,13 +18,14 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.sensor.cm0134_driver import CM0134, CM0134Poller, O2MonExec
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the CM-0134 O2 sensor.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the CM-0134 O2 sensor.
 
     Constructs a FastAPI app bound to the CM0134 driver and registers
     endpoints to acquire and cancel O2 ppm measurements.
@@ -34,10 +35,10 @@ def makeApp(server_key) -> BaseAPI:
             group; used as the URL prefix and configuration lookup key.
 
     Returns:
-        The configured BaseAPI instance ready for the launcher.
+        The configured ActionHost instance ready for the launcher.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Sensor server",
@@ -46,8 +47,9 @@ def makeApp(server_key) -> BaseAPI:
         poller_class=CM0134Poller,
     )
 
-    @app.post(f"/{server_key}/acquire_o2", tags=["action"])
+    @app.action()
     async def acquire_o2(
+        ctx: ActionContext,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: list[
@@ -67,8 +69,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The active action dictionary returned by ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
-        active.action.action_abbr = "O2"
+        active = await ctx.begin(action_abbr="O2")
         executor = O2MonExec(
             active=active,
             oneoff=False,
@@ -77,8 +78,8 @@ def makeApp(server_key) -> BaseAPI:
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_acquire_o2", tags=["action"])
-    async def cancel_acquire_o2():
+    @app.action()
+    async def cancel_acquire_o2(ctx: ActionContext):
         """Stop any running ``acquire_o2`` executor.
 
         Iterates the server's executor registry and calls
@@ -91,8 +92,8 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        active = await ctx.begin()
+        for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "acquire_o2":
                 executor.stop_action_task()
         finished_action = await active.finish()
