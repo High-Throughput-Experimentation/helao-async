@@ -194,6 +194,7 @@ class OrchHost(ActionHost):
         self._register_orch_routes()
         self._register_orch_payload_routes()
         self._register_orch_family_overrides()
+        self._register_orch_ws_routes()
         self._register_orch_action_routes()
         self._register_orch_loop_routes()
 
@@ -1236,3 +1237,65 @@ class OrchHost(ActionHost):
         def latest_experiment_uuids():
             """The 50 most recent dispatched experiment uuids."""
             return list(self.experiment_history.keys())[-50:]
+
+    def _register_orch_ws_routes(self) -> None:
+        """Re-register the three WS routes with the ORCH family's encoding.
+
+        This is the one family difference no surface gate can see:
+        WebSockets do not appear in ``openapi.json`` at all, so the 74-route
+        diff that covers every parameter schema says nothing here.
+
+        The two families genuinely differ on the wire. ``base_api`` streams
+        through ``WsPublisher``, whose default ``xform_func`` is the
+        IDENTITY -- it pickles the model object. ``orch_api`` streams
+        through ``Base._ws_relay``, which pickles ``msg.as_dict()`` for
+        status and data, and the raw message for the live buffer
+        (``use_as_dict=False``). So on ``/ws_status`` the action family
+        delivers an ``ActionModel`` and the orchestrator a plain dict.
+
+        Inheriting ActionHost's registration would send objects to every
+        consumer that expects dicts. Nothing would error: the frame decodes,
+        the attribute lookup that follows does not, and each Bokeh
+        visualizer and Reflex panel subscribed to the orchestrator goes
+        quietly blank.
+
+        The routes must be REPLACED, not added -- FastAPI matches in
+        registration order and ActionHost registered first.
+        """
+        from fastapi import WebSocket
+        from websockets.exceptions import ConnectionClosedOK
+
+        from fastapi import WebSocketDisconnect
+
+        from helao.helpers.ws_utils import WsPublisher
+
+        # as_dict for status and data; the live buffer is dict-native and
+        # legacy passes use_as_dict=False for it.
+        self.status_publisher = WsPublisher(self.status_q, lambda m: m.as_dict())
+        self.data_publisher = WsPublisher(self.data_q, lambda m: m.as_dict())
+        self.live_publisher = WsPublisher(self.live_q)
+
+        for path in ("/ws_status", "/ws_data", "/ws_live"):
+            self._replace_inherited_route(path)
+
+        async def _stream(publisher: WsPublisher, websocket: WebSocket) -> None:
+            await publisher.connect(websocket)
+            try:
+                await publisher.broadcast(websocket)
+            except (WebSocketDisconnect, ConnectionClosedOK):
+                publisher.disconnect(websocket)
+
+        @self.websocket("/ws_status")
+        async def websocket_status(websocket: WebSocket):
+            """Stream orchestrator status dicts until the client disconnects."""
+            await _stream(self.status_publisher, websocket)
+
+        @self.websocket("/ws_data")
+        async def websocket_data(websocket: WebSocket):
+            """Stream data-package dicts until the client disconnects."""
+            await _stream(self.data_publisher, websocket)
+
+        @self.websocket("/ws_live")
+        async def websocket_live(websocket: WebSocket):
+            """Stream live-buffer updates, which are dict-native already."""
+            await _stream(self.live_publisher, websocket)

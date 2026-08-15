@@ -185,3 +185,37 @@ def test_the_stub_exemption_list_is_exactly_the_routes_that_still_raise():
         f"NOT_YET_PORTED={sorted(NOT_YET_PORTED)} but "
         f"STUB_ROUTES={sorted(STUB_ROUTES)} -- these empty together"
     )
+
+
+def test_the_ws_routes_use_the_ORCH_family_encoding_not_the_action_one():
+    """The one difference no surface gate can see.
+
+    WebSockets are absent from openapi.json, so the 74-route diff -- which
+    covers every parameter schema -- says nothing about them. And the two
+    families really do differ: base_api streams through WsPublisher with
+    the IDENTITY xform (pickling the model object), while orch_api streams
+    through Base._ws_relay, which pickles msg.as_dict() for status and data
+    and the raw message for the live buffer.
+
+    Inheriting ActionHost's registration sends objects to consumers that
+    expect dicts. Nothing errors -- the frame decodes and the attribute
+    access after it does not -- so every Bokeh visualizer and Reflex panel
+    on the orchestrator goes quietly blank.
+    """
+    host = _host()
+
+    def _calls_as_dict(publisher) -> bool:
+        return "as_dict" in publisher.xform_func.__code__.co_names
+
+    assert _calls_as_dict(host.status_publisher), "/ws_status must send dicts"
+    assert _calls_as_dict(host.data_publisher), "/ws_data must send dicts"
+    assert not _calls_as_dict(
+        host.live_publisher
+    ), "/ws_live is dict-native; legacy passes use_as_dict=False"
+
+    for path in ("/ws_status", "/ws_data", "/ws_live"):
+        matches = [r for r in host.routes if getattr(r, "path", "") == path]
+        assert len(matches) == 1, (
+            f"{path} registered {len(matches)} times -- ActionHost registers "
+            "first, so a duplicate leaves the action-family handler serving"
+        )
