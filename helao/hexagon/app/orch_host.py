@@ -189,6 +189,9 @@ class OrchHost(ActionHost):
         )
 
         self._init_orch_collaborators()
+        self._register_orch_routes()
+        self._register_orch_payload_routes()
+        self._register_orch_loop_routes()
 
     # -- names the API layer and the collaborators reach through ---------
 
@@ -381,3 +384,254 @@ class OrchHost(ActionHost):
     def import_queues(self, pck_path: Optional[str] = None) -> str:
         """Restore all three queues from a pickle. Returns the path read."""
         return self.queue_persister.import_queues(pck_path)
+
+    # -- route registration ---------------------------------------------
+
+    def _register_orch_routes(self) -> None:
+        """Register the orchestrator's own private routes.
+
+        Eight of ``orch_api``'s private routes -- /get_status,
+        /attach_client, /detach_client, /stop_executor, /endpoints,
+        /get_lbuf, /list_executors, /shutdown -- are ALREADY registered by
+        ActionHost with the same bodies, so they are not repeated here.
+        FastAPI accepts a duplicate path without complaint and the first
+        registration wins, so a second copy would sit shadowed and never
+        execute while every surface check still passed.
+        """
+        from typing import Optional as _Optional
+
+        from fastapi import Body
+
+        @self.post("/global_status", tags=["private"])
+        def global_status():
+            """Return the orchestrator's global status model as JSON."""
+            return self.globalstatusmodel.as_json()
+
+        @self.post("/export_queues", tags=["private"])
+        def export_queues(timestamp_pck: bool = False):
+            """Pickle all three queues to STATES."""
+            return self.export_queues(timestamp_pck)
+
+        @self.post("/import_queues", tags=["private"])
+        def import_queues(pck_path: _Optional[str] = None):
+            """Restore all three queues from a pickle."""
+            return self.import_queues(pck_path)
+
+        @self.post("/append_sequence", tags=["private"])
+        async def append_sequence(sequence: Sequence = Body({}, embed=True)):
+            """Queue a sequence."""
+            return await self.add_sequence(sequence)
+
+        @self.post("/append_split_sequences", tags=["private"])
+        async def append_split_sequences(sequence: Sequence = Body({}, embed=True)):
+            """Queue a sequence split into per-plate children."""
+            return await self.add_split_sequences(sequence)
+
+        @self.post("/prepend_sequences", tags=["private"])
+        async def prepend_sequences(
+            sequences: list[Sequence] = Body([], embed=True),
+        ):
+            """Put sequences at the front of the queue."""
+            return await self.prepend_sequences(sequences)
+
+        @self.post("/move_sequence", tags=["private"])
+        async def move_sequence(from_idx: int, to_idx: int):
+            """Move a queued sequence. Indices are ABSOLUTE."""
+            return await self.move_sequence(from_idx, to_idx)
+
+        @self.post("/remove_sequence", tags=["private"])
+        async def remove_sequence(idx: int):
+            """Remove a queued sequence. Index is ABSOLUTE."""
+            return await self.remove_sequence(idx)
+
+        @self.post("/move_experiment", tags=["private"])
+        async def move_experiment(from_idx: int, to_idx: int):
+            """Move a queued experiment. Indices are ABSOLUTE."""
+            return await self.move_experiment(from_idx, to_idx)
+
+        @self.post("/remove_experiment", tags=["private"])
+        async def remove_experiment(idx: int):
+            """Remove a queued experiment. Index is ABSOLUTE."""
+            return await self.remove_experiment(idx)
+
+        @self.post("/move_action", tags=["private"])
+        async def move_action(from_idx: int, to_idx: int):
+            """Move a queued action. Indices are ABSOLUTE."""
+            return await self.move_action(from_idx, to_idx)
+
+        @self.post("/remove_action", tags=["private"])
+        async def remove_action(idx: int):
+            """Remove a queued action. Index is ABSOLUTE."""
+            return await self.remove_action(idx)
+
+        @self.post("/append_experiment", tags=["private"])
+        async def append_experiment(experiment: Experiment = Body({}, embed=True)):
+            """Queue an experiment under the active sequence."""
+            return await self.add_experiment(self.seq_model, experiment.get_exp())
+
+        @self.post("/prepend_experiment", tags=["private"])
+        async def prepend_experiment(experiment: Experiment = Body({}, embed=True)):
+            """Put an experiment at the front of the queue."""
+            return await self.add_experiment(
+                self.seq_model, experiment.get_exp(), prepend=True
+            )
+
+        @self.post("/insert_experiment", tags=["private"])
+        async def insert_experiment(
+            experiment: Experiment = Body({}, embed=True), idx: int = 0
+        ):
+            """Insert an experiment at an ABSOLUTE queue index."""
+            return await self.add_experiment(
+                self.seq_model, experiment.get_exp(), at_index=idx
+            )
+
+        @self.post("/list_sequences", tags=["private"])
+        def list_sequences(limit: _Optional[int] = None, offset: int = 0):
+            """Page the sequence queue. ``limit=None`` means all of it."""
+            return self.list_sequences(limit=limit, offset=offset)
+
+        @self.post("/list_experiments", tags=["private"])
+        def list_experiments(limit: _Optional[int] = None, offset: int = 0):
+            """Page the experiment queue. ``limit=None`` means all of it."""
+            return self.list_experiments(limit=limit, offset=offset)
+
+        @self.post("/list_all_experiments", tags=["private"])
+        def list_all_experiments():
+            """Return every queued experiment, unpaged."""
+            return self.list_all_experiments()
+
+        @self.post("/list_actions", tags=["private"])
+        def list_actions(limit: _Optional[int] = None, offset: int = 0):
+            """Page the action queue. ``limit=None`` means all of it."""
+            return self.list_actions(limit=limit, offset=offset)
+
+        @self.post("/drop_experiment_inds", tags=["private"])
+        def drop_experiment_inds(inds: list[int]):
+            """Drop queued experiments at ABSOLUTE indices."""
+            return self.drop_experiment_inds(inds)
+
+        @self.post("/clear_sequences", tags=["private"])
+        async def clear_sequences():
+            """Empty the sequence queue."""
+            return await self.clear_sequences()
+
+        @self.post("/clear_experiments", tags=["private"])
+        async def clear_experiments():
+            """Empty the experiment queue."""
+            return await self.clear_experiments()
+
+    def _register_orch_loop_routes(self) -> None:
+        """Register B3b's routes so the surface is complete and honest.
+
+        They raise rather than 404. A 404 reads as a missing server and
+        sends a caller looking at config and ports; a NotImplementedError
+        naming B3b says what is actually true. Same choice B1 made for
+        start_executor/oneoff_executor before its Task 6.
+        """
+        loop_routes = (
+            "/start",
+            "/stop",
+            "/estop_orch",
+            "/clear_estop",
+            "/clear_error",
+            "/skip_experiment",
+            "/clear_actions",
+            "/clear_actives",
+            "/update_status",
+            "/update_nonblocking",
+            "/get_active_experiment",
+            "/get_active_sequence",
+            "/active_experiment",
+            "/last_experiment",
+            "/list_active_actions",
+            "/list_nonblocking",
+            "/get_orch_state",
+            "/get_status_summary",
+            "/get_step_flags",
+            "/set_step_flag",
+            "/latest_sequence_uuids",
+            "/latest_experiment_uuids",
+        )
+        for path in loop_routes:
+            self._register_loop_stub(path)
+
+    def _register_loop_stub(self, path: str) -> None:
+        """Register one raising stub.
+
+        A separate method so each closure binds its OWN ``path``. Defining
+        them in the loop body would close over the loop variable, and every
+        stub would report the last path in the tuple.
+        """
+
+        @self.post(path, tags=["private"])
+        async def _loop_stub():
+            raise NotImplementedError(f"{path} is the dispatch loop; lands in B3b")
+
+    def _register_orch_payload_routes(self) -> None:
+        """The read-only payload routes and the global-param surface.
+
+        The three payload builders are imported from ``orch_api`` rather
+        than reimplemented: they shape what the operator UIs parse, and a
+        second implementation would drift from the one the Bokeh and Reflex
+        operators are written against. B7 deletes the importer.
+        """
+        from typing import Optional as _Optional
+
+        from helao.core.servers.orch_api import (
+            _histories_payload,
+            _history_page_payload,
+            _queue_object_payload,
+        )
+
+        @self.post("/get_queue_object", tags=["private"])
+        def get_queue_object(kind: str, idx: int):
+            """Return one queued object. ``idx`` is ABSOLUTE."""
+            return _queue_object_payload(self, kind, idx)
+
+        @self.post("/get_histories", tags=["private"])
+        def get_histories():
+            """Return all three history containers whole.
+
+            Kept beside the paged /get_history_page rather than replaced by
+            it: helao/hexagon/tests/smoke/conc_items.py calls this one.
+            """
+            return _histories_payload(self)
+
+        @self.post("/get_history_page", tags=["private"])
+        def get_history_page(kind: str, limit: _Optional[int] = None, offset: int = 0):
+            """Page one history container, newest first, with a total.
+
+            History indices are page-local and must NOT have an offset
+            added -- the opposite of the queues. The history cache holds
+            only the rendered page, so adding an offset indexes past its end.
+            """
+            return _history_page_payload(self, kind, limit, offset)
+
+        @self.post("/latest_action_uuids", tags=["private"])
+        def latest_action_uuids():
+            """Return the 50 most recent action uuids."""
+            return list(self.action_history.keys())[-50:]
+
+        @self.post("/drop_experiment_range", tags=["private"])
+        def drop_experiment_range(lower: int, upper: int):
+            """Drop queued experiments in an INCLUSIVE absolute range."""
+            inds = list(range(lower, upper + 1))
+            return self.drop_experiment_inds(inds)
+
+        @self.post("/update_global_params", tags=["private"])
+        async def update_global_params(params: dict = {}):
+            """Merge ``params`` into the orchestrator's global params."""
+            params = params or {}
+            LOGGER.info(f"Updated global params with {params}.")
+            self.global_params.update(params)
+
+        @self.post("/get_global_params", tags=["private"])
+        def get_global_params():
+            """Return the orchestrator's global params."""
+            return self.global_params
+
+        @self.post("/clear_global_params_private", tags=["private"])
+        def clear_global_params_private():
+            """Empty the orchestrator's global params."""
+            self.global_params = {}
+            return self.global_params
