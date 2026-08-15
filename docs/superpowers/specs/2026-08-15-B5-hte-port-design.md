@@ -87,8 +87,8 @@ commented, and counting them would have invented two station gates that do not e
 
 **Six of the 23 have no live hte station config**: `analysis_server`, `HTEdata_server`,
 `o2sensor_server`, `power_supply_server`, `tec_server` (all commented out or archive-only) and
-`pdu_server`, whose only live consumer is a Deployment-C station and is therefore B6's gate,
-not B5's. These six are ported — B7 deletes the engine underneath them regardless — but they
+`pdu_server`. Of those, only `pdu_server` turns out to run anywhere — at `uvis4`, whose config
+lives in a private deployment; see the correction below. The other five are ported — B7 deletes the engine underneath them regardless — but they
 carry **no station gate**, and this spec says so rather than letting a station-count summary
 imply coverage they do not have.
 
@@ -241,12 +241,24 @@ ports must pass `path=` to keep both the route and the operation_id where they
 were, and the extractor reported those correct ports as missing/extra pairs
 until it learned to read the kwarg.
 
-**Six modules finish B5 without a station gate**, and no later station adds
+**The station map in this spec was built from `helao/deploy/hte/configs/*.yml`
+and is therefore incomplete.** Three more live stations — `uvis4`, `amts`,
+`note1` — run B5-changed hte modules from configs held in private deployments,
+resolving to those modules through the launcher's deployment fallback. `uvis4`
+alone runs eight of them. The station gate runbook carries all ten; this
+section's table does not, and is left as the record of what the hte configs
+themselves say.
+
+That also corrects one claim below: `pdu_server` **does** have a station gate,
+at `uvis4`. It is the only live consumer of that module anywhere.
+
+**Five modules finish B5 without a station gate**, and no later station adds
 one: `analysis_server`, `HTEdata_server`, `o2sensor_server`,
-`power_supply_server`, `tec_server` (no live hte config) and `pdu_server`
-(live only in a private deployment, so B6's gate). `analysis_server` also has
-no route checklist — its endpoints are built at runtime — leaving the ratchet
-and the build probe as its whole gate.
+`power_supply_server` and `tec_server` — none appears in any live config, hte
+or otherwise. `pdu_server` was originally listed here too and does not belong:
+it runs at `uvis4`. `analysis_server` also has no route checklist — its
+endpoints are built at runtime — leaving the ratchet and the build probe as its
+whole gate.
 
 ## 7. What B5 does not change
 
