@@ -11,24 +11,25 @@ __all__ = ["makeApp"]
 
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.pump.legato_driver import KDS100, KDS100Poller, PumpExec
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the KDS100 syringe pump.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the KDS100 syringe pump.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with infuse/withdraw and volume
+        The configured ActionHost instance with infuse/withdraw and volume
         bookkeeping endpoints registered.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Syringe pump server",
@@ -47,8 +48,9 @@ def makeApp(server_key) -> BaseAPI:
         """Stop the driver's background polling loop."""
         await app.driver.stop_polling()
 
-    @app.post(f"/{server_key}/infuse", tags=["action"])
+    @app.action()
     async def infuse(
+        ctx: ActionContext,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
     ):
@@ -63,13 +65,14 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         executor = PumpExec(direction=1, active=active, oneoff=False, poll_rate=0.2)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/withdraw", tags=["action"])
+    @app.action()
     async def withdraw(
+        ctx: ActionContext,
         rate_uL_sec: int = 0,
         volume_uL: int = 0,
     ):
@@ -84,13 +87,13 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         executor = PumpExec(direction=-1, active=active, oneoff=False, poll_rate=0.2)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/get_present_volume", tags=["action"])
-    async def get_present_volume():
+    @app.action()
+    async def get_present_volume(ctx: ActionContext):
         """Read and record the driver's tracked syringe volume.
 
         Enqueues a data row with the current ``present_volume_ul`` and stores
@@ -103,7 +106,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         present_volume = app.driver.present_volume_ul
         datadict = {"present_volume_ul": present_volume, "error_code": ErrorCodes.none}
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})

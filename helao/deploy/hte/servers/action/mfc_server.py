@@ -22,7 +22,8 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
 from ...drivers.mfc.alicat_driver import (
@@ -37,7 +38,7 @@ from ...drivers.mfc.alicat_driver import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-async def mfc_dyn_endpoints(app: BaseAPI):
+async def mfc_dyn_endpoints(app: ActionHost):
     """Register MFC endpoints once the driver is online.
 
     The ``maintain_concentration`` endpoints are only registered when a CO2
@@ -46,16 +47,17 @@ async def mfc_dyn_endpoints(app: BaseAPI):
     declared under ``server_params['devices']``.
 
     Args:
-        app: The :class:`BaseAPI` instance being configured.
+        app: The :class:`ActionHost` instance being configured.
     """
-    server_key = app.base.server.server_name
-    co2_sensor_key = app.base.server_params.get("co2_server_name", None)
-    devices = list(app.base.server_params["devices"].keys())
+    server_key = app.server.server_name
+    co2_sensor_key = app.server_params.get("co2_server_name", None)
+    devices = list(app.server_params["devices"].keys())
 
     if co2_sensor_key in app.helao_cfg["servers"] and devices:
 
-        @app.post(f"/{server_key}/maintain_concentration", tags=["action"])
+        @app.action()
         async def maintain_concentration(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             target_co2_ppm: float = 1e5,
             headspace_scc: float = 7.5,
@@ -87,7 +89,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "hold_conc"
             executor = MfcConstConcExec(
                 active=active,
@@ -97,8 +99,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_maintain_concentration", tags=["action"])
+        @app.action()
         async def cancel_maintain_concentration(
+            ctx: ActionContext,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -116,9 +119,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
+                app.stop_executor(active.action.action_params["exec_id"])
             else:
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
@@ -126,7 +129,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                     dev_dict = {
                         "device_name": active.action.action_params["device_name"]
                     }
-                app.base.stop_all_executor_prefix("maintain_concentration", dev_dict)
+                app.stop_all_executor_prefix("maintain_concentration", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -136,9 +139,10 @@ async def mfc_dyn_endpoints(app: BaseAPI):
 
     if devices:
 
-        @app.post(f"/{server_key}/acquire_flowrate", tags=["action"])
+        @app.action()
         @action_version(2)
         async def acquire_flowrate(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
@@ -169,7 +173,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "acq_flow"
             executor = MfcExec(
                 active=active,
@@ -179,8 +183,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_acquire_flowrate", tags=["action"])
+        @app.action()
         async def cancel_acquire_flowrate(
+            ctx: ActionContext,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -198,9 +203,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
+                app.stop_executor(active.action.action_params["exec_id"])
             else:
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
@@ -208,13 +213,14 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                     dev_dict = {
                         "device_name": active.action.action_params["device_name"]
                     }
-                app.base.stop_all_executor_prefix("acquire_flowrate", dev_dict)
+                app.stop_all_executor_prefix("acquire_flowrate", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/acquire_pressure", tags=["action"])
+        @app.action()
         @action_version(2)
         async def acquire_pressure(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
@@ -245,7 +251,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "acq_pres"
             executor = PfcExec(
                 active=active,
@@ -255,8 +261,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_acquire_pressure", tags=["action"])
+        @app.action()
         async def cancel_acquire_pressure(
+            ctx: ActionContext,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -274,9 +281,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
+                app.stop_executor(active.action.action_params["exec_id"])
             else:
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
@@ -284,12 +291,13 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                     dev_dict = {
                         "device_name": active.action.action_params["device_name"]
                     }
-                app.base.stop_all_executor_prefix("acquire_pressure", dev_dict)
+                app.stop_all_executor_prefix("acquire_pressure", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/set_flowrate", tags=["action"])
+        @app.action()
         async def set_flowrate(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             flowrate_sccm: Optional[float] = None,
             ramp_sccm_sec: float = 0,
@@ -306,13 +314,14 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="set_flow")
+            active = await ctx.begin(action_abbr="set_flow")
             await app.driver.set_flowrate(**active.action.action_params)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/set_pressure", tags=["action"])
+        @app.action()
         async def set_pressure(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             pressure_psia: Optional[float] = None,
             ramp_psi_sec: float = 0,
@@ -329,13 +338,14 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="set_pressure")
+            active = await ctx.begin(action_abbr="set_pressure")
             await app.driver.set_pressure(**active.action.action_params)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/hold_valve_action", tags=["action"])
+        @app.action()
         async def hold_valve_action(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Hold the valve open at its current position on the selected device.
@@ -348,15 +358,16 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="hold_valve")
+            active = await ctx.begin(action_abbr="hold_valve")
             await app.driver.hold_valve(
                 active.action.action_params.get("device_name", None)
             )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/cancel_hold_valve_action", tags=["action"])
+        @app.action()
         async def cancel_hold_valve_action(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Release a previously held valve on the selected device.
@@ -369,15 +380,16 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="cancel_hold")
+            active = await ctx.begin(action_abbr="cancel_hold")
             await app.driver.hold_cancel(
                 active.action.action_params.get("device_name", None)
             )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/hold_valve_closed_action", tags=["action"])
+        @app.action()
         async def hold_valve_closed_action(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
         ):
             """Hold the valve fully closed on the selected device.
@@ -390,16 +402,17 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="close_valve")
+            active = await ctx.begin(action_abbr="close_valve")
             await app.driver.hold_valve_closed(
                 active.action.action_params.get("device_name", None)
             )
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/maintain_pressure", tags=["action"])
+        @app.action()
         @action_version(2)
         async def maintain_pressure(
+            ctx: ActionContext,
             device_name: app.driver.dev_mfcs = devices[0],
             target_pressure: float = 14.7,
             total_gas_scc: float = 7.0,
@@ -431,7 +444,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "hold_pres"
             executor = MfcConstPresExec(
                 active=active,
@@ -441,8 +454,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_maintain_pressure", tags=["action"])
+        @app.action()
         async def cancel_maintain_pressure(
+            ctx: ActionContext,
             device_name: Optional[str] = None,
             exec_id: Optional[str] = None,
         ):
@@ -460,9 +474,9 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
+                app.stop_executor(active.action.action_params["exec_id"])
             else:
                 if active.action.action_params["device_name"] is None:
                     dev_dict = {}
@@ -470,7 +484,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
                     dev_dict = {
                         "device_name": active.action.action_params["device_name"]
                     }
-                app.base.stop_all_executor_prefix("maintain_pressure", dev_dict)
+                app.stop_all_executor_prefix("maintain_pressure", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
@@ -559,7 +573,7 @@ async def mfc_dyn_endpoints(app: BaseAPI):
         @app.post("/manual_query_state", tags=["private"])
         def manual_query_state(device_name: app.driver.dev_mfcs = devices[0]):
             """Return the most recent live-buffer entry for the chosen device."""
-            return app.base.get_lbuf(device_name)
+            return app.get_lbuf(device_name)
 
         @app.post("/read_valve_register", tags=["private"])
         def read_valve_register(device_name: app.driver.dev_mfcs = devices[0]):
@@ -581,21 +595,21 @@ async def mfc_dyn_endpoints(app: BaseAPI):
             return app.driver._send(device_name, command)
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for Alicat MFC/PFC devices.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for Alicat MFC/PFC devices.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance. Device-specific endpoints are
+        The configured ActionHost instance. Device-specific endpoints are
         registered via :func:`mfc_dyn_endpoints` once the driver is up.
     """
 
     # current plan is 1 mfc per COM
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="MFC server",
