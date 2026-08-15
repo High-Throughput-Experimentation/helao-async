@@ -37,30 +37,31 @@ from helao.core.models.sample import (
     SolidSample,
     object_to_sample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
 
 from ...drivers.data.archive_driver import Archive, ScanDirection, ScanOperator
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the SAMPLE archive/database server.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the SAMPLE archive/database server.
 
-    Constructs a :class:`BaseAPI` backed by the sole :class:`Archive`
-    (``driver_classes=[Archive]``; ``BaseAPI`` instantiates a non-HelaoDriver
-    class as ``Archive(self.base)``) and registers the archive/db action
-    surface plus the private RPC surface used by the PAL driver shim.
+    Constructs an :class:`ActionHost` backed by the sole :class:`Archive`
+    (``driver_classes=[Archive]``; the host instantiates a non-HelaoDriver
+    class as ``Archive(self)``) and registers the archive/db action surface
+    plus the private RPC surface used by the PAL driver shim.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance.
+        The configured ActionHost instance.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key,
         server_key,
         "Sample Archive/Database Server",
@@ -80,8 +81,8 @@ def makeApp(server_key) -> BaseAPI:
     # Surface (a): orchestrated action endpoints (lifted from pal_server)
     # ------------------------------------------------------------------
 
-    @app.post(f"/{server_key}/convert_v1DB", tags=["action"])
-    async def convert_v1DB() -> dict:
+    @app.action()
+    async def convert_v1DB(ctx: ActionContext) -> dict:
         """Convert the legacy liquid JSON database to the SQLite schema.
 
         Args:
@@ -94,8 +95,9 @@ def makeApp(server_key) -> BaseAPI:
         await app.driver.unified_db.liquidAPI.old_jsondb_to_sqlitedb()
         return {}
 
-    @app.post(f"/{server_key}/archive_tray_query_sample", tags=["action"])
+    @app.action()
     async def archive_tray_query_sample(
+        ctx: ActionContext,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         vial: Optional[int] = None,
@@ -116,7 +118,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="query_sample")
+        active = await ctx.begin(action_abbr="query_sample")
         error_code, sample = await app.driver.tray_query_sample(
             tray=active.action.action_params["tray"],
             slot=active.action.action_params["slot"],
@@ -131,8 +133,8 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_unloadall", tags=["action"])
-    async def archive_tray_unloadall():
+    @app.action()
+    async def archive_tray_unloadall(ctx: ActionContext):
         """Unload every position from every tray and reset the vial table.
 
         The previously loaded samples are appended to ``samples_in`` and the
@@ -145,7 +147,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
+        active = await ctx.begin(action_abbr="unload_sample")
         (
             unloaded,
             samples_in,
@@ -160,8 +162,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_load", tags=["action"])
+    @app.action()
     async def archive_tray_load(
+        ctx: ActionContext,
         load_sample_in: Union[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample],
             dict,
@@ -191,7 +194,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="load_sample",
         )
         error_code, loaded_sample = await app.driver.tray_load(
@@ -206,8 +209,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_unload", tags=["action"])
+    @app.action()
     async def archive_tray_unload(
+        ctx: ActionContext,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -222,7 +226,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="unload_sample")
+        active = await ctx.begin(action_abbr="unload_sample")
         (
             unloaded,
             samples_in,
@@ -237,8 +241,14 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_new_position", tags=["action"])
+    # `path=` because the handler is named `archive_tray_new` while the route
+    # is `archive_tray_new_position`. @app.action() derives the path from the
+    # handler's name, so relying on the default here would silently MOVE the
+    # route -- and renaming the handler instead would change the operation_id
+    # FastAPI derives from it. Both stay exactly as legacy had them.
+    @app.action(path=f"/{server_key}/archive_tray_new_position")
     async def archive_tray_new(
+        ctx: ActionContext,
         req_vol: Optional[float] = None,
     ):
         """Find an empty vial position large enough to hold a given volume.
@@ -256,15 +266,16 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary including the selected tray/slot
             /vial location.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         datadict = await app.driver.tray_new_position(**active.action.action_params)
         datamodel = DataModel(data={active.base.dflt_file_conn_key(): datadict})
         active.enqueue_data_nowait(datamodel, action=active.action)
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_update_position", tags=["action"])
+    @app.action()
     async def archive_tray_update_position(
+        ctx: ActionContext,
         sample: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
         ] = Body(
@@ -294,7 +305,7 @@ def makeApp(server_key) -> BaseAPI:
             ``update`` set to ``True`` if the position was empty, else
             ``False``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         datadict = {
             "update": await app.driver.tray_update_position(
                 **active.action.action_params
@@ -305,8 +316,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_export_json", tags=["action"])
+    @app.action()
     async def archive_tray_export_json(
+        ctx: ActionContext,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -321,7 +333,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="traytojson",
             file_type="palvialtable_helao__file",
         )
@@ -331,8 +343,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_export_icpms", tags=["action"])
+    @app.action()
     async def archive_tray_export_icpms(
+        ctx: ActionContext,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
         survey_runs: Optional[int] = None,
@@ -355,7 +368,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="traytoicpms",
         )
         await app.driver.tray_export_icpms(
@@ -370,8 +383,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_tray_export_csv", tags=["action"])
+    @app.action()
     async def archive_tray_export_csv(
+        ctx: ActionContext,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
     ):
@@ -386,7 +400,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="traytocsv",
         )
 
@@ -398,8 +412,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_load_solid", tags=["action"])
+    @app.action()
     async def archive_custom_load_solid(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
         sample_no: int = 1,
         plate_id: int = 1,
@@ -416,7 +431,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="load_sample",
         )
         active.action.action_params["load_sample_in"] = SolidSample.model_validate(
@@ -433,8 +448,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_load", tags=["action"])
+    @app.action()
     async def archive_custom_load(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
         load_sample_in: Union[
             AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample
@@ -457,7 +473,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="load_sample",
         )
         loaded, loaded_sample, customs_dict = await app.driver.custom_load(
@@ -471,8 +487,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_unload", tags=["action"])
+    @app.action()
     async def archive_custom_unload(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
@@ -497,7 +514,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="unload_sample",
         )
         (
@@ -516,8 +533,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_unloadall", tags=["action"])
+    @app.action()
     async def archive_custom_unloadall(
+        ctx: ActionContext,
         destroy_liquid: bool = False,
         destroy_gas: bool = False,
         destroy_solid: bool = False,
@@ -544,7 +562,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="unload_sample",
         )
         (
@@ -578,8 +596,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_query_sample", tags=["action"])
+    @app.action()
     async def archive_custom_query_sample(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
     ):
         """Look up the sample currently loaded at a custom position.
@@ -593,7 +612,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary; the sample dict is mirrored into
             ``action_params['_fast_samples_in']``.
         """
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="query_sample",
         )
         error_code, sample = await app.driver.custom_query_sample(
@@ -608,8 +627,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_add_liquid", tags=["action"])
+    @app.action()
     async def archive_custom_add_liquid(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
         source_liquid_in: LiquidSample = Body(
             LiquidSample.model_validate(
@@ -638,7 +658,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary.
         """
 
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="add_liquid",
         )
         (
@@ -662,9 +682,10 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/archive_custom_add_gas", tags=["action"])
+    @app.action()
     @action_version(2)
     async def archive_custom_add_gas(
+        ctx: ActionContext,
         custom: Optional[dev_customitems] = None,
         source_gas_in: GasSample = Body(
             GasSample.model_validate(
@@ -693,7 +714,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary.
         """
 
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="add_gas",
         )
         (
@@ -717,8 +738,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/db_get_samples", tags=["action"])
+    @app.action()
     async def db_get_samples(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
@@ -744,7 +766,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         samples = await app.driver.unified_db.get_samples(
             samples=active.action.samples_in
         )
@@ -757,8 +779,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/db_new_samples", tags=["action"])
+    @app.action()
     async def db_new_samples(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body(
@@ -797,7 +820,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary; the first created sample is
             mirrored into ``action_params['_fast_sample_out']``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         samples = await app.driver.create_samples(
             reference_samples_in=active.action.samples_in, action=active.action
         )
@@ -813,8 +836,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/generate_plate_sample_no_list", tags=["action"])
+    @app.action()
     async def generate_plate_sample_no_list(
+        ctx: ActionContext,
         plate_id: int = 1,
         sample_code: int = Query(0, ge=0, le=2),
         skip_n_samples: int = Query(0, ge=0),
@@ -846,7 +870,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         await app.driver.generate_plate_sample_no_list(
             active=active,
             plate_id=active.action.action_params.get("plate_id", None),
@@ -865,8 +889,10 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/get_loaded_positions", tags=["action"])
-    async def get_positions():
+    # `path=`: handler `get_positions`, route `get_loaded_positions`. See the
+    # note on archive_tray_new_position above.
+    @app.action(path=f"/{server_key}/get_loaded_positions")
+    async def get_positions(ctx: ActionContext):
         """Snapshot the archive's loaded positions into ``action_params``.
 
         Populates ``_positions`` (full archive dict), ``_tray_pos`` (loaded
@@ -880,7 +906,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         positions = app.driver.positions
         tray_positions = {
             (traynum, slotnum, vialidx + 1): sample.global_label

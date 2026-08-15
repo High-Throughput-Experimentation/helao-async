@@ -46,9 +46,9 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
-from helao.helpers.active_params import ActiveParams
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
@@ -145,7 +145,7 @@ def build_do_port_map(server_params: dict) -> tuple[dict, dict]:
     return do_ports, do_owners
 
 
-async def nidaqmx_dyn_endpoints(app: BaseAPI):
+async def nidaqmx_dyn_endpoints(app: ActionHost):
     """Open the NI-DAQ connection and wire the seams the driver needs from the server.
 
     Called once at startup (after the driver is constructed): opens the
@@ -165,8 +165,8 @@ async def nidaqmx_dyn_endpoints(app: BaseAPI):
     await app.unified_db.init_db()
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the NI DAQmx server.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the NI DAQmx server.
 
     Reads device group dictionaries from ``server_params`` and only registers
     endpoint families whose corresponding mapping is non-empty.
@@ -176,10 +176,10 @@ def makeApp(server_key) -> BaseAPI:
             group.
 
     Returns:
-        The configured BaseAPI instance.
+        The configured ActionHost instance.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="NIdaqmx server",
@@ -235,8 +235,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_mastercell:
 
-        @app.post(f"/{server_key}/mastercell", tags=["action"])
+        @app.action()
         async def mastercell(
+            ctx: ActionContext,
             cell: Optional[dev_mastercellitems] = None,
             on: bool = True,
         ):
@@ -251,7 +252,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="mcell")
+            active = await ctx.begin(action_abbr="mcell")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_mastercell[
@@ -268,8 +269,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_activecell:
 
-        @app.post(f"/{server_key}/activecell", tags=["action"])
+        @app.action()
         async def activecell(
+            ctx: ActionContext,
             cell: Optional[dev_activecellitems] = None,
             on: bool = True,
         ):
@@ -284,7 +286,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="acell")
+            active = await ctx.begin(action_abbr="acell")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_activecell[
@@ -301,8 +303,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_pump:
 
-        @app.post(f"/{server_key}/pump", tags=["action"])
+        @app.action()
         async def pump(
+            ctx: ActionContext,
             pump: Optional[dev_pumpitems] = None,
             on: bool = True,
         ):
@@ -317,7 +320,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="pump")
+            active = await ctx.begin(action_abbr="pump")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_pump[
@@ -334,8 +337,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_gasvalve:
 
-        @app.post(f"/{server_key}/gasvalve", tags=["action"])
+        @app.action()
         async def gasvalve(
+            ctx: ActionContext,
             gasvalve: Optional[dev_gasvalveitems] = None,
             on: bool = True,
         ):
@@ -350,7 +354,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="gfv")
+            active = await ctx.begin(action_abbr="gfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_gasvalve[
@@ -369,8 +373,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_liquidvalve:
 
-        @app.post(f"/{server_key}/liquidvalve", tags=["action"])
+        @app.action()
         async def liquidvalve(
+            ctx: ActionContext,
             liquidvalve: Optional[dev_liquidvalveitems] = None,
             on: bool = True,
         ):
@@ -385,7 +390,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="lfv")
+            active = await ctx.begin(action_abbr="lfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_liquidvalve[
@@ -404,8 +409,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_multivalve:
 
-        @app.post(f"/{server_key}/multivalve", tags=["action"])
+        @app.action()
         async def multivalve(
+            ctx: ActionContext,
             multivalve: Optional[dev_multivalveitems] = None,
             on: bool = True,
         ):
@@ -420,7 +426,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="lfv")
+            active = await ctx.begin(action_abbr="lfv")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_multivalve[
@@ -439,8 +445,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_led:
 
-        @app.post(f"/{server_key}/led", tags=["action"])
+        @app.action()
         async def led(
+            ctx: ActionContext,
             led: Optional[dev_leditems] = None,
             on: bool = True,
         ):
@@ -455,7 +462,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="led")
+            active = await ctx.begin(action_abbr="led")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_led[
@@ -472,8 +479,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_fswbcd:
 
-        @app.post(f"/{server_key}/fswbcd", tags=["action"])
+        @app.action()
         async def fswbcd(
+            ctx: ActionContext,
             fswbcd: Optional[dev_fswbcditems] = None,
             on: bool = True,
         ):
@@ -488,7 +496,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="fswbcd")
+            active = await ctx.begin(action_abbr="fswbcd")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_fswbcd[
@@ -507,8 +515,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_fsw:
 
-        @app.post(f"/{server_key}/fsw", tags=["action"])
+        @app.action()
         async def fsw(
+            ctx: ActionContext,
             fsw: Optional[dev_fswitems] = None,
         ):
             """Read the digital input wired to the chosen foot switch.
@@ -521,7 +530,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="fsw")
+            active = await ctx.begin(action_abbr="fsw")
             # some additional params in order to call the same driver functions
             # for all DI actions
             active.action.action_params["di_port"] = dev_fsw[
@@ -538,8 +547,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_cellcurrent and dev_cellvoltage:
 
-        @app.post(f"/{server_key}/cellIV", tags=["action"])
+        @app.action()
         async def cellIV(
+            ctx: ActionContext,
             fast_samples_in: list[
                 Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
             ] = Body([], embed=True),
@@ -570,7 +580,10 @@ def makeApp(server_key) -> BaseAPI:
                 The active action dictionary from ``start_executor``, or a
                 finished-with-error action dict if validation failed.
             """
-            A = app.base.setup_action()
+            # Two-step: the driver-busy and no-sample branches must answer
+            # with an error code and no artifacts, so the Action is needed
+            # before any session exists. ctx.action is legacy's setup_action().
+            A = ctx.action
             A.action_abbr = "multiCV"
             A.error_code = ErrorCodes.none
 
@@ -602,20 +615,15 @@ def makeApp(server_key) -> BaseAPI:
                     sample_label = None
                 file_sample_label[cell_key] = sample_label
 
-            active = await app.base.contain_action(
-                ActiveParams(
-                    action=A,
-                    file_conn_params_dict={
-                        app.base.dflt_file_conn_key(): FileConnParams(
-                            file_conn_key=app.base.dflt_file_conn_key(),
-                            sample_global_labels=file_sample_label[cell_keys[0]],
-                            file_type="ni_helao__file",
-                            # only add optional keys to header
-                            # rest will be added later
-                            hloheader=HloHeaderModel(optional={"cell": cell_keys[0]}),
-                        )
-                    },
-                )
+            # ctx.begin assembles the same ActiveParams this spelled out.
+            # sample_global_labels is the field legacy's convenience method
+            # never exposed, which is why this endpoint used the lower-level
+            # contain_action; the native session factory takes it.
+            active = await ctx.begin(
+                sample_global_labels=file_sample_label[cell_keys[0]],
+                file_type="ni_helao__file",
+                # only add optional keys to header, rest will be added later
+                hloheader=HloHeaderModel(optional={"cell": cell_keys[0]}),
             )
             executor = CellIVExec(
                 samples_in=samples_in,
@@ -629,8 +637,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_monitor:
 
-        @app.post(f"/{server_key}/acquire_monitors", tags=["action"])
+        @app.action()
         async def acquire_monitors(
+            ctx: ActionContext,
             duration: float = -1,
             acquisition_rate: float = 0.2,
             fast_samples_in: list[
@@ -651,7 +660,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "ni_monitor"
             executor = DevMonExec(
                 active=active,
@@ -661,8 +670,8 @@ def makeApp(server_key) -> BaseAPI:
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_acquire_monitors", tags=["action"])
-        async def cancel_acquire_monitors():
+        @app.action()
+        async def cancel_acquire_monitors(ctx: ActionContext):
             """Stop any running ``acquire_monitors`` executor.
 
             Args:
@@ -672,8 +681,8 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
-            for exec_id, executor in app.base.executors.items():
+            active = await ctx.begin()
+            for exec_id, executor in app.executors.items():
                 if exec_id.split()[0] == "acquire_monitors":
                     executor.stop_action_task()
             finished_action = await active.finish()
@@ -693,8 +702,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if dev_heat:
 
-        @app.post(f"/{server_key}/heater", tags=["action"])
+        @app.action()
         async def heater(
+            ctx: ActionContext,
             heater: Optional[dev_heatitems] = None,
             on: bool = True,
         ):
@@ -709,7 +719,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="heat")
+            active = await ctx.begin(action_abbr="heat")
             # some additional params in order to call the same driver functions
             # for all DO actions
             active.action.action_params["do_port"] = dev_heat[
@@ -739,10 +749,11 @@ def makeApp(server_key) -> BaseAPI:
             """
             await app.poller._start_polling()
 
-        @app.post(f"/{server_key}/heatloop", tags=["action"])
+        @app.action()
         async def heatloop(
             # action: Action = Body({}, embed=True),
             # action_version: int = 1,
+            ctx: ActionContext,
             duration_hrs: float = 2,
             celltemp_min_C: float = 74.5,
             celltemp_max_C: float = 75.5,
@@ -762,7 +773,7 @@ def makeApp(server_key) -> BaseAPI:
                 reservoir2_min_C: Lower bound for the reservoir thermocouple.
                 reservoir2_max_C: Upper bound for the reservoir thermocouple.
             """
-            # A =  app.base.setup_action()
+            # A =  app.setup_action()
             A = await app.driver.Heatloop(
                 duration_h=duration_hrs,
                 celltemp_min=celltemp_min_C,
@@ -895,8 +906,8 @@ def makeApp(server_key) -> BaseAPI:
                 {do_name: app.driver.do_state.get(do_name)},
             )
 
-    @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop():
+    @app.action()
+    async def stop(ctx: ActionContext):
         """Stop driver activity in a controlled way and record the result.
 
         Args:
@@ -906,7 +917,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
+        active = await ctx.begin(action_abbr="stop")
         await active.enqueue_data_dflt(datadict={"stop": await app.driver.stop()})
         finished_act = await active.finish()
         return finished_act.as_dict()

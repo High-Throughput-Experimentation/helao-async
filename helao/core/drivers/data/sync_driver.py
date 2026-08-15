@@ -32,7 +32,7 @@ from copy import copy
 from datetime import datetime
 from glob import glob
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 from zipfile import ZipFile
 
 import boto3
@@ -43,7 +43,12 @@ from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.machine import MachineModel
 from helao.core.models.process import ProcessModel
 from helao.core.models.run_dir import SYNC_PROGRESSION, RunDir
-from helao.core.servers.base import Base
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # B5: the host that constructs this driver. Annotation-only, so it costs
+    # no import at runtime and does not bind helao/core/drivers to the app
+    # layer -- but the NAME has to be right, because B7 deletes ``Base``.
+    from helao.hexagon.app.action_host import ActionHost
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
@@ -2165,7 +2170,7 @@ class SyncDriver:
 
 
 class HelaoSyncer(SyncDriver):
-    """``SyncDriver`` variant that gets its config from a running HELAO ``Base`` server.
+    """``SyncDriver`` variant that gets its config from a running HELAO host.
 
     The constructor pulls ``params`` from the action server's own
     ``server_cfg`` first, falling back to the global ``servers[sync_server_name]``
@@ -2175,9 +2180,11 @@ class HelaoSyncer(SyncDriver):
         base: Server instance this syncer is attached to.
     """
 
-    base: Base
+    base: "ActionHost"
 
-    def __init__(self, action_serv: Base, sync_server_name: Optional[str] = None):
+    def __init__(
+        self, action_serv: "ActionHost", sync_server_name: Optional[str] = None
+    ):
         """Pick up driver params from ``action_serv`` and initialize ``SyncDriver``.
 
         Args:

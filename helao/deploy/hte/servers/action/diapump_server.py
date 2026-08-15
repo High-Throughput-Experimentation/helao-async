@@ -11,15 +11,16 @@ __all__ = ["makeApp"]
 
 from typing import Optional
 
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.pump.simdos_driver import SIMDOS, RunExec, SIMDOSPoller
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the diaphragm-pump FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by :class:`SIMDOS` and registers the
+    Constructs a :class:`ActionHost` backed by :class:`SIMDOS` and registers the
     ``run_continuous`` / ``cancel_run_continuous`` action endpoints plus the
     private polling and pump on/off endpoints.
 
@@ -27,10 +28,10 @@ def makeApp(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Diaphragm pump server",
@@ -59,8 +60,9 @@ def makeApp(server_key) -> BaseAPI:
         """Stop the pump directly via the driver (no action record)."""
         await app.driver.stop_pump()
 
-    @app.post(f"/{server_key}/run_continuous", tags=["action"])
+    @app.action()
     async def run_continuous(
+        ctx: ActionContext,
         rate_uL_min: int = 0,
         duration_sec: float = -1,
     ):
@@ -68,13 +70,14 @@ def makeApp(server_key) -> BaseAPI:
 
         ``duration_sec`` of ``-1`` runs until ``cancel_run_continuous``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         executor = RunExec(active=active, oneoff=False, poll_rate=0.2)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_run_continuous", tags=["action"])
+    @app.action()
     async def cancel_run_continuous(
+        ctx: ActionContext,
         exec_id: Optional[str] = None,
     ):
         """Stop the targeted ``run_continuous`` executor, or all of them.
@@ -82,11 +85,11 @@ def makeApp(server_key) -> BaseAPI:
         If ``exec_id`` is provided only that executor is stopped; otherwise all
         executors whose id begins with ``run_continuous`` are stopped.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         if active.action.action_params["exec_id"] is not None:
-            app.base.stop_executor(active.action.action_params["exec_id"])
+            app.stop_executor(active.action.action_params["exec_id"])
         else:
-            app.base.stop_all_executor_prefix("run_continuous", {})
+            app.stop_all_executor_prefix("run_continuous", {})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
@@ -97,7 +100,7 @@ def makeApp(server_key) -> BaseAPI:
     #     volume_uL: int = 0,
     #     dispense_duration_sec: int = 0,
     # ):
-    # #     active = await app.base.setup_and_contain_action()
+    # #     active = await ctx.begin()
     # #     executor = VolExec(active=active, oneoff=False, poll_rate=0.2)
     # #     active_action_dict = active.start_executor(executor)
     # #     return active_action_dict
@@ -110,7 +113,7 @@ def makeApp(server_key) -> BaseAPI:
     #     rate_uL_min: int = 0,
     #     dispense_duration_sec: int = 0,
     # ):
-    # #     active = await app.base.setup_and_contain_action()
+    # #     active = await ctx.begin()
     # #     executor = RateExec(active=active, oneoff=False, poll_rate=0.2)
     # #     active_action_dict = active.start_executor(executor)
     # #     return active_action_dict

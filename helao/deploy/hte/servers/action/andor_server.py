@@ -14,8 +14,9 @@ import time
 from helao.core.error import ErrorCodes
 from helao.core.models.file import HloHeaderModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base_api import BaseAPI, action_version
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.executor import Executor
 
 from ...drivers.spec.andor.driver import AndorDriver, DriverStatus
@@ -229,17 +230,17 @@ class AndorAcquire(Executor):
         return {"error": error, "data": {}}
 
 
-async def andor_dyn_endpoints(app: BaseAPI):
+async def andor_dyn_endpoints(app: ActionHost):
     """Register Andor action endpoints on ``app`` after the driver is ready.
 
     Disables concurrent actions on this server and attaches the ``acquire``,
     ``cancel_acquire``, ``cooling`` and ``adjust_nd`` POST routes.
 
     Args:
-        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+        app: The :class:`ActionHost` instance being constructed by ``makeApp``.
     """
-    server_key = app.base.server.server_name
-    app.base.server_params["allow_concurrent_actions"] = False
+    server_key = app.server.server_name
+    app.server_params["allow_concurrent_actions"] = False
 
     # P3a-2 constructor-connect fix: AndorDriver.__init__ no longer opens the
     # camera (disconnected construct); open it here at startup before any
@@ -247,9 +248,10 @@ async def andor_dyn_endpoints(app: BaseAPI):
     connect_resp = app.driver.connect()
     LOGGER.info(f"Andor connect() returned status={connect_resp.status}")
 
-    @app.post(f"/{server_key}/acquire", tags=["action"])
+    @app.action()
     @action_version(2)
     async def acquire(
+        ctx: ActionContext,
         external_trigger: bool = True,
         duration: float = 10.0,
         frames_per_poll: int = 100,
@@ -266,7 +268,7 @@ async def andor_dyn_endpoints(app: BaseAPI):
         data_keys = ["elapsed_time_s"] + [
             f"ch_{i:04}" for i in range(app.driver.wl_arr.shape[0])
         ]
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             json_data_keys=data_keys,
             file_type="andor_helao__file",
             # to reduce polling data size, we get the wl_arr directly from the driver
@@ -283,42 +285,43 @@ async def andor_dyn_endpoints(app: BaseAPI):
 
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_acquire", tags=["action"])
-    async def cancel_acquire():
+    @app.action()
+    async def cancel_acquire(ctx: ActionContext):
         """Stop any running ``acquire`` executor on this server."""
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        active = await ctx.begin()
+        for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "acquire":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/cooling", tags=["action"])
+    @app.action()
     async def cooling(
+        ctx: ActionContext,
         cooldown: bool = True,
         timeout: int = 600,
     ):
         """Cool or warm the Andor sensor using :class:`AndorCooling`."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         executor = AndorCooling(
             active=active, oneoff=False, cooldown=cooldown, timeout=timeout
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/adjust_nd", tags=["action"])
-    async def adjust_nd():
+    @app.action()
+    async def adjust_nd(ctx: ActionContext):
         """Run the ND-filter auto-selection routine via :class:`AndorAdjustND`."""
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         executor = AndorAdjustND(active=active, oneoff=True)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the Andor camera FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by :class:`AndorDriver` and uses
+    Constructs a :class:`ActionHost` backed by :class:`AndorDriver` and uses
     :func:`andor_dyn_endpoints` to register the action endpoints once the
     driver finishes initialising.
 
@@ -326,10 +329,10 @@ def makeApp(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Andor camera/action server",

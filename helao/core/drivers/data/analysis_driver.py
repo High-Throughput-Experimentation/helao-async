@@ -65,7 +65,7 @@ import json
 import os
 import time
 from importlib import import_module, util as importlib_util
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from helao.core.drivers.data.analyses.base_analysis import BaseAnalysis
@@ -82,11 +82,11 @@ from helao.core.drivers.data.loaders import pgs3
 from helao.core.drivers.data.loaders.localfs import LocalLoader
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -514,10 +514,10 @@ class AnalysisSyncer(HelaoSyncer):
         region: S3 region.
     """
 
-    base: Base
+    base: "ActionHost"
     running_tasks: dict
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: "ActionHost"):
         """Initialise queues, loader, configured analyses, and worker coroutines.
 
         Args:
@@ -549,18 +549,18 @@ class AnalysisSyncer(HelaoSyncer):
         }
 
     @staticmethod
-    def _resolve_journal_dir(action_serv: Base) -> Optional[str]:
+    def _resolve_journal_dir(action_serv: "ActionHost") -> Optional[str]:
         """Return ``<STATES>/ana_pending``, or ``None`` to disable journalling.
 
         The ``STATES`` root is read off the action server's own
-        :class:`~helao.core.models.helaodirs.HelaoDirs` (``Base.helaodirs``,
+        :class:`~helao.core.models.helaodirs.HelaoDirs` (``ActionHost.helaodirs``,
         built by :func:`~helao.helpers.helao_dirs.helao_dirs` from the world
         config's ``root``) rather than re-resolved from the config here, so the
         journal cannot end up under a different root than the rest of the
         server's state.
 
         Every field of ``HelaoDirs`` is ``None`` when the config carries no
-        ``root``, which is a supported construction (``Base`` itself only warns),
+        ``root``, which is a supported construction (the host itself only warns),
         and a test double need not carry ``helaodirs`` at all. Either way the
         answer is ``None``: journalling degrades to off with one WARNING and the
         server keeps behaving exactly as it did before the journal existed.
@@ -1198,10 +1198,10 @@ class AnalysisExecutor(Executor):
         return {"data": {}, "error": error}
 
 
-def make_analysis_app(server_key) -> BaseAPI:
+def make_analysis_app(server_key) -> ActionHost:
     """Build the analysis FastAPI app with config-driven action endpoints.
 
-    Constructs a :class:`BaseAPI` backed by :class:`AnalysisSyncer` and registers
+    Constructs an :class:`ActionHost` backed by :class:`AnalysisSyncer` and registers
     one ``analyze_<module>`` action endpoint per analysis class named in the
     server config ``params.analyses`` list, plus the private ``list_running_tasks``
     and ``list_queued_tasks`` endpoints, and arms the startup sweep that
@@ -1218,7 +1218,7 @@ def make_analysis_app(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
 
     Raises:
         AnalysisLoadError: when a configured analysis cannot be loaded; the
@@ -1234,7 +1234,7 @@ def make_analysis_app(server_key) -> BaseAPI:
         config_path=world_cfg.get("loaded_config_path"),
     )
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Analysis server",
@@ -1245,13 +1245,19 @@ def make_analysis_app(server_key) -> BaseAPI:
     def _register_endpoint(endpoint_name: str, ana_cls: BaseAnalysis):
         """Register one analysis action endpoint bound to ``ana_cls``."""
 
-        @app.post(f"/{server_key}/{endpoint_name}", tags=["action"], name=endpoint_name)
+        # `path=` is required, not stylistic: @app.action() derives the path
+        # from the handler's __name__, and this handler is named `_analyze` at
+        # decoration time -- the rename to `endpoint_name` happens two lines
+        # after the decorator has already run. Every config-declared analysis
+        # would otherwise register at the same /<server>/_analyze.
+        @app.action(path=f"/{server_key}/{endpoint_name}", name=endpoint_name)
         async def _analyze(
+            ctx: ActionContext,
             sequence_zip_path: str = "",
             params: dict = {},
         ):
             f"""Action endpoint: run {ana_cls.__name__} on a sequence zip."""
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             executor = AnalysisExecutor(
                 analysis_class=ana_cls,
                 active=active,
@@ -1296,12 +1302,12 @@ def make_analysis_app(server_key) -> BaseAPI:
         }
 
     # Hot-reload safety: defer restart while an analysis is queued or running.
-    # Both ``app.base`` and ``app.driver`` are created in BaseAPI's own startup
-    # event, so wire the hook from a startup handler (registered after
-    # BaseAPI's, hence run after it). The hook still reads app.driver lazily.
+    # ``app.driver`` is created in the host's own startup event, so wire the
+    # hook from a startup handler (registered after the host's, hence run after
+    # it). The hook still reads app.driver lazily.
     @app.on_event("startup")
     def _wire_hotreload_busy():
-        app.base.hotreload_busy_hook = lambda: (
+        app.hotreload_busy_hook = lambda: (
             app.driver is not None and app.driver.has_pending_work()
         )
 
@@ -1309,7 +1315,7 @@ def make_analysis_app(server_key) -> BaseAPI:
     def _recover_journalled_analyses():
         """Re-enqueue whatever a previous process left in the request journal.
 
-        Registered after BaseAPI's startup handler, so ``app.driver`` exists by
+        Registered after the host's startup handler, so ``app.driver`` exists by
         the time this runs. It launches a task rather than awaiting the sweep:
         rebuilding a loader indexes a sequence zip, and holding up startup for
         that would delay the port bind and every route with it.

@@ -287,7 +287,8 @@ class ActionContext:
 
         Args:
             **kwargs: Forwarded to the host's session factory --
-                ``json_data_keys``, ``action_abbr``, ``file_type``, ``hloheader``.
+                ``json_data_keys``, ``action_abbr``, ``file_type``,
+                ``hloheader``, ``sample_global_labels``.
 
         Returns:
             The :class:`~helao.hexagon.app.action_session.ActionSession` now

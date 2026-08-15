@@ -105,15 +105,21 @@ class _FakeApp:
         self.server_params = server_params or {}
         self.routes = {}
         self.api = FastAPI()
-        self.base = types.SimpleNamespace(
-            server=types.SimpleNamespace(server_name=server_name),
-            server_params=self.server_params,
-            # No ``helaodirs``: the galil driver's ``connect()`` reads plate
-            # and instrument calibration off disk when one is present, and
-            # this feature has nothing to do with calibration.
-            helaodirs=None,
-            actionservermodel=types.SimpleNamespace(endpoints={}, estop=False),
-        )
+        # B5: these live on the APP now, not on a separate ``base`` object.
+        # ``ActionHost`` merged the two -- its ``base`` property returns the
+        # host itself -- so the fake mirrors that rather than keeping a nested
+        # namespace the ported modules would never reach through.
+        self.server = types.SimpleNamespace(server_name=server_name)
+        # No ``helaodirs``: the galil driver's ``connect()`` reads plate and
+        # instrument calibration off disk when one is present, and this
+        # feature has nothing to do with calibration.
+        self.helaodirs = None
+        self.actionservermodel = types.SimpleNamespace(endpoints={}, estop=False)
+
+    @property
+    def base(self):
+        """``ActionHost.base`` returns the host; so does this."""
+        return self
 
     def post(self, path, tags=None, **kwargs):
         def _register(fn):
@@ -129,6 +135,24 @@ class _FakeApp:
             return fn
 
         return _register
+
+    def action(self, **route_kwargs):
+        """Mirror of ``ActionHost.action``.
+
+        The ported ``*_dyn_endpoints`` register action routes through this
+        decorator instead of ``post``, and the path it derives -- from the
+        handler's own name -- is exactly what these tests assert on. A fake
+        that only implemented ``post`` recorded no action routes at all, which
+        reads as "this server registers nothing" rather than as a fake missing
+        a method.
+        """
+
+        def _decorate(fn):
+            path = route_kwargs.pop("path", f"/{self.server.server_name}/{fn.__name__}")
+            tags = route_kwargs.pop("tags", ["action"])
+            return self.post(path, tags=tags, **route_kwargs)(fn)
+
+        return _decorate
 
     def set_busy(self, *endpoint_names):
         """Make the server report a running action on each named endpoint."""
