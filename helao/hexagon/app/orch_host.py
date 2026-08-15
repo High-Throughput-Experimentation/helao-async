@@ -1047,6 +1047,17 @@ class OrchHost(ActionHost):
         self.globalstatusmodel.loop_intent = LoopIntent.stop
         await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
 
+    async def intend_estop(self) -> None:
+        """Post an E-STOP intent to the interrupt queue.
+
+        Reached only from the reducer's effect runner, which is why no
+        earlier gate found it missing: the member contract was measured
+        from the legacy collaborators and orch_api, and orch_effects only
+        became a consumer of this host at the cut-over.
+        """
+        self.globalstatusmodel.loop_intent = LoopIntent.estop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
     async def intend_none(self) -> None:
         """Clear any pending loop intent."""
         self.globalstatusmodel.loop_intent = LoopIntent.none
