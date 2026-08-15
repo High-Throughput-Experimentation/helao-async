@@ -10,7 +10,7 @@ driver modules from `BaseAPI`/`OrchAPI`/`Base`/`Active` to the native
 
 **This is a first-launch checklist, not a campaign.** The decision was to merge
 on the Linux gates and let each station gate itself the next time it is used,
-rather than hold the branch for a seven-station sweep. So the work below is
+rather than hold the branch for a whole-fleet sweep. So the work below is
 what to do the *first* time each station comes up on this code — by whoever is
 already using it, not by someone making a special trip.
 
@@ -84,9 +84,33 @@ Every server listed is changed — B5 ported all of them. The orchestrator
 | `ecms1` | CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI, ORCH, PSTAT (gamry), SAMPLE, SYNC |
 | `hispec` | ANDOR, CALC, IO, KMOTOR, MOTOR, ORCH, PSTAT (**biologic**), SAMPLE, SYNC |
 
+### Three more stations, whose configs live in private deployments
+
+**These were missed when this document was first written** and are affected
+exactly as the seven above are. The station map was built by globbing
+`helao/deploy/hte/configs/*.yml`; these configs live in a private deployment's
+own `configs/` directory while their servers resolve to hte modules through the
+launcher's deployment fallback. Nothing about them is special — the omission
+was in how the list was gathered.
+
+| station | B5-changed servers it runs |
+|---|---|
+| `uvis4` | CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC, ORCH |
+| `amts` | PSTAT (gamry), SYNC, ORCH |
+| `note1` | SYNC, ORCH |
+
+`uvis4` carries the most of any station in the programme after ccsi2, and it is
+the **only** live consumer of `pdu_server` anywhere — the module the B5 spec
+recorded as having no station gate. It has one; it is here.
+
+`SYNC` is worth calling out separately: it runs on all seven hte stations and
+on all three of these, so it is the single highest-blast-radius module B5
+touched. A `SYNC` fault is a fault everywhere.
+
 **Preferred order, where there is a choice: `ccsi2`, `eche10`, `anec`, `adss3`,
-`clad`, `ecms1`, `hispec`.** Stations will come up in whatever order work
-demands; this is only what to prefer when two are equally convenient.
+`clad`, `ecms1`, `hispec`, then `uvis4`, `amts`, `note1`.** Stations will come
+up in whatever order work demands; this is only what to prefer when two are
+equally convenient.
 
 `ccsi2` first because its unique modules (`co2sensor_server`, `diapump_server`)
 are the smallest ports in the phase and it runs no motion or PAL. `hispec` last
@@ -244,6 +268,9 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `clad` | | | | | | |
 | `ecms1` | | | | | | |
 | `hispec` | | | | | | |
+| `uvis4` | | | | | | |
+| `amts` | | | | | | |
+| `note1` | | | | | | |
 
 B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
