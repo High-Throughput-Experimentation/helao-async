@@ -109,10 +109,16 @@ resulting `AttributeError` fired inside the FastAPI startup event where uvicorn 
 **Decision.** Two sub-projects:
 
 - **B3a — host + state + queue surface.** `OrchHost` construction, the 135-member contract, the
-  ratchet, `orch_queues`, `orch_persist`, `orch_estop`, `orch_lifecycle`, and the ~55 routes that
-  read or mutate queues without running the loop.
+  ratchet, `orch_queues`, `orch_persist`, `orch_estop`, `orch_lifecycle`, and **48 routes** — 39
+  private plus 9 `/{server_key}/…` action routes — that read or mutate queues without running the
+  loop. The remaining 24 are registered here as raising stubs, so the surface is complete and a
+  caller fails at the call site rather than on a 404 that reads as a missing server.
 - **B3b — the loop.** `orch_dispatch`, `orch_status_sync`, `orch_monitor`, the reducer cut-over
-  (D-B3.2), the globstat broadcaster, and the ~17 routes that start, stop, skip or estop.
+  (D-B3.2), the globstat broadcaster, and the **24 routes** that start, stop, skip, estop, ingest
+  status or stream WS.
+
+*(Counted by AST over `orch_api.py`, not by grep: 9 of the 72 have f-string paths that a
+same-line string-literal regex misses entirely.)*
 
 **Why.** B1 was one sub-project and it was too big: the host, the route surface, the context, the
 session, the executor runner, the middleware and nine deployment modules landed together, and the
@@ -213,10 +219,18 @@ live at amts, uvis4, note1, ccs2 and eche10 today. The cut-over is a same-commit
 no window where both drive the loop, but there is also no incremental rollout: the gate has to be
 the concurrency suite plus GM, not a station.
 
-**Deployment code reads `app.orch`.** The `host.orch is host` property covers the attribute, but
-any deployment that constructs an `Orch` directly, or that type-checks against it, breaks. Not yet
-measured — **B3a task 1 is to measure it**, across hte and the three private deployments, the way
-B1 measured the 21 hte modules reaching `app.base`.
+**~~Deployment code reads `app.orch`.~~ Measured: it does not.** Zero files under
+`helao/deploy/` touch `.orch` — hte and all three private deployments. The only direct
+constructors are tests and `MicroOrch`, which is a separate mechanism under `helao/core/runners/`
+and is out of scope. The `host.orch is host` property therefore covers `orch_api`'s 60 internal
+sites and nothing else needs it. Risk closed before B3a starts.
+
+**`Orch` extends `Base`, but `OrchAPI` does not extend `BaseAPI`.** The native shape must
+reproduce that asymmetry: `OrchHost(ActionHost)` inherits the Base half (23 of the 135 members
+come free), while the WS encoding stays the `OrchAPI` family — a plain dict on `/ws_status` where
+the action family sends an `ActionModel`. `ActionHost` already registers all three WS routes, so
+`OrchHost` **must override them** rather than inherit, or B3b silently ships the wrong family to
+every Bokeh visualizer and Reflex panel.
 
 ---
 
