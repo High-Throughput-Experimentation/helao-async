@@ -46,7 +46,18 @@ SEARCH_DIRS: Final[tuple[Path, ...]] = (
 )
 
 #: Modules whose sole back-reference is the orchestrator.
+#:
+#: The last three are the REDUCER, and they were missing until GM-4 failed
+#: on a live rig with ``'OrchHost' object has no attribute 'intend_estop'``.
+#: The contract was measured from the legacy collaborators and orch_api,
+#: which is what a GRAFTED reducer needed -- it reached a legacy Orch. After
+#: D-B3.2 the reducer reaches THIS host, so its effect runner, loop and
+#: ingestion are consumers like any other, and a contract that omits them
+#: reports full coverage over a server that raises the moment it is stopped.
 CONSUMERS: Final[tuple[str, ...]] = (
+    "orch_effects",
+    "dispatch_loop",
+    "ingestion",
     "orch_dispatch",
     "orch_queues",
     "orch_lifecycle",
