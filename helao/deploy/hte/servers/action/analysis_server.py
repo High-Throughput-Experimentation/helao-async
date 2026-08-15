@@ -12,16 +12,16 @@ models.
 __all__ = ["makeApp"]
 
 from helao.core.drivers.data.analysis_driver import make_analysis_app
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_host import ActionHost
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the analysis FastAPI app for ``server_key``.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
     return make_analysis_app(server_key)

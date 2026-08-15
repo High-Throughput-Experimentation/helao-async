@@ -135,7 +135,8 @@ class ActionSession:
         ``contain_action``: one default file connection carrying the endpoint's
         ``json_data_keys``, a file type defaulting to
         ``<server>_helao__file``, and an HLO header stamped with the current
-        real time.
+        real time. ``sample_global_labels`` is the one field legacy's
+        convenience method did not expose; see the comment on it below.
         """
         from helao.core.models.file import FileConnParams, HloHeaderModel
         from helao.helpers.active_params import ActiveParams
@@ -144,6 +145,13 @@ class ActionSession:
         action_abbr = kwargs.get("action_abbr")
         file_type = kwargs.get("file_type")
         hloheader = kwargs.get("hloheader")
+        # NOT a kwarg of legacy `setup_and_contain_action`, deliberately: the
+        # endpoints that needed per-file sample labels (NI's multi-cell CV)
+        # dropped to the lower-level `contain_action` and spelled out their own
+        # ActiveParams. B5 has no lower level to drop to, so the one field
+        # those call sites set beyond the convenience method's reach is
+        # accepted here. Default matches FileConnParams' own.
+        sample_global_labels = kwargs.get("sample_global_labels") or []
 
         if action_abbr is not None:
             action.action_abbr = action_abbr
@@ -159,6 +167,7 @@ class ActionSession:
                 dflt: FileConnParams(
                     file_conn_key=dflt,
                     json_data_keys=json_data_keys,
+                    sample_global_labels=sample_global_labels,
                     file_type=file_type,
                     hloheader=hloheader,
                 )

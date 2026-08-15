@@ -32,9 +32,9 @@ from helao.core.models.sample import (
     SampleStatus,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
-from helao.helpers.active_params import ActiveParams
 from helao.helpers.executor import Executor
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
@@ -128,7 +128,7 @@ class SM303Exec(Executor):
         return {"error": ErrorCodes.none}
 
 
-async def sm303_dyn_endpoints(app: BaseAPI):
+async def sm303_dyn_endpoints(app: ActionHost):
     """Register SM303 spectrometer endpoints.
 
     Disables concurrent actions on this server, opens the vendor DLL
@@ -140,10 +140,10 @@ async def sm303_dyn_endpoints(app: BaseAPI):
     control.
 
     Args:
-        app: The :class:`BaseAPI` instance being configured.
+        app: The :class:`ActionHost` instance being configured.
     """
-    server_key = app.base.server.server_name
-    app.base.server_params["allow_concurrent_actions"] = False
+    server_key = app.server.server_name
+    app.server_params["allow_concurrent_actions"] = False
 
     app.driver: SM303
     connect_resp = app.driver.connect()
@@ -157,9 +157,10 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         """Return the spectrometer wavelength array with shape ``(num_pixels,)``."""
         return app.driver.pxwl  # type: ignore
 
-    @app.post(f"/{server_key}/acquire_spec", tags=["action"])
+    @app.action()
     @action_version(2)
     async def acquire_spec(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -187,7 +188,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         """
         LOGGER.info("!!! Starting acquire_spec action.")
         spec_header = {"wl": app.driver.pxwl}  # type: ignore
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
         LOGGER.info("!!! acquire_spec action is active.")
@@ -205,9 +206,10 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/acquire_spec_adv", tags=["action"])
+    @app.action()
     @action_version(2)
     async def acquire_spec_adv(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -242,7 +244,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             The finished action dictionary.
         """
         spec_header = {"wl": app.driver.pxwl}
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
         starttime = time.time()
@@ -263,8 +265,9 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/calibrate_intensity", tags=["action"])
+    @app.action()
     async def calibrate_intensity(
+        ctx: ActionContext,
         int_time_ms: int = 35,
         n_avg: int = 3,
         peak_lower_wl: Optional[float] = 400,
@@ -298,7 +301,7 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             The finished action dictionary.
         """
         spec_header = {"wl": app.driver.pxwl}
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             action_abbr="OPT", hloheader=HloHeaderModel(optional=spec_header)
         )
         current_int_time = active.action.action_params["int_time_ms"]
@@ -344,8 +347,9 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         finished_act = await active.finish()
         return finished_act.as_dict()
 
-    @app.post(f"/{server_key}/acquire_spec_extrig", tags=["action"])
+    @app.action()
     async def acquire_spec_extrig(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -380,7 +384,11 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             (matching the pre-migration behavior: neither case creates an
             ``Active`` action).
         """
-        A = app.base.setup_action()
+        # Two-step: the trigger-setup and no-sample branches must answer with
+        # an error code and no artifacts (pre-migration behaviour, noted below),
+        # so the Action is needed before any session exists. ctx.action is
+        # legacy's setup_action().
+        A = ctx.action
         A.action_abbr = "OPT"
         # K7 CRITICAL: read from action_params (subscript), never endpoint fn-args
         p = A.action_params
@@ -411,21 +419,12 @@ async def sm303_dyn_endpoints(app: BaseAPI):
             return A.as_dict()
 
         spec_header = {"wl": app.driver.pxwl}
-        dflt_conn_key = app.base.dflt_file_conn_key()
-        active = await app.base.contain_action(
-            ActiveParams(
-                action=A,
-                file_conn_params_dict={
-                    dflt_conn_key: FileConnParams(
-                        file_conn_key=dflt_conn_key,
-                        sample_global_labels=[
-                            sample.get_global_label() for sample in samples_in
-                        ],
-                        file_type="spec_helao__file",
-                        hloheader=HloHeaderModel(optional=spec_header),
-                    )
-                },
-            )
+        # ctx.begin assembles the same ActiveParams this spelled out, including
+        # the per-file sample labels legacy's convenience method never exposed.
+        active = await ctx.begin(
+            sample_global_labels=[sample.get_global_label() for sample in samples_in],
+            file_type="spec_helao__file",
+            hloheader=HloHeaderModel(optional=spec_header),
         )
         for sample in samples_in:
             sample.reset_sample_status(SampleStatus.preserved)
@@ -444,8 +443,9 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         executor = SM303Exec(active=active, oneoff=False, poll_rate=0.01)
         return active.start_executor(executor)
 
-    @app.post(f"/{server_key}/stop_extrig_after", tags=["action"])
+    @app.action()
     async def stop_extrig_after(
+        ctx: ActionContext,
         delay: int = 0,
     ):
         """Schedule a delayed stop of any running external-trigger capture.
@@ -466,11 +466,11 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         stop_resp = await app.driver.stop_acquisition(
             delay=active.action.action_params["delay"]
         )
-        for exec_id, exec_active in list(app.base.executors.items()):
+        for exec_id, exec_active in list(app.executors.items()):
             if exec_id.split()[0] == "acquire_spec_extrig":
                 exec_active.stop_action_task()
         await active.enqueue_data_dflt(datadict={"stop": stop_resp})
@@ -478,19 +478,19 @@ async def sm303_dyn_endpoints(app: BaseAPI):
         return finished_action.as_dict()
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the SM303 spectrometer.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the SM303 spectrometer.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with spectrometer endpoints attached
+        The configured ActionHost instance with spectrometer endpoints attached
         via :func:`sm303_dyn_endpoints`.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Spectrometer server",

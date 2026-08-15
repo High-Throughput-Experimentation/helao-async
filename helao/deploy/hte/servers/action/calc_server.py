@@ -16,7 +16,8 @@ from typing import Union
 import numpy as np
 
 from helao.core.models.file import HloFileGroup, HloHeaderModel
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 from helao.helpers.dispatcher import async_private_dispatcher
 
@@ -25,10 +26,10 @@ from ...drivers.data.calc_driver import Calc
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the calculation FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by the :class:`Calc` driver and
+    Constructs an :class:`ActionHost` backed by the :class:`Calc` driver and
     registers the ``calc_uvis_abs``, ``check_co2_purge``,
     ``fill_syringe_volume_check``, ``keep_min_ocv`` and
     ``check_CP_Ewe_bounds`` action endpoints.
@@ -37,9 +38,9 @@ def makeApp(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Calculation server",
@@ -47,9 +48,10 @@ def makeApp(server_key) -> BaseAPI:
         driver_classes=[Calc],
     )
 
-    @app.post(f"/{server_key}/calc_uvis_abs", tags=["action"])
+    @app.action()
     @action_version(2)
     async def calc_uvis_abs(
+        ctx: ActionContext,
         ev_parts: list = [1.8, 2.2, 2.6, 3.0],
         bin_width: int = 3,
         window_length: int = 45,
@@ -68,7 +70,7 @@ def makeApp(server_key) -> BaseAPI:
         writes one ``helao_calc__file`` per array key with the wavelength
         vector embedded in the file header.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="calcAbs")
+        active = await ctx.begin(action_abbr="calcAbs")
         seq_absdir = os.path.join(
             str(active.base.helaodirs.save_root), active.action.get_sequence_dir()
         )
@@ -91,7 +93,7 @@ def makeApp(server_key) -> BaseAPI:
                 action_name=active.action.action_name,
                 column_headings=colnames,
                 optional={"wl": ad["wavelength"]},
-                epoch_ns=app.base.get_realtime_nowait(time_ns()),
+                epoch_ns=app.get_realtime_nowait(time_ns()),
             )
             abbr = active.action.action_abbr
             subi = active.action.orch_submit_order
@@ -112,9 +114,10 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/check_co2_purge", tags=["action"])
+    @app.action()
     @action_version(2)
     async def check_co2_purge(
+        ctx: ActionContext,
         co2_ppm_thresh: float = 95000,
         purge_if: Union[str, float] = "below",
         present_syringe_volume_ul: float = 0,
@@ -127,7 +130,7 @@ def makeApp(server_key) -> BaseAPI:
         Delegates to :meth:`Calc.check_co2_purge_level`; the returned dict is
         used by the experiment to decide whether to schedule a repeat purge.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="checkCO2")
+        active = await ctx.begin(action_abbr="checkCO2")
         seq_absdir = os.path.join(
             str(active.base.helaodirs.save_root), active.action.get_sequence_dir()
         )
@@ -158,8 +161,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/fill_syringe_volume_check", tags=["action"])
+    @app.action()
     async def fill_syringe_volume_check(
+        ctx: ActionContext,
         check_volume_ul: float = 0,
         target_volume_ul: float = 0,
         present_volume_ul: float = 0,
@@ -172,9 +176,7 @@ def makeApp(server_key) -> BaseAPI:
         Delegates to :meth:`Calc.fill_syringe_volume_check`; the returned dict
         is used by the experiment to decide whether to schedule a repeat fill.
         """
-        active = await app.base.setup_and_contain_action(
-            action_abbr="syringefillvolume"
-        )
+        active = await ctx.begin(action_abbr="syringefillvolume")
         p = active.action.action_params
         result = await app.driver.fill_syringe_volume_check(
             p["check_volume_ul"],
@@ -201,9 +203,10 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/keep_min_ocv", tags=["action"])
+    @app.action()
     @action_version(2)
     async def keep_min_ocv(
+        ctx: ActionContext,
         min_offset_ocv: float | bool = False,
         new_ocv: float | bool = False,
         lower_limit: float = 0.2,
@@ -220,7 +223,7 @@ def makeApp(server_key) -> BaseAPI:
         ``min_offset_ocv``.
         """
 
-        active = await app.base.setup_and_contain_action(action_abbr="keepMinOCV")
+        active = await ctx.begin(action_abbr="keepMinOCV")
         try:
             if isinstance(active.action.action_params["min_offset_ocv"], bool):
                 min_offset_ocv = 3
@@ -259,9 +262,10 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/check_CP_Ewe_bounds", tags=["action"])
+    @app.action()
     @action_version(2)
     async def check_CP_Ewe_bounds(
+        ctx: ActionContext,
         CP_Ewe_V__mean_final: float | bool = False,
         limted_Ewe_V__mean_final: float | bool = False,
         lower_limit: float = -1,
@@ -273,7 +277,7 @@ def makeApp(server_key) -> BaseAPI:
         substitutes ``0.4`` when missing, clamps it to the configured bounds
         and stores the clamped value back as ``CP_Ewe_V__mean_final``.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="CheckCPEweBounds")
+        active = await ctx.begin(action_abbr="CheckCPEweBounds")
 
         try:
             Ewe_V__mean_final = active.action.action_params["CP_Ewe_V__mean_final"]

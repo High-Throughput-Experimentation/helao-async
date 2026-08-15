@@ -16,7 +16,8 @@ from typing import Optional
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.ui.shared.motion_control import Units
 from helao.helpers.executor import Executor
 
@@ -28,7 +29,7 @@ from ...drivers.motion.kinesis_driver import (
 )
 
 
-def _running_actions(app: BaseAPI) -> list:
+def _running_actions(app: ActionHost) -> list:
     """Names of this server's endpoints that currently have a running action.
 
     Whether an action is running is knowable only server-side, from the
@@ -39,9 +40,7 @@ def _running_actions(app: BaseAPI) -> list:
     for the stage cares that the server is moving something, not which route
     was asked to move it.
     """
-    return [
-        ep for ep, em in app.base.actionservermodel.endpoints.items() if em.active_dict
-    ]
+    return [ep for ep, em in app.actionservermodel.endpoints.items() if em.active_dict]
 
 
 class KinesisMotorExec(Executor):
@@ -163,7 +162,7 @@ class KinesisMotorExec(Executor):
         return {"error": ErrorCodes.none}
 
 
-async def kinesis_dyn_endpoints(app: BaseAPI):
+async def kinesis_dyn_endpoints(app: ActionHost):
     """Register Kinesis motion endpoints after driver initialisation.
 
     Reads the configured axes from ``server_params['axes']`` and, if any are
@@ -171,15 +170,16 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
     private polling control endpoints.
 
     Args:
-        app: The :class:`BaseAPI` instance being configured.
+        app: The :class:`ActionHost` instance being configured.
     """
-    server_key = app.base.server.server_name
-    motors = list(app.base.server_params["axes"].keys())
+    server_key = app.server.server_name
+    motors = list(app.server_params["axes"].keys())
 
     if motors:
 
-        @app.post(f"/{server_key}/kmove", tags=["action"])
+        @app.action()
         async def kmove(
+            ctx: ActionContext,
             axis: app.driver.dev_kinesis = motors[0],
             move_mode: MoveModes = "relative",
             value_mm: float = 0.0,
@@ -204,7 +204,7 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             active.action.action_abbr = "kmove"
             executor = KinesisMotorExec(
                 active=active,
@@ -214,8 +214,9 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             active_action_dict = active.start_executor(executor)
             return active_action_dict
 
-        @app.post(f"/{server_key}/cancel_kmove", tags=["action"])
+        @app.action()
         async def cancel_kmove(
+            ctx: ActionContext,
             axis: app.driver.dev_kinesis = motors[0],
             exec_id: Optional[str] = None,
         ):
@@ -234,20 +235,21 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             if active.action.action_params["exec_id"] is not None:
-                app.base.stop_executor(active.action.action_params["exec_id"])
+                app.stop_executor(active.action.action_params["exec_id"])
             else:
                 if active.action.action_params["axis"] is None:
                     dev_dict = {}
                 else:
                     dev_dict = {"axis": active.action.action_params["axis"]}
-                app.base.stop_all_executor_prefix("kmove", dev_dict)
+                app.stop_all_executor_prefix("kmove", dev_dict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/set_velocity", tags=["action"])
+        @app.action()
         async def set_velocity(
+            ctx: ActionContext,
             axis: app.driver.dev_kinesis = motors[0],
             velocity_mm_s: Optional[float] = None,
             acceleration_mm_s2: Optional[float] = None,
@@ -264,7 +266,7 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             Returns:
                 The finished action dictionary.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="set_velocity")
+            active = await ctx.begin(action_abbr="set_velocity")
             app.driver.motors[
                 active.action.action_params["axis"]
             ].set_velocity_parameters(
@@ -274,16 +276,22 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
+        # ``ActionHost.poller`` is Optional -- most servers declare no poller
+        # -- but this module always passes ``poller_class=KinesisPoller``, so
+        # it is never None here. The legacy annotation on this function was
+        # ``BaseAPI``, which did not carry the Optional, so B5's retype is what
+        # made pyright able to see the narrowing gap. Ignored rather than
+        # asserted: a port must add no runtime statement.
         @app.post("/start_polling", tags=["private"])
         async def start_polling() -> str:
             """Start the Kinesis poller background loop."""
-            await app.poller.start_polling()
+            await app.poller.start_polling()  # pyright: ignore[reportOptionalMemberAccess]
             return "start_polling: ok"
 
         @app.post("/stop_polling", tags=["private"])
         async def stop_polling() -> str:
             """Stop the Kinesis poller background loop."""
-            await app.poller.stop_polling()
+            await app.poller.stop_polling()  # pyright: ignore[reportOptionalMemberAccess]
             return "stop_polling: ok"
 
         # Private motion controls for the engineering control panel. Same
@@ -434,21 +442,21 @@ async def kinesis_dyn_endpoints(app: BaseAPI):
             return ErrorCodes.none, app.driver.query_axis_positions()
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for Kinesis motorised stages.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for Kinesis motorised stages.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance. Axis-specific endpoints are added
+        The configured ActionHost instance. Axis-specific endpoints are added
         lazily via :func:`kinesis_dyn_endpoints`.
     """
 
     # current plan is 1 mfc per COM
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Kinesis motor server",

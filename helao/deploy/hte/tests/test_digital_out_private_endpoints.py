@@ -42,12 +42,15 @@ class _FakeApp:
         class _Server:
             server_name = None
 
-        class _Base:
-            pass
+        # B5: on the APP, not on a nested ``base``. ``ActionHost`` merged the
+        # two and its ``base`` property returns the host itself.
+        self.server = _Server()
+        self.server.server_name = server_name
 
-        self.base = _Base()
-        self.base.server = _Server()
-        self.base.server.server_name = server_name
+    @property
+    def base(self):
+        """``ActionHost.base`` returns the host; so does this."""
+        return self
 
     def post(self, path, tags=None, **kwargs):
         def _register(fn):
@@ -55,6 +58,24 @@ class _FakeApp:
             return fn
 
         return _register
+
+    def action(self, **route_kwargs):
+        """Mirror of ``ActionHost.action``.
+
+        The ported ``*_dyn_endpoints`` register action routes through this
+        decorator instead of ``post``, and the path it derives -- from the
+        handler's own name -- is exactly what these tests assert on. A fake
+        that only implemented ``post`` recorded no action routes at all, which
+        reads as "this server registers nothing" rather than as a fake missing
+        a method.
+        """
+
+        def _decorate(fn):
+            path = route_kwargs.pop("path", f"/{self.server.server_name}/{fn.__name__}")
+            tags = route_kwargs.pop("tags", ["action"])
+            return self.post(path, tags=tags, **route_kwargs)(fn)
+
+        return _decorate
 
 
 # --------------------------------------------------------------------------
@@ -262,10 +283,14 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
     # `<x>items` enum built from that group.
     togglable = set()
     for m in re.finditer(
-        # The annotation may be wrapped: a typing sweep turned every one of
-        # these into Optional[...], which silently emptied this match until the
-        # assert below caught it.
-        r"async def \w+\(\n\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
+        # Two ways this match has been silently emptied, both caught only by
+        # the assert below. A typing sweep wrapped every annotation in
+        # Optional[...]; and B5's port inserted `ctx: ActionContext` as the
+        # FIRST parameter of every action handler, pushing the group argument
+        # off the line after the paren. Both are tolerated here.
+        r"async def \w+\(\n"
+        r"(?:\s+ctx: ActionContext,\n)?"
+        r"\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
         src,
     ):
         togglable.add(m.group(1))

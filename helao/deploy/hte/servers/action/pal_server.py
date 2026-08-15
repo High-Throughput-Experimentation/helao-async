@@ -19,9 +19,9 @@ from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
 from helao.core.models.file import FileConnParams
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
-from helao.helpers.active_params import ActiveParams
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.executor import Executor
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.premodels import Action
@@ -82,8 +82,8 @@ class PALJobExec(Executor):
         }
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the PAL autosampler.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the PAL autosampler.
 
     Reads the server's ``cams`` and ``positions`` blocks to decide which
     method endpoints to register. Custom-position endpoints typed against
@@ -97,10 +97,10 @@ def makeApp(server_key) -> BaseAPI:
             group.
 
     Returns:
-        The configured BaseAPI instance.
+        The configured ActionHost instance.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key,
         server_key,
         "PAL Autosampler Server",
@@ -110,7 +110,7 @@ def makeApp(server_key) -> BaseAPI:
 
     _cams = app.server_params.get("cams", {})
     # _camsitems = make_str_enum("cams",{key:key for key in _cams.keys()})
-    # app.base.print_message(_cams)
+    # app.print_message(_cams)
 
     if "positions" in app.server_params:
         dev_custom = app.server_params["positions"].get("custom", {})
@@ -127,7 +127,7 @@ def makeApp(server_key) -> BaseAPI:
         sec 3.1 warning): this mirrors the exact error codes the legacy
         ``_init_PAL_IOloop`` guard returned, just moved out of the driver.
         """
-        if app.base.actionservermodel.estop:
+        if app.actionservermodel.estop:
             LOGGER.error("PAL is in estop.")
             A.error_code = ErrorCodes.estop
             return A.as_dict()
@@ -141,25 +141,23 @@ def makeApp(server_key) -> BaseAPI:
             return A.as_dict()
         return None
 
-    async def _pal_start(A: Action, palcam) -> dict:
-        """Contain the action and hand it off to a ``PALJobExec`` (K7b)."""
-        active = await app.base.contain_action(
-            ActiveParams(
-                action=A,
-                file_conn_params_dict={
-                    app.base.dflt_file_conn_key(): FileConnParams(
-                        file_conn_key=app.base.dflt_file_conn_key(),
-                        file_type="pal_helao__file",
-                    )
-                },
-            )
-        )
+    async def _pal_start(ctx: ActionContext, palcam) -> dict:
+        """Open the session and hand it off to a ``PALJobExec`` (K7b).
+
+        B5: takes the context rather than the Action. Every caller runs the
+        busy/estop/no-host guard against ``ctx.action`` FIRST and answers with
+        an error code and no artifacts when it rejects, so the session cannot
+        be opened before that decision -- which is why this is a separate step
+        at all. ``ctx.begin`` assembles the ActiveParams that was spelled out
+        here: default file-conn key, PAL's own file type.
+        """
+        active = await ctx.begin(file_type="pal_helao__file")
         return active.start_executor(
             PALJobExec(palcam=palcam, active=active, oneoff=False)
         )
 
-    @app.post(f"/{server_key}/stop", tags=["action"])
-    async def stop():
+    @app.action()
+    async def stop(ctx: ActionContext):
         """Request a controlled stop on the PAL driver.
 
         Args:
@@ -169,7 +167,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary including the driver stop result.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
+        active = await ctx.begin(action_abbr="stop")
         stop_resp = app.driver.stop()
         await active.enqueue_data_dflt(
             datadict={"stop": stop_resp.response == DriverResponseType.success}
@@ -177,8 +175,8 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/kill_PAL", tags=["action"])
-    async def kill_PAL():
+    @app.action()
+    async def kill_PAL(ctx: ActionContext):
         """Kill the PAL process via the driver and record the error code.
 
         Args:
@@ -188,7 +186,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         error_code = await app.driver.kill_PAL()
         active.action.error_code = error_code
         await active.enqueue_data_dflt(datadict={"error_code": error_code})
@@ -197,8 +195,9 @@ def makeApp(server_key) -> BaseAPI:
 
     if _cams:
 
-        @app.post(f"/{server_key}/PAL_run_method", tags=["action"])
+        @app.action()
         async def PAL_run_method(
+            ctx: ActionContext,
             micropal: list = [
                 PalMicroCam.model_validate(
                     {
@@ -283,12 +282,12 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
             palcam = app.driver.build_palcam_arbitrary(A.action_params, A.samples_in)
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if (
         "injection_custom_GC_liquid_start" in _cams
@@ -298,8 +297,9 @@ def makeApp(server_key) -> BaseAPI:
         and "archive"
     ):
 
-        @app.post(f"/{server_key}/PAL_ANEC_aliquot", tags=["action"])
+        @app.action()
         async def PAL_ANEC_aliquot(
+            ctx: ActionContext,
             toolGC: PALtools = PALtools.HS2,
             toolarchive: PALtools = PALtools.LS3,
             source: dev_customitems = "cell1_we",
@@ -328,13 +328,13 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "GC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
             palcam = app.driver.build_palcam_ANEC_aliquot(A.action_params, A.samples_in)
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if (
         "injection_custom_GC_liquid_start" in _cams
@@ -343,8 +343,9 @@ def makeApp(server_key) -> BaseAPI:
         or "injection_custom_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{server_key}/PAL_ANEC_GC", tags=["action"])
+        @app.action()
         async def PAL_ANEC_GC(
+            ctx: ActionContext,
             toolGC: PALtools = PALtools.HS2,
             source: dev_customitems = "cell1_we",
             volume_ul_GC: int = 300,
@@ -361,13 +362,13 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "GC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
             palcam = app.driver.build_palcam_ANEC_GC(A.action_params, A.samples_in)
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if (
         "injection_tray_GC_liquid_start" in _cams
@@ -376,8 +377,9 @@ def makeApp(server_key) -> BaseAPI:
         or "injection_tray_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{server_key}/PAL_injection_tray_GC", tags=["action"])
+        @app.action()
         async def PAL_injection_tray_GC(
+            ctx: ActionContext,
             startGC: bool = True,
             sampletype: GCsampletype = "liquid",
             tool: PALtools = PALtools.LS1,
@@ -412,7 +414,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "GC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -420,7 +422,7 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_injection_tray_GC(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if (
         "injection_custom_GC_liquid_start" in _cams
@@ -429,8 +431,9 @@ def makeApp(server_key) -> BaseAPI:
         or "injection_custom_GC_gas_wait" in _cams
     ):
 
-        @app.post(f"/{server_key}/PAL_injection_custom_GC", tags=["action"])
+        @app.action()
         async def PAL_injection_custom_GC(
+            ctx: ActionContext,
             startGC: Optional[bool] = None,
             sampletype: Optional[GCsampletype] = None,
             tool: Optional[PALtools] = None,
@@ -461,7 +464,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "GC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -469,12 +472,13 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_injection_custom_GC(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if "injection_custom_HPLC" in _cams:
 
-        @app.post(f"/{server_key}/PAL_injection_custom_HPLC", tags=["action"])
+        @app.action()
         async def PAL_injection_custom_HPLC(
+            ctx: ActionContext,
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             dest: Optional[dev_customitems] = None,
@@ -501,7 +505,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "HPLC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -509,12 +513,13 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_injection_custom_HPLC(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if "injection_tray_HPLC" in _cams:
 
-        @app.post(f"/{server_key}/PAL_injection_tray_HPLC", tags=["action"])
+        @app.action()
         async def PAL_injection_tray_HPLC(
+            ctx: ActionContext,
             tool: PALtools = PALtools.LS1,
             source_tray: int = 1,
             source_slot: int = 1,
@@ -545,7 +550,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "HPLC_injection"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -553,13 +558,14 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_injection_tray_HPLC(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     #    if "transfer_tray_tray" in _cams:
     if "transfer_tray_tray" in _cams:
 
-        @app.post(f"/{server_key}/PAL_transfer_tray_tray", tags=["action"])
+        @app.action()
         async def PAL_transfer_tray_tray(
+            ctx: ActionContext,
             sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -602,7 +608,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "transfer"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -610,13 +616,14 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_transfer_tray_tray(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     #    if "transfer_tray_custom" in _cams:
     if "transfer_tray_custom" in _cams:
 
-        @app.post(f"/{server_key}/PAL_transfer_tray_custom", tags=["action"])
+        @app.action()
         async def PAL_transfer_tray_custom(
+            ctx: ActionContext,
             sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -655,7 +662,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "transfer"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -663,13 +670,14 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_transfer_tray_custom(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     #    if "transfer_custom_tray" in _cams:
     if "transfer_custom_tray" in _cams:
 
-        @app.post(f"/{server_key}/PAL_transfer_custom_tray", tags=["action"])
+        @app.action()
         async def PAL_transfer_custom_tray(
+            ctx: ActionContext,
             sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -708,7 +716,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "transfer"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -716,12 +724,13 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_transfer_custom_tray(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if "transfer_custom_custom" in _cams:
 
-        @app.post(f"/{server_key}/PAL_transfer_custom_custom", tags=["action"])
+        @app.action()
         async def PAL_transfer_custom_custom(
+            ctx: ActionContext,
             sampleperiod: list[float] = Body([0.0], embed=True),
             spacingmethod: Spacingmethod = Spacingmethod.linear,
             spacingfactor: float = 1.0,
@@ -756,7 +765,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "transfer"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
@@ -764,12 +773,13 @@ def makeApp(server_key) -> BaseAPI:
             palcam = app.driver.build_palcam_transfer_custom_custom(
                 A.action_params, A.samples_in
             )
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if "archive" in _cams:
 
-        @app.post(f"/{server_key}/PAL_archive", tags=["action"])
+        @app.action()
         async def PAL_archive(
+            ctx: ActionContext,
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: int = 200,
@@ -802,13 +812,13 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "archive"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
             palcam = app.driver.build_palcam_archive(A.action_params, A.samples_in)
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     # if "fill" in _cams:
     #     @app.post(f"/{server_key}/PAL_fill", tags=["action"])
@@ -824,7 +834,7 @@ def makeApp(server_key) -> BaseAPI:
     #         wash3: bool = False,
     #         wash4: bool = False,
     #     ):
-    #         A =  app.base.setup_action()
+    #         A =  app.setup_action()
     #         A.action_abbr = "fill"
     #         active_dict = await app.driver.method_fill(A)
     #         return active_dict
@@ -843,15 +853,16 @@ def makeApp(server_key) -> BaseAPI:
     #         wash3: bool = False,
     #         wash4: bool = False,
     #     ):
-    #         A =  app.base.setup_action()
+    #         A =  app.setup_action()
     #         A.action_abbr = "fillfixed"
     #         active_dict = await app.driver.method_fillfixed(A)
     #         return active_dict
 
     if "deepclean" in _cams:
 
-        @app.post(f"/{server_key}/PAL_deepclean", tags=["action"])
+        @app.action()
         async def PAL_deepclean(
+            ctx: ActionContext,
             tool: Optional[PALtools] = None,
             volume_ul: Optional[
                 int
@@ -877,18 +888,19 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "deepclean"
             rejected = _pal_reject_busy(A)
             if rejected is not None:
                 return rejected
             palcam = app.driver.build_palcam_deepclean(A.action_params, A.samples_in)
-            return await _pal_start(A, palcam)
+            return await _pal_start(ctx, palcam)
 
     if "dilute" in _cams:
 
-        @app.post(f"/{server_key}/PAL_dilute", tags=["action"])
+        @app.action()
         async def PAL_dilute(
+            ctx: ActionContext,
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: int = 200,
@@ -927,15 +939,16 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "dilute"
             active_dict = await app.driver.method_dilute(A)
             return active_dict
 
     if "autodilute" in _cams:
 
-        @app.post(f"/{server_key}/PAL_autodilute", tags=["action"])
+        @app.action()
         async def PAL_autodilute(
+            ctx: ActionContext,
             tool: Optional[PALtools] = None,
             source: Optional[dev_customitems] = None,
             volume_ul: int = 200,
@@ -968,7 +981,7 @@ def makeApp(server_key) -> BaseAPI:
             Returns:
                 The active action dictionary returned by the driver.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             A.action_abbr = "autodilute"
             active_dict = await app.driver.method_autodilute(A)
             return active_dict

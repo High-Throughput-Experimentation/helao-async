@@ -44,11 +44,10 @@ from typing import Optional, Union
 import numpy as np
 
 from helao.core.error import ErrorCodes
-from helao.core.models.file import FileConnParams
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.ui.shared.motion_control import Units
 from helao.helpers import helao_logging as logging
-from helao.helpers.active_params import ActiveParams
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
@@ -74,7 +73,7 @@ from ...drivers.motion.galil_motion_driver import (
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
-def _running_actions(app: BaseAPI) -> list:
+def _running_actions(app: ActionHost) -> list:
     """Names of this server's endpoints that currently have a running action.
 
     Whether an action is running is knowable only server-side, from the
@@ -85,9 +84,7 @@ def _running_actions(app: BaseAPI) -> list:
     for the stage cares that the server is moving something, not which route
     was asked to move it.
     """
-    return [
-        ep for ep, em in app.base.actionservermodel.endpoints.items() if em.active_dict
-    ]
+    return [ep for ep, em in app.actionservermodel.endpoints.items() if em.active_dict]
 
 
 def _first_error(err_code) -> ErrorCodes:
@@ -171,12 +168,12 @@ def _dispatch_panel_move(coro, axis: str, value: float, units: str):
     return task
 
 
-async def galil_dyn_endpoints(app: BaseAPI):
+async def galil_dyn_endpoints(app: ActionHost):
     """Wire the driver's ``_base_hook``, open the Galil connection, construct
     the shared sample-DB handle, and register motion endpoints once the
     driver reports itself enabled.
 
-    ``BaseAPI``'s own startup handler (``base_api.py``) only constructs the
+    the host's own startup handler only constructs the
     driver with ``config=server_params``; it never assigns a live ``Base``
     reference nor opens the gclib connection (K1/K2/K4/K8). Unlike
     ``thorlabs_kinesis.py`` (whose sibling server registers all endpoints
@@ -192,9 +189,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
     ``connect()`` completes before the ``galil_enabled`` gate below is read.
 
     Args:
-        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+        app: The :class:`ActionHost` instance being constructed by ``makeApp``.
     """
-    server_key = app.base.server.server_name
+    server_key = app.server.server_name
 
     app.driver._base_hook = app.base
     # K7/sm: the sample DB is server/app-level state (mirrors
@@ -215,7 +212,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             app.aligner_host = GalilAlignerHost(
                 driver=app.driver,
                 base=app.base,
-                server_cfg=app.base.server_cfg,
+                server_cfg=app.server_cfg,
                 server_name=server_key,
                 config=app.server_params,
                 ui_host=BokehServerUiHost(),
@@ -232,36 +229,35 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/setmotionref", tags=["action"])
-            async def setmotionref():
+            @app.action()
+            async def setmotionref(ctx: ActionContext):
                 """Establish the xyz reference position.
 
                 Homes xyz, sets absolute zero, moves back by the configured
                 centre counts and resets absolute zero again.
                 """
-                active = await app.base.setup_and_contain_action(
-                    action_abbr="setmotionref"
-                )
+                active = await ctx.begin(action_abbr="setmotionref")
                 await active.enqueue_data_dflt(
                     datadict={"setref": await app.driver.setaxisref()}
                 )
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/reset_plate_alignment", tags=["action"])
-        async def reset_plate_alignment():
+        @app.action()
+        async def reset_plate_alignment(ctx: ActionContext):
             """Reset the plate transform matrix back to identity."""
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             app.driver.reset_plate_transfermatrix()
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/load_plate_alignment", tags=["action"])
+        @app.action()
         async def load_plate_alignment(
+            ctx: ActionContext,
             matrix: list = [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
         ):
             """Install ``matrix`` as the plate-to-motor transform matrix."""
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             newmatrix = app.driver.update_plate_transfermatrix(
                 newtransfermatrix=np.matrix(active.action.action_params["matrix"])
             )
@@ -269,55 +265,50 @@ async def galil_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/run_aligner", tags=["action"])
+        @app.action()
         async def run_aligner(
+            ctx: ActionContext,
             plateid_or_pmpath: int | str = 6353,  # None
         ):
             """Start the interactive plate-alignment routine.
 
-            K7b: containing the action (``contain_action``) is done here,
-            not by the driver. P3a slice-4: the precheck + run-start moved
-            from the driver to the vis-layer ``GalilAlignerHost`` (which owns
-            the Bokeh aligner UI + its Active); ``run_aligner_precheck``
-            reports whether a new run may start and, if not, the exact
-            rejection code. Only when it reports success is the ``Active``
-            created and handed to ``host.start_aligner_run``; the final
-            transfer matrix is delivered when the user submits the alignment.
+            K7b: opening the session is done here, not by the driver. P3a
+            slice-4: the precheck + run-start moved from the driver to the
+            vis-layer ``GalilAlignerHost`` (which owns the Bokeh aligner UI +
+            its session); ``run_aligner_precheck`` reports whether a new run
+            may start and, if not, the exact rejection code. Only when it
+            reports success is the session opened and handed to
+            ``host.start_aligner_run``; the final transfer matrix is delivered
+            when the user submits the alignment.
+
+            B5: this is the deployment's only two-step endpoint -- it needs the
+            Action WITHOUT opening a session, because the precheck can reject
+            and must answer with an error code and no artifacts. ``ctx.action``
+            is that Action (legacy ``setup_action``), and ``ctx.begin`` opens
+            the session only on the success branch (legacy ``contain_action``).
+            The explicit ActiveParams it used to build is what ``begin``
+            assembles: the default file-conn key, empty sample labels, and this
+            endpoint's own ``file_type``. The header legacy left unset was
+            stamped later by ``Active`` anyway, from the same clock.
             """
-            A = app.base.setup_action()
+            A = ctx.action
             host = app.aligner_host
             if host is None:
                 A.error_code = ErrorCodes.not_available
                 return A.as_dict()
             ok, error_code = host.run_aligner_precheck()
             if ok:
-                active = await app.base.contain_action(
-                    ActiveParams(
-                        action=A,
-                        file_conn_params_dict={
-                            app.base.dflt_file_conn_key(): FileConnParams(
-                                # use dflt file conn key for first
-                                # init
-                                file_conn_key=app.base.dflt_file_conn_key(),
-                                sample_global_labels=[],
-                                file_type="aligner_helao__file",
-                                # hloheader = HloHeaderModel(
-                                #     optional = None
-                                # ),
-                            )
-                        },
-                    )
-                )
+                active = await ctx.begin(file_type="aligner_helao__file")
                 active_dict = await host.start_aligner_run(active)
             else:
                 A.error_code = error_code
                 active_dict = A.as_dict()
             return active_dict
 
-        @app.post(f"/{server_key}/stop_aligner", tags=["action"])
-        async def stop_aligner():
+        @app.action()
+        async def stop_aligner(ctx: ActionContext):
             """Abort an in-progress plate-alignment routine."""
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             host = app.aligner_host
             if host is None:
                 active.action.error_code = ErrorCodes.not_available
@@ -327,12 +318,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(platexy).tolist())}
-        @app.post(f"/{server_key}/toMotorXY", tags=["action"])
+        @app.action()
         async def toMotorXY(
+            ctx: ActionContext,
             platexy: Optional[str] = None,
         ):
             """Transform plate (sample) XY coordinates into motor XY coordinates."""
-            active = await app.base.setup_and_contain_action(action_abbr="tomotorxy")
+            active = await ctx.begin(action_abbr="tomotorxy")
             await active.enqueue_data_dflt(
                 datadict={
                     "motorxy": app.driver.transform.transform_platexy_to_motorxy(
@@ -344,12 +336,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
         # parse as {'M':json.dumps(np.matrix(M).tolist()),'platexy':json.dumps(np.array(motorxy).tolist())}
-        @app.post(f"/{server_key}/toPlateXY", tags=["action"])
+        @app.action()
         async def toPlateXY(
+            ctx: ActionContext,
             motorxy: Optional[str] = None,
         ):
             """Transform motor XY coordinates into plate (sample) XY coordinates."""
-            active = await app.base.setup_and_contain_action(action_abbr="toplatexy")
+            active = await ctx.begin(action_abbr="toplatexy")
             await active.enqueue_data_dflt(
                 datadict={
                     "platexy": app.driver.transform.transform_motorxy_to_platexy(
@@ -360,12 +353,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/MxytoMPlate", tags=["action"])
+        @app.action()
         async def MxytoMPlate(
+            ctx: ActionContext,
             Mxy: Optional[str] = None,
         ):
             """Strip the instrument matrix from a system matrix to obtain ``Mplate``."""
-            active = await app.base.setup_and_contain_action(action_abbr="mxytomplate")
+            active = await ctx.begin(action_abbr="mxytomplate")
             await active.enqueue_data_dflt(
                 datadict={
                     "mplate": app.driver.transform.get_Mplate_Msystem(
@@ -378,8 +372,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/move", tags=["action"])
+            @app.action()
             async def move(
+                ctx: ActionContext,
                 d_mm: list[float] = [0, 0],
                 axis: list[str] = ["x", "y"],
                 speed: Optional[int] = None,
@@ -393,9 +388,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 be combined with ``x``/``y``/``z`` in the ``motorxy`` frame;
                 only x/y are valid when ``platexy`` is selected.
                 """
-                active = await app.base.setup_and_contain_action(action_abbr="move")
+                active = await ctx.begin(action_abbr="move")
                 datadict = await app.driver.motor_move(active)
-                active.action.error_code = app.base.get_main_error(
+                active.action.error_code = app.get_main_error(
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
@@ -404,8 +399,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/easymove", tags=["action"])
+            @app.action()
             async def easymove(
+                ctx: ActionContext,
                 axis: Optional[dev_axisitems] = None,
                 d_mm: float = 0,
                 speed: Optional[int] = None,
@@ -416,17 +412,18 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
                 Same coordinate/rotation restrictions as ``move`` apply.
                 """
-                active = await app.base.setup_and_contain_action(action_abbr="move")
+                active = await ctx.begin(action_abbr="move")
                 datadict = await app.driver.motor_move(active)
-                active.action.error_code = app.base.get_main_error(
+                active.action.error_code = app.get_main_error(
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-            @app.post(f"/{server_key}/easymove_to_solid", tags=["action"])
+            @app.action()
             async def easymove_to_solid(
+                ctx: ActionContext,
                 plate_id: Optional[int] = None,
                 sample_no: Optional[int] = None,
                 speed: Optional[int] = None,
@@ -438,7 +435,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 ``error_code`` to ``not_available`` if the sample has no
                 platemap coordinates.
                 """
-                active = await app.base.setup_and_contain_action()
+                active = await ctx.begin()
                 datadict0 = await app.driver.solid_get_samples_xy(
                     app.unified_db, **active.action.action_params
                 )
@@ -455,29 +452,27 @@ async def galil_dyn_endpoints(app: BaseAPI):
                         }
                     )
                     datadict1 = await app.driver.motor_move(active)
-                    active.action.error_code = app.base.get_main_error(
+                    active.action.error_code = app.get_main_error(
                         datadict1.get("err_code", ErrorCodes.unspecified)
                     )
                     await active.enqueue_data_dflt(datadict=datadict1)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/disconnect", tags=["action"])
-        async def disconnect():
+        @app.action()
+        async def disconnect(ctx: ActionContext):
             """Disconnect from the Galil motion controller."""
-            active = await app.base.setup_and_contain_action(action_abbr="disconnect")
+            active = await ctx.begin(action_abbr="disconnect")
             await active.enqueue_data_dflt(datadict=await app.driver.motor_disconnect())
             finished_action = await active.finish()
             return finished_action.as_dict()
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/query_positions", tags=["action"])
-            async def query_positions():
+            @app.action()
+            async def query_positions(ctx: ActionContext):
                 """Return the current position of every configured axis."""
-                active = await app.base.setup_and_contain_action(
-                    action_abbr="query_position"
-                )
+                active = await ctx.begin(action_abbr="query_position")
                 await active.enqueue_data_dflt(
                     datadict=await app.driver.query_axis_position(
                         axis=app.driver.get_all_axis()
@@ -488,15 +483,14 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/query_position", tags=["action"])
+            @app.action()
             async def query_position(
                 # axis: Union[list[str], str] = None
+                ctx: ActionContext,
                 axis: Optional[dev_axisitems] = None,
             ):
                 """Return the current position of a single named axis."""
-                active = await app.base.setup_and_contain_action(
-                    action_abbr="query_position"
-                )
+                active = await ctx.begin(action_abbr="query_position")
                 await active.enqueue_data_dflt(
                     datadict=await app.driver.query_axis_position(
                         **active.action.action_params
@@ -507,18 +501,17 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/query_moving", tags=["action"])
+            @app.action()
             async def query_moving(
+                ctx: ActionContext,
                 axis: Union[list[str], str, None] = None,
             ):
                 """Return whether the given axis or list of axes is currently moving."""
-                active = await app.base.setup_and_contain_action(
-                    action_abbr="query_moving"
-                )
+                active = await ctx.begin(action_abbr="query_moving")
                 datadict = await app.driver.query_axis_moving(
                     **active.action.action_params
                 )
-                active.action.error_code = app.base.get_main_error(
+                active.action.error_code = app.get_main_error(
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
@@ -527,16 +520,17 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/axis_off", tags=["action"])
+            @app.action()
             async def axis_off(
                 # axis: Union[list[str], str] = None
+                ctx: ActionContext,
                 axis: Optional[dev_axisitems] = None,
             ):
                 """De-energise (turn off) the named motor axis."""
                 # http://127.0.0.1:8001/motor/set/off?axis=x
-                active = await app.base.setup_and_contain_action(action_abbr="axis_off")
+                active = await ctx.begin(action_abbr="axis_off")
                 datadict = await app.driver.motor_off(**active.action.action_params)
-                active.action.error_code = app.base.get_main_error(
+                active.action.error_code = app.get_main_error(
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
@@ -545,26 +539,28 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            @app.post(f"/{server_key}/axis_on", tags=["action"])
+            @app.action()
             async def axis_on(
+                ctx: ActionContext,
                 axis: Optional[dev_axisitems] = None,
             ):
                 """Energise (turn on) the named motor axis."""
-                active = await app.base.setup_and_contain_action(action_abbr="axis_on")
+                active = await ctx.begin(action_abbr="axis_on")
                 datadict = await app.driver.motor_on(**active.action.action_params)
-                active.action.error_code = app.base.get_main_error(
+                active.action.error_code = app.get_main_error(
                     datadict.get("err_code", ErrorCodes.unspecified)
                 )
                 await active.enqueue_data_dflt(datadict=datadict)
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/solid_get_platemap", tags=["action"])
+        @app.action()
         async def solid_get_platemap(
+            ctx: ActionContext,
             plate_id: Optional[int] = None,
         ):
             """Return the platemap rows for ``plate_id`` via the driver."""
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             datadict = await app.driver.solid_get_platemap(
                 app.unified_db, **active.action.action_params
             )
@@ -572,8 +568,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/solid_get_samples_xy", tags=["action"])
+        @app.action()
         async def solid_get_samples_xy(
+            ctx: ActionContext,
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
         ):
@@ -583,7 +580,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             params as ``_platexy`` and sets ``error_code`` to ``not_available``
             when the lookup yields no coordinates.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             datadict = await app.driver.solid_get_samples_xy(
                 app.unified_db, **active.action.action_params
             )
@@ -595,8 +592,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/solid_get_builtin_specref", tags=["action"])
+        @app.action()
         async def solid_get_builtin_specref(
+            ctx: ActionContext,
             specref_code: int = 1,
             ref_position_name: str = "builtin_ref_motorxy",
         ):
@@ -605,15 +603,16 @@ async def galil_dyn_endpoints(app: BaseAPI):
             Looks up ``ref_position_name`` in :attr:`Base.world_cfg` and stores
             it on the action params as ``_refxy``.
             """
-            active = await app.base.setup_and_contain_action()
-            refxy = app.base.world_cfg[active.action.action_params["ref_position_name"]]
+            active = await ctx.begin()
+            refxy = app.world_cfg[active.action.action_params["ref_position_name"]]
             active.action.action_params.update({"_refxy": refxy})
             await active.enqueue_data_dflt(datadict={"_refxy": refxy})
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/solid_get_nearest_specref", tags=["action"])
+        @app.action()
         async def solid_get_nearest_specref(
+            ctx: ActionContext,
             plate_id: Optional[int] = None,
             sample_no: Optional[int] = None,
             specref_code: int = 1,
@@ -624,7 +623,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             ``code`` equals ``specref_code``, and picks the one closest to the
             target sample. Stores ``_refno`` and ``_refxy`` on the action params.
             """
-            active = await app.base.setup_and_contain_action()
+            active = await ctx.begin()
             datadict = await app.driver.solid_get_platemap(
                 app.unified_db, active.action.action_params["plate_id"]
             )
@@ -658,20 +657,20 @@ async def galil_dyn_endpoints(app: BaseAPI):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/stop", tags=["action"])
-        async def stop():
+        @app.action()
+        async def stop(ctx: ActionContext):
             """De-energise every configured motor axis."""
-            active = await app.base.setup_and_contain_action(action_abbr="stop")
+            active = await ctx.begin(action_abbr="stop")
             datadict = await app.driver.motor_off(axis=app.driver.get_all_axis())
-            active.action.error_code = app.base.get_main_error(
+            active.action.error_code = app.get_main_error(
                 datadict.get("err_code", ErrorCodes.unspecified)
             )
             await active.enqueue_data_dflt(datadict=datadict)
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/reset", tags=["action"])
-        async def reset():
+        @app.action()
+        async def reset(ctx: ActionContext):
             """Reset the Galil controller. Emergency use only.
 
             Calls :meth:`Galil.reset_controller` -- the pre-migration
@@ -680,7 +679,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
             whole connection); the two were given different names to
             resolve the K1 naming collision introduced by the ABC.
             """
-            active = await app.base.setup_and_contain_action(action_abbr="reset")
+            active = await ctx.begin(action_abbr="reset")
             await active.enqueue_data_dflt(
                 datadict={"reset": await app.driver.reset_controller()}
             )
@@ -689,12 +688,13 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if dev_axis:
 
-            zpos_dict = app.base.server_params.get("z_height_mm", {})
+            zpos_dict = app.server_params.get("z_height_mm", {})
             zpos_dict["NA"] = None
             Zpos = Enum("Zpos", {k: k for k in zpos_dict.keys()})
 
-            @app.post(f"/{server_key}/z_move", tags=["action"])
+            @app.action()
             async def z_move(
+                ctx: ActionContext,
                 z_position: Zpos = "NA",
             ):
                 """Move the z-axis to a named cell height from the server config.
@@ -703,7 +703,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 in this server's config; ``NA`` is a no-op that returns
                 ``not_available``.
                 """
-                active = await app.base.setup_and_contain_action(action_abbr="z_move")
+                active = await ctx.begin(action_abbr="z_move")
                 z_arg = active.action.action_params["z_position"]
                 if isinstance(z_arg, Zpos):
                     z_key = z_arg.value
@@ -720,7 +720,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                         }
                     )
                     datadict = await app.driver.motor_move(active)
-                    active.action.error_code = app.base.get_main_error(
+                    active.action.error_code = app.get_main_error(
                         datadict.get("err_code", ErrorCodes.unspecified)
                     )
                     await active.enqueue_data_dflt(datadict=datadict)
@@ -931,10 +931,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 return ErrorCodes.none, state
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the Galil motion FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by the native
+    Constructs a :class:`ActionHost` backed by the native
     :class:`NativeGalilMotion` driver (gclib behind a command-channel port) and
     defers endpoint registration (plus the driver's ``connect()`` call) to
     :func:`galil_dyn_endpoints`.
@@ -943,10 +943,10 @@ def makeApp(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Galil motion server",

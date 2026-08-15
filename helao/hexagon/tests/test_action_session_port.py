@@ -313,3 +313,84 @@ async def test_ctx_begin_opens_a_session_through_the_host(tmp_path) -> None:
     assert isinstance(session, ActionSession)
     assert session.action.action_abbr == "WsSim"
     assert host.actives[session.action.action_uuid] is session
+
+
+def test_open_carries_sample_global_labels_onto_the_file_connection(tmp_path) -> None:
+    """B5: the one field legacy's convenience method never exposed.
+
+    ``Base.setup_and_contain_action`` took json_data_keys, action_abbr,
+    file_type and hloheader -- no sample labels -- so the endpoints that
+    needed per-file labels (NI's multi-cell CV, which stamps each cell's
+    sample onto its own file) dropped to the lower-level ``contain_action``
+    and spelled out their own ActiveParams. The explicit-context port has no
+    lower level to drop to, so ``open`` accepts it. Without this the labels
+    are silently ``[]`` and the .hlo header loses which sample it measured --
+    a data-provenance loss that nothing on the wire or in the route surface
+    would report.
+    """
+    import asyncio
+
+    from helao.hexagon.adapters.native.artifact_store import (
+        NativeArtifactStoreAdapter,
+    )
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.action_session import ActionSession
+    from helao.hexagon.app.wiring import PortWiring
+    from helao.helpers.premodels import Action
+
+    class _Clock:
+        def now_ns(self):
+            return 0
+
+        def offset(self):
+            return 0.0
+
+    class _Stub:
+        def __getattr__(self, name):
+            raise AssertionError(f"port member {name!r} used unexpectedly")
+
+    def _host():
+        return ActionHost(
+            server_key="SIM",
+            server_title="SIM",
+            description="sample labels",
+            version=1.0,
+            wiring=PortWiring(
+                config=_Stub(),
+                logging=_Stub(),
+                clock=_Clock(),
+                transport=_Stub(),
+                state_persistence=_Stub(),
+                status=_Stub(),
+                health=_Stub(),
+                artifact_store=NativeArtifactStoreAdapter(
+                    config=_Stub(), clock=_Clock()
+                ),
+                data_sink=_Stub(),
+            ),
+            helao_cfg={
+                "root": str(tmp_path),
+                "servers": {"SIM": {"host": "127.0.0.1", "port": 8002, "params": {}}},
+            },
+        )
+
+    host = _host()
+    session = asyncio.run(
+        ActionSession.open(
+            host,
+            Action(action_name="cellIV"),
+            sample_global_labels=["solid__1_2"],
+            file_type="ni_helao__file",
+        )
+    )
+    conn = session.file_conn_dict[host.dflt_file_conn_key()]
+    assert conn.params.sample_global_labels == ["solid__1_2"]
+    assert conn.params.file_type == "ni_helao__file"
+
+    # Default stays the empty list FileConnParams itself declares, so every
+    # other call site is unaffected by the new keyword.
+    plain = asyncio.run(ActionSession.open(_host(), Action(action_name="acquire_data")))
+    assert (
+        plain.file_conn_dict[host.dflt_file_conn_key()].params.sample_global_labels
+        == []
+    )

@@ -21,7 +21,7 @@ from copy import deepcopy
 from datetime import datetime
 from enum import Enum
 from socket import gethostname
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from helao.helpers import helao_logging as logging
 
@@ -38,8 +38,26 @@ from helao.core.models.sample import (
     SolidSample,
     object_to_sample,
 )
-from helao.core.servers.base import Active, Base
 from helao.helpers.premodels import Action
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # B5: the host that constructs this driver, and the session that reaches
+    # ``myactive``. Both annotations were also WRONG before the port: an
+    # ActionHost constructs the Archive, and what a caller passes as
+    # ``myactive`` is an ActionSession. Typing-only, so no runtime import --
+    # but the NAMES have to be right, because B7 deletes Base and Active.
+    #
+    # ActionSession, NOT ActionSessionPort. The port is derived from what the
+    # three native write collaborators read off a session -- it says so in its
+    # own docstring -- and deliberately does not carry the deployment-facing
+    # surface. Ten of the fifteen members deployment code calls are absent from
+    # it, ``write_file`` among them, which is exactly what this driver uses.
+    # Annotating against the port would report correct calls as errors and
+    # invite someone to "fix" it by hand-adding members the port is documented
+    # not to hand-add.
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.app.action_session import ActionSession
+
 from helao.helpers.sample_api import (
     UnifiedSampleDataAPI,
     unpack_samples_helper,
@@ -83,7 +101,7 @@ class Archive:
     actions interact with samples via this class.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: "ActionHost"):
         """Initialise the archive, load persisted positions, sync samples.
 
         Compares the persisted positions against the startup config and
@@ -619,7 +637,7 @@ class Archive:
         self,
         tray: Optional[int] = None,
         slot: Optional[int] = None,
-        myactive: Optional[Active] = None,
+        myactive: Optional["ActionSession"] = None,
         survey_runs: Optional[int] = None,
         main_runs: Optional[int] = None,
         rack: Optional[int] = None,
