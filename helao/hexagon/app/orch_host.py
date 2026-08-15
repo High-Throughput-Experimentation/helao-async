@@ -191,6 +191,7 @@ class OrchHost(ActionHost):
         self._init_orch_collaborators()
         self._register_orch_routes()
         self._register_orch_payload_routes()
+        self._register_orch_action_routes()
         self._register_orch_loop_routes()
 
     # -- names the API layer and the collaborators reach through ---------
@@ -552,6 +553,13 @@ class OrchHost(ActionHost):
             "/latest_sequence_uuids",
             "/latest_experiment_uuids",
         )
+        # Action routes that call stop()/skip(), which are B3b members.
+        loop_routes += (
+            f"/{self.server_key}/interrupt",
+            f"/{self.server_key}/conditional_stop",
+            f"/{self.server_key}/conditional_skip",
+            f"/{self.server_key}/conditional_exp",
+        )
         for path in loop_routes:
             self._register_loop_stub(path)
 
@@ -635,3 +643,75 @@ class OrchHost(ActionHost):
             """Empty the orchestrator's global params."""
             self.global_params = {}
             return self.global_params
+
+    def _register_orch_action_routes(self) -> None:
+        """The orchestrator's OWN action endpoints, on B1's context machinery.
+
+        The orchestrator has always also been an action server -- which is
+        why GM captures contain ``ORCH__wait`` directories. These ride
+        ``@host.action()``, so they get the explicit ActionContext, the
+        queuing middleware and the native session for free.
+
+        ``/{server_key}/estop`` is NOT here: ActionHost already registers it
+        with the same body (driver hook, latch, stop executors, finalize
+        actives). Registering a second one would sit shadowed and never
+        run, because FastAPI accepts the duplicate silently and the first
+        wins -- and a route-surface check would still pass, since the path
+        is present either way.
+
+        Three of the nine are NOT completable in B3a and are registered as
+        raising stubs alongside the loop routes: ``interrupt`` calls
+        ``stop()``, and ``conditional_stop``/``conditional_skip`` call
+        ``stop()``/``skip()``. All three are B3b members. The plan put all
+        nine action routes in B3a; that was wrong, and this is the seam.
+        """
+        from helao.core.servers.orch_api import WaitExec, checkcond
+        from helao.hexagon.app.action_context import ActionContext
+
+        @self.action()
+        async def wait(ctx: ActionContext, waittime: float = 10.0):
+            """Sleep ``waittime`` seconds via a ``WaitExec`` executor."""
+            active = await ctx.begin()
+            active.action.action_abbr = "wait"
+            executor = WaitExec(active=active, oneoff=False)
+            return active.start_executor(executor)
+
+        @self.action()
+        async def cancel_wait(ctx: ActionContext):
+            """Stop every running ``wait`` executor and finish the action."""
+            active = await ctx.begin()
+            for exec_id, executor in self.executors.items():
+                if exec_id.split()[0] == "wait":
+                    executor.stop_action_task()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.action()
+        async def add_global_param(
+            ctx: ActionContext,
+            param_name: str = "global_param_test",
+            param_value: Union[str, float, int, bool] = True,
+        ):
+            """Write ``param_name=param_value`` into ``global_params``."""
+            active = await ctx.begin()
+            pdict = {
+                active.action.action_params["param_name"]: active.action.action_params[
+                    "param_value"
+                ]
+            }
+            active.action.action_params.update(pdict)
+            self.global_params.update(pdict)
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.action()
+        async def clear_global_params(ctx: ActionContext):
+            """Empty ``global_params`` as an action, so the run records it."""
+            active = await ctx.begin()
+            self.global_params = {}
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        # checkcond is imported so conditional_exp's signature keeps legacy's
+        # enum type on the wire; the parameter schema is part of the gate.
+        _ = checkcond
