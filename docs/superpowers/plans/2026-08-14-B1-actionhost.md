@@ -1436,3 +1436,39 @@ missing, never why. That is how one defect got labelled "manual actions write no
 `test_action_writes_artifacts.py` is the standing gate, and it is deliberately an *outcome*
 test — files on disk, not collaborator calls. Every previous fix along this path (`init_act`,
 `file_conn_keys`, `write_act`) satisfied a call-level expectation and still wrote nothing.
+
+### Result: GM-1 through GM-5 all pass, 0 diffs
+
+| scenario | before B1's write-path work | after |
+|---|---|---|
+| GM-1 (sequence + sync + S3) | FAIL 91 | **PASS 0** |
+| GM-2 (WS frames) | PASS 0 | **PASS 0** |
+| GM-3 (manual action) | FAIL 5 | **PASS 0** |
+| GM-4 (stop / skip / estop) | FAIL 154 | **PASS 0** \* |
+| GM-5 (sync round-trip) | aborted — no RUNS_SYNCED zip | **PASS 0** |
+
+\* GM-4 read FAIL 365 against the recorded baseline, and every one of those diffs was an
+artifact of the **baseline**, not the candidate.
+
+The tell was in the shape rather than the count: each content diff was a uuid *index* shift, and
+the shifts grew 1 → 2 → 3 across sequence → experiment → action. That is what a candidate
+minting three fewer uuids early looks like. The three files present only in the golden were a
+manual action's seq/exp/act under `RUNS_DIAG` — and **`run_gm4` performs no manual action at
+all**. Their timestamp (13:27:16) precedes GM-4's own first sequence (13:28:40) and matches the
+GM-3 capture taken minutes earlier.
+
+`assert_fresh` looked for `*.yml` under `RUNS_FINISHED` and anything under `RUNS_SYNCED`. A
+manual action touches neither — it lands only in `RUNS_DIAG` — so a root holding an entire GM-3
+run read as fresh, and the GM-4 baseline was captured on top of it. Removing that subtree from a
+copy of the baseline turns the identical comparison into PASS (0 diffs); the corrected copy sits
+beside the original as `GM-4/legacy_nodiag`, with the reason recorded in its provenance rather
+than silently replacing the golden.
+
+The check now counts *any* file in *any* of the four run trees. Two tests pin it, one of which
+constructs exactly the root that used to pass.
+
+**The generalisable part:** the old check was a per-tree allowlist — this tree, that file glob —
+and it grew a hole the moment a scenario wrote somewhere new. It also failed in the worst
+available direction: never loudly, at the point of contamination, but as hundreds of diffs in a
+later comparison that looks like a code regression. Cheap to misread as one, too: 365 diffs
+against a candidate that was byte-identical everywhere the scenario actually wrote.
