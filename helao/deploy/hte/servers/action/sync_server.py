@@ -18,7 +18,8 @@ import time
 from typing import Any, Optional
 
 from helao.core.drivers.data.sync_driver import HelaoSyncer
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -154,20 +155,20 @@ async def sweep_pending(driver: Any, enabled: bool = True, logger: Any = None) -
     return summary
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the data-packaging FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by :class:`HelaoSyncer` and registers
-    the private syncer-management endpoints.
+    Constructs an :class:`ActionHost` backed by :class:`HelaoSyncer` and
+    registers the private syncer-management endpoints.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Data packaging server",
@@ -255,12 +256,12 @@ def makeApp(server_key) -> BaseAPI:
         return app.driver.progress
 
     # Hot-reload safety: defer restart while the syncer has queued or running
-    # tasks. Both ``app.base`` and ``app.driver`` are created in BaseAPI's own
-    # startup event, so wire the hook from a startup handler (registered after
-    # BaseAPI's, hence run after it). The hook still reads app.driver lazily.
+    # tasks. ``app.driver`` is created in the host's own startup event, so wire
+    # the hook from a startup handler (registered after the host's, hence run
+    # after it). The hook still reads app.driver lazily.
     @app.on_event("startup")
     def _wire_hotreload_busy():
-        app.base.hotreload_busy_hook = lambda: (
+        app.hotreload_busy_hook = lambda: (
             app.driver is not None and app.driver.has_pending_work()
         )
 
@@ -272,8 +273,8 @@ def makeApp(server_key) -> BaseAPI:
 
     # Startup recovery: enqueue whatever the last process left in
     # RUNS_FINISHED. Registered as a startup handler (so it runs after
-    # BaseAPI's own, which is what creates ``app.base`` and ``app.driver`` —
-    # same reasoning as ``_wire_hotreload_busy`` above), and dispatched as a
+    # the host's own, which is what creates ``app.driver`` — same reasoning as
+    # ``_wire_hotreload_busy`` above), and dispatched as a
     # task rather than awaited: the sweep enqueues potentially hundreds of
     # ymls, and blocking startup on it would hold the server's health
     # endpoints down for that whole time.
@@ -281,7 +282,7 @@ def makeApp(server_key) -> BaseAPI:
     def _arm_startup_sweep():
         """Dispatch the pending sweep onto the server event loop."""
         enabled = bool(app.server_params.get(SWEEP_PARAM, True))
-        app.startup_sweep_task = app.base.aloop.create_task(  # type: ignore[attr-defined]
+        app.startup_sweep_task = app.aloop.create_task(  # type: ignore[attr-defined]
             _startup_sweep(enabled)
         )
 

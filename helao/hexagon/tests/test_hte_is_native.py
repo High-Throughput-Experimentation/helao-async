@@ -46,9 +46,7 @@ NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
         "nidaqmx_server",
         "pal_server",
         "power_supply_server",
-        "sample_server",
         "spec_server",
-        "sync_server",
         "syringe_server",
         "tec_server",
     }

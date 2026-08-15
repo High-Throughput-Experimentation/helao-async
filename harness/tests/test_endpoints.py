@@ -42,3 +42,40 @@ def test_diff_route_sets_reports_gaps():
             r["params"] = [p for p in r["params"] if p["name"] != "duration"]
     diffs = diff_route_sets(frozen, mutated)
     assert any(d["kind"] == "changed" for d in diffs)
+
+
+def test_action_decorator_honours_an_explicit_path_and_tags(tmp_path):
+    """``@host.action(path=...)`` must extract at the path it declares.
+
+    A few legacy hte routes were served at a path that did not match their
+    handler's name -- ``get_positions`` answered ``/SAMPLE/get_loaded_positions``
+    -- so their B5 ports pass ``path=`` to keep the route where it was rather
+    than renaming the handler and moving both the route and the operation_id.
+    Deriving the path from the handler name regardless would report those
+    correct ports as a missing/extra pair against the frozen checklist.
+    """
+    module = tmp_path / "ported.py"
+    module.write_text(
+        "def makeApp(server_key):\n"
+        "    @app.action()\n"
+        "    async def plain(ctx: ActionContext, duration: float = -1):\n"
+        "        pass\n"
+        '    @app.action(path=f"/{server_key}/get_loaded_positions")\n'
+        "    async def get_positions(ctx: ActionContext):\n"
+        "        pass\n"
+        '    @app.action(tags=["private"])\n'
+        "    async def internal(ctx: ActionContext):\n"
+        "        pass\n"
+    )
+    by_path = {r["path"]: r for r in extract_routes(module, server_key="SAMPLE")}
+
+    assert "/SAMPLE/plain" in by_path
+    assert by_path["/SAMPLE/plain"]["tags"] == ["action"]
+    # `ctx` is injected by the host and stripped before FastAPI sees it, so it
+    # must not appear in the extracted signature.
+    assert [p["name"] for p in by_path["/SAMPLE/plain"]["params"]] == ["duration"]
+
+    assert "/SAMPLE/get_loaded_positions" in by_path
+    assert "/SAMPLE/get_positions" not in by_path
+
+    assert by_path["/SAMPLE/internal"]["tags"] == ["private"]
