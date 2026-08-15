@@ -27,13 +27,15 @@ from uuid import UUID
 
 from helao.core.drivers.data.sync_driver import HelaoSyncer
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
-from helao.core.models.server import GlobalStatusModel
+from helao.core.error import ErrorCodes
+from helao.core.models.orchstatus import LoopIntent, LoopStatus
+from helao.core.models.server import ActionServerModel, GlobalStatusModel
 from helao.core.servers import orch_unpack
 from helao.helpers import helao_logging as logging
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
-from helao.helpers.premodels import Experiment, Sequence
+from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.processors import MetaProcessor
 from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.zdeque import zdeque
@@ -203,15 +205,21 @@ class OrchHost(ActionHost):
         return self
 
     def _init_orch_collaborators(self) -> None:
-        """Construct the B3a collaborators. B3b adds dispatch/status/monitor."""
+        """Construct the seven collaborators, in legacy's order (orch.py:206)."""
+        from helao.hexagon.app.orch_dispatch import DispatchRunner
         from helao.hexagon.app.orch_estop import EstopController
         from helao.hexagon.app.orch_lifecycle import RunLifecycle
+        from helao.hexagon.app.orch_monitor import ServerMonitor
         from helao.hexagon.app.orch_persist import QueuePersister
         from helao.hexagon.app.orch_queues import RunQueues
+        from helao.hexagon.app.orch_status_sync import StatusIngester
 
         self.queue_persister = QueuePersister(self)
+        self.server_monitor = ServerMonitor(self)
+        self.status_ingester = StatusIngester(self)
         self.run_queues = RunQueues(self)
         self.run_lifecycle = RunLifecycle(self)
+        self.dispatch_runner = DispatchRunner(self)
         self.estop_controller = EstopController(self)
 
     # -- sequence unpacking (orch.py delegations to orch_unpack) ---------
@@ -522,60 +530,6 @@ class OrchHost(ActionHost):
             """Empty the experiment queue."""
             return await self.clear_experiments()
 
-    def _register_orch_loop_routes(self) -> None:
-        """Register B3b's routes so the surface is complete and honest.
-
-        They raise rather than 404. A 404 reads as a missing server and
-        sends a caller looking at config and ports; a NotImplementedError
-        naming B3b says what is actually true. Same choice B1 made for
-        start_executor/oneoff_executor before its Task 6.
-        """
-        loop_routes = (
-            "/start",
-            "/stop",
-            "/estop_orch",
-            "/clear_estop",
-            "/clear_error",
-            "/skip_experiment",
-            "/clear_actions",
-            "/clear_actives",
-            "/update_status",
-            "/update_nonblocking",
-            "/get_active_experiment",
-            "/get_active_sequence",
-            "/active_experiment",
-            "/last_experiment",
-            "/list_active_actions",
-            "/list_nonblocking",
-            "/get_orch_state",
-            "/get_status_summary",
-            "/get_step_flags",
-            "/set_step_flag",
-            "/latest_sequence_uuids",
-            "/latest_experiment_uuids",
-        )
-        # Action routes that call stop()/skip(), which are B3b members.
-        loop_routes += (
-            f"/{self.server_key}/interrupt",
-            f"/{self.server_key}/conditional_stop",
-            f"/{self.server_key}/conditional_skip",
-            f"/{self.server_key}/conditional_exp",
-        )
-        for path in loop_routes:
-            self._register_loop_stub(path)
-
-    def _register_loop_stub(self, path: str) -> None:
-        """Register one raising stub.
-
-        A separate method so each closure binds its OWN ``path``. Defining
-        them in the loop body would close over the loop variable, and every
-        stub would report the last path in the tuple.
-        """
-
-        @self.post(path, tags=["private"])
-        async def _loop_stub():
-            raise NotImplementedError(f"{path} is the dispatch loop; lands in B3b")
-
     def _register_orch_payload_routes(self) -> None:
         """The read-only payload routes and the global-param surface.
 
@@ -667,7 +621,7 @@ class OrchHost(ActionHost):
         nine action routes in B3a; that was wrong, and this is the seam.
         """
         from helao.core.servers.orch_api import WaitExec, checkcond
-        from helao.hexagon.app.action_context import ActionContext
+        from helao.hexagon.app.action_context import ActionContext, action_version
 
         @self.action()
         async def wait(ctx: ActionContext, waittime: float = 10.0):
@@ -713,9 +667,152 @@ class OrchHost(ActionHost):
             finished_action = await active.finish()
             return finished_action.as_dict()
 
-        # checkcond is imported so conditional_exp's signature keeps legacy's
-        # enum type on the wire; the parameter schema is part of the gate.
-        _ = checkcond
+        @self.action()
+        async def interrupt(ctx: ActionContext, reason: str = "wait"):
+            """Stop the orchestrator with ``reason`` and finish."""
+            active = await ctx.begin()
+            self.current_stop_message = active.action.action_params["reason"]
+            LOGGER.warning(active.action.action_params["reason"])
+            await self.stop()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.action()
+        async def conditional_exp(
+            ctx: ActionContext,
+            check_parameter: Optional[str] = "",
+            check_condition: checkcond = checkcond.equals,
+            check_value: Union[float, int, bool] = True,
+            conditional_experiment_name: str = "",
+            conditional_experiment_params: dict = {},
+        ):
+            """Prepend an experiment when the condition holds."""
+            active = await ctx.begin()
+            experiment_model = Experiment(
+                experiment_name=active.action.action_params[
+                    "conditional_experiment_name"
+                ],
+                experiment_params=active.action.action_params[
+                    "conditional_experiment_params"
+                ],
+            )
+            cond = active.action.action_params["check_condition"]
+            check_key = active.action.action_params.get("check_parameter") or ""
+            param = None
+            if check_key:
+                param = self.global_params.get(check_key)
+                if param is None:
+                    param = active.action.action_params.get(check_key)
+            thresh = active.action.action_params["check_value"]
+            check = False
+            if cond == checkcond.uncond:
+                check = True
+            elif cond is None:
+                check = False
+            elif param is None:
+                LOGGER.warning(
+                    "conditional_exp: parameter %r is missing (not in "
+                    "global_params or action_params); condition cannot be "
+                    "evaluated -> treating as False.",
+                    check_key,
+                )
+                check = False
+            elif cond == checkcond.equals:
+                check = param == thresh
+            elif cond == checkcond.above:
+                check = param > thresh
+            elif cond == checkcond.below:
+                check = param < thresh
+            elif cond == checkcond.isnot:
+                check = param != thresh
+            if check:
+                await self.add_experiment(
+                    seq=self.seq_model,
+                    experimentmodel=experiment_model,
+                    prepend=True,
+                )
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.action()
+        @action_version(2)
+        async def conditional_stop(
+            ctx: ActionContext,
+            stop_parameter: Optional[str] = "",
+            stop_condition: checkcond = checkcond.equals,
+            stop_value: Union[str, float, int, bool] = True,
+            reason: str = "conditional stop",
+            clear_queues: bool = False,
+        ):
+            """Stop the orchestrator, optionally clearing every queue."""
+            active = await ctx.begin()
+            cond = active.action.action_params["stop_condition"]
+            param = active.action.action_params.get(
+                active.action.action_params["stop_parameter"], None
+            )
+            thresh = active.action.action_params["stop_value"]
+            stop = False
+            if cond == checkcond.equals:
+                stop = param == thresh
+            elif cond == checkcond.above:
+                stop = param > thresh
+            elif cond == checkcond.below:
+                stop = param < thresh
+            elif cond == checkcond.isnot:
+                stop = param != thresh
+            elif cond == checkcond.uncond:
+                stop = True
+            elif cond is None:
+                stop = False
+            if stop:
+                if active.action.action_params["clear_queues"]:
+                    await self.clear_actions()
+                    await self.clear_experiments()
+                    await self.clear_sequences()
+                await self.stop()
+                self.current_stop_message = active.action.action_params["reason"]
+                LOGGER.warning(active.action.action_params["reason"])
+                LOGGER.alert(f"ORCH STOPPED ~ {active.action.action_params['reason']}")
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
+        @self.action()
+        async def conditional_skip(
+            ctx: ActionContext,
+            skip_parameter: Optional[str] = "",
+            skip_condition: checkcond = checkcond.equals,
+            skip_value: Union[str, float, int, bool] = True,
+            skip_queued_actions: bool = True,
+            skip_queued_experiments: bool = False,
+            reason: str = "conditional skip",
+        ):
+            """Clear queued actions and/or experiments when the condition holds."""
+            active = await ctx.begin()
+            cond = active.action.action_params["skip_condition"]
+            param = active.action.action_params.get(
+                active.action.action_params["skip_parameter"], None
+            )
+            thresh = active.action.action_params["skip_value"]
+            skip = False
+            if cond == checkcond.equals:
+                skip = param == thresh
+            elif cond == checkcond.above:
+                skip = param > thresh
+            elif cond == checkcond.below:
+                skip = param < thresh
+            elif cond == checkcond.isnot:
+                skip = param != thresh
+            elif cond == checkcond.uncond:
+                skip = True
+            elif cond is None:
+                skip = False
+            if skip:
+                if active.action.action_params["skip_queued_actions"]:
+                    await self.clear_actions()
+                if active.action.action_params["skip_queued_experiments"]:
+                    await self.clear_experiments()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
     def _replace_inherited_route(self, path: str) -> None:
         """Drop a route ActionHost registered, so this host can re-register it.
@@ -752,3 +849,390 @@ class OrchHost(ActionHost):
             if executor_id == "":
                 return {"error": "executor_id was not specified"}
             return self.stop_executor(executor_id)
+
+    # -- uuid registration (delegations to RunQueues) --------------------
+
+    def register_obj_uuid(self, obj_uuid_key, obj_uuid_dict, obj_type: str) -> None:
+        """Record a sequence/experiment uuid in its history map."""
+        return self.run_queues.register_obj_uuid(obj_uuid_key, obj_uuid_dict, obj_type)
+
+    def register_action_uuid(self, action_uuid, action_dict) -> None:
+        """Record an action uuid in the action history map."""
+        return self.run_queues.register_action_uuid(action_uuid, action_dict)
+
+    def track_action_uuid(self, action_uuid) -> None:
+        """Mark ``action_uuid`` as the most recently dispatched action."""
+        return self.run_queues.track_action_uuid(action_uuid)
+
+    # -- status ingestion (delegations to StatusIngester) ----------------
+
+    async def update_status(
+        self, actionservermodel: Optional[ActionServerModel] = None
+    ) -> bool:
+        """Fold one action server's status into the global model."""
+        return await self.status_ingester.update_status(actionservermodel)
+
+    async def update_nonblocking(
+        self, actionmodel: Action, server_host: str, server_port: int
+    ) -> dict:
+        """Record a non-blocking action's status transition."""
+        return await self.status_ingester.update_nonblocking(
+            actionmodel, server_host, server_port
+        )
+
+    async def clear_nonblocking(self) -> list:
+        """Stop tracking every non-blocking action."""
+        return await self.status_ingester.clear_nonblocking()
+
+    # -- the dispatch loop (delegations to DispatchRunner) ---------------
+
+    async def loop_task_dispatch_sequence(self) -> ErrorCodes:
+        """Dequeue and unpack the next sequence."""
+        return await self.dispatch_runner.dispatch_sequence()
+
+    async def loop_task_dispatch_experiment(self) -> ErrorCodes:
+        """Dequeue the next experiment and expand it into actions."""
+        return await self.dispatch_runner.dispatch_experiment()
+
+    async def loop_task_dispatch_action(self) -> ErrorCodes:
+        """Dispatch the action at the head of the queue."""
+        return await self.dispatch_runner._launch_action()
+
+    async def dispatch_loop_task(self) -> None:
+        """The loop itself."""
+        return await self.dispatch_runner.dispatch_loop_task()
+
+    # -- loop control ----------------------------------------------------
+    #
+    # These carry real logic rather than delegating, and are ported
+    # statement for statement from orch.py. The state checks are the whole
+    # substance: `start` on an already-started loop must log and do
+    # nothing, and `skip` on an IDLE orchestrator clears the action queue
+    # rather than posting an intent nothing will read.
+
+    async def wait_for_interrupt(self, pending_action=None) -> bool:
+        """Block until an interrupt arrives; re-queue ``pending_action`` on stop.
+
+        Returns False when the pending action was pushed back and the
+        caller must bail out, True otherwise.
+        """
+        interrupt = await self.interrupt_q.get()
+        if isinstance(interrupt, GlobalStatusModel):
+            self.incoming = interrupt
+        self.last_interrupt = time.time()
+        while not self.interrupt_q.empty():
+            interrupt = await self.interrupt_q.get()
+            if isinstance(interrupt, GlobalStatusModel):
+                self.incoming = interrupt
+                await self.globstat_q.put(interrupt.as_json())
+        if (
+            pending_action is not None
+            and self.globalstatusmodel.loop_intent == LoopIntent.stop
+        ):
+            pending_action.action_server.machine_name = self.server.machine_name
+            self.action_dq.insert(0, pending_action)
+            return False
+        return True
+
+    async def orch_wait_for_all_actions(self) -> None:
+        """Block until no action anywhere is still active."""
+        while not self.globalstatusmodel.actions_idle():
+            if time.time() - self.last_interrupt > 10.0:
+                LOGGER.info("some actions are still active, waiting for status update")
+            await self.wait_for_interrupt()
+
+    async def start(self) -> None:
+        """Start or resume the loop when there is something queued."""
+        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
+            if (
+                self.action_dq
+                or self.experiment_dq
+                or self.sequence_dq
+                or (self.active_sequence is not None)
+            ):
+                await self.start_loop()
+            else:
+                LOGGER.info("experiment list is empty")
+        else:
+            LOGGER.info("already running")
+        self.current_stop_message = ""
+
+    async def start_loop(self) -> LoopStatus:
+        """Create the loop task, refusing to start while E-STOP is latched."""
+        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
+            LOGGER.info("starting orch loop")
+            self.loop_task = asyncio.create_task(self.dispatch_loop_task())
+        elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
+            LOGGER.error("E-STOP flag was raised, clear E-STOP before starting.")
+        else:
+            LOGGER.info("loop already started.")
+        return self.globalstatusmodel.loop_state
+
+    async def stop(self, reset_run_id: bool = False) -> None:
+        """Request a graceful stop, respecting the current loop state."""
+        if self.globalstatusmodel.loop_state == LoopStatus.started:
+            await self.intend_stop()
+        elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
+            LOGGER.info("orchestrator E-STOP flag was raised; nothing to stop")
+        else:
+            LOGGER.info("orchestrator is not running")
+        if reset_run_id:
+            LOGGER.info("resetting active_run_id on stop")
+            self.active_run_id = None
+
+    async def stop_loop(self) -> None:
+        """Alias legacy keeps for callers that spell it this way."""
+        await self.intend_stop()
+
+    async def skip(self) -> None:
+        """Skip while running; clear the action queue when idle."""
+        if self.globalstatusmodel.loop_state == LoopStatus.started:
+            await self.intend_skip()
+        else:
+            LOGGER.info("orchestrator not running, clearing action queue")
+            self.action_dq.clear()
+
+    async def intend_skip(self) -> None:
+        """Post a skip intent to the interrupt queue."""
+        self.globalstatusmodel.loop_intent = LoopIntent.skip
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def intend_stop(self) -> None:
+        """Post a stop intent to the interrupt queue."""
+        self.globalstatusmodel.loop_intent = LoopIntent.stop
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    async def intend_none(self) -> None:
+        """Clear any pending loop intent."""
+        self.globalstatusmodel.loop_intent = LoopIntent.none
+        await self.interrupt_q.put(self.globalstatusmodel.loop_intent)
+
+    # -- E-STOP (delegations to EstopController) -------------------------
+
+    async def estop_loop(self, reason: str = "") -> None:
+        """Latch E-STOP and stop the loop."""
+        return await self.estop_controller.estop_loop(reason=reason)
+
+    async def estop_actions(self, switch: bool) -> None:
+        """Fan E-STOP out to every action server."""
+        return await self.estop_controller.estop_actions(switch)
+
+    async def estop_finish_active(self) -> None:
+        """Finalize the in-flight experiment and sequence as estopped."""
+        return await self.estop_controller.estop_finish_active()
+
+    async def clear_estop(self) -> None:
+        """Clear the E-STOP latch."""
+        return await self.estop_controller.clear_estop()
+
+    async def clear_error(self) -> None:
+        """Clear the error state."""
+        return await self.estop_controller.clear_error()
+
+    async def clear_actions(self) -> None:
+        """Empty the action queue."""
+        return await self.run_queues.clear_actions()
+
+    def _register_orch_loop_routes(self) -> None:
+        """The loop-control, status-ingestion and read-state routes (B3b).
+
+        Bodies ported from ``orch_api`` unchanged apart from the back
+        reference. The state guards are the substance: /estop_orch on an
+        already-estopped orchestrator logs rather than re-latching, and
+        /clear_estop refuses unless the loop is actually estopped.
+        """
+        from fastapi import Body
+
+        from helao.core.models.hlostatus import HloStatus
+        from helao.core.servers.orch_api import (
+            _queue_counts,
+            _set_step_flag,
+            _status_summary_payload,
+            _step_flags_payload,
+        )
+
+        @self.post("/start", tags=["private"])
+        async def start():
+            """Start (or resume) the dispatch loop."""
+            await self.start()
+            return {}
+
+        @self.post("/stop", tags=["private"])
+        async def stop(reset_run_id: bool = False):
+            """Request a graceful stop; optionally drop the active run_id."""
+            await self.stop(reset_run_id=reset_run_id)
+            return {}
+
+        @self.post("/skip_experiment", tags=["private"])
+        async def skip_experiment():
+            """Skip the current experiment."""
+            await self.skip()
+            return {}
+
+        @self.post("/clear_actions", tags=["private"])
+        async def clear_actions():
+            """Empty the action queue."""
+            await self.clear_actions()
+            return {}
+
+        @self.post("/estop_orch", tags=["private"])
+        async def estop_orch():
+            """Latch E-STOP if the loop is running; otherwise log and return."""
+            if self.globalstatusmodel.loop_state == LoopStatus.started:
+                await self.estop_loop()
+            elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
+                LOGGER.info("orchestrator E-STOP flag already raised")
+            else:
+                LOGGER.info("orchestrator is not running")
+            return {}
+
+        @self.post("/clear_estop", tags=["private"])
+        async def clear_estop():
+            """Clear the E-STOP latch, only from the estopped state."""
+            if self.globalstatusmodel.loop_state != LoopStatus.estopped:
+                LOGGER.info("orchestrator is not currently in E-STOP")
+            else:
+                await self.clear_estop()
+
+        @self.post("/clear_error", tags=["private"])
+        async def clear_error():
+            """Clear the error state, only from the error state."""
+            if self.globalstatusmodel.loop_state != LoopStatus.error:
+                LOGGER.info("orchestrator is not currently in ERROR")
+            else:
+                await self.clear_error()
+
+        @self.post("/update_status", tags=["private"])
+        async def update_status(
+            actionservermodel: ActionServerModel = Body({}, embed=True),
+            regular_task: str = "false",
+        ):
+            """Fold a remote action server's status into the global model."""
+            if actionservermodel is None:
+                return False
+            if regular_task == "false":
+                LOGGER.debug(
+                    f"orch '{self.server.server_name}' got status from "
+                    f"'{actionservermodel.action_server.server_name}': "
+                    f"{actionservermodel.endpoints}"
+                )
+            return await self.update_status(actionservermodel=actionservermodel)
+
+        @self.post("/update_nonblocking", tags=["private"])
+        async def update_nonblocking(
+            actionmodel: Action = Body({}, embed=True),
+            server_host: str = "",
+            server_port: int = 9000,
+        ):
+            """Record a non-blocking action transition."""
+            LOGGER.info(
+                f"'{self.server.server_name.upper()}' got nonblocking status from "
+                f"'{actionmodel.action_server.server_name}': exec_id: "
+                f"{actionmodel.exec_id} -- status: {actionmodel.action_status} on "
+                f"{server_host}:{server_port}"
+            )
+            return await self.update_nonblocking(actionmodel, server_host, server_port)
+
+        @self.post("/clear_actives", tags=["private"])
+        async def clear_actives():
+            """Move every active action to ``skipped`` and return their uuids."""
+            cleared_actives = []
+            for actionservermodel in self.globalstatusmodel.server_dict.values():
+                for endpointkey, endpointmodel in actionservermodel.endpoints.items():
+                    active_items = list(endpointmodel.active_dict.items())
+                    for uuid, statusmodel in active_items:
+                        endpointmodel.active_dict.pop(uuid)
+                        cleared_actives.append(uuid)
+                        self.globalstatusmodel.active_dict.pop(uuid)
+                        if HloStatus.skipped not in endpointmodel.nonactive_dict:
+                            endpointmodel.nonactive_dict[HloStatus.skipped] = {}
+                        endpointmodel.nonactive_dict[HloStatus.skipped].update(
+                            {uuid: statusmodel}
+                        )
+                    actionservermodel.endpoints[endpointkey] = endpointmodel
+                await self.update_status(actionservermodel=actionservermodel)
+            return cleared_actives
+
+        @self.post("/get_active_experiment", tags=["private"])
+        def get_active_experiment():
+            """The active experiment as a cleaned dict, or {}."""
+            if self.active_experiment is None:
+                return {}
+            return self.active_experiment.clean_dict()
+
+        @self.post("/get_active_sequence", tags=["private"])
+        def get_active_sequence():
+            """The active sequence as a cleaned dict, or {}."""
+            if self.active_sequence is None:
+                return {}
+            return self.active_sequence.clean_dict()
+
+        @self.post("/active_experiment", tags=["private"])
+        def active_experiment():
+            """The active experiment object."""
+            return self.get_experiment(last=False)
+
+        @self.post("/last_experiment", tags=["private"])
+        def last_experiment():
+            """The most recently finished experiment."""
+            return self.get_experiment(last=True)
+
+        @self.post("/list_active_actions", tags=["private"])
+        def list_active_actions():
+            """The actions currently running across all servers."""
+            return self.list_active_actions()
+
+        @self.post("/list_nonblocking", tags=["private"])
+        def list_non_blocking():
+            """Tracked non-blocking executor identifiers."""
+            return self.nonblocking
+
+        @self.post("/get_orch_state", tags=["private"])
+        def get_orch_state() -> dict:
+            """Loop state plus the active/last sequence and experiment.
+
+            The queue DEPTHS come from _queue_counts, not from len() of a
+            rendered page -- a paged list reports its page size, which read
+            as the queue's depth in the operator until it was fixed.
+            """
+            resp = {
+                "orch_state": self.globalstatusmodel.orch_state,
+                "loop_state": self.globalstatusmodel.loop_state,
+                "loop_intent": self.globalstatusmodel.loop_intent,
+            }
+            active_seq = self.get_sequence()
+            last_seq = self.get_sequence(last=True)
+            active_exp = self.get_experiment()
+            last_exp = self.get_experiment(last=True)
+            resp["active_sequence"] = active_seq.clean_dict() if active_seq else {}
+            resp["last_sequence"] = last_seq.clean_dict() if last_seq else {}
+            resp["active_experiment"] = active_exp.clean_dict() if active_exp else {}
+            resp["last_experiment"] = last_exp.clean_dict() if last_exp else {}
+            resp.update(_queue_counts(self))
+            resp["current_stop_message"] = self.current_stop_message
+            return resp
+
+        @self.post("/get_status_summary", tags=["private"])
+        def get_status_summary():
+            """The per-server (server_status, driver_status) summary."""
+            return _status_summary_payload(self)
+
+        @self.post("/get_step_flags", tags=["private"])
+        def get_step_flags():
+            """The step-through flags."""
+            return _step_flags_payload(self)
+
+        @self.post("/set_step_flag", tags=["private"])
+        def set_step_flag(kind: str, value: bool):
+            """Set one step-through flag and return its new value."""
+            return _set_step_flag(self, kind, value)
+
+        @self.post("/latest_sequence_uuids", tags=["private"])
+        def latest_sequence_uuids():
+            """The 50 most recent dispatched sequence uuids."""
+            return list(self.sequence_history.keys())[-50:]
+
+        @self.post("/latest_experiment_uuids", tags=["private"])
+        def latest_experiment_uuids():
+            """The 50 most recent dispatched experiment uuids."""
+            return list(self.experiment_history.keys())[-50:]

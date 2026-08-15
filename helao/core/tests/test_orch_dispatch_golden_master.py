@@ -106,8 +106,8 @@ from types import SimpleNamespace
 from typing import Optional
 
 import helao.core.servers.orch as orch_module
-import helao.core.servers.orch_monitor as orch_monitor_module
-import helao.core.servers.orch_status_sync as orch_status_sync_module
+import helao.hexagon.app.orch_monitor as orch_monitor_module
+import helao.hexagon.app.orch_status_sync as orch_status_sync_module
 from helao.core.error import ErrorCodes
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ShortExperimentModel

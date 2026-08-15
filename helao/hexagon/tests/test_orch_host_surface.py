@@ -118,22 +118,10 @@ CHECKLIST = (
 )
 
 
-#: Routes registered as raising stubs until B3b. They take no parameters
-#: yet, so the parameter gate cannot cover them -- exempted HERE, by name,
-#: rather than by weakening the comparison, so the exemption is visible and
-#: B3b has to delete it.
-STUB_ROUTES: frozenset[str] = frozenset(
-    {
-        "/set_step_flag",
-        "/stop",
-        "/update_nonblocking",
-        "/update_status",
-        "/ORCH/interrupt",
-        "/ORCH/conditional_exp",
-        "/ORCH/conditional_skip",
-        "/ORCH/conditional_stop",
-    }
-)
+#: Routes still registered as raising stubs. EMPTY as of B3b: every loop
+#: route now has a real body and a real parameter schema, so the parameter
+#: gate below covers the whole surface with no exemption.
+STUB_ROUTES: frozenset[str] = frozenset()
 
 
 def _by_key(doc: dict) -> dict:
@@ -183,16 +171,17 @@ def test_parameter_schemas_match_the_live_legacy_orchestrator():
 
 
 def test_the_stub_exemption_list_is_exactly_the_routes_that_still_raise():
-    """The exemption must not outlive the stubs.
+    """The exemption must not outlive the stubs, and it no longer does.
 
-    B3b implements these; each one it lands must leave this set, or the
-    parameter gate silently stops covering a route that now has a real
-    body. Checked by asking the ratchet which members are still missing
-    rather than by a second hand-written list, which would drift.
+    Both sets are empty together, which is the invariant: a member left on
+    NOT_YET_PORTED means a route still raises and must stay exempt, and an
+    exemption with nothing outstanding silently stops covering a route that
+    now has a real body. Tied to the ratchet rather than to a second
+    hand-written list, which would drift.
     """
     from helao.hexagon.tests.test_orch_host_member_coverage import NOT_YET_PORTED
 
-    assert NOT_YET_PORTED, (
-        "NOT_YET_PORTED is empty, so nothing should still be stubbed -- "
-        "STUB_ROUTES must be emptied in the same change"
+    assert bool(NOT_YET_PORTED) == bool(STUB_ROUTES), (
+        f"NOT_YET_PORTED={sorted(NOT_YET_PORTED)} but "
+        f"STUB_ROUTES={sorted(STUB_ROUTES)} -- these empty together"
     )
