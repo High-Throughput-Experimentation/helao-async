@@ -343,9 +343,16 @@ def _handler(app, name, which="on_startup"):
 
 
 def _prime(app, driver):
-    """Stand in for what BaseAPI's startup event binds, without running it."""
+    """Stand in for what the host's startup event binds, without running it.
+
+    B5: ``app.base`` used to be assignable, because it was a separate ``Base``
+    the legacy startup handler attached. On an ``ActionHost`` it is a read-only
+    property returning the host itself, so the loop is set where the host
+    actually keeps it -- ``app.aloop``, which is the attribute the sweep
+    dispatcher reads either way.
+    """
     app.driver = driver
-    app.base = SimpleNamespace(aloop=asyncio.get_running_loop())
+    app.aloop = asyncio.get_running_loop()
 
 
 @pytest.mark.asyncio

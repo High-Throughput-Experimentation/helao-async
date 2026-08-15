@@ -30,7 +30,8 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
 from helao.helpers import helao_logging as logging
 
 from ...drivers.io.galil_io_driver import AiMonExec, Galil, GalilPoller, TriggerType
@@ -64,7 +65,7 @@ def do_value_to_bool(value):
         return None
 
 
-async def galil_dyn_endpoints(app: BaseAPI):
+async def galil_dyn_endpoints(app: ActionHost):
     """Register Galil IO action endpoints conditional on driver capabilities.
 
     Only registers each route if the corresponding device family is present on
@@ -72,9 +73,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
     ``dev_di``/``dev_do`` -> digital-in/out and cycle endpoints).
 
     Args:
-        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+        app: The :class:`ActionHost` instance being constructed by ``makeApp``.
     """
-    server_key = app.base.server.server_name
+    server_key = app.server.server_name
     app.driver: Galil
 
     # gclib connection is opened here (not in the driver's __init__, per the
@@ -90,13 +91,14 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_ai:
 
-            @app.post(f"/{server_key}/get_analog_in", tags=["action"])
+            @app.action()
             @action_version(2)
             async def get_analog_in(
+                ctx: ActionContext,
                 ai_item: Optional[app.driver.dev_aiitems] = None,
             ):
                 """Read a single analog input channel identified by ``ai_item``."""
-                active = await app.base.setup_and_contain_action(action_abbr="get_ai")
+                active = await ctx.begin(action_abbr="get_ai")
 
                 active.action.action_params["ai_name"] = active.action.action_params[
                     "ai_item"
@@ -109,8 +111,9 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-            @app.post(f"/{server_key}/acquire_analog_in", tags=["action"])
+            @app.action()
             async def acquire_analog_in(
+                ctx: ActionContext,
                 duration: float = -1,
                 acquisition_rate: float = 0.2,
                 fast_samples_in: list[
@@ -120,7 +123,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 ] = Body([], embed=True),
             ):
                 """Start a monitored analog-in acquisition via :class:`AiMonExec`."""
-                active = await app.base.setup_and_contain_action()
+                active = await ctx.begin()
                 active.action.action_abbr = "galil_ai"
                 executor = AiMonExec(
                     active=active,
@@ -132,11 +135,11 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 LOGGER.info("Returning active dict.")
                 return active_action_dict
 
-            @app.post(f"/{server_key}/cancel_acquire_analog_in", tags=["action"])
-            async def cancel_acquire_analog_in():
+            @app.action()
+            async def cancel_acquire_analog_in(ctx: ActionContext):
                 """Stop any running ``acquire_analog_in`` executors on this server."""
-                active = await app.base.setup_and_contain_action()
-                for exec_id, executor in app.base.executors.items():
+                active = await ctx.begin()
+                for exec_id, executor in app.executors.items():
                     if exec_id.split()[0] == "acquire_analog_in":
                         executor.stop_action_task()
                 finished_action = await active.finish()
@@ -144,14 +147,15 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_ao:
 
-            @app.post(f"/{server_key}/set_analog_out", tags=["action"])
+            @app.action()
             @action_version(2)
             async def set_analog_out(
+                ctx: ActionContext,
                 ao_item: Optional[app.driver.dev_aoitems] = None,
                 value: Optional[float] = None,
             ):
                 """Drive an analog output channel ``ao_item`` to ``value``."""
-                active = await app.base.setup_and_contain_action(action_abbr="set_ao")
+                active = await ctx.begin(action_abbr="set_ao")
 
                 active.action.action_params["ao_name"] = active.action.action_params[
                     "ao_item"
@@ -168,13 +172,14 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_di:
 
-            @app.post(f"/{server_key}/get_digital_in", tags=["action"])
+            @app.action()
             @action_version(2)
             async def get_digital_in(
+                ctx: ActionContext,
                 di_item: Optional[app.driver.dev_diitems] = None,
             ):
                 """Read the state of a digital input ``di_item``."""
-                active = await app.base.setup_and_contain_action(action_abbr="get_di")
+                active = await ctx.begin(action_abbr="get_di")
 
                 active.action.action_params["di_name"] = active.action.action_params[
                     "di_item"
@@ -191,13 +196,14 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_do:
 
-            @app.post(f"/{server_key}/get_digital_out", tags=["action"])
+            @app.action()
             @action_version(2)
             async def get_digital_out(
+                ctx: ActionContext,
                 do_item: Optional[app.driver.dev_doitems] = None,
             ):
                 """Read the current setpoint of a digital output ``do_item``."""
-                active = await app.base.setup_and_contain_action(action_abbr="get_do")
+                active = await ctx.begin(action_abbr="get_do")
 
                 active.action.action_params["do_name"] = active.action.action_params[
                     "do_item"
@@ -214,14 +220,15 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_do:
 
-            @app.post(f"/{server_key}/set_digital_out", tags=["action"])
+            @app.action()
             @action_version(2)
             async def set_digital_out(
+                ctx: ActionContext,
                 do_item: Optional[app.driver.dev_doitems] = None,
                 on: bool = False,
             ):
                 """Set the digital output ``do_item`` on or off."""
-                active = await app.base.setup_and_contain_action(action_abbr="set_do")
+                active = await ctx.begin(action_abbr="set_do")
 
                 active.action.action_params["do_name"] = active.action.action_params[
                     "do_item"
@@ -292,9 +299,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{server_key}/set_digital_cycle", tags=["action"])
+            @app.action()
             @action_version(2)
             async def set_digital_cycle(
+                ctx: ActionContext,
                 trigger_name: app.driver.dev_diitems = "gamry_ttl0",
                 triggertype: TriggerType = TriggerType.fallingedge,
                 out_name: Optional[
@@ -332,7 +340,7 @@ async def galil_dyn_endpoints(app: BaseAPI):
                     req_out_name: Optional digital output(s) required to remain
                         asserted while cycling.
                 """
-                active = await app.base.setup_and_contain_action()
+                active = await ctx.begin()
 
                 datadict = await app.driver.set_digital_cycle(
                     **active.action.action_params
@@ -346,11 +354,11 @@ async def galil_dyn_endpoints(app: BaseAPI):
 
         if app.driver.dev_di and app.driver.dev_do:
 
-            @app.post(f"/{server_key}/stop_digital_cycle", tags=["action"])
+            @app.action()
             @action_version(2)
-            async def stop_digital_cycle():
+            async def stop_digital_cycle(ctx: ActionContext):
                 """Stop the currently running digital toggle cycle."""
-                active = await app.base.setup_and_contain_action()
+                active = await ctx.begin()
 
                 datadict = await app.driver.stop_digital_cycle()
                 active.action.error_code = datadict.get(
@@ -360,10 +368,10 @@ async def galil_dyn_endpoints(app: BaseAPI):
                 finished_action = await active.finish()
                 return finished_action.as_dict()
 
-        @app.post(f"/{server_key}/reset", tags=["action"])
-        async def reset():
+        @app.action()
+        async def reset(ctx: ActionContext):
             """Reset the Galil controller. Emergency use only."""
-            active = await app.base.setup_and_contain_action(action_abbr="reset")
+            active = await ctx.begin(action_abbr="reset")
             reset_resp = app.driver.reset()
             active.action.error_code = (
                 ErrorCodes.none
@@ -380,20 +388,20 @@ async def galil_dyn_endpoints(app: BaseAPI):
             return finished_action.as_dict()
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the Galil IO FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by the :class:`Galil` IO driver and
+    Constructs a :class:`ActionHost` backed by the :class:`Galil` IO driver and
     defers endpoint registration to :func:`galil_dyn_endpoints`.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Galil IO server",
