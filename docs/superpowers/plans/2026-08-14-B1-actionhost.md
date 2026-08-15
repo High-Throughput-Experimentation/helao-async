@@ -1397,3 +1397,42 @@ successfully. The readiness probe used `urlopen(url)`, a GET; every HELAO privat
 POST, so `/loaded_modules` answered 405, and the probe's `except Exception` reported that as
 down. Five minutes of waiting, then a healthy rig torn down. A port check is not a health
 check — and neither is a health check aimed at the wrong verb.
+
+### D1 and D2 were one defect, and the capture rig was the wrong instrument
+
+The b2 capture (status spine landed, write-path fixes not yet) showed GM-1 going from 10 files
+to 27 against legacy's 29, with both experiments now running and all four process ymls present
+— the orchestrated stall was real and the status spine fixed it. What remained looked like a
+syncer problem: no `raw_data` uploads, no experiment or sequence S3 records, no final sequence
+zip, exp/seq ymls still sitting in `RUNS_FINISHED`.
+
+It was not a syncer problem. Reading the four S3 action records showed every one of them was an
+ORCH `wait`; **not a single SIM action had produced anything**. The syncer can only ship what
+the write path wrote.
+
+Reproducing that over ASGI took under a second and produced two tracebacks where the capture
+tree had produced none:
+
+1. **`ActionHost` had no `_write_meta_atomic`.** `meta_writer` calls back through
+   `self.base._write_meta_atomic` for all three writes, so every `write_act` raised
+   `AttributeError` *inside a caught block*: 200 returned, no meta file written. The member is
+   underscore-prefixed but contractual, and the coverage ratchet scanned public members only —
+   which is precisely why it survived the sweep that closed 43 other gaps. Grepping
+   `self\.base\._` across `helao/core/servers` and `helao/hexagon` finds exactly three such
+   members; all three are now in the ratchet.
+2. **`ActionSession` never ran `myinit`.** Legacy calls it from `setup_and_contain_action`,
+   which the explicit-context port replaced — so nothing called it, and the data-logger task,
+   the only consumer of the action's data queue, was never created. Every `enqueue_data`
+   accumulated and no `.hlo` was ever written. The finalizer's
+   `self.active.data_logger.cancel()` then raised `AttributeError` on `None` inside *another*
+   caught block, logging "Failed to finish data logging" and hiding the cause.
+
+Both were invisible from the capture tree, and both were obvious from a traceback. The lesson
+generalises past this instance: **the capture rig measures parity, it does not diagnose.** A
+launch, a scenario, a quiesce and a snapshot per attempt yields a tree; a tree tells you what is
+missing, never why. That is how one defect got labelled "manual actions write nothing" (D1) and
+"the sync leg is incomplete" (D2) on separate days.
+
+`test_action_writes_artifacts.py` is the standing gate, and it is deliberately an *outcome*
+test — files on disk, not collaborator calls. Every previous fix along this path (`init_act`,
+`file_conn_keys`, `write_act`) satisfied a call-level expectation and still wrote nothing.
