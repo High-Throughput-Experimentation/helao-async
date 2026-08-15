@@ -29,15 +29,10 @@ ACTION_DIR: Final[Path] = REPO_ROOT / "helao/deploy/hte/servers/action"
 FORBIDDEN: Final[str] = "helao.core.servers"
 
 #: Modules that have NOT yet been ported. Remove a name when its module lands;
-#: never add one back. Seeded with all 23 at B5's start.
-NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
-    {
-        "HTEdata_server",
-        "analysis_server",
-        "calc_server",
-        "tec_server",
-    }
-)
+#: never add one back. Seeded with all 23 at B5's start, emptied by B5.6 --
+#: kept rather than deleted so a later phase adding an hte action server has
+#: somewhere to declare it, and so the tests below keep their shape.
+NOT_YET_PORTED: Final[frozenset[str]] = frozenset()
 
 
 def _modules() -> list[Path]:
@@ -124,3 +119,38 @@ def test_the_ratchet_only_names_modules_that_exist() -> None:
     stems = {p.stem for p in _modules()}
     unknown = sorted(NOT_YET_PORTED - stems)
     assert unknown == [], f"NOT_YET_PORTED names modules that do not exist: {unknown}"
+
+
+def test_the_ratchet_is_empty_and_b5_is_done() -> None:
+    """B5's terminal assertion. Once this passes the file says what B4's says."""
+    assert NOT_YET_PORTED == frozenset(), (
+        f"{len(NOT_YET_PORTED)} hte module(s) still on the legacy engine: "
+        f"{sorted(NOT_YET_PORTED)}"
+    )
+
+
+def test_the_whole_deployment_reaches_the_engine_nowhere() -> None:
+    """Wider than the action directory: drivers, orchestrator, tests, all of it.
+
+    The per-module ratchet above policed ``servers/action/`` because that is
+    where the 23 modules were. B5 also retyped ``drivers/data/archive_driver``
+    and moved the orchestrator entrypoint onto OrchHost, and neither lives
+    under that directory -- so this is the assertion that actually says the
+    deployment is done.
+    """
+    deployment = REPO_ROOT / "helao/deploy/hte"
+    offenders = {}
+    for path in sorted(deployment.rglob("*.py")):
+        if "__pycache__" in path.parts:
+            continue
+        bad = sorted(m for m in _imports(path) if m.startswith(FORBIDDEN))
+        if bad:
+            offenders[str(path.relative_to(REPO_ROOT))] = bad
+    assert offenders == {}, f"hte imports {FORBIDDEN} in: {offenders}"
+
+
+def test_the_wide_sweep_is_not_vacuous() -> None:
+    """The sweep above passes trivially if it walks an empty tree."""
+    deployment = REPO_ROOT / "helao/deploy/hte"
+    files = [p for p in deployment.rglob("*.py") if "__pycache__" not in p.parts]
+    assert len(files) > 100, f"only {len(files)} files under {deployment}"
