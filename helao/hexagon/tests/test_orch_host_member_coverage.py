@@ -32,7 +32,19 @@ from pathlib import Path
 from typing import Final
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
-CORE_SERVERS: Final[Path] = REPO_ROOT / "helao/core/servers"
+
+#: Where a consumer module may live. B3a MOVES four of them from the first
+#: directory to the second, and the contract must not notice.
+#:
+#: It did notice, once. With only ``helao/core/servers`` listed, moving
+#: orch_queues/orch_persist/orch_estop/orch_lifecycle dropped the measured
+#: contract from 136 members to 115 -- the ratchet quietly got weaker at
+#: exactly the moment work progressed, and 21 members it was tracking
+#: turned into "already done" without anyone implementing them.
+SEARCH_DIRS: Final[tuple[Path, ...]] = (
+    REPO_ROOT / "helao/core/servers",
+    REPO_ROOT / "helao/hexagon/app",
+)
 
 #: Modules whose sole back-reference is the orchestrator.
 CONSUMERS: Final[tuple[str, ...]] = (
@@ -58,9 +70,14 @@ def orch_contract() -> set[str]:
     """
     found: set[str] = set()
     for mod in CONSUMERS:
-        path = CORE_SERVERS / f"{mod}.py"
-        if not path.exists():
-            continue
+        path = next(
+            (d / f"{mod}.py" for d in SEARCH_DIRS if (d / f"{mod}.py").exists()), None
+        )
+        assert path is not None, (
+            f"consumer module {mod!r} found in neither {SEARCH_DIRS[0]} nor "
+            f"{SEARCH_DIRS[1]}. Skipping it silently would shrink the contract "
+            "and weaken this ratchet, which is the one failure it cannot afford."
+        )
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if not isinstance(node, ast.Attribute):
@@ -105,7 +122,6 @@ NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
         "loop_task_dispatch_sequence",
         "orch_wait_for_all_actions",
         "wait_for_interrupt",
-        "interrupt_q",
         "start",
         "stop",
         "skip",
@@ -118,56 +134,20 @@ NOT_YET_PORTED: Final[frozenset[str]] = frozenset(
         "clear_error",
         "clear_estop",
         "clear_actions",
-        "current_stop_message",
-        "init_success",
         # --- B3b: status ingestion + monitors ---------------------------
         "update_status",
         "update_nonblocking",
         "clear_nonblocking",
-        "nonblocking",
-        "globstat_q",
-        "status_summary",
-        "last_dispatched_action_uuid",
-        "step_thru_actions",
-        "step_thru_experiments",
-        "step_thru_sequences",
-        "heartbeat_interval",
-        "ignore_heartbeats",
         "register_obj_uuid",
         "register_action_uuid",
         "track_action_uuid",
         # --- B3a, filled in by Tasks 2-6 (delete as you go) -------------
-        "sequence_dq",
-        "experiment_dq",
-        "action_dq",
-        "action_history",
-        "experiment_history",
-        "sequence_history",
-        "active_experiment",
-        "active_sequence",
-        "last_experiment",
-        "last_sequence",
-        "active_run_id",
-        "active_seq_exp_counter",
-        "last_action_uuid",
-        "globalstatusmodel",
-        "global_params",
-        "aiolock",
-        "wait_task",
-        "current_wait_ts",
-        "last_wait_ts",
         "dispatch_wait_task",
-        "verify_plates",
         "verify_plate_in_params",
         "use_sync",
         "syncer",
-        "executors",
         "exp_model",
         "seq_model",
-        "exp_postprocessors",
-        "exp_postprocess_libs",
-        "seq_postprocessors",
-        "seq_postprocess_libs",
         "experiment_lib",
         "sequence_lib",
         "experiment_codehash_lib",
@@ -216,7 +196,7 @@ def _host_members() -> set[str]:
     """Class members plus instance attributes, INCLUDING inherited ones.
 
     Walking only orch_host.py reports phantom gaps for everything OrchHost
-    inherits from ActionHost -- 23 of the 135, and B1's first ratchet run
+    inherits from ActionHost -- 24 of the 136, and B1's first ratchet run
     made exactly this mistake with three HelaoFastAPI attributes.
     """
     from helao.hexagon.app.orch_host import OrchHost
@@ -228,16 +208,44 @@ def _host_members() -> set[str]:
         "helao/helpers/server_api.py",
     ):
         src = (REPO_ROOT / rel).read_text(encoding="utf-8")
-        members |= set(re.findall(r"self\.([A-Za-z_][A-Za-z0-9_]*)\s*=", src))
+        # `[^=\n]*` spans an optional annotation: `self.live_buffer: dict = {}`
+        # is an assignment, and a pattern anchored straight to `=` misses
+        # every annotated attribute. That read as ActionHost not providing
+        # live_buffer, active_experiment, active_sequence or active_run_id --
+        # all four of which it or OrchHost plainly assign.
+        members |= set(
+            re.findall(r"self\.([A-Za-z_][A-Za-z0-9_]*)\s*(?::[^=\n]*)?=", src)
+        )
     return members
 
 
 def test_the_contract_extraction_is_not_vacuous() -> None:
     """A broken AST walk would make every coverage assertion pass for free."""
     contract = orch_contract()
-    assert len(contract) > 120, f"only {len(contract)} members found; walk is inert"
+    assert len(contract) > 130, f"only {len(contract)} members found; walk is inert"
     for known in ("action_dq", "globalstatusmodel", "_ensure_run_id", "add_sequence"):
         assert known in contract, f"{known} missing from the extraction"
+
+
+def test_every_tracked_name_is_actually_in_the_contract() -> None:
+    """Both lists must be SUBSETS of the measured contract.
+
+    Without this, a name that leaves the contract -- because its consumer
+    module moved, was renamed, or stopped using it -- reads as "already
+    done" in the staleness check below, and its entry gets deleted having
+    never been implemented. That is not hypothetical: moving four
+    collaborators out of helao/core/servers did exactly this to 21 names
+    before SEARCH_DIRS existed.
+    """
+    contract = orch_contract()
+    assert sorted(NOT_YET_PORTED - contract) == [], (
+        "on NOT_YET_PORTED but not in the measured contract -- the extraction "
+        "lost sight of a consumer module, or the name is misspelled"
+    )
+    assert sorted(DELIBERATELY_ABSENT - contract) == [], (
+        "excluded but not in the contract -- nothing requires this member, so "
+        "the exclusion is noise"
+    )
 
 
 def test_no_new_gap_has_opened_in_the_host() -> None:
