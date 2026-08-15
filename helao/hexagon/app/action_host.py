@@ -460,6 +460,18 @@ class ActionHost(HelaoFastAPI):
 
     # -- meta files ------------------------------------------------------------
 
+    async def _write_meta_atomic(self, output_file: str, output_str: str) -> None:
+        """Atomically write ``output_str`` to ``output_file``.
+
+        Underscore-prefixed but NOT internal: ``meta_writer`` calls back
+        through ``self.base._write_meta_atomic`` for all three writes (and
+        ``posthoc_writer`` mirrors the same indirection), so this is part of
+        the host's contract with its own collaborator. Its absence made every
+        ``write_act`` raise AttributeError inside a caught block -- the action
+        returned 200 and left no meta file at all.
+        """
+        await self.meta_writer._write_meta_atomic(output_file, output_str)
+
     async def write_act(self, action) -> None:
         """Write the action's ``-act.yml`` via the native meta writer.
 

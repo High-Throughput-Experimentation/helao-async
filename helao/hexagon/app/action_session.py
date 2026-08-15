@@ -166,7 +166,80 @@ class ActionSession:
         )
         session = cls(host, params)
         host.actives[action.action_uuid] = session
+        await session.myinit()
         return session
+
+    async def myinit(self) -> None:
+        """Start the data-logger task, make the output dir, broadcast status.
+
+        Port of ``Active.myinit`` (base.py:1013). Legacy calls this from
+        ``setup_and_contain_action`` right after ``contain_action`` returns;
+        the explicit-context port has no such caller, so ``open`` calls it.
+
+        **The data-logger task is the reason this is not optional.** It is the
+        only consumer of the action's data queue, so without it every
+        ``enqueue_data`` accumulates and nothing reaches a file: the action
+        completes, the meta files are written, and no ``.hlo`` exists. The
+        finalizer's ``self.active.data_logger.cancel()`` then raises
+        AttributeError on None inside a caught block, which logs "Failed to
+        finish data logging" and hides the cause.
+        """
+        import os
+        from copy import deepcopy
+
+        from helao.core.models.run_dir import RunDir
+
+        # The host captures aloop at startup; fall back to the loop we are
+        # already running on when it has not. Legacy could assume Base.myinit
+        # ran first; nothing enforces that ordering here, and the failure mode
+        # is an AttributeError on None that reads as a session bug.
+        aloop = self.base.aloop or asyncio.get_running_loop()
+        self.data_logger = aloop.create_task(self.log_data_task())
+        save_root = str(self.base.helaodirs.save_root)
+        if self.action.manual_action:
+            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+        if self.action.save_act:
+            full_action_output_path = os.path.join(
+                save_root,
+                self.action.action_output_dir,
+            )
+            if self.action.manual_action:
+                full_action_output_path = full_action_output_path.replace(
+                    "ACTIVE",
+                    "DIAG",
+                )
+            os.makedirs(full_action_output_path, exist_ok=True)
+            await self.update_act_file()
+
+            if self.action.manual_action:
+                exp = deepcopy(self.action_list[-1])
+                exp.reset_experiment_status(HloStatus.active)
+                exp.reset_sequence_status(HloStatus.active)
+                exp.samples_in = []
+                exp.samples_out = []
+                exp.files = []
+
+                # add actions to experiment
+                for action in self.action_list:
+                    exp.dispatched_actions.append(self.action.get_act())
+
+                # add experiment to sequence
+                exp.dispatched_experiments.append(self.action.get_exp())
+                # create and write seq file for manual action
+                await self.base.write_seq(self.action)
+                # create and write exp file for manual action
+                await self.base.write_exp(self.action)
+
+        LOGGER.info("init active: sending active data_stream_status package")
+        await self.add_status()
+
+    async def log_data_task(self) -> None:
+        """Drain the action's data queue into its files."""
+        return await self.data_stream.log_data_task()
+
+    async def update_act_file(self) -> None:
+        """Rewrite the action's meta YAML to reflect the current state."""
+        return await self.data_file_writer.update_act_file()
 
     # -- real logic (the four members that are not delegation) ---------------
 
