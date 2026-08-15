@@ -2,8 +2,8 @@
 
 :class:`ControlSurface` satisfies
 :class:`~helao.hexagon.ports.control_surface.ControlSurfacePort` by
-**delegating to the shared wrappers** in ``helao/core/servers/io_control.py``
-and ``helao/core/servers/motion_control.py``. Nothing is reimplemented here,
+**delegating to the shared wrappers** in ``helao/ui/shared/io_control.py``
+and ``helao/ui/shared/motion_control.py``. Nothing is reimplemented here,
 and that is the whole design: those wrappers carry three behaviours that a
 second implementation would silently lose --
 
@@ -26,7 +26,7 @@ which is precisely where both wrapper modules live.
 
 from typing import Optional
 
-from helao.core.servers import io_control, motion_control
+from helao.ui.shared import io_control, motion_control
 from helao.hexagon.ports.control_surface import ControlSurfacePort
 
 __all__ = ["ControlSurface"]

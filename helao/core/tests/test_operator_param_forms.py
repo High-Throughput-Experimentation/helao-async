@@ -7,7 +7,7 @@ operator's own suite reaches it only through UI callbacks.
 
 from pydantic import BaseModel
 
-from helao.core.servers.operator import param_forms as pf
+from helao.ui.shared.operator import param_forms as pf
 
 
 def test_parse_arg_docs_reads_a_plain_args_section():

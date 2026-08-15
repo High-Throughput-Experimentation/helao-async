@@ -1,7 +1,7 @@
 """The Reflex motion controls on ``/control``: discovery, arming, and unknown.
 
 The page is the thin half of this feature by design -- every behavioural rule
-lives in :mod:`helao.core.servers.motion_control`, which
+lives in :mod:`helao.ui.shared.motion_control`, which
 ``test_motion_control.py`` gates -- so what is asserted here is that the page
 *routes through* those rules rather than reimplementing them, and that its two
 row storages stay independent.
@@ -34,8 +34,8 @@ from pathlib import Path
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import palette
-from helao.core.servers.motion_control import (
+from helao.ui.shared import palette
+from helao.ui.shared.motion_control import (
     ARM_TIMEOUT_S,
     FAILED_STATUS,
     FOLLOWUP_CEILING_S,
@@ -44,9 +44,9 @@ from helao.core.servers.motion_control import (
     REFUSED_STATUS,
     Units,
 )
-from helao.core.servers.palette import TW
-from helao.core.servers.reflex import control as control_mod
-from helao.core.servers.reflex.control import (
+from helao.ui.shared.palette import TW
+from helao.ui.reflex import control as control_mod
+from helao.ui.reflex.control import (
     MOTION_ARM,
     MOTION_AXIS,
     MOTION_ENABLED,
@@ -1237,7 +1237,7 @@ def test_the_cadence_is_the_shared_layer_s_and_not_the_page_s():
     """
     assert control_mod.FOLLOWUP_TICK_MS == int(FOLLOWUP_INTERVAL_S * 1000)
     source = (
-        REPO_ROOT / "helao" / "core" / "servers" / "reflex" / "control.py"
+        REPO_ROOT / "helao" / "ui" / "reflex" / "control.py"
     ).read_text(encoding="utf-8")
     assert "should_follow_up" in source, "the page must ask the shared policy"
     # The three policy constants are imported, never restated.
@@ -1313,7 +1313,7 @@ def test_the_page_never_drives_itself_from_a_loop():
     one line that forbade the component.
     """
     source = (
-        REPO_ROOT / "helao" / "core" / "servers" / "reflex" / "control.py"
+        REPO_ROOT / "helao" / "ui" / "reflex" / "control.py"
     ).read_text(encoding="utf-8")
     tree = ast.parse(source)
     # The AST, not a substring sweep: the prose in this module has to be free
@@ -1414,7 +1414,7 @@ def test_the_page_holds_no_colour_of_its_own():
     page would acquire one, and it renders perfectly while being unmeasurable.
     """
     source = (
-        REPO_ROOT / "helao" / "core" / "servers" / "reflex" / "control.py"
+        REPO_ROOT / "helao" / "ui" / "reflex" / "control.py"
     ).read_text(encoding="utf-8")
     for offender in ("bg-", "text-slate", "text-white", "border-slate", "rgb("):
         for lineno, line in enumerate(source.splitlines(), 1):

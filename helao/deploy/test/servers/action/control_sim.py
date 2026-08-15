@@ -49,9 +49,9 @@ from enum import Enum
 from typing import Optional
 
 from helao.core.error import ErrorCodes
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
-from helao.core.servers.motion_control import Units
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
+from helao.ui.shared.motion_control import Units
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -91,7 +91,7 @@ class ControlSim:
         moving_until: Epoch after which an axis is no longer reported moving.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Initialise the simulated device from the server's config block."""
         self.base = action_serv
         self.config_dict = action_serv.server_cfg.get("params", {})
@@ -301,7 +301,7 @@ def makeApp(server_key):
     # the server ever binds -- and the launcher reports that as a server that
     # simply never became ready. Same seam the shipped IO and motion servers
     # use, for the same reason.
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Engineering-control simulator",

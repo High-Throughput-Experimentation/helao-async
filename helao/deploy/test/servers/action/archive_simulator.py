@@ -14,8 +14,8 @@ import pandas as pd
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-from helao.core.servers.base import Base
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 
 class ArchiveSim:
@@ -42,7 +42,7 @@ class ArchiveSim:
         platespaces: List of per-plate descriptors.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: ActionHost):
         """Load the archive CSV and precompute plate descriptors.
 
         Args:
@@ -213,7 +213,7 @@ def makeApp(server_key):
     Returns:
         Configured :class:`HelaoFastAPI` app.
     """
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Archive simulator",
@@ -270,23 +270,25 @@ def makeApp(server_key):
 
     # BEGIN PUBLIC ENDPOINTS (Actions dispatched by Orch)
 
-    @app.post(f"/{server_key}/load_space", tags=["action"])
+    @app.action()
     async def load_space(
+        ctx: ActionContext,
         plate_id: int = 0,
     ):
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         platedict = app.driver.load_plate_id(**active.action.action_params)
         for k, v in platedict.items():
             active.action.action_params.update({f"_{k}": v})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/query_plate", tags=["action"])
+    @app.action()
     async def query_plate(
+        ctx: ActionContext,
         elements: list[str] = ["Ni", "Fe", "La", "Ce", "Co", "Ta"],
         ph: int = 13,
     ):
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         platespaces = app.driver.list_spaces()
         if active.action.action_params["ph"] is not None:
             platespaces = [
@@ -305,11 +307,12 @@ def makeApp(server_key):
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/acquire", tags=["action"])
+    @app.action()
     async def acquire(
+        ctx: ActionContext,
         element_fracs: list[int] = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     ):
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         sample_no = app.driver.acquire(**active.action.action_params)
         LOGGER.info(f"/acquire endpoint retrieved sample_no: {sample_no}")
         active.action.action_params.update(

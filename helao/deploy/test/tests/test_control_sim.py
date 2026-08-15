@@ -17,7 +17,7 @@ import asyncio
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers.motion_control import Units
+from helao.ui.shared.motion_control import Units
 from helao.deploy.test.servers.action.control_sim import (
     ControlSim,
     MoveModes,
@@ -360,8 +360,8 @@ def test_the_config_shape_is_the_one_the_panels_discover(params, source, expecte
     A simulator whose config the shared discovery functions cannot read would
     let the negative gate pass over routes no panel could ever reach.
     """
-    from helao.core.servers.io_control import discover_do_items
-    from helao.core.servers.motion_control import discover_axes
+    from helao.ui.shared.io_control import discover_do_items
+    from helao.ui.shared.motion_control import discover_axes
 
     cfg = {"host": "127.0.0.1", "port": 8002, "params": params}
     if isinstance(source, tuple):
@@ -373,7 +373,7 @@ def test_the_config_shape_is_the_one_the_panels_discover(params, source, expecte
 
 
 def test_the_shipped_scale_orientation_is_read_correctly():
-    from helao.core.servers.motion_control import discover_axes
+    from helao.ui.shared.motion_control import discover_axes
 
     cfg = {"host": "127.0.0.1", "port": 8003, "params": MOTION_PARAMS}
     axes = {a.axis: a for a in discover_axes(cfg, "letter_scale", server_key="M")}

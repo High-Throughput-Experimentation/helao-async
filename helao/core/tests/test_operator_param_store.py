@@ -8,7 +8,7 @@ same file. These drive it directly against a tmp root.
 import json
 import os
 
-from helao.core.servers.operator import param_store as ps
+from helao.ui.shared.operator import param_store as ps
 
 
 def _root(tmp_path):

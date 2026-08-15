@@ -27,7 +27,6 @@ servers:
     port: 8002
     group: action
     fast: ws_simulator
-    deployment: hexagon
     live_vis: wssim_live_vis
     params: {}
     hlo_postprocess_libs:
@@ -37,7 +36,6 @@ servers:
     port: 8010
     group: action
     fast: sim_db_server
-    deployment: hexagon
     params:
       aws_bucket: helao-sim
       s3_record: true

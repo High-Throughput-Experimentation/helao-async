@@ -6,8 +6,8 @@ name, exactly as the ``*_vis`` panels pair across the two stacks. A station
 gains the Reflex panel by adding a ``reflex:`` server and changing nothing else.
 
 All this module contributes is *which* config blocks hold the outputs. The
-rendering and the endpoint calls are in ``helao.core.servers.reflex.control``
-and ``helao.core.servers.io_control``, shared with the Bokeh half.
+rendering and the endpoint calls are in ``helao.ui.reflex.control``
+and ``helao.ui.shared.io_control``, shared with the Bokeh half.
 """
 
 __all__ = ["DO_GROUPS", "TITLE"]

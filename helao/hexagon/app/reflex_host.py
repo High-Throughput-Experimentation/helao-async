@@ -10,7 +10,7 @@ snapshot import alike.
 
 Facade discipline, identical to P7e's ``makeVisApp``: **rendering is entirely
 the legacy module's**. The Reflex app object here *is*
-``helao.core.servers.reflex.app.app`` -- the same instance, not a rebuild --
+``helao.ui.reflex.app.app`` -- the same instance, not a rebuild --
 so the browser gets a byte-identical page and the exported bundle is
 byte-identical too. What hexagon routing adds is that the process is composed
 rather than hexagon in name only: ``build_wiring`` runs, the ``ui_host`` port
@@ -105,7 +105,7 @@ def _server_key(config) -> str:
 
     ``HELAO_REFLEX_SERVER_KEY`` is set by the launcher for the backend and by
     ``build_reflex_bundle`` for the export; the config scan is the same
-    fallback ``helao.core.servers.reflex.app`` applies, so the facade and the
+    fallback ``helao.ui.reflex.app`` applies, so the facade and the
     module it wraps can never disagree about which server they are.
     """
     import os
@@ -148,7 +148,7 @@ def build_host_wiring(key: str):
 # process that has none (the backend and the export are both children that
 # load `HELAO_REFLEX_CONFIG` themselves). So this import must come before the
 # wiring: `build_wiring` reads the installed config.
-from helao.core.servers.reflex import app as _legacy  # noqa: E402
+from helao.ui.reflex import app as _legacy  # noqa: E402
 from helao.helpers import config_loader as _config_loader  # noqa: E402
 from helao.helpers import helao_logging as _logging  # noqa: E402
 

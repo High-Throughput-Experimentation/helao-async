@@ -34,7 +34,7 @@ def _believable_stamp():
         "tool_versions": {"reflex": "0.9.7"},
         "modules": {
             rb.APP_MODULE_REL: "c" * 40,
-            **{f"helao/core/servers/reflex/m{i}.py": "d" * 40 for i in range(20)},
+            **{f"helao/ui/reflex/m{i}.py": "d" * 40 for i in range(20)},
         },
     }
 
@@ -206,13 +206,13 @@ def test_snapshot_import_follows_the_same_routing_as_the_child():
         seen.append(name)
         return name
 
-    assert rl.import_app_module({}, importer=_spy) == "helao.core.servers.reflex.app"
+    assert rl.import_app_module({}, importer=_spy) == "helao.ui.reflex.app"
     assert (
         rl.import_app_module({"deployment": "hexagon"}, importer=_spy)
         == "helao.hexagon.app.reflex_host"
     )
     assert seen == [
-        "helao.core.servers.reflex.app",
+        "helao.ui.reflex.app",
         "helao.hexagon.app.reflex_host",
     ]
 
@@ -463,7 +463,7 @@ def test_frontend_proxies_the_buffer_route_to_the_backend():
     from fastapi.testclient import TestClient
     from fastapi.staticfiles import StaticFiles
 
-    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+    from helao.ui.reflex.xy_component import BUFFER_ROUTE_PREFIX
 
     backend = FastAPI()
 
@@ -525,7 +525,7 @@ def test_buffer_proxy_reports_a_dead_backend_as_502():
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from helao.core.servers.reflex.xy_component import BUFFER_ROUTE_PREFIX
+    from helao.ui.reflex.xy_component import BUFFER_ROUTE_PREFIX
 
     with socket.socket() as probe:
         probe.bind(("127.0.0.1", 0))

@@ -171,7 +171,7 @@ class GalilAlignerHost:
         ``query_axis_position``/``query_axis_moving``) keeps feeding live
         positions to the Bokeh widgets.
         """
-        from helao.core.servers.vis import HelaoVis
+        from helao.ui.bokeh.vis import HelaoVis
         from helao.deploy.hte.layouts.aligner import Aligner
 
         app = HelaoVis(server_key=self._server_name, doc=doc)

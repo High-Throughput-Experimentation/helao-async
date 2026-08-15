@@ -21,7 +21,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from helao.core.servers.reflex import xy_component as xc
+from helao.ui.reflex import xy_component as xc
 
 
 def _bufs():

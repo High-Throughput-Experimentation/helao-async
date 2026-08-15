@@ -7,7 +7,7 @@ to prove the loader actually loads one.
 
 import os
 
-from helao.core.servers.operator import spec_parser as sp
+from helao.ui.shared.operator import spec_parser as sp
 
 PARSER_SOURCE = '''
 """A stand-in for a deployment's spec parser."""

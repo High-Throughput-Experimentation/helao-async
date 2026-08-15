@@ -57,10 +57,28 @@ def _path_str(node: ast.expr) -> Optional[str]:
     return None
 
 
-def _decorator_route(dec: ast.expr) -> Optional[dict]:
+def _decorator_route(dec: ast.expr, handler_name: str) -> Optional[dict]:
+    """The route a decorator declares, or None if it declares none.
+
+    Two forms, because a ported module no longer writes the first:
+
+    * ``@app.post(f"/{server_key}/acquire_data", tags=["action"])`` -- legacy,
+      path spelled out in the decorator.
+    * ``@host.action()`` -- native. The path is **not in the source**: the
+      ActionHost derives it from the handler's own name, and the method and
+      tag are fixed. Extracting only the first form silently yields an empty
+      route set for a ported module, which reads as "this server has no
+      action routes" rather than as an unsupported decorator.
+    """
     if not isinstance(dec, ast.Call):
         return None
     func = dec.func
+    if isinstance(func, ast.Attribute) and func.attr == "action":
+        return {
+            "path": f"/{{server_key}}/{handler_name}",
+            "method": "post",
+            "tags": ["action"],
+        }
     if not (isinstance(func, ast.Attribute) and func.attr in HTTP_METHODS):
         return None
     if not dec.args:
@@ -86,6 +104,13 @@ def _params(fn) -> list[dict]:
     for a, d in zip(args.args, defaults):
         if a.arg == "self":
             continue
+        # `ctx` is the native host's injected ActionContext. It is stripped
+        # from the exposed signature before FastAPI ever sees it, so it is not
+        # on the wire -- and recording it here would make every ported handler
+        # differ from its frozen legacy record on a parameter that no client
+        # can send.
+        if a.arg == "ctx":
+            continue
         out.append(
             {
                 "name": a.arg,
@@ -102,7 +127,7 @@ def extract_routes(module_path: Path, server_key: Optional[str] = None) -> list[
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             for dec in node.decorator_list:
-                r = _decorator_route(dec)
+                r = _decorator_route(dec, node.name)
                 if r is None:
                     continue
                 path = r["path"]

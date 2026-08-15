@@ -13,8 +13,8 @@ import inspect
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers.operator import helao_operator
-from helao.core.servers.operator.orch_backend import OrchBackend, RemoteBackend
+from helao.ui.shared.operator import helao_operator
+from helao.ui.shared.operator.orch_backend import OrchBackend, RemoteBackend
 from helao.hexagon.ports.operator_backend import OperatorBackendPort
 from helao.hexagon.tests.mirror_pin import abc_surface, protocol_members
 

@@ -284,8 +284,8 @@ def test_an_mfc_status_dict_becomes_the_columns_the_panel_plots():
     columns. Without the normalizer flattening a plain dict there were no
     numeric columns at all -- an empty chart beside an empty table, while the
     connection badge still read `live`."""
-    from helao.core.servers.reflex.ingest import normalize
-    from helao.core.servers.reflex.ringbuffer import RingBuffer
+    from helao.ui.reflex.ingest import normalize
+    from helao.ui.reflex.ringbuffer import RingBuffer
 
     cols, _ = normalize(
         [{"MFC0": ({"mass_flow": 1.5, "pressure": 14.7, "gas": "N2"}, 100.0)}]

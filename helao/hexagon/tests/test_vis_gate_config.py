@@ -117,7 +117,12 @@ def test_gate_config_ws_sources_present(path):
     conf = _load(path)
     servers = conf["servers"]
     assert servers["ORCH"]["deployment"] == "hexagon"
-    assert servers["SIM"]["deployment"] == "hexagon"
+    # SIM carries NO deployment key, and that is the assertion. The key routes
+    # a server through the hexagon shim, which grafts over a legacy BaseAPI;
+    # ws_simulator is now natively an ActionHost (test_ws_simulator_port), so
+    # re-adding the key would send a native host back through a graft that has
+    # nothing to rebind.
+    assert "deployment" not in servers["SIM"]
     assert servers["SIM"]["live_vis"] == "wssim_live_vis"
     assert servers["OPERATOR"]["params"]["orch_key"] == "ORCH"
     hostports = [

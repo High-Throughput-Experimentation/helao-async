@@ -20,8 +20,8 @@ import pytest
 from bokeh.document import Document
 from bokeh.models import Div, GlobalInlineStyleSheet, InlineStyleSheet
 
-from helao.core.servers import bokeh_theme
-from helao.core.servers.bokeh_theme import (
+from helao.ui.bokeh import theme as bokeh_theme
+from helao.ui.bokeh.theme import (
     CARRIER_TAG,
     GLOBAL_CSS,
     HELAO_THEME,
@@ -32,7 +32,7 @@ from helao.core.servers.bokeh_theme import (
     marker_style_block,
     semantic_button_stylesheet,
 )
-from helao.core.servers.palette import (
+from helao.ui.shared.palette import (
     BODY_TEXT,
     BUTTON_DANGER_BG,
     BUTTON_LABEL,
@@ -371,7 +371,7 @@ def test_helao_vis_themes_its_document():
 
     from helao.helpers import config_loader
 
-    from helao.core.servers.vis import HelaoVis
+    from helao.ui.bokeh.vis import HelaoVis
 
     config = {
         "root": tempfile.mkdtemp(),
@@ -553,6 +553,7 @@ def test_no_bokeh_input_widget_sets_styles():
             *repo_root.glob("helao/deploy/*/servers/**/*.py"),
             *repo_root.glob("helao/deploy/*/layouts/**/*.py"),
             *repo_root.glob("helao/core/servers/**/*.py"),
+            *repo_root.glob("helao/ui/**/*.py"),
         }
     )
     offenders: list[str] = []

@@ -21,9 +21,9 @@ __all__ = [
 
 import reflex as rx
 
-from helao.core.servers.palette import reflex_header_class, reflex_table_class
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import LiveVisState, assign
+from helao.ui.shared.palette import reflex_header_class, reflex_table_class
+from helao.ui.reflex import plots
+from helao.ui.reflex.state import LiveVisState, assign
 
 WS_PATH = "ws_live"
 

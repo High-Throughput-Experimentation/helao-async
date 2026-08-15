@@ -1,8 +1,8 @@
 __all__ = ["makeBokehApp"]
 
-from helao.core.servers.operator.bokeh_operator import BokehOperator
-from helao.core.servers.operator.orch_backend import RemoteBackend
-from helao.core.servers.vis import HelaoVis
+from helao.ui.bokeh.operator import BokehOperator
+from helao.ui.shared.operator.orch_backend import RemoteBackend
+from helao.ui.bokeh.vis import HelaoVis
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER

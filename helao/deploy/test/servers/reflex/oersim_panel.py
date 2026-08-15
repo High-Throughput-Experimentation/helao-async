@@ -9,8 +9,8 @@ __all__ = ["WS_PATH", "STATE_BASE", "build", "extract", "panel_id"]
 import numpy as np
 import reflex as rx
 
-from helao.core.servers.reflex import plots
-from helao.core.servers.reflex.state import ActionVisState
+from helao.ui.reflex import plots
+from helao.ui.reflex.state import ActionVisState
 
 WS_PATH = "ws_data"
 

@@ -1,4 +1,4 @@
-"""Gate on ``helao.core.servers.palette`` and on the colour-literal sweeper.
+"""Gate on ``helao.ui.shared.palette`` and on the colour-literal sweeper.
 
 Four things are pinned here:
 
@@ -27,8 +27,8 @@ from typing import Final
 
 import pytest
 
-from helao.core.servers import palette
-from helao.core.servers.palette import SERIES, TW
+from helao.ui.shared import palette
+from helao.ui.shared.palette import SERIES, TW
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 FIXTURE_DIR: Final[Path] = Path(__file__).parent / "fixtures" / "sweeper_calibration"
@@ -167,7 +167,7 @@ def test_neutral_ramp_is_slate_only() -> None:
 # ===========================================================================
 def test_palette_imports_nothing_heavy() -> None:
     """The module must stay importable by both stacks and by the tests."""
-    source = (REPO_ROOT / "helao/core/servers/palette.py").read_text()
+    source = (REPO_ROOT / "helao/ui/shared/palette.py").read_text()
     tree = ast.parse(source)
     imported: set[str] = set()
     for node in ast.walk(tree):
@@ -946,7 +946,7 @@ def test_reflex_page_tints_cover_the_shell_routes() -> None:
     guards for the Bokeh canvas: nothing fails, every contrast row passes, and
     the signal the colour exists to carry is simply gone.
     """
-    from helao.core.servers.reflex.app import SHELL_ROUTES
+    from helao.ui.reflex.app import SHELL_ROUTES
 
     assert set(palette.REFLEX_PAGE_TINTS) == set(SHELL_ROUTES)
     assert len(set(palette.REFLEX_PAGE_TINTS.values())) == len(SHELL_ROUTES)
@@ -1071,9 +1071,7 @@ def test_gridjs_hover_does_not_reintroduce_a_grey_header() -> None:
 
 
 REFLEX_STACK_GLOBS: Final[tuple[str, ...]] = (
-    "helao/core/servers/reflex/**/*.py",
-    "helao/core/servers/operator/app_reflex.py",
-    "helao/core/servers/data_browser/app_reflex.py",
+    "helao/ui/reflex/**/*.py",
     "helao/deploy/*/servers/reflex/**/*.py",
 )
 
@@ -1402,7 +1400,7 @@ def test_gridjs_header_padding_cannot_clip_its_content() -> None:
     icon 4px clear of each edge.
 
     A header *without* a sort button is shorter still, and got shorter again
-    when :data:`~helao.core.servers.palette.GRIDJS_HEADER_FONT_SIZE` brought the
+    when :data:`~helao.ui.shared.palette.GRIDJS_HEADER_FONT_SIZE` brought the
     label to 14px: its 21px line box measured 29.5px overall. The 24px figure
     below is deliberately the worst case rather than that one.
     """
@@ -1516,8 +1514,8 @@ _ASSIGN_TARGET_RE: Final[re.Pattern[str]] = re.compile(
 # whole-tree sweep could never reach zero — it would fail on its first run,
 # against the file the palette phase just wrote.
 SWEEP_EXEMPT_PATHS: Final[tuple[str, ...]] = (
-    "helao/core/servers/palette.py",
-    "helao/core/servers/bokeh_theme.py",
+    "helao/ui/shared/palette.py",
+    "helao/ui/bokeh/theme.py",
 )
 
 # Rule 4: a named per-site allowlist for ColumnDataSource *column-name*
@@ -1658,8 +1656,8 @@ def sweep_color_literals(paths) -> list[tuple[Path, int, str]]:
 def test_exemption_list_holds_exactly_two_entries() -> None:
     """Pinned by exact path so the exemption cannot quietly grow."""
     assert SWEEP_EXEMPT_PATHS == (
-        "helao/core/servers/palette.py",
-        "helao/core/servers/bokeh_theme.py",
+        "helao/ui/shared/palette.py",
+        "helao/ui/bokeh/theme.py",
     )
     assert len(SWEEP_EXEMPT_PATHS) == 2
     assert all(
@@ -1668,7 +1666,7 @@ def test_exemption_list_holds_exactly_two_entries() -> None:
 
 
 def test_palette_module_is_exempt_from_its_own_sweep() -> None:
-    assert sweep_color_literals([REPO_ROOT / "helao/core/servers/palette.py"]) == []
+    assert sweep_color_literals([REPO_ROOT / "helao/ui/shared/palette.py"]) == []
 
 
 def test_a_deployment_palette_py_does_not_inherit_the_exemption(tmp_path) -> None:
@@ -1678,9 +1676,7 @@ def test_a_deployment_palette_py_does_not_inherit_the_exemption(tmp_path) -> Non
 
 
 def test_sweeper_skips_absent_paths() -> None:
-    assert (
-        sweep_color_literals([REPO_ROOT / "helao/core/servers/no_such_file.py"]) == []
-    )
+    assert sweep_color_literals([REPO_ROOT / "helao/ui/shared/no_such_file.py"]) == []
 
 
 # --- fixture calibration ---------------------------------------------------
@@ -1769,6 +1765,7 @@ def test_no_raw_color_literals_anywhere() -> None:
         {
             *REPO_ROOT.glob("helao/deploy/*/servers/**/*.py"),
             *REPO_ROOT.glob("helao/core/servers/**/*.py"),
+            *REPO_ROOT.glob("helao/ui/**/*.py"),
             *REPO_ROOT.glob("helao/hexagon/**/*.py"),
         }
     )
@@ -1780,7 +1777,7 @@ def test_no_raw_color_literals_anywhere() -> None:
         f"{len(findings)} raw colour literals remain across "
         f"{len({p for p, _, _ in findings})} modules. This test is EXPECTED TO "
         f"FAIL until the final sweep phase lands; every site below must resolve "
-        f"through helao.core.servers.palette:\n{rendered}"
+        f"through helao.ui.shared.palette:\n{rendered}"
     )
 
 
@@ -1797,6 +1794,20 @@ def test_sweep_reaches_hexagon_tree() -> None:
     assert (
         "helao/hexagon/adapters/vis/galil_aligner_host.py" in targets
     ), "helao/hexagon/**/*.py matched nothing under adapters/vis — glob is inert"
+
+
+def test_sweep_reaches_the_ui_tree() -> None:
+    """B0: the whole-tree sweep must cover ``helao/ui/``.
+
+    Same vacuity trap as the hexagon guard above, and the same remedy: pin a
+    file known to live under the new root rather than asserting the glob is
+    merely non-empty, so a glob that matches the package but stops descending
+    into it still fails.
+    """
+    targets = {_relative(p) for p in REPO_ROOT.glob("helao/ui/**/*.py")}
+    assert (
+        "helao/ui/shared/palette.py" in targets
+    ), "helao/ui/**/*.py matched nothing under shared/ — glob is inert"
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,8 @@ import asyncio
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import io_control
-from helao.core.servers.io_control import (
+from helao.ui.shared import io_control
+from helao.ui.shared.io_control import (
     DoItem,
     discover_do_items,
     group_do_items,

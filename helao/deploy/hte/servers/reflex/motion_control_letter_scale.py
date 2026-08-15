@@ -21,8 +21,8 @@ name. Its ``count_to_mm`` is millimetres per count -- the *reciprocal* of
 ``motion_control_inverse_scale``'s ``pos_scale``.
 
 All this module contributes is *which* schema the axes are declared in. The
-rendering and the endpoint calls are in ``helao.core.servers.reflex.control``
-and ``helao.core.servers.motion_control``, shared with the Bokeh half.
+rendering and the endpoint calls are in ``helao.ui.reflex.control``
+and ``helao.ui.shared.motion_control``, shared with the Bokeh half.
 """
 
 __all__ = ["DO_GROUPS", "AXIS_SOURCE", "TITLE"]

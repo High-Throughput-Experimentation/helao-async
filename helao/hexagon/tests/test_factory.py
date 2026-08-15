@@ -381,10 +381,7 @@ async def test_action_app_startup_binds_ws_publish_bridge(
     """P2b-2 D3: the existing _hexagon_active_graft_startup hook constructs
     WsPublishBridge over the live base's queues and binds it into the status
     adapter (ACTION apps only; makeOrchApp is untouched, Q1)."""
-    from types import SimpleNamespace
-
     import helao.hexagon.app.active_graft as active_graft_mod
-    from helao.helpers.multisubscriber_queue import MultisubscriberQueue
     from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
     from helao.hexagon.app.factory import makeActionApp
 
@@ -400,11 +397,10 @@ async def test_action_app_startup_binds_ws_publish_bridge(
     )
     app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
     assert app.hexagon_ws_bridge is None  # bound at startup, not at build
-    app.base = SimpleNamespace(
-        status_q=MultisubscriberQueue(),
-        data_q=MultisubscriberQueue(),
-        live_q=MultisubscriberQueue(),
-    )
+    # No injected `base` any more: makeActionApp returns an ActionHost, which
+    # owns the three fan-out queues itself and answers to `app.base is app`.
+    # Assigning one here raised AttributeError once `base` became a read-only
+    # property, and the assertions below read the real queues regardless.
     hook = [
         h
         for h in app.router.on_startup
