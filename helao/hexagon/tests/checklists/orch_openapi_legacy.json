@@ -1,0 +1,1112 @@
+{
+ "routes": [
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": "global_param_test",
+     "in": "query",
+     "name": "param_name",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "param_value",
+     "required": false,
+     "type": [
+      "boolean",
+      "integer",
+      "number",
+      "string"
+     ]
+    }
+   ],
+   "path": "/ORCH/add_global_param",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/ORCH/cancel_wait",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/ORCH/clear_global_params",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": "equals",
+     "in": "query",
+     "name": "check_condition",
+     "required": false,
+     "type": null
+    },
+    {
+     "default": "",
+     "in": "query",
+     "name": "check_parameter",
+     "required": false,
+     "type": [
+      "null",
+      "string"
+     ]
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "check_value",
+     "required": false,
+     "type": [
+      "boolean",
+      "integer",
+      "number"
+     ]
+    },
+    {
+     "default": "",
+     "in": "query",
+     "name": "conditional_experiment_name",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "path": "/ORCH/conditional_exp",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": "conditional skip",
+     "in": "query",
+     "name": "reason",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "equals",
+     "in": "query",
+     "name": "skip_condition",
+     "required": false,
+     "type": null
+    },
+    {
+     "default": "",
+     "in": "query",
+     "name": "skip_parameter",
+     "required": false,
+     "type": [
+      "null",
+      "string"
+     ]
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "skip_queued_actions",
+     "required": false,
+     "type": "boolean"
+    },
+    {
+     "default": false,
+     "in": "query",
+     "name": "skip_queued_experiments",
+     "required": false,
+     "type": "boolean"
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "skip_value",
+     "required": false,
+     "type": [
+      "boolean",
+      "integer",
+      "number",
+      "string"
+     ]
+    }
+   ],
+   "path": "/ORCH/conditional_skip",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 2,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": false,
+     "in": "query",
+     "name": "clear_queues",
+     "required": false,
+     "type": "boolean"
+    },
+    {
+     "default": "conditional stop",
+     "in": "query",
+     "name": "reason",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": "equals",
+     "in": "query",
+     "name": "stop_condition",
+     "required": false,
+     "type": null
+    },
+    {
+     "default": "",
+     "in": "query",
+     "name": "stop_parameter",
+     "required": false,
+     "type": [
+      "null",
+      "string"
+     ]
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "stop_value",
+     "required": false,
+     "type": [
+      "boolean",
+      "integer",
+      "number",
+      "string"
+     ]
+    }
+   ],
+   "path": "/ORCH/conditional_stop",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": true,
+     "in": "query",
+     "name": "switch",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "path": "/ORCH/estop",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": "wait",
+     "in": "query",
+     "name": "reason",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "path": "/ORCH/interrupt",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 1,
+     "in": "query",
+     "name": "action_version",
+     "required": false,
+     "type": "integer"
+    },
+    {
+     "default": 10.0,
+     "in": "query",
+     "name": "waittime",
+     "required": false,
+     "type": "number"
+    }
+   ],
+   "path": "/ORCH/wait",
+   "tags": [
+    "action"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/_raise_async_exception",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/_raise_exception",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/active_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/append_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/append_sequence",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/append_split_sequences",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "client_host",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "in": "query",
+     "name": "client_port",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "client_servkey",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "path": "/attach_client",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_actions",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_actives",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_error",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_estop",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_experiments",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_global_params_private",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/clear_sequences",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "client_host",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "in": "query",
+     "name": "client_port",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "client_servkey",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "path": "/detach_client",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/drop_experiment_inds",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "lower",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "upper",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/drop_experiment_range",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/endpoints",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/estop_orch",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": false,
+     "in": "query",
+     "name": "timestamp_pck",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "path": "/export_queues",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_active_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_active_sequence",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_global_params",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_histories",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "kind",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    {
+     "default": 0,
+     "in": "query",
+     "name": "offset",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/get_history_page",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_lbuf",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_orch_state",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "idx",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "kind",
+     "required": true,
+     "type": "string"
+    }
+   ],
+   "path": "/get_queue_object",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_status",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_status_summary",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/get_step_flags",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/global_status",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "pck_path",
+     "required": false,
+     "type": [
+      "null",
+      "string"
+     ]
+    }
+   ],
+   "path": "/import_queues",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": 0,
+     "in": "query",
+     "name": "idx",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/insert_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/last_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/latest_action_uuids",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/latest_experiment_uuids",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/latest_sequence_uuids",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    {
+     "default": 0,
+     "in": "query",
+     "name": "offset",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/list_actions",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/list_active_actions",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/list_all_experiments",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/list_executors",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    {
+     "default": 0,
+     "in": "query",
+     "name": "offset",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/list_experiments",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/list_nonblocking",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "limit",
+     "required": false,
+     "type": [
+      "integer",
+      "null"
+     ]
+    },
+    {
+     "default": 0,
+     "in": "query",
+     "name": "offset",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/list_sequences",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/loaded_modules",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "from_idx",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "to_idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/move_action",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "from_idx",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "to_idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/move_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "from_idx",
+     "required": true,
+     "type": "integer"
+    },
+    {
+     "in": "query",
+     "name": "to_idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/move_sequence",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/prepend_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/prepend_sequences",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/remove_action",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/remove_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "idx",
+     "required": true,
+     "type": "integer"
+    }
+   ],
+   "path": "/remove_sequence",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "in": "query",
+     "name": "kind",
+     "required": true,
+     "type": "string"
+    },
+    {
+     "in": "query",
+     "name": "value",
+     "required": true,
+     "type": "boolean"
+    }
+   ],
+   "path": "/set_step_flag",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/shutdown",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/skip_experiment",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/start",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": false,
+     "in": "query",
+     "name": "reset_run_id",
+     "required": false,
+     "type": "boolean"
+    }
+   ],
+   "path": "/stop",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": "",
+     "in": "query",
+     "name": "executor_id",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "path": "/stop_executor",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/test_alert",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/test_receive",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [],
+   "path": "/update_global_params",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": "",
+     "in": "query",
+     "name": "server_host",
+     "required": false,
+     "type": "string"
+    },
+    {
+     "default": 9000,
+     "in": "query",
+     "name": "server_port",
+     "required": false,
+     "type": "integer"
+    }
+   ],
+   "path": "/update_nonblocking",
+   "tags": [
+    "private"
+   ]
+  },
+  {
+   "method": "post",
+   "params": [
+    {
+     "default": "false",
+     "in": "query",
+     "name": "regular_task",
+     "required": false,
+     "type": "string"
+    }
+   ],
+   "path": "/update_status",
+   "tags": [
+    "private"
+   ]
+  }
+ ]
+}

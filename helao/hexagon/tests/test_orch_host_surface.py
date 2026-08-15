@@ -1,6 +1,8 @@
 """OrchHost construction and route surface (B3a)."""
 
+import json
 import tempfile
+from pathlib import Path
 
 
 def _host():
@@ -109,3 +111,88 @@ def test_estop_is_registered_exactly_once():
     host = _host()
     estops = [r for r in host.routes if getattr(r, "path", "") == "/ORCH/estop"]
     assert len(estops) == 1, f"expected exactly one /ORCH/estop, got {len(estops)}"
+
+
+CHECKLIST = (
+    Path(__file__).resolve().parents[1] / "tests/checklists/orch_openapi_legacy.json"
+)
+
+
+#: Routes registered as raising stubs until B3b. They take no parameters
+#: yet, so the parameter gate cannot cover them -- exempted HERE, by name,
+#: rather than by weakening the comparison, so the exemption is visible and
+#: B3b has to delete it.
+STUB_ROUTES: frozenset[str] = frozenset(
+    {
+        "/set_step_flag",
+        "/stop",
+        "/update_nonblocking",
+        "/update_status",
+        "/ORCH/interrupt",
+        "/ORCH/conditional_exp",
+        "/ORCH/conditional_skip",
+        "/ORCH/conditional_stop",
+    }
+)
+
+
+def _by_key(doc: dict) -> dict:
+    return {(r["path"], r["method"]): r for r in doc["routes"]}
+
+
+def test_the_route_surface_matches_the_live_legacy_orchestrator():
+    """Captured from a LAUNCHED legacy orchestrator, not hand-written.
+
+    B1 measured its hand-written surface checklist stale: 9 routes listed
+    with 5 marked GET where the live server had 19, every one POST. A
+    decorator scan is no better here -- orch_api also calls
+    _register_utility_endpoints, whose routes it cannot see.
+
+    WebSockets are absent from openapi.json entirely, so this says nothing
+    about ws_status/ws_data/ws_live. Those are B3b's, and they need a
+    connect test rather than a schema diff.
+    """
+    from harness import openapi_capture
+
+    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    current = _by_key(openapi_capture.normalize(_host().openapi()))
+
+    missing = sorted(k for k in legacy if k not in current)
+    assert (
+        missing == []
+    ), f"routes the live legacy orchestrator has, OrchHost lacks: {missing}"
+
+
+def test_parameter_schemas_match_the_live_legacy_orchestrator():
+    """A route can be present, correctly tagged, and still reject every
+    request its predecessor accepted -- a renamed parameter, a lost
+    default, a changed type. None of that shows in a path-set diff."""
+    from harness import openapi_capture
+
+    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    current = _by_key(openapi_capture.normalize(_host().openapi()))
+
+    drifted = {
+        key: {"legacy": legacy[key]["params"], "host": current[key]["params"]}
+        for key in legacy
+        if key in current
+        and key[0] not in STUB_ROUTES
+        and legacy[key]["params"] != current[key]["params"]
+    }
+    assert drifted == {}, f"parameter drift on {len(drifted)} route(s): {drifted}"
+
+
+def test_the_stub_exemption_list_is_exactly_the_routes_that_still_raise():
+    """The exemption must not outlive the stubs.
+
+    B3b implements these; each one it lands must leave this set, or the
+    parameter gate silently stops covering a route that now has a real
+    body. Checked by asking the ratchet which members are still missing
+    rather than by a second hand-written list, which would drift.
+    """
+    from helao.hexagon.tests.test_orch_host_member_coverage import NOT_YET_PORTED
+
+    assert NOT_YET_PORTED, (
+        "NOT_YET_PORTED is empty, so nothing should still be stubbed -- "
+        "STUB_ROUTES must be emptied in the same change"
+    )
