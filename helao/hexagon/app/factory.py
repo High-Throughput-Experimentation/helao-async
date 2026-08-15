@@ -13,6 +13,7 @@ launcher edits, per-config atomic cut-over/rollback."""
 import os
 from importlib import import_module
 
+from helao.helpers import helao_logging as logging
 from helao.hexagon.adapters.errors import UnwiredPortError
 from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
 from helao.hexagon.adapters.legacy.config import from_global_config
@@ -32,6 +33,19 @@ from helao.hexagon.app.wiring import (
 )
 
 __all__ = ["build_wiring", "makeActionApp", "makeOrchApp", "makeVisApp"]
+
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def _is_native_host(app) -> bool:
+    """True when ``app`` is an ``ActionHost`` rather than a legacy BaseAPI.
+
+    Imported inside the function: ``action_host`` imports this module's
+    siblings, and a module-level import here closes that cycle.
+    """
+    from helao.hexagon.app.action_host import ActionHost
+
+    return isinstance(app, ActionHost)
 
 
 def build_wiring(server_key: str) -> PortWiring:
@@ -104,7 +118,18 @@ def makeActionApp(server_key: str, legacy_module: str):
     # contain_action + meta_writer before any action can be contained.
     @app.on_event("startup")
     async def _hexagon_active_graft_startup():
-        app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
+        # A module that has been ported to ActionHost needs no write graft:
+        # it has no contain_action to rebind (the explicit ActionContext
+        # replaced it) and its writes already run on the native runtime.
+        # Grafting anyway is not a no-op -- it raises AttributeError inside
+        # the startup event, which uvicorn reports only as SystemExit(3), so
+        # the server never binds and the launch reads as a mystery.
+        if _is_native_host(app):
+            LOGGER.info(
+                f"{server_key}: native ActionHost, skipping the active write graft"
+            )
+        else:
+            app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
         # P2b-2 (D3): the WS publish bridge needs the live Base's fan-out
         # queues — construct and bind it now, ACTION apps only (orch WS
         # stays on legacy relays, Q1: makeOrchApp never binds).
