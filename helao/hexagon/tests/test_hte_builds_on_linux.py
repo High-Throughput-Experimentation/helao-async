@@ -102,6 +102,27 @@ def test_windows_only_module_fails_the_way_we_recorded(
     ), f"{module} raised {exc.value!r}, not {expected!r}"
 
 
+def test_the_orchestrator_builds_a_native_OrchHost() -> None:
+    """B5.6 moved the hte orchestrator entrypoint from OrchAPI to OrchHost.
+
+    Worth its own case rather than a row in BUILDS: the constructors differ.
+    ``OrchAPI`` took ``driver_classes``, every hte config passed None, and
+    ``OrchHost`` does not have the parameter at all -- so the port raised
+    TypeError on a keyword that had only ever meant "this server has no
+    driver". Nothing in the route checklist could see that; the orchestrator
+    has no entry there, and the failure is at construction.
+    """
+    from helao.hexagon.app.orch_host import OrchHost
+
+    load_global_config("adss3", set_global=True)
+    mod = importlib.import_module("helao.deploy.hte.servers.orchestrator.async_orch2")
+    app = mod.makeApp("ORCH")
+    assert isinstance(app, OrchHost), f"orchestrator built a {type(app).__name__}"
+    assert app.title == "ORCH"
+    # The surface B3a froze against the live legacy orchestrator.
+    assert len(app.routes) == 84, f"orchestrator has {len(app.routes)} routes"
+
+
 def test_the_probe_covers_every_station_live_module() -> None:
     """17 modules appear in a live hte station config; all 17 are accounted for.
 

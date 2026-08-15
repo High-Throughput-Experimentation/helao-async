@@ -19,7 +19,8 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.temperature_control.mecom_driver import (
     MeerstetterTEC,
@@ -29,19 +30,19 @@ from ...drivers.temperature_control.mecom_driver import (
 )
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the Meerstetter TEC.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the Meerstetter TEC.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with TEC monitoring and control
+        The configured ActionHost instance with TEC monitoring and control
         endpoints registered.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Sensor server",
@@ -50,8 +51,9 @@ def makeApp(server_key) -> BaseAPI:
         poller_class=MeerstetterTECPoller,
     )
 
-    @app.post(f"/{server_key}/record_tec", tags=["action"])
+    @app.action()
     async def record_tec(
+        ctx: ActionContext,
         duration: float = -1,
         acquisition_rate: float = 0.2,
         fast_samples_in: list[
@@ -73,7 +75,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "TEC"
         executor = TECMonExec(
             active=active,
@@ -83,8 +85,8 @@ def makeApp(server_key) -> BaseAPI:
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_record_tec", tags=["action"])
-    async def cancel_record_tec():
+    @app.action()
+    async def cancel_record_tec(ctx: ActionContext):
         """Stop any running ``record_tec`` executors.
 
         Does not change the setpoint or enable/disable the controller.
@@ -96,15 +98,16 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        active = await ctx.begin()
+        for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "record_tec":
                 executor.stop_action_task()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/set_temperature", tags=["action"])
+    @app.action()
     async def set_temperature(
+        ctx: ActionContext,
         target_temperature_degc: float = 25.0,
     ):
         """Write a new temperature setpoint to the TEC controller.
@@ -119,13 +122,13 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="setTEC")
+        active = await ctx.begin(action_abbr="setTEC")
         app.driver.set_temp(active.action.action_params["target_temperature_degc"])
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/enable_tec", tags=["action"])
-    async def enable_tec():
+    @app.action()
+    async def enable_tec(ctx: ActionContext):
         """Enable the TEC controller output.
 
         Args:
@@ -135,13 +138,13 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="enableTEC")
+        active = await ctx.begin(action_abbr="enableTEC")
         app.driver.enable()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/disable_tec", tags=["action"])
-    async def disable_tec():
+    @app.action()
+    async def disable_tec(ctx: ActionContext):
         """Disable the TEC controller output.
 
         Args:
@@ -151,13 +154,14 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action(action_abbr="disableTEC")
+        active = await ctx.begin(action_abbr="disableTEC")
         app.driver.disable()
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/wait_till_stable", tags=["action"])
+    @app.action()
     async def wait_till_stable(
+        ctx: ActionContext,
         acquisition_rate: float = 0.2,
     ):
         """Start a :class:`TECWaitExec` that returns once the TEC is stable.
@@ -173,7 +177,7 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The active action dictionary from ``start_executor``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "waitTEC"
         executor = TECWaitExec(
             active=active,
@@ -183,8 +187,8 @@ def makeApp(server_key) -> BaseAPI:
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/cancel_wait_till_stable", tags=["action"])
-    async def cancel_wait_till_stable():
+    @app.action()
+    async def cancel_wait_till_stable(ctx: ActionContext):
         """Stop any running ``wait_till_stable`` executors.
 
         Args:
@@ -194,8 +198,8 @@ def makeApp(server_key) -> BaseAPI:
         Returns:
             The finished action dictionary.
         """
-        active = await app.base.setup_and_contain_action()
-        for exec_id, executor in app.base.executors.items():
+        active = await ctx.begin()
+        for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "wait_till_stable":
                 executor.stop_action_task()
         finished_action = await active.finish()
