@@ -12,25 +12,27 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base_api import BaseAPI
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
 
 from ...drivers.io.synaccess.driver import NetbooterDriver
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for the Synaccess Netbooter PDU.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for the Synaccess Netbooter PDU.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with PDU outlet endpoints registered.
+        The configured ActionHost instance with PDU outlet endpoints
+        registered.
     """
 
     # current plan is 1 mfc per COM
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="PDU server",
@@ -38,8 +40,9 @@ def makeApp(server_key) -> BaseAPI:
         driver_classes=[NetbooterDriver],
     )
 
-    @app.post(f"/{server_key}/switch_outlet", tags=["action"])
+    @app.action()
     async def switch_outlet(
+        ctx: ActionContext,
         outlet_number: int = 1,
         on: bool = False,
     ):
@@ -55,7 +58,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary, marked errored if the driver
             response is not ``DriverResponseType.success``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         driver_resp = app.driver.switch_outlet(
             outlet_number=active.action.action_params["outlet_number"],
             on=active.action.action_params["on"],
@@ -66,8 +69,9 @@ def makeApp(server_key) -> BaseAPI:
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/switch_all", tags=["action"])
+    @app.action()
     async def switch_all(
+        ctx: ActionContext,
         on: bool = False,
     ):
         """Toggle every PDU outlet on or off.
@@ -81,7 +85,7 @@ def makeApp(server_key) -> BaseAPI:
             The finished action dictionary, marked errored if the driver
             response is not ``DriverResponseType.success``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         driver_resp = app.driver.switch_all(
             on=active.action.action_params["on"],
         )
