@@ -192,6 +192,10 @@ class ActionHost(HelaoFastAPI):
         # HelaoSyncer.__init__ (sync_driver.py:2203) among others -- its absence
         # is a startup crash for any driver that writes, not a lazy failure.
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
+        #: Legacy reads this from typed_cfg; an action with no run_type inherits
+        #: it and is marked MANUAL, which is what routes it to RUNS_DIAG.
+        rt = self.world_cfg.get("run_type")
+        self.run_type = rt.lower() if isinstance(rt, str) else None
 
         self.status_q = MultisubscriberQueue()
         self.data_q = MultisubscriberQueue()
