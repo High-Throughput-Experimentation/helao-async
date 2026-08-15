@@ -27,35 +27,36 @@ import httpx
 import pytest
 
 
-def _app(root: str):
+def _app(root: str, postprocess_libs: list[str] | None = None):
     from helao.deploy.test.servers.action.ws_simulator import makeApp
     from helao.helpers import config_loader
 
+    server: dict = {
+        "host": "127.0.0.1",
+        "port": 8002,
+        "group": "action",
+        "params": {"columns": {"a": 1, "b": 2}},
+    }
+    if postprocess_libs is not None:
+        server["hlo_postprocess_libs"] = postprocess_libs
     config_loader.CONFIG = {
         "root": root,
         "dummy": True,
         "simulation": True,
         "run_type": "simulation",
-        "servers": {
-            "SIM": {
-                "host": "127.0.0.1",
-                "port": 8002,
-                "group": "action",
-                "params": {"columns": {"a": 1, "b": 2}},
-            }
-        },
+        "servers": {"SIM": server},
     }
     return makeApp("SIM")
 
 
-async def _started_app(root: str):
+async def _started_app(root: str, postprocess_libs: list[str] | None = None):
     """Build the host and run its startup handlers.
 
     ``httpx.ASGITransport`` does not run lifespan events, and the startup
     handler is what builds the driver and starts the status spine -- without
     it the action has nothing to acquire from.
     """
-    app = _app(root)
+    app = _app(root, postprocess_libs)
     for handler in app.router.on_startup:
         # _rpc_startup binds the co-located ZMQ ROUTER on port+10000, which
         # collides with anything already serving that port (a running rig, a
@@ -79,10 +80,9 @@ def _run_files(root: str) -> list[Path]:
     return found
 
 
-@pytest.mark.asyncio
-async def test_an_action_writes_its_meta_and_data_files() -> None:
-    root = tempfile.mkdtemp(prefix="helao_artifacts_")
-    app = await _started_app(root)
+async def _run_one_action(root: str, postprocess_libs: list[str] | None = None):
+    """Start a host, run one acquire_data to completion, return its files."""
+    app = await _started_app(root, postprocess_libs)
 
     # The executor reads the live buffer on its first poll, and the buffer is
     # filled by live_buffer_task folding what the driver's 10 Hz loop
@@ -117,10 +117,37 @@ async def test_an_action_writes_its_meta_and_data_files() -> None:
     await asyncio.sleep(0.2)  # let the finalizer's writes land
 
     files = _run_files(root)
-    names = sorted(p.name for p in files)
     assert files, (
         "the action returned 200 and wrote nothing under any RUNS_* tree; "
         f"root contents: {sorted(p.name for p in Path(root).iterdir())}"
     )
+    return sorted(p.name for p in files)
+
+
+@pytest.mark.asyncio
+async def test_an_action_writes_its_meta_and_data_files() -> None:
+    names = await _run_one_action(tempfile.mkdtemp(prefix="helao_artifacts_"))
     assert any(n.endswith("-act.yml") for n in names), f"no act meta file: {names}"
     assert any(n.endswith(".hlo") for n in names), f"no hlo data file: {names}"
+
+
+@pytest.mark.asyncio
+async def test_a_bare_named_post_processor_runs_and_emits_its_file() -> None:
+    """``hlo_postprocess_libs: [hlo_to_csv]`` -- a NAME, not a path.
+
+    The bare-name form is what production configs use, and it resolves
+    against a deployment's ``processors/`` directory. A path-only loader
+    skips it with a warning, and the only visible consequence is a run that
+    produces no ``.csv``: GM-1 matched legacy on every one of the 26 members
+    of the synced zip except the four csv files.
+
+    The processor also has to be registered as a **class** -- the finalizer
+    calls ``hpp(action, save_root)`` per action, so an instance raises
+    TypeError inside a caught block and the csv silently never appears.
+    """
+    names = await _run_one_action(
+        tempfile.mkdtemp(prefix="helao_postproc_"), postprocess_libs=["hlo_to_csv"]
+    )
+    assert any(
+        n.endswith(".csv") for n in names
+    ), f"post-processor produced no csv: {names}"
