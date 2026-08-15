@@ -121,12 +121,17 @@ class OrchHost(ActionHost):
         # hexagon/adapters/native/sync_driver.py and the DB server already
         # runs on it, but switching the orchestrator's own instance is a
         # behaviour decision, and B3a makes none.
-        sync_server_key = resolve_sync_server_key(self.world_cfg)
-        self.use_sync = sync_server_key is not None
-        if self.use_sync:
-            self.syncer = HelaoSyncer(
-                action_serv=self, sync_server_name=sync_server_key
-            )
+        # `use_sync` is decided here because collaborators read it, but the
+        # SyncDriver itself is constructed at startup: its __init__ calls
+        # asyncio.create_task, and there is no running loop yet.
+        #
+        # Legacy never hit this because OrchAPI constructs Orch INSIDE its
+        # startup handler -- `self.orch = Orch(fastapp=self)` -- so the whole
+        # of Orch.__init__ already ran on a live loop. Porting that body into
+        # a constructor that runs at import/build time moves it off one.
+        self._sync_server_key = resolve_sync_server_key(self.world_cfg)
+        self.use_sync = self._sync_server_key is not None
+        self.syncer = None
 
         # --- orch.py:121-125: the three queues --------------------------
         self.sequence_dq = zdeque([])
@@ -1397,6 +1402,10 @@ class OrchHost(ActionHost):
 
         @self.on_event("startup")
         async def _orch_startup():
+            if self.use_sync and self.syncer is None:
+                self.syncer = HelaoSyncer(
+                    action_serv=self, sync_server_name=self._sync_server_key
+                )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
             self.globstat_broadcaster = asyncio.create_task(
                 self.globstat_broadcast_task()

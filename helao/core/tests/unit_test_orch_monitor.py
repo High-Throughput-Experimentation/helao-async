@@ -32,7 +32,7 @@ import traceback
 
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers import orch_monitor as om
+from helao.hexagon.app import orch_monitor as om
 from helao.core.tests._test_utils import TestReporter
 
 

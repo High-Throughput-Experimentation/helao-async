@@ -37,7 +37,7 @@ import json
 import traceback
 
 from helao.core.error import ErrorCodes
-from helao.core.servers import orch_status_sync as oss
+from helao.hexagon.app import orch_status_sync as oss
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 
