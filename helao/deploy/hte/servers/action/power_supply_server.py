@@ -21,8 +21,9 @@ import time
 from helao.core.error import ErrorCodes
 from helao.core.models.file import HloHeaderModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base_api import BaseAPI
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.executor import Executor
 
 from ...drivers.power_supply.power_supply_driver import (
@@ -444,20 +445,21 @@ class SquareWaveExecutor(Executor):
         return {"error": ErrorCodes.none}
 
 
-async def power_supply_dyn_endpoints(app: BaseAPI):
+async def power_supply_dyn_endpoints(app: ActionHost):
     """Register the power-supply action endpoints.
 
     Disables concurrent actions on this server and attaches ``apply_voltage``,
     ``square_wave``, and ``constant_current_square_wave`` endpoints.
 
     Args:
-        app: The :class:`BaseAPI` instance being configured.
+        app: The :class:`ActionHost` instance being configured.
     """
-    server_key = app.base.server.server_name
-    app.base.server_params["allow_concurrent_actions"] = False
+    server_key = app.server.server_name
+    app.server_params["allow_concurrent_actions"] = False
 
-    @app.post(f"/{server_key}/apply_voltage", tags=["action"])
+    @app.action()
     async def apply_voltage(
+        ctx: ActionContext,
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
@@ -476,7 +478,7 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
 
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
@@ -497,8 +499,9 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
         return active_action_dict
 
-    @app.post(f"/{server_key}/square_wave", tags=["action"])
+    @app.action()
     async def square_wave(
+        ctx: ActionContext,
         voltage: float = 1.0,
         sleep_time: float = 0.05,
     ):
@@ -517,7 +520,7 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
 
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
@@ -538,8 +541,9 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
 
         return active_action_dict
 
-    @app.post(f"/{server_key}/constant_current_square_wave", tags=["action"])
+    @app.action()
     async def constant_current_square_wave(
+        ctx: ActionContext,
         current: float = 0.01,
         sleep_time: float = 0.05,
         sleep_time1: float = 1,
@@ -566,7 +570,7 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         # Prepare json_data_keys for logging/serialization (for example: ["elapsed_time_s", "voltage_v", "current_a"])
         data_keys = ["elapsed_time_s", "voltage_v", "current_a"]  # Adjust as needed
 
-        active = await app.base.setup_and_contain_action(
+        active = await ctx.begin(
             json_data_keys=data_keys,
             file_type="power_supply_helao__file",
             hloheader=HloHeaderModel(
@@ -590,20 +594,20 @@ async def power_supply_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
 
-def makeApp(server_key) -> BaseAPI:
-    """Build the BaseAPI app for a generic programmable power supply.
+def makeApp(server_key) -> ActionHost:
+    """Build the ActionHost app for a generic programmable power supply.
 
     Args:
         server_key: Unique key identifying this server in the orchestration
             group.
 
     Returns:
-        The configured BaseAPI instance with power-supply action endpoints
+        The configured ActionHost instance with power-supply action endpoints
         attached via :func:`power_supply_dyn_endpoints` and a private
         ``stop_private`` endpoint that disconnects the driver.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Power supply action server",

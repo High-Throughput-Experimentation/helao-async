@@ -319,7 +319,8 @@ class ActionHost(HelaoFastAPI):
         Args:
             action: The action this session tracks.
             **kwargs: ``json_data_keys``, ``action_abbr``, ``file_type``,
-                ``hloheader`` — forwarded to :meth:`ActionSession.open`.
+                ``hloheader``, ``sample_global_labels`` — forwarded to
+                :meth:`ActionSession.open`.
 
         Returns:
             The :class:`ActionSession` now tracking *action*.

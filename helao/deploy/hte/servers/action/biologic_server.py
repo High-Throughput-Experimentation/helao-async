@@ -29,8 +29,9 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.core.servers.base_api import BaseAPI, action_version
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.hexagon.app.action_context import ActionContext, action_version
+from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
 
@@ -307,7 +308,7 @@ class BiologicExec(Executor):
         return {"error": error}
 
 
-async def biologic_dyn_endpoints(app: BaseAPI):
+async def biologic_dyn_endpoints(app: ActionHost):
     """Register the Biologic technique endpoints once the driver is ready.
 
     Disables concurrent actions on this server, waits for
@@ -315,10 +316,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
     ``run_OCV``, ``run_PEIS``, ``run_GEIS`` and ``run_CAOCV`` POST routes.
 
     Args:
-        app: The :class:`BaseAPI` instance being constructed by ``makeApp``.
+        app: The :class:`ActionHost` instance being constructed by ``makeApp``.
     """
-    server_key = app.base.server.server_name
-    app.base.server_params["allow_concurrent_actions"] = False
+    server_key = app.server.server_name
+    app.server_params["allow_concurrent_actions"] = False
 
     # P3a-2 constructor-connect fix: BiologicDriver.__init__ no longer opens the
     # instrument (disconnected construct); connect here at startup. connect()
@@ -330,9 +331,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         LOGGER.info("waiting for biologic init")
         await asyncio.sleep(1)
 
-    @app.post(f"/{server_key}/run_CA", tags=["action"])
+    @app.action()
     @action_version(2)
     async def run_CA(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -358,7 +360,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         bitmask for trigger arguments; valid I/E ranges depend on the
         Biologic model.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CA"
         active.action.action_params["AcqInterval__A"] = 10.0
         active.action.action_params["IRange"] = EC_IRange_map[
@@ -374,9 +376,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CP", tags=["action"])
+    @app.action()
     @action_version(2)
     async def run_CP(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -401,7 +404,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         configured with :data:`TECH_CP`. Use a 4-bit bitmask for trigger
         arguments; valid I/E ranges depend on the Biologic model.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CP"
         active.action.action_params["AcqInterval__V"] = 10.0
         active.action.action_params["IRange"] = EC_IRange_map[
@@ -417,9 +420,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CV", tags=["action"])
+    @app.action()
     @action_version(2)
     async def run_CV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -449,7 +453,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
         configured with :data:`TECH_CV`.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_params["Cycles"] -= 1  # i.e. additional cycles
         active.action.action_params["AcqInterval__V"] = (
             active.action.action_params["AcqInterval__s"]
@@ -469,9 +473,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_OCV", tags=["action"])
+    @app.action()
     @action_version(2)
     async def run_OCV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -492,16 +497,17 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         the ``*_threshold`` parameters are forwarded to bubble detection during
         ``_post_exec``.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "OCV"
         active.action.action_params["AcqInterval__V"] = 10.0
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_PEIS", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_PEIS(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -529,7 +535,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         Maps the I/E/Bandwidth range enums and dispatches a
         :class:`BiologicExec` configured with :data:`TECH_PEIS`.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "PEIS"
         active.action.action_params["IRange"] = EC_IRange_map[
             active.action.action_params["IRange"]
@@ -544,9 +550,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_GEIS", tags=["action"])
+    @app.action()
     @action_version(3)
     async def run_GEIS(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -574,7 +581,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         Maps the I/E/Bandwidth range enums and dispatches a
         :class:`BiologicExec` configured with :data:`TECH_GEIS`.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "GEIS"
         active.action.action_params["IRange"] = EC_IRange_map[
             active.action.action_params["IRange"]
@@ -589,9 +596,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    @app.post(f"/{server_key}/run_CAOCV", tags=["action"])
+    @app.action()
     @action_version(2)
     async def run_CAOCV(
+        ctx: ActionContext,
         fast_samples_in: list[
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
@@ -618,7 +626,7 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         CA I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
         configured with :data:`TECH_CAOCV`.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         active.action.action_abbr = "CAOCV"
         active.action.action_params["CA_AcqInterval__A"] = 10.0
         active.action.action_params["CA_IRange"] = EC_IRange_map[
@@ -636,10 +644,10 @@ async def biologic_dyn_endpoints(app: BaseAPI):
         return active_action_dict
 
 
-def makeApp(server_key) -> BaseAPI:
+def makeApp(server_key) -> ActionHost:
     """Build the Biologic potentiostat FastAPI app.
 
-    Constructs a :class:`BaseAPI` backed by :class:`BiologicDriver`, defers
+    Constructs a :class:`ActionHost` backed by :class:`BiologicDriver`, defers
     technique endpoint registration to :func:`biologic_dyn_endpoints`, and adds
     the ``get_meas_status``, ``stop`` and private ``stop_private`` routes.
 
@@ -647,10 +655,10 @@ def makeApp(server_key) -> BaseAPI:
         server_key: Key identifying this server in the orchestration group.
 
     Returns:
-        The configured :class:`BaseAPI` application.
+        The configured :class:`ActionHost` application.
     """
 
-    app = BaseAPI(
+    app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Biologic instrument/action server",
@@ -659,24 +667,25 @@ def makeApp(server_key) -> BaseAPI:
         dyn_endpoints=biologic_dyn_endpoints,
     )
 
-    @app.post(f"/{server_key}/get_meas_status", tags=["action"])
-    async def get_meas_status():
+    @app.action()
+    async def get_meas_status(ctx: ActionContext):
         """Report the dtaq sink status (e.g. ``idle``/``measuring``).
 
         Intended for use alongside an estimated ETA in an
         ``asyncio.sleep``-based polling loop.
         """
-        active = await app.base.setup_and_contain_action()
+        active = await ctx.begin()
         await active.enqueue_data_dflt(datadict={"status": app.driver.dtaqsink.status})
         finished_action = await active.finish()
         return finished_action.as_dict()
 
-    @app.post(f"/{server_key}/stop", tags=["action"])
+    @app.action()
     async def stop(
+        ctx: ActionContext,
         channel: Optional[int] = None,
     ):
         """Stop the measurement on ``channel`` via :meth:`BiologicDriver.stop`."""
-        active = await app.base.setup_and_contain_action(action_abbr="stop")
+        active = await ctx.begin(action_abbr="stop")
         app.driver.stop(active.action.action_params["channel"])
         finished_action = await active.finish()
         return finished_action.as_dict()
