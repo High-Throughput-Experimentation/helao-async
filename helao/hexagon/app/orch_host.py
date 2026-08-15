@@ -44,6 +44,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from helao.core.servers.base import Active
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring
+from helao.hexagon.domain.orchestration import (
+    ClearErrorRequested,
+    ClearEstopRequested,
+    EstopRequested,
+    SkipRequested,
+    StartRequested,
+    StopRequested,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -191,12 +199,14 @@ class OrchHost(ActionHost):
         )
 
         self._init_orch_collaborators()
+        self._build_reducer()
         self._register_orch_routes()
         self._register_orch_payload_routes()
         self._register_orch_family_overrides()
         self._register_orch_ws_routes()
         self._register_orch_action_routes()
         self._register_orch_loop_routes()
+        self._register_orch_lifecycle()
 
     # -- names the API layer and the collaborators reach through ---------
 
@@ -870,14 +880,20 @@ class OrchHost(ActionHost):
     async def update_status(
         self, actionservermodel: Optional[ActionServerModel] = None
     ) -> bool:
-        """Fold one action server's status into the global model."""
-        return await self.status_ingester.update_status(actionservermodel)
+        """Fold one action server's status in, through the reducer.
+
+        P2a DD-2 atomic hand-off: routing here rather than to the legacy
+        StatusIngester removes its inline orch_state writes at the same
+        instant the reducer's apply_state_delta takes them, so there is no
+        window with two writers.
+        """
+        return await self._hex_ingestion.update_status(actionservermodel)
 
     async def update_nonblocking(
         self, actionmodel: Action, server_host: str, server_port: int
     ) -> dict:
         """Record a non-blocking action's status transition."""
-        return await self.status_ingester.update_nonblocking(
+        return await self._hex_ingestion.update_nonblocking(
             actionmodel, server_host, server_port
         )
 
@@ -900,8 +916,43 @@ class OrchHost(ActionHost):
         return await self.dispatch_runner._launch_action()
 
     async def dispatch_loop_task(self) -> None:
-        """The loop itself."""
-        return await self.dispatch_runner.dispatch_loop_task()
+        """The legacy loop. Replaced by the reducer at startup (D-B3.2).
+
+        Kept because ``start_loop`` names it and the reducer cut-over is a
+        startup-time swap, not a source deletion -- but on a launched
+        OrchHost the loop task is the reducer's, not this.
+        """
+        return await self.dispatch_runner.run()
+
+    # -- background tasks legacy starts from myinit ----------------------
+
+    async def subscribe_all(self, retry_limit: int = 15):
+        """Subscribe to every action server's status stream."""
+        return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
+
+    async def globstat_broadcast_task(self):
+        """Drain globstat_q so subscribers can read eagerly."""
+        return await self.status_ingester.globstat_broadcast_task()
+
+    async def ws_globstat(self, websocket):
+        """Stream global status. NOT registered as a route -- no decorator
+        for it exists anywhere in the tree, on legacy or here. It is the
+        dead sender already recorded in the post-parity backlog, and
+        reproducing legacy means not inventing a route legacy never served."""
+        return await self.status_ingester.ws_globstat(websocket)
+
+    async def active_action_monitor(self):
+        """Legacy heartbeat monitor. Superseded by HexHealthMonitor when the
+        reducer runs, exactly as the graft superseded it."""
+        return await self.server_monitor.active_action_monitor()
+
+    async def action_server_monitor(self):
+        """Poll every action server's driver health."""
+        return await self.server_monitor.action_server_monitor()
+
+    async def ping_action_servers(self):
+        """One health sweep across the configured action servers."""
+        return await self.server_monitor.ping_action_servers()
 
     # -- loop control ----------------------------------------------------
     #
@@ -943,36 +994,24 @@ class OrchHost(ActionHost):
             await self.wait_for_interrupt()
 
     async def start(self) -> None:
-        """Start or resume the loop when there is something queued."""
-        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
-            if (
-                self.action_dq
-                or self.experiment_dq
-                or self.sequence_dq
-                or (self.active_sequence is not None)
-            ):
-                await self.start_loop()
-            else:
-                LOGGER.info("experiment list is empty")
-        else:
-            LOGGER.info("already running")
-        self.current_stop_message = ""
+        """Start or resume the loop, through the reducer.
+
+        Legacy guarded on empty queues before calling start_loop; the
+        reducer's StartRequested carries that decision, so the guard lives
+        in one place rather than two that can disagree.
+        """
+        await self._hex_runtime.handle(StartRequested())
+        self.current_stop_message = ""  # legacy start() clears the banner
 
     async def start_loop(self) -> LoopStatus:
-        """Create the loop task, refusing to start while E-STOP is latched."""
-        if self.globalstatusmodel.loop_state == LoopStatus.stopped:
-            LOGGER.info("starting orch loop")
-            self.loop_task = asyncio.create_task(self.dispatch_loop_task())
-        elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
-            LOGGER.error("E-STOP flag was raised, clear E-STOP before starting.")
-        else:
-            LOGGER.info("loop already started.")
+        """Start the loop and report the resulting state."""
+        await self._hex_runtime.handle(StartRequested())
         return self.globalstatusmodel.loop_state
 
     async def stop(self, reset_run_id: bool = False) -> None:
-        """Request a graceful stop, respecting the current loop state."""
+        """Request a graceful stop. Guards mirror orch.py:541-556 verbatim."""
         if self.globalstatusmodel.loop_state == LoopStatus.started:
-            await self.intend_stop()
+            await self._hex_runtime.handle(StopRequested())
         elif self.globalstatusmodel.loop_state == LoopStatus.estopped:
             LOGGER.info("orchestrator E-STOP flag was raised; nothing to stop")
         else:
@@ -983,12 +1022,12 @@ class OrchHost(ActionHost):
 
     async def stop_loop(self) -> None:
         """Alias legacy keeps for callers that spell it this way."""
-        await self.intend_stop()
+        await self.stop()
 
     async def skip(self) -> None:
         """Skip while running; clear the action queue when idle."""
         if self.globalstatusmodel.loop_state == LoopStatus.started:
-            await self.intend_skip()
+            await self._hex_runtime.handle(SkipRequested())
         else:
             LOGGER.info("orchestrator not running, clearing action queue")
             self.action_dq.clear()
@@ -1011,8 +1050,18 @@ class OrchHost(ActionHost):
     # -- E-STOP (delegations to EstopController) -------------------------
 
     async def estop_loop(self, reason: str = "") -> None:
-        """Latch E-STOP and stop the loop."""
-        return await self.estop_controller.estop_loop(reason=reason)
+        """Latch E-STOP through the reducer, then WAKE the interrupt queue.
+
+        The wake is not optional (DD-5 item 6). Legacy's estop_loop calls
+        intend_none(), which posts to interrupt_q; the reducer's none->none
+        intent delta skips that call, so a dispatch effect parked in
+        wait_for_interrupt would never re-check and never observe the
+        E-STOP. It would sit blocked while the orchestrator believed it had
+        stopped.
+        """
+        msg = f"E-STOP{' ' + reason if reason else ''}"
+        await self._hex_runtime.handle(EstopRequested(reason=msg))
+        await self.interrupt_q.put("estop")
 
     async def estop_actions(self, switch: bool) -> None:
         """Fan E-STOP out to every action server."""
@@ -1023,12 +1072,12 @@ class OrchHost(ActionHost):
         return await self.estop_controller.estop_finish_active()
 
     async def clear_estop(self) -> None:
-        """Clear the E-STOP latch."""
-        return await self.estop_controller.clear_estop()
+        """Clear the E-STOP latch, through the reducer."""
+        await self._hex_runtime.handle(ClearEstopRequested())
 
     async def clear_error(self) -> None:
-        """Clear the error state."""
-        return await self.estop_controller.clear_error()
+        """Clear the error state, through the reducer."""
+        await self._hex_runtime.handle(ClearErrorRequested())
 
     async def clear_actions(self) -> None:
         """Empty the action queue."""
@@ -1299,3 +1348,97 @@ class OrchHost(ActionHost):
         async def websocket_live(websocket: WebSocket):
             """Stream live-buffer updates, which are dict-native already."""
             await _stream(self.live_publisher, websocket)
+
+    # -- the reducer (D-B3.2: driven natively, not grafted) --------------
+
+    def _build_reducer(self) -> None:
+        """Construct the reducer runtime this host's control methods drive.
+
+        ``graft_hexagon_loop`` built exactly this and then REBOUND nine
+        methods onto a live legacy ``Orch`` instance, because there was no
+        native host to own it. There is now, so the methods below are
+        written against the runtime directly and the graft is retired in
+        the same change rather than left beside it.
+
+        Keeping both would be two code paths for one behaviour, and B1 has
+        already shown the cost: ``makeActionApp`` went on grafting the write
+        path onto native hosts after B1 landed, and the resulting
+        AttributeError fired inside the FastAPI startup event where uvicorn
+        reports it only as SystemExit(3) -- the server never bound and
+        nothing named the cause.
+        """
+        from helao.hexagon.app.dispatch_loop import HexDispatchLoop, HexRuntime
+        from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion
+        from helao.hexagon.app.orch_effects import OrchCommandRunner
+
+        self._hex_effects = OrchCommandRunner(self, self.hexagon_wiring)
+        self._hex_runtime = HexRuntime(self, self._hex_effects)
+        self._hex_loop = HexDispatchLoop(self._hex_runtime)
+        self._hex_ingestion = HexStatusIngestion(self, self._hex_runtime)
+        # health is required for an orch composition (ORCH_REQUIRED), and
+        # wiring.require() has already run, so this is not optional.
+        bind = getattr(self.hexagon_wiring.health, "bind_orch", None)
+        if bind is not None:
+            bind(self)
+        self._hex_health = HexHealthMonitor(
+            self, self._hex_runtime, self.hexagon_wiring.health
+        )
+
+    def _register_orch_lifecycle(self) -> None:
+        """Start the reducer loop and the orchestrator's background tasks.
+
+        ActionHost's startup already ran by the time this fires (Starlette
+        preserves registration order), so the live buffer, status log and
+        regular updater are running. What legacy's ``myinit`` adds on an
+        orchestrator is these four, and the reducer replaces one of them:
+        ``active_action_monitor`` is superseded by HexHealthMonitor exactly
+        as the graft superseded it.
+        """
+
+        @self.on_event("startup")
+        async def _orch_startup():
+            self.status_subscriber = asyncio.create_task(self.subscribe_all())
+            self.globstat_broadcaster = asyncio.create_task(
+                self.globstat_broadcast_task()
+            )
+            self.driver_monitor = asyncio.create_task(self.action_server_monitor())
+            # health is in ORCH_REQUIRED and wiring.require() runs in
+            # __init__, so an unwired health port cannot reach here -- a
+            # legacy-heartbeat fallback would be unreachable code pretending
+            # to be a safety net.
+            self._hex_health.start()
+            self._hex_loop.start()
+            if self.server_cfg.get("restore_queues_on_startup", False):
+                LOGGER.info(
+                    "restore_queues_on_startup is set; importing saved queues "
+                    "from STATES/queues.pck."
+                )
+                self.import_queues()
+
+        @self.on_event("shutdown")
+        async def _orch_shutdown():
+            await self.orch_shutdown()
+
+    async def orch_shutdown(self) -> None:
+        """Cancel the orchestrator's tasks and preserve unfinished queues.
+
+        The queue export is the part that matters operationally: a stop
+        with work still queued would otherwise lose it, and ``--restore``
+        exists precisely to replay this file.
+        """
+        for task in (
+            self.status_subscriber,
+            self.globstat_broadcaster,
+            self.driver_monitor,
+            self.heartbeat_monitor,
+        ):
+            if task is not None:
+                task.cancel()
+        stop = getattr(self._hex_health, "stop", None)
+        if callable(stop):
+            stop()
+        if any(
+            len(x) > 0 for x in (self.sequence_dq, self.experiment_dq, self.action_dq)
+        ):
+            export_path = self.export_queues(timestamp_pck=False)
+            LOGGER.info(f"Orch queues are not empty, exported queues to {export_path}")
