@@ -106,7 +106,7 @@ class AnalysisSim:
 def makeApp(server_key):
     """Build the analysis-simulator FastAPI app.
 
-    Wires :class:`AnalysisSim` into a :class:`BaseAPI` instance and exposes
+    Wires :class:`AnalysisSim` into an :class:`ActionHost` and exposes
     a single ``/<server_key>/calc_cpfom`` action that returns the stored
     eta value for the queried sample.
 

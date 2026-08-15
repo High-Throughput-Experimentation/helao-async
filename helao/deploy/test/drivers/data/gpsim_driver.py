@@ -22,7 +22,16 @@ from helao.deploy.test.drivers.data.gp_backend import GPRegressor
 from helao.deploy.test.drivers.data.oer_metrics import calc_eta  # noqa: F401
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base import Active, Base
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # The runtime types, not the legacy ones. This driver is constructed by
+    # ActionHost (`driver_class(self)`) and handed an ActionSession, so the
+    # old `Base`/`Active` annotations described objects it no longer sees --
+    # and importing them kept a ported deployment bound to the engine for
+    # nothing but a type name.
+    from helao.hexagon.app.action_host import ActionHost
+    from helao.hexagon.ports.action_session import ActionSessionPort
 from helao.deploy.test.param_models import StopCondition, resolve_stop_condition
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.executor import Executor
@@ -60,7 +69,7 @@ class GPSim:
         global_step: Counter of acquisitions across all plates.
     """
 
-    def __init__(self, action_serv: Base):
+    def __init__(self, action_serv: "ActionHost"):
         """Initialize the simulator and kick off prior initialization.
 
         Args:
@@ -462,7 +471,7 @@ class GPSim:
         ]
         self.models[plate_id] = None
 
-    async def check_condition(self, activeobj: Active) -> dict:
+    async def check_condition(self, activeobj: "ActionSessionPort") -> dict:
         """Evaluate the active-learning stop condition and requeue if needed.
 
         Inspects the latest plate progress against the configured
