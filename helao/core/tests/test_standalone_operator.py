@@ -44,7 +44,7 @@ def _bare_orch():
     per-test attribute assignments that follow still take effect.
     """
     from helao.core.servers.orch import Orch
-    from helao.core.servers.orch_queues import RunQueues
+    from helao.hexagon.app.orch_queues import RunQueues
 
     orch = Orch.__new__(Orch)
     orch.run_queues = RunQueues(orch)

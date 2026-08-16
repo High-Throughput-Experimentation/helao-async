@@ -43,6 +43,7 @@ such lengths to avoid.
 __all__ = [
     "ANA_JOURNAL_SCHEMA",
     "ANA_JOURNAL_SUBDIR",
+    "ANA_JOURNAL_FAILED_SUBDIR",
     "ANA_JOURNAL_SUFFIX",
     "AnalysisSyncer",
     "AnalysisExecutor",
@@ -337,6 +338,11 @@ def load_analysis_classes(
 
 #: Subdirectory of ``<root>/STATES`` holding the pending-analysis journal.
 ANA_JOURNAL_SUBDIR = "ana_pending"
+#: Where a failed analysis's journal entry is moved to. Kept rather than
+#: deleted so the failure is diagnosable and requeueable, moved rather than
+#: left in place so the startup sweep does not re-run a poison item at every
+#: restart -- the failure mode the syncer has on its own side.
+ANA_JOURNAL_FAILED_SUBDIR = "ana_failed"
 
 #: Extension of one journal entry. Anything else in the directory (notably the
 #: ``.json.tmp`` an interrupted atomic write leaves behind) is not an entry.
@@ -662,11 +668,16 @@ class AnalysisSyncer(HelaoSyncer):
         :meth:`journal_clear_by_process` for why the task-name route cannot be
         that precise.
 
-        Removed on **completion**, not on success: a failed analysis has already
-        been alerted by :meth:`syncer`, and keeping its entry would re-run a
-        permanently-failing analysis at every restart, forever. The journal's
-        job is to survive an *interruption* -- a crash, a kill, a graceful stop
-        -- which is exactly the case where no worker ever reaches here.
+        Removed on **success only**. It used to be removed on completion of
+        either kind, to stop a permanently-failing analysis re-running at every
+        restart -- a real concern, and the failure mode the syncer has on its
+        own side. But deleting the entry also destroyed the only durable record
+        that the analysis had not run, so a failure became both unretryable and
+        undiagnosable. :meth:`journal_quarantine` keeps the record and moves it
+        aside instead, which answers the re-run concern without the erasure.
+
+        The journal's job is to survive an *interruption* -- a crash, a kill, a
+        graceful stop -- which is exactly the case where no worker reaches here.
         """
         if not self.journal_dir:
             return
@@ -676,6 +687,43 @@ class AnalysisSyncer(HelaoSyncer):
                 remove_journal_entry(journal_entry_path(self.journal_dir, key))
         except Exception:
             LOGGER.warning("Failed to clear an analysis journal entry.", exc_info=True)
+
+    def journal_quarantine(self, calc_tup: tuple) -> None:
+        """Move ``calc_tup``'s journal entry aside after its analysis failed.
+
+        Kept, because deleting it is what made a failed analysis invisible: the
+        entry is the only place the loader target and analysis class survive, so
+        erasing it left an ALERT line naming a process uuid and nothing to
+        resolve it against. Moved, because leaving it in ``ana_pending`` means
+        the next startup sweep re-runs it, and a genuinely un-analysable record
+        then fails at every restart forever.
+
+        Lands in ``<STATES>/ana_failed/`` under the same filename, so requeueing
+        after a fix is a move back. Best effort: a quarantine that cannot be
+        written must not take down the worker that was already failing.
+        """
+        if not self.journal_dir:
+            return
+        try:
+            key = self._journal_key(calc_tup)
+            if key is None:
+                return
+            src = journal_entry_path(self.journal_dir, key)
+            if not os.path.exists(src):
+                return
+            failed_dir = os.path.join(
+                os.path.dirname(self.journal_dir), ANA_JOURNAL_FAILED_SUBDIR
+            )
+            os.makedirs(failed_dir, exist_ok=True)
+            os.replace(src, os.path.join(failed_dir, os.path.basename(src)))
+            LOGGER.warning(
+                f"Quarantined the journal entry for {calc_tup[0]} in {failed_dir}; "
+                "it will not be re-run until it is moved back."
+            )
+        except Exception:
+            LOGGER.warning(
+                "Failed to quarantine an analysis journal entry.", exc_info=True
+            )
 
     def journal_clear_by_process(self, process_uuid_str: str) -> None:
         """Drop every journal entry for one process uuid. Best effort.
@@ -955,6 +1003,7 @@ class AnalysisSyncer(HelaoSyncer):
                 continue
             self.running_tasks[proc_uuid_str] = asyncio.current_task()
             cancelled = False
+            failed = False
             try:
                 await self.sync_ana(calc_tup)
             except asyncio.CancelledError:
@@ -968,16 +1017,35 @@ class AnalysisSyncer(HelaoSyncer):
                 cancelled = True
                 raise
             except Exception:
-                _alert(f"Error in ana syncer worker for {proc_uuid_str}", exc_info=True)
+                # The loader target is in the message because the journal entry
+                # that also recorded it is about to be kept-but-quarantined, and
+                # because without it identifying WHICH sequence failed meant
+                # searching a CIFS share by uuid. One field, hours saved.
+                _alert(
+                    f"Error in ana syncer worker for {proc_uuid_str} "
+                    f"(target: {getattr(calc_tup[1], 'target', '?')})",
+                    exc_info=True,
+                )
+                failed = True
             finally:
                 self.running_tasks.pop(proc_uuid_str, None)
                 self.task_set.discard(calc_tup[0])
-                if not cancelled:
-                    # This worker is done with the item, success or failure, so
-                    # its durable record goes with it -- keyed off the tuple,
-                    # which is the only place the loader target and analysis
-                    # class are still known.
+                if not cancelled and not failed:
+                    # Cleared on SUCCESS only. It used to clear on failure too,
+                    # on the reasoning that the worker was done with the item --
+                    # but that erased the only durable record of an analysis
+                    # that did not run, so a failure was unretryable AND
+                    # undiagnosable: 15 lost in one campaign, and the entry that
+                    # would have named the sequence was deleted by the same
+                    # line. A failure is not an outcome, it is an absence of
+                    # one.
                     self.journal_clear(calc_tup)
+                elif failed:
+                    # Kept, but moved aside, so the next startup sweep does not
+                    # re-run a poison item forever -- the failure mode the
+                    # syncer has on its own side. Visible in the filesystem and
+                    # requeued by hand once the cause is fixed.
+                    self.journal_quarantine(calc_tup)
                 self.task_queue.task_done()
 
     def _calc_and_write_model(
