@@ -35,12 +35,18 @@ FORBIDDEN: Final[str] = "helao.core.servers"
 #: import the engine. **May only shrink.** A count rather than a list because a
 #: list would have to name them.
 #:
-#: 13 at B6's start. Deliberately NOT pinned to the live measurement: it spans
-#: three separate repositories whose checked-out branch this repo neither
-#: controls nor can see, so an equality assertion goes red whenever a sibling
-#: is mid-port. A checkout carrying none of them measures 0 and passes, which
-#: is correct -- the gate is "no new coupling", not "the deployments are here".
-MAX_UNPORTED_PRIVATE_MODULES: Final[int] = 13
+#: 13 at B6's start, **0 now that B6 has landed in all three**. At zero this
+#: stops being a ratchet and becomes the absolute invariant B7 needs: nothing
+#: outside `helao/core/servers/` constructs the engine, so the engine can be
+#: deleted.
+#:
+#: Deliberately NOT pinned to the live measurement, which is why it survived
+#: B6 rather than going red through it: the count spans three separate
+#: repositories whose checked-out branch this repo neither controls nor can
+#: see. A checkout carrying none of them measures 0 and passes, which is the
+#: same answer for a different reason -- the gate is "no engine coupling", not
+#: "the deployments are here".
+MAX_UNPORTED_PRIVATE_MODULES: Final[int] = 0
 
 
 def _tracked(path: Path) -> bool:
