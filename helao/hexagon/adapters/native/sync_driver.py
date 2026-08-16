@@ -42,7 +42,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from copy import copy
 from datetime import datetime
 from glob import glob
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Optional, Protocol, Union
 from zipfile import ZipFile
 
@@ -632,6 +632,108 @@ class Progress:
             self.read_dict()
             if not hasattr(self, "yml"):
                 self.ymlpath = Path(self.dict["yml"])
+            self.reanchor_recorded_paths()
+
+    @staticmethod
+    def _tail_after(parts: tuple, anchor: str):
+        """Components of *parts* following the LAST occurrence of *anchor*.
+
+        ``None`` when the anchor does not appear. Last rather than first
+        because a record directory's name could in principle also name a
+        subdirectory inside it; the deeper match is the correct one.
+        """
+        for i in range(len(parts) - 1, -1, -1):
+            if parts[i] == anchor:
+                return parts[i + 1 :]
+        return None
+
+    def relpath(self, path: Union[Path, str]) -> str:
+        """*path* relative to this record's own directory, POSIX-style.
+
+        **Recorded paths are relative because an absolute one is only true for
+        the root it was written under.** Relocating the run trees -- inserting
+        one ``DATA/`` level, say -- left every absolute entry in every sidecar
+        naming a location that no longer existed, while the file itself sat
+        untouched under the new root. ``sync_yml`` then raised ValueError from
+        ``relative_to(targetdir)`` on a path it had recorded itself, the
+        exception escaped to the worker, and the record returned to
+        ``RUNS_FINISHED`` to fail identically at every restart.
+
+        Falls back to the path unchanged when it cannot be placed inside this
+        record at all. That is deliberate: a wrong guess would point the
+        uploader at some other action's data, and a path left alone fails
+        loudly at the next ``stat`` instead.
+        """
+        p = Path(str(path).replace("\\", "/"))
+        base = self.yml.targetdir
+        try:
+            return p.relative_to(base).as_posix()
+        except ValueError:
+            pass
+        if not p.is_absolute():
+            return p.as_posix()
+        tail = self._tail_after(p.parts, base.name)
+        if not tail:
+            return p.as_posix()
+        return PurePosixPath(*tail).as_posix()
+
+    def abspath(self, recorded: Union[Path, str]) -> Path:
+        """Where a recorded path lives on disk, under the CURRENT root.
+
+        An absolute entry is passed through rather than re-anchored: by the
+        time anything calls this, :meth:`reanchor_recorded_paths` has already
+        had its chance, so an absolute survivor is one that could not be placed
+        and must not be silently redirected somewhere plausible.
+        """
+        p = Path(recorded)
+        return p if p.is_absolute() else self.yml.targetdir / p
+
+    def reanchor_recorded_paths(self) -> bool:
+        """Convert absolute entries loaded from disk to record-relative ones.
+
+        The migration half of the same fix, run on every read so a sidecar
+        written before this change -- or before any future root move -- heals
+        the first time it is opened. Nothing is written back here; the next
+        :meth:`write_dict` persists the normalized form, so a record that is
+        never touched again is never rewritten.
+
+        Wrapped defensively: this runs inside ``__init__`` for every sidecar
+        the syncer opens, and a record whose yml cannot currently be resolved
+        must still load. Failing to normalize leaves the dict exactly as it was
+        on disk, which is the pre-existing behaviour.
+
+        Returns:
+            ``True`` when anything changed.
+        """
+        try:
+            changed = False
+            pending = self.dict.get("files_pending")
+            if isinstance(pending, list):
+                fixed = [self.relpath(x) for x in pending]
+                if fixed != pending:
+                    self.dict["files_pending"] = fixed
+                    changed = True
+            uploaded = self.dict.get("files_s3")
+            if isinstance(uploaded, dict):
+                fixed_s3 = {self.relpath(k): v for k, v in uploaded.items()}
+                if fixed_s3 != uploaded:
+                    self.dict["files_s3"] = fixed_s3
+                    changed = True
+            # ``yml`` is absolute by design -- it is how a Progress built from a
+            # .prg finds its record -- but it is just as root-bound, so restate
+            # it from the yml this Progress actually resolved.
+            if hasattr(self, "ymlpath"):
+                current = str(self.yml.target)
+                if self.dict.get("yml") != current:
+                    self.dict["yml"] = current
+                    changed = True
+            return changed
+        except Exception:  # pragma: no cover - defensive, see docstring
+            LOGGER.warning(
+                f"Could not re-anchor recorded paths in {getattr(self, 'prg', '?')}",
+                exc_info=True,
+            )
+            return False
 
     @property
     def yml(self) -> HelaoYml:
@@ -1220,16 +1322,22 @@ class SyncDriver:
         if prog.yml.type == "action":
             # re-check file lists
             LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
+            # Recorded RELATIVE to the record directory: an absolute entry is
+            # only true for the root it was written under, and a later
+            # relocation of the run trees strands every one of them.
             prog.dict["files_pending"] += [
-                str(p)
-                for p in prog.yml.hlo_files + prog.yml.misc_files
-                if str(p) not in prog.dict["files_pending"]
-                and str(p) not in prog.dict["files_s3"]
+                rel
+                for rel in (
+                    prog.relpath(p)
+                    for p in prog.yml.hlo_files + prog.yml.misc_files
+                )
+                if rel not in prog.dict["files_pending"]
+                and rel not in prog.dict["files_s3"]
             ]
             # push files to S3
             while prog.dict.get("files_pending", []):
                 for sp in prog.dict["files_pending"]:
-                    fp = Path(sp)
+                    fp = prog.abspath(sp)
                     LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
                         if fp.stat().st_size < 1024**3:  # 1GB
@@ -1271,10 +1379,12 @@ class SyncDriver:
                                 )
                                 msg = None
                     else:
-                        rel_posix_path = str(
-                            fp.relative_to(prog.yml.targetdir)
-                        ).replace("\\", "/")
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{rel_posix_path}"
+                        # ``sp`` is already the record-relative POSIX form, which
+                        # is exactly what the S3 key wants. This used to recompute
+                        # it with ``fp.relative_to(prog.yml.targetdir)`` -- the
+                        # call that raised ValueError for every sidecar written
+                        # before the run trees were relocated.
+                        file_s3_key = f"raw_data/{meta['action_uuid']}/{sp}"
                         msg = fp
                     LOGGER.debug(f"Destination: {file_s3_key}")
                     file_success = await self.to_s3(
@@ -1285,8 +1395,8 @@ class SyncDriver:
                     if file_success:
                         LOGGER.debug("Removing file from pending list.")
                         prog.dict["files_pending"].remove(sp)
-                        LOGGER.info(f"Adding file to S3 dict. {str(fp)}: {file_s3_key}")
-                        prog.dict["files_s3"].update({str(fp): file_s3_key})
+                        LOGGER.info(f"Adding file to S3 dict. {sp}: {file_s3_key}")
+                        prog.dict["files_s3"].update({sp: file_s3_key})
                         LOGGER.debug(f"Updating progress: {prog.dict}")
                         prog.write_dict()
 
