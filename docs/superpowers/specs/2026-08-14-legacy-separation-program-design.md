@@ -133,3 +133,46 @@ so B7 deletes a directory rather than picking through one.
 - No behaviour visible on disk or on the wire. The post-parity backlog (the `set_error`
   quirk, the finish-drain window, the 0.3 s per-client pacing sleep, `/ws_globstat`'s dead
   sender, `params.limit_vis`) is dispositioned in B7, not opportunistically during a port.
+
+## 6. Deferred past the programme
+
+Work this programme deliberately does not do, recorded here so it is not rediscovered as a
+surprise. Unlike the post-parity backlog above, these are not B7 items — they wait until the
+migration is finished.
+
+### A quarantine state for records that can never sync
+
+**There is none today, and that is by design as far as it goes.** A record whose sync raises
+is logged by the `syncer` worker and dropped; the yml stays in `RUNS_FINISHED`; and
+`sweep_pending` re-enqueues everything in `RUNS_FINISHED` at every SYNC start. So a record
+that cannot succeed fails identically at every launch, forever, leaving only a log line. There
+is no failure marker, no strike count, and no retry cap on that path — the cap that exists is
+on S3 upload attempts, not on a record that throws.
+
+The design rationale holds: **the sweep cannot distinguish "will never succeed" from "was
+interrupted"**, and the second case is the one it exists to recover. Quarantining on first
+failure would silently strand work that a restart would have completed.
+
+What makes it worth revisiting is that the failure is invisible until someone reads the logs.
+The 2026-08-15 case — a station whose run trees moved one level deeper, stranding three records
+behind absolute paths recorded in their sidecars — had been failing at every startup since
+July and surfaced only because an operator happened to look. That root cause is fixed
+(`fix(sync): record sidecar paths relative to the record`), but the *class* is not: any
+never-succeeding record behaves the same way.
+
+Shape to consider, not yet decided:
+
+- a `RUNS_FAILED` tree, moved into after N consecutive failures of the same record, so the
+  backlog is visible in the filesystem rather than only in logs;
+- or a strike count in the `.prg`, which keeps the record in place and needs no new tree;
+- either way, a route that lists quarantined records and one that returns them to
+  `RUNS_FINISHED` after a repair.
+
+The trade to settle first is what N should be and whether "consecutive" is measured per
+process or persisted — a strike count that resets on restart counts restarts, not failures.
+
+**Why after the migration and not during.** B7 deletes the legacy engine, and the syncer is
+one of the few components both engines share. A behavioural change to it during the port would
+land in the middle of the one comparison the programme depends on: a station's before/after run
+tree, diffed across a git revision. Changing when records move between trees changes exactly
+that diff.
