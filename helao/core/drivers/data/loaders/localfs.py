@@ -160,6 +160,17 @@ def parse_prc_path(ymlp) -> tuple:
     return prc_idx, prc_uuid, techname, yml_dir, ymlp, exp_timestamp, exp_name
 
 
+class ActionProvenanceError(RuntimeError):
+    """A dispatched action could not be resolved to the action that ran it.
+
+    Raised by :meth:`LocalLoader.resolve_action` when the directory a process
+    names holds no action, or holds one belonging to a different record set.
+    Its own type so an analysis runner can tell a provenance problem -- which
+    means the metadata and the files disagree about what happened -- from an
+    ordinary data or computation failure.
+    """
+
+
 class LocalLoader:
     """Loader for local HELAO run data (loose directories or a synced ``.zip``).
 
@@ -387,6 +398,69 @@ class LocalLoader:
         if path not in self.act_cache:
             self.act_cache[path] = self.get_yml(path)
         return HelaoAction(path, self.act_cache[path], self)
+
+    def resolve_action(self, action_uuid, action_output_dir: str) -> "HelaoAction":
+        """The action a process dispatched, matched by path and **verified by uuid**.
+
+        Analyses locate a dispatched action by taking the tail of the process's
+        ``action_output_dir`` and substring-matching it against
+        ``action_localpath``. That is sound only while one record set occupies a
+        given directory, and on 2026-08-16 that turned out not to hold: two
+        conversions of one source produced two complete record sets sharing a
+        ``sequence_output_dir``, because that name is derived from the source
+        timestamp, name and label with nothing to distinguish the conversion.
+        Locally one conversion's files won the directory; both uploaded their
+        metadata.
+
+        A path match cannot tell those apart. Whatever action occupies the
+        directory matches, so a process from set A silently paired with an
+        action from set B -- measured, 333 of 348 analyses in one campaign
+        resolved to an action whose uuid was not the one their own process
+        named. The 15 that raised did so only because the two conversions
+        straddled a second boundary and the directory names differed by one
+        digit; they were the honest signal, and everything else was a quiet
+        mismatch.
+
+        So the uuid is checked rather than discarded. Callers already have it --
+        it is what they used to find ``action_output_dir`` in the first place.
+
+        Args:
+            action_uuid: ``action_uuid`` from the process's
+                ``dispatched_actions_abbr`` entry.
+            action_output_dir: ``action_output_dir`` from that same entry.
+
+        Returns:
+            The verified :class:`HelaoAction`.
+
+        Raises:
+            ActionProvenanceError: If no action sits at that path, or if one
+                does and its uuid is not the one asked for. Distinguished in
+                the message, because "the record set is missing locally" and
+                "the wrong record set is present" need different remedies.
+        """
+        reldir = "/".join(str(action_output_dir).replace("\\", "/").split("/")[-2:])
+        candidates = self.actions.query("action_localpath.str.contains(@reldir)")
+        if not len(candidates):
+            raise ActionProvenanceError(
+                f"no action at {reldir!r} for action_uuid {action_uuid}. The "
+                "record naming it is present but its files are not; the usual "
+                "cause is a second conversion of the same source that lost the "
+                "race for this directory."
+            )
+        wanted = str(action_uuid)
+        found = []
+        for index in candidates.index:
+            act = self.get_act(index)
+            got = str(act.json.get("action_uuid"))
+            if got == wanted:
+                return act
+            found.append(got)
+        raise ActionProvenanceError(
+            f"the action at {reldir!r} is {found[0] if len(found) == 1 else found}, "
+            f"not {wanted}. Two record sets share this directory and the one on "
+            "disk belongs to the other conversion, so analysing it would attribute "
+            "another run's data to this process."
+        )
 
     def get_exp(self, index=None, path: Optional[str] = None) -> "HelaoExperiment":
         """Load an experiment by dataframe ``index`` or yml ``path``.

@@ -35,18 +35,24 @@ FORBIDDEN: Final[str] = "helao.core.servers"
 #: import the engine. **May only shrink.** A count rather than a list because a
 #: list would have to name them.
 #:
-#: 13 at B6's start, **0 now that B6 has landed in all three**. At zero this
-#: stops being a ratchet and becomes the absolute invariant B7 needs: nothing
-#: outside `helao/core/servers/` constructs the engine, so the engine can be
-#: deleted.
+#: 13 at B6's start. **Not 0 yet, and that was a mistake worth recording.** It
+#: was set to 0 the moment B6's ports were committed -- but they were committed
+#: to feature BRANCHES, and this count reads whatever the sibling repositories
+#: happen to have checked out. Anyone on their `main`, which is every fresh
+#: clone until those branches merge, measured 13 against a ceiling of 0 and got
+#: a red suite for work that was perfectly fine.
 #:
-#: Deliberately NOT pinned to the live measurement, which is why it survived
-#: B6 rather than going red through it: the count spans three separate
-#: repositories whose checked-out branch this repo neither controls nor can
+#: So the ceiling tracks what is merged to the siblings' `main`, not what has
+#: been written somewhere. Drop it to 0 when B6 merges there, and this becomes
+#: the absolute invariant B7 needs: nothing outside `helao/core/servers/`
+#: constructs the engine, so the engine can be deleted.
+#:
+#: The count is deliberately not pinned to the live measurement for the same
+#: underlying reason -- three repositories this one neither controls nor can
 #: see. A checkout carrying none of them measures 0 and passes, which is the
-#: same answer for a different reason -- the gate is "no engine coupling", not
-#: "the deployments are here".
-MAX_UNPORTED_PRIVATE_MODULES: Final[int] = 0
+#: right answer for a different reason: the gate is "no NEW engine coupling",
+#: not "the deployments are here".
+MAX_UNPORTED_PRIVATE_MODULES: Final[int] = 13
 
 
 def _tracked(path: Path) -> bool:

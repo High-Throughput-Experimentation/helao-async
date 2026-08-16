@@ -16,7 +16,7 @@ from collections import deque
 from types import SimpleNamespace
 
 from helao.core.servers.orch_api import _histories_payload, _history_page_payload
-from helao.core.servers.orch_queues import _dq_page
+from helao.hexagon.app.orch_queues import _dq_page
 from helao.helpers.dequedict import DequeDict
 
 # -- queue paging ------------------------------------------------------------
@@ -64,7 +64,7 @@ def test_the_ten_row_default_is_gone_from_every_layer():
     import inspect
 
     from helao.core.servers.orch import Orch
-    from helao.core.servers.orch_queues import RunQueues
+    from helao.hexagon.app.orch_queues import RunQueues
 
     for owner in (Orch, RunQueues):
         for name in ("list_sequences", "list_experiments", "list_actions"):
