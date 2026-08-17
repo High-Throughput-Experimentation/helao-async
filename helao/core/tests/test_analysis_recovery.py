@@ -30,7 +30,7 @@ import asyncio
 import json
 import os
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -101,7 +101,7 @@ def logger(monkeypatch):
     return stub
 
 
-def _syncer(journal_dir, logger=None) -> m.AnalysisSyncer:
+def _syncer(journal_dir, logger=None, config=None) -> m.AnalysisSyncer:
     """Build a syncer with only the attributes the journal paths touch.
 
     ``object.__new__`` rather than ``__init__``: the real constructor installs a
@@ -113,7 +113,7 @@ def _syncer(journal_dir, logger=None) -> m.AnalysisSyncer:
     syncer.task_queue = asyncio.Queue()
     syncer.task_set = set()
     syncer.running_tasks = {}
-    syncer.config_dict = {}
+    syncer.config_dict = dict(config or {})
     return syncer
 
 
@@ -549,6 +549,7 @@ async def test_startup_reenqueues_a_journalled_entry(tmp_path, logger, monkeypat
         "dropped": 0,
         "unconfigured": 0,
         "failed": 0,
+        "deferred": 0,
     }
     assert syncer.task_queue.qsize() == 1
     process_uuid, loader, params, ana_cls, action_uuid = syncer.task_queue.get_nowait()
@@ -747,6 +748,7 @@ async def test_tmp_files_from_an_interrupted_write_are_not_swept(
         "dropped": 0,
         "unconfigured": 0,
         "failed": 0,
+        "deferred": 0,
     }
     assert (journal / f"half{m.ANA_JOURNAL_SUFFIX}.tmp").exists()
 
@@ -1044,3 +1046,92 @@ def test_a_missing_driver_at_startup_does_not_raise(tmp_path, monkeypatch):
     app = _app(tmp_path, monkeypatch)
     app.driver = None
     _startup_handler(app)()  # must not raise
+
+
+# --- the sweep must not take the server down -------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_large_backlog_is_swept_in_bounded_slices(
+    tmp_path, logger, monkeypatch
+):
+    """Measured at a station: 8802 entries on disk, all one analysis class, one
+    per process. Sweeping them unbounded enqueued thousands of analyses into a
+    server that had just bound its port, and ANA became unreachable -- the
+    sweep meant to stop silent loss became the thing stopping the server.
+    """
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for i in range(12):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4()))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 5})
+    summary = await syncer.recover_journal(_classes(_AnaA))
+
+    assert summary["pending"] == 12
+    assert summary["recovered"] == 5
+    assert summary["deferred"] == 7
+    assert syncer.task_queue.qsize() == 5
+
+
+@pytest.mark.asyncio
+async def test_the_deferred_entries_are_still_on_disk(tmp_path, logger, monkeypatch):
+    """Deferring must not be a quiet form of dropping: the next start has to
+    find them, which is the whole reason the cap is safe."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for _ in range(6):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4()))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 2})
+    await syncer.recover_journal(_classes(_AnaA))
+
+    assert len(m.list_journal_entries(str(journal))) == 6
+
+
+@pytest.mark.asyncio
+async def test_successive_starts_drain_the_backlog(tmp_path, logger, monkeypatch):
+    """A cap that never drains is just a stall. Each start takes the next
+    slice, and entries clear as their workers finish -- simulated here by
+    clearing what was recovered."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    procs = [uuid4() for _ in range(7)]
+    for pu in procs:
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=pu))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    seen = 0
+    for _ in range(4):
+        syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 3})
+        summary = await syncer.recover_journal(_classes(_AnaA))
+        seen += summary["recovered"]
+        while not syncer.task_queue.empty():
+            pu, *_ = syncer.task_queue.get_nowait()
+            syncer.journal_clear_by_process(pu)
+        if not m.list_journal_entries(str(journal)):
+            break
+    assert seen == 7
+    assert m.list_journal_entries(str(journal)) == []
+
+
+@pytest.mark.asyncio
+async def test_no_cap_sweeps_everything(tmp_path, logger, monkeypatch):
+    """0 disables the cap. Suppressing the sweep entirely is a different knob
+    (analysis_recovery_on_startup), and the two must not be conflated."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for _ in range(9):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4()))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 0})
+    summary = await syncer.recover_journal(_classes(_AnaA))
+    assert summary["recovered"] == 9
+    assert summary["deferred"] == 0
