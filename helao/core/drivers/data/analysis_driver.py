@@ -789,7 +789,22 @@ class AnalysisSyncer(HelaoSyncer):
             "dropped": 0,
             "unconfigured": 0,
             "failed": 0,
+            "deferred": 0,
         }
+        # A backlog must drain across restarts rather than take the server down
+        # at every one. Measured at a station: 8802 entries on disk, all of one
+        # analysis class, one per process. Sweeping them unbounded enqueued
+        # thousands of analyses into a server that had just bound its port, and
+        # ANA became unreachable -- so the sweep meant to stop silent loss
+        # became the thing stopping the server. Entries beyond the cap stay on
+        # disk, keyed and idempotent, and the next start takes the next slice.
+        limit = self.config_dict.get("analysis_recovery_max_per_startup", 250)
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            limit = 250
+        if limit <= 0:
+            limit = 0  # 0 disables the cap; the knob above disables the sweep
         if not self.journal_dir:
             LOGGER.info("Analysis journal is disabled; no recovery sweep to run.")
             return summary
@@ -806,7 +821,14 @@ class AnalysisSyncer(HelaoSyncer):
         # Building one is a full index of the archive, so this is not a
         # micro-optimisation on a plate with dozens of processes.
         loaders: dict = {}
-        for name in names:
+        for index, name in enumerate(names):
+            if limit and summary["recovered"] >= limit:
+                # Counted, not swept. Only re-enqueues are capped: dropping an
+                # unrunnable entry and reporting an unreadable one are cheap and
+                # must still happen, or a poison entry would sit at the head of
+                # the backlog and be re-examined at every restart forever.
+                summary["deferred"] = len(names) - index
+                break
             path = journal_entry_path(self.journal_dir, name)
             entry = read_journal_entry(path)
             if entry is None:
@@ -890,6 +912,14 @@ class AnalysisSyncer(HelaoSyncer):
             f"unrunnable, {summary['unconfigured']} for another host, "
             f"{summary['failed']} unreadable."
         )
+        if summary["deferred"]:
+            message += (
+                f" {summary['deferred']} left for a later start: this sweep is "
+                f"capped at {limit} re-enqueues "
+                "(analysis_recovery_max_per_startup) so a backlog drains over "
+                "successive restarts instead of saturating the server at each "
+                "one. They are still on disk and nothing is lost."
+            )
         if summary["recovered"]:
             # An alert, because the restart that lost these was itself silent:
             # each recovered analysis had already been reported as done by the
