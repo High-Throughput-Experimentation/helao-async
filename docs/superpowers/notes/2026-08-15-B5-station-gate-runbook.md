@@ -130,12 +130,16 @@ launch `electrode-demo` to roll back.
 the **only** live consumer of `pdu_server` anywhere — the module the B5 spec
 recorded as having no station gate. It has one; it is here.
 
-`SYNC` is worth calling out separately: it runs on all seven hte stations and
-on all three of these, so it is the single highest-blast-radius module B5
-touched. A `SYNC` fault is a fault everywhere.
+`SYNC` is worth calling out separately: it runs on all seven hte stations and on
+three of these four — `electrode-demo` is the exception, having no syncer — so it
+is the single highest-blast-radius module B5 touched. A `SYNC` fault is a fault
+almost everywhere.
 
 **Preferred order, where there is a choice: `ccsi2`, `eche10`, `anec`, `adss3`,
-`clad`, `ecms1`, `hispec`, then `uvis4`, `amts`, `note1`.** Stations will come
+`clad`, `ecms1`, `hispec`, then `uvis4`, `amts`, `note1`, `electrode-demo`.**
+`electrode-demo` sits last because it is a demo station rather than a production
+one, not because it is less informative — its five servers are covered nowhere
+else without an action server in front of them. Stations will come
 up in whatever order work demands; this is only what to prefer when two are
 equally convenient.
 
