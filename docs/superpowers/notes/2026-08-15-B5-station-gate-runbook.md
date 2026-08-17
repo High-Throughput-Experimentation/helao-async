@@ -270,7 +270,7 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `hispec` | | | | | | |
 | `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
 | `amts` | | | | | | |
-| `note1` | | | | | | |
+| `note1` | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 
 B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
@@ -309,4 +309,37 @@ why the captured rev matters:
 - The first, aborted attempt was caught during calibration, before any sample
   was measured, and that run's records were discarded rather than repaired.
 
-`uvis4` is signed off. One of ten.
+### `note1`, 2026-08-17 — signed off on a continuous soak (‡)
+
+**‡ `note1` ran continuously from 2026-08-15 through 2026-08-17** — batch
+conversion, `SYNC` and `ANA` — across the whole deduplication campaign. It
+carries `SYNC` and `ORCH`, and `SYNC` is the highest-blast-radius module B5
+touched. Days of unattended operation against a live share is a soak, and a
+soak catches a class of fault a scripted gate cannot: the slow leak, the
+sidecar written under one root and read under another, the queue that only
+saturates after thousands of items. Signed off by the station owner on that
+basis.
+
+Three defects surfaced here in that window. Recorded because a soak's value is
+precisely what it finds, and because two of the three were *not* deduplication
+artifacts — they were framework defects that the campaign merely provided the
+volume to expose:
+
+- `20c5cb5d` — `.prg` sidecars recorded **absolute** file paths, so relocating
+  the run trees under a new root stranded every record written before the move.
+  `SYNC` raised `ValueError: ... is not in the subpath of ...` on startup and
+  the records never synced. Now recorded relative and re-anchored on read.
+- `118660ee` — the fix above passed the record-relative path to `read_hlo`,
+  which needs the absolute one; the `except` arm then uploaded an empty
+  envelope and marked the file synced. Silent data loss, caught at `uvis4` but
+  present anywhere `SYNC` ran in that window, `note1` included.
+- `762cd9f0` — `ANA`'s startup journal sweep re-enqueued every pending entry
+  unbounded. With 8,802 entries accumulated it queued thousands of analyses
+  into a just-started server and `ANA` became unreachable. Now swept in bounded
+  slices.
+
+What a soak does not do is compare against the pre-migration reference or
+exercise the abort path. As with `uvis4`, a regression visible only as a
+*difference* from legacy, or only under e-stop, would not have surfaced here.
+
+`uvis4` and `note1` are signed off. Two of ten.
