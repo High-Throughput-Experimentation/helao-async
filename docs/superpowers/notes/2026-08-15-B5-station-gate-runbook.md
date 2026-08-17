@@ -268,7 +268,7 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `clad` | | | | | | |
 | `ecms1` | | | | | | |
 | `hispec` | | | | | | |
-| `uvis4` | | | | | | |
+| `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
 | `amts` | | | | | | |
 | `note1` | | | | | | |
 
@@ -276,3 +276,37 @@ B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
 full** — that is the phase which removes the engine these rows are evidence
 against. B6 (the private deployments) is independent and can proceed.
+
+### `uvis4`, 2026-08-17 — signed off on a production run († )
+
+**† The three gate columns record what the sign-off actually rests on, which is
+a full production sequence rather than the three scripted gates.** A complete
+`UVIS_GAIA_preset` ran on `uvis4_hex` with no errors: the station's nine
+B5-changed servers took a real plate end to end on the native `ActionHost`,
+through CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC and ORCH. Signed off by
+the station owner on that basis.
+
+Worth knowing what that does and does not cover, for whoever reads this table
+before B7. A production run exercises the composed system harder than any of the
+three gates — it is real hardware, real samples, real artifacts. What it does
+not do is compare this build's routes and outputs against the pre-migration
+reference (the golden diff), or exercise the abort path (the e-stop drill). A
+regression that only shows up in a *difference* from legacy, or only under
+abort, would not have been caught here. If either becomes a concern later, this
+row is the place to revisit.
+
+Two defects were found and fixed during this session at this station, which is
+why the captured rev matters:
+
+- `118660ee` — `sync_yml` passed the record-**relative** path to `read_hlo`,
+  which needs the absolute one. The read failed, and the `except` arm then
+  uploaded `{"meta": {}, "data": {}}` and recorded the file in `files_s3` as a
+  success. Every hlo written between `20cd5b0c` and `118660ee` was therefore
+  marked synced while its data never left the station. Confirmed fixed here:
+  zero `Failed to read hlo file` in SYNC's log across the completed sequence,
+  and with the empty-payload fallback removed a read failure can no longer be
+  recorded as a sync at all.
+- The first, aborted attempt was caught during calibration, before any sample
+  was measured, and that run's records were discarded rather than repaired.
+
+`uvis4` is signed off. One of ten.
