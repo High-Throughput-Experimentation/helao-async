@@ -84,7 +84,7 @@ Every server listed is changed — B5 ported all of them. The orchestrator
 | `ecms1` | CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI, ORCH, PSTAT (gamry), SAMPLE, SYNC |
 | `hispec` | ANDOR, CALC, IO, KMOTOR, MOTOR, ORCH, PSTAT (**biologic**), SAMPLE, SYNC |
 
-### Three more stations, whose configs live in private deployments
+### Four more stations, whose configs live in private deployments
 
 **These were missed when this document was first written** and are affected
 exactly as the seven above are. The station map was built by globbing
@@ -98,6 +98,33 @@ was in how the list was gathered.
 | `uvis4` | CAM, IO, MOTOR, PAL, PDU, SAMPLE, SPEC_R, SYNC, ORCH |
 | `amts` | PSTAT (gamry), SYNC, ORCH |
 | `note1` | SYNC, ORCH |
+| `electrode-demo` | ORCH, OPERATOR, VIS, CONTROL, UI |
+
+`electrode-demo` was missed a second time, by a subtler version of the same
+mistake: the three above were found by looking for stations running hte
+**action** servers, and this one runs none. Its deployment owns only
+`servers/action/`, so every *other* group falls back to hte — the orchestrator,
+the operator, both Bokeh visualizers and the Reflex UI. Its action servers
+(MOTION, IO, PSTAT, MUX) are the deployment's own, reached through the generic
+graft, and are B6's business rather than B5's.
+
+That makes it the only station here that exercises the B5 orchestrator, operator
+and visualizer surface **without** any hte action server underneath, which is
+worth having in the set: everywhere else those servers are validated incidentally,
+alongside the action modules the smoke sequence is really driving.
+
+**The route-checklist gate does not apply to it.** The frozen checklists under
+`helao/hexagon/tests/checklists/hte/` cover action modules and the BaseAPI system
+surface; there is no frozen checklist for `async_orch2`, `standalone_operator`,
+`action_visualizer` or `control_visualizer`. For this station the gate is the
+smoke sequence and the on-station golden diff, and the checklist column should be
+read as not-applicable rather than skipped.
+
+Its hexagon variant is `electrode-hex`, already present and derived from
+`electrode-demo` through `hexagon_variant` rather than copied — so unlike the
+paired `*_hex` YAMLs elsewhere in this programme there is no second copy of the
+station's hardware params to go stale. Launch `electrode-hex` to validate;
+launch `electrode-demo` to roll back.
 
 `uvis4` carries the most of any station in the programme after ccsi2, and it is
 the **only** live consumer of `pdu_server` anywhere — the module the B5 spec
@@ -271,6 +298,7 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
 | `amts` | | | | | | |
 | `note1` | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
+| `electrode-demo` | | | n/a — no hte action server | | | |
 
 B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
@@ -342,4 +370,4 @@ What a soak does not do is compare against the pre-migration reference or
 exercise the abort path. As with `uvis4`, a regression visible only as a
 *difference* from legacy, or only under e-stop, would not have surfaced here.
 
-`uvis4` and `note1` are signed off. Two of ten.
+`uvis4` and `note1` are signed off. Two of eleven.
