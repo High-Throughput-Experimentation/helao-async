@@ -1348,16 +1348,27 @@ class SyncDriver:
                                 file_s3_key += ".gz"
                             LOGGER.debug("Parsing hlo dicts.")
                             try:
+                                # ``fp``, not ``sp``: the pending list holds the
+                                # record-RELATIVE form, which is what the S3 key
+                                # wants and what survives a relocated run tree,
+                                # but opening a file needs the absolute path.
                                 file_meta, file_data = await asyncio.to_thread(
-                                    read_hlo, sp
+                                    read_hlo, fp
                                 )
                             except Exception:
+                                # Do NOT fall through to an empty payload. An
+                                # unreadable hlo used to upload {"meta": {},
+                                # "data": {}} and be recorded in files_s3 as a
+                                # success, so the raw data never reached S3 and
+                                # nothing ever retried it -- silent data loss
+                                # that reads as a clean sync.
                                 LOGGER.error(
-                                    f"Failed to read hlo file {fp}, skipping upload.",
+                                    f"Failed to read hlo file {fp}; leaving it "
+                                    "pending rather than uploading an empty "
+                                    "payload.",
                                     exc_info=True,
                                 )
-                                file_meta = {}
-                                file_data = {}
+                                raise
                             msg = {"meta": file_meta, "data": file_data}
                         else:
                             LOGGER.debug(
