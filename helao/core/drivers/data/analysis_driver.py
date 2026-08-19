@@ -28,7 +28,11 @@ successfully. The fix is a **request journal**, one small json file per queued
 analysis under ``<root>/STATES/ana_pending/``, written *before* the item reaches
 the queue and deleted when its worker finishes with it. At startup the journal
 is swept and every surviving entry is re-enqueued (see
-:meth:`AnalysisSyncer.recover_journal`).
+:meth:`AnalysisSyncer.recover_journal`), in capped batches: one sweep stops at
+``analysis_recovery_max_per_startup`` re-enqueues so a large backlog cannot
+saturate a server that has just bound its port, and
+:meth:`AnalysisSyncer.idle_drain` takes the next batch each time the server falls
+idle with entries still on disk.
 
 Re-running a recovered analysis is an idempotent upsert rather than a duplicate,
 which is what makes the sweep safe to arm by default: an analysis uuid is the
@@ -548,6 +552,13 @@ class AnalysisSyncer(HelaoSyncer):
         self.task_set = set()
         self.running_tasks = {}
         self.journal_dir = self._resolve_journal_dir(action_serv)
+        # Set by make_analysis_app's startup handler; see recover_journal and
+        # idle_drain for why the drain cannot own its own copy.
+        self.recovery_task: Optional[asyncio.Task] = None
+        self.idle_drain_task: Optional[asyncio.Task] = None
+        # Entry names as of the last sweep that re-enqueued nothing. See
+        # idle_drain.
+        self._barren_journal: Optional[frozenset] = None
 
         self.syncer_loops = {
             i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
@@ -746,7 +757,9 @@ class AnalysisSyncer(HelaoSyncer):
         """Journal entry file names currently on disk, for the status endpoint."""
         return list_journal_entries(self.journal_dir)
 
-    async def recover_journal(self, analysis_classes: dict) -> dict:
+    async def recover_journal(
+        self, analysis_classes: dict, alert_on_recover: bool = True
+    ) -> dict:
         """Re-enqueue every analysis the journal still holds. Startup sweep.
 
         An entry survives only when its worker never finished with it, so every
@@ -776,9 +789,21 @@ class AnalysisSyncer(HelaoSyncer):
         * **left in place, unreadable** -- corrupt json, a missing field, or a
           ``schema`` newer than this build's. Logged and skipped; a human decides.
 
+        Not only a startup sweep: :meth:`idle_drain` calls this again every time
+        the server falls idle with entries still on disk, so a backlog larger
+        than the cap drains over successive batches within one process rather
+        than needing one restart per batch.
+
         Args:
             analysis_classes: The endpoint-name-to-class mapping
                 :func:`make_analysis_app` built from ``params.analyses``.
+            alert_on_recover: Raise the recovery summary as an alert rather than
+                logging it at INFO. True for the startup sweep, whose whole point
+                is to be loud about analyses lost to a restart. False for
+                :meth:`idle_drain`'s continuations: that alert has already fired
+                for this backlog, and at the 8802 entries measured at a station
+                repeating it would add 35 alerts carrying no new fact. The
+                per-entry ``dropped`` alerts are unaffected either way.
 
         Returns:
             ``{"pending", "recovered", "dropped", "unconfigured", "failed"}``.
@@ -797,7 +822,11 @@ class AnalysisSyncer(HelaoSyncer):
         # thousands of analyses into a server that had just bound its port, and
         # ANA became unreachable -- so the sweep meant to stop silent loss
         # became the thing stopping the server. Entries beyond the cap stay on
-        # disk, keyed and idempotent, and the next start takes the next slice.
+        # disk, keyed and idempotent, and the next slice is taken by
+        # :meth:`idle_drain` once this one has drained (or by the next start, if
+        # the drain is disabled). The key keeps its ``_per_startup`` name because
+        # it may already be set in a station config this repo cannot see; it now
+        # bounds every batch, not only the first.
         limit = self.config_dict.get("analysis_recovery_max_per_startup", 250)
         try:
             limit = int(limit)
@@ -914,13 +943,13 @@ class AnalysisSyncer(HelaoSyncer):
         )
         if summary["deferred"]:
             message += (
-                f" {summary['deferred']} left for a later start: this sweep is "
+                f" {summary['deferred']} left for a later batch: this sweep is "
                 f"capped at {limit} re-enqueues "
                 "(analysis_recovery_max_per_startup) so a backlog drains over "
-                "successive restarts instead of saturating the server at each "
-                "one. They are still on disk and nothing is lost."
+                "successive batches instead of saturating the server at once. "
+                "They are still on disk and nothing is lost."
             )
-        if summary["recovered"]:
+        if summary["recovered"] and alert_on_recover:
             # An alert, because the restart that lost these was itself silent:
             # each recovered analysis had already been reported as done by the
             # action that requested it.
@@ -928,6 +957,109 @@ class AnalysisSyncer(HelaoSyncer):
         else:
             LOGGER.info(message)
         return summary
+
+    def idle_drain_poll_seconds(self) -> float:
+        """Seconds between idle checks. ``analysis_recovery_idle_poll_seconds``.
+
+        Floored at one second: a zero or negative interval would turn the drain
+        into a busy loop doing a ``listdir`` per iteration.
+        """
+        try:
+            poll = float(
+                self.config_dict.get("analysis_recovery_idle_poll_seconds", 30)
+            )
+        except (TypeError, ValueError):
+            poll = 30.0
+        return max(1.0, poll)
+
+    def _journal_signature(self) -> frozenset:
+        """The journal's current entry names, as a comparable value."""
+        if not self.journal_dir:
+            return frozenset()
+        return frozenset(list_journal_entries(self.journal_dir))
+
+    async def idle_drain(self, analysis_classes: dict) -> None:
+        """Keep taking capped batches out of the journal while the server is idle.
+
+        The startup sweep re-enqueues at most
+        ``analysis_recovery_max_per_startup`` entries and stops. Before this
+        existed, that was the whole of it: the batch drained, the server went
+        idle, and the rest of the backlog sat on disk until somebody restarted
+        the process -- one restart per 250 entries, against the 8802 measured at
+        a station. This loop closes that gap by running the same sweep again
+        whenever the server has nothing left to do.
+
+        Four conditions must all hold before a batch is taken:
+
+        * **Nothing queued or running** (:meth:`has_pending_work`). Sweeping mid
+          flight would re-enqueue items whose journal entries are still on disk
+          precisely *because* their workers have not finished with them.
+        * **The startup sweep is not still in flight.** It is launched as a task
+          rather than awaited, so at the first tick after startup ``task_set`` can
+          legitimately still be empty while the sweep is between its first entry
+          and its first ``enqueue_calc``.
+        * **The journal is not empty.**
+        * **The journal listing has changed since the last barren sweep.** Two
+          dispositions leave an entry in place forever by design: ``unconfigured``
+          (it names an analysis class another host in the group serves, so
+          deleting it here would destroy that host's work) and ``failed``
+          (unreadable json, or a ``schema`` newer than this build). Without this
+          check a journal holding only those would be re-read every tick for the
+          life of the process. Comparing *names* rather than keeping a bare flag
+          is what lets an operator move a file back from ``ana_failed/`` into
+          ``ana_pending/`` and have it picked up on the next tick with no restart.
+
+        The drain deliberately holds ``/hotreload_busy`` high while it has work:
+        a draining server is genuinely busy, and a restart mid-batch is exactly
+        what that gate exists to prevent. The loop is bounded -- it stops when the
+        journal empties or goes barren.
+
+        Args:
+            analysis_classes: The same endpoint-name-to-class mapping the startup
+                sweep is given. The driver has no copy of its own, which is why
+                this is started from :func:`make_analysis_app`.
+        """
+        poll = self.idle_drain_poll_seconds()
+        LOGGER.info(
+            f"Analysis journal idle drain armed; checking every {poll:g}s for "
+            "recoverable entries whenever the server is idle."
+        )
+        while True:
+            await asyncio.sleep(poll)
+            try:
+                if self.has_pending_work():
+                    continue
+                sweep = self.recovery_task
+                if sweep is not None and not sweep.done():
+                    continue
+                names = self._journal_signature()
+                if not names or names == self._barren_journal:
+                    continue
+                summary = await self.recover_journal(
+                    analysis_classes, alert_on_recover=False
+                )
+                if summary.get("recovered"):
+                    self._barren_journal = None
+                else:
+                    # Re-read after the sweep, not before: it may have dropped
+                    # unrunnable entries, and the signature has to describe what
+                    # is actually left.
+                    self._barren_journal = self._journal_signature()
+                    LOGGER.info(
+                        f"Analysis journal idle drain re-enqueued nothing; the "
+                        f"{len(self._barren_journal)} remaining entr(ies) are not "
+                        "runnable on this host. Pausing until the journal changes."
+                    )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # A drain that dies takes the backlog with it until the next
+                # restart, which is the failure this whole mechanism exists to
+                # end. Log and keep ticking.
+                LOGGER.warning(
+                    "Analysis journal idle drain hit an error; continuing.",
+                    exc_info=True,
+                )
 
     def has_pending_work(self) -> bool:
         """True while any analysis is queued for or actively running.
@@ -1234,7 +1366,14 @@ class AnalysisSyncer(HelaoSyncer):
         discarded, as it always was -- what changed is that it is no longer
         discarded *silently*, because every queued item has a journal entry and
         :meth:`recover_journal` re-enqueues it on the next launch.
+
+        The idle drain *is* cancelled here, and must be: it is the one task that
+        would otherwise keep pulling new entries out of the journal and into a
+        queue that is about to be discarded.
         """
+        if self.idle_drain_task is not None:
+            self.idle_drain_task.cancel()
+            self.idle_drain_task = None
         pending = self.journal_pending_keys()
         if pending:
             LOGGER.warning(
@@ -1425,6 +1564,19 @@ def make_analysis_app(server_key) -> ActionHost:
         pass; the entries stay on disk and stay visible through
         ``/list_queued_tasks``, so a backlog can be inspected before anything
         acts on it.
+
+        The same handler arms :meth:`AnalysisSyncer.idle_drain`, which takes the
+        next capped batch each time the server falls idle with entries still on
+        disk. It lives here rather than in the driver's ``__init__`` for one
+        reason: it needs ``analysis_classes``, which is built in this factory and
+        which the driver holds no copy of.
+
+        ``analysis_recovery_on_startup: false`` suppresses the drain too. An
+        operator who turned the sweep off to inspect a backlog by hand must not
+        find it swept anyway thirty seconds later. ``params.
+        analysis_recovery_drain_when_idle: false`` turns off only the
+        continuation, leaving the one startup batch as it was before the drain
+        existed.
         """
         if app.driver is None:
             LOGGER.warning(
@@ -1443,5 +1595,16 @@ def make_analysis_app(server_key) -> ActionHost:
             app.driver.recover_journal(analysis_classes),
             name="ana_journal_recovery",
         )
+        if app.driver.config_dict.get("analysis_recovery_drain_when_idle", True):
+            app.driver.idle_drain_task = asyncio.create_task(
+                app.driver.idle_drain(analysis_classes),
+                name="ana_journal_idle_drain",
+            )
+        else:
+            LOGGER.info(
+                "analysis_recovery_drain_when_idle is false; the journal will be "
+                "swept once at startup and any entries beyond "
+                "analysis_recovery_max_per_startup will wait for the next launch."
+            )
 
     return app
