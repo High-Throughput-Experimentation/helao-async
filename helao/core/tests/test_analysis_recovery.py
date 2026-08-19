@@ -114,6 +114,9 @@ def _syncer(journal_dir, logger=None, config=None) -> m.AnalysisSyncer:
     syncer.task_set = set()
     syncer.running_tasks = {}
     syncer.config_dict = dict(config or {})
+    syncer.recovery_task = None
+    syncer.idle_drain_task = None
+    syncer._barren_journal = None
     return syncer
 
 
@@ -992,13 +995,21 @@ class _StubDriver:
         self.config_dict = cfg
         self.journal_dir = "/nowhere"
         self.swept = False
+        self.drained = False
+        self.recovery_task = None
+        self.idle_drain_task = None
 
     def journal_pending_keys(self):
         return []
 
-    async def recover_journal(self, analysis_classes):
+    async def recover_journal(self, analysis_classes, alert_on_recover=True):
         self.swept = True
         return {}
+
+    async def idle_drain(self, analysis_classes):
+        # Returns rather than looping: the handler's job is to arm it, and a
+        # real loop here would outlive every ``asyncio.run`` in this file.
+        self.drained = True
 
 
 def test_recovery_sweep_is_armed_by_default_and_can_be_suppressed(
@@ -1135,3 +1146,326 @@ async def test_no_cap_sweeps_everything(tmp_path, logger, monkeypatch):
     summary = await syncer.recover_journal(_classes(_AnaA))
     assert summary["recovered"] == 9
     assert summary["deferred"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Idle drain: the backlog continues within one process
+# ---------------------------------------------------------------------------
+#
+# The cap makes one sweep safe; on its own it made the *backlog* need one
+# restart per batch (8802 entries at 250 a start is 36 restarts). ``idle_drain``
+# takes the next batch whenever the server has nothing left to do. What these
+# tests pin is the set of conditions under which it must NOT take one, because
+# each of those is a way a plausible drain is silently wrong: sweeping mid
+# flight re-enqueues items whose entries are on disk precisely because their
+# workers have not finished; sweeping while the startup sweep is still between
+# entries double-enqueues the same batch; and sweeping a journal of entries this
+# host can never run is an infinite loop over a listdir.
+
+
+def _fast_drain(syncer, poll=0.001):
+    """Bind the drain's poll interval below its own floor, for test speed.
+
+    The floor (one second) exists so a misconfigured station cannot turn the
+    drain into a busy loop; overriding the accessor rather than the config keeps
+    that floor under test in ``test_the_idle_poll_interval_is_floored`` while
+    letting these tests run in milliseconds.
+    """
+    syncer.idle_drain_poll_seconds = lambda: poll  # type: ignore[method-assign]
+
+
+async def _until(predicate, timeout=5.0, poll=0.005):
+    """Await ``predicate()`` becoming true. Returns whether it did."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if predicate():
+            return True
+        await asyncio.sleep(poll)
+    return predicate()
+
+
+async def _drain_queue(syncer):
+    """Stand in for the syncer workers: finish everything currently queued.
+
+    Clearing the journal entry is what a *successful* worker does in its
+    ``finally``, so this is the completion the drain is waiting on.
+    """
+    while not syncer.task_queue.empty():
+        calc_tup = syncer.task_queue.get_nowait()
+        syncer.task_set.discard(calc_tup[0])
+        syncer.journal_clear(calc_tup)
+
+
+@pytest.mark.asyncio
+async def test_the_idle_drain_takes_the_next_batch_without_a_restart(
+    tmp_path, logger, monkeypatch
+):
+    """The reported behaviour: 250 re-enqueued at startup, and when they finish
+    the server goes idle with the rest of the backlog still on disk. Here 7
+    entries at a cap of 3 must all run within one process."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for _ in range(7):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4()))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 3})
+    _fast_drain(syncer)
+
+    # The startup sweep takes the first batch, exactly as today.
+    first = await syncer.recover_journal(_classes(_AnaA))
+    assert first["recovered"] == 3
+    assert first["deferred"] == 4
+
+    # The first batch is already queued, so the drain must sit out this tick --
+    # ``task_set`` is what tells it the server is not idle.
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    batches = []
+    try:
+        while m.list_journal_entries(str(journal)):
+            assert await _until(lambda: not syncer.task_queue.empty())
+            batches.append(syncer.task_queue.qsize())
+            await _drain_queue(syncer)
+    finally:
+        drain.cancel()
+
+    # Capped at three per sweep, and the last one takes what is left.
+    assert batches == [3, 3, 1]
+    assert m.list_journal_entries(str(journal)) == []
+
+
+@pytest.mark.asyncio
+async def test_the_idle_drain_does_not_sweep_while_work_is_in_flight(
+    tmp_path, logger, monkeypatch
+):
+    """An entry is on disk for the whole time its worker holds it. Sweeping then
+    would re-enqueue the analysis that is currently running."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for _ in range(4):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4()))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal, config={"analysis_recovery_max_per_startup": 2})
+    _fast_drain(syncer)
+    syncer.running_tasks = {str(uuid4()): object()}
+
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    await asyncio.sleep(0.05)
+    drain.cancel()
+
+    assert syncer.task_queue.qsize() == 0
+    assert len(m.list_journal_entries(str(journal))) == 4
+
+
+@pytest.mark.asyncio
+async def test_the_idle_drain_waits_for_the_startup_sweep_to_finish(
+    tmp_path, logger, monkeypatch
+):
+    """The startup sweep is launched as a task, not awaited, so at the first
+    tick ``task_set`` can still be empty while the sweep sits between its first
+    entry and its first ``enqueue_calc``. Sweeping there enqueues that batch
+    twice."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    await writer.enqueue_calc(_tup(zip_path))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+    _fast_drain(syncer)
+
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def _slow_sweep():
+        started.set()
+        await release.wait()
+        return {"recovered": 0}
+
+    syncer.recovery_task = asyncio.create_task(_slow_sweep())
+    await started.wait()
+
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    await asyncio.sleep(0.05)
+    assert syncer.task_queue.qsize() == 0, "the drain swept under the startup sweep"
+
+    release.set()
+    await syncer.recovery_task
+    assert await _until(lambda: syncer.task_queue.qsize() == 1)
+    drain.cancel()
+
+
+@pytest.mark.asyncio
+async def test_a_journal_this_host_cannot_run_is_swept_once_and_then_left_alone(
+    tmp_path, logger, monkeypatch
+):
+    """``unconfigured`` entries stay on disk forever by design -- another host in
+    the group serves that analysis, so deleting them here would destroy its
+    work. Without the barren check the drain would re-read all of them on every
+    tick for the life of the process."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    for _ in range(3):
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4(), ana_cls=_AnaB))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+    _fast_drain(syncer)
+
+    sweeps = []
+    real = syncer.recover_journal
+
+    async def _counting(classes, alert_on_recover=True):
+        sweeps.append(alert_on_recover)
+        return await real(classes, alert_on_recover=alert_on_recover)
+
+    syncer.recover_journal = _counting  # type: ignore[method-assign]
+
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    await asyncio.sleep(0.08)
+    drain.cancel()
+
+    assert sweeps == [False], f"the barren journal was swept {len(sweeps)} times"
+    assert len(m.list_journal_entries(str(journal))) == 3
+    assert any("not runnable on this host" in i for i in logger.infos)
+
+
+@pytest.mark.asyncio
+async def test_a_requeued_entry_wakes_a_barren_drain(tmp_path, logger, monkeypatch):
+    """The barren state is keyed on the entry *names*, not a bare flag, so
+    moving a file back from ``ana_failed/`` into ``ana_pending/`` is picked up on
+    the next tick rather than waiting for a restart."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    await writer.enqueue_calc(_tup(zip_path, process_uuid=uuid4(), ana_cls=_AnaB))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+    _fast_drain(syncer)
+
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    try:
+        assert await _until(lambda: syncer._barren_journal is not None)
+        # A human moves a quarantined entry back, with the cause now fixed.
+        await writer.enqueue_calc(_tup(zip_path, process_uuid=PROC_B))
+        assert await _until(lambda: syncer.task_queue.qsize() == 1)
+    finally:
+        drain.cancel()
+
+    process_uuid, *_ = syncer.task_queue.get_nowait()
+    assert process_uuid == PROC_B
+
+
+@pytest.mark.asyncio
+async def test_only_the_first_sweep_alerts(tmp_path, logger, monkeypatch):
+    """The alert exists because the restart that lost these was itself silent.
+    Repeating it once per batch would add 35 alerts to an 8802-entry backlog and
+    no new fact, so continuations log the same summary at INFO."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    await writer.enqueue_calc(_tup(zip_path))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+
+    await syncer.recover_journal(_classes(_AnaA))
+    assert any("re-enqueued" in a for a in logger.alerts)
+
+    logger.alerts.clear()
+    await syncer.recover_journal(_classes(_AnaA), alert_on_recover=False)
+    assert logger.alerts == []
+    assert any("re-enqueued" in i for i in logger.infos)
+
+
+@pytest.mark.asyncio
+async def test_the_idle_drain_survives_a_failing_sweep(tmp_path, logger, monkeypatch):
+    """A drain that dies takes the backlog with it until the next restart --
+    which is the failure this whole mechanism exists to end."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    await writer.enqueue_calc(_tup(zip_path))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+    _fast_drain(syncer)
+
+    calls = []
+
+    async def _boom(classes, alert_on_recover=True):
+        calls.append(1)
+        raise RuntimeError("the share went away")
+
+    syncer.recover_journal = _boom  # type: ignore[method-assign]
+
+    drain = asyncio.create_task(syncer.idle_drain(_classes(_AnaA)))
+    assert await _until(lambda: len(calls) >= 2)
+    assert not drain.done(), "the drain died on the first error"
+    drain.cancel()
+    assert any("idle drain hit an error" in w for w in logger.warnings)
+
+
+def test_the_idle_poll_interval_is_floored(tmp_path, logger):
+    """A zero or negative interval would make the drain a busy loop doing a
+    listdir per iteration."""
+    assert _syncer(tmp_path).idle_drain_poll_seconds() == 30.0
+    assert (
+        _syncer(
+            tmp_path, config={"analysis_recovery_idle_poll_seconds": 5}
+        ).idle_drain_poll_seconds()
+        == 5.0
+    )
+    for bad in (0, -10, "not a number", None):
+        syncer = _syncer(tmp_path, config={"analysis_recovery_idle_poll_seconds": bad})
+        assert syncer.idle_drain_poll_seconds() >= 1.0
+
+
+def test_shutdown_cancels_the_idle_drain(tmp_path, logger):
+    """The one task that would otherwise keep pulling entries out of the journal
+    and into a queue that is about to be discarded."""
+
+    async def _run():
+        syncer = _syncer(tmp_path / "ana_pending")
+        _fast_drain(syncer)
+        syncer.idle_drain_task = asyncio.create_task(syncer.idle_drain({}))
+        await asyncio.sleep(0.01)
+        task = syncer.idle_drain_task
+        syncer.shutdown()
+        assert syncer.idle_drain_task is None
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(_run())
+
+
+def test_the_drain_is_armed_by_default_and_has_its_own_off_switch(
+    tmp_path, monkeypatch
+):
+    """Two knobs, deliberately not one. ``analysis_recovery_on_startup: false``
+    suppresses the drain too -- an operator who turned the sweep off to inspect a
+    backlog by hand must not find it swept anyway thirty seconds later --
+    while ``analysis_recovery_drain_when_idle: false`` leaves the single startup
+    batch exactly as it was before the drain existed."""
+    app = _app(tmp_path, monkeypatch)
+    handler = _startup_handler(app)
+
+    async def _run(cfg):
+        app.driver = _StubDriver(cfg)
+        handler()
+        for task in (app.driver.recovery_task, app.driver.idle_drain_task):
+            if task is not None:
+                await task
+        return app.driver.swept, app.driver.drained
+
+    assert asyncio.run(_run({})) == (True, True)
+    assert asyncio.run(_run({"analysis_recovery_drain_when_idle": False})) == (
+        True,
+        False,
+    )
+    assert asyncio.run(_run({"analysis_recovery_on_startup": False})) == (False, False)
