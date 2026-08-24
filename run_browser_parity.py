@@ -62,10 +62,15 @@ MATRIX_DIR = os.path.join(REPO_ROOT, ".browser-parity")
 #: legacy-hosted and hexagon-hosted runs of the same documents must agree.
 #:
 #: **The Reflex lane has no pair, and that is a measured limitation rather than
-#: an omission.** A hexagon-hosted Reflex variant does not exist yet:
+#: an omission.** What is missing is the *host*, not the config:
 #: ``helao/hexagon/app/ui_host.py``'s ``build_ui_app`` raises ``HexagonDeferred
-#: ("Reflex hosting lands in P7f")``, and no config can select a hexagon Reflex
-#: host. The Reflex half of the matrix diff becomes runnable when P7f lands --
+#: ("Reflex hosting lands in P7f")``, while a config can already select a
+#: hexagon Reflex host today -- ``goldenhexreflex.yml`` pairs ``reflex:
+#: helao_ui`` with ``deployment: hexagon``, which
+#: ``reflex_bundle.app_module_for`` routes to ``HEXAGON_APP_MODULE``. A
+#: ``reflex:`` value names the bundle rather than a module, so the hexagon
+#: routing has to come from that key. The Reflex half of the matrix diff
+#: becomes runnable when P7f lands --
 #: add ``"pair": "reflex_hexagon"`` here and a config beside it. Everything
 #: else about the Reflex lane (styles, pixels, both Q10 branches) runs today.
 LANES = {

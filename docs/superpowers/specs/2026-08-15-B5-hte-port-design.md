@@ -118,7 +118,7 @@ default, on all 247 routes — including the ones registered inside `dyn_endpoin
 decorated in source and so are visible to the extractor even though they do not exist on the
 app until startup.
 
-**D-B5.4 — `helao/core/drivers/analysis_driver.py` and `sync_driver.py` are in scope.**
+**D-B5.4 — `helao/core/drivers/data/analysis_driver.py` and `sync_driver.py` are in scope.**
 The program spec counted 49 deployment modules and missed these two. `analysis_server.py` is a
 15-line delegation to `analysis_driver.make_analysis_app`, which is where the `BaseAPI` is
 actually constructed; `sync_driver.py` imports `Base` for typing. `helao/core/drivers/`
