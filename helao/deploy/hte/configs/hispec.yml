@@ -1,4 +1,4 @@
-dummy: true
+dummy: false
 simulation: false
 # builtin_ref_motorxy:
 #   - 44.850974338462315
