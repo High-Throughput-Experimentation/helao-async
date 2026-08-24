@@ -120,7 +120,7 @@ open(sys.argv[1], 'wb').write(
 }
 
 # ---------------------------------------------------------------------------
-run_one dbpack "$LEGACY_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
+run_one sync "$LEGACY_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
 run_one synchex "$HEX_JSON" || { echo "[canary] ABORTED -- see logs in $OUTDIR"; exit 2; }
 
 echo
