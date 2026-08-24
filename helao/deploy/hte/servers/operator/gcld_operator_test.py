@@ -13,7 +13,7 @@ from helao.ui.shared.operator.helao_operator import HelaoOperator
 from helao.helpers.config_loader import read_config
 from helao.helpers.server_keys import SYNC_SERVER_KEY, resolve_sync_server_key
 
-from ...sequences.TEST_seq import TEST_consecutive_noblocking
+from helao.deploy.test.sequences.TEST_seq import TEST_consecutive_noblocking
 
 inst_config = sys.argv[1]
 PLATE_ID = int(sys.argv[2])
