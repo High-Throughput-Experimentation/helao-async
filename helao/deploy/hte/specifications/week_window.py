@@ -73,7 +73,7 @@ class WeekWindowSpecParser(BaseParser):
         zdat = HelaoData(specfile)
         zyml = zdat.yml
         seqname = zyml["sequence_name"]
-        if "sequence_name" not in orch.sequence_lib:
+        if seqname not in orch.sequence_lib:
             LOGGER.warning(
                 f"sequence '{seqname}' not found in current sequence library"
             )
