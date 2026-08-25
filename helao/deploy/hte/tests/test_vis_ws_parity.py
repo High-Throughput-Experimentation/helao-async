@@ -3,7 +3,7 @@ fed the decoded payload the real `VisSubscriber.IOloop_data` would hand them,
 built from `harness/ws_frames` (real encoder -> real WsSubscriber decoder,
 never a hand-built dict standing in for the wire).
 
-12 hte visualizer modules define `add_points`; **10** are conformance-tested
+13 hte visualizer modules define `add_points`; **11** are conformance-tested
 here. Two are excluded, both measured rather than assumed:
 
 - `sample_vis.add_points(self)` takes no payload argument at all -- it is
@@ -33,6 +33,14 @@ raise" premise for the ws_live family):
   all guard with `if data_label in self.data_dict_keys` -- an unrecognized
   column (e.g. a composition string) is silently ignored, matching the
   Reflex ingest layer's `normalize_data_package` semantics.
+  `oceandirect_vis` reaches the same tolerance by a different route: it does
+  not enumerate columns at all but hands the payload to
+  `spec_long_format.latest_spectra`, which returns `[]` unless
+  `spec_idx`/`wl`/`i` are all present -- so an unrecognized *or* incomplete
+  payload is ignored without raising, and a string column never reaches a
+  `float()`. Unlike its three siblings it is not a time series: one packet
+  can carry many spectra (a buffered drain delivers up to 15) and each
+  becomes its own `multi_line` row rather than extending a column.
 
 `power_supply_vis` carried a genuine defect, found by running its real code
 rather than assumed: `data_dict_keys` was `["t_s", "current_a"]` with no
@@ -118,7 +126,7 @@ def _import(modname):
 
 
 def test_targeted_module_set_matches_disk_and_is_documented():
-    """12 hte modules define add_points; 10 are conformance-tested; the 2
+    """13 hte modules define add_points; 11 are conformance-tested; the 2
     exclusions are named and justified in the module docstring above, not
     silently dropped."""
     import subprocess
@@ -130,11 +138,14 @@ def test_targeted_module_set_matches_disk_and_is_documented():
         check=True,
     ).stdout
     found = {line.split("/")[-1][: -len(".py")] for line in out.strip().splitlines()}
-    assert len(found) == 12, found
+    assert len(found) == 13, found
     excluded = {"sample_vis", "spec_vis"}
     tested = found - excluded
-    assert len(tested) == 10, tested
+    assert len(tested) == 11, tested
     assert excluded <= found
+    # oceandirect_vis is tested, not excluded: unlike spec_vis it does no
+    # private dispatch during construction, so this harness can build it.
+    assert "oceandirect_vis" in tested
 
 
 # --- ws_live family: unconditional-append panels (KeyError on unknown key) --
@@ -386,6 +397,57 @@ def test_nidaqmx_vis_ingests_recognized_columns_and_drops_string():
     asyncio.run(_run())
 
 
+def test_oceandirect_vis_reframes_spectra_and_ignores_an_unusable_payload():
+    """The long-format panel: rows are pixels, `spec_idx` is the framing key.
+
+    Two spectra of two pixels arrive in one packet and must become two
+    `multi_line` rows, not one four-point curve. A payload without the
+    spectrum columns -- a device-control action publishes one on this same
+    server -- must be ignored silently, matching the ws_data family.
+    """
+    module = _import("oceandirect_vis")
+
+    async def _run():
+        vis = _build(module, "SPEC_OD")
+        assert vis.connected
+        vis.downsample = 1
+        assert vis.datasource.data["wl"] == []
+
+        decoded = await _decoded_data(
+            numeric={
+                "epoch_s": [10.0, 10.0, 20.0, 20.0],
+                "spec_idx": [0.0, 0.0, 1.0, 1.0],
+                "wl": [400.0, 401.0, 400.0, 401.0],
+                "i": [1.0, 2.0, 3.0, 4.0],
+            },
+            strings={wf.STRING_COLUMN: [wf.STRING_VALUES[0]] * 4},
+            action_name="acquire_spec",
+        )
+        vis.add_points([decoded])
+
+        # Two frames -> two traces, each two points long.
+        assert len(vis.datasource.data["wl"]) == 2
+        assert vis.datasource.data["frame"] == [0, 1]
+        assert vis.datasource.data["intensity"] == [[1.0, 2.0], [3.0, 4.0]]
+        assert vis.datasource.data["wl"] == [[400.0, 401.0], [400.0, 401.0]]
+        # The string column never reaches a float(), and never a data source.
+        assert wf.STRING_COLUMN not in vis.datasource.data
+        # Each frame keeps its own timestamp; a buffered drain is not
+        # simultaneous.
+        assert len(set(vis.datasource.data["time"])) == 2
+
+        # A payload with no spectrum columns is ignored, not raised on.
+        control = await _decoded_data(
+            numeric={"epoch_s": [1.0]},
+            strings={wf.STRING_COLUMN: [wf.STRING_VALUES[0]]},
+            action_name="acquire_spec",
+        )
+        vis.add_points([control])
+        assert len(vis.datasource.data["wl"]) == 2
+
+    asyncio.run(_run())
+
+
 if __name__ == "__main__":
     test_targeted_module_set_matches_disk_and_is_documented()
     test_co2_vis_ingests_recognized_and_raises_on_unrecognized()
@@ -398,4 +460,5 @@ if __name__ == "__main__":
     test_biologic_vis_ingests_recognized_columns_and_drops_string()
     test_gamry_vis_ingests_recognized_columns_and_drops_string()
     test_nidaqmx_vis_ingests_recognized_columns_and_drops_string()
+    test_oceandirect_vis_reframes_spectra_and_ignores_an_unusable_payload()
     print("ALL HTE TEST_VIS_WS_PARITY TESTS PASS")
