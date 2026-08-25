@@ -1,0 +1,66 @@
+# Development config for the OceanDirect spectrometer server.
+#
+# Not a station config and not meant to become one. `simulate: true` on the
+# SPEC_OD params selects `oceandirect_sim` instead of the vendor SDK, so this
+# launches on any machine -- the `oceandirect` wheel ships inside the Ocean
+# Insight SDK installer and is not on PyPI, so a dev box does not have it.
+#
+# A real station replaces `simulate: true` with the device's `serial_number`
+# (preferred -- stable across reboots and unambiguous on a multi-device host)
+# or a positional `dev_index`, and changes nothing else. Run
+# `POST /get_device_info` first: which `Advanced` features exist varies per
+# model, and that capability matrix is what decides which endpoints on this
+# server will actually work against the attached device.
+dummy: true
+simulation: true
+run_type: simulation
+# HELAO does not expand `~`; a tilde here creates a literal '~' directory
+# in the working directory, which for a dev launch is the repo itself.
+root: /tmp/helao-odspec
+experiment_libraries: []
+sequence_libraries: []
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8111
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: false
+  SPEC_OD:
+    host: 127.0.0.1
+    port: 8112
+    group: action
+    fast: oceandirect_server
+    # One key, both UI stacks: `visualizer/oceandirect_vis.py` (Bokeh, mounted
+    # by ACTVIS) and `reflex/oceandirect_vis.py` (the /action page of UI)
+    # answer to this same name. A station adds a `reflex:` server to gain the
+    # Reflex panel and changes nothing else.
+    action_vis: oceandirect_vis
+    params:
+      # Simulated SR2: 2048 pixels, 339-789 nm, 1 ms to 10 s integration.
+      simulate: true
+      # Integration time is MICROSECONDS here, not the milliseconds the
+      # SM303 server uses. 100 ms.
+      int_time_us: 100000
+      # No sample plumbing in a dev launch, so buffered capture would
+      # otherwise refuse to start.
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5110
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: OceanDirect Spectrometer Visualizer
+      launch_browser: false
+  UI:
+    host: 127.0.0.1
+    port: 5111
+    group: visualizer
+    # A Reflex server occupies TWO consecutive ports: 5111 serves the prebuilt
+    # frontend and 5112 is its backend, so nothing else may claim 5112.
+    reflex: helao_ui
+    params:
+      pages:
+        - action
