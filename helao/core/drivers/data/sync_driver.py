@@ -456,30 +456,47 @@ class HelaoYml:
         )
         return sorted(all_children, key=lambda x: x.timestamp)
 
+    @staticmethod
+    def _is_syncable_misc_file(path: Path) -> bool:
+        """Whether *path* is a run artifact rather than write-path bookkeeping.
+
+        The uploader learns an action's non-hlo files by globbing the record
+        directory, so **anything transiently present there gets uploaded**.
+        Every meta and data writer in this codebase writes atomically by
+        staging ``.<name>.<uuid1hex>.tmp`` beside its target and renaming it
+        into place, so a glob landing mid-write captures a name that no longer
+        exists by the time boto3 stats it -- and one that can never upload used
+        to spin the push loop forever, wedging the rest of the action behind
+        it. Won the other way, the upload succeeds instead: a batch conversion
+        racing the syncer put two such objects under ``raw_data/``.
+
+        Excluded by suffix *and* by the leading dot, independently: the suffix
+        rule catches a ``.tmp`` written without the dotfile convention, and the
+        dotfile rule catches the staging names of any future writer, since a
+        dotfile inside a record directory is bookkeeping in every case this
+        codebase writes one.
+        """
+        return (
+            path.is_file()
+            and path.suffix not in (".yml", ".hlo", ".lock", ".tmp")
+            and not path.name.startswith(".")
+        )
+
     @property
     def misc_files(self) -> list[Path]:
         """Files inside the target directory that are not ``.yml``/``.hlo``/``.lock``.
 
         Action ymls recurse into subdirectories; experiments and sequences
-        only look at their immediate directory.
+        only look at their immediate directory. Atomic-write staging files are
+        never included; see :meth:`_is_syncable_misc_file`.
         """
         if self.type == "action":
             return [
-                x
-                for x in self.targetdir.rglob("*")
-                if x.is_file()
-                and not x.suffix == ".yml"
-                and not x.suffix == ".hlo"
-                and not x.suffix == ".lock"
+                x for x in self.targetdir.rglob("*") if self._is_syncable_misc_file(x)
             ]
         else:
             return [
-                x
-                for x in self.targetdir.glob("*")
-                if x.is_file()
-                and not x.suffix == ".yml"
-                and not x.suffix == ".hlo"
-                and not x.suffix == ".lock"
+                x for x in self.targetdir.glob("*") if self._is_syncable_misc_file(x)
             ]
 
     @property
@@ -629,6 +646,7 @@ class Progress:
             if not hasattr(self, "yml"):
                 self.ymlpath = Path(self.dict["yml"])
             self.reanchor_recorded_paths()
+            self.prune_missing_pending()
 
     @staticmethod
     def _tail_after(parts: tuple, anchor: str):
@@ -790,6 +808,69 @@ class Progress:
             ]
             return s3_unf, api_unf
         return [], []
+
+    def prune_missing_pending(self) -> bool:
+        """Drop ``files_pending`` entries that are neither on disk nor declared.
+
+        The healing half of the staging-file fix, and it runs on every read for
+        the same reason :meth:`reanchor_recorded_paths` does: a sidecar written
+        before the glob was tightened still names a file that was renamed out
+        from under it, and nothing else would ever remove that name. An entry
+        survives if it exists on disk (it is simply not uploaded yet) or if the
+        record's own yml declares it in ``files`` -- a **declared** file that
+        has gone missing is a real fault and must stay visible rather than be
+        quietly forgotten here.
+
+        Ordered after :meth:`reanchor_recorded_paths` deliberately: an entry
+        still in its pre-relocation absolute form would resolve to a path that
+        does not exist under the current root, and pruning first would delete
+        every one of them.
+
+        Nothing is written back; the next :meth:`write_dict` persists the
+        pruned list, so a record that is never synced again is never rewritten.
+
+        Returns:
+            True when at least one entry was dropped.
+        """
+        pending = self.dict.get("files_pending")
+        if not pending:
+            return False
+        # Wrapped whole, for the same reason reanchor_recorded_paths is: this
+        # runs inside __init__ for every sidecar the syncer opens, and a record
+        # whose yml cannot currently be resolved or parsed must still load. An
+        # unreadable yml means "unknown", not "declares nothing" -- pruning
+        # against an empty set would discard every pending file it has.
+        try:
+            missing = [p for p in pending if not self.abspath(p).exists()]
+            if not missing:
+                return False
+            # Read the yml only when there is something to decide; the common
+            # case exits above without touching it.
+            declared = {
+                str(f.get("file_name"))
+                for f in (yml_load(self.yml.target, fast=True).get("files") or [])
+                if f.get("file_name")
+            }
+            dropped = [
+                p
+                for p in missing
+                if p not in declared and os.path.basename(p) not in declared
+            ]
+        except Exception:
+            LOGGER.debug(
+                f"Could not resolve {self.prg} against its yml to prune pending "
+                "files; leaving the list as found.",
+                exc_info=True,
+            )
+            return False
+        if not dropped:
+            return False
+        LOGGER.warning(
+            f"Dropping {len(dropped)} pending file(s) from {self.prg.name} that are "
+            f"neither on disk nor declared in the yml: {dropped}"
+        )
+        self.dict["files_pending"] = [p for p in pending if p not in dropped]
+        return True
 
     def read_dict(self):
         """Reload ``self.dict`` from the ``.prg`` file on disk."""
@@ -1331,9 +1412,32 @@ class SyncDriver:
                 and rel not in prog.dict["files_s3"]
             ]
             # push files to S3
+            #
+            # Bounded, because ``to_s3`` returns False rather than raising once
+            # its own five retries are spent: an entry that can never upload
+            # kept this loop spinning in place forever, and the record never
+            # advanced -- one wedged worker per such file, visible only as the
+            # same failure repeating in the log. Two escapes now. A pending path
+            # that is not on disk is dropped outright: it is not data, it is a
+            # glob that landed on an atomic-write staging name (see
+            # ``_is_syncable_misc_file``) and was then persisted into the
+            # sidecar. And a pass that uploads nothing at all returns, leaving
+            # the rest pending for the next scan instead of retrying in place.
             while prog.dict.get("files_pending", []):
-                for sp in prog.dict["files_pending"]:
+                pending_before = len(prog.dict["files_pending"])
+                # Iterate a copy: the body removes from the live list, which
+                # used to skip the entry after every successful upload and left
+                # the outer ``while`` to pick them up on a later pass.
+                for sp in list(prog.dict["files_pending"]):
                     fp = prog.abspath(sp)
+                    if not fp.exists():
+                        LOGGER.error(
+                            f"Pending file {sp} for {prog.yml.target.name} is not on "
+                            "disk; dropping it from the upload list."
+                        )
+                        prog.dict["files_pending"].remove(sp)
+                        prog.write_dict()
+                        continue
                     LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
                     if fp.suffix == ".hlo":
                         if fp.stat().st_size < 1024**3:  # 1GB
@@ -1435,6 +1539,14 @@ class SyncDriver:
                                     f"helao__{file_s3_key.split('.')[-1]}_file",
                                 )
                             meta["files"].append(fileinfo.model_dump())
+                if len(prog.dict["files_pending"]) == pending_before:
+                    LOGGER.error(
+                        f"No file uploaded for {prog.yml.target.name} in a full pass; "
+                        f"leaving {prog.dict['files_pending']} pending. The record "
+                        "stays in RUNS_FINISHED for the next scan rather than "
+                        "retrying in place."
+                    )
+                    return False
 
         # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
