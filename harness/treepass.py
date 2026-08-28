@@ -245,14 +245,32 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
         parts = f.relative_to(root).parts
         if row is ArtifactRow.PRC_YML:
             # A process artifact is keyed by its filename alone, never by its
-            # path. The write moved from root/PROCESSES into the RUNS_* tree
-            # (and so into the sequence zip), and the golden sets predate that
-            # move; keying by path would report every process as both missing
-            # and extra. The filename is
+            # full path. The write moved from root/PROCESSES into the RUNS_*
+            # tree (and so into the sequence zip), and the golden sets predate
+            # that move; keying by path would report every process as both
+            # missing and extra. The filename is
             # {pidx}__{process_uuid}__{technique}-prc.yml, so the key is unique
-            # by construction -- and snapshot raises on a collision, so a
-            # mistake here fails loud rather than merging two processes.
-            norm = mapper.sub(f"PRC/{normalize_name(parts[-1])}", strict=True)
+            # by construction -- EXCEPT across a reset_sync round trip, where
+            # the pre-reset zip survives as a ``.orig`` sidecar (exploded to
+            # ``.origdir``) beside the freshly rebuilt ``.zip`` (``.zipdir``):
+            # both legitimately carry a byte-identical copy of the SAME
+            # process now that it travels inside the zip, and a bare filename
+            # key cannot tell that expected backup duplication apart from an
+            # actual collision. Prefix with the nearest zipdir/origdir
+            # ancestor token (if any) so the two stay distinct; a process that
+            # sits directly in RUNS_SYNCED or under the old PROCESSES mirror
+            # has no such ancestor and keys exactly as before. snapshot still
+            # raises on a same-container collision, so a real mistake fails
+            # loud rather than merging two processes.
+            container = ""
+            cur = root
+            for name in parts[:-1]:
+                cur = cur / name
+                tok = token_of[cur]
+                if tok.endswith(".zipdir") or tok.endswith(".origdir"):
+                    container = tok
+            prefix = f"{container}/" if container else ""
+            norm = mapper.sub(f"PRC/{prefix}{normalize_name(parts[-1])}", strict=True)
         else:
             norm_parts = []
             cur = root
