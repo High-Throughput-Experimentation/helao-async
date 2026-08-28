@@ -55,3 +55,44 @@ def test_a_process_present_in_both_places_is_indexed_once(tmp_path):
     (mirror / PRC_A).write_text(BODY_A)
     loader = LocalLoader(str(zpath))
     assert len(loader._yml_paths["prc"]) == 1, "the same process must not appear twice"
+
+
+def test_helao_data_picks_the_record_yml_not_the_process(tmp_path):
+    from helao.helpers.helao_data import HelaoData
+
+    exp_dir = tmp_path / "RUNS_SYNCED" / "26.35" / "0828" / "seq" / "260828.120000__exp"
+    exp_dir.mkdir(parents=True)
+    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
+    (exp_dir / PRC_A).write_text(BODY_A)  # sorts first under a bare glob
+    hd = HelaoData(str(exp_dir))
+    assert hd.ymlpath.endswith("-exp.yml")
+    assert hd.type == "exp"
+
+
+def test_processors_picks_the_experiment_yml_not_the_process(tmp_path):
+    """HloPostProcessor is abstract, so subclass it to instantiate."""
+    from helao.core.models.file import FileInfo
+    from helao.helpers.premodels import Action
+    from helao.helpers.processors import HloPostProcessor
+
+    rel = Path("26.35") / "0828" / "seq" / "260828.120000__exp"
+    exp_dir = tmp_path / "RUNS_ACTIVE" / rel
+    act_dir = exp_dir / "0__0__SIM__do_thing"
+    act_dir.mkdir(parents=True)
+    (exp_dir / "260828.120000000000-exp.yml").write_text("experiment_name: SIM_exp\n")
+    (exp_dir / PRC_A).write_text(BODY_A)  # sorts first under a bare glob
+    (exp_dir.parent / "260828.115959000000-seq.yml").write_text(
+        "sequence_name: SIM_seq\n"
+    )
+
+    class _Proc(HloPostProcessor):
+        def process(self) -> list[FileInfo]:
+            return []
+
+    action = Action(
+        action_name="do_thing",
+        action_output_dir=str(rel / "0__0__SIM__do_thing"),
+    )
+    proc = _Proc(action, str(tmp_path / "RUNS_ACTIVE"))
+    assert proc.exp_yml_path.endswith("-exp.yml")
+    assert proc.seq_yml_path.endswith("-seq.yml")

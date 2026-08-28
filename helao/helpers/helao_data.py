@@ -129,7 +129,14 @@ class HelaoData:
             else:
                 if os.path.isdir(self.target):
                     self.ymldir = self.target
-                    self.ymlpath = glob(os.path.join(self.target, "*.yml"))[0]
+                    # Record suffixes only: a colocated -prc.yml sorts ahead of
+                    # a timestamped -exp.yml, and the next line derives
+                    # self.type from whichever name is picked.
+                    self.ymlpath = [
+                        x
+                        for x in sorted(glob(os.path.join(self.target, "*.yml")))
+                        if x.endswith(("-seq.yml", "-exp.yml", "-act.yml"))
+                    ][0]
                 elif target.endswith(".yml"):
                     self.ymldir = os.path.dirname(self.target)
                     self.ymlpath = target
