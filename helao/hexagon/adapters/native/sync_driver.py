@@ -65,7 +65,12 @@ from helao.helpers.time_utils import gen_uuid
 from helao.helpers.yml_tools import yml_dumps, yml_load
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
+ABR_MAP = {
+    "act": "action",
+    "exp": "experiment",
+    "seq": "sequence",
+    "prc": "process",
+}
 MOD_MAP = {
     "action": Action,
     "experiment": Experiment,
@@ -1259,7 +1264,16 @@ class SyncDriver:
                 prevent runaway re-queuing.
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if rank < rank_limit:
+        if yml_path.name.endswith("-prc.yml"):
+            # A process is an artifact of an experiment's sync, never a record
+            # that syncs on its own. It reaches here only by mistake -- most
+            # plausibly a hand-POSTed /finish_yml, which ranks an unrecognised
+            # suffix -1, above rank_limit, and so enqueues rather than drops.
+            LOGGER.info(
+                f"{str(yml_path)} is a process artifact, not a syncable record; "
+                "skipping enqueue request."
+            )
+        elif rank < rank_limit:
             LOGGER.debug(
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
@@ -1305,6 +1319,17 @@ class SyncDriver:
             shipped state; ``True`` if there was nothing to sync; ``False``
             when the yml could not be synced this pass.
         """
+        if yml_path.name.endswith("-prc.yml"):
+            # Authoritative backstop to enqueue_yml's guard: syncer() calls this
+            # directly off the queue, so anything queued before the guard
+            # existed would otherwise run. Returning True retires it without a
+            # requeue; finish_pending never offers it again because no
+            # list_pending* glob matches a -prc.yml suffix.
+            LOGGER.info(
+                f"{str(yml_path)} is a process artifact, not a syncable record; "
+                "not syncing."
+            )
+            return True
         if not yml_path.exists():
             LOGGER.debug(
                 f"{str(yml_path)} does not exist, assume yml has moved to synced."
