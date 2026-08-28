@@ -256,18 +256,38 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
             # both legitimately carry a byte-identical copy of the SAME
             # process now that it travels inside the zip, and a bare filename
             # key cannot tell that expected backup duplication apart from an
-            # actual collision. Prefix with the nearest zipdir/origdir
-            # ancestor token (if any) so the two stay distinct; a process that
-            # sits directly in RUNS_SYNCED or under the old PROCESSES mirror
-            # has no such ancestor and keys exactly as before. snapshot still
-            # raises on a same-container collision, so a real mistake fails
-            # loud rather than merging two processes.
+            # actual collision.
+            #
+            # The prefix therefore covers ONLY an ``.origdir`` ancestor, never
+            # a ``.zipdir`` one. A live post-move prc ALWAYS sits inside a
+            # ``.zipdir`` in production -- the sequence directory is zipped and
+            # removed -- so prefixing on ``.zipdir`` too would apply to every
+            # real prc unconditionally, making the golden's PROCESSES-shaped
+            # `PRC/<name>` key permanently unreachable and silently turning a
+            # field-by-field content comparison into a present/absent tree
+            # diff for every process in the golden gate. Prefixing only the
+            # backup keeps the live copy's key exactly as Task 4 intended
+            # while still telling it apart from its own ``.orig`` sidecar. A
+            # process that sits directly in RUNS_SYNCED (no zip involved) or
+            # under the old PROCESSES mirror has no ``.origdir`` ancestor
+            # either and keys exactly as before. snapshot still raises on a
+            # same-container collision, so a real mistake fails loud rather
+            # than merging two processes.
+            #
+            # Accepted gap: a tree holding BOTH an old PROCESSES-mirror copy
+            # AND a colocated in-zip copy of the SAME process would still
+            # collide under this rule (neither has an ``.origdir`` ancestor).
+            # That mixed-era shape is unreachable in the tests and in
+            # production -- a run is captured either fully pre-move or fully
+            # post-move, never both for the same process -- and if it ever
+            # did happen, snapshot() raises loudly rather than silently
+            # merging the two, so it is accepted rather than overlooked.
             container = ""
             cur = root
             for name in parts[:-1]:
                 cur = cur / name
                 tok = token_of[cur]
-                if tok.endswith(".zipdir") or tok.endswith(".origdir"):
+                if tok.endswith(".origdir"):
                     container = tok
             prefix = f"{container}/" if container else ""
             norm = mapper.sub(f"PRC/{prefix}{normalize_name(parts[-1])}", strict=True)
