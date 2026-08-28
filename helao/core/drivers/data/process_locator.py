@@ -14,12 +14,7 @@ region of ``sync_driver.py`` requires.
 """
 
 import os
-import re
 from pathlib import Path
-
-#: ``{pidx}__{process_uuid}__{technique_name}-prc.yml`` -- the shape
-#: ``sync_process`` writes and ``localfs.parse_process_path`` splits on.
-PRC_NAME = re.compile(r"^(?P<pidx>\d+)__(?P<uuid>[^_]+(?:_[^_]+)*?)__.*-prc\.yml$")
 
 
 def process_uuid_of(path: "str | os.PathLike[str]") -> str:
