@@ -2,7 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
-Amended: 2026-08-28 (Amendments 1 and 2)
+Amended: 2026-08-28 (Amendments 1, 2 and 3)
 
 ## Problem
 
@@ -485,3 +485,90 @@ be keyed by the anchoring action, or supplied per experiment name.
 - The colocation sub-project is still worth doing on its own merits — it is what
   puts the `-prc.yml` in the zip for future runs — but it is **no longer a
   prerequisite** for the legacy converter, so the two can proceed independently.
+
+## Amendment 3 — 2026-08-28, the recording's file set
+
+The instrument writes six files per recording, sharing a basename. All six were
+decoded or accounted for. The conclusion is that **only the `.csv` needs to be
+parsed**; the layouts of the others are recorded here so the work does not have
+to be repeated if that ever changes.
+
+| File | What it is | Needed? |
+|------|-----------|---------|
+| `.csv` | Vendor export: header + full-precision time series | **Yes — the only parser** |
+| `.dat` | Binary time series, one record per mass per cycle | No; decoded below |
+| `.exp` | ASCII cycle index into `.dat` | No; decoded below |
+| `.scn` | Scan definitions | No; duplicated by the CSV header |
+| `.env` | Full instrument/device property dump | No; superset of the CSV's environment block, static |
+| `.ann` | MASsoft view state | No; contains no data |
+
+### `.csv` — the parser target
+
+A 25-line header (its own length is declared on line 2 as
+`"header",0000000025,"lines"`), then a `"Data",N` line, a column-heading line, and
+the rows. Header line 3 carries the absolute origin as
+`"Date",<MM/DD/YYYY>,"Time",<h:mm:ss AM/PM>`. The scan table names the mass
+channels; the example recording has five (2, 15, 22, 26, 28) at roughly 300 ms per
+cycle, 53049 cycles, about 4.5 h.
+
+Each row is `HH:MM:SS, elapsed_ms, <one float per mass>`. **Use `elapsed_ms`**;
+the `HH:MM:SS` column is truncated to the second. Absolute time is the header
+origin plus `elapsed_ms`.
+
+### `.dat` — decoded, not needed
+
+A 5-byte preamble, then fixed 46-byte records: a `V1` marker, a `float64`
+timestamp in milliseconds at **offset 26**, and a `float64` intensity at
+**offset 38**. One record per mass per cycle, in scan-table order. The example
+holds 265,245 records — exactly 53,049 × 5 — and decodes to values identical to
+the CSV's.
+
+### `.exp` — decoded, not needed
+
+ASCII, 15-character fixed fields, no line terminators, seven fields per cycle:
+`[105, 5, <offset>, 5, 5, 1, 114]`. Six are constant; the varying one is the byte
+offset of that cycle within `.dat`, stepping by 230 (= 46 bytes × 5 masses).
+Verified for all 53,049 cycles with no mismatch, and `5 + 230 × 53049` is the
+`.dat` file size exactly. It is a cycle index and carries nothing else.
+
+### `.scn`, `.env`, `.ann` — a shared binary container
+
+All three begin `3A 01 01 00 00` and are Delphi object streams: length-prefixed
+strings and class-name tags (`TApexScan`, `TInstrument`, `TAllDeviceProperties`,
+`TScanCanvas`, `TTrendView`). The structure is legible; the semantics would need
+reverse-engineering, and there is no reason to.
+
+`.ann` is worth naming explicitly because the extension invites a wrong guess: it
+holds **no annotations**. Its contents are chart layout — canvas, trend view,
+axes, legend items, a font name. There are no user-placed markers in it, so it is
+not a candidate source of alignment events.
+
+### What the CSV loses, and why it does not matter
+
+The CSV reports one timestamp per cycle — the *first* mass's — so it implicitly
+presents the channels as simultaneous. `.dat` shows they are not: 30, 90, 151,
+212, 272 ms in the first cycle, about 60 ms apart, spanning 242 ms.
+
+Against the 23 s lag and the 2 s analysis bins this is 0.26% of the lag and 3% of
+a bin. It is recorded here rather than corrected. If per-mass timestamps ever
+matter, `.dat` is a short reader given the layout above.
+
+### Consequences for the design
+
+- **The converter parses the `.csv` and nothing else.** Read the declared header
+  length rather than hardcoding a row index — the one-off script's `text[29:]`
+  silently drops two scans (Amendment 2).
+- **The archival record holds the whole recording directory.** Decision 5's
+  process-free record should carry all six files, not just the parsed one. They
+  are one instrument output, the unparsed ones are small beside the `.csv` and
+  `.dat`, and archiving them keeps the `.dat` route open without a second
+  decision later.
+- **Proposed slice representation, for review.** Wide format, one row per cycle:
+  `epoch_s` plus one column per mass channel, named from the scan table
+  (`mass_2`, `mass_15`, …). `json_data_keys` is passed explicitly to `ctx.begin`
+  so the column order is pinned rather than inferred. Wide rather than the long,
+  array-packed shape used by the OceanDirect spectrometer stack, because a
+  spectrum there is thousands of pixels with a wavelength axis that must survive
+  reframing, whereas this is a handful of fixed named channels — and it matches
+  the frame the existing analysis already builds. The channel set is read from the
+  recording, not hardcoded, so a recording with different masses works unchanged.
