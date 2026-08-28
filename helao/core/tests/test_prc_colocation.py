@@ -98,3 +98,25 @@ def test_sync_yml_refuses_a_process_yml(tmp_path):
     result, called = asyncio.run(_run())
     assert result is True
     assert called == [], "sync_yml must return before touching progress"
+
+
+def test_list_children_ignores_a_colocated_process_yml(tmp_path):
+    exp_dir = _tree(tmp_path)
+    seq_dir = exp_dir.parent
+    (seq_dir / "260828.115959000000-seq.yml").write_text("sequence_name: SIM_seq\n")
+    (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+    )
+    seq_yml = next(seq_dir.glob("*-seq.yml"))
+    children = HelaoYml(seq_yml).list_children(seq_yml)
+    assert [c.type for c in children] == ["experiment"]
+
+
+def test_parent_path_of_an_action_is_the_experiment_not_the_process(tmp_path):
+    exp_dir = _tree(tmp_path)
+    # sorts before the -exp.yml, so a bare glob's [0] would pick it
+    (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+    )
+    act = next((exp_dir / "0__0__SIM__do_thing").glob("*-act.yml"))
+    assert HelaoYml(act).parent_path.name.endswith("-exp.yml")

@@ -438,7 +438,14 @@ class HelaoYml:
             ``HelaoYml`` objects for every ``*.yml`` one level below the
             parent, sorted oldest-first.
         """
-        paths = yml_path.parent.glob("*/*.yml")
+        # Record suffixes only. A colocated ``-prc.yml`` is a process artifact
+        # sitting beside its experiment, not a child record, and wrapping one
+        # in HelaoYml would put a process into the sync hierarchy.
+        paths = [
+            p
+            for p in yml_path.parent.glob("*/*.yml")
+            if p.stem.endswith(("-seq", "-exp", "-act"))
+        ]
         hpaths = [HelaoYml(x) for x in paths]
         return sorted(hpaths, key=lambda x: x.timestamp)
 
@@ -534,7 +541,11 @@ class HelaoYml:
             return self.target
         else:
             possible_parents = [
-                list(x.parent.parent.glob("*.yml"))
+                [
+                    p
+                    for p in x.parent.parent.glob("*.yml")
+                    if p.stem.endswith(("-seq", "-exp", "-act"))
+                ]
                 for x in (self.active_path, self.finished_path, self.synced_path)
             ]
             return [p[0] for p in possible_parents if p][0]
