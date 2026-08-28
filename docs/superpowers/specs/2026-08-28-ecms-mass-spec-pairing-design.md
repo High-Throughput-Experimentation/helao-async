@@ -2,6 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
+Amended: 2026-08-28 (Amendment 1)
 
 ## Problem
 
@@ -177,19 +178,22 @@ about the on-disk date layout reaches the bucket.
 sequence timestamp against the recording window, open the candidate and confirm
 `run_type == "ecms"`.
 
-**Identity recovery, before anything is written.** `sync_process` names its local
-artifact `{pidx}__{uuid_key}__{technique_name}-prc.yml` (`:2053`), so where the
-zip carries `-prc.yml` entries the whole pidx→`process_uuid` map is readable from
-the filenames alone. Source ladder:
+**Identity recovery, before anything is written.** Amended 2026-08-28, see
+*Amendment 1*. The archived legacy zips do **not** carry `-prc.yml` entries —
+`sync_process` writes them to `root/PROCESSES`, outside the tree that gets zipped
+— so the filename map is not recoverable from the archive. An API lookup by
+`experiment_uuid` does exist. The ladder is therefore:
 
-1. `-prc.yml` names in the zip
-2. an API lookup by `experiment_uuid`
-3. recompute `gen_uuid(f"{experiment_uuid}__{pidx}")`, accepted only if it agrees
-   with one of the above
+1. an API lookup by `experiment_uuid` — the primary source
+2. recompute `gen_uuid(f"{experiment_uuid}__{pidx}")` as a **cross-check**;
+   agreement with the API raises confidence, disagreement aborts the record
+3. `-prc.yml` names in the zip, where present — empty for the current backlog,
+   but populated for any sequence re-synced after the relocation of
+   *2026-08-28-process-yml-colocation-design.md* ships, including the ones this
+   converter itself re-syncs
 4. otherwise **abort that sequence and leave it untouched**
 
-Nothing is written until the map is in hand. Which rung actually applies to the
-real backlog is to be settled against the example legacy sequences, not guessed.
+Nothing is written until the map is in hand.
 
 **Unzip.** `reset_sync(zip_path)` (`:2262`) extracts everything but `.prg`/`.lock`
 into the parallel `RUNS_FINISHED` directory and renames the zip to `.orig`. That
@@ -289,9 +293,6 @@ byte-identical.
 
 ## Open, to settle against example data
 
-- Which rung of the legacy identity ladder the real backlog actually reaches —
-  whether archived zips carry `-prc.yml` entries, and whether an API lookup by
-  `experiment_uuid` exists.
 - The MS recording's own format, and therefore the slice representation and
   `json_data_keys` of the injected action.
 - Concrete `lag_s` and padding values per station.
@@ -303,3 +304,38 @@ byte-identical.
   hold-indefinitely, and quarantine remains deferred until after the hexagon
   migration.
 - Re-typing legacy `ecms` records as `agde`.
+
+## Amendment 1 — 2026-08-28
+
+Two facts were confirmed after the design was approved, and one companion
+sub-project was split out.
+
+**Legacy zips carry no `-prc.yml`.** `sync_process` writes the process artifact
+to `root/PROCESSES`, mirroring the record's relative path but sitting outside the
+`RUNS_*` tree that `zip_dir` archives. The zip therefore has no record of process
+identity at all. Rung 1 of the original identity ladder is empty for the entire
+existing backlog.
+
+**The API lookup by `experiment_uuid` exists**, so it becomes the primary source
+and the `gen_uuid` recomputation demotes from a fallback to a cross-check. A
+disagreement between the two aborts the record rather than picking a winner:
+minting the wrong `process_uuid` would create a duplicate process rather than
+update the intended one, which is the failure this whole ladder exists to prevent.
+
+**The deficiency itself is being fixed**, in a separate sub-project specified in
+`2026-08-28-process-yml-colocation-design.md`: `-prc.yml` moves to sit beside its
+`-exp.yml` inside the `RUNS_*` tree, so it is carried by the sequence zip. The S3
+key stays `process/{process_uuid}.json`; readers gain a shared resolver that falls
+back to the legacy `PROCESSES` mirror.
+
+Three consequences for this design:
+
+- Future `agde` runs never need the identity ladder. Their zips carry their own
+  process identity, so a later reopen reads it directly.
+- The legacy `ecms` converter repairs the deficiency as a side effect. It already
+  unzips and re-syncs; under the new write location the rebuilt zip gains its
+  `-prc.yml` entries, so a sequence processed once by this converter is
+  self-describing thereafter.
+- Ordering: the colocation sub-project should land **before** the legacy
+  converter runs in anger, so the backlog is repaired in one pass rather than
+  two.
