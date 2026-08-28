@@ -243,13 +243,24 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
         if row in (ArtifactRow.IGNORE, ArtifactRow.LOCK):
             continue
         parts = f.relative_to(root).parts
-        norm_parts = []
-        cur = root
-        for name in parts[:-1]:
-            cur = cur / name
-            norm_parts.append(token_of[cur])
-        norm_parts.append(normalize_name(parts[-1]))
-        norm = mapper.sub("/".join(norm_parts), strict=True)
+        if row is ArtifactRow.PRC_YML:
+            # A process artifact is keyed by its filename alone, never by its
+            # path. The write moved from root/PROCESSES into the RUNS_* tree
+            # (and so into the sequence zip), and the golden sets predate that
+            # move; keying by path would report every process as both missing
+            # and extra. The filename is
+            # {pidx}__{process_uuid}__{technique}-prc.yml, so the key is unique
+            # by construction -- and snapshot raises on a collision, so a
+            # mistake here fails loud rather than merging two processes.
+            norm = mapper.sub(f"PRC/{normalize_name(parts[-1])}", strict=True)
+        else:
+            norm_parts = []
+            cur = root
+            for name in parts[:-1]:
+                cur = cur / name
+                norm_parts.append(token_of[cur])
+            norm_parts.append(normalize_name(parts[-1]))
+            norm = mapper.sub("/".join(norm_parts), strict=True)
         if norm in snap.files:
             raise ValueError(f"normalized-name collision: {norm} ({rel})")
         snap.files[norm] = (f, row)
