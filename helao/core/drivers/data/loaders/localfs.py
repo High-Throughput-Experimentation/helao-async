@@ -20,6 +20,7 @@ from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
 )
+from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_bytes
@@ -240,15 +241,28 @@ class LocalLoader:
                 zip_contents = zf.namelist()
             self._is_microorch_zip = "MANIFEST.txt" in zip_contents
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
-            _yml_paths += glob(
-                os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
-            )
+            self._zip_members = set(_yml_paths)
+            # The mirror still holds the processes of records synced before the
+            # write moved into the RUNS_* tree. Union both, but never index the
+            # same process twice: the in-zip copy wins.
+            in_zip_uuids = {
+                process_uuid_of(x) for x in _yml_paths if x.endswith("-prc.yml")
+            }
+            _yml_paths += [
+                x
+                for x in glob(
+                    os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
+                )
+                if process_uuid_of(x) not in in_zip_uuids
+            ]
         elif os.path.isdir(self.target):
+            self._zip_members = set()
             for check_dir in check_dirs:
                 _yml_paths += glob(
                     os.path.join(check_dir, "**", "*.yml"), recursive=True
                 )
         else:
+            self._zip_members = set()
             for check_dir in check_dirs:
                 _yml_paths += glob(
                     os.path.join(os.path.dirname(check_dir), "**", "*.yml"),
@@ -365,7 +379,11 @@ class LocalLoader:
         Returns:
             Parsed YAML dict.
         """
-        if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
+        # Read from the zip when the path IS a zip member. The old test asked
+        # whether the path ended in -prc.yml, using "is a process" as a proxy
+        # for "is on disk" -- true only while processes were written outside
+        # the tree that gets zipped, and false as soon as one is a zip member.
+        if self.target.endswith(".zip") and path in self._zip_members:
             with ZipFile(self.target, "r") as zf:
                 metad = dict(
                     yml_load(
