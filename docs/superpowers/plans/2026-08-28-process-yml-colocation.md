@@ -548,7 +548,7 @@ Create `harness/tests/test_parity_prc_location.py`:
 
 from pathlib import Path
 
-from harness.treepass import snapshot
+from harness.treepass import seed_mapper, snapshot
 from harness.uuidmap import UuidMapper
 
 PRC = "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
@@ -579,8 +579,15 @@ def _colocated_tree(root: Path) -> Path:
 def test_prc_key_is_the_same_in_both_locations(tmp_path):
     legacy = _legacy_tree(tmp_path / "legacy")
     colocated = _colocated_tree(tmp_path / "colocated")
-    g = snapshot(legacy, UuidMapper())
-    c = snapshot(colocated, UuidMapper())
+    # snapshot() substitutes uuids with strict=True, so the mapper must be
+    # seeded from the same tree first -- every existing call site in harness/
+    # pairs seed_mapper with snapshot for exactly this reason. Without it the
+    # test raises KeyError: unseeded uuid, before and after the fix alike.
+    mg, mc = UuidMapper(), UuidMapper()
+    seed_mapper(legacy, mg)
+    seed_mapper(colocated, mc)
+    g = snapshot(legacy, mg)
+    c = snapshot(colocated, mc)
     assert set(g.files) == set(c.files), (
         f"prc keys differ: golden={sorted(g.files)} candidate={sorted(c.files)}"
     )
