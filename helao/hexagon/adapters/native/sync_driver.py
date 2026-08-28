@@ -530,6 +530,22 @@ class HelaoYml:
         ]
 
     @property
+    def process_ymls(self) -> list[Path]:
+        """``*-prc.yml`` files in the immediate target directory.
+
+        A process artifact is colocated with the ``-exp.yml`` it belongs to, so
+        it is in neither :attr:`misc_files` (which excludes ``.yml``) nor
+        :attr:`hlo_files`. It therefore has to be named explicitly in the set
+        that moves to ``RUNS_SYNCED``; left behind, it both orphans the process
+        and keeps :meth:`cleanup` reporting the directory as not empty forever.
+        """
+        return [
+            x
+            for x in self.targetdir.glob("*-prc.yml")
+            if x.is_file()
+        ]
+
+    @property
     def parent_path(self) -> Path:
         """Path of this record's parent yml.
 
