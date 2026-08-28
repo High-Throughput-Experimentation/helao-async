@@ -142,3 +142,108 @@ def test_process_ymls_is_empty_for_an_action(tmp_path):
     exp_dir = _tree(tmp_path)
     act = next((exp_dir / "0__0__SIM__do_thing").glob("*-act.yml"))
     assert HelaoYml(act).process_ymls == []
+
+
+def test_sync_process_writes_beside_the_exp_yml(tmp_path):
+    """The prc lands in the experiment directory and nowhere else.
+
+    Drives the real sync_process through the fixture builders rather than
+    stubbing it, so the assertion covers the path construction actually used.
+
+    make_sync_driver's SyncDriver.__init__ spawns the syncer worker tasks, so
+    it (and sync_process, and its teardown) must run inside a single running
+    event loop rather than across separate asyncio.run() calls -- the same
+    constraint test_sync_yml_refuses_a_process_yml above works around.
+    """
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.tests.sync_fixtures import (
+        make_action,
+        make_exp_tree,
+        make_sync_driver,
+        mk_uuid,
+        teardown_driver,
+    )
+    from helao.core.models.run_dir import RunDir
+
+    exp_yml = make_exp_tree(
+        tmp_path, RunDir.FINISHED.value, mk_uuid(1001), process_order_groups={0: [0]}
+    )
+    make_action(exp_yml, 0, process_finish=True)
+
+    async def _run():
+        driver = make_sync_driver(tmp_path, SyncDriver)
+        try:
+            exp_prog = driver.get_progress(exp_yml)
+            # sync_yml always reconciles process metas from on-disk actions
+            # before calling sync_process (sync_driver.py:1611); get_progress
+            # alone does not, so a bare sync_process call sees no process
+            # metas and drops the group as phantom rather than writing it.
+            exp_prog = driver.reconcile_processes(exp_prog)
+            await driver.sync_process(exp_prog, force=True)
+        finally:
+            await teardown_driver(driver)
+
+    asyncio.run(_run())
+
+    written = list(exp_yml.parent.glob("*-prc.yml"))
+    assert len(written) == 1, f"expected one prc beside the exp yml, got {written}"
+    assert not list(
+        (tmp_path / "PROCESSES").rglob("*-prc.yml")
+    ), "nothing may be written under process_root"
+
+
+def test_the_prc_moves_with_the_record_and_the_directory_cleans_up(tmp_path):
+    """Drive the real move and assert the outcome, not the set composition.
+
+    A stranded prc is worse than an orphan: cleanup() walks up from the moved
+    record and reports any non-empty directory as "failed", so the leftover
+    would keep the experiment directory alive forever. Asserting
+    ``prc in misc_files + hlo_files + process_ymls`` would only restate the
+    production expression in the test and would pass before the fix -- so this
+    drives move_to_synced and looks at where the file actually ends up.
+    """
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.core.models.run_dir import RunDir
+    from helao.hexagon.tests.sync_fixtures import (
+        make_action,
+        make_exp_tree,
+        make_sync_driver,
+        mk_uuid,
+        teardown_driver,
+    )
+
+    exp_yml = make_exp_tree(
+        tmp_path, RunDir.FINISHED.value, mk_uuid(3001), process_order_groups={0: [0]}
+    )
+    act_yml = make_action(exp_yml, 0, process_finish=True)
+
+    written = []
+
+    async def _run():
+        driver = make_sync_driver(tmp_path, SyncDriver)
+        try:
+            # Sync the action first: sync_yml's own "action contributes
+            # processes" branch (sync_driver.py:1747-1749) folds it via
+            # update_process and calls sync_process as a real side effect --
+            # the same path production takes, and what actually establishes
+            # the precondition that the prc exists beside the exp yml before
+            # anything moves it.
+            await driver.sync_yml(yml_path=act_yml)
+            written.extend(exp_yml.parent.glob("*-prc.yml"))
+
+            await driver.sync_yml(yml_path=exp_yml)
+        finally:
+            await teardown_driver(driver)
+
+    asyncio.run(_run())
+
+    assert len(written) == 1
+
+    finished_leftovers = [
+        p for p in (tmp_path / RunDir.FINISHED.value).rglob("*-prc.yml")
+    ]
+    assert (
+        not finished_leftovers
+    ), f"the prc was stranded in RUNS_FINISHED: {finished_leftovers}"
+    synced = list((tmp_path / RunDir.SYNCED.value).rglob("*-prc.yml"))
+    assert len(synced) == 1, f"the prc must travel to RUNS_SYNCED, found {synced}"
