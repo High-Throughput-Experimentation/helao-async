@@ -2,7 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
-Amended: 2026-08-28 (Amendment 1)
+Amended: 2026-08-28 (Amendments 1 and 2)
 
 ## Problem
 
@@ -178,8 +178,9 @@ about the on-disk date layout reaches the bucket.
 sequence timestamp against the recording window, open the candidate and confirm
 `run_type == "ecms"`.
 
-**Identity recovery, before anything is written.** Amended 2026-08-28, see
-*Amendment 1*. The archived legacy zips do **not** carry `-prc.yml` entries —
+**Identity recovery, before anything is written.** **Superseded by Amendment 2** —
+identity turned out to be present in the archive all along. The paragraph below
+is retained for the reasoning; read Amendment 2 for what the converter does. The archived legacy zips do **not** carry `-prc.yml` entries —
 `sync_process` writes them to `root/PROCESSES`, outside the tree that gets zipped
 — so the filename map is not recoverable from the archive. An API lookup by
 `experiment_uuid` does exist. The ladder is therefore:
@@ -293,9 +294,12 @@ byte-identical.
 
 ## Open, to settle against example data
 
-- The MS recording's own format, and therefore the slice representation and
-  `json_data_keys` of the injected action.
-- Concrete `lag_s` and padding values per station.
+- Whether every `ECMS_*` sequence in the backlog has the same shape as the two
+  inspected, or whether older ones predate `process_list` on the experiment yml.
+  The converter refuses a record without it, so this bounds coverage rather than
+  risking a wrong write.
+- The lag and baseline-lead values for anchors other than `run_CA`, and whether
+  they are stable across the backlog's date range.
 
 ## Out of scope
 
@@ -339,3 +343,145 @@ Three consequences for this design:
 - Ordering: the colocation sub-project should land **before** the legacy
   converter runs in anger, so the backlog is repaired in one pass rather than
   two.
+
+## Amendment 2 — 2026-08-28, after inspecting a real example
+
+One MS recording and the two `ECMS_series_CA_recirculation_mixedthreereactant`
+sequences it pairs with (`CA1` and `CA2`, one day's archive), plus the one-off
+pairing script a colleague wrote against them. Findings, in descending order of
+how much they change the design.
+
+### The identity ladder is unnecessary. Delete it.
+
+The CA experiment ymls **already carry both fields the converter needs**, inside
+the zip:
+
+```
+experiment_name: ECMS_sub_CA
+process_order_groups: {0: [1]}
+process_list: ['06734f93-c4c2-7266-8000-5a70b9bf635b']
+```
+
+`process_list` holds the pre-minted uuid7 the orchestrator assigned at experiment
+pop, and `process_order_groups` declares the group explicitly. What was missing
+from the archive was only the `-prc.yml`, never the identity.
+
+So decision 10 is a no-op rather than a reconstruction: the converter **appends
+the MS `action_order` to `process_order_groups[0]` and leaves `process_list`
+untouched**. No API lookup, no `gen_uuid` recomputation, no bucket recomputation
+from `process_finish` flags. The risk raised before inspection — that an API
+returning uuids without group indices would make a positional `process_list`
+unbuildable — does not arise.
+
+### These are not `legacy_experiment` records
+
+`legacy_experiment` is true only when `process_order_groups` is absent
+(`sync_driver.py:1744`). The CA experiments declare it, so the deterministic path
+runs and the `legacy_finisher_idxs` logic is never reached. The design's
+discussion of that path does not apply to this population.
+
+### Only five experiments per sequence have a process at all
+
+Each sequence holds 52 experiments across 12 names. Exactly five — the
+`ECMS_sub_CA` ones — carry a process group. The other 47 declare no group **and
+contain no action with `process_finish: true`**, verified across both sequences,
+so they materialise no processes by either path. There is nothing for an MS slice
+to attach to on them, and the converter should not try.
+
+This also makes decision 11 unambiguous rather than a heuristic: "the last group"
+is group `0`, the only group, containing only the measurement action.
+
+### The CA experiment's shape
+
+```
+order=0  archive_custom_query_sample   contrib=None  finish=False
+order=1  run_CA                        contrib=[action_params, files,
+                                                samples_in, samples_out]
+                                       finish=True
+order=2  wait                          contrib=None  finish=False
+```
+
+Next free `action_order` is **3**. Action directories are named
+`{order}__{split}__{SERVER_KEY}__{action_name}/`, which the injected action must
+follow. `technique_name` is `None` on the experiment, so the process technique
+falls back to `experiment_name` (`sync_driver.py:1819-1821`) — relevant because
+the `-prc.yml` filename embeds it.
+
+### Discovery must read an experiment yml, not the sequence yml
+
+`run_type` is **`None` on the `-seq.yml`** and `ecms` on all 52 `-exp.yml` files.
+The design's discovery filter (`run_type == "ecms"` on the sequence) would have
+matched nothing. Discovery reads one experiment yml, or falls back to the
+`sequence_name` prefix.
+
+Sequence yml filenames use `%Y%m%d.%H%M%S%f` (`20241113.110230983651-seq.yml`), so
+`HelaoYml.timestamp`'s 4-digit-year fallback (`:317`) is genuinely exercised.
+Zip *basenames*, however, are `HHMMSS__<sequence_name>__<label>.zip` with the date
+only in the parent directory — a zip basename is not parseable by that method, so
+discovery must read the yml inside or compose the date from the parent directory.
+
+### The window rule needs revising: anchor on the contributing action
+
+Decision 4 set the bounds from the experiment timestamp to the terminal action's
+timestamp. For this population that is wrong: the CA experiment spans
+`11:08:44` to about `11:18:46` and includes a trailing `wait`, while the
+measurement is `run_CA`'s 600 s. The colleague's script anchors on the
+measurement action, and so should the converter.
+
+The best available anchor is `epoch_ns` from the measurement's `.hlo` header, not
+the action yml's `action_timestamp` — they differ by **0.219 s** on the inspected
+action (yml stamp is action creation, `epoch_ns` is when acquisition began).
+Against a 23 s lag that is about 1%, so the yml stamp is usable, but `epoch_ns`
+is strictly better and is present in the zip.
+
+The window also needs a **lead**, not just the measurement span. The script takes
+a baseline from `[-71 s, -21 s]` relative to the aligned start, because the
+analysis subtracts pre-measurement MS signal. A slice covering only the
+measurement would be useless for that.
+
+### The MS time origin is in the file header — do not use mtime
+
+The recording is a HAL RC RGA 201 CSV: a 25-line header, five mass channels
+(2, 15, 22, 26, 28), then rows of `HH:MM:SS, elapsed_ms, <5 floats>` at roughly
+300 ms cadence — 53049 scans, about 4.5 h. The absolute origin is header line 3,
+`"Date",11/13/2024,"Time",10:40:45 AM`. `elapsed_ms` is the precise time base; the
+`HH:MM:SS` column is truncated to the second and should be ignored.
+
+The colleague's script instead derives the origin from
+`os.path.getmtime()` of the sidecar `.scn`. On this example the two agree to
+**0.95 s** — but that is incidental. The `.scn` and `.env` are written at
+recording start while the `.csv`, `.dat` and `.exp` mtimes all fall at recording
+*end* (about 4.5 h later), and an mtime does not survive a copy without `-p`, an
+archival move, or a checkout. **Use the header stamp.** This repository already
+carries the same lesson in the Reflex bundle stamp, which refuses mtime for
+exactly this reason.
+
+### The lag is per-anchor, not per-station
+
+The script uses **+23.0 s** from `run_CA`'s `epoch_ns` and **+41.0 s** from a
+`wait` action's yml timestamp on the calibration path. Two different constants for
+two different anchor actions in the same apparatus, because each anchor sits a
+different distance from the moment gas reaches the spectrometer. A single
+converter-wide `lag_s` would be wrong across experiment types; the parameter must
+be keyed by the anchoring action, or supplied per experiment name.
+
+### Two defects in the one-off script, not to be ported
+
+- It reads `text[29:]` while the data rows begin at line 28 (1-indexed), so it
+  **silently drops the first two scans**. Harmless at 300 ms cadence against a
+  23 s offset, but it is a hardcoded index where the header declares its own
+  length on line 2 (`"header",0000000025,"lines"`). Parse the declared length.
+- The calibration path converts a yml timestamp with
+  `time.mktime(time.strptime(...))`, which is local-time and therefore
+  DST-sensitive. The CA path avoids this by using `epoch_ns` directly.
+
+### Consequences for the plan
+
+- Decision 10 shrinks to "append one `action_order` to an existing group".
+- Decision 11 stops being a heuristic and becomes a fact about the data.
+- The API lookup demoted in Amendment 1 to a cross-check is now not needed at all,
+  though it remains available if a record is ever found without `process_list`.
+  The converter should refuse such a record rather than reconstructing identity.
+- The colocation sub-project is still worth doing on its own merits — it is what
+  puts the `-prc.yml` in the zip for future runs — but it is **no longer a
+  prerequisite** for the legacy converter, so the two can proceed independently.
