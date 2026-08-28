@@ -255,10 +255,19 @@ def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):
     zip_dir takes the sequence directory, so a colocated prc is included with
     no change to the zip code; reset_sync extracts everything but .prg/.lock,
     so it comes back on a reopen.
+
+    reset_sync's zip branch only fires when the archive carries a
+    ``-seq.prg`` (sync_driver.py:2341) -- an ``-exp.prg`` alone (the fixture's
+    original shape) never satisfies that check, so the "reset_sync restores
+    it" half of this test's own name went unexercised. This adds the
+    seq-level sidecar the real syncer leaves on a fully-synced sequence,
+    alongside the exp-level one, and drives reset_sync for real.
     """
     import zipfile
 
+    from helao.core.drivers.data.sync_driver import SyncDriver
     from helao.helpers.file_utils import zip_dir
+    from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
     seq_dir = tmp_path / "RUNS_SYNCED" / "26.35" / "0828" / "260828.115959__seq"
     exp_dir = seq_dir / "260828.120000__exp"
@@ -270,6 +279,7 @@ def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):
         "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
     )
     (exp_dir / "260828.120000000000-exp.prg").write_text("{}\n")
+    (seq_dir / "260828.115959000000-seq.prg").write_text("{}\n")
 
     zpath = seq_dir.parent / "260828.115959__seq.zip"
     zip_dir(seq_dir, zpath)
@@ -278,15 +288,47 @@ def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):
         m.endswith(prc_name) for m in members
     ), f"the zip must carry the process artifact; members={members}"
 
+    # make_sync_driver's SyncDriver.__init__ spawns the syncer worker tasks
+    # via create_task, so it needs a running event loop even though
+    # reset_sync's zip branch is itself synchronous.
+    async def _run():
+        driver = make_sync_driver(tmp_path, SyncDriver)
+        try:
+            return driver.reset_sync(str(zpath))
+        finally:
+            await teardown_driver(driver)
+
+    assert asyncio.run(_run()) is True
+
+    restored = (
+        tmp_path
+        / "RUNS_FINISHED"
+        / "26.35"
+        / "0828"
+        / "260828.115959__seq"
+        / "260828.120000__exp"
+        / prc_name
+    )
+    assert (
+        restored.exists()
+    ), f"the prc must come back on reopen, not found at {restored}"
+
 
 def test_the_process_s3_key_is_unchanged(tmp_path):
     """Relocating the local write must not touch the bucket layout.
 
     S3 destinations are uuid-keyed, not path-keyed, so nothing about where the
-    yml lands on disk may reach the key.
+    yml lands on disk may reach the key. Asserts the exact key rather than
+    just its shape: ``process/<some/path>/<uuid>.json`` would satisfy a
+    startswith/endswith check while still leaking the local path, which is
+    exactly the regression this test exists to catch. The expected uuid is
+    computed from ``gen_uuid``, the same function sync_process itself calls
+    (sync_driver.py:1879), rather than a restated literal, so this breaks if
+    either the seed string or the hash function moves.
     """
     from helao.core.drivers.data.sync_driver import SyncDriver
     from helao.core.models.run_dir import RunDir
+    from helao.helpers.time_utils import gen_uuid
     from helao.hexagon.tests.sync_fixtures import (
         make_action,
         make_exp_tree,
@@ -295,6 +337,10 @@ def test_the_process_s3_key_is_unchanged(tmp_path):
         teardown_driver,
     )
 
+    exp_uuid = mk_uuid(2001)
+    pidx = 0
+    expected_key = f"process/{gen_uuid(f'{exp_uuid}__{pidx}')}.json"
+
     seen: list[str] = []
 
     async def _record(msg, target, compress=False):
@@ -302,7 +348,7 @@ def test_the_process_s3_key_is_unchanged(tmp_path):
         return True
 
     exp_yml = make_exp_tree(
-        tmp_path, RunDir.FINISHED.value, mk_uuid(2001), process_order_groups={0: [0]}
+        tmp_path, RunDir.FINISHED.value, exp_uuid, process_order_groups={pidx: [0]}
     )
     make_action(exp_yml, 0, process_finish=True)
 
@@ -326,9 +372,7 @@ def test_the_process_s3_key_is_unchanged(tmp_path):
 
     asyncio.run(_run())
 
-    prc_keys = [k for k in seen if k.startswith("process/")]
-    assert prc_keys, f"expected a process/ key, saw {seen}"
-    assert all(k.startswith("process/") and k.endswith(".json") for k in prc_keys)
+    assert seen == [expected_key], f"expected exactly [{expected_key}], saw {seen}"
 
 
 def test_list_pending_exps_does_not_return_a_colocated_prc(tmp_path):
@@ -363,18 +407,52 @@ def test_list_pending_exps_does_not_return_a_colocated_prc(tmp_path):
     assert not any("-prc.yml" in p for p in pending), pending
 
 
-def test_finish_yml_route_drops_a_process_path(tmp_path):
-    """The route that makes the guard necessary.
+def test_finish_yml_route_drops_a_process_path(tmp_path, monkeypatch):
+    """The route that makes the guard necessary, driven for real.
 
-    /finish_yml assigns rank -1 to an unrecognised suffix, and -1 is above
-    enqueue_yml's rank_limit of -5, so a prc path reaches the queue rather
-    than being dropped by the rank floor. Exercises the same rank the route
-    would pass.
+    /finish_yml computes its own rank from the yml suffix before calling
+    enqueue_yml: a prc path matches none of -seq/-exp/-act.yml, falls to the
+    else branch, and gets rank -1 -- above enqueue_yml's rank_limit of -5. So
+    without the type guard in enqueue_yml, a hand-POSTed prc path would reach
+    the sync queue rather than being dropped by the rank floor. This drives
+    the real route's suffix-to-rank dispatch (not a re-typed copy of the
+    number it happens to emit today), against a stub syncer standing in for
+    the driver BaseAPI would otherwise construct in its own startup event.
     """
+    from helao.deploy.hte.servers.action import sync_server
+    from helao.helpers import config_loader
+
     exp_dir = _tree(tmp_path)
     prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
     prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
-    syncer = _StubSyncer()
-    asyncio.run(syncer.enqueue_yml(str(prc), rank=-1))  # the route's rank
-    assert syncer.task_queue.items == []
-    assert syncer.task_set == set()
+
+    (tmp_path / "LOGS").mkdir(exist_ok=True)
+    monkeypatch.setattr(
+        config_loader,
+        "CONFIG",
+        {
+            "root": str(tmp_path),
+            "dummy": True,
+            "simulation": True,
+            "servers": {
+                "DB": {
+                    "host": "127.0.0.1",
+                    "port": 8911,
+                    "group": "action",
+                    "fast": "sync_server",
+                    "params": {},
+                },
+            },
+        },
+    )
+    app = sync_server.makeApp("DB")
+    # BaseAPI builds the real HelaoSyncer in its own startup event, which
+    # this test never runs; a stub standing in for it is enough to exercise
+    # the route's suffix-to-rank branch and enqueue_yml's guard together.
+    app.driver = _StubSyncer()
+
+    route = next(r for r in app.routes if r.path == "/finish_yml")
+    asyncio.run(route.endpoint(yml_path=str(prc)))
+
+    assert app.driver.task_queue.items == []
+    assert app.driver.task_set == set()
