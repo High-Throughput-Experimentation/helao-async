@@ -68,3 +68,33 @@ def test_enqueue_yml_still_accepts_an_action_yml(tmp_path):
     syncer = _StubSyncer()
     asyncio.run(syncer.enqueue_yml(act, rank=0))
     assert len(syncer.task_queue.items) == 1
+
+
+def test_sync_yml_refuses_a_process_yml(tmp_path):
+    """syncer() calls sync_yml directly off the queue, so this guard is the
+    authoritative one and needs its own coverage.
+
+    make_sync_driver's SyncDriver.__init__ spawns the syncer worker tasks, so
+    it (and the sync_yml call under test, and its teardown) must run inside a
+    single running event loop rather than across separate asyncio.run() calls.
+    """
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
+
+    exp_dir = _tree(tmp_path)
+    prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
+    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+
+    async def _run():
+        driver = make_sync_driver(tmp_path, SyncDriver)
+        called = []
+        driver.get_progress = lambda p: called.append(p)  # must never be reached
+        try:
+            result = await driver.sync_yml(yml_path=prc)
+        finally:
+            await teardown_driver(driver)
+        return result, called
+
+    result, called = asyncio.run(_run())
+    assert result is True
+    assert called == [], "sync_yml must return before touching progress"
