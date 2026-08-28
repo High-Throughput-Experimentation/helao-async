@@ -240,15 +240,47 @@ Insert immediately above it:
 
 Apply the identical text to the native twin.
 
+- [ ] **Step 8b: Test the `sync_yml` guard directly**
+
+The `enqueue_yml` tests do not reach this guard, and it is the one that matters:
+`syncer()` calls `sync_yml` straight off the queue, so `enqueue_yml`'s guard
+alone leaves the hole this step closes. Without a test here, deleting the
+`sync_yml` guard breaks nothing in the suite.
+
+Append to `helao/core/tests/test_prc_colocation.py`:
+
+```python
+def test_sync_yml_refuses_a_process_yml(tmp_path):
+    """syncer() calls sync_yml directly off the queue, so this guard is the
+    authoritative one and needs its own coverage."""
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.tests.sync_fixtures import make_sync_driver
+
+    driver = make_sync_driver(tmp_path, SyncDriver)
+    exp_dir = _tree(tmp_path)
+    prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
+    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+
+    called = []
+    driver.get_progress = lambda p: called.append(p)  # must never be reached
+
+    assert asyncio.run(driver.sync_yml(yml_path=prc)) is True
+    assert called == [], "sync_yml must return before touching progress"
+```
+
+Run it, confirm it passes, then confirm it is load-bearing: comment out the
+`sync_yml` guard, re-run, see it FAIL, restore the guard.
+
 - [ ] **Step 9: Run the guard tests and the twin-parity pin**
 
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
-Expected: all PASS. If the parity pin in `helao/hexagon/tests/` fails with "not byte-identical", the two twins differ — diff them and make the patch text match exactly.
+Expected: all PASS. The byte-identity gate is `test_native_sync_pins.py` — `test_verbatim_region` and `test_region_holds_no_imports` plus eight per-member parity pins. `test_native_sync_driver.py` holds only a construction and an enqueue-dedup test and asserts nothing about the twins, so running it alone proves nothing about byte-identity. If a pin fails with "not byte-identical", the two twins differ — diff them and make the patch text match exactly.
 
 - [ ] **Step 10: Commit**
 
@@ -363,6 +395,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
@@ -467,6 +500,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
@@ -796,6 +830,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py \
   helao/core/tests/unit_test_sync_process_recovery.py -q
 PYTHONPATH=$PWD timeout 600 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
@@ -1716,6 +1751,7 @@ PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_process_locator.py \
   helao/core/tests/test_prc_readers.py \
   harness/tests/test_parity_prc_location.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py \
   helao/hexagon/tests/test_native_sync_adapter.py \
   helao/core/tests/test_sync_staging_files.py \
