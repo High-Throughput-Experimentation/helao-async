@@ -43,9 +43,12 @@ Usage::
 Given a run-tree root the ``RUNS_*`` subtrees are scanned; given anything else
 the directory itself is walked, so a single week or sequence can be checked.
 
-Exit status is 0 only when every record was read and none carried a staging
-name; it is 1 when a ghost is found or when any directory could not be read, so
-it can gate a cleanup sweep.
+Exit status is 0 only when every record encountered was actually examined and
+none carried a staging name. It is 1 when a ghost is found, and also when any
+record went unexamined -- a directory that would not list, an archive that would
+not open, or a member that would not decode. Counting only the first of those
+three is what let a real sweep print "no staging files recorded in any sidecar"
+while 28 records had never been read.
 """
 
 __all__ = ["is_staging_name", "scan_root", "scan_prg_text", "Findings"]
@@ -133,9 +136,20 @@ class Findings:
         return len(self.uploaded) + len(self.pending)
 
     @property
+    def n_unexamined(self) -> int:
+        """Records encountered but never actually read.
+
+        A damaged archive and a member that will not decompress are as
+        unexamined as a directory that would not list -- counting only the last
+        of the three is what let a real sweep report "no staging files recorded
+        in any sidecar" while 28 records had gone unread.
+        """
+        return len(self.unreadable) + len(self.unparseable) + len(self.bad_zips)
+
+    @property
     def complete(self) -> bool:
-        """Whether every record was actually read."""
-        return not self.unreadable
+        """Whether every record encountered was actually examined."""
+        return not self.n_unexamined
 
 
 # A dot-led token in any of the three positions a recorded name can occupy: a
@@ -320,7 +334,8 @@ def main(argv=None) -> int:
 
     print(
         f"\ncoverage: {found.n_prg} loose .prg, {found.n_zip} zips, "
-        f"{len(found.unreadable)} unreadable, {len(found.bad_zips)} damaged zips"
+        f"{found.n_unexamined} unexamined ({len(found.unreadable)} unreadable, "
+        f"{len(found.unparseable)} undecodable, {len(found.bad_zips)} damaged zips)"
     )
 
     for label, name, key in found.uploaded:
@@ -347,8 +362,11 @@ def main(argv=None) -> int:
         )
     if not found.complete:
         print(
-            f"\nCoverage is INCOMPLETE: {len(found.unreadable)} path(s) could not "
-            "be read after retries, so a clean result here would be meaningless."
+            f"\nCoverage is INCOMPLETE: {found.n_unexamined} record(s) were "
+            "encountered but never read -- a directory that would not list, an "
+            "archive that would not open, or a member that would not decode. "
+            "Whatever they hold is unknown, so treat the findings above as a "
+            "lower bound rather than the whole picture."
         )
     elif not found.n_ghosts:
         print("\nNo staging files recorded in any sidecar.")

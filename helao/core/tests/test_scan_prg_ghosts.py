@@ -220,11 +220,29 @@ class TestScanRoot:
         scan_root(str(tmp_path), found)
         assert found.n_ghosts == 0 and found.complete and found.n_prg == 1
 
-    def test_a_damaged_zip_is_reported_not_raised(self, tmp_path):
+    def test_a_damaged_zip_is_reported_and_counts_as_unexamined(self, tmp_path):
+        """A zip that will not open holds records nobody has looked at."""
         (tmp_path / "broken.zip").write_bytes(b"not a zip at all")
         found = Findings()
         scan_root(str(tmp_path), found)
-        assert found.bad_zips and found.complete
+        assert found.bad_zips
+        assert not found.complete and found.n_unexamined == 1
+
+    def test_an_undecodable_member_counts_as_unexamined(self, tmp_path):
+        """A zip can open while one member's bytes are damaged."""
+        path = tmp_path / "seq.zip"
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr("a-act.prg", _prg(files_s3={"d.hlo": "raw_data/u/d"}))
+            archive.writestr("b-act.prg", "placeholder")
+        raw = bytearray(path.read_bytes())
+        # Corrupt the second member's stored bytes, leaving the directory intact.
+        idx = raw.find(b"placeholder")
+        raw[idx : idx + len(b"placeholder")] = b"CORRUPTED!!"
+        path.write_bytes(bytes(raw))
+        found = Findings()
+        scan_root(str(path.parent), found)
+        assert found.unparseable
+        assert not found.complete and found.n_unexamined >= 1
 
     def test_nested_directories_are_walked(self, tmp_path):
         deep = tmp_path / "26.33" / "0820" / "seq" / "exp" / "act"
@@ -270,6 +288,14 @@ class TestMainExitStatus:
         (tmp_path / "x-act.prg").write_text(_prg(files_pending=[REAL_GHOSTS[3]]))
         assert main([str(tmp_path)]) == 1
         assert "prune_missing_pending" in capsys.readouterr().out
+
+    def test_a_damaged_zip_alone_exits_one(self, tmp_path, capsys):
+        """Unexamined records must not be reported as a clean archive."""
+        (tmp_path / "broken.zip").write_bytes(b"not a zip at all")
+        assert main([str(tmp_path)]) == 1
+        out = capsys.readouterr().out
+        assert "Coverage is INCOMPLETE" in out
+        assert "No staging files recorded" not in out
 
     @pytest.mark.skipif(os.geteuid() == 0, reason="root can read any directory")
     def test_incomplete_coverage_exits_one_even_with_no_ghosts(self, tmp_path, capsys):
