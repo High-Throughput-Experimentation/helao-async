@@ -93,14 +93,19 @@ dropping. Today it would reach `HelaoYml.type` and raise `KeyError: 'prc'`.
 
 ### Glob tightening
 
-Three bare `*.yml` globs in each twin would otherwise wrap a colocated prc as a
+**Two** bare `*.yml` globs in each twin would otherwise wrap a colocated prc as a
 record. They become suffix-filtered to `act`/`exp`/`seq`:
 
-- `:275` — yml discovery in `HelaoYml`
 - `:432` — `list_children`, which globs `parent/*/*.yml`; from a sequence
   directory that is the experiment directories, so it would return both the
   `-exp.yml` and its prc siblings
-- `:528` — `parent_path`, which globs two directories up
+- `:528` — `parent_path`, which globs two directories up and takes `p[0]`. A
+  `{pidx}__…-prc.yml` sorts ahead of a timestamped `-exp.yml`, so it would win
+  that index more often than not.
+
+`HelaoYml.__init__`'s directory glob at `:275` needs **no** change — it is
+already filtered to `-seq`/`-exp`/`-act` (an earlier draft of this spec
+miscounted it as a third site).
 
 The guard is the backstop; the tightening is what stops a prc being reached by
 record traversal at all.
