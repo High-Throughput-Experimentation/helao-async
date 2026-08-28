@@ -723,24 +723,55 @@ Append to `helao/core/tests/test_prc_colocation.py`:
 
 ```python
 def test_the_prc_moves_with_the_record_and_the_directory_cleans_up(tmp_path):
-    """A stranded prc is worse than an orphan: cleanup() walks up from the
-    moved record and reports any non-empty directory as "failed", so the
-    leftover would keep the experiment directory alive forever."""
-    exp_dir = _tree(tmp_path)
-    exp_yml = next(exp_dir.glob("*-exp.yml"))
-    prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
-    hy = HelaoYml(exp_yml)
-    assert prc in hy.process_ymls
-    moved_set = hy.misc_files + hy.hlo_files + hy.process_ymls
-    assert prc in moved_set, "the prc must be in the set move_to_synced relocates"
+    """Drive the real move and assert the outcome, not the set composition.
+
+    A stranded prc is worse than an orphan: cleanup() walks up from the moved
+    record and reports any non-empty directory as "failed", so the leftover
+    would keep the experiment directory alive forever. Asserting
+    ``prc in misc_files + hlo_files + process_ymls`` would only restate the
+    production expression in the test and would pass before the fix -- so this
+    drives move_to_synced and looks at where the file actually ends up.
+    """
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.core.models.run_dir import RunDir
+    from helao.hexagon.tests.sync_fixtures import (
+        make_action,
+        make_exp_tree,
+        make_sync_driver,
+        mk_uuid,
+    )
+
+    driver = make_sync_driver(tmp_path, SyncDriver)
+    exp_yml = make_exp_tree(
+        tmp_path, RunDir.FINISHED.value, mk_uuid(3001), process_order_groups={0: [0]}
+    )
+    make_action(exp_yml, 0, process_finish=True)
+    asyncio.run(driver.sync_process(driver.get_progress(exp_yml), force=True))
+    written = list(exp_yml.parent.glob("*-prc.yml"))
+    assert len(written) == 1
+
+    asyncio.run(driver.sync_yml(yml_path=exp_yml))
+
+    finished_leftovers = [
+        p for p in (tmp_path / RunDir.FINISHED.value).rglob("*-prc.yml")
+    ]
+    assert not finished_leftovers, (
+        f"the prc was stranded in RUNS_FINISHED: {finished_leftovers}"
+    )
+    synced = list((tmp_path / RunDir.SYNCED.value).rglob("*-prc.yml"))
+    assert len(synced) == 1, f"the prc must travel to RUNS_SYNCED, found {synced}"
 ```
+
+If `sync_yml` cannot be driven to completion in this fixture (it uploads and
+moves), narrow the second half to the move step the driver exposes and assert
+the same two outcomes — the prc absent from `RUNS_FINISHED` and present under
+`RUNS_SYNCED`. Do not fall back to asserting the set composition.
 
 - [ ] **Step 6: Run to verify it fails**
 
 Run: `PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest helao/core/tests/test_prc_colocation.py -q -k moves_with_the_record`
 
-Expected: PASS on the property assertion but this test only pins the set; now make the production code use it.
+Expected: FAIL — the prc is left behind in `RUNS_FINISHED` because nothing moves it yet.
 
 - [ ] **Step 7: Add the prc to the move set in both twins**
 
