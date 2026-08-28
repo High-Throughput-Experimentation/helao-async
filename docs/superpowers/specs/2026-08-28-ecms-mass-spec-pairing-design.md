@@ -40,6 +40,7 @@ Two populations need solving, and they are different problems:
 | 9 | Legacy mutation | `reset_sync` → inject → full re-sync |
 | 10 | Legacy process identity | Explicit `process_order_groups` plus a `process_list` pinned from the archive |
 | 11 | Legacy group selection | The last process group of each experiment only |
+| 12 | Slice representation | Wide: `epoch_s` plus one column per mass, named from the scan table |
 
 ### Notes on the ones that were close
 
@@ -563,7 +564,7 @@ matter, `.dat` is a short reader given the layout above.
   are one instrument output, the unparsed ones are small beside the `.csv` and
   `.dat`, and archiving them keeps the `.dat` route open without a second
   decision later.
-- **Proposed slice representation, for review.** Wide format, one row per cycle:
+- **Slice representation (decision 12, approved 2026-08-28).** Wide format, one row per cycle:
   `epoch_s` plus one column per mass channel, named from the scan table
   (`mass_2`, `mass_15`, …). `json_data_keys` is passed explicitly to `ctx.begin`
   so the column order is pinned rather than inferred. Wide rather than the long,
@@ -572,3 +573,5 @@ matter, `.dat` is a short reader given the layout above.
   reframing, whereas this is a handful of fixed named channels — and it matches
   the frame the existing analysis already builds. The channel set is read from the
   recording, not hardcoded, so a recording with different masses works unchanged.
+  A recording whose scan table names a channel the column-naming rule cannot
+  render is a refusal, not a silently dropped column.
