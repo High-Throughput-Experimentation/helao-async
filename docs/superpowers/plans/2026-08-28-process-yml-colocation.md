@@ -1289,6 +1289,7 @@ def test_processors_picks_the_experiment_yml_not_the_process(tmp_path):
     proc = _Proc(action, str(tmp_path / "RUNS_ACTIVE"))
     assert proc.exp_yml_path.endswith("-exp.yml")
     assert proc.seq_yml_path.endswith("-seq.yml")
+```
 
 - [ ] **Step 2: Run to verify it fails**
 
