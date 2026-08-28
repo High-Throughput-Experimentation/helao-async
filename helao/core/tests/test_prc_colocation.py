@@ -120,3 +120,25 @@ def test_parent_path_of_an_action_is_the_experiment_not_the_process(tmp_path):
     )
     act = next((exp_dir / "0__0__SIM__do_thing").glob("*-act.yml"))
     assert HelaoYml(act).parent_path.name.endswith("-exp.yml")
+
+
+def test_process_ymls_lists_colocated_prc_only(tmp_path):
+    exp_dir = _tree(tmp_path)
+    (exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml").write_text(
+        "process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n"
+    )
+    (exp_dir / "1__06a5a2d6-b26c-7673-8000-9f38fe556fd6__SIM_exp-prc.yml").write_text(
+        "process_uuid: 06a5a2d6-b26c-7673-8000-9f38fe556fd6\n"
+    )
+    exp_yml = next(exp_dir.glob("*-exp.yml"))
+    found = HelaoYml(exp_yml).process_ymls
+    assert sorted(p.name for p in found) == [
+        "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml",
+        "1__06a5a2d6-b26c-7673-8000-9f38fe556fd6__SIM_exp-prc.yml",
+    ]
+
+
+def test_process_ymls_is_empty_for_an_action(tmp_path):
+    exp_dir = _tree(tmp_path)
+    act = next((exp_dir / "0__0__SIM__do_thing").glob("*-act.yml"))
+    assert HelaoYml(act).process_ymls == []
