@@ -1449,14 +1449,22 @@ Replace:
 with:
 
 ```python
-    # Processes are written beside their -exp.yml inside the RUNS_* tree, so
-    # they travel in the sequence zip. PROCESSES is legacy-read-only and must
-    # gain nothing.
-    prcs = [p for p in root_p.rglob("*-prc.yml") if "PROCESSES" not in p.parts]
-    check(len(prcs) == 4, f"RUNS_* tree has 4 -prc.yml (got {len(prcs)})")
+    # Processes are written beside their -exp.yml, so a fully synced sequence
+    # carries them INSIDE its zip: zip_dir deletes the source directory on
+    # success, so a filesystem glob alone finds none of them. Count both --
+    # loose ones (a sequence not yet zipped) and zip members.
+    prcs = [str(p) for p in root_p.rglob("*-prc.yml") if "PROCESSES" not in p.parts]
+    for z in sorted(root_p.rglob("*.zip")):
+        with zipfile.ZipFile(z) as zf:
+            prcs += [
+                f"{z.name}:{n}" for n in zf.namelist() if n.endswith("-prc.yml")
+            ]
+    check(len(prcs) == 4, f"RUNS_* tree and zips hold 4 -prc.yml (got {len(prcs)})")
     stale = list((root_p / "PROCESSES").rglob("*-prc.yml"))
     check(not stale, f"PROCESSES must gain nothing (got {len(stale)})")
 ```
+
+`zipfile` must be imported at the top of the file if it is not already.
 
 - [ ] **Step 3: Run the smoke assertion if the harness is available**
 
