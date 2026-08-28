@@ -1665,7 +1665,9 @@ class SyncDriver:
             LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
-            for file_path in prog.yml.misc_files + prog.yml.hlo_files:
+            for file_path in (
+                prog.yml.misc_files + prog.yml.hlo_files + prog.yml.process_ymls
+            ):
                 LOGGER.debug(f"Moving {str(file_path)}")
                 move_success = await asyncio.to_thread(move_to_synced, file_path)
                 while not move_success:
@@ -2095,12 +2097,13 @@ class SyncDriver:
                 uuid_key = meta["process_uuid"]
                 model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
                 # write to local yml
-                save_dir = os.path.dirname(
-                    os.path.join(
-                        self.helaodirs.process_root,
-                        exp_prog.yml.relative_path,
-                    )
-                )
+                # Beside the -exp.yml, inside the RUNS_* tree, so the sequence
+                # zip carries its own process identity. It used to go to
+                # helaodirs.process_root, which zip_dir never reaches -- so an
+                # archived sequence recorded no process identity at all and
+                # every repair tool had to consult a parallel tree that might
+                # no longer be beside the zip it was repairing.
+                save_dir = str(exp_prog.yml.target.parent)
                 save_yml_path = os.path.join(
                     save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
                 )
