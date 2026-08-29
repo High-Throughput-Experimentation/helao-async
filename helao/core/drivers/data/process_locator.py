@@ -1,5 +1,5 @@
-"""Locate a experiment's ``-prc.yml`` artifacts, in either of the two places
-they have lived.
+"""Locate a experiment's ``-prc.yml`` artifacts, in either of the two
+FILESYSTEM places they have lived.
 
 A process's only on-disk artifact used to be written to ``root/PROCESSES``,
 mirroring the record's relative path but sitting outside the ``RUNS_*`` tree
@@ -7,6 +7,14 @@ that gets zipped. It is now written beside its ``-exp.yml``. Records synced
 before that change keep their artifact in the mirror, and nothing migrates
 them, so every reader needs the same two-location rule -- which is why it
 lives here and not copied into each one.
+
+Both locations this module knows about are paths on disk. A fully-synced
+record's colocated prc is no longer one of them: ``zip_dir`` deletes the
+source directory on success, so the prc exists only as bytes inside the
+sequence zip. This module does not read zip members and never will --
+that is an accepted scope limit, not an oversight. A caller that needs a
+fully-synced record's prc must go through a zip-aware reader instead (see
+``helao.ui.shared.data_browser.sources.DerivedSourceIndex`` for one).
 
 The write side does not use this. It needs only the colocated set, and
 ``HelaoYml.process_ymls`` supplies that without an import, which the byte-pinned
