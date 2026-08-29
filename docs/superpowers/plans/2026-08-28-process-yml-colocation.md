@@ -240,15 +240,47 @@ Insert immediately above it:
 
 Apply the identical text to the native twin.
 
+- [ ] **Step 8b: Test the `sync_yml` guard directly**
+
+The `enqueue_yml` tests do not reach this guard, and it is the one that matters:
+`syncer()` calls `sync_yml` straight off the queue, so `enqueue_yml`'s guard
+alone leaves the hole this step closes. Without a test here, deleting the
+`sync_yml` guard breaks nothing in the suite.
+
+Append to `helao/core/tests/test_prc_colocation.py`:
+
+```python
+def test_sync_yml_refuses_a_process_yml(tmp_path):
+    """syncer() calls sync_yml directly off the queue, so this guard is the
+    authoritative one and needs its own coverage."""
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.hexagon.tests.sync_fixtures import make_sync_driver
+
+    driver = make_sync_driver(tmp_path, SyncDriver)
+    exp_dir = _tree(tmp_path)
+    prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
+    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
+
+    called = []
+    driver.get_progress = lambda p: called.append(p)  # must never be reached
+
+    assert asyncio.run(driver.sync_yml(yml_path=prc)) is True
+    assert called == [], "sync_yml must return before touching progress"
+```
+
+Run it, confirm it passes, then confirm it is load-bearing: comment out the
+`sync_yml` guard, re-run, see it FAIL, restore the guard.
+
 - [ ] **Step 9: Run the guard tests and the twin-parity pin**
 
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
-Expected: all PASS. If the parity pin in `helao/hexagon/tests/` fails with "not byte-identical", the two twins differ — diff them and make the patch text match exactly.
+Expected: all PASS. The byte-identity gate is `test_native_sync_pins.py` — `test_verbatim_region` and `test_region_holds_no_imports` plus eight per-member parity pins. `test_native_sync_driver.py` holds only a construction and an enqueue-dedup test and asserts nothing about the twins, so running it alone proves nothing about byte-identity. If a pin fails with "not byte-identical", the two twins differ — diff them and make the patch text match exactly.
 
 - [ ] **Step 10: Commit**
 
@@ -363,6 +395,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
@@ -467,6 +500,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py -q
 ```
 
@@ -514,7 +548,7 @@ Create `harness/tests/test_parity_prc_location.py`:
 
 from pathlib import Path
 
-from harness.treepass import snapshot
+from harness.treepass import seed_mapper, snapshot
 from harness.uuidmap import UuidMapper
 
 PRC = "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
@@ -545,8 +579,15 @@ def _colocated_tree(root: Path) -> Path:
 def test_prc_key_is_the_same_in_both_locations(tmp_path):
     legacy = _legacy_tree(tmp_path / "legacy")
     colocated = _colocated_tree(tmp_path / "colocated")
-    g = snapshot(legacy, UuidMapper())
-    c = snapshot(colocated, UuidMapper())
+    # snapshot() substitutes uuids with strict=True, so the mapper must be
+    # seeded from the same tree first -- every existing call site in harness/
+    # pairs seed_mapper with snapshot for exactly this reason. Without it the
+    # test raises KeyError: unseeded uuid, before and after the fix alike.
+    mg, mc = UuidMapper(), UuidMapper()
+    seed_mapper(legacy, mg)
+    seed_mapper(colocated, mc)
+    g = snapshot(legacy, mg)
+    c = snapshot(colocated, mc)
     assert set(g.files) == set(c.files), (
         f"prc keys differ: golden={sorted(g.files)} candidate={sorted(c.files)}"
     )
@@ -723,24 +764,55 @@ Append to `helao/core/tests/test_prc_colocation.py`:
 
 ```python
 def test_the_prc_moves_with_the_record_and_the_directory_cleans_up(tmp_path):
-    """A stranded prc is worse than an orphan: cleanup() walks up from the
-    moved record and reports any non-empty directory as "failed", so the
-    leftover would keep the experiment directory alive forever."""
-    exp_dir = _tree(tmp_path)
-    exp_yml = next(exp_dir.glob("*-exp.yml"))
-    prc = exp_dir / "0__06a5a2d6-b26c-7019-8000-4c2d967e5df1__SIM_exp-prc.yml"
-    prc.write_text("process_uuid: 06a5a2d6-b26c-7019-8000-4c2d967e5df1\n")
-    hy = HelaoYml(exp_yml)
-    assert prc in hy.process_ymls
-    moved_set = hy.misc_files + hy.hlo_files + hy.process_ymls
-    assert prc in moved_set, "the prc must be in the set move_to_synced relocates"
+    """Drive the real move and assert the outcome, not the set composition.
+
+    A stranded prc is worse than an orphan: cleanup() walks up from the moved
+    record and reports any non-empty directory as "failed", so the leftover
+    would keep the experiment directory alive forever. Asserting
+    ``prc in misc_files + hlo_files + process_ymls`` would only restate the
+    production expression in the test and would pass before the fix -- so this
+    drives move_to_synced and looks at where the file actually ends up.
+    """
+    from helao.core.drivers.data.sync_driver import SyncDriver
+    from helao.core.models.run_dir import RunDir
+    from helao.hexagon.tests.sync_fixtures import (
+        make_action,
+        make_exp_tree,
+        make_sync_driver,
+        mk_uuid,
+    )
+
+    driver = make_sync_driver(tmp_path, SyncDriver)
+    exp_yml = make_exp_tree(
+        tmp_path, RunDir.FINISHED.value, mk_uuid(3001), process_order_groups={0: [0]}
+    )
+    make_action(exp_yml, 0, process_finish=True)
+    asyncio.run(driver.sync_process(driver.get_progress(exp_yml), force=True))
+    written = list(exp_yml.parent.glob("*-prc.yml"))
+    assert len(written) == 1
+
+    asyncio.run(driver.sync_yml(yml_path=exp_yml))
+
+    finished_leftovers = [
+        p for p in (tmp_path / RunDir.FINISHED.value).rglob("*-prc.yml")
+    ]
+    assert not finished_leftovers, (
+        f"the prc was stranded in RUNS_FINISHED: {finished_leftovers}"
+    )
+    synced = list((tmp_path / RunDir.SYNCED.value).rglob("*-prc.yml"))
+    assert len(synced) == 1, f"the prc must travel to RUNS_SYNCED, found {synced}"
 ```
+
+If `sync_yml` cannot be driven to completion in this fixture (it uploads and
+moves), narrow the second half to the move step the driver exposes and assert
+the same two outcomes — the prc absent from `RUNS_FINISHED` and present under
+`RUNS_SYNCED`. Do not fall back to asserting the set composition.
 
 - [ ] **Step 6: Run to verify it fails**
 
 Run: `PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest helao/core/tests/test_prc_colocation.py -q -k moves_with_the_record`
 
-Expected: PASS on the property assertion but this test only pins the set; now make the production code use it.
+Expected: FAIL — the prc is left behind in `RUNS_FINISHED` because nothing moves it yet.
 
 - [ ] **Step 7: Add the prc to the move set in both twins**
 
@@ -765,6 +837,7 @@ Apply the identical text to the native twin.
 ```bash
 PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_prc_colocation.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py \
   helao/core/tests/unit_test_sync_process_recovery.py -q
 PYTHONPATH=$PWD timeout 600 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
@@ -1258,6 +1331,7 @@ def test_processors_picks_the_experiment_yml_not_the_process(tmp_path):
     proc = _Proc(action, str(tmp_path / "RUNS_ACTIVE"))
     assert proc.exp_yml_path.endswith("-exp.yml")
     assert proc.seq_yml_path.endswith("-seq.yml")
+```
 
 - [ ] **Step 2: Run to verify it fails**
 
@@ -1375,14 +1449,22 @@ Replace:
 with:
 
 ```python
-    # Processes are written beside their -exp.yml inside the RUNS_* tree, so
-    # they travel in the sequence zip. PROCESSES is legacy-read-only and must
-    # gain nothing.
-    prcs = [p for p in root_p.rglob("*-prc.yml") if "PROCESSES" not in p.parts]
-    check(len(prcs) == 4, f"RUNS_* tree has 4 -prc.yml (got {len(prcs)})")
+    # Processes are written beside their -exp.yml, so a fully synced sequence
+    # carries them INSIDE its zip: zip_dir deletes the source directory on
+    # success, so a filesystem glob alone finds none of them. Count both --
+    # loose ones (a sequence not yet zipped) and zip members.
+    prcs = [str(p) for p in root_p.rglob("*-prc.yml") if "PROCESSES" not in p.parts]
+    for z in sorted(root_p.rglob("*.zip")):
+        with zipfile.ZipFile(z) as zf:
+            prcs += [
+                f"{z.name}:{n}" for n in zf.namelist() if n.endswith("-prc.yml")
+            ]
+    check(len(prcs) == 4, f"RUNS_* tree and zips hold 4 -prc.yml (got {len(prcs)})")
     stale = list((root_p / "PROCESSES").rglob("*-prc.yml"))
     check(not stale, f"PROCESSES must gain nothing (got {len(stale)})")
 ```
+
+`zipfile` must be imported at the top of the file if it is not already.
 
 - [ ] **Step 3: Run the smoke assertion if the harness is available**
 
@@ -1684,6 +1766,7 @@ PYTHONPATH=$PWD /home/dan/miniforge3/envs/helao/bin/python -m pytest \
   helao/core/tests/test_process_locator.py \
   helao/core/tests/test_prc_readers.py \
   harness/tests/test_parity_prc_location.py \
+  helao/hexagon/tests/test_native_sync_pins.py \
   helao/hexagon/tests/test_native_sync_driver.py \
   helao/hexagon/tests/test_native_sync_adapter.py \
   helao/core/tests/test_sync_staging_files.py \

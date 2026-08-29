@@ -212,8 +212,8 @@ def test_runs_synced_index():
     print("test_runs_synced_index PASS")
 
 
-def _make_process(root):
-    """Create a -prc.yml referencing the .hlo created by _make_finished_tree."""
+def _make_process(root, technique="CV"):
+    """Create a legacy-mirror -prc.yml referencing the .hlo made by _make_finished_tree."""
     prc_dir = os.path.join(
         root,
         "PROCESSES",
@@ -226,6 +226,31 @@ def _make_process(root):
     with open(os.path.join(prc_dir, "0__abc__CV-prc.yml"), "w") as f:
         yaml.safe_dump(
             {
+                "technique_name": technique,
+                "run_type": "data",
+                "samples_out": [{"global_label": "solid__lab1_1"}],
+                "files": [{"file_name": "cv_data.hlo", "file_type": "helao__file"}],
+            },
+            f,
+        )
+
+
+def _make_colocated_loose_process(root, state="SYNCED", uuid_str="def"):
+    """A loose (unzipped) colocated -prc.yml directly under RUNS_<state>,
+    beside where the -exp.yml would sit -- the mid-sync / reset_sync-restored
+    shape, as opposed to either the legacy PROCESSES mirror or a zip member."""
+    exp_dir = os.path.join(
+        root,
+        f"RUNS_{state}",
+        "26.25",
+        "0618",
+        "141523__SDC_seq__lab1",
+        "260618.141524__SDC_exp_CV",
+    )
+    os.makedirs(exp_dir)
+    with open(os.path.join(exp_dir, f"0__{uuid_str}__CV-prc.yml"), "w") as f:
+        yaml.safe_dump(
+            {
                 "technique_name": "CV",
                 "run_type": "data",
                 "samples_out": [{"global_label": "solid__lab1_1"}],
@@ -233,6 +258,46 @@ def _make_process(root):
             },
             f,
         )
+    return exp_dir
+
+
+def _make_synced_zip_with_prc(root, uuid_str="abc", technique="CV"):
+    """RUNS_SYNCED/26.25/0618/<seq>.zip with act.yml + .hlo + a colocated
+    prc.yml -- the steady-state shape for a fully-synced record, where the
+    prc travels inside the sequence zip beside the -exp.yml it accompanies."""
+    day = os.path.join(root, RunDir.SYNCED.value, "26.25", "0618")
+    os.makedirs(day, exist_ok=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        hlo = os.path.join(tmp, "cv_data.hlo")
+        _write_hlo(hlo)
+        actyml = os.path.join(tmp, "act.yml")
+        with open(actyml, "w") as f:
+            yaml.safe_dump(
+                {
+                    "technique_name": "CV",
+                    "samples_out": [{"global_label": "solid__lab1_1"}],
+                },
+                f,
+            )
+        prcyml = os.path.join(tmp, "prc.yml")
+        with open(prcyml, "w") as f:
+            yaml.safe_dump(
+                {
+                    "technique_name": technique,
+                    "run_type": "data",
+                    "samples_out": [{"global_label": "solid__lab1_1"}],
+                    "files": [{"file_name": "cv_data.hlo", "file_type": "helao__file"}],
+                },
+                f,
+            )
+        zpath = os.path.join(day, "141523__SDC_seq__lab1.zip")
+        with zipfile.ZipFile(zpath, "w") as zf:
+            zf.write(
+                actyml, "260618.141524__SDC_exp_CV/1__0__sim__cv/260618.141525-act.yml"
+            )
+            zf.write(hlo, "260618.141524__SDC_exp_CV/1__0__sim__cv/cv_data.hlo")
+            zf.write(prcyml, f"260618.141524__SDC_exp_CV/0__{uuid_str}__CV-prc.yml")
+    return zpath
 
 
 def test_processes_index_resolves_to_runs():
@@ -259,6 +324,81 @@ def test_processes_index_missing_file_unavailable():
         assert df.iloc[0]["available"] is False
         assert df.iloc[0]["locator"] == ""
     print("test_processes_index PASS")
+
+
+def test_processes_index_colocated_loose_under_runs_synced():
+    """A prc that never touched the legacy PROCESSES mirror -- the mid-sync
+    (or reset_sync-restored) shape of a loose, unzipped colocated prc -- must
+    still be found. Before the I1 fix this date has NO root/PROCESSES entry
+    at all, so the day was never even visited."""
+    with tempfile.TemporaryDirectory() as d:
+        _make_finished_tree(d)  # the actual cv_data.hlo
+        _make_colocated_loose_process(d, state="SYNCED")
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "PROCESSES"
+        assert r["available"] is True
+        assert r["locator"] and not r["locator"].startswith("zip::")
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["t_s"] == [0.0, 1.0]
+    print("test_processes_index_colocated_loose_under_runs_synced PASS")
+
+
+def test_processes_index_zip_member_only():
+    """The steady-state shape for a fully-synced record: the prc exists
+    ONLY as bytes inside the sequence zip, never on disk as a loose file and
+    never in the legacy PROCESSES mirror. Before the I1 fix this date has NO
+    root/PROCESSES entry, so the whole record was invisible to the tab."""
+    with tempfile.TemporaryDirectory() as d:
+        _make_synced_zip_with_prc(d)
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()
+        assert len(df) == 1, df
+        r = df.iloc[0]
+        assert r["source"] == "PROCESSES"
+        assert r["sequence"] == "SDC_seq"
+        assert r["technique"] == "CV"
+        assert r["sample"] == "solid__lab1_1"
+        assert r["available"] is True
+        assert r["locator"].startswith("zip::")
+        _, data = readers.read_dataset(r["locator"], r["file_type"])
+        assert data["t_s"] == [0.0, 1.0]
+    print("test_processes_index_zip_member_only PASS")
+
+
+def test_processes_index_both_present_no_duplicate():
+    """The SAME process (same uuid segment) reachable through BOTH the
+    legacy mirror AND a colocated zip member must yield ONE row, not two --
+    and the colocated copy wins, matching
+    process_locator.find_process_ymls's "colocated copy wins" rule. Distinct
+    technique names tell the two copies apart in the assertion; a naive
+    union with no dedup would produce 2 rows, and a dedup that prefers the
+    mirror would report "CV_LEGACY"."""
+    with tempfile.TemporaryDirectory() as d:
+        _make_synced_zip_with_prc(d, uuid_str="abc", technique="CV_ZIP")
+        _make_process(d, technique="CV_LEGACY")  # SAME "abc" process uuid segment
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()
+        assert len(df) == 1, df  # deduped -- not one row per location
+        assert df.iloc[0]["technique"] == "CV_ZIP", df.iloc[0]["technique"]
+    print("test_processes_index_both_present_no_duplicate PASS")
+
+
+def test_processes_index_corrupt_zip_skipped():
+    """A damaged RUNS_SYNCED zip must be skipped, not raise -- one bad
+    archive must not take down the whole Processes tab, and a good zip
+    alongside it must still be indexed. (A day with ONLY a corrupt zip and
+    nothing else would trivially "pass" even without the I1 fix, since the
+    unfixed code never visits RUNS_SYNCED at all -- the valid sibling zip is
+    what makes this exercise the new code path.)"""
+    with tempfile.TemporaryDirectory() as d:
+        day = os.path.join(d, RunDir.SYNCED.value, "26.25", "0618")
+        os.makedirs(day)
+        with open(os.path.join(day, "bad__seq.zip"), "wb") as f:
+            f.write(b"not actually a zip file")
+        _make_synced_zip_with_prc(d)  # a good sibling zip, same day
+        df = sources.DerivedSourceIndex(d, "PROCESSES").index()  # must not raise
+        assert len(df) == 1, df
+    print("test_processes_index_corrupt_zip_skipped PASS")
 
 
 def _make_analysis(root, with_local_output=True):
@@ -565,6 +705,10 @@ def run_all():
     test_runs_synced_index()
     test_processes_index_resolves_to_runs()
     test_processes_index_missing_file_unavailable()
+    test_processes_index_colocated_loose_under_runs_synced()
+    test_processes_index_zip_member_only()
+    test_processes_index_both_present_no_duplicate()
+    test_processes_index_corrupt_zip_skipped()
     test_analyses_index_local()
     test_analyses_index_s3_only_unavailable()
     test_get_index_dispatch()

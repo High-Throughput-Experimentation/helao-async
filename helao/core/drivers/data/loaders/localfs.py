@@ -20,6 +20,7 @@ from helao.core.drivers.data.loaders.model_base import (
     HelaoArtifact,
     HelaoDataModelMixin,
 )
+from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_bytes
@@ -240,15 +241,28 @@ class LocalLoader:
                 zip_contents = zf.namelist()
             self._is_microorch_zip = "MANIFEST.txt" in zip_contents
             _yml_paths = [x for x in zip_contents if x.endswith(".yml")]
-            _yml_paths += glob(
-                os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
-            )
+            self._zip_members = set(_yml_paths)
+            # The mirror still holds the processes of records synced before the
+            # write moved into the RUNS_* tree. Union both, but never index the
+            # same process twice: the in-zip copy wins.
+            in_zip_uuids = {
+                process_uuid_of(x) for x in _yml_paths if x.endswith("-prc.yml")
+            }
+            _yml_paths += [
+                x
+                for x in glob(
+                    os.path.join(process_dir, "**", "*-prc.yml"), recursive=True
+                )
+                if process_uuid_of(x) not in in_zip_uuids
+            ]
         elif os.path.isdir(self.target):
+            self._zip_members = set()
             for check_dir in check_dirs:
                 _yml_paths += glob(
                     os.path.join(check_dir, "**", "*.yml"), recursive=True
                 )
         else:
+            self._zip_members = set()
             for check_dir in check_dirs:
                 _yml_paths += glob(
                     os.path.join(os.path.dirname(check_dir), "**", "*.yml"),
@@ -365,7 +379,11 @@ class LocalLoader:
         Returns:
             Parsed YAML dict.
         """
-        if self.target.endswith(".zip") and not path.endswith("-prc.yml"):
+        # Read from the zip when the path IS a zip member. The old test asked
+        # whether the path ended in -prc.yml, using "is a process" as a proxy
+        # for "is on disk" -- true only while processes were written outside
+        # the tree that gets zipped, and false as soon as one is a zip member.
+        if self.target.endswith(".zip") and path in self._zip_members:
             with ZipFile(self.target, "r") as zf:
                 metad = dict(
                     yml_load(
@@ -866,14 +884,27 @@ class HelaoProcess(HelaoModel):
     def read_action_file(self, relative_path: str) -> bytes:
         """Read the raw bytes of an action file by its run-tree-relative path.
 
-        Process yml files live in the ``PROCESSES`` tree, not beside the
-        action files they reference, so the file is resolved against the run
-        tree rather than relative to ``self.yml_path``. ``relative_path`` (as
+        The process yml now sits beside its ``-exp.yml`` (colocated in the
+        same ``RUNS_<state>`` tree, or the legacy ``PROCESSES`` mirror for a
+        pre-cutover record), not in a separate location, but the file is
+        still resolved against the run tree rather than relative to
+        ``self.yml_path`` -- :class:`FileMapper` needs only the run root, and
+        deriving it that way lets it also find files that moved to a
+        different state directory than the prc did. ``relative_path`` (as
         produced by :attr:`files`) is rooted at the ``RUNS_<state>`` directory
         — ``YY.WW/MMDD/<seq_dir>/<exp>/<act>/<file>`` — which is enough for
         :class:`FileMapper` to deduce and read from the owning synced sequence
         zip (``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``) once the loose file is
         gone. Only the run root is taken from ``self.yml_path``.
+
+        This requires ``self.yml_path`` to be a real filesystem path inside
+        a ``RUNS_*``/``PROCESSES`` tree. A process loaded from a
+        fully-synced sequence zip has a bare zip-member name as its
+        ``yml_path`` (e.g. ``"<exp_dir>/<name>-prc.yml"``, with no
+        ``RUNS_*``/``PROCESSES`` segment for :class:`FileMapper` to anchor
+        on); that case is rejected explicitly below rather than left to
+        raise an opaque ``IndexError`` out of :class:`FileMapper`'s
+        constructor.
 
         Args:
             relative_path: Action file path relative to the ``RUNS_<state>``
@@ -881,6 +912,18 @@ class HelaoProcess(HelaoModel):
 
         Returns:
             Raw file bytes.
+
+        Raises:
+            ValueError: ``self.yml_path`` has no ``RUNS_*``/``PROCESSES``
+                segment for :class:`FileMapper` to anchor on -- e.g. a
+                zip-member path from a fully-synced record.
         """
+        parts = os.path.normpath(self.yml_path).split(os.sep)
+        if not any(p.startswith("RUNS_") or p == "PROCESSES" for p in parts):
+            raise ValueError(
+                f"read_action_file: yml_path {self.yml_path!r} has no "
+                "RUNS_*/PROCESSES segment (likely a zip-member path from a "
+                "fully-synced record); FileMapper cannot anchor on it"
+            )
         fm = FileMapper(self.yml_path)
         return fm.read_bytes(relative_path)

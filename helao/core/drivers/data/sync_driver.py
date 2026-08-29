@@ -61,7 +61,12 @@ from helao.helpers.time_utils import gen_uuid
 from helao.helpers.yml_tools import yml_dumps, yml_load
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-ABR_MAP = {"act": "action", "exp": "experiment", "seq": "sequence"}
+ABR_MAP = {
+    "act": "action",
+    "exp": "experiment",
+    "seq": "sequence",
+    "prc": "process",
+}
 MOD_MAP = {
     "action": Action,
     "experiment": Experiment,
@@ -429,7 +434,14 @@ class HelaoYml:
             ``HelaoYml`` objects for every ``*.yml`` one level below the
             parent, sorted oldest-first.
         """
-        paths = yml_path.parent.glob("*/*.yml")
+        # Record suffixes only. A colocated ``-prc.yml`` is a process artifact
+        # sitting beside its experiment, not a child record, and wrapping one
+        # in HelaoYml would put a process into the sync hierarchy.
+        paths = [
+            p
+            for p in yml_path.parent.glob("*/*.yml")
+            if p.stem.endswith(("-seq", "-exp", "-act"))
+        ]
         hpaths = [HelaoYml(x) for x in paths]
         return sorted(hpaths, key=lambda x: x.timestamp)
 
@@ -514,6 +526,22 @@ class HelaoYml:
         ]
 
     @property
+    def process_ymls(self) -> list[Path]:
+        """``*-prc.yml`` files in the immediate target directory.
+
+        A process artifact is colocated with the ``-exp.yml`` it belongs to, so
+        it is in neither :attr:`misc_files` (which excludes ``.yml``) nor
+        :attr:`hlo_files`. It therefore has to be named explicitly in the set
+        that moves to ``RUNS_SYNCED``; left behind, it both orphans the process
+        and keeps :meth:`cleanup` reporting the directory as not empty forever.
+        """
+        return [
+            x
+            for x in self.targetdir.glob("*-prc.yml")
+            if x.is_file()
+        ]
+
+    @property
     def parent_path(self) -> Path:
         """Path of this record's parent yml.
 
@@ -525,7 +553,11 @@ class HelaoYml:
             return self.target
         else:
             possible_parents = [
-                list(x.parent.parent.glob("*.yml"))
+                [
+                    p
+                    for p in x.parent.parent.glob("*.yml")
+                    if p.stem.endswith(("-seq", "-exp", "-act"))
+                ]
                 for x in (self.active_path, self.finished_path, self.synced_path)
             ]
             return [p[0] for p in possible_parents if p][0]
@@ -1255,7 +1287,16 @@ class SyncDriver:
                 prevent runaway re-queuing.
         """
         yml_path = Path(upath) if isinstance(upath, str) else upath
-        if rank < rank_limit:
+        if yml_path.name.endswith("-prc.yml"):
+            # A process is an artifact of an experiment's sync, never a record
+            # that syncs on its own. It reaches here only by mistake -- most
+            # plausibly a hand-POSTed /finish_yml, which ranks an unrecognised
+            # suffix -1, above rank_limit, and so enqueues rather than drops.
+            LOGGER.info(
+                f"{str(yml_path)} is a process artifact, not a syncable record; "
+                "skipping enqueue request."
+            )
+        elif rank < rank_limit:
             LOGGER.debug(
                 f"{str(yml_path)} re-queue rank is under {rank_limit}, skipping enqueue request."
             )
@@ -1301,6 +1342,17 @@ class SyncDriver:
             shipped state; ``True`` if there was nothing to sync; ``False``
             when the yml could not be synced this pass.
         """
+        if yml_path.name.endswith("-prc.yml"):
+            # Authoritative backstop to enqueue_yml's guard: syncer() calls this
+            # directly off the queue, so anything queued before the guard
+            # existed would otherwise run. Returning True retires it without a
+            # requeue; finish_pending never offers it again because no
+            # list_pending* glob matches a -prc.yml suffix.
+            LOGGER.info(
+                f"{str(yml_path)} is a process artifact, not a syncable record; "
+                "not syncing."
+            )
+            return True
         if not yml_path.exists():
             LOGGER.debug(
                 f"{str(yml_path)} does not exist, assume yml has moved to synced."
@@ -1613,7 +1665,9 @@ class SyncDriver:
             LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
-            for file_path in prog.yml.misc_files + prog.yml.hlo_files:
+            for file_path in (
+                prog.yml.misc_files + prog.yml.hlo_files + prog.yml.process_ymls
+            ):
                 LOGGER.debug(f"Moving {str(file_path)}")
                 move_success = await asyncio.to_thread(move_to_synced, file_path)
                 while not move_success:
@@ -2043,12 +2097,13 @@ class SyncDriver:
                 uuid_key = meta["process_uuid"]
                 model = ProcessModel.model_validate(meta).clean_dict(strip_private=True)
                 # write to local yml
-                save_dir = os.path.dirname(
-                    os.path.join(
-                        self.helaodirs.process_root,
-                        exp_prog.yml.relative_path,
-                    )
-                )
+                # Beside the -exp.yml, inside the RUNS_* tree, so the sequence
+                # zip carries its own process identity. It used to go to
+                # helaodirs.process_root, which zip_dir never reaches -- so an
+                # archived sequence recorded no process identity at all and
+                # every repair tool had to consult a parallel tree that might
+                # no longer be beside the zip it was repairing.
+                save_dir = str(exp_prog.yml.target.parent)
                 save_yml_path = os.path.join(
                     save_dir, f"{pidx}__{uuid_key}__{meta['technique_name']}-prc.yml"
                 )

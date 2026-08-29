@@ -243,13 +243,62 @@ def snapshot(root: Path, mapper: UuidMapper) -> TreeSnapshot:
         if row in (ArtifactRow.IGNORE, ArtifactRow.LOCK):
             continue
         parts = f.relative_to(root).parts
-        norm_parts = []
-        cur = root
-        for name in parts[:-1]:
-            cur = cur / name
-            norm_parts.append(token_of[cur])
-        norm_parts.append(normalize_name(parts[-1]))
-        norm = mapper.sub("/".join(norm_parts), strict=True)
+        if row is ArtifactRow.PRC_YML:
+            # A process artifact is keyed by its filename alone, never by its
+            # full path. The write moved from root/PROCESSES into the RUNS_*
+            # tree (and so into the sequence zip), and the golden sets predate
+            # that move; keying by path would report every process as both
+            # missing and extra. The filename is
+            # {pidx}__{process_uuid}__{technique}-prc.yml, so the key is unique
+            # by construction -- EXCEPT across a reset_sync round trip, where
+            # the pre-reset zip survives as a ``.orig`` sidecar (exploded to
+            # ``.origdir``) beside the freshly rebuilt ``.zip`` (``.zipdir``):
+            # both legitimately carry a byte-identical copy of the SAME
+            # process now that it travels inside the zip, and a bare filename
+            # key cannot tell that expected backup duplication apart from an
+            # actual collision.
+            #
+            # The prefix therefore covers ONLY an ``.origdir`` ancestor, never
+            # a ``.zipdir`` one. A live post-move prc ALWAYS sits inside a
+            # ``.zipdir`` in production -- the sequence directory is zipped and
+            # removed -- so prefixing on ``.zipdir`` too would apply to every
+            # real prc unconditionally, making the golden's PROCESSES-shaped
+            # `PRC/<name>` key permanently unreachable and silently turning a
+            # field-by-field content comparison into a present/absent tree
+            # diff for every process in the golden gate. Prefixing only the
+            # backup keeps the live copy's key exactly as Task 4 intended
+            # while still telling it apart from its own ``.orig`` sidecar. A
+            # process that sits directly in RUNS_SYNCED (no zip involved) or
+            # under the old PROCESSES mirror has no ``.origdir`` ancestor
+            # either and keys exactly as before. snapshot still raises on a
+            # same-container collision, so a real mistake fails loud rather
+            # than merging two processes.
+            #
+            # Accepted gap: a tree holding BOTH an old PROCESSES-mirror copy
+            # AND a colocated in-zip copy of the SAME process would still
+            # collide under this rule (neither has an ``.origdir`` ancestor).
+            # That mixed-era shape is unreachable in the tests and in
+            # production -- a run is captured either fully pre-move or fully
+            # post-move, never both for the same process -- and if it ever
+            # did happen, snapshot() raises loudly rather than silently
+            # merging the two, so it is accepted rather than overlooked.
+            container = ""
+            cur = root
+            for name in parts[:-1]:
+                cur = cur / name
+                tok = token_of[cur]
+                if tok.endswith(".origdir"):
+                    container = tok
+            prefix = f"{container}/" if container else ""
+            norm = mapper.sub(f"PRC/{prefix}{normalize_name(parts[-1])}", strict=True)
+        else:
+            norm_parts = []
+            cur = root
+            for name in parts[:-1]:
+                cur = cur / name
+                norm_parts.append(token_of[cur])
+            norm_parts.append(normalize_name(parts[-1]))
+            norm = mapper.sub("/".join(norm_parts), strict=True)
         if norm in snap.files:
             raise ValueError(f"normalized-name collision: {norm} ({rel})")
         snap.files[norm] = (f, row)
