@@ -220,3 +220,64 @@ Fixtures: `helao/hexagon/tests/sync_fixtures.py` already builds these trees, and
   should.
 - Any change to `ProcessModel`, to the S3 layout, or to the API push.
 - Analysis artifacts, which have their own tree and are untouched.
+
+## Follow-ups, recorded at implementation (2026-08-28)
+
+Implemented on `feat/prc-colocation`. These are known, accepted gaps — none is a
+regression, and none blocked the branch. They are recorded here because the
+execution ledger they came from is scratch.
+
+### The resolver does not read zip members
+
+`zip_dir` deletes the source directory on success, so a fully synced record's
+`-prc.yml` exists **only as zip bytes**. `find_process_ymls` looks at two
+filesystem locations and neither is that. The consequence is narrower delivery
+than this spec claimed for the private repair tools: each runs only once a synced
+zip exists, by which point the colocated path it now also consults is already
+gone. Nothing that worked before is broken, and the main readers — `LocalLoader`,
+`HelaoData`, and (after the fix below) the data browser's process source — are
+zip-aware and correct.
+
+The fix is to teach `find_process_ymls` to read zip members. It subsumes the two
+items below and should be done as one piece of work rather than piecemeal.
+
+### The data browser's process source was missed by this spec
+
+`helao/ui/shared/data_browser/sources.py`'s `DerivedSourceIndex` walked only
+`root/PROCESSES` — including its day-directory enumeration, so a post-cutover date
+with no legacy activity was never visited at all. Both UIs share that layer, so
+the Processes tab would have silently stopped showing new runs. Fixed in
+`313031eb` by unioning three sources (legacy mirror, in-zip members, loose
+colocated) and deduplicating with the colocated copy winning. Recorded here
+because the reader inventory above omitted it, and the same omission could recur.
+
+### `prune_process_sets.py`'s bulk triage cannot discover post-cutover sets
+
+Its cheap scan (`find_candidates` / `holds_more_than_one_set`) still walks
+`PROCESSES` only, so a fully post-cutover sequence is never surfaced as a
+duplicate-set candidate — even though `inspect()` handles it correctly once
+pointed at one. Subsumed by the resolver work above.
+
+### The live-tree counterpart is not uniform across the repair tools
+
+`prune_process_sets.py` uses `RUNS_SYNCED/<rel>`; three others use
+`RUNS_FINISHED/<rel>`. Each matches its own file's pre-existing convention, but
+given the zip lifecycle the `RUNS_SYNCED` choice is arguably the correct one, and
+`RUNS_FINISHED` does not match the one scenario where those fixes could fire (a
+zip that failed mid-write, leaving loose files under an unzipped `RUNS_SYNCED`).
+Re-examine alongside the resolver work rather than as a style nit.
+
+### Pre-existing, surfaced but not caused here
+
+The golden gate's strong assertion in `test_native_sync_parity.py` — "native
+reproduces the immutable GM-1 bytes" — has never fired for GM-1. Its
+`legacy_vs_golden` diff count was already 4 at this branch's base, from an
+`appended_exp_param` divergence in two prc ymls and their two S3 payloads, so the
+test takes its weaker equal-drift branch. That degrades the gate for everything,
+not just this work, and deserves its own decision: accepted divergence, or a
+defect in the reset/re-drive path.
+
+`helao/hexagon/tests/test_hte_is_native.py` asserts 23 modules under
+`helao/deploy/hte/servers/action` and finds 24 — the OceanDirect action server
+was added without bumping the count. Also pre-existing.
+
