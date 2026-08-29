@@ -70,6 +70,63 @@ def test_prc_key_is_the_same_in_both_locations(tmp_path):
     ), f"prc keys differ: golden={sorted(g.files)} candidate={sorted(c.files)}"
 
 
+def _mixed_zipdir_and_origdir_tree(root: Path) -> Path:
+    """One tree holding BOTH the live in-zip copy of a process (already
+    exploded to a ``.zipdir``) and its reset_sync pre-reset backup (already
+    exploded to a ``.origdir``) -- the shape a real reset_sync round trip
+    produces (see ``explode_zips``). The two copies are byte-identical, so
+    only the container-prefix rule can tell them apart; this is the case
+    the ``.origdir``-only prefix in ``snapshot`` exists for."""
+    zipdir = (
+        root
+        / "RUNS_SYNCED"
+        / "26.35"
+        / "0828"
+        / "115959__seq.zipdir"
+        / "260828.120000__exp"
+    )
+    zipdir.mkdir(parents=True)
+    (zipdir / PRC).write_text(BODY)
+
+    origdir = (
+        root
+        / "RUNS_SYNCED"
+        / "26.35"
+        / "0828"
+        / "115959__seq.origdir"
+        / "260828.120000__exp"
+    )
+    origdir.mkdir(parents=True)
+    (origdir / PRC).write_text(BODY)
+    return root
+
+
+def test_zipdir_and_origdir_copies_of_the_same_prc_key_distinctly(tmp_path):
+    """Hermetic (no golden fixtures) counterpart to the two tests above: a
+    byte-identical prc reachable through BOTH an exploded ``.zipdir`` (the
+    live copy) and an exploded ``.origdir`` (its reset_sync backup) in the
+    SAME tree must key to two DIFFERENT strings. The existing two tests
+    above only ever put one container shape in a tree at a time, so neither
+    exercises the collision this narrow ``.origdir``-only rule prevents:
+    deleting the ``if tok.endswith(".origdir")`` guard (leaving `container`
+    always ``""``) makes both copies key to the bare ``PRC/<name>`` string,
+    and ``snapshot`` raises a normalized-name collision instead of quietly
+    merging two real, distinct files.
+    """
+    tree = _mixed_zipdir_and_origdir_tree(tmp_path / "mixed")
+    mapper = UuidMapper()
+    seed_mapper(tree, mapper)
+    snap = snapshot(tree, mapper)
+    prc_keys = [k for k in snap.files if k.startswith("PRC/")]
+    assert len(prc_keys) == 2, prc_keys
+    assert len(set(prc_keys)) == 2, f"prc keys collided: {prc_keys}"
+    bare = [k for k in prc_keys if not k.startswith("PRC/TS")]
+    origdir_prefixed = [k for k in prc_keys if "origdir/" in k]
+    assert len(bare) == 1, prc_keys
+    assert len(origdir_prefixed) == 1, prc_keys
+    assert not any("zipdir" in k for k in prc_keys), prc_keys
+
+
 def test_prc_key_matches_the_legacy_mirror_even_inside_an_exploded_zipdir(tmp_path):
     """The shape a real synced record actually has: a live prc reaches
     snapshot() only after explode_zips expands its sequence's ``.zip`` into a

@@ -884,14 +884,27 @@ class HelaoProcess(HelaoModel):
     def read_action_file(self, relative_path: str) -> bytes:
         """Read the raw bytes of an action file by its run-tree-relative path.
 
-        Process yml files live in the ``PROCESSES`` tree, not beside the
-        action files they reference, so the file is resolved against the run
-        tree rather than relative to ``self.yml_path``. ``relative_path`` (as
+        The process yml now sits beside its ``-exp.yml`` (colocated in the
+        same ``RUNS_<state>`` tree, or the legacy ``PROCESSES`` mirror for a
+        pre-cutover record), not in a separate location, but the file is
+        still resolved against the run tree rather than relative to
+        ``self.yml_path`` -- :class:`FileMapper` needs only the run root, and
+        deriving it that way lets it also find files that moved to a
+        different state directory than the prc did. ``relative_path`` (as
         produced by :attr:`files`) is rooted at the ``RUNS_<state>`` directory
         — ``YY.WW/MMDD/<seq_dir>/<exp>/<act>/<file>`` — which is enough for
         :class:`FileMapper` to deduce and read from the owning synced sequence
         zip (``RUNS_SYNCED/YY.WW/MMDD/<seq_dir>.zip``) once the loose file is
         gone. Only the run root is taken from ``self.yml_path``.
+
+        This requires ``self.yml_path`` to be a real filesystem path inside
+        a ``RUNS_*``/``PROCESSES`` tree. A process loaded from a
+        fully-synced sequence zip has a bare zip-member name as its
+        ``yml_path`` (e.g. ``"<exp_dir>/<name>-prc.yml"``, with no
+        ``RUNS_*``/``PROCESSES`` segment for :class:`FileMapper` to anchor
+        on); that case is rejected explicitly below rather than left to
+        raise an opaque ``IndexError`` out of :class:`FileMapper`'s
+        constructor.
 
         Args:
             relative_path: Action file path relative to the ``RUNS_<state>``
@@ -899,6 +912,18 @@ class HelaoProcess(HelaoModel):
 
         Returns:
             Raw file bytes.
+
+        Raises:
+            ValueError: ``self.yml_path`` has no ``RUNS_*``/``PROCESSES``
+                segment for :class:`FileMapper` to anchor on -- e.g. a
+                zip-member path from a fully-synced record.
         """
+        parts = os.path.normpath(self.yml_path).split(os.sep)
+        if not any(p.startswith("RUNS_") or p == "PROCESSES" for p in parts):
+            raise ValueError(
+                f"read_action_file: yml_path {self.yml_path!r} has no "
+                "RUNS_*/PROCESSES segment (likely a zip-member path from a "
+                "fully-synced record); FileMapper cannot anchor on it"
+            )
         fm = FileMapper(self.yml_path)
         return fm.read_bytes(relative_path)
