@@ -2,7 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
-Amended: 2026-08-28 (Amendments 1, 2 and 3)
+Amended: 2026-08-28 (Amendments 1, 2 and 3); 2026-08-29 (Amendment 4)
 
 ## Problem
 
@@ -295,12 +295,12 @@ byte-identical.
 
 ## Open, to settle against example data
 
-- Whether every `ECMS_*` sequence in the backlog has the same shape as the two
-  inspected, or whether older ones predate `process_list` on the experiment yml.
-  The converter refuses a record without it, so this bounds coverage rather than
-  risking a wrong write.
+- ~~Whether every `ECMS_*` sequence in the backlog carries `process_list`.~~
+  **Settled by Amendment 4: all of them do.**
 - The lag and baseline-lead values for anchors other than `run_CA`, and whether
   they are stable across the backlog's date range.
+- **New in Amendment 4:** whether MS calibration is in scope, given the
+  calibration sequences materialise no processes to fold a slice into.
 
 ## Out of scope
 
@@ -575,3 +575,83 @@ matter, `.dat` is a short reader given the layout above.
   recording, not hardcoded, so a recording with different masses works unchanged.
   A recording whose scan table names a channel the column-naming rule cannot
   render is a refusal, not a silently dropped column.
+
+## Amendment 4 — 2026-08-29, the backlog surveyed in full
+
+The whole archive was walked, not sampled: 16 week directories, 38 day
+directories, 539 sequence zips, of which **127 are `ECMS_*`**. Every one of the
+127 was opened and its experiment ymls parsed. **Zero listing failures and zero
+read errors** — coverage is total, not partial. That matters because this
+archive is a FUSE network mount, and this repository already carries one
+incident where a survey over such a mount silently swallowed errors and returned
+a confident clean verdict at about 2% coverage.
+
+### The identity ladder never fires. Coverage is the whole backlog.
+
+Of the 127, **78 contain at least one experiment with a `process_order_groups`
+entry, and every one of those experiments carries a populated `process_list`** —
+zero exceptions across the archive. Amendment 2 established this for two
+sequences; it holds for all of them. The converter's "refuse a record whose
+identity cannot be recovered" rule is therefore dead code in practice. Keep it
+as a guard, but do not size the work around it.
+
+Those 78 sequences hold **226 processes** in total. Their names:
+
+| Sequences | Name |
+|---|---|
+| 33 | `ECMS_series_CA_recirculation` |
+| 24 | `ECMS_series_CA_recirculation_mixedreactant` |
+| 11 | `ECMS_series_CA_recirculation_mixedthreereactant` |
+| 7 | `ECMS_CV_recirculation_mixedreactant` |
+| 3 | `ECMS_series_CA_change_gasflow` |
+
+Note the CV sequences: the design and its example were built entirely around
+`run_CA`. Seven sequences are cyclic voltammetry, whose anchor action and
+meaningful window are not the same shape. They are in the 78 and must not be
+assumed to behave like a CA.
+
+### The other 49 are skips by design, not refusals
+
+43 are `ECMS_initiation_*` and 6 are `ECMS_MS_calibration*`. None has a process
+group. The converter should pass over them silently rather than treating them as
+records it failed to process — a refusal count of 49 would read as a defect.
+
+### Calibration has nothing to attach to — this is a real gap
+
+`ECMS_MS_calibration_recirculation` holds five `ECMS_sub_cali` experiments and
+**zero actions with `process_finish: true`**, so it materialises no processes by
+either the declared or the legacy path. Decision 1 folds an MS slice into an
+existing process; for calibration there is no such process, on any of the six
+archived calibration sequences.
+
+This is not an oversight in the archive — those sequences produce a calibration
+curve, not a measurement. But the one-off analysis script builds that curve from
+exactly these windows (anchoring on each `ECMS_sub_cali` experiment's `wait`
+action and applying a **+41.0 s** offset, distinct from `run_CA`'s +23.0 s), so
+the data is needed even though the record layer has nowhere to put it.
+
+Three ways out, none yet chosen:
+1. **Out of scope for the record layer.** The MS raw archival record (decision 5)
+   plus the calibration sequence's own action timestamps are sufficient for an
+   analysis to recompute the curve on demand. Nothing is added to the record
+   layer and nothing is lost — the inputs are all archived.
+2. **Give calibration experiments a process.** Correct-looking, but it is a
+   change to the deployment's experiment library that only affects future runs;
+   the six archived calibration sequences cannot be fixed retroactively without
+   inventing processes that never existed.
+3. **Attach the calibration slice to the archival MS record instead.** Keeps
+   everything in the record layer, but decision 5 deliberately made that record
+   process-free, and reversing it there would recreate the competing-process-set
+   problem that decision avoided.
+
+### Two smaller confirmations
+
+**Both date layouts coexist in this one archive** — `25.27/20250709` (4-digit
+year) beside `26.03/0120`. Discovery must handle both, which it does: the glob
+depth is identical and only the directory name differs.
+
+**No zip in the archive contains a `-prc.yml`** (0 across all 127). The archive
+is entirely pre-cutover, so the colocation work merged in `bae36d19` benefits
+these records only once this converter re-syncs them — which it does, as
+Amendment 1 noted.
+
