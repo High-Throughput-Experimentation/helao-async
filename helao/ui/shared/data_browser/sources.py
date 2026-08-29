@@ -12,6 +12,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from helao.core.drivers.data.process_locator import process_uuid_of
 from helao.core.models.run_dir import RunDir
 from helao.ui.shared.data_browser.readers import make_zip_locator
 
@@ -257,49 +258,160 @@ class DerivedSourceIndex(SourceIndex):
         self.base = self.root / source
 
     def list_dates(self):
+        if self.source == "PROCESSES":
+            return self._process_dates()
         return [d for d, _ in _list_day_dirs(self.base)]
 
     def index(self, date_start=None, date_end=None):
         rows = []
+        if self.source == "PROCESSES":
+            for date_str in self._process_dates():
+                if not _in_range(date_str, date_start, date_end):
+                    continue
+                rows.extend(self._index_processes(date_str))
+            return _rows_to_index_df(rows)
         for date_str, day in _list_day_dirs(self.base):
             if not _in_range(date_str, date_start, date_end):
                 continue
-            if self.source == "PROCESSES":
-                rows.extend(self._index_processes(date_str, day))
-            else:
-                rows.extend(self._index_analyses(date_str, day))
+            rows.extend(self._index_analyses(date_str, day))
         return _rows_to_index_df(rows)
 
-    def _index_processes(self, date_str, day):
+    def _process_dates(self):
+        """Dates with a process row somewhere: legacy mirror, or colocated.
+
+        A process's only artifact moved from the ``PROCESSES`` mirror to
+        sitting beside its ``-exp.yml`` (loose, then zipped away by
+        ``zip_dir``). ``self.base`` (``root/PROCESSES``) alone therefore
+        misses every date whose records were all written post-cutover -- the
+        mirror gains nothing for those dates, so a bare ``_list_day_dirs``
+        over it silently drops them.
+        """
+        dates = {d for d, _ in _list_day_dirs(self.base)}
+        for state in ("SYNCED", "FINISHED"):
+            dates.update(d for d, _ in _list_day_dirs(self.root / f"RUNS_{state}"))
+        return sorted(dates)
+
+    def _index_processes(self, date_str):
+        """Combine legacy-mirror, colocated-loose, and colocated-zip prc rows.
+
+        Colocated copies are scanned first so they win the same-process
+        dedup over a legacy-mirror copy, mirroring
+        ``process_locator.find_process_ymls``'s "colocated copy wins" rule.
+        A prc found in more than one place (e.g. a reset_sync ``.orig``
+        backup) yields one row, not two.
+        """
+        seen = set()
         rows = []
-        for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
-            exp_dir = prc_yml.parent
-            seq_dir = exp_dir.parent
-            meta = _safe_yaml(prc_yml)
-            technique, sample, run_type = _meta_fields(meta)
-            for fi in meta.get("files") or []:
-                fn = (fi or {}).get("file_name", "")
-                if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
+        rows.extend(self._colocated_loose_process_rows(date_str, seen))
+        rows.extend(self._colocated_zip_process_rows(date_str, seen))
+        day = self.base / date_str
+        if day.is_dir():
+            for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
+                uuid = process_uuid_of(prc_yml)
+                if uuid and uuid in seen:
                     continue
-                locator, available = _resolve_run_file(
-                    self.root, date_str, seq_dir.name, exp_dir.name, fn
-                )
-                rows.append(
-                    _row(
-                        source="PROCESSES",
-                        sequence=_seq_name(seq_dir.name),
-                        experiment=exp_dir.name,
-                        node=prc_yml.stem,
-                        technique=technique,
-                        sample=sample,
-                        run_type=run_type,
-                        file_name=fn,
-                        file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
-                        date=date_str,
-                        available=available,
-                        locator=locator,
+                exp_dir = prc_yml.parent
+                seq_dir = exp_dir.parent
+                meta = _safe_yaml(prc_yml)
+                rows.extend(
+                    self._process_rows(
+                        date_str, seq_dir.name, exp_dir.name, prc_yml.stem, meta
                     )
                 )
+                if uuid:
+                    seen.add(uuid)
+        return rows
+
+    def _colocated_loose_process_rows(self, date_str, seen):
+        """Loose (unzipped) colocated prc ymls: a sequence mid-sync, or one
+        restored by ``reset_sync``, under RUNS_SYNCED or RUNS_FINISHED."""
+        rows = []
+        for state in ("SYNCED", "FINISHED"):
+            day = self.root / f"RUNS_{state}" / date_str
+            if not day.is_dir():
+                continue
+            for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
+                uuid = process_uuid_of(prc_yml)
+                if uuid and uuid in seen:
+                    continue
+                exp_dir = prc_yml.parent
+                seq_dir = exp_dir.parent
+                meta = _safe_yaml(prc_yml)
+                rows.extend(
+                    self._process_rows(
+                        date_str, seq_dir.name, exp_dir.name, prc_yml.stem, meta
+                    )
+                )
+                if uuid:
+                    seen.add(uuid)
+        return rows
+
+    def _colocated_zip_process_rows(self, date_str, seen):
+        """Colocated prc ymls that only exist as members of a synced
+        sequence zip -- the steady-state shape for a fully-synced record.
+
+        A zip that fails to open is skipped, not raised: one damaged
+        archive must not take down the whole Processes tab.
+        """
+        rows = []
+        day = self.root / RunDir.SYNCED.value / date_str
+        if not day.is_dir():
+            return rows
+        for zip_path in sorted(day.glob("*.zip")):
+            # The zip itself IS one sequence (mirrors RunsSourceIndex._index_zips):
+            # a member path is rooted at <exp_dir>/..., never <seq_dir>/<exp_dir>/....
+            seq_dirname = zip_path.stem
+            try:
+                zf = zipfile.ZipFile(zip_path)
+            except zipfile.BadZipFile:
+                continue
+            with zf:
+                for n in zf.namelist():
+                    if not n.endswith("-prc.yml"):
+                        continue
+                    member_name = posixpath.basename(n)
+                    uuid = process_uuid_of(member_name)
+                    if uuid and uuid in seen:
+                        continue
+                    exp_dirname = posixpath.basename(posixpath.dirname(n))
+                    meta = _safe_yaml_bytes(zf.read(n))
+                    node = posixpath.splitext(member_name)[0]
+                    rows.extend(
+                        self._process_rows(
+                            date_str, seq_dirname, exp_dirname, node, meta
+                        )
+                    )
+                    if uuid:
+                        seen.add(uuid)
+        return rows
+
+    def _process_rows(self, date_str, seq_dirname, exp_dirname, node, meta):
+        """One row per data file a prc's ``files`` list references."""
+        technique, sample, run_type = _meta_fields(meta)
+        rows = []
+        for fi in meta.get("files") or []:
+            fn = (fi or {}).get("file_name", "")
+            if not fn or posixpath.splitext(fn)[1].lower() not in DATA_EXTS:
+                continue
+            locator, available = _resolve_run_file(
+                self.root, date_str, seq_dirname, exp_dirname, fn
+            )
+            rows.append(
+                _row(
+                    source="PROCESSES",
+                    sequence=_seq_name(seq_dirname),
+                    experiment=exp_dirname,
+                    node=node,
+                    technique=technique,
+                    sample=sample,
+                    run_type=run_type,
+                    file_name=fn,
+                    file_type=posixpath.splitext(fn)[1].lower().lstrip("."),
+                    date=date_str,
+                    available=available,
+                    locator=locator,
+                )
+            )
         return rows
 
     def _index_analyses(self, date_str, day):

@@ -2,6 +2,7 @@
 Wiring proof only -- normalized parity diffs are P1b2."""
 
 import sys
+import zipfile
 from pathlib import Path
 
 
@@ -17,8 +18,17 @@ def main(root: str) -> int:
     check(len(zips) >= 1, f"RUNS_SYNCED sequence zip present ({zips})")
 
     # 2. process leg ran: GM-1 = 2 experiments x 2 process groups -> 4 prc ymls
-    prcs = list((root_p / "PROCESSES").rglob("*-prc.yml"))
-    check(len(prcs) == 4, f"PROCESSES has 4 -prc.yml (got {len(prcs)})")
+    # Processes are written beside their -exp.yml, so a fully synced sequence
+    # carries them INSIDE its zip: zip_dir deletes the source directory on
+    # success, so a filesystem glob alone finds none of them. Count both --
+    # loose ones (a sequence not yet zipped) and zip members.
+    prcs = [str(p) for p in root_p.rglob("*-prc.yml") if "PROCESSES" not in p.parts]
+    for z in sorted(root_p.rglob("*.zip")):
+        with zipfile.ZipFile(z) as zf:
+            prcs += [f"{z.name}:{n}" for n in zf.namelist() if n.endswith("-prc.yml")]
+    check(len(prcs) == 4, f"RUNS_* tree and zips hold 4 -prc.yml (got {len(prcs)})")
+    stale = list((root_p / "PROCESSES").rglob("*-prc.yml"))
+    check(not stale, f"PROCESSES must gain nothing (got {len(stale)})")
 
     # 3. recorded S3 sink got payloads (sim DB s3_record mode)
     s3 = list((root_p / "S3_SIM").rglob("*")) if (root_p / "S3_SIM").is_dir() else []
