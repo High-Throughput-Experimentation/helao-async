@@ -2,7 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
-Amended: 2026-08-28 (Amendments 1, 2 and 3); 2026-08-29 (Amendment 4)
+Amended: 2026-08-28 (Amendments 1, 2 and 3); 2026-08-29 (Amendments 4 and 5)
 
 ## Problem
 
@@ -41,6 +41,8 @@ Two populations need solving, and they are different problems:
 | 10 | Legacy process identity | Explicit `process_order_groups` plus a `process_list` pinned from the archive |
 | 11 | Legacy group selection | The last process group of each experiment only |
 | 12 | Slice representation | Wide: `epoch_s` plus one column per mass, named from the scan table |
+| 13 | MS calibration | Attach the slice to the archival MS record, scoped to calibration windows only (Amendment 5) |
+| 14 | Anchor action | Whichever action `process_order_groups[pidx]` names — never a hardcoded action name (Amendment 5) |
 
 ### Notes on the ones that were close
 
@@ -654,4 +656,62 @@ depth is identical and only the directory name differs.
 is entirely pre-cutover, so the colocation work merged in `bae36d19` benefits
 these records only once this converter re-syncs them — which it does, as
 Amendment 1 noted.
+
+## Amendment 5 — 2026-08-29, CV inspected and calibration decided
+
+### CV is structurally identical to CA, and that simplifies the design
+
+`ECMS_CV_recirculation_mixedreactant` (7 sequences, 8 grouped experiments each):
+
+```
+ECMS_sub_CV   process_order_groups={0: [1]}   process_list=['0671fe71-…']
+  order=0  archive_custom_query_sample   contrib=None   finish=False
+  order=1  run_CV                        contrib=[action_params, files,
+                                                  samples_in, samples_out]
+                                         finish=True
+  order=2  wait                          contrib=None   finish=False
+```
+
+The same slot, the same single-member group, the same contrib set, the same next
+free `action_order` of 3, and `epoch_ns` present in its `.hlo` header exactly as
+`run_CA`'s is. Only the action name and the duration differ — the inspected CV
+measurement runs about 151 s against CA's 600 s.
+
+**So the converter must not match on action name.** Decision 14: the anchor is
+whichever action `process_order_groups[pidx]` names. That is data-driven, needs
+no per-technique table, and covers CA, CV and `ECMS_series_CA_change_gasflow`
+alike. Amendment 2's framing — "anchor on the measurement action" — was right;
+this makes it precise and removes the last dependence on `run_CA` specifically.
+
+Two consequences follow. The window LENGTH must be read from the record (the
+span from the anchor to the next action, or the anchor's own data extent), never
+from a constant: a 600 s CA constant applied to a 151 s CV would drag in four
+minutes of unrelated signal. And the LAG stays a single value across measurement
+sequences: +23.0 s is a gas-transport delay of the apparatus, not a property of
+the technique. The script's +41.0 s was never a second apparatus delay — it was
+the same physical lag measured from a different anchor, a `wait` action on the
+calibration path. Anchoring uniformly on the measurement action's `epoch_ns`
+removes that second constant entirely.
+
+### Calibration attaches to the archival MS record
+
+Decision 13. The six archived calibration sequences materialise no processes, so
+there is nothing to fold into; the raw MS record becomes the home for those
+slices instead.
+
+This is a deliberate, bounded reversal of decision 5's process-free property, and
+the bound is what keeps decision 5's actual purpose intact. **The archival record
+materialises processes only for calibration windows — never for the whole
+recording.** Decision 5 existed to stop a whole-day process set competing with
+the sliced ones that cover the same signal; a calibration-window process covers
+time no measurement slice covers, because calibration and measurement happen in
+different sequences at different times. The two sets are disjoint by
+construction, and the converter should assert that rather than assume it: a
+calibration window overlapping a measurement window is a fault, not a merge.
+
+The window rule is the same as everywhere else — anchor on the `ECMS_sub_cali`
+experiment's own action, apply the lag, take the window from the record. What it
+must NOT reuse is the one-off script's +41.0 s constant, which encodes the offset
+from a `wait` action; with the anchor rule of decision 14 the ordinary lag
+applies.
 
