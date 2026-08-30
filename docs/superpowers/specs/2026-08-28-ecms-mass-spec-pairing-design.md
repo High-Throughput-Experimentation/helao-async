@@ -2,7 +2,7 @@
 
 Date: 2026-08-28
 Status: design approved, not yet implemented
-Amended: 2026-08-28 (Amendments 1, 2 and 3); 2026-08-29 (Amendments 4 and 5)
+Amended: 2026-08-28 (Amendments 1, 2 and 3); 2026-08-29 (Amendments 4 and 5); 2026-08-30 (Amendment 6)
 
 ## Problem
 
@@ -43,6 +43,7 @@ Two populations need solving, and they are different problems:
 | 12 | Slice representation | Wide: `epoch_s` plus one column per mass, named from the scan table |
 | 13 | MS calibration | Attach the slice to the archival MS record, scoped to calibration windows only (Amendment 5) |
 | 14 | Anchor action | Whichever action `process_order_groups[pidx]` names — never a hardcoded action name (Amendment 5) |
+| 15 | MS origin timezone | Pinned by an explicit station-configured parameter, and the raw header strings plus resolved offset recorded (Amendment 6) |
 
 ### Notes on the ones that were close
 
@@ -714,4 +715,39 @@ experiment's own action, apply the lag, take the window from the record. What it
 must NOT reuse is the one-off script's +41.0 s constant, which encodes the offset
 from a `wait` action; with the anchor rule of decision 14 the ordinary lag
 applies.
+
+## Amendment 6 — 2026-08-30, the recording's timezone
+
+Found by the ingest core's final review, and settled before the pairing work
+makes it load-bearing.
+
+The recording's header carries `"Date",11/13/2024,"Time",10:40:45 AM` — a naive
+wall-clock stamp with no zone. Parsing it with `strptime(...).timestamp()`
+interprets it in the **converting host's** timezone, which is not necessarily the
+instrument's.
+
+That is harmless while the raw recording stands alone. It stops being harmless in
+the pairing work, which compares these epochs against HELAO action epochs recorded
+at the station: a batch host in a different zone shifts every pairing by whole
+hours, and the failure is silent — the slices are the right length, drawn from the
+wrong part of the day.
+
+**Unit tests structurally cannot catch this.** The fixtures build their expected
+origin with the identical conversion, so parser and fixture agree in any
+timezone. Nothing in the current test suite would move if the host moved.
+
+**Decision 15, both halves:**
+
+- **Pin it.** The converter takes an explicit timezone for the instrument, from
+  station configuration, and interprets the header stamp in that zone regardless
+  of where conversion runs. Correct by construction rather than by coincidence of
+  deployment.
+- **Record it.** The written record carries the raw `"Date"` and `"Time"` header
+  strings verbatim alongside the resolved UTC offset. A wrong setting is then
+  detectable and correctable after the fact, instead of being invisible in a
+  column of plausible numbers.
+
+The second half is what makes the first half safe to get wrong. A pinned zone that
+is misconfigured fails exactly as silently as no pinning at all; carrying the
+evidence is what turns that from an undetectable error into a recoverable one.
 
