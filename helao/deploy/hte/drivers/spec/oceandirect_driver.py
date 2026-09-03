@@ -122,7 +122,12 @@ class OceanDirectSpec(HelaoDriver):
         self.int_time_max_us: Optional[int] = None
         self.int_time_increment_us: Optional[int] = None
         self.max_intensity: Optional[int] = None
-        self.features: dict[str, bool] = {}
+        # Tri-state: True/False = the device answered, None = the probe failed
+        # and availability is unknown. See _probe_features.
+        self.features: dict[str, Optional[bool]] = {}
+        #: {FeatureID name: error} for probes that raised, empty when all
+        #: probes answered.
+        self.feature_probe_errors: dict[str, str] = {}
         self.ready: bool = False
 
         # The vendor warns that discovery and open must be serialized across
@@ -468,23 +473,55 @@ class OceanDirectSpec(HelaoDriver):
             + ", ".join(sorted(k for k, v in self.features.items() if v))
         )
 
-    def _probe_features(self) -> dict[str, bool]:
-        """Return the device's full ``FeatureID`` capability matrix.
+    def _probe_features(self) -> dict[str, Optional[bool]]:
+        """Return the device's ``FeatureID`` matrix as an explicit tri-state.
 
-        Every probe is individually guarded: the vendor raises for an
-        unsupported id on some models and returns ``False`` on others, and a
-        single raise must not abort the whole sweep.
+        ``True``/``False`` mean the device answered; ``None`` means the probe
+        itself failed and the feature's availability is **unknown**.
+
+        That distinction is the whole point. This originally recorded a raised
+        probe as ``False``, which made "the device says no" and "we could not
+        ask" the same answer -- and since every optional endpoint gates on this
+        matrix, an unreliable probe silently disabled features that work. A
+        real OCEANSR4 reported all 38 features ``False`` while acquisition, the
+        serial read and the firmware/FPGA revisions all plainly worked, and the
+        old shape could not tell anyone which of the two it was looking at.
         """
-        matrix: dict[str, bool] = {}
+        matrix: dict[str, Optional[bool]] = {}
         # Via _load_sdk() rather than self._sdk: it is already cached by the
         # time connect() gets here, and going through the accessor keeps this
         # method callable without asserting the cache is populated.
         feature_enum = self._load_sdk().FeatureID
+        errors: dict[str, str] = {}
         for feature in feature_enum:
             try:
                 matrix[feature.name] = bool(self.dev.is_feature_id_enabled(feature))
-            except Exception:
-                matrix[feature.name] = False
+            except Exception as exc:
+                matrix[feature.name] = None
+                errors[feature.name] = self._err_detail(exc)
+        self.feature_probe_errors = errors
+
+        unknown = [name for name, state in matrix.items() if state is None]
+        if unknown:
+            sample = errors.get(unknown[0], "")
+            LOGGER.warning(
+                f"{len(unknown)} of {len(matrix)} feature probes failed on "
+                f"{self.model}; those features are UNKNOWN, not absent, and "
+                f"their endpoints will be attempted rather than refused. "
+                f"First error: {sample}"
+            )
+        elif not any(matrix.values()):
+            # Every probe answered, and every answer was no. Worth saying out
+            # loud: it means this server can only do plain acquisition, and it
+            # is also what a device with a broken capability report looks like
+            # when the report does not raise.
+            LOGGER.warning(
+                f"{self.model} reports every FeatureID as unavailable. Plain "
+                "acquisition still works; buffered capture, TEC, shutter, lamp "
+                "and strobe endpoints will refuse. If a feature is known to "
+                "work on this unit, its report is untrustworthy -- say so "
+                "rather than trusting /get_device_info."
+            )
         return matrix
 
     def _apply_default_integration_time(self) -> None:
@@ -500,10 +537,26 @@ class OceanDirectSpec(HelaoDriver):
         return str(value)
 
     def _require(self, feature_name: str, caller: str) -> None:
-        """Raise unless the device reports ``feature_name`` as enabled."""
-        if not self.features.get(feature_name, False):
+        """Raise only when the device explicitly reported ``feature_name`` off.
+
+        An **unknown** state (the probe raised, so the matrix holds ``None``)
+        does not block the call. The vendor call is itself the real gate: an
+        unsupported command raises ``OceanDirectError``, which every public
+        method already turns into a failed ``DriverResponse``. So attempting
+        it costs an error message, while refusing on an unknown would disable
+        a feature that may work perfectly -- and on a device whose capability
+        probe fails wholesale, refusing would disable all of them.
+        """
+        state = self.features.get(feature_name)
+        if state is False:
             raise RuntimeError(
-                f"{caller}: device {self.model} does not support {feature_name}"
+                f"{caller}: device {self.model} reports no support for "
+                f"{feature_name}"
+            )
+        if state is None:
+            LOGGER.info(
+                f"{caller}: {feature_name} support is unknown on {self.model} "
+                "(capability probe failed); attempting anyway"
             )
 
     def _require_ready(self, caller: str) -> None:
@@ -534,6 +587,15 @@ class OceanDirectSpec(HelaoDriver):
             "max_intensity": self.max_intensity,
             "simulated": self.simulate,
             "features": dict(self.features),
+            # A reader cannot otherwise tell "device said no" from "we could
+            # not ask": both used to render as false. `features` now carries
+            # null for unknown, and these two summarize it.
+            "feature_report": (
+                "unreliable"
+                if self.feature_probe_errors
+                else ("all_unavailable" if not any(self.features.values()) else "ok")
+            ),
+            "feature_probe_errors": dict(self.feature_probe_errors),
         }
         if self.dev is not None:
             try:
@@ -897,7 +959,7 @@ class OceanDirectSpec(HelaoDriver):
     ) -> dict:
         """Pack spectra into one long-format data payload.
 
-        The five columns are equal-length parallel arrays. Both HLO readers
+        The columns are equal-length parallel arrays. Both HLO readers
         (``read_hlo_stream`` and ``read_hlo_data_chunks``) concatenate
         list-valued columns across lines, so this encoding reads back as
         one row per pixel -- exactly the long format -- while writing one
@@ -913,8 +975,9 @@ class OceanDirectSpec(HelaoDriver):
                 running counter, which it then advances.
 
         Returns:
-            A dict keyed by :data:`LONG_FORMAT_KEYS`, empty when there is
-            nothing to emit.
+            A dict keyed by :data:`LONG_FORMAT_KEYS`, minus ``dev_ts_ns`` when
+            no spectrum in the batch carried a device timestamp. Empty when
+            there is nothing to emit.
         """
         if not spectra:
             return {}
@@ -941,6 +1004,15 @@ class OceanDirectSpec(HelaoDriver):
             self.spec_idx = idx
         if not cols["spec_idx"]:
             return {}
+        if all(value is None for value in cols["dev_ts_ns"]):
+            # Nothing in this payload has a device timestamp, which is the
+            # normal case for the single-shot path and the case for any device
+            # whose metadata feature is absent. Emitting the column anyway
+            # writes one `null` per pixel -- ~17.8 KB per spectrum at 3648
+            # pixels -- and tells a reader nothing it could not infer from the
+            # column's absence. A partially-populated column is kept whole, so
+            # positional alignment with the others is never disturbed.
+            del cols["dev_ts_ns"]
         return cols
 
     def reset_spec_idx(self) -> None:

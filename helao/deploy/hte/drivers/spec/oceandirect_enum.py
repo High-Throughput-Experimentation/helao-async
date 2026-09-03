@@ -46,6 +46,16 @@ class ODTrigMode(IntEnum):
 #: framing that the flattening would otherwise destroy.
 LONG_FORMAT_KEYS = ["epoch_s", "spec_idx", "dev_ts_ns", "wl", "i"]
 
+#: Column order for the paths that cannot produce a device timestamp.
+#:
+#: ``dev_ts_ns`` only exists on the buffered/metadata path
+#: (``get_spectrum_with_metadata``); plain ``get_spectrum()`` carries no
+#: metadata at all. Declaring the full five keys on a single-shot action wrote
+#: an entire all-null column -- and because the encoding is array-packed, that
+#: is one ``null`` per pixel per spectrum: ~17.8 KB per spectrum on a
+#: 3648-pixel OCEANSR4, about 14% of the line, for zero information.
+SINGLE_SHOT_KEYS = ["epoch_s", "spec_idx", "wl", "i"]
+
 #: Hard cap on ``Advanced.get_spectrum_with_metadata()``'s ``buffer_size``.
 #: The vendor documents a maximum of 15 spectra per read on FX/HDX; newer
 #: OBP2 devices accept the call directly but the same ceiling applies, so the
