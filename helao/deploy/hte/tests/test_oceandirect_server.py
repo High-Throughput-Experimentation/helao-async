@@ -298,7 +298,7 @@ def test_every_acquisition_handler_declares_microsecond_integration_time(built):
 # ----------------------------------------------------------------------
 def test_get_device_info_returns_the_capability_matrix(built):
     info = built.routes["/get_device_info"].fn()
-    assert info["model"] == "SR2"
+    assert info["model"] == "SIM-SR2"
     assert info["n_pixels"] == 2048
     assert set(info["features"]) == {f.name for f in sim.FeatureID}
     assert info["features"]["DATA_BUFFER"] is True
@@ -338,7 +338,7 @@ def test_begin_pins_the_column_order_and_ships_the_wavelength_header(built):
     assert kwargs["action_abbr"] == "OPT"
     optional = kwargs["hloheader"].optional
     assert len(optional["wl"]) == 2048
-    assert optional["model"] == "SR2"
+    assert optional["model"] == "SIM-SR2"
     assert optional["serial_number"] == "SIM-SR2-0001"
     assert optional["n_pixels"] == 2048
 

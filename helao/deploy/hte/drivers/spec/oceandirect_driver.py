@@ -155,7 +155,16 @@ class OceanDirectSpec(HelaoDriver):
         if self.simulate:
             from . import oceandirect_sim as sim_sdk
 
-            LOGGER.info("OceanDirect driver running against the simulated SDK.")
+            # WARNING, not INFO: a station left on `simulate: true` produces a
+            # complete, plausible-looking device_info for a device that was
+            # never opened. That has already been mistaken for a device
+            # reporting the wrong model.
+            LOGGER.warning(
+                "OceanDirect driver is SIMULATED (`simulate: true` in this "
+                "server's params) -- no hardware will be opened. Remove that "
+                "key and set `serial_number` (or `dev_index`) to use the real "
+                "spectrometer."
+            )
             self._sdk = _SDKNames(
                 FeatureID=sim_sdk.FeatureID,
                 OceanDirectAPI=sim_sdk.OceanDirectAPI,
