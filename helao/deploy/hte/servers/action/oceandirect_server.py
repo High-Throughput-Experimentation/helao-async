@@ -8,12 +8,16 @@ lamp, light source, strobes) that the device reports as available.
 Two design points are worth reading before editing:
 
 * **Every acquired spectrum is emitted in long format.** One ``.hlo`` line
-  carries one spectrum as five parallel arrays (``epoch_s``, ``spec_idx``,
-  ``dev_ts_ns``, ``wl``, ``i``); both HLO readers concatenate list-valued
-  columns across lines, so a reader reconstructs one row per pixel. See
-  ``OceanDirectSpec.build_rows``. ``json_data_keys`` is passed explicitly to
-  ``ctx.begin`` so the column order is pinned rather than inferred from
-  whichever data message happens to arrive first.
+  carries one spectrum as parallel arrays (``epoch_s``, ``spec_idx``, ``wl``,
+  ``i``, plus ``dev_ts_ns`` where the device supplies one); both HLO readers
+  concatenate list-valued columns across lines, so a reader reconstructs one
+  row per pixel. See ``OceanDirectSpec.build_rows``. ``json_data_keys`` is
+  passed explicitly to ``ctx.begin`` so the column order is pinned rather than
+  inferred from whichever data message happens to arrive first.
+* **``dev_ts_ns`` is written only when it exists.** ``get_spectrum()`` carries
+  no metadata, so the single-shot actions declare ``SINGLE_SHOT_KEYS`` and omit
+  the column entirely rather than writing one ``null`` per pixel. Only the
+  buffered path, via ``get_spectrum_with_metadata``, can fill it.
 * **Optional features are gated at the driver, not here.** An endpoint for a
   feature the device lacks returns an error code on a finished action rather
   than raising, which is why each handler inspects the ``DriverResponse``
@@ -52,6 +56,7 @@ from ...drivers.spec.oceandirect_enum import (
     LONG_FORMAT_KEYS,
     MAX_METADATA_BUFFER_SIZE,
     ODTrigMode,
+    SINGLE_SHOT_KEYS,
 )
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -231,10 +236,16 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
         )
 
     async def _begin_spec_action(ctx: ActionContext, **kwargs):
-        """Open a session configured for the long-format data contract."""
+        """Open a session for the single-shot long-format data contract.
+
+        ``SINGLE_SHOT_KEYS``, not ``LONG_FORMAT_KEYS``: ``get_spectrum()``
+        carries no metadata, so ``dev_ts_ns`` can never be filled on this path
+        and declaring it wrote an all-null column one value wide per pixel.
+        The buffered action declares the full five keys itself.
+        """
         return await ctx.begin(
             action_abbr="OPT",
-            json_data_keys=LONG_FORMAT_KEYS,
+            json_data_keys=SINGLE_SHOT_KEYS,
             hloheader=_header(),
             **kwargs,
         )
