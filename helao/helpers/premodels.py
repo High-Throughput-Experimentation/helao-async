@@ -127,6 +127,8 @@ class Sequence(SequenceModel):
         plate = self.sequence_params.get("plate_id", "")
         smpno = self.sequence_params.get("plate_sample_no_list", [])
         append_plate = ""
+        if self.sequence_label is None:
+            self.sequence_label = "noLabel"
         if plate:
             serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
             if f"-{serial}" not in self.sequence_label:

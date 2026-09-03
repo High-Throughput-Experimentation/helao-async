@@ -119,20 +119,20 @@ servers:
         A: 0.0
         B: 0.0
       timeout: 600
-  # KMOTOR:
-  #   host: 127.0.0.1
-  #   port: 8004
-  #   group: action
-  #   fast: kinesis_server
-  #   control_vis: motion_control_inverse_scale
-  #   params:
-  #     axes:
-  #       z:
-  #         serial_no: "49535754"
-  #         pos_scale: 1228800.0  # device to mm
-  #         vel_scale: 65970697.6  # device to mm/s
-  #         acc_scale: 13518.2  # device to mm/s2
-  #         move_limit_mm: 10.0
+  KMOTOR:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: kinesis_server
+    control_vis: motion_control_inverse_scale
+    params:
+      axes:
+        z:
+          serial_no: "49535754"
+          pos_scale: 1228800.0  # device to mm
+          vel_scale: 65970697.6  # device to mm/s
+          acc_scale: 13518.2  # device to mm/s2
+          move_limit_mm: 10.0
   IO:
     host: 127.0.0.1
     port: 8005
@@ -153,3 +153,14 @@ servers:
     bokeh: control_visualizer
     params:
       doc_name: Engineering Controls
+  PSTAT:
+    host: 127.0.0.1
+    port: 8004
+    group: action
+    fast: biologic_server
+    action_vis: biologic_vis
+    params:
+      allow_no_sample: true
+      address: 192.168.1.102
+      num_channels: 1
+      grounded: true
