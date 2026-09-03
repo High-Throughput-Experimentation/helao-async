@@ -146,7 +146,11 @@ class SimConfig:
     """
 
     serial_numbers: tuple[str, ...] = ("SIM-SR2-0001",)
-    model: str = "SR2"
+    # Prefixed "SIM-" deliberately. A bare "SR2" here is indistinguishable
+    # from a real reading, and `/get_device_info` against a station still
+    # configured `simulate: true` then looks like a device reporting the
+    # wrong model rather than like the simulator answering.
+    model: str = "SIM-SR2"
     n_pixels: int = 2048
     wl_start: float = 339.0
     wl_step: float = 0.22

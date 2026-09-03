@@ -73,7 +73,7 @@ def test_construction_performs_no_device_io():
 
 def test_connect_interrogates_the_device():
     drv = _connected(int_time_us=50_000)
-    assert drv.model == "SR2"
+    assert drv.model == "SIM-SR2"
     assert drv.serial == "SIM-SR2-0001"
     assert drv.n_pixels == 2048
     assert len(drv.pxwl) == 2048

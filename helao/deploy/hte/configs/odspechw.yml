@@ -1,0 +1,66 @@
+# Real-hardware bench config for the OceanDirect spectrometer.
+#
+# The sibling `odspec.yml` is the hardware-free variant: it sets
+# `simulate: true`, which loads `oceandirect_sim` and opens no device. That is
+# the right config for developing on a machine with no spectrometer, and the
+# wrong one for reading a real device -- `/get_device_info` against it returns
+# a complete, plausible device report for hardware that was never touched
+# (model `SIM-SR2`, serial `SIM-SR2-0001`, firmware `SIM-FW-1.2.3`).
+#
+# This config has no `simulate` key, so the driver imports the vendor
+# `oceandirect` package. Two preconditions on the machine running it:
+#
+#   1. The `oceandirect` wheel must be installed from the Ocean Insight SDK
+#      installer. It is not on PyPI, so no env file can fetch it. Without it
+#      `connect()` fails with "oceandirect not installed: ..." and the server
+#      comes up with no device rather than silently simulating.
+#   2. The spectrometer must be attached over USB and not held open by another
+#      process (OceanView, or a second HELAO group) -- the vendor allows one
+#      open handle per device.
+#
+# Device selection: leave `dev_index: 0` for a single attached spectrometer.
+# With more than one, or to pin this server to a specific unit across reboots,
+# set `serial_number` instead (read it off the first successful
+# `/get_device_info`, or the label on the device) and delete `dev_index`.
+#
+# `host: 127.0.0.1` assumes the device is plugged into the machine running the
+# group. A station config points these at the station's own hostname.
+dummy: false
+simulation: false
+run_type: spectrometer_bench
+root: /tmp/helao-odspec-hw
+experiment_libraries: []
+sequence_libraries: []
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8111
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: false
+  SPEC_OD:
+    host: 127.0.0.1
+    port: 8112
+    group: action
+    fast: oceandirect_server
+    action_vis: oceandirect_vis
+    params:
+      # Positional selection: the first device discovery finds. Replace with
+      # `serial_number: <serial>` once the unit is identified.
+      dev_index: 0
+      # MICROSECONDS. 100 ms is a safe opening value; the driver clamps it to
+      # whatever the attached device actually accepts and snaps it to the
+      # device's increment, logging the adjustment.
+      int_time_us: 100000
+      # A bench config has no sample plumbing, so buffered capture would
+      # otherwise refuse to start. A station config should drop this.
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5110
+    group: visualizer
+    bokeh: action_visualizer
+    params:
+      doc_name: OceanDirect Spectrometer Visualizer (hardware)
+      launch_browser: false
