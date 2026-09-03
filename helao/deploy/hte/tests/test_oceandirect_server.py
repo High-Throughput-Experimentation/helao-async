@@ -28,7 +28,10 @@ from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.deploy.hte.drivers.spec import oceandirect_sim as sim
 from helao.deploy.hte.drivers.spec.oceandirect_driver import OceanDirectSpec
-from helao.deploy.hte.drivers.spec.oceandirect_enum import LONG_FORMAT_KEYS
+from helao.deploy.hte.drivers.spec.oceandirect_enum import (
+    LONG_FORMAT_KEYS,
+    SINGLE_SHOT_KEYS,
+)
 from helao.deploy.hte.servers.action import oceandirect_server as srv
 from helao.hexagon.app.action_context import collect_default_params
 
@@ -323,7 +326,8 @@ def test_acquire_spec_emits_one_long_format_payload(built):
     session = ctx.session
     assert len(session.enqueued) == 1
     payload = session.enqueued[0]
-    assert list(payload) == LONG_FORMAT_KEYS
+    assert list(payload) == SINGLE_SHOT_KEYS
+    assert "dev_ts_ns" not in payload  # get_spectrum() carries no metadata
     assert {len(v) for v in payload.values()} == {2048}
     assert set(payload["spec_idx"]) == {0}
     assert result["finished"] is True
@@ -334,7 +338,8 @@ def test_begin_pins_the_column_order_and_ships_the_wavelength_header(built):
     """Inferring json_data_keys from the first message would be order-dependent."""
     ctx, _ = _call(built, "acquire_spec")
     kwargs = ctx.session.begin_kwargs
-    assert kwargs["json_data_keys"] == LONG_FORMAT_KEYS
+    # The single-shot session declares only what it can fill.
+    assert kwargs["json_data_keys"] == SINGLE_SHOT_KEYS
     assert kwargs["action_abbr"] == "OPT"
     optional = kwargs["hloheader"].optional
     assert len(optional["wl"]) == 2048
@@ -395,7 +400,7 @@ def test_acquire_spec_adv_records_but_survives_unsupported_processing(built):
     assert result["error_code"] == ErrorCodes.critical_error
     # ...and a spectrum was still acquired and emitted.
     assert len(ctx.session.enqueued) == 1
-    assert list(ctx.session.enqueued[0]) == LONG_FORMAT_KEYS
+    assert list(ctx.session.enqueued[0]) == SINGLE_SHOT_KEYS
 
 
 def test_acquire_spec_aborts_when_integration_time_cannot_be_set(built):
@@ -474,7 +479,7 @@ def test_store_dark_then_corrected_acquisition(built):
     ctx, result = _call(built, "acquire_spec_corrected", int_time_us=50_000)
     assert result["error_code"] == ErrorCodes.none
     payload = ctx.session.enqueued[0]
-    assert list(payload) == LONG_FORMAT_KEYS
+    assert list(payload) == SINGLE_SHOT_KEYS
     # Same light level as the dark, so the correction cancels out.
     assert max(abs(x) for x in payload["i"]) == pytest.approx(0.0, abs=1e-9)
 
@@ -641,6 +646,8 @@ def test_executor_drains_the_whole_burst_across_batches(built):
     # Frames are consecutive with no gaps or repeats across the whole run.
     frames = []
     for payload in payloads:
+        # Five keys here, unlike the single-shot path: the buffered drain is
+        # the only source of a device timestamp.
         assert list(payload) == LONG_FORMAT_KEYS
         assert {len(v) for v in payload.values()} == {len(payload["spec_idx"])}
         frames += sorted(set(payload["spec_idx"]))

@@ -27,6 +27,7 @@ from helao.deploy.hte.drivers.spec.oceandirect_driver import OceanDirectSpec
 from helao.deploy.hte.drivers.spec.oceandirect_enum import (
     LONG_FORMAT_KEYS,
     MAX_METADATA_BUFFER_SIZE,
+    SINGLE_SHOT_KEYS,
 )
 from helao.helpers.hlo_data import read_hlo, read_hlo_data_chunks, read_hlo_header
 from helao.helpers.to_json import hlo_json_dumps
@@ -274,6 +275,154 @@ def test_light_source_index_is_bounds_checked():
 
 
 # ----------------------------------------------------------------------
+# The real OCEANSR4's parameters
+# ----------------------------------------------------------------------
+#: Read off the physical unit at the station via /get_device_info. Pinned
+#: because all three differ from the simulator's defaults in ways the code has
+#: to handle generically: 3648 pixels (not 2048), a 3800 us floor (not 1000),
+#: and a 1 us increment (so snapping is a no-op, where the sim's 1000 us
+#: increment always snaps).
+OCEANSR4 = dict(
+    model="OCEANSR4",
+    serial_numbers=("SR404456",),
+    n_pixels=3648,
+    wl_start=186.0549774169922,
+    wl_step=(906.8162231445312 - 186.0549774169922) / 3647,
+    int_time_min_us=3800,
+    int_time_max_us=10_000_000,
+    int_time_increment_us=1,
+)
+
+
+def test_the_real_sr4_geometry_and_integration_bounds_are_honoured():
+    sim.set_sim_config(sim.SimConfig(**OCEANSR4))
+    drv = _connected(int_time_us=100_000)
+
+    assert drv.n_pixels == 3648
+    assert len(drv.pxwl) == 3648
+    assert drv.pxwl[0] == pytest.approx(186.055, abs=1e-3)
+    assert drv.pxwl[-1] == pytest.approx(906.816, abs=1e-3)
+
+    # A 1 us increment means an odd value is kept, not snapped away.
+    assert drv.clamp_integration_time_us(100_001) == 100_001
+    # ...and the 3800 us floor is enforced, where the sim's default is 1000.
+    assert drv.clamp_integration_time_us(1000) == 3800
+    assert drv.clamp_integration_time_us(0) == 3800
+
+
+def test_a_real_sr4_spectrum_fills_every_pixel_and_omits_dev_ts_ns():
+    sim.set_sim_config(sim.SimConfig(**OCEANSR4))
+    drv = _connected()
+
+    spectrum, epoch_s = drv.acquire_spectrum()
+    rows = drv.build_rows([spectrum], [epoch_s])
+
+    assert len(spectrum) == 3648
+    assert {len(v) for v in rows.values()} == {3648}
+    assert "dev_ts_ns" not in rows
+
+
+# ----------------------------------------------------------------------
+# Capability probe: "device says no" vs "we could not ask"
+# ----------------------------------------------------------------------
+def _break_the_probe(monkeypatch, exc=None):
+    """Make ``is_feature_id_enabled`` raise for every feature.
+
+    This is the real OCEANSR4's behaviour as observed at the station: the
+    capability report was unusable while acquisition, the serial read and the
+    firmware revisions all worked.
+    """
+
+    def _raise(self, featureID):
+        raise exc or sim.OceanDirectError(-99, "capability query not supported")
+
+    monkeypatch.setattr(sim.Spectrometer, "is_feature_id_enabled", _raise)
+
+
+def test_a_failed_probe_is_unknown_not_absent(monkeypatch):
+    """Recording a raised probe as False made these two indistinguishable,
+    and every optional endpoint gates on the result."""
+    _break_the_probe(monkeypatch)
+    drv = _connected()
+
+    assert set(drv.features) == {f.name for f in sim.FeatureID}
+    assert all(state is None for state in drv.features.values())
+    assert len(drv.feature_probe_errors) == len(drv.features)
+    assert "capability query not supported" in drv.feature_probe_errors["DATA_BUFFER"]
+
+
+def test_device_info_says_the_report_is_unreliable(monkeypatch):
+    """A reader must not have to infer this from 38 nulls."""
+    _break_the_probe(monkeypatch)
+    info = _connected().device_info()
+
+    assert info["feature_report"] == "unreliable"
+    assert info["features"]["SPECTROMETER"] is None
+    assert info["feature_probe_errors"]
+
+
+def test_an_unknown_feature_is_attempted_rather_than_refused(monkeypatch):
+    """The vendor call is the real gate.
+
+    Here the probe is broken but the device genuinely supports buffering --
+    exactly the station case. Refusing on the unknown would have disabled a
+    feature that works.
+    """
+    _break_the_probe(monkeypatch)
+    drv = _connected()
+    assert drv.features["DATA_BUFFER"] is None
+
+    resp = drv.start_buffered(n_scans=4)
+
+    assert resp.response == DriverResponseType.success
+    assert drv.buffering is True
+    spectra, _ts = drv.drain_buffered()
+    assert len(spectra) == 4
+
+
+def test_an_unknown_feature_the_device_really_lacks_still_fails_cleanly(monkeypatch):
+    """Attempting an unknown must surface the vendor's own error, not a crash."""
+    features = set(sim.SR_SERIES_FEATURES) - {sim.FeatureID.DATA_BUFFER}
+    sim.set_sim_config(sim.SimConfig(features=frozenset(features)))
+    _break_the_probe(monkeypatch)
+    drv = _connected()
+
+    resp = drv.start_buffered(n_scans=4)
+
+    assert resp.response == DriverResponseType.failed
+    assert "DATA_BUFFER" in resp.message
+    assert drv.buffering is False
+
+
+def test_an_explicit_no_is_still_refused_without_touching_the_device():
+    """The permissive path must not become permissive about a real answer."""
+    drv = _connected()
+    assert drv.features["SHUTTER"] is False
+
+    resp = drv.set_shutter_open(True)
+
+    assert resp.response == DriverResponseType.failed
+    assert "reports no support" in resp.message
+
+
+def test_a_device_reporting_nothing_available_is_called_out():
+    """Distinguished from `unreliable`: here every probe answered, and the
+    answer was no."""
+    sim.set_sim_config(sim.SimConfig(features=frozenset()))
+    info = _connected().device_info()
+
+    assert info["feature_report"] == "all_unavailable"
+    assert info["feature_probe_errors"] == {}
+    assert all(state is False for state in info["features"].values())
+
+
+def test_a_healthy_report_says_so():
+    info = _connected().device_info()
+    assert info["feature_report"] == "ok"
+    assert info["feature_probe_errors"] == {}
+
+
+# ----------------------------------------------------------------------
 # Acquisition and peak detection
 # ----------------------------------------------------------------------
 def test_acquire_spectrum_returns_pixel_count_and_epoch():
@@ -327,17 +476,39 @@ def test_dark_corrected_acquisition_requires_a_stored_dark():
 # ----------------------------------------------------------------------
 # Long-format rows
 # ----------------------------------------------------------------------
-def test_build_rows_emits_five_equal_length_columns():
+def test_build_rows_omits_dev_ts_ns_when_nothing_carries_one():
+    """The single-shot path has no metadata, so the column is absent rather
+    than one ``null`` per pixel -- ~17.8 KB of nulls per spectrum on a
+    3648-pixel OCEANSR4, for information the absence already conveys."""
     drv = _connected()
     spectrum, epoch_s = drv.acquire_spectrum()
     rows = drv.build_rows([spectrum], [epoch_s])
-    assert list(rows) == LONG_FORMAT_KEYS
+    assert list(rows) == SINGLE_SHOT_KEYS
+    assert "dev_ts_ns" not in rows
     lengths = {len(v) for v in rows.values()}
     assert lengths == {drv.n_pixels}
     assert rows["wl"] == drv.pxwl
     assert rows["i"] == spectrum
     assert set(rows["spec_idx"]) == {0}
-    assert set(rows["dev_ts_ns"]) == {None}
+
+
+def test_build_rows_keeps_dev_ts_ns_when_the_device_supplies_one():
+    """The buffered path can fill it, and then it must be recorded."""
+    drv = _connected()
+    spectrum, epoch_s = drv.acquire_spectrum()
+    rows = drv.build_rows([spectrum], [epoch_s], dev_timestamps=[123456789])
+    assert list(rows) == LONG_FORMAT_KEYS
+    assert set(rows["dev_ts_ns"]) == {123456789}
+
+
+def test_build_rows_keeps_a_partially_populated_dev_ts_ns_whole():
+    """Dropping only the null entries would break positional alignment."""
+    drv = _connected()
+    spectra = [drv.acquire_spectrum()[0] for _ in range(2)]
+    rows = drv.build_rows(spectra, [1.0, 2.0], dev_timestamps=[None, 42])
+    assert "dev_ts_ns" in rows
+    assert len(rows["dev_ts_ns"]) == len(rows["i"])
+    assert set(rows["dev_ts_ns"]) == {None, 42}
 
 
 def test_build_rows_advances_and_resets_the_frame_counter():
@@ -442,7 +613,7 @@ def test_the_parquet_chunk_reader_flattens_identically(tmp_path):
     chunks = list(read_hlo_data_chunks(str(path), data_start, chunk_size=100))
     assert len(chunks) == 1
     chunk, chunk_len = chunks[0]
-    assert set(chunk) == set(LONG_FORMAT_KEYS)
+    assert set(chunk) == set(SINGLE_SHOT_KEYS)
     assert {len(v) for v in chunk.values()} == {drv.n_pixels}
     assert chunk_len == drv.n_pixels
 
@@ -451,10 +622,13 @@ def test_every_emitted_value_is_json_serializable():
     """A non-serializable value is written as an error row, silently."""
     drv = _connected()
     spectrum, epoch_s = drv.acquire_spectrum()
-    rows = drv.build_rows([spectrum], [epoch_s])
+    rows = drv.build_rows([spectrum], [epoch_s], dev_timestamps=[7])
     decoded = json.loads(hlo_json_dumps(rows))
     assert set(decoded) == set(LONG_FORMAT_KEYS)
-    assert decoded["dev_ts_ns"][0] is None  # None becomes JSON null, not "None"
+    assert decoded["dev_ts_ns"][0] == 7
+    # And a None entry survives as JSON null, not the string "None".
+    partial = drv.build_rows([spectrum, spectrum], [1.0, 2.0], dev_timestamps=[None, 7])
+    assert json.loads(hlo_json_dumps(partial))["dev_ts_ns"][0] is None
 
 
 # ----------------------------------------------------------------------
