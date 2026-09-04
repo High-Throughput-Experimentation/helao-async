@@ -143,7 +143,7 @@ class OceanDirectSpec(HelaoDriver):
         # Buffered-capture state, owned by the server's executor.
         self.buffering: bool = False
         self.spec_idx: int = 0
-        #: Trigger mode currently armed, or None while free-running. Tracked so
+        #: Trigger mode currently armed, or None when never armed. Tracked so
         #: teardown can put the device back: a device left armed on an external
         #: trigger answers no later acquisition until one arrives.
         self.armed_trigger_mode: Optional[int] = None

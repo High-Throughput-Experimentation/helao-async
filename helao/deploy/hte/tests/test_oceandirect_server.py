@@ -1052,12 +1052,50 @@ def _extrig_call_with(app, **overrides):
     return ctx, asyncio.run(route.fn(ctx))
 
 
-def test_the_extrig_default_is_the_external_edge_mode(built):
-    """It defaulted to 3 -- the FX/HDX edge value -- which no SR device
-    accepts, so the endpoint's own default could never have worked."""
+def test_the_extrig_default_is_the_universally_supported_mode(built):
+    """Two bad defaults preceded this one, and both failed at the device.
+
+    First ``3``, the FX/HDX edge value, which no SR device accepts at all.
+    Then ``1``, external edge, which an SR4 with the default Option 1
+    firmware refuses -- confirmed at the station on SR404456, so the
+    endpoint failed out of the box on the very hardware it was added for.
+    Mode 0 is the power-on mode and the only one every SR device supports.
+    """
     route = built.routes[f"/{built.server.server_name}/acquire_spec_extrig"]
     defaults = collect_default_params(inspect.signature(route.fn))
-    assert defaults["trigger_mode"] == int(SRTrigMode.ext_edge) == 1
+    assert defaults["trigger_mode"] == int(SRTrigMode.software) == 0
+
+
+def test_an_option_1_device_can_still_run_the_long_software_triggered_path(built):
+    """The remaining long-run path on a unit with no external triggering.
+
+    An Option 1 SR4 has no data buffer *and* no external trigger, so mode 0
+    through this endpoint is the only way it can capture for longer than one
+    HTTP request. It must arm, run and disarm without touching mode 1.
+    """
+    built.driver.allow_no_sample = True
+    # The device this models: mode 0 only, exactly what the station reported.
+    built.driver.dev._cfg.trigger_modes = (0,)
+
+    ctx, _result = _extrig_call_with(built, trigger_mode=int(SRTrigMode.software))
+
+    # A started run returns its active action, so the evidence is the running
+    # executor, not a finished action's error_code.
+    executor = ctx.session.started_executor
+    assert isinstance(executor, srv.OceanDirectExtrigExec)
+
+    # Arming happens in _pre_exec, not in the endpoint, so it is driven here
+    # -- that call is the one an Option 1 device would refuse at mode 1.
+    assert asyncio.run(executor._pre_exec()) == {"error": ErrorCodes.none}
+    assert built.driver.armed_trigger_mode == int(SRTrigMode.software)
+    assert built.driver.dev.get_trigger_mode() == 0
+    assert asyncio.run(executor._post_exec())["error"] == ErrorCodes.none
+    assert built.driver.armed_trigger_mode is None
+
+    p = ctx.session.action.action_params
+    # Software mode owns the integration time, unlike the level trigger.
+    assert p["int_time_ignored"] is False
+    assert p["applied_int_time_us"] == p["int_time_us"]
 
 
 def test_a_non_sr_mode_is_refused_without_opening_a_session(built):
