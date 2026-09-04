@@ -161,6 +161,17 @@ class SimConfig:
     features: frozenset = SR_SERIES_FEATURES
     find_returns_nothing: bool = False
     open_raises: bool = False
+    #: Trigger modes the device accepts. The SR series has three (0/1/2), but
+    #: an SR4 with the default "Option 1" firmware supports *only* mode 0 --
+    #: manual p.20, "External triggering is not supported". Narrow this to
+    #: ``(0,)`` to model that unit.
+    trigger_modes: tuple[int, ...] = (0, 1, 2)
+    #: External Level trigger pulse width, microseconds. Only consulted in
+    #: mode 2, where the pulse width *is* the integration time. ``None`` means
+    #: a pulse at least as long as the minimum integration time.
+    level_pulse_us: Optional[int] = None
+    acq_delay_max_us: int = 335_500
+    acq_delay_increment_us: int = 1
     _next_device_id: int = field(default=1, repr=False)
 
 
@@ -489,6 +500,7 @@ class Spectrometer:
         self._saturation_check = False
         self._stored_dark: Optional[list] = None
         self._timestamp_ns = 0
+        self._acq_delay_us = 0
 
         self._tec_enabled = False
         self._tec_setpoint = 10.0
@@ -597,6 +609,39 @@ class Spectrometer:
         self._check_open("get_integration_time")
         return self._int_time_us
 
+    # --- acquisition delay (t_ACQDLY) ---
+    def set_acquisition_delay(self, delayMicrosecond: int) -> None:
+        self._require_feature(FeatureID.ACQUISITION_DELAY, "set_acquisition_delay")
+        if not 0 <= delayMicrosecond <= self._cfg.acq_delay_max_us:
+            raise OceanDirectError(
+                -13,
+                f"set_acquisition_delay: {delayMicrosecond} us out of range "
+                f"(0-{self._cfg.acq_delay_max_us})",
+            )
+        self._acq_delay_us = int(delayMicrosecond)
+
+    def get_acquisition_delay(self) -> int:
+        self._require_feature(FeatureID.ACQUISITION_DELAY, "get_acquisition_delay")
+        return self._acq_delay_us
+
+    def get_acquisition_delay_minimum(self) -> int:
+        self._require_feature(
+            FeatureID.ACQUISITION_DELAY, "get_acquisition_delay_minimum"
+        )
+        return 0
+
+    def get_acquisition_delay_maximum(self) -> int:
+        self._require_feature(
+            FeatureID.ACQUISITION_DELAY, "get_acquisition_delay_maximum"
+        )
+        return self._cfg.acq_delay_max_us
+
+    def get_acquisition_delay_increment(self) -> int:
+        self._require_feature(
+            FeatureID.ACQUISITION_DELAY, "get_acquisition_delay_increment"
+        )
+        return self._cfg.acq_delay_increment_us
+
     # --- processing ---
     def set_scans_to_average(self, newScanToAverage: int) -> None:
         self._check_open("set_scans_to_average")
@@ -694,8 +739,15 @@ class Spectrometer:
     # --- trigger ---
     def set_trigger_mode(self, mode: int) -> None:
         self._check_open("set_trigger_mode")
-        if mode not in (0, 1, 2, 3, 4):
-            raise OceanDirectError(-11, f"set_trigger_mode: unsupported mode {mode}")
+        # The SR series has three modes, and a unit with Option 1 firmware
+        # accepts only mode 0. Both are modelled through cfg.trigger_modes so
+        # a test can reproduce either device.
+        if mode not in self._cfg.trigger_modes:
+            raise OceanDirectError(
+                -11,
+                f"set_trigger_mode: mode {mode} not supported by this device "
+                f"(supports {list(self._cfg.trigger_modes)})",
+            )
         self._trigger_mode = int(mode)
 
     def get_trigger_mode(self) -> int:
@@ -730,11 +782,33 @@ class Spectrometer:
     def get_formatted_spectrum(self) -> list[float]:
         return self.get_spectrum()
 
+    def _effective_int_time_us(self) -> Optional[int]:
+        """Integration time actually in force, or ``None`` for an error frame.
+
+        In External Level mode (2) the trigger pulse width is the integration
+        time and the software value is ignored; a pulse shorter than the
+        device minimum is the documented all-zeros case (manual p.30), which
+        this returns ``None`` for.
+        """
+        if self._trigger_mode != 2:
+            return self._int_time_us
+        pulse = self._cfg.level_pulse_us
+        if pulse is None:
+            return self._cfg.int_time_min_us
+        if pulse < self._cfg.int_time_min_us:
+            return None
+        return pulse
+
     def _synth_spectrum(self) -> list[float]:
         """Two Gaussian peaks scaled by integration time, clipped at saturation."""
         cfg = self._cfg
+        int_time = self._effective_int_time_us()
+        if int_time is None:
+            # "an error will occur and the received spectral values will be
+            # all 0's" -- note it does NOT raise.
+            return [0.0] * cfg.n_pixels
         # Scale linearly with integration time so a calibration loop converges.
-        gain = self._int_time_us / max(cfg.int_time_min_us, 1)
+        gain = int_time / max(cfg.int_time_min_us, 1)
         out = []
         for i in range(cfg.n_pixels):
             wl = cfg.wl_start + i * cfg.wl_step

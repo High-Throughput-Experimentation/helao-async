@@ -42,7 +42,12 @@ from helao.core.drivers.helao_driver import (
 )
 from helao.helpers import helao_logging as logging
 
-from .oceandirect_enum import LONG_FORMAT_KEYS, MAX_METADATA_BUFFER_SIZE, ODTrigMode
+from .oceandirect_enum import (
+    HSAM_UNSUPPORTED_TRIGGER_MODES,
+    LONG_FORMAT_KEYS,
+    MAX_METADATA_BUFFER_SIZE,
+    SRTrigMode,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -622,6 +627,8 @@ class OceanDirectSpec(HelaoDriver):
                 else ("all_unavailable" if not any(self.features.values()) else "ok")
             ),
             "feature_probe_errors": dict(self.feature_probe_errors),
+            "armed_trigger_mode": self.armed_trigger_mode,
+            "trigger_modes": {m.name: int(m) for m in SRTrigMode},
         }
         if self.dev is not None:
             try:
@@ -630,6 +637,7 @@ class OceanDirectSpec(HelaoDriver):
                 LOGGER.warning(
                     f"could not read integration time: {self._err_detail(exc)}"
                 )
+            info.update(self.acquisition_delay_bounds())
             for key, getter in (
                 ("revision_firmware", "get_revision_firmware"),
                 ("revision_fpga", "get_revision_fpga"),
@@ -736,6 +744,25 @@ class OceanDirectSpec(HelaoDriver):
         """
         try:
             self._require_ready("set_processing")
+            if (
+                scans_to_average is not None
+                and int(scans_to_average) > 1
+                and self.armed_trigger_mode in HSAM_UNSUPPORTED_TRIGGER_MODES
+            ):
+                # scans_to_average > 1 is what selects High Speed Averaging
+                # Mode, and the manual's acquisition-mode table lists HSAM as
+                # supporting only software and external-edge triggers. Refusing
+                # is better than letting the device arbitrate: the two features
+                # both want to own the integration time, and which one wins is
+                # not documented.
+                raise RuntimeError(
+                    f"set_processing: scans_to_average={scans_to_average} "
+                    "selects High Speed Averaging Mode, which cannot be "
+                    f"combined with trigger mode "
+                    f"{SRTrigMode(self.armed_trigger_mode).name} "
+                    "(the level trigger owns the integration time). Use "
+                    "scans_to_average=1, or arm software/external-edge instead."
+                )
             with self._lock:
                 if scans_to_average is not None:
                     self.dev.set_scans_to_average(int(scans_to_average))
@@ -753,22 +780,33 @@ class OceanDirectSpec(HelaoDriver):
         except Exception as exc:
             return self._failed("set_processing", exc)
 
-    def set_trigger_mode(self, mode: int = ODTrigMode.normal) -> DriverResponse:
+    def set_trigger_mode(self, mode: int = SRTrigMode.software) -> DriverResponse:
         """Set the trigger source and report the value read back.
 
         Trigger-mode integers are defined by the device manual, not the SDK,
         so the write is verified by reading it back rather than assumed.
 
         Args:
-            mode: Trigger mode integer (see :class:`ODTrigMode`).
+            mode: Trigger mode integer (see :class:`SRTrigMode`).
 
         Returns:
             ``DriverResponse`` with the requested and read-back modes.
         """
         try:
             self._require_ready("set_trigger_mode")
+            # Validated here rather than left to the device. An out-of-range
+            # mode is a caller mistake, and the vendor's own error for one is
+            # a bare code that names neither the value nor the alternatives.
+            try:
+                resolved = SRTrigMode(int(mode))
+            except ValueError:
+                raise RuntimeError(
+                    f"set_trigger_mode: {mode!r} is not an SR-series trigger "
+                    f"mode. {self.model} supports "
+                    + ", ".join(f"{m.value}={m.name}" for m in SRTrigMode)
+                ) from None
             with self._lock:
-                self.dev.set_trigger_mode(int(mode))
+                self.dev.set_trigger_mode(int(resolved))
                 try:
                     readback = int(self.dev.get_trigger_mode())
                 except Exception as exc:
@@ -776,14 +814,24 @@ class OceanDirectSpec(HelaoDriver):
                         f"trigger mode not read-backable: {self._err_detail(exc)}"
                     )
                     readback = None
-            if readback is not None and readback != int(mode):
+            if readback is not None and readback != int(resolved):
                 LOGGER.warning(
-                    f"trigger mode requested {int(mode)} but device reports "
-                    f"{readback}; check this model's manual for its mode values"
+                    f"trigger mode requested {int(resolved)} "
+                    f"({resolved.name}) but device reports {readback}. On an "
+                    "SR4 with the default (Option 1) firmware external "
+                    "triggering is not supported at all and only mode 0 "
+                    "(software) is available."
                 )
             return DriverResponse(
                 response=DriverResponseType.success,
-                data={"requested": int(mode), "trigger_mode": readback},
+                data={
+                    "requested": int(resolved),
+                    "mode_name": resolved.name,
+                    "trigger_mode": readback,
+                    # In level mode the pulse width *is* the integration time,
+                    # so whatever set_integration_time_us applied is inert.
+                    "int_time_from_pulse_width": resolved == SRTrigMode.ext_level,
+                },
                 status=DriverStatus.ok,
             )
         except Exception as exc:
@@ -794,7 +842,7 @@ class OceanDirectSpec(HelaoDriver):
 
         Args:
             mode: Trigger mode integer from the device manual. See
-                :class:`ODTrigMode` for the family's usual values.
+                :class:`SRTrigMode` for the SR-series values.
 
         Returns:
             ``DriverResponse`` with the requested and read-back modes.
@@ -805,7 +853,11 @@ class OceanDirectSpec(HelaoDriver):
         return resp
 
     def disarm_trigger(self) -> DriverResponse:
-        """Return the device to free-running mode.
+        """Return the device to software-trigger mode (the power-on mode).
+
+        Note this is not a "free-running" mode -- SR mode 0 still triggers per
+        request; it is simply the mode in which a plain ``get_spectrum()``
+        returns without waiting on an external signal.
 
         Called from the triggered executor's teardown, from :meth:`stop` and
         from :meth:`disconnect`. Leaving a device armed is not a cosmetic
@@ -819,11 +871,79 @@ class OceanDirectSpec(HelaoDriver):
             return DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
-        resp = self.set_trigger_mode(int(ODTrigMode.normal))
+        resp = self.set_trigger_mode(int(SRTrigMode.software))
         # Cleared regardless of the outcome: a failed disarm must not leave the
         # driver believing it is still armed and skipping later attempts.
         self.armed_trigger_mode = None
         return resp
+
+    def set_acquisition_delay_us(self, delay_us: int) -> DriverResponse:
+        """Set the delay between the Trigger Event and the start of integration.
+
+        ``t_ACQDLY`` in the manual's timing diagrams, documented for all three
+        trigger modes (0 to 335,500 us at 1 us resolution on an SR4). This is
+        the knob for skipping a flash lamp's rise, or for offsetting several
+        instruments driven from one trigger, so a triggered setup without it is
+        only usable when the trigger already lands exactly where wanted.
+
+        Bounds come from the device rather than the manual: the vendor exposes
+        min/max/increment, and reading them keeps this correct on an SR2 or SR6
+        without a per-model table here.
+
+        Args:
+            delay_us: Requested delay in microseconds. Clamped to the device's
+                range and snapped to its increment.
+
+        Returns:
+            ``DriverResponse`` carrying the requested and applied values.
+        """
+        try:
+            self._require_ready("set_acquisition_delay_us")
+            self._require("ACQUISITION_DELAY", "set_acquisition_delay_us")
+            with self._lock:
+                applied = self._clamp_device(
+                    self.dev,
+                    int(delay_us),
+                    "get_acquisition_delay_minimum",
+                    "get_acquisition_delay_maximum",
+                    "get_acquisition_delay_increment",
+                    "acquisition delay",
+                )
+                self.dev.set_acquisition_delay(applied)
+                readback = self._safe_int(self.dev, "get_acquisition_delay")
+            return DriverResponse(
+                response=DriverResponseType.success,
+                data={
+                    "requested_us": int(delay_us),
+                    "acquisition_delay_us": (
+                        readback if readback is not None else applied
+                    ),
+                },
+                status=DriverStatus.ok,
+            )
+        except Exception as exc:
+            return self._failed("set_acquisition_delay_us", exc)
+
+    def acquisition_delay_bounds(self) -> dict:
+        """Device-reported acquisition-delay min/max/increment and current value.
+
+        Every entry is ``None`` when the device does not answer, so a caller
+        can tell "no delay support" from "delay of zero".
+        """
+        if self.dev is None:
+            return {}
+        return {
+            "acquisition_delay_us": self._safe_int(self.dev, "get_acquisition_delay"),
+            "acquisition_delay_min_us": self._safe_int(
+                self.dev, "get_acquisition_delay_minimum"
+            ),
+            "acquisition_delay_max_us": self._safe_int(
+                self.dev, "get_acquisition_delay_maximum"
+            ),
+            "acquisition_delay_increment_us": self._safe_int(
+                self.dev, "get_acquisition_delay_increment"
+            ),
+        }
 
     def set_corrections(
         self,

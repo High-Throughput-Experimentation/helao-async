@@ -68,8 +68,8 @@ from ...drivers.spec.oceandirect_driver import OceanDirectSpec
 from ...drivers.spec.oceandirect_enum import (
     LONG_FORMAT_KEYS,
     MAX_METADATA_BUFFER_SIZE,
-    ODTrigMode,
     SINGLE_SHOT_KEYS,
+    SRTrigMode,
 )
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -246,6 +246,11 @@ class OceanDirectExtrigExec(Executor):
         self.emitted = 0
         self.waits = 0
         self.armed = False
+        #: Frames that came back all zeros. In External Level mode that is the
+        #: documented symptom of a trigger pulse shorter than the device's
+        #: minimum integration time -- it does not raise, so counting is the
+        #: only way the run can report it.
+        self.zero_frames = 0
 
     async def _pre_exec(self) -> dict:
         """Arm the requested trigger mode from ``action_params``."""
@@ -255,6 +260,17 @@ class OceanDirectExtrigExec(Executor):
         self.emitted = 0
         self.waits = 0
         loop = asyncio.get_event_loop()
+        if p["acquisition_delay_us"] is not None:
+            delay_resp = await loop.run_in_executor(
+                None,
+                lambda: self.driver.set_acquisition_delay_us(p["acquisition_delay_us"]),
+            )
+            p["applied_acquisition_delay"] = delay_resp.data
+            if delay_resp.response != DriverResponseType.success:
+                # Not fatal: the delay is a refinement, and a device that
+                # cannot offer it can still be triggered. Recorded so a run
+                # whose timing looks wrong can be traced to this.
+                LOGGER.warning(f"acquisition delay not applied: {delay_resp.message}")
         resp = await loop.run_in_executor(
             None, lambda: self.driver.arm_trigger(p["trigger_mode"])
         )
@@ -302,6 +318,22 @@ class OceanDirectExtrigExec(Executor):
             LOGGER.error(f"triggered read failed: {exc!r}")
             return {"error": ErrorCodes.critical_error, "status": HloStatus.finished}
 
+        if spectrum and not any(spectrum):
+            self.zero_frames += 1
+            if p["trigger_mode"] == int(SRTrigMode.ext_level):
+                LOGGER.warning(
+                    f"spectrum {self.emitted} came back all zeros in "
+                    "External Level mode. The manual's documented cause is a "
+                    "trigger pulse shorter than the device's minimum "
+                    f"integration time ({self.driver.int_time_min_us} us) -- "
+                    "widen the pulse. Recording the frame as measured."
+                )
+            else:
+                LOGGER.warning(
+                    f"spectrum {self.emitted} came back all zeros; check the "
+                    "light path and integration time."
+                )
+
         rows = self.driver.build_rows(spectra=[spectrum], epochs=[epoch_s])
         self.emitted += 1
 
@@ -318,6 +350,7 @@ class OceanDirectExtrigExec(Executor):
         p = self.active.action.action_params
         p["spectra_emitted"] = self.emitted
         p["trigger_waits"] = self.waits
+        p["zero_frames"] = self.zero_frames
         return {"error": ErrorCodes.none, "data": {}}
 
     async def _manual_stop(self) -> dict:
@@ -969,7 +1002,8 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         int_time_us: int = 100_000,
-        trigger_mode: int = int(ODTrigMode.ext_hardware_edge),
+        trigger_mode: int = int(SRTrigMode.ext_edge),
+        acquisition_delay_us: Optional[int] = None,
         n_spectra: Optional[int] = None,
         duration: float = -1,
         read_timeout_s: float = 5.0,
@@ -996,10 +1030,17 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
             ctx: Per-request action context supplied by the host.
             fast_samples_in: Sample references associated with this action.
             int_time_us: Integration time in microseconds.
-            trigger_mode: Trigger mode integer. **Defined by the device
-                manual, not the SDK** -- see ``ODTrigMode`` for the family's
-                usual values, and check the applied value in the log, since
-                the driver reads it back and warns on a mismatch.
+            trigger_mode: SR-series trigger mode: ``0`` software, ``1``
+                external edge (the default here), ``2`` external level. In
+                mode 2 the trigger pulse width *is* the integration time, so
+                ``int_time_us`` is ignored -- the action records
+                ``int_time_ignored`` when that applies. An SR4 with the
+                default Option 1 firmware supports only mode 0.
+            acquisition_delay_us: Delay between the Trigger Event and the
+                start of integration (``t_ACQDLY``; 0-335,500 us on an SR4).
+                ``None`` leaves the device's current value alone. This is the
+                knob for skipping a flash lamp's rise or offsetting several
+                instruments driven from one trigger.
             n_spectra: Finish after this many spectra; ``None`` runs until
                 ``duration`` expires or the action is stopped.
             duration: Total run duration in seconds; negative runs until
@@ -1019,11 +1060,35 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
         A.action_abbr = "OPT"
         p = A.action_params
 
-        int_resp = app.driver.set_integration_time_us(p["int_time_us"])  # type: ignore[attr-defined]
-        if int_resp.response != DriverResponseType.success:
-            LOGGER.error(f"could not set integration time: {int_resp.message}")
-            A.error_code = ErrorCodes.critical_error
+        try:
+            mode = SRTrigMode(int(p["trigger_mode"]))
+        except ValueError:
+            LOGGER.error(
+                f"trigger_mode {p['trigger_mode']!r} is not an SR-series mode; "
+                + ", ".join(f"{m.value}={m.name}" for m in SRTrigMode)
+            )
+            A.error_code = ErrorCodes.not_available
             return A.as_dict()
+
+        # In level mode the pulse width owns the integration time. Setting it
+        # anyway would look like the caller was in control of something it is
+        # not, so it is skipped and the fact recorded on the action.
+        p["int_time_ignored"] = mode == SRTrigMode.ext_level
+        if mode == SRTrigMode.ext_level:
+            LOGGER.warning(
+                f"trigger mode {mode.name}: integration time comes from the "
+                f"trigger pulse width, so int_time_us={p['int_time_us']} is "
+                "ignored. The pulse must be at least "
+                f"{app.driver.int_time_min_us} us or the device returns a "  # type: ignore[attr-defined]
+                "spectrum of all zeros without raising."
+            )
+        else:
+            int_resp = app.driver.set_integration_time_us(p["int_time_us"])  # type: ignore[attr-defined]
+            if int_resp.response != DriverResponseType.success:
+                LOGGER.error(f"could not set integration time: {int_resp.message}")
+                A.error_code = ErrorCodes.critical_error
+                return A.as_dict()
+            p["applied_int_time_us"] = int_resp.data.get("int_time_us")
         A.error_code = ErrorCodes.none
 
         samples_in = await app.unified_db.get_samples(A.samples_in)
@@ -1114,7 +1179,7 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
     @action_version(1)
     async def set_trigger_mode(
         ctx: ActionContext,
-        mode: int = int(ODTrigMode.normal),
+        mode: int = int(SRTrigMode.software),
     ):
         """Set the device trigger source.
 
@@ -1123,7 +1188,8 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
 
         Args:
             ctx: Per-request action context supplied by the host.
-            mode: Trigger mode integer (see ``ODTrigMode``).
+            mode: SR-series trigger mode: 0 software, 1 external edge,
+                2 external level (see ``SRTrigMode``).
 
         Returns:
             The finished action dictionary.
@@ -1131,6 +1197,38 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
         active = await ctx.begin(action_abbr="OPT")
         resp = app.driver.set_trigger_mode(active.action.action_params["mode"])  # type: ignore[attr-defined]
         return await _control_action(active, resp, "trigger_mode")
+
+    @app.action()
+    @action_version(1)
+    async def set_acquisition_delay(
+        ctx: ActionContext,
+        delay_us: int = 0,
+    ):
+        """Set the delay between the Trigger Event and the start of integration.
+
+        ``t_ACQDLY`` in the manual's timing diagrams, applicable in all three
+        trigger modes (0-335,500 us on an SR4, 1 us resolution). Exposed as its
+        own action as well as an ``acquire_spec_extrig`` parameter, so a station
+        can set it once and leave it.
+
+        Args:
+            ctx: Per-request action context supplied by the host.
+            delay_us: Requested delay in microseconds; clamped to the device's
+                own range and snapped to its increment.
+
+        Returns:
+            The finished action dictionary.
+        """
+        active = await ctx.begin(action_abbr="OPT")
+        resp = app.driver.set_acquisition_delay_us(  # type: ignore[attr-defined]
+            active.action.action_params["delay_us"]
+        )
+        return await _control_action(active, resp, "acquisition_delay")
+
+    @app.post("/get_acquisition_delay", tags=["private"])
+    def get_acquisition_delay():
+        """Return the acquisition-delay bounds and current value."""
+        return app.driver.acquisition_delay_bounds()  # type: ignore[attr-defined]
 
     @app.action()
     @action_version(1)
