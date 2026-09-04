@@ -1353,10 +1353,17 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
     ):
         """Configure the continuous strobe, clamped to the device's limits.
 
+        The strobe fires only while its period is **shorter than** the
+        integration time; a longer period is accepted by the device and
+        simply never fires. The finished action carries ``int_time_us`` and
+        ``period_fires`` so an inert strobe is visible rather than looking
+        like dead hardware.
+
         Args:
             ctx: Per-request action context supplied by the host.
             enable: Strobe enable state; ``None`` leaves it unchanged.
-            period_us: Strobe period in microseconds; ``None`` leaves it alone.
+            period_us: Strobe period in microseconds; ``None`` leaves it
+                alone. Must be shorter than the integration time to fire.
             width_us: Strobe width in microseconds; ``None`` leaves it alone.
 
         Returns:

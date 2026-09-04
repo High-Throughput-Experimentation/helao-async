@@ -22,6 +22,7 @@ import json
 import pytest
 
 from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
+from helao.deploy.hte.drivers.spec import oceandirect_driver as od_driver
 from helao.deploy.hte.drivers.spec import oceandirect_sim as sim
 from helao.deploy.hte.drivers.spec.oceandirect_driver import OceanDirectSpec
 from helao.deploy.hte.drivers.spec.oceandirect_enum import (
@@ -264,6 +265,141 @@ def test_strobe_values_are_clamped_to_device_limits():
     assert resp.data["delay_us"] == 1_000_000  # device maximum
     assert resp.data["width_us"] == 1  # device minimum
     assert resp.data["enabled"] is True
+
+
+# ----------------------------------------------------------------------
+# Continuous strobe period vs integration time (t_CSPER)
+# ----------------------------------------------------------------------
+class _WarnRecorder:
+    """Stand-in for the driver's module logger that captures warnings.
+
+    The driver's logger comes from ``helao_logging``, whose handlers and
+    propagation depend on whether a server initialized it, so ``caplog``
+    cannot be relied on here. Substituting the module-level name is exact.
+    """
+
+    def __init__(self):
+        self.warnings: list[str] = []
+
+    def warning(self, msg, *args, **kwargs):
+        self.warnings.append(str(msg))
+
+    def __getattr__(self, _name):
+        return lambda *args, **kwargs: None
+
+
+def _warn_recorder(monkeypatch) -> _WarnRecorder:
+    recorder = _WarnRecorder()
+    monkeypatch.setattr(od_driver, "LOGGER", recorder)
+    return recorder
+
+
+def _raiser(*_args, **_kwargs):
+    raise sim.OceanDirectError("feature unavailable")
+
+
+def test_a_period_shorter_than_the_integration_time_fires():
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    resp = drv.set_continuous_strobe(enable=True, period_us=1000)
+    assert resp.response == DriverResponseType.success
+    assert resp.data["period_us"] == 1000
+    assert resp.data["int_time_us"] == 100_000
+    assert resp.data["period_fires"] is True
+
+
+@pytest.mark.parametrize("period_us", [100_000, 250_000])
+def test_a_period_not_shorter_than_the_integration_time_reads_as_inert(
+    period_us, monkeypatch
+):
+    """Equal is not shorter: the manual's condition on t_CSPER is strict.
+
+    Reported rather than refused -- the device accepts the write, and
+    configuring the strobe before lowering the integration time is a
+    legitimate order to do it in.
+    """
+    recorder = _warn_recorder(monkeypatch)
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    resp = drv.set_continuous_strobe(enable=True, period_us=period_us)
+    assert resp.response == DriverResponseType.success
+    assert resp.data["period_fires"] is False
+    assert any("will not fire" in w for w in recorder.warnings)
+
+
+def test_an_inert_period_is_not_warned_about_while_the_strobe_is_off(monkeypatch):
+    recorder = _warn_recorder(monkeypatch)
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    resp = drv.set_continuous_strobe(enable=False, period_us=250_000)
+    assert resp.data["period_fires"] is False
+    assert not [w for w in recorder.warnings if "will not fire" in w]
+
+
+def test_lowering_the_integration_time_silences_a_live_strobe(monkeypatch):
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    drv.set_continuous_strobe(enable=True, period_us=50_000)
+    recorder = _warn_recorder(monkeypatch)
+    drv.set_integration_time_us(10_000)
+    assert any("stop firing" in w for w in recorder.warnings)
+    assert drv.device_info()["continuous_strobe_fires"] is False
+
+
+def test_raising_the_integration_time_past_the_period_is_silent(monkeypatch):
+    drv = _connected()
+    drv.set_integration_time_us(10_000)
+    drv.set_continuous_strobe(enable=True, period_us=50_000)
+    recorder = _warn_recorder(monkeypatch)
+    drv.set_integration_time_us(100_000)
+    assert recorder.warnings == []
+    assert drv.device_info()["continuous_strobe_fires"] is True
+
+
+def test_the_integration_time_check_never_reads_the_device(monkeypatch):
+    """It runs per acquisition, so it is judged from cache, not round trips."""
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    drv.set_continuous_strobe(enable=True, period_us=50_000)
+
+    def _forbidden(*_args, **_kwargs):
+        raise AssertionError("strobe read on the integration-time path")
+
+    monkeypatch.setattr(sim._Advanced, "get_continuous_strobe_period", _forbidden)
+    monkeypatch.setattr(sim._Advanced, "get_continuous_strobe_enable", _forbidden)
+    resp = drv.set_integration_time_us(10_000)
+    assert resp.response == DriverResponseType.success
+
+
+def test_a_device_that_will_not_report_its_period_is_not_judged(monkeypatch):
+    recorder = _warn_recorder(monkeypatch)
+    drv = _connected()
+    monkeypatch.setattr(sim._Advanced, "get_continuous_strobe_period", _raiser)
+    resp = drv.set_continuous_strobe(enable=True, period_us=50_000)
+    assert resp.response == DriverResponseType.success
+    assert resp.data["period_us"] is None
+    assert resp.data["period_fires"] is None
+    assert not [w for w in recorder.warnings if "will not fire" in w]
+
+
+def test_the_predicate_reports_unknown_rather_than_guessing():
+    assert OceanDirectSpec.continuous_strobe_fires(None, 1000) is None
+    assert OceanDirectSpec.continuous_strobe_fires(1000, None) is None
+    assert OceanDirectSpec.continuous_strobe_fires(999, 1000) is True
+    assert OceanDirectSpec.continuous_strobe_fires(1000, 1000) is False
+
+
+@pytest.mark.asyncio
+async def test_teardown_stops_the_strobe_warning_from_outliving_the_strobe(
+    monkeypatch,
+):
+    drv = _connected()
+    drv.set_integration_time_us(100_000)
+    drv.set_continuous_strobe(enable=True, period_us=50_000)
+    await drv.estop(True)
+    recorder = _warn_recorder(monkeypatch)
+    drv.set_integration_time_us(10_000)
+    assert recorder.warnings == []
 
 
 def test_light_source_index_is_bounds_checked():

@@ -578,6 +578,27 @@ def test_lamp_and_light_source_and_strobes(built):
     )
 
 
+def test_the_strobe_action_records_whether_the_period_actually_fires(built):
+    """A strobe the integration time silences is inert, not an error.
+
+    ``_control_action`` records the driver's data verbatim, so the verdict
+    reaches the action -- and the operator -- without the endpoint doing
+    anything. The fixture connects at ``int_time_us: 50_000``.
+    """
+    ctx, result = _call(built, "set_continuous_strobe", enable=True, period_us=250_000)
+    assert result["error_code"] == ErrorCodes.none
+    applied = ctx.session.action.action_params["applied_continuous_strobe"]
+    assert applied["int_time_us"] == 50_000
+    assert applied["period_fires"] is False
+
+    ctx2, result2 = _call(built, "set_continuous_strobe", enable=True, period_us=1000)
+    assert result2["error_code"] == ErrorCodes.none
+    assert (
+        ctx2.session.action.action_params["applied_continuous_strobe"]["period_fires"]
+        is True
+    )
+
+
 def test_bad_light_source_index_is_rejected(built):
     _ctx, result = _call(built, "set_light_source", index=9, enable=True)
     assert result["error_code"] == ErrorCodes.critical_error

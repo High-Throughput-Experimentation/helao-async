@@ -147,6 +147,12 @@ class OceanDirectSpec(HelaoDriver):
         #: teardown can put the device back: a device left armed on an external
         #: trigger answers no later acquisition until one arrives.
         self.armed_trigger_mode: Optional[int] = None
+        #: Continuous-strobe period and enable state as last written through
+        #: this driver, or None while it has never been configured here.
+        #: Cached so an integration-time change can warn about silencing a
+        #: live strobe without paying two vendor round trips per acquisition.
+        self.continuous_strobe_period_us: Optional[int] = None
+        self.continuous_strobe_enabled: Optional[bool] = None
 
     # ------------------------------------------------------------------
     # SDK loading
@@ -629,6 +635,11 @@ class OceanDirectSpec(HelaoDriver):
             "feature_probe_errors": dict(self.feature_probe_errors),
             "armed_trigger_mode": self.armed_trigger_mode,
             "trigger_modes": {m.name: int(m) for m in SRTrigMode},
+            # As configured through this driver. Reported because a strobe
+            # whose period is not shorter than the integration time is
+            # silently inert, and this is where that is diagnosed.
+            "continuous_strobe_enabled": self.continuous_strobe_enabled,
+            "continuous_strobe_period_us": self.continuous_strobe_period_us,
         }
         if self.dev is not None:
             try:
@@ -637,6 +648,9 @@ class OceanDirectSpec(HelaoDriver):
                 LOGGER.warning(
                     f"could not read integration time: {self._err_detail(exc)}"
                 )
+            info["continuous_strobe_fires"] = self.continuous_strobe_fires(
+                self.continuous_strobe_period_us, info.get("int_time_us")
+            )
             info.update(self.acquisition_delay_bounds())
             for key, getter in (
                 ("revision_firmware", "get_revision_firmware"),
@@ -699,6 +713,7 @@ class OceanDirectSpec(HelaoDriver):
                 f"{self.int_time_increment_us} us)"
             )
         self.dev.set_integration_time(applied)
+        self._warn_if_strobe_silenced(applied)
         return applied
 
     def set_integration_time_us(self, int_time_us: int) -> DriverResponse:
@@ -1583,11 +1598,63 @@ class OceanDirectSpec(HelaoDriver):
         except Exception as exc:
             return self._failed("set_single_strobe", exc)
 
+    @staticmethod
+    def continuous_strobe_fires(
+        period_us: Optional[int], int_time_us: Optional[int]
+    ) -> Optional[bool]:
+        """Whether a continuous strobe of ``period_us`` will actually fire.
+
+        The continuous strobe is only active while its period is **shorter
+        than** the integration time (*Ocean SR Series* UM-SR-Series_1025,
+        Tables 3/6/9, note on ``t_CSPER``). A longer period is accepted both
+        by ``set_continuous_strobe_period`` and by the device's own bounds
+        without complaint -- it simply never fires, which at a station reads
+        as dead hardware rather than as a misconfiguration.
+
+        Args:
+            period_us: Configured strobe period in microseconds.
+            int_time_us: Current integration time in microseconds.
+
+        Returns:
+            ``True`` if the strobe fires, ``False`` if the period silences it,
+            and ``None`` when either value is unknown -- a device that will
+            not report its period cannot be judged, and guessing either way
+            would produce a warning nobody can act on.
+        """
+        try:
+            return int(period_us) < int(int_time_us)  # type: ignore[arg-type]
+        except (TypeError, ValueError):
+            return None
+
+    def _warn_if_strobe_silenced(self, int_time_us: int) -> None:
+        """Warn when a new integration time silences a configured strobe.
+
+        Judged against the cached strobe configuration, never the device:
+        this runs on the acquisition path, where reading the strobe back would
+        cost two vendor round trips per acquisition on every device, including
+        the ones with no strobe at all.
+        """
+        if not self.continuous_strobe_enabled:
+            return
+        fires = self.continuous_strobe_fires(
+            self.continuous_strobe_period_us, int_time_us
+        )
+        if fires is False:
+            LOGGER.warning(
+                f"integration time {int_time_us} us is not longer than the "
+                f"enabled continuous strobe period "
+                f"{self.continuous_strobe_period_us} us, so the strobe will "
+                "stop firing; lower the period or raise the integration time"
+            )
+
     def _set_continuous_strobe_enable(self, enable: bool) -> None:
         self._require_ready("set_continuous_strobe")
         self._require("CONTINUOUS_STROBE", "set_continuous_strobe")
         with self._lock:
             self.dev.Advanced.set_continuous_strobe_enable(bool(enable))
+            # Kept truthful here too, not only in set_continuous_strobe: this
+            # is the leg estop and teardown use to switch the strobe off.
+            self.continuous_strobe_enabled = bool(enable)
 
     def set_continuous_strobe(
         self,
@@ -1633,6 +1700,29 @@ class OceanDirectSpec(HelaoDriver):
                         "period_us": "get_continuous_strobe_period",
                         "width_us": "get_continuous_strobe_width",
                     },
+                )
+                # The period is honoured only while it is shorter than the
+                # integration time, and neither the SDK nor the device says
+                # so. Report both numbers and which way they fell, rather
+                # than refusing: configuring the strobe before lowering the
+                # integration time is a legitimate order, and the device
+                # itself accepts the write.
+                int_time_us = self._safe_int(self.dev, "get_integration_time")
+                data["int_time_us"] = int_time_us
+                data["period_us"] = self._opt_int(data.get("period_us"))
+                data["period_fires"] = self.continuous_strobe_fires(
+                    data["period_us"], int_time_us
+                )
+                self.continuous_strobe_period_us = data["period_us"]
+                self.continuous_strobe_enabled = (
+                    None if data.get("enabled") is None else bool(data["enabled"])
+                )
+            if data["period_fires"] is False and self.continuous_strobe_enabled:
+                LOGGER.warning(
+                    f"continuous strobe period {data['period_us']} us is not "
+                    f"shorter than the integration time {int_time_us} us, so "
+                    "the strobe will not fire; lower the period below "
+                    f"{int_time_us} us or raise the integration time"
                 )
             return DriverResponse(
                 response=DriverResponseType.success,
@@ -1682,6 +1772,14 @@ class OceanDirectSpec(HelaoDriver):
         try:
             return int(getattr(obj, getter)())
         except Exception:
+            return None
+
+    @staticmethod
+    def _opt_int(value) -> Optional[int]:
+        """Coerce ``value`` to int, or ``None`` when it is missing or not numeric."""
+        try:
+            return int(value)
+        except (TypeError, ValueError):
             return None
 
     def _read_back(self, obj, getters: dict[str, str]) -> dict:
