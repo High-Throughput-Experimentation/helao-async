@@ -171,5 +171,34 @@ servers:
     fast: andor_server
     params:
       dev_id: 0
+      # This bench has no software-controlled spectrograph. The grating,
+      # central wavelength, slit width and ND filter are set BY HAND at the
+      # instrument and HELAO never writes them, so the wavelength axis cannot
+      # come from ATSpectrograph's GetCalibration the way hispec.yml's does.
+      #
+      # `calibration` selects AndorCalibratedDriver, which reads the axis from
+      # a lamp-calibration fit persisted at
+      #   <root>/STATES/<host>_ANDOR_andor_wl_calib.json
+      # Omit this key (or set `spectrograph`) and you get the vendor path,
+      # which is the default so every existing station config keeps working.
+      # An unrecognised value raises at launch rather than falling back.
+      #
+      # Four consequences worth knowing before running this:
+      #   1. `pyAndorSpectrograph` need NOT be installed here. Only
+      #      `pyAndorSDK3` is, for the camera. spectrograph.py is the sole
+      #      importer of the former and this path never loads it.
+      #   2. Until a calibration exists, `connect()` SUCCEEDS with a loud
+      #      warning and `acquire` REFUSES. That is deliberate: the
+      #      calibration action runs on this same server, so a refusing
+      #      connect() would leave the bench permanently uncalibratable.
+      #   3. Run POST /ANDOR/calibrate_wl once, with the lamp lit, passing
+      #      `lamp_lines_nm` explicitly -- there is no default line table,
+      #      because which lines land on the detector depends on the grating
+      #      and central wavelength this bench is physically set to. The fit
+      #      is refused if its residual exceeds `max_fit_rms_nm` (0.5 nm
+      #      default) or if the resulting axis is not monotonic.
+      #   4. /ANDOR/adjust_nd REFUSES here -- there is no software-controlled
+      #      ND filter wheel to drive. Set the filter by hand.
+      wl_source: calibration
     hlo_postprocess_libs: 
       - hispec_process_all
