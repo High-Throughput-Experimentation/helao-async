@@ -7,8 +7,6 @@ hand at the instrument and never written by HELAO. Imports nothing from
 
 from __future__ import annotations
 
-import socket
-from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -22,49 +20,17 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 
 class AndorCalibratedDriver(AndorDriver):
-    """Andor Zyla whose wavelength axis is read from a persisted lamp fit."""
+    """Andor Zyla whose wavelength axis is read from a persisted lamp fit.
 
-    def __init__(self, config: dict = {}, server_key: str = "ANDOR"):
-        """Construct without opening the camera or reading the calibration.
+    ``__init__``, ``calibration_file`` and the ``server_key`` argument live on
+    :class:`AndorDriver`: a spectrograph station also measures a lamp, to
+    compare the fit against ``GetCalibration``. What is different here is that
+    the fit is what ``acquire`` actually uses, which is what
+    ``uses_lamp_calibration`` says.
+    """
 
-        Args:
-            config: Driver configuration. ``states_root`` and ``host`` locate
-                the calibration file; both fall back to sane values so a
-                construct-test needs no station config.
-            server_key: This server's key, part of the calibration filename
-                because one host can run more than one andor server.
-        """
-        super().__init__(config=config)
-        self.server_key = server_key
-
-    def calibration_file(self) -> Path:
-        """Where this server's persisted wavelength calibration lives.
-
-        ``states_root`` is resolved in three steps, in order:
-
-        1. ``self._base_hook.helaodirs.states_root`` -- the production path,
-           once the base-hook/server_key wiring lands in a later task.
-        2. ``config["states_root"]`` -- lets a test or a config pin it.
-        3. The bare relative string ``"STATES"``, resolved against the
-           process cwd. This is a last resort, not a normal case: a driver
-           constructed as ``driver_class(config=self.server_params)`` (no
-           ``_base_hook``, no ``states_root`` in ``params:``) hits it on
-           every station today, so it logs a WARNING naming the absolute
-           path actually used rather than failing silently.
-        """
-        helaodirs = getattr(getattr(self, "_base_hook", None), "helaodirs", None)
-        states_root = getattr(helaodirs, "states_root", None)
-        if states_root is None:
-            states_root = self.config.get("states_root")
-        if states_root is None:
-            states_root = "STATES"
-            LOGGER.warning(
-                "no states_root from _base_hook.helaodirs or config; falling "
-                "back to cwd-relative %s",
-                Path(states_root).resolve(),
-            )
-        host = self.config.get("host") or socket.gethostname()
-        return wlc.calibration_path(states_root, host, self.server_key)
+    #: This variant's live wavelength axis IS the lamp fit.
+    uses_lamp_calibration = True
 
     def _wavelengths(self) -> Optional[np.ndarray]:
         """The calibrated axis, or ``None`` when none has been measured yet.
