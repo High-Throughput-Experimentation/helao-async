@@ -1,7 +1,7 @@
 # Frozen route checklists: an additions allowlist
 
 **Date:** 2026-09-04
-**Status:** design approved, no code written
+**Status:** implemented 2026-09-04 (Tasks 1-4)
 **Lands before:** `2026-09-04-andor-driver-split-design.md`, which is the first
 consumer but not the reason the gate needs this.
 
