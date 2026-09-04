@@ -295,7 +295,8 @@ def _warn_recorder(monkeypatch) -> _WarnRecorder:
 
 
 def _raiser(*_args, **_kwargs):
-    raise sim.OceanDirectError("feature unavailable")
+    """Fail the way the vendor does: a numeric code and a bare string."""
+    raise sim.OceanDirectError(-1, "feature unavailable")
 
 
 def test_a_period_shorter_than_the_integration_time_fires():
@@ -484,6 +485,122 @@ def test_an_option_1_sr4_accepts_only_the_software_mode():
         resp = drv.set_trigger_mode(mode)
         assert resp.response == DriverResponseType.failed
         assert "not supported by this device" in resp.message
+
+
+def test_a_rejected_external_mode_names_the_firmware_option():
+    """A real device's refusal is a bare numeric code.
+
+    The code table ships only in the C SDK's ``OceanDirectAPIConstants.c``,
+    and the SDK documents no error for an unsupported mode -- unlike
+    ``get_trigger_mode``, the setter carries no device-support note at all.
+    So the reading has to come from the driver, or a station gets ``[6]``
+    and nothing else.
+    """
+    sim.set_sim_config(sim.SimConfig(model="OCEANSR4", trigger_modes=(0,)))
+    drv = _connected()
+    resp = drv.set_trigger_mode(SRTrigMode.ext_edge)
+    assert resp.response == DriverResponseType.failed
+    assert "Option 1 firmware" in resp.message
+    assert "Try mode 0" in resp.message
+    assert resp.data["requested"] == int(SRTrigMode.ext_edge)
+    # What the device is actually left in -- which the bare code never says.
+    assert resp.data["trigger_mode"] == int(SRTrigMode.software)
+    assert resp.data["reads_in_flight"] == 0
+
+
+def test_a_rejected_software_mode_points_at_the_link_not_the_firmware():
+    """Mode 0 is the power-on mode on every SR device.
+
+    Blaming the firmware option for a mode 0 failure would send a station
+    off to re-order firmware over what is a link or device fault.
+    """
+    sim.set_sim_config(sim.SimConfig(trigger_modes=()))
+    drv = _connected()
+    resp = drv.set_trigger_mode(SRTrigMode.software)
+    assert resp.response == DriverResponseType.failed
+    assert "points at the link or the device" in resp.message
+    assert "Option 1" not in resp.message
+
+
+def test_an_unserialized_read_is_counted_only_while_it_is_in_flight(monkeypatch):
+    drv = _connected()
+    seen: list[int] = []
+    real = sim.Spectrometer.get_spectrum
+
+    def _watching(device_self):
+        seen.append(drv.reads_in_flight)
+        return real(device_self)
+
+    monkeypatch.setattr(sim.Spectrometer, "get_spectrum", _watching)
+    drv.acquire_spectrum(serialize=False)
+    assert seen == [1]
+    assert drv.reads_in_flight == 0
+
+
+def test_a_serialized_read_is_not_counted(monkeypatch):
+    """The counter exists for the path that can outlive its action.
+
+    The locked path cannot, and counting it would report an ordinary
+    single-shot read as a possible source of a transfer collision.
+    """
+    drv = _connected()
+    seen: list[int] = []
+    real = sim.Spectrometer.get_spectrum
+
+    def _watching(device_self):
+        seen.append(drv.reads_in_flight)
+        return real(device_self)
+
+    monkeypatch.setattr(sim.Spectrometer, "get_spectrum", _watching)
+    drv.acquire_spectrum()
+    assert seen == [0]
+
+
+def test_the_counter_is_released_when_a_read_raises(monkeypatch):
+    drv = _connected()
+    monkeypatch.setattr(sim.Spectrometer, "get_spectrum", _raiser)
+    with pytest.raises(sim.OceanDirectError):
+        drv.acquire_spectrum(serialize=False)
+    assert drv.reads_in_flight == 0
+
+
+def test_a_pending_read_is_blamed_before_the_firmware():
+    """A stranded read and a firmware refusal give the same vendor error.
+
+    Both surface as an unresolvable transport code, so the hint has to
+    distinguish them -- and the pending read comes first, being the one a
+    station can clear itself.
+    """
+    sim.set_sim_config(sim.SimConfig(model="OCEANSR4", trigger_modes=(0,)))
+    drv = _connected()
+    # A genuinely blocked vendor call cannot be staged in-process, and the
+    # counter is what the driver reasons from, so it is set directly.
+    drv._reads_in_flight = 1
+    resp = drv.set_trigger_mode(SRTrigMode.ext_edge)
+    assert resp.response == DriverResponseType.failed
+    assert "shared the device handle" in resp.message
+    assert "Option 1" not in resp.message
+    assert resp.data["reads_in_flight"] == 1
+
+
+def test_status_reports_a_pending_read_without_calling_the_device_busy():
+    """Deliberate: a triggered read can outlive its action, so a stranded
+    one would otherwise pin the server at busy for the rest of its life."""
+    drv = _connected()
+    drv._reads_in_flight = 2
+    resp = drv.get_status()
+    assert resp.data["reads_in_flight"] == 2
+    assert resp.data["armed_trigger_mode"] is None
+    assert resp.status == DriverStatus.ok
+
+
+def test_device_info_reports_the_state_a_transfer_error_comes_from():
+    drv = _connected()
+    info = drv.device_info()
+    assert info["reads_in_flight"] == 0
+    assert info["trigger_mode"] == int(SRTrigMode.software)
+    # The SDK's only documented idle probe. None would mean "could not ask".
+    assert info["idle_state"] is True
 
 
 def test_disarming_returns_to_the_software_mode():

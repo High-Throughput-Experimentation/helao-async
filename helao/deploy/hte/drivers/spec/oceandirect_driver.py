@@ -154,6 +154,18 @@ class OceanDirectSpec(HelaoDriver):
         self.continuous_strobe_period_us: Optional[int] = None
         self.continuous_strobe_enabled: Optional[bool] = None
 
+        #: Unserialized vendor reads currently in flight. Only the externally
+        #: triggered path (`acquire_spectrum(serialize=False)`) contributes,
+        #: and it is exactly the path that can leave a worker thread blocked
+        #: inside the vendor call after its action has finished -- the SDK has
+        #: no acquisition timeout, so `asyncio.wait_for` frees the coroutine
+        #: and not the thread. A later device write then shares the handle
+        #: with a pending read, which is worth reporting because the vendor
+        #: renders that collision as an unresolvable numeric error code.
+        #: Guarded by its own lock: the read deliberately holds no other.
+        self._reads_in_flight: int = 0
+        self._flight_lock = threading.Lock()
+
     # ------------------------------------------------------------------
     # SDK loading
     # ------------------------------------------------------------------
@@ -292,9 +304,17 @@ class OceanDirectSpec(HelaoDriver):
                 message="no device open",
                 status=DriverStatus.uninitialized,
             )
+        # A triggered read inside the vendor call is reported but deliberately
+        # does NOT make the status `busy`: that read can outlive its action,
+        # and a stranded one would then pin the server at busy for the rest
+        # of its life. Diagnosable, not load-bearing.
         return DriverResponse(
             response=DriverResponseType.success,
-            data={"buffering": self.buffering},
+            data={
+                "buffering": self.buffering,
+                "reads_in_flight": self.reads_in_flight,
+                "armed_trigger_mode": self.armed_trigger_mode,
+            },
             status=DriverStatus.busy if self.buffering else DriverStatus.ok,
         )
 
@@ -640,6 +660,7 @@ class OceanDirectSpec(HelaoDriver):
             # silently inert, and this is where that is diagnosed.
             "continuous_strobe_enabled": self.continuous_strobe_enabled,
             "continuous_strobe_period_us": self.continuous_strobe_period_us,
+            "reads_in_flight": self.reads_in_flight,
         }
         if self.dev is not None:
             try:
@@ -651,6 +672,15 @@ class OceanDirectSpec(HelaoDriver):
             info["continuous_strobe_fires"] = self.continuous_strobe_fires(
                 self.continuous_strobe_period_us, info.get("int_time_us")
             )
+            # The SDK's only documented way to ask whether the device is idle.
+            # Vendor-documented as "very few devices supported this command",
+            # so None here means "could not ask", not "not idle" -- but on a
+            # device that does answer it is the one direct read of the state
+            # a colliding transfer would be caused by.
+            info["idle_state"] = self._safe_bool(
+                self.dev.Advanced, "get_device_idle_state"
+            )
+            info["trigger_mode"] = self._safe_int(self.dev, "get_trigger_mode")
             info.update(self.acquisition_delay_bounds())
             for key, getter in (
                 ("revision_firmware", "get_revision_firmware"),
@@ -674,13 +704,32 @@ class OceanDirectSpec(HelaoDriver):
         except Exception as exc:
             return self._failed("get_device_info", exc)
 
-    def _failed(self, caller: str, exc: Exception) -> DriverResponse:
-        """Log ``exc`` against ``caller`` and wrap it as a failed response."""
+    def _failed(
+        self,
+        caller: str,
+        exc: Exception,
+        data: Optional[dict] = None,
+        hint: Optional[str] = None,
+    ) -> DriverResponse:
+        """Log ``exc`` against ``caller`` and wrap it as a failed response.
+
+        Args:
+            caller: Name used in the log line.
+            exc: The exception being reported.
+            data: State worth carrying on the failure. The vendor's own error
+                strings are bare codes, so what the device was doing is often
+                the only diagnosable part.
+            hint: Appended to the message. For a vendor error whose code this
+                build cannot resolve, a named likely cause is the difference
+                between a station diagnosing it and filing a bug.
+        """
         detail = self._err_detail(exc)
-        LOGGER.error(f"{caller} failed: {detail}")
+        message = f"{detail} -- {hint}" if hint else detail
+        LOGGER.error(f"{caller} failed: {message}")
         return DriverResponse(
             response=DriverResponseType.failed,
-            message=detail,
+            message=message,
+            data=dict(data or {}),
             status=DriverStatus.error,
         )
 
@@ -820,8 +869,38 @@ class OceanDirectSpec(HelaoDriver):
                     f"mode. {self.model} supports "
                     + ", ".join(f"{m.value}={m.name}" for m in SRTrigMode)
                 ) from None
+            pending = self.reads_in_flight
+            if pending:
+                # Not refused: the counter can only be cleared by the read
+                # returning, so refusing would make a stranded thread an
+                # unrecoverable lockout needing a server restart. Reported
+                # instead, on the success path as well as the failure one.
+                LOGGER.warning(
+                    f"set_trigger_mode with {pending} triggered read(s) still "
+                    "inside the vendor call; this write shares the device "
+                    "handle with them and may fail at the transport level"
+                )
             with self._lock:
-                self.dev.set_trigger_mode(int(resolved))
+                try:
+                    self.dev.set_trigger_mode(int(resolved))
+                except Exception as exc:
+                    # The vendor's error is a numeric code this build cannot
+                    # resolve -- the table ships only in the C SDK -- so the
+                    # diagnosable part is what the device is doing and what
+                    # mode it is actually left in.
+                    return self._failed(
+                        "set_trigger_mode",
+                        exc,
+                        data={
+                            "requested": int(resolved),
+                            "mode_name": resolved.name,
+                            "trigger_mode": self._safe_int(
+                                self.dev, "get_trigger_mode"
+                            ),
+                            "reads_in_flight": pending,
+                        },
+                        hint=self._trigger_write_hint(resolved, pending),
+                    )
                 try:
                     readback = int(self.dev.get_trigger_mode())
                 except Exception as exc:
@@ -846,11 +925,46 @@ class OceanDirectSpec(HelaoDriver):
                     # In level mode the pulse width *is* the integration time,
                     # so whatever set_integration_time_us applied is inert.
                     "int_time_from_pulse_width": resolved == SRTrigMode.ext_level,
+                    "reads_in_flight": pending,
                 },
                 status=DriverStatus.ok,
             )
         except Exception as exc:
             return self._failed("set_trigger_mode", exc)
+
+    @staticmethod
+    def _trigger_write_hint(resolved: "SRTrigMode", pending: int) -> str:
+        """Name the likely cause of a rejected trigger-mode write.
+
+        The SDK documents no error for an unsupported mode -- unlike
+        ``get_trigger_mode``, the setter carries no device-support note at
+        all, and the numeric codes are defined only in the C SDK's
+        ``OceanDirectAPIConstants.c``. So a transport-level failure is
+        exactly what an unsupported mode is expected to look like, and a
+        station has no way to reach that reading from the code alone.
+        """
+        if pending:
+            return (
+                f"{pending} triggered read(s) were still inside the vendor "
+                "call, so this write shared the device handle with them; "
+                "retry once they have returned, or restart the server if a "
+                "read is stranded waiting for a trigger that never came"
+            )
+        if resolved == SRTrigMode.software:
+            return (
+                "mode 0 is the power-on mode and is supported by every SR "
+                "device, so a failure here points at the link or the device "
+                "rather than at the trigger configuration"
+            )
+        return (
+            f"mode {int(resolved)} ({resolved.name}) is external triggering, "
+            "which an SR4 with the default Option 1 firmware does not "
+            "support at all (manual p.20: 'Only mode supported: Software "
+            "Trigger Mode (0)'). The 16-pin connector is fitted regardless, "
+            "so having the port and cable does not mean the firmware allows "
+            "it. Try mode 0: if that succeeds, this unit is Option 1 and "
+            "external triggering needs a firmware ordered for it"
+        )
 
     def arm_trigger(self, mode: int) -> DriverResponse:
         """Put the device into ``mode`` and remember that it is armed.
@@ -1065,9 +1179,27 @@ class OceanDirectSpec(HelaoDriver):
             # `allow_concurrent_actions = False`, so no second action can race
             # this read; what must stay reachable is the private endpoints and
             # teardown, and those are exactly what the lock would block.
-            return self._read_spectrum(dark_corrected)
+            #
+            # That protection ends when the action does, and this path can
+            # outlive its action: a read that timed out leaves the worker
+            # thread in the vendor call until a trigger arrives or the device
+            # closes. The counter is how a later call can say so, since the
+            # lock cannot express it.
+            with self._flight_lock:
+                self._reads_in_flight += 1
+            try:
+                return self._read_spectrum(dark_corrected)
+            finally:
+                with self._flight_lock:
+                    self._reads_in_flight -= 1
         with self._lock:
             return self._read_spectrum(dark_corrected)
+
+    @property
+    def reads_in_flight(self) -> int:
+        """Unserialized triggered reads currently inside the vendor call."""
+        with self._flight_lock:
+            return self._reads_in_flight
 
     def _read_spectrum(self, dark_corrected: bool) -> tuple[list[float], float]:
         """The bare vendor read, with no locking of its own."""
@@ -1771,6 +1903,14 @@ class OceanDirectSpec(HelaoDriver):
         """Call ``getter`` and coerce to int, or return ``None`` if it fails."""
         try:
             return int(getattr(obj, getter)())
+        except Exception:
+            return None
+
+    @staticmethod
+    def _safe_bool(obj, getter: str) -> Optional[bool]:
+        """Call ``getter`` and coerce to bool, or return ``None`` if it fails."""
+        try:
+            return bool(getattr(obj, getter)())
         except Exception:
             return None
 
