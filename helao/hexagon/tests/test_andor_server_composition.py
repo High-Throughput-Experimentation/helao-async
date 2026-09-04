@@ -159,3 +159,26 @@ async def test_calibration_file_resolves_under_the_configured_states_root(
     assert calib_path.parent == Path(app.helaodirs.states_root)
     assert calib_path.parent != Path("STATES").resolve()
     assert hispec_andor_alt_key in calib_path.name
+
+
+# --- Route surface: the frozen record is untouched, the addition is listed --
+
+
+def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
+    """adjust_nd survives this work; only calibrate_wl is added."""
+    import json
+
+    frozen = json.loads(
+        Path("helao/hexagon/tests/checklists/hte/andor_server.json").read_text()
+    )
+    paths = {r["path"] for r in frozen}
+    assert "/ANDOR/adjust_nd" in paths, "the frozen record must not have been edited"
+    assert "/ANDOR/calibrate_wl" not in paths, "additions go in _additions.json"
+
+    additions = json.loads(
+        Path("helao/hexagon/tests/checklists/hte/_additions.json").read_text()
+    )
+    entry = [a for a in additions if a["path"] == "/ANDOR/calibrate_wl"]
+    assert len(entry) == 1, "calibrate_wl must be listed exactly once"
+    assert entry[0]["module"] == "andor_server.py"
+    assert entry[0]["method"] == "post"

@@ -79,3 +79,42 @@ def test_a_one_dimensional_acquisition_is_refused(tmp_path, monkeypatch):
     # surfaced as a failed DriverResponse, never as an exception at the handler
     resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=1)
     assert resp.response == "failed"
+
+
+def test_a_spectrograph_station_keeps_its_live_axis_after_calibrating(
+    tmp_path, monkeypatch
+):
+    """The refresh is gated on `uses_lamp_calibration`, and must stay gated.
+
+    Ungated it would be worse than a no-op here: this variant's
+    `_wavelengths()` re-drives the ATSpectrograph, so refreshing would open a
+    vendor handle and reset the grating/slit/ND mid-run to compute an axis
+    the station does not use.
+    """
+    d = AndorSpectrographDriver(
+        config={"states_root": str(tmp_path), "host": "teststation"},
+        server_key="ANDOR",
+    )
+    sentinel = np.linspace(300.0, 800.0, 2560)
+    d.wl_arr = sentinel
+    line_pixels = [200, 700, 1300, 1900, 2400]
+    true_nm = [400.0 + 0.2 * p for p in line_pixels]
+    monkeypatch.setattr(
+        d,
+        "_capture_lamp_frame",
+        lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
+    )
+
+    def _must_not_be_called():
+        raise AssertionError("_wavelengths() re-drives the spectrograph hardware")
+
+    monkeypatch.setattr(d, "_wavelengths", _must_not_be_called)
+
+    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+
+    # An ungated refresh trips `_must_not_be_called`, which run_wl_calibration
+    # swallows into a `failed` response -- so this line, not the wl_arr one, is
+    # what catches the regression.
+    assert resp.response == "success"
+    assert resp.data["applied"] is False
+    assert d.wl_arr is sentinel, "the spectrograph's live axis was replaced"

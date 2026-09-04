@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "module": "andor_server.py",
+    "path": "/ANDOR/calibrate_wl",
+    "method": "post",
+    "date": "2026-09-04",
+    "why": "lamp wavelength calibration for stations without a software-controlled spectrograph; see docs/superpowers/specs/2026-09-04-andor-driver-split-design.md"
+  }
+]

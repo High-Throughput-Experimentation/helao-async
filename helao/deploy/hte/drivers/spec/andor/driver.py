@@ -242,6 +242,14 @@ class AndorDriver(HelaoDriver):
                 calib.fit_rms_nm,
                 calib.n_lines,
             )
+            # Take effect now, not at the next connect(): the variant that
+            # uses the lamp fit reports `applied: True` here, and an operator
+            # who then finds `acquire` still refusing reads that as a broken
+            # station. Guarded because the spectrograph variant's
+            # _wavelengths() re-drives the ATSpectrograph -- calling it here
+            # would touch hardware to compute an axis it does not use.
+            if self.uses_lamp_calibration:
+                self.wl_arr = self._wavelengths()
             return DriverResponse(
                 response=DriverResponseType.success,
                 status=DriverStatus.ok,
