@@ -37,8 +37,26 @@ from typing import Optional
 
 import pytest
 
-from harness.endpoints import diff_route_sets, extract_routes
+from harness.endpoints import diff_route_sets, extract_routes, filter_allowed_additions
 from harness.hte_freeze import HTE_ACTION, OUT, SERVERS
+
+ADDITIONS_PATH = OUT / "_additions.json"
+
+#: Action/private route totals measured from the frozen JSONs at B5. The
+#: spec first quoted 175/81 from a grep over source, which counted seven
+#: commented-out decorators and two docstring mentions; the AST extractor
+#: ignores both. These are the measured numbers, and deliberate additions
+#: are added to them rather than folded into them.
+FROZEN_ACTION_TOTAL = 168
+FROZEN_PRIVATE_TOTAL = 79
+
+
+def _load_additions() -> list[dict]:
+    return json.loads(ADDITIONS_PATH.read_text())
+
+
+def _additions_for(module: str) -> list[dict]:
+    return [a for a in _load_additions() if a["module"] == module]
 
 
 def test_the_checklist_directory_is_actually_populated() -> None:
@@ -54,12 +72,25 @@ def test_module_matches_its_frozen_checklist(
     checklist = OUT / (Path(module).stem + ".json")
     frozen = json.loads(checklist.read_text())
     current = extract_routes(HTE_ACTION / module, server_key=server_key)
-    diffs = diff_route_sets(frozen, current)
+    diffs, _allowed = filter_allowed_additions(
+        diff_route_sets(frozen, current), _additions_for(module)
+    )
     assert (
         diffs == []
     ), f"{module}: {len(diffs)} route diff(s) against {checklist.name}\n" + json.dumps(
         diffs, indent=2
     )
+
+
+def test_every_addition_entry_is_well_formed() -> None:
+    """An entry without `why` is a bypass nobody can review in a diff."""
+    for entry in _load_additions():
+        missing = {"module", "path", "method", "date", "why"} - set(entry)
+        assert not missing, f"{entry} is missing {sorted(missing)}"
+        assert entry["why"].strip(), f"{entry['path']} has an empty `why`"
+        assert entry["module"] in {
+            m for m, _ in SERVERS
+        }, f"{entry['module']} is not an hte action module"
 
 
 def test_the_gate_covers_the_whole_measured_surface() -> None:
@@ -72,6 +103,11 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
     AST extractor ignores both, correctly. The grep number was wrong and this
     test failed on its first run against the untouched tree, which is what a
     gate seeded before the work is for.
+
+    The frozen counts are asserted separately from the deliberate additions.
+    Editing a combined literal to make a diff pass is a re-freeze with extra
+    steps: it leaves no record of what moved, and it cannot distinguish an
+    intended addition from an accidental deletion that happens to net out.
     """
     action = private = 0
     for module, _ in SERVERS:
@@ -81,6 +117,19 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
             elif "private" in route["tags"]:
                 private += 1
     assert (action, private) == (
-        168,
-        79,
-    ), f"measured {action} action / {private} private"
+        FROZEN_ACTION_TOTAL,
+        FROZEN_PRIVATE_TOTAL,
+    ), f"frozen record measures {action} action / {private} private"
+
+    by_module = dict(SERVERS)
+    resolved = 0
+    for entry in _load_additions():
+        current = extract_routes(
+            HTE_ACTION / entry["module"], server_key=by_module[entry["module"]]
+        )
+        for route in current:
+            if (route["path"], route["method"]) == (entry["path"], entry["method"]):
+                resolved += 1
+    assert resolved == len(
+        _load_additions()
+    ), f"{len(_load_additions()) - resolved} listed addition(s) resolve to no route"
