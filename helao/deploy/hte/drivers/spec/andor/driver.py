@@ -49,7 +49,8 @@ class AndorDriver(HelaoDriver):
     Attributes:
         cam: The underlying ``AndorSDK3`` camera handle.
         pixel_width: Detector pixel width in micrometres.
-        wl_arr: Calibrated wavelength array for the configured AOI.
+        wl_arr: Calibrated wavelength array for the configured AOI, or
+            ``None`` before one exists (see the annotation below).
         horiz_pixels: AOI width in pixels.
         vert_pixels: AOI height in pixels.
         stride: Buffer row stride in bytes.
@@ -59,7 +60,11 @@ class AndorDriver(HelaoDriver):
 
     cam: AndorSDK3
     pixel_width: float
-    wl_arr: np.ndarray
+    # Optional, and not an oversight to "fix" back: __init__ sets this to None
+    # and the lamp-calibrated variant has no axis at all until its first
+    # calibration, so _wavelengths() legitimately returns None there. acquire
+    # refuses on None rather than measuring against a fabricated axis.
+    wl_arr: Optional[np.ndarray]
     horiz_pixels: float
     vert_pixels: float
     stride: float
