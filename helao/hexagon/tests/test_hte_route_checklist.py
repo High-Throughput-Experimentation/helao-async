@@ -32,6 +32,7 @@ name, so the same rename is caught -- which is the direction B5 moves in.
 """
 
 import json
+import shutil
 from pathlib import Path
 from typing import Optional
 
@@ -59,10 +60,47 @@ def _additions_for(module: str) -> list[dict]:
     return [a for a in _load_additions() if a["module"] == module]
 
 
+def _missing_module_checklists(directory: Path) -> list[str]:
+    """Modules in ``SERVERS`` with no frozen checklist in ``directory``.
+
+    ``_*.json`` never counts: ``_additions.json`` and the other underscore
+    records are not module checklists. Neither is ``servers.json``, which is
+    the module-to-server_key manifest -- which is why this answers by NAME
+    rather than by count. Two non-checklists in the same directory is two
+    deletions a bare count would absorb.
+    """
+    present = {p.name for p in directory.glob("*.json") if not p.name.startswith("_")}
+    return [m for m, _ in SERVERS if (Path(m).stem + ".json") not in present]
+
+
 def test_the_checklist_directory_is_actually_populated() -> None:
     """A wrong OUT path would make every parametrised case pass over nothing."""
-    frozen = sorted(OUT.glob("*.json"))
+    frozen = sorted(p for p in OUT.glob("*.json") if not p.name.startswith("_"))
     assert len(frozen) >= len(SERVERS), f"only {len(frozen)} checklists in {OUT}"
+    assert not _missing_module_checklists(OUT), "a module checklist is missing"
+
+
+def test_the_population_guard_notices_one_deleted_module_checklist(
+    tmp_path: Path,
+) -> None:
+    """The count alone does not, and that is the whole reason for the by-name check.
+
+    ``servers.json`` sits beside the checklists without being one, so with a
+    count of 24 against 23 modules the directory can lose a real checklist
+    and still read as populated.
+    """
+    for src in OUT.glob("*.json"):
+        shutil.copy(src, tmp_path / src.name)
+    assert _missing_module_checklists(tmp_path) == []
+
+    (tmp_path / "andor_server.json").unlink()
+
+    assert _missing_module_checklists(tmp_path) == ["andor_server.py"]
+    survivors = [p for p in tmp_path.glob("*.json") if not p.name.startswith("_")]
+    assert len(survivors) >= len(SERVERS), (
+        "if this ever fails the count has become sufficient on its own and "
+        "this test is describing a directory that no longer exists"
+    )
 
 
 @pytest.mark.parametrize("module,server_key", SERVERS, ids=[m for m, _ in SERVERS])
