@@ -265,7 +265,24 @@ async def andor_dyn_endpoints(app: ActionHost):
 
         Channel columns ``ch_0000..ch_NNNN`` carry per-pixel intensities and the
         ``wl`` array from the driver is embedded in the file header.
+
+        Refuses outright when the driver has no wavelength axis. It cannot
+        fall back to a bare pixel index: the channel names come from
+        ``wl_arr.shape[0]`` and the header's ``optional.wl`` is the array
+        itself, so a fallback would record a run against a fabricated axis
+        that looks entirely healthy afterwards.
         """
+        if app.driver.wl_arr is None:
+            LOGGER.error(
+                "acquire refused: no wavelength calibration on this station. "
+                "Run POST /%s/calibrate_wl, then restart this server.",
+                server_key,
+            )
+            active = await ctx.begin()
+            active.action.error_code = ErrorCodes.critical_error
+            finished_action = await active.finish()
+            return finished_action.as_dict()
+
         data_keys = ["elapsed_time_s"] + [
             f"ch_{i:04}" for i in range(app.driver.wl_arr.shape[0])
         ]
