@@ -218,24 +218,25 @@ methods, touches the vendor package.
 The net effect on the frozen record is **one added route**. `adjust_nd` survives
 the change, so `andor_server.json` continues to match verbatim.
 
-The mechanism is an additions allowlist, not a re-freeze. The risk is asymmetric,
-and `diff_route_sets` (`harness/endpoints.py:206-209`) already reports it that way,
-emitting typed `missing`, `extra`, and `changed` kinds. A `missing` or `changed`
-route breaks a client that relied on it. An `extra` route cannot.
+The mechanism is **not** specified here. It is a change to a shared gate that
+every future hte route change inherits, so it is split into its own design and
+lands first: `2026-09-04-frozen-checklist-additions-allowlist-design.md`. In short,
+an `_additions.json` allowlist absorbs `extra` diffs while `missing` and `changed`
+keep failing unconditionally.
 
-- Add `helao/hexagon/tests/checklists/hte/_additions.json`: one
-  `{module, path, method, date, why}` entry per deliberately added route.
-- `test_module_matches_its_frozen_checklist` drops `extra` diffs named in that
-  file. Every `missing` and `changed` diff still fails unconditionally, and any
-  **unlisted** `extra` still fails.
-- Staleness guard: an entry naming a route that is not currently present fails, so
-  the file cannot accumulate dead records.
-- `test_the_gate_covers_the_whole_measured_surface` computes
-  `168 + len(additions)` rather than carrying the literal.
+What this work owes that mechanism is one entry:
 
-The pre-port record stays byte-identical, removing a route remains impossible
-without an explicit argument, and every addition is a named, dated line in the
-diff.
+```json
+{
+  "module": "andor_server.py",
+  "path": "/ANDOR/calibrate_wl",
+  "method": "post",
+  "date": "2026-09-04",
+  "why": "lamp wavelength calibration; see 2026-09-04-andor-driver-split-design.md"
+}
+```
+
+No frozen record is edited, and `andor_server.json` stays byte-identical.
 
 The B5 station-gate runbook's `unstable`-versus-branch run-tree diff will show
 `calibrate_wl` as a delta. That expected difference is recorded in the runbook
