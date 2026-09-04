@@ -150,6 +150,7 @@ class AndorCalibrateWavelength(Executor):
             self.n_frames = self.action_params.get("n_frames", 1)
             self.exp_time = self.action_params.get("exp_time", 0.0098)
             self.degree = self.action_params.get("degree", 3)
+            self.max_fit_rms_nm = self.action_params.get("max_fit_rms_nm", 0.5)
         except Exception:
             LOGGER.error("AndorCalibrateWavelength init failed", exc_info=True)
 
@@ -162,6 +163,7 @@ class AndorCalibrateWavelength(Executor):
             n_frames=self.n_frames,
             exp_time=self.exp_time,
             degree=self.degree,
+            max_fit_rms_nm=self.max_fit_rms_nm,
             source_action_uuid=str(self.active.action.action_uuid),
         )
         error = (
@@ -420,12 +422,27 @@ async def andor_dyn_endpoints(app: ActionHost):
         n_frames: int = 1,
         exp_time: float = 0.0098,
         degree: int = 3,
+        max_fit_rms_nm: float = 0.5,
     ):
         """Measure a calibration lamp and fit this detector's wavelength axis.
 
         Works on both driver variants. On a spectrograph station the fit is
         recorded for comparison against ``GetCalibration`` and the live axis is
         unchanged; the response's ``applied`` field says which happened.
+
+        ``lamp_lines_nm`` is REQUIRED -- the action refuses when it is empty
+        rather than falling back to a reference table. Pass the wavelengths of
+        the lines actually visible on this detector at its current grating and
+        central wavelength; ``HG_AR_REFERENCE_LINES_NM`` in the driver module
+        is an Hg-Ar list to choose from. A line that is off the detector still
+        gets a noise maximum fitted to it, and the resulting axis is wrong in
+        a way no recorded spectrum will ever reveal.
+
+        Nothing is written unless the fit clears both quality gates: a
+        residual no worse than ``max_fit_rms_nm``, and a strictly monotonic
+        axis. A refused calibration leaves the previous one in place, and any
+        calibration that IS written moves the outgoing one to a ``.prev``
+        sibling first.
         """
         active = await ctx.begin()
         executor = AndorCalibrateWavelength(active=active, oneoff=True)

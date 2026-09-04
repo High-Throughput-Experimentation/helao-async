@@ -118,3 +118,31 @@ def test_a_spectrograph_station_keeps_its_live_axis_after_calibrating(
     assert resp.response == "success"
     assert resp.data["applied"] is False
     assert d.wl_arr is sentinel, "the spectrograph's live axis was replaced"
+
+
+def test_a_comparison_fit_records_that_it_is_one(tmp_path, monkeypatch):
+    """The two variants write one filename, so the record has to say which.
+
+    Without it, a station that measured a lamp here for comparison, changed
+    gratings, then flipped to ``wl_source: calibration`` adopts this fit as
+    its live axis with nothing anywhere saying it was never meant to be one.
+    """
+    from helao.deploy.hte.drivers.spec.andor import wl_calibration as wlc
+
+    d = AndorSpectrographDriver(
+        config={"states_root": str(tmp_path), "host": "teststation"},
+        server_key="ANDOR",
+    )
+    line_pixels = [200, 700, 1300, 1900, 2400]
+    monkeypatch.setattr(
+        d,
+        "_capture_lamp_frame",
+        lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
+    )
+
+    resp = d.run_wl_calibration(
+        [400.0 + 0.2 * p for p in line_pixels], lamp="Hg-Ar", degree=1
+    )
+
+    assert resp.response == "success"
+    assert wlc.load(d.calibration_file()).wl_source == "spectrograph"

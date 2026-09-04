@@ -211,3 +211,158 @@ def test_a_brighter_non_reference_feature_shows_up_as_a_bad_residual():
         f"a mis-assigned peak produced rms {calib.fit_rms_nm}, which an "
         "operator would read as a good calibration"
     )
+
+
+def test_is_monotonic_accepts_an_axis_that_only_increases():
+    assert wlc.is_monotonic(np.linspace(300.0, 800.0, 2560))
+
+
+def test_is_monotonic_accepts_an_axis_that_only_decreases():
+    """A reversed detector read-out is a legitimate axis, just descending."""
+    assert wlc.is_monotonic(np.linspace(800.0, 300.0, 2560))
+
+
+def test_is_monotonic_refuses_an_axis_that_turns_back_on_itself():
+    """Two pixels claiming the same wavelength is not a calibration."""
+    axis = np.concatenate(
+        [np.linspace(400.0, 500.0, 100), np.linspace(499.0, 600.0, 100)]
+    )
+    assert not wlc.is_monotonic(axis)
+
+
+def test_is_monotonic_refuses_a_repeated_value():
+    """Strict, not merely non-decreasing: a flat run is a degenerate axis."""
+    assert not wlc.is_monotonic([400.0, 401.0, 401.0, 402.0])
+
+
+def test_is_monotonic_refuses_a_nan():
+    """A NaN makes both comparisons False, and that is the safe direction."""
+    assert not wlc.is_monotonic([400.0, np.nan, 402.0])
+
+
+def test_is_monotonic_tolerates_an_axis_too_short_to_violate_it():
+    assert wlc.is_monotonic([])
+    assert wlc.is_monotonic([400.0])
+
+
+NON_MONOTONIC_LINE_PIXELS = [700, 1200, 1700, 2100, 2500]
+
+
+def _turning_poly(pixel):
+    """A cubic that dips before pixel 300 and rises monotonically after.
+
+    Sampled at :data:`NON_MONOTONIC_LINE_PIXELS` it is strictly ascending, so
+    the fit is exact and its residual is ~1e-13 -- it sails through the rms
+    gate. Evaluated across the whole detector it turns over, which is the
+    case ``is_monotonic`` exists to catch and rms cannot.
+    """
+    return 1e-9 * pixel**3 + 1.05e-6 * pixel**2 - 9e-4 * pixel + 400.0
+
+
+def test_a_tight_fit_can_still_describe_a_non_monotonic_axis():
+    """Why rms alone is not enough of a gate."""
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, NON_MONOTONIC_LINE_PIXELS)
+    lines = [_turning_poly(p) for p in NON_MONOTONIC_LINE_PIXELS]
+    calib = wlc.fit_wavelength(counts, lines, degree=3)
+    assert calib.fit_rms_nm < 0.5, "this fixture must clear the rms gate"
+    assert not wlc.is_monotonic(wlc.evaluate(calib))
+
+
+def test_save_moves_the_outgoing_calibration_to_a_prev_sibling(tmp_path):
+    """An overwrite must be recoverable: it destroys a known-good record."""
+    path = tmp_path / "calib.json"
+    first = wlc.WavelengthCalibration(
+        model=wlc.MODEL_POLY,
+        coeffs=[400.0, 0.2],
+        n_pixels=16,
+        fit_rms_nm=0.01,
+        n_lines=5,
+        lamp="first",
+        created="2026-09-04T00:00:00Z",
+        source_action_uuid=None,
+    )
+    wlc.save(first, path)
+    assert not path.with_name("calib.json.prev").exists(), "nothing to back up yet"
+
+    second = wlc.WavelengthCalibration(
+        model=wlc.MODEL_POLY,
+        coeffs=[500.0, 0.3],
+        n_pixels=16,
+        fit_rms_nm=0.02,
+        n_lines=5,
+        lamp="second",
+        created="2026-09-05T00:00:00Z",
+        source_action_uuid=None,
+    )
+    wlc.save(second, path)
+
+    assert wlc.load(path) == second
+    assert wlc.load(path.with_name("calib.json.prev")) == first
+
+
+def test_the_prev_backup_leaves_no_staging_file_behind(tmp_path):
+    """The staging name follows the repo's `.<name>.tmp` convention.
+
+    The syncer ships anything it finds in a record directory that is not a
+    dotfile or a `.tmp`; a backup left half-written under any other name
+    would be uploaded.
+    """
+    path = tmp_path / "calib.json"
+    calib = wlc.WavelengthCalibration(
+        model=wlc.MODEL_POLY,
+        coeffs=[400.0, 0.2],
+        n_pixels=16,
+        fit_rms_nm=0.01,
+        n_lines=5,
+        lamp="x",
+        created="2026-09-04T00:00:00Z",
+        source_action_uuid=None,
+    )
+    wlc.save(calib, path)
+    wlc.save(calib, path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "calib.json",
+        "calib.json.prev",
+    ]
+
+
+def test_fit_records_the_variant_that_asked_for_it():
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, LINE_PIXELS)
+    lines = [_true_nm(p) for p in LINE_PIXELS]
+    calib = wlc.fit_wavelength(counts, lines, degree=3, wl_source="calibration")
+    assert calib.wl_source == "calibration"
+
+
+def test_load_defaults_an_absent_wl_source_to_unknown(tmp_path):
+    """Records written before the field existed must keep loading.
+
+    Refusing them would strand a station that calibrated legitimately last
+    month; "unknown" is both true and exactly what a reader needs told.
+    """
+    path = tmp_path / "calib.json"
+    path.write_text(
+        json.dumps(
+            {
+                "model": wlc.MODEL_POLY,
+                "coeffs": [400.0, 0.2],
+                "n_pixels": 16,
+                "fit_rms_nm": 0.01,
+                "n_lines": 5,
+                "lamp": "Hg-Ar",
+                "created": "2026-09-04T00:00:00Z",
+                "source_action_uuid": None,
+            }
+        )
+    )
+    calib = wlc.load(path)
+    assert calib.wl_source == "unknown"
+    assert wlc.evaluate(calib).shape == (16,)
+
+
+def test_wl_source_round_trips_through_disk(tmp_path):
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, LINE_PIXELS)
+    lines = [_true_nm(p) for p in LINE_PIXELS]
+    calib = wlc.fit_wavelength(counts, lines, degree=3, wl_source="spectrograph")
+    path = tmp_path / "calib.json"
+    wlc.save(calib, path)
+    assert wlc.load(path).wl_source == "spectrograph"
