@@ -34,6 +34,7 @@ from helao.deploy.hte.drivers.spec.oceandirect_driver import OceanDirectSpec
 from helao.deploy.hte.drivers.spec.oceandirect_enum import (
     LONG_FORMAT_KEYS,
     SINGLE_SHOT_KEYS,
+    SRTrigMode,
 )
 from helao.deploy.hte.servers.action import oceandirect_server as srv
 from helao.hexagon.app.action_context import collect_default_params
@@ -237,6 +238,7 @@ def test_private_endpoints_are_bare_paths_tagged_private(built):
         "get_wl",
         "get_tec_status",
         "get_buffered_count",
+        "get_acquisition_delay",
     ):
         route = built.routes[f"/{name}"]
         assert route.tags == ["private"]
@@ -257,6 +259,7 @@ def test_action_endpoints_are_prefixed_and_tagged_action(built):
         "stop_buffered_after",
         "stop_extrig_after",
         "set_trigger_mode",
+        "set_acquisition_delay",
         "set_tec",
         "set_shutter",
         "set_lamp",
@@ -531,10 +534,30 @@ def test_unsupported_shutter_finishes_with_an_error_and_does_not_raise(built):
 
 
 def test_trigger_mode_is_read_back(built):
-    ctx, result = _call(built, "set_trigger_mode", mode=3)
+    ctx, result = _call(built, "set_trigger_mode", mode=int(SRTrigMode.ext_edge))
     assert result["error_code"] == ErrorCodes.none
     applied = ctx.session.action.action_params["applied_trigger_mode"]
-    assert applied == {"requested": 3, "trigger_mode": 3}
+    assert applied["requested"] == 1
+    assert applied["mode_name"] == "ext_edge"
+    assert applied["trigger_mode"] == 1
+    assert applied["int_time_from_pulse_width"] is False
+
+
+def test_a_non_sr_trigger_mode_is_refused_with_the_real_options(built):
+    """Mode 3 is the FX/HDX convention this enum used to carry; an SR device
+    rejects it, and the refusal should say what the options are."""
+    ctx, result = _call(built, "set_trigger_mode", mode=3)
+
+    assert result["error_code"] == ErrorCodes.critical_error
+    message = ctx.session.enqueued[0]["message"]
+    assert "not an SR-series trigger mode" in message
+    assert "0=software" in message and "2=ext_level" in message
+
+
+def test_level_mode_reports_that_the_pulse_owns_the_integration_time(built):
+    ctx, _result = _call(built, "set_trigger_mode", mode=int(SRTrigMode.ext_level))
+    applied = ctx.session.action.action_params["applied_trigger_mode"]
+    assert applied["int_time_from_pulse_width"] is True
 
 
 def test_lamp_and_light_source_and_strobes(built):
@@ -798,7 +821,10 @@ def test_a_bufferless_device_is_told_where_to_go_instead():
 def _extrig_exec(driver, **params):
     """Build the triggered executor over a fake session."""
     defaults = {
-        "trigger_mode": 3,
+        # 1 = external edge. Mode 3 was used here before and is not an
+        # SR-series mode at all.
+        "trigger_mode": 1,
+        "acquisition_delay_us": None,
         "n_spectra": None,
         "duration": -1,
         "read_timeout_s": 0.2,
@@ -816,7 +842,7 @@ def test_the_triggered_path_works_without_a_buffer():
     ex = _extrig_exec(driver, n_spectra=3)
 
     assert asyncio.run(ex._pre_exec())["error"] == ErrorCodes.none
-    assert driver.armed_trigger_mode == 3
+    assert driver.armed_trigger_mode == int(SRTrigMode.ext_edge)
 
     payloads = []
     for _ in range(10):
@@ -954,7 +980,7 @@ def test_stop_extrig_after_disarms_and_signals_only_its_own_executors(built):
         f"acquire_spec_extrig {uuid4()}": matching,
         f"acquire_spec_buffered {uuid4()}": other,
     }
-    built.driver.arm_trigger(3)
+    built.driver.arm_trigger(int(SRTrigMode.ext_edge))
 
     ctx, result = _call(built, "stop_extrig_after", delay=0)
 
@@ -990,6 +1016,125 @@ def test_the_extrig_endpoint_declares_the_timestamp_free_column_set(built):
     assert ctx.session.begin_kwargs["json_data_keys"] == SINGLE_SHOT_KEYS
     assert isinstance(ctx.session.started_executor, srv.OceanDirectExtrigExec)
     assert ctx.session.started_executor.oneoff is False
+
+
+# ----------------------------------------------------------------------
+# The extrig endpoint against the manual's trigger semantics
+# ----------------------------------------------------------------------
+def _extrig_call_with(app, **overrides):
+    route = app.routes[f"/{app.server.server_name}/acquire_spec_extrig"]
+    params = collect_default_params(inspect.signature(route.fn))
+    params.pop("fast_samples_in", None)
+    params.update(overrides)
+    action = _FakeAction(action_name="acquire_spec_extrig", action_params=dict(params))
+    ctx = _FakeContext(action, app.driver)
+    return ctx, asyncio.run(route.fn(ctx))
+
+
+def test_the_extrig_default_is_the_external_edge_mode(built):
+    """It defaulted to 3 -- the FX/HDX edge value -- which no SR device
+    accepts, so the endpoint's own default could never have worked."""
+    route = built.routes[f"/{built.server.server_name}/acquire_spec_extrig"]
+    defaults = collect_default_params(inspect.signature(route.fn))
+    assert defaults["trigger_mode"] == int(SRTrigMode.ext_edge) == 1
+
+
+def test_a_non_sr_mode_is_refused_without_opening_a_session(built):
+    built.driver.allow_no_sample = True
+    ctx, result = _extrig_call_with(built, trigger_mode=3)
+
+    assert result["error_code"] == ErrorCodes.not_available
+    assert ctx.session is None  # nothing armed, no artifacts
+
+
+def test_level_mode_skips_the_integration_time_and_records_that(built):
+    """The pulse width owns integration in mode 2, so writing int_time_us
+    would imply control the caller does not have."""
+    built.driver.allow_no_sample = True
+    before = built.driver.dev.get_integration_time()
+
+    ctx, _result = _extrig_call_with(
+        built, trigger_mode=int(SRTrigMode.ext_level), int_time_us=987_000
+    )
+
+    p = ctx.session.action.action_params
+    assert p["int_time_ignored"] is True
+    assert "applied_int_time_us" not in p
+    assert built.driver.dev.get_integration_time() == before
+
+
+def test_edge_mode_does_apply_the_integration_time(built):
+    built.driver.allow_no_sample = True
+    ctx, _result = _extrig_call_with(
+        built, trigger_mode=int(SRTrigMode.ext_edge), int_time_us=50_000
+    )
+
+    p = ctx.session.action.action_params
+    assert p["int_time_ignored"] is False
+    assert p["applied_int_time_us"] == 50_000
+
+
+def test_the_acquisition_delay_is_applied_before_arming(built):
+    ex = _extrig_exec(built.driver, acquisition_delay_us=2500)
+
+    assert asyncio.run(ex._pre_exec())["error"] == ErrorCodes.none
+
+    p = ex.active.action.action_params
+    assert p["applied_acquisition_delay"]["acquisition_delay_us"] == 2500
+    assert built.driver.dev.get_acquisition_delay() == 2500
+    assert built.driver.armed_trigger_mode == int(SRTrigMode.ext_edge)
+
+
+def test_an_unavailable_acquisition_delay_does_not_abort_the_run(built):
+    """The delay is a refinement; a device that cannot offer it can still be
+    triggered, so this warns and continues."""
+
+    def _boom(*args, **kwargs):
+        raise sim.OceanDirectError(-13, "acquisition delay unsupported")
+
+    built.driver.dev.set_acquisition_delay = _boom  # type: ignore[method-assign]
+    ex = _extrig_exec(built.driver, acquisition_delay_us=1000)
+
+    assert asyncio.run(ex._pre_exec())["error"] == ErrorCodes.none
+    assert ex.armed is True
+
+
+def test_an_all_zero_frame_is_counted_and_still_recorded(built):
+    """An under-width level pulse yields all zeros with no error. The frame is
+    real data as far as the device is concerned, so it is recorded -- but
+    counted, because a run of them means the pulse is too short."""
+    driver = built.driver
+    driver.dev.get_spectrum = lambda: [0.0] * driver.n_pixels  # type: ignore[method-assign]
+    ex = _extrig_exec(driver, trigger_mode=int(SRTrigMode.ext_level), n_spectra=2)
+    asyncio.run(ex._pre_exec())
+
+    for _ in range(6):
+        if asyncio.run(ex._poll())["status"] == HloStatus.finished:
+            break
+
+    assert ex.emitted == 2
+    assert ex.zero_frames == 2
+    asyncio.run(ex._post_exec())
+    assert ex.active.action.action_params["zero_frames"] == 2
+
+
+def test_a_normal_frame_is_not_counted_as_zero(built):
+    ex = _extrig_exec(built.driver, n_spectra=1)
+    asyncio.run(ex._pre_exec())
+    for _ in range(4):
+        if asyncio.run(ex._poll())["status"] == HloStatus.finished:
+            break
+    assert ex.emitted == 1
+    assert ex.zero_frames == 0
+
+
+def test_the_delay_action_and_getter_agree(built):
+    ctx, result = _call(built, "set_acquisition_delay", delay_us=4321)
+
+    assert result["error_code"] == ErrorCodes.none
+    applied = ctx.session.action.action_params["applied_acquisition_delay"]
+    assert applied["acquisition_delay_us"] == 4321
+    assert built.routes["/get_acquisition_delay"].fn()["acquisition_delay_us"] == 4321
 
 
 # ----------------------------------------------------------------------

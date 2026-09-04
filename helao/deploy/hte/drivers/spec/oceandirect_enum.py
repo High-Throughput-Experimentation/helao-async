@@ -2,37 +2,64 @@
 
 Trigger-mode values are **defined by each device's manual, not by the
 OceanDirect SDK** -- ``Spectrometer.set_trigger_mode()`` takes a bare ``int``
-and there is no vendor enum to import. The values below are the Ocean Insight
-convention shared by the SR/FX/HDX families; a device whose manual disagrees
-needs its own mapping, which is why the driver logs the requested mode and the
-value read back rather than assuming the write took.
+and there is no vendor enum to import. :class:`SRTrigMode` therefore holds the
+**Ocean SR series** values, taken from *Ocean SR Series* UM-SR-Series_1025
+p.19, and is named for that family rather than for OceanDirect as a whole: an
+FX or HDX on this driver would need its own mapping. The driver validates a
+requested mode against this enum and reads the applied value back, so a device
+that disagrees says so instead of silently acquiring in the wrong mode.
 """
 
 __all__ = [
-    "ODTrigMode",
+    "SRTrigMode",
+    "HSAM_UNSUPPORTED_TRIGGER_MODES",
     "LONG_FORMAT_KEYS",
+    "SINGLE_SHOT_KEYS",
     "MAX_METADATA_BUFFER_SIZE",
 ]
 
 from enum import IntEnum
 
 
-class ODTrigMode(IntEnum):
-    """Spectrometer trigger source.
+class SRTrigMode(IntEnum):
+    """Ocean SR-series trigger source (manual p.19).
+
+    These are the only three modes the SR series has. An earlier version of
+    this enum carried the five-value FX/HDX convention
+    (``normal``/``software``/``ext_synchronization``/``ext_hardware_edge``/
+    ``ext_hardware_level``), under which the natural default for a triggered
+    acquisition was ``3`` -- a value an SR device rejects outright.
 
     Attributes:
-        normal: Free-running; the device acquires continuously.
-        software: Acquire on a software request.
-        ext_synchronization: External synchronization (level) trigger.
-        ext_hardware_edge: External hardware edge trigger.
-        ext_hardware_level: External hardware level trigger.
+        software: The Trigger Event comes from a host software command, and
+            integration time is whatever software configured. This is the
+            device's power-on mode, and the mode a plain ``get_spectrum()``
+            uses. It is **not** a free-running mode: each acquisition is
+            triggered by the request.
+        ext_edge: The Trigger Event is the rising edge of the External Trigger
+            input on the 16-pin IO connector; integration time is still set by
+            software. Minimum trigger pulse width is 10 ns.
+        ext_level: The Trigger Event is the rising edge of the External Trigger
+            input, and **the integration time is the pulse width** -- whatever
+            software configured is ignored. The pulse must be at least the
+            device's minimum integration time (3800 us on an SR4); a shorter
+            pulse returns a spectrum of **all zeros** rather than raising.
     """
 
-    normal = 0
-    software = 1
-    ext_synchronization = 2
-    ext_hardware_edge = 3
-    ext_hardware_level = 4
+    software = 0
+    ext_edge = 1
+    ext_level = 2
+
+
+#: Trigger modes that High Speed Averaging Mode cannot be combined with.
+#:
+#: HSAM is what ``set_scans_to_average(n > 1)`` selects: the device performs n
+#: integrations back-to-back and returns one hardware-averaged spectrum. The
+#: manual's Acquisition Mode Summary Table (p.20) lists HSAM as supporting only
+#: Software and External Edge triggers -- with External Level the two features
+#: are mutually exclusive, because the level trigger owns the integration time
+#: that HSAM needs to repeat.
+HSAM_UNSUPPORTED_TRIGGER_MODES = (SRTrigMode.ext_level,)
 
 
 #: Column order of the long-format ``.hlo`` body, pinned via ``json_data_keys``

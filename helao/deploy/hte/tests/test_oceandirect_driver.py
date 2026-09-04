@@ -25,9 +25,11 @@ from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
 from helao.deploy.hte.drivers.spec import oceandirect_sim as sim
 from helao.deploy.hte.drivers.spec.oceandirect_driver import OceanDirectSpec
 from helao.deploy.hte.drivers.spec.oceandirect_enum import (
+    HSAM_UNSUPPORTED_TRIGGER_MODES,
     LONG_FORMAT_KEYS,
     MAX_METADATA_BUFFER_SIZE,
     SINGLE_SHOT_KEYS,
+    SRTrigMode,
 )
 from helao.helpers.hlo_data import read_hlo, read_hlo_data_chunks, read_hlo_header
 from helao.helpers.to_json import hlo_json_dumps
@@ -272,6 +274,212 @@ def test_light_source_index_is_bounds_checked():
     bad = drv.set_light_source_enable(5, True)
     assert bad.response == DriverResponseType.failed
     assert "out of range" in bad.message
+
+
+# ----------------------------------------------------------------------
+# SR-series trigger modes (manual UM-SR-Series_1025 p.19-20)
+# ----------------------------------------------------------------------
+def test_the_sr_series_has_exactly_three_trigger_modes():
+    """0/1/2 per the manual. The enum previously carried the five-value
+    FX/HDX convention, under which the natural triggered default was 3 -- a
+    value an SR device rejects."""
+    assert [(m.name, int(m)) for m in SRTrigMode] == [
+        ("software", 0),
+        ("ext_edge", 1),
+        ("ext_level", 2),
+    ]
+
+
+@pytest.mark.parametrize("mode", [0, 1, 2])
+def test_every_sr_mode_is_accepted(mode):
+    drv = _connected()
+    resp = drv.set_trigger_mode(mode)
+    assert resp.response == DriverResponseType.success
+    assert resp.data["trigger_mode"] == mode
+    assert resp.data["mode_name"] == SRTrigMode(mode).name
+
+
+@pytest.mark.parametrize("mode", [3, 4, -1, 99])
+def test_a_non_sr_mode_is_refused_before_touching_the_device(mode):
+    drv = _connected()
+    resp = drv.set_trigger_mode(mode)
+
+    assert resp.response == DriverResponseType.failed
+    assert "not an SR-series trigger mode" in resp.message
+    # The refusal enumerates the real options rather than a bare code.
+    assert "0=software" in resp.message
+    assert "1=ext_edge" in resp.message
+    assert "2=ext_level" in resp.message
+    # And nothing was armed.
+    assert drv.armed_trigger_mode is None
+
+
+def test_level_mode_declares_that_the_pulse_owns_the_integration_time():
+    """In mode 2 the trigger pulse width *is* the integration time, so a
+    caller's int_time_us is inert. Saying so is the difference between a
+    surprising measurement and an expected one."""
+    drv = _connected()
+
+    assert (
+        drv.set_trigger_mode(SRTrigMode.ext_level).data["int_time_from_pulse_width"]
+        is True
+    )
+    assert (
+        drv.set_trigger_mode(SRTrigMode.ext_edge).data["int_time_from_pulse_width"]
+        is False
+    )
+    assert (
+        drv.set_trigger_mode(SRTrigMode.software).data["int_time_from_pulse_width"]
+        is False
+    )
+
+
+def test_an_option_1_sr4_accepts_only_the_software_mode():
+    """The default SR4 firmware: "External triggering is not supported. Only
+    mode supported: Software Trigger Mode (0)" (manual p.20). The refusal must
+    come from the device, and must not be mistaken for a bad request."""
+    sim.set_sim_config(sim.SimConfig(model="OCEANSR4", trigger_modes=(0,)))
+    drv = _connected()
+
+    assert drv.set_trigger_mode(SRTrigMode.software).response == (
+        DriverResponseType.success
+    )
+    for mode in (SRTrigMode.ext_edge, SRTrigMode.ext_level):
+        resp = drv.set_trigger_mode(mode)
+        assert resp.response == DriverResponseType.failed
+        assert "not supported by this device" in resp.message
+
+
+def test_disarming_returns_to_the_software_mode():
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_edge)
+    assert drv.armed_trigger_mode == 1
+
+    assert drv.disarm_trigger().response == DriverResponseType.success
+
+    assert drv.armed_trigger_mode is None
+    assert drv.dev.get_trigger_mode() == int(SRTrigMode.software)
+
+
+# ----------------------------------------------------------------------
+# High Speed Averaging Mode vs the level trigger (manual p.20, p.35)
+# ----------------------------------------------------------------------
+def test_hsam_and_the_level_trigger_are_mutually_exclusive():
+    """scans_to_average > 1 selects HSAM, which the manual's acquisition-mode
+    table supports only for software and external-edge triggers. Both features
+    want to own the integration time; which wins is undocumented, so this
+    refuses rather than letting the device arbitrate."""
+    assert HSAM_UNSUPPORTED_TRIGGER_MODES == (SRTrigMode.ext_level,)
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_level)
+
+    resp = drv.set_processing(scans_to_average=8)
+
+    assert resp.response == DriverResponseType.failed
+    assert "High Speed Averaging Mode" in resp.message
+    assert "ext_level" in resp.message
+
+
+def test_single_scan_averaging_is_allowed_in_level_mode():
+    """scans_to_average == 1 is Single Spectrum mode, which supports all three
+    trigger modes -- so it must not be caught by the HSAM guard."""
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_level)
+
+    resp = drv.set_processing(scans_to_average=1)
+
+    assert resp.response == DriverResponseType.success
+    assert resp.data["scans_to_average"] == 1
+
+
+def test_hsam_is_allowed_with_the_edge_trigger():
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_edge)
+
+    resp = drv.set_processing(scans_to_average=8)
+
+    assert resp.response == DriverResponseType.success
+    assert resp.data["scans_to_average"] == 8
+
+
+def test_an_underwidth_level_pulse_returns_all_zeros_without_raising():
+    """Manual p.30: "If the External Level Trigger pulse does not meet the
+    minimum pulse width, an error will occur and the received spectral values
+    will be all 0's." It does not raise -- a flat line is the only symptom."""
+    sim.set_sim_config(
+        sim.SimConfig(model="OCEANSR4", int_time_min_us=3800, level_pulse_us=100)
+    )
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_level)
+
+    spectrum, _epoch = drv.acquire_spectrum()
+
+    assert len(spectrum) == drv.n_pixels
+    assert not any(spectrum)
+
+
+def test_a_valid_level_pulse_sets_the_integration_time():
+    """The pulse width is the integration time, so a longer pulse must yield
+    more signal even though int_time_us was never changed."""
+    sim.set_sim_config(
+        sim.SimConfig(model="OCEANSR4", int_time_min_us=3800, level_pulse_us=3800)
+    )
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_level)
+    short, _ = drv.acquire_spectrum()
+
+    sim.set_sim_config(
+        sim.SimConfig(model="OCEANSR4", int_time_min_us=3800, level_pulse_us=38_000)
+    )
+    drv2 = _connected()
+    drv2.arm_trigger(SRTrigMode.ext_level)
+    long, _ = drv2.acquire_spectrum()
+
+    assert max(long) > max(short)
+
+
+# ----------------------------------------------------------------------
+# Acquisition delay (t_ACQDLY)
+# ----------------------------------------------------------------------
+def test_acquisition_delay_is_clamped_to_the_device_range():
+    drv = _connected()
+
+    assert drv.set_acquisition_delay_us(0).data["acquisition_delay_us"] == 0
+    assert drv.set_acquisition_delay_us(1234).data["acquisition_delay_us"] == 1234
+    # SR4 maximum is 335,500 us; the driver reads that from the device.
+    assert drv.set_acquisition_delay_us(10**9).data["acquisition_delay_us"] == 335_500
+    assert drv.set_acquisition_delay_us(-5).data["acquisition_delay_us"] == 0
+
+
+def test_acquisition_delay_bounds_are_reported():
+    drv = _connected()
+    bounds = drv.acquisition_delay_bounds()
+
+    assert bounds["acquisition_delay_min_us"] == 0
+    assert bounds["acquisition_delay_max_us"] == 335_500
+    assert bounds["acquisition_delay_increment_us"] == 1
+    assert bounds["acquisition_delay_us"] == 0
+
+
+def test_device_info_carries_the_delay_and_the_mode_table():
+    drv = _connected()
+    drv.arm_trigger(SRTrigMode.ext_edge)
+    info = drv.device_info()
+
+    assert info["armed_trigger_mode"] == 1
+    assert info["trigger_modes"] == {"software": 0, "ext_edge": 1, "ext_level": 2}
+    assert info["acquisition_delay_max_us"] == 335_500
+
+
+def test_a_device_without_the_delay_feature_fails_cleanly():
+    features = set(sim.SR_SERIES_FEATURES) - {sim.FeatureID.ACQUISITION_DELAY}
+    sim.set_sim_config(sim.SimConfig(features=frozenset(features)))
+    drv = _connected()
+
+    resp = drv.set_acquisition_delay_us(1000)
+
+    assert resp.response == DriverResponseType.failed
+    assert "ACQUISITION_DELAY" in resp.message
 
 
 # ----------------------------------------------------------------------
