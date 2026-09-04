@@ -224,6 +224,32 @@ def diff_route_sets(frozen: list[dict], current: list[dict]) -> list[dict]:
     return diffs
 
 
+def filter_allowed_additions(
+    diffs: list[dict],
+    additions: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Split checklist diffs into ``(failing, allowed)``.
+
+    An ``extra`` diff whose ``(path, method)`` appears in ``additions`` is
+    allowed: a route the frozen record never described cannot have been
+    depended on by a client that read it. Every ``missing`` and ``changed``
+    diff fails regardless of what is listed -- those break a caller, and a
+    JSON entry must never be able to launder one into the other.
+
+    ``additions`` entries need only ``path`` and ``method``; the ``module``,
+    ``date`` and ``why`` fields carried for the reader are ignored here.
+    """
+    listed = {(a["path"], a["method"]) for a in additions}
+    failing: list[dict] = []
+    allowed: list[dict] = []
+    for d in diffs:
+        if d["kind"] == "extra" and (d["path"], d["method"]) in listed:
+            allowed.append(d)
+        else:
+            failing.append(d)
+    return failing, allowed
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(prog="python -m harness.endpoints")
     sub = parser.add_subparsers(dest="cmd", required=True)

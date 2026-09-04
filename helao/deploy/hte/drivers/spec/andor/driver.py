@@ -1,13 +1,15 @@
-"""HelaoDriver wrapping the Andor Zyla camera and Andor ATSpectrograph.
+"""HelaoDriver wrapping the Andor Zyla camera.
 
-Combines the ``pyAndorSDK3`` camera SDK with the ``pyAndorSpectrograph``
-spectrograph control library so the action server can capture spectra,
-manage cooling and select grating/filter/slit settings.
+Uses the ``pyAndorSDK3`` camera SDK so the action server can capture
+spectra and manage cooling.
 """
 
 from __future__ import annotations
 
+import socket
 import time as time
+from abc import abstractmethod
+from pathlib import Path
 from typing import Optional
 
 import numpy as np
@@ -25,28 +27,55 @@ from helao.core.drivers.helao_driver import (
     HelaoDriver,
 )
 
+from . import wl_calibration
 
-# Andor SDKs (pyAndorSDK3 / pyAndorSpectrograph) are vendor runtimes; import
-# them lazily so the module imports on a vendor-less Linux box (§11.1).
-# Called before the camera/spectrograph is first touched.
-def _load_andor():
-    global AndorSDK3, CameraException, ATSpectrograph
+#: Hg-Ar pen-lamp lines, nm, in air. A reference list to CHOOSE FROM, and
+#: deliberately not a default: which of these actually land on the detector
+#: depends on the grating and the central wavelength. This span is 404.7-912.3
+#: nm, while a 2560 x 6.5 um Zyla covers something on the order of 150-350 nm
+#: at one setting -- so most of these lines are off the detector at any given
+#: station. `find_peaks` has no notion of "absent": asked for nine peaks it
+#: returns the nine strongest maxima, noise included, and the fit then
+#: succeeds against wavelengths that were never measured. `run_wl_calibration`
+#: therefore refuses an empty `lamp_lines_nm` rather than substituting this.
+HG_AR_REFERENCE_LINES_NM: list[float] = [
+    404.6565,
+    435.8335,
+    546.0750,
+    576.9610,
+    579.0670,
+    696.5431,
+    763.5106,
+    811.5311,
+    912.2967,
+]
+
+
+# The Andor SDK is a vendor runtime; import it lazily so the module imports on
+# a vendor-less Linux box (§11.1). The spectrograph SDK has its own loader in
+# ``spectrograph.py``: a station may have the camera without the spectrograph,
+# and a combined loader made connect() demand both before it had touched
+# anything.
+def _load_camera():
+    """Bind the camera SDK. Called before the camera is first touched."""
+    global AndorSDK3, CameraException
     from pyAndorSDK3 import AndorSDK3, CameraException
-    from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 
 class AndorDriver(HelaoDriver):
-    """HelaoDriver for an Andor Zyla camera coupled to an ATSpectrograph.
+    """HelaoDriver for an Andor Zyla camera.
 
     Opens a single camera context for the lifetime of the driver, sets up
-    imaging defaults, configures the spectrograph (grating, central
-    wavelength, slit, ND filter) and caches frame metadata (pixel width,
-    wavelength array, AOI size, stride and timestamp clock frequency).
+    imaging defaults and caches frame metadata (pixel width, wavelength
+    array, AOI size, stride and timestamp clock frequency). Where the
+    wavelength array comes from is the subclass's business -- see
+    :meth:`_wavelengths`.
 
     Attributes:
         cam: The underlying ``AndorSDK3`` camera handle.
         pixel_width: Detector pixel width in micrometres.
-        wl_arr: Calibrated wavelength array for the configured AOI.
+        wl_arr: Calibrated wavelength array for the configured AOI, or
+            ``None`` before one exists (see the annotation below).
         horiz_pixels: AOI width in pixels.
         vert_pixels: AOI height in pixels.
         stride: Buffer row stride in bytes.
@@ -56,14 +85,24 @@ class AndorDriver(HelaoDriver):
 
     cam: AndorSDK3
     pixel_width: float
-    wl_arr: np.ndarray
+    # Optional, and not an oversight to "fix" back: __init__ sets this to None
+    # and the lamp-calibrated variant has no axis at all until its first
+    # calibration, so _wavelengths() legitimately returns None there. acquire
+    # refuses on None rather than measuring against a fabricated axis.
+    wl_arr: Optional[np.ndarray]
     horiz_pixels: float
     vert_pixels: float
     stride: float
     clock_hz: float
     frame: int
+    server_key: str
 
-    def __init__(self, config: dict = {}):
+    #: Whether this variant's live wavelength axis comes from the lamp fit.
+    #: Reported back as `applied` so an operator can tell, from the action's
+    #: own output, whether the calibration they just ran changed anything.
+    uses_lamp_calibration: bool = False
+
+    def __init__(self, config: dict = {}, server_key: str = "ANDOR"):
         """Construct the driver WITHOUT opening the camera (§10.4
         disconnected-construct).
 
@@ -75,8 +114,14 @@ class AndorDriver(HelaoDriver):
 
         Args:
             config: Driver configuration dict from the action server.
+                ``states_root`` and ``host`` locate this server's calibration
+                file; both fall back to sane values so a construct-test needs
+                no station config.
+            server_key: This server's key, part of the calibration filename
+                because one host can run more than one andor server.
         """
         super().__init__(config=config)
+        self.server_key = server_key
         # get params from config or use defaults
         self.cam = None
         self.pixel_width = None
@@ -95,8 +140,217 @@ class AndorDriver(HelaoDriver):
         LOGGER.info(f"using device_id {self.device_id} from config")
         self.ready = True
 
+    @abstractmethod
+    def _wavelengths(self) -> Optional[np.ndarray]:
+        """The wavelength array for the configured AOI, one entry per pixel.
+
+        ``Optional`` because the lamp-calibrated variant legitimately returns
+        ``None`` before its first calibration; annotating this ``np.ndarray``
+        would make that subclass an illegal narrowing and fail pyright.
+
+        The one thing that differs between an ATSpectrograph station and a
+        lamp-calibrated one. Abstract rather than a defaulted hook: a subclass
+        that forgot it would otherwise acquire against a fabricated axis, and
+        a wrong wavelength axis is invisible in the recorded data.
+        """
+
+    def calibration_file(self) -> Path:
+        """Where this server's persisted wavelength calibration lives.
+
+        ``states_root`` is resolved in three steps, in order:
+
+        1. ``self._base_hook.helaodirs.states_root`` -- the production path,
+           once the base-hook/server_key wiring lands in a later task.
+        2. ``config["states_root"]`` -- lets a test or a config pin it.
+        3. The bare relative string ``"STATES"``, resolved against the
+           process cwd. This is a last resort, not a normal case: a driver
+           constructed as ``driver_class(config=self.server_params)`` (no
+           ``_base_hook``, no ``states_root`` in ``params:``) hits it on
+           every station today, so it logs a WARNING naming the absolute
+           path actually used rather than failing silently.
+        """
+        helaodirs = getattr(getattr(self, "_base_hook", None), "helaodirs", None)
+        states_root = getattr(helaodirs, "states_root", None)
+        if states_root is None:
+            states_root = self.config.get("states_root")
+        if states_root is None:
+            states_root = "STATES"
+            LOGGER.warning(
+                "no states_root from _base_hook.helaodirs or config; falling "
+                "back to cwd-relative %s",
+                Path(states_root).resolve(),
+            )
+        host = self.config.get("host") or socket.gethostname()
+        return wl_calibration.calibration_path(states_root, host, self.server_key)
+
+    def _capture_lamp_frame(self, n_frames: int, exp_time: float) -> np.ndarray:
+        """Average ``n_frames`` single captures into one spectrum.
+
+        Separated from :meth:`run_wl_calibration` so the fit can be tested
+        without a camera: the tests replace this method and leave the rest of
+        the routine real.
+        """
+        frames = []
+        for _ in range(n_frames):
+            acq, _max, _in_range, _optimality = self.image_and_check_dynamic_range(
+                exposure_time=exp_time
+            )
+            # acq.image is 2D: vertical (spatial) rows by horizontal
+            # (wavelength) columns -- the same orientation the commented
+            # imshow in image_and_check_dynamic_range assumes with
+            # extent=[wl_arr[0], wl_arr[-1], 0, 2160]. Sum down the spatial
+            # axis to get one spectrum per frame.
+            image = np.asarray(acq.image, dtype=float)
+            if image.ndim != 2:
+                raise ValueError(f"expected a 2D detector image, got {image.shape}")
+            frames.append(image.sum(axis=0))
+        return np.mean(np.vstack(frames), axis=0)
+
+    def _refused(self, why: str, data: Optional[dict] = None) -> DriverResponse:
+        """A ``failed`` response for a calibration that was rejected, not lost.
+
+        Logged as well as returned: the message is the only account of what
+        went wrong that reaches the station's log, and the caller may only
+        ever see ``failed``.
+        """
+        LOGGER.error("wavelength calibration REFUSED: %s", why)
+        return DriverResponse(
+            response=DriverResponseType.failed,
+            message=f"wavelength calibration refused: {why}",
+            data=dict(data or {}, applied=False),
+            status=DriverStatus.error,
+        )
+
+    def run_wl_calibration(
+        self,
+        lamp_lines_nm: Optional[list] = None,
+        *,
+        lamp: str = "Hg-Ar",
+        n_frames: int = 1,
+        exp_time: float = 0.0098,
+        degree: int = 3,
+        max_fit_rms_nm: float = 0.5,
+        source_action_uuid: Optional[str] = None,
+    ) -> DriverResponse:
+        """Measure a calibration lamp, fit pixel-to-nm, and persist the result.
+
+        Available on both variants. On a lamp-calibrated station the result
+        becomes the live wavelength axis immediately, with no restart; on a
+        spectrograph station it is recorded for comparison against
+        ``GetCalibration`` and leaves the live axis unchanged.
+
+        Nothing reaches disk until the fit has passed both quality gates. This
+        is the whole point of them: ``save`` overwrites the station's existing
+        calibration, and a wrong wavelength axis is invisible afterwards --
+        the spectra it produces look entirely plausible and carry no evidence
+        of the error. A misaligned lamp still yields one "peak" per requested
+        line, so the fit succeeding is not evidence that it is right.
+
+        Args:
+            lamp_lines_nm: Wavelengths of the lines visible on THIS detector
+                at its current grating and central wavelength. Required; see
+                :data:`HG_AR_REFERENCE_LINES_NM`.
+            lamp: Free-text lamp identifier, recorded in the calibration.
+            n_frames: Frames to average into the lamp spectrum.
+            exp_time: Exposure time per frame, seconds.
+            degree: Polynomial degree of the pixel-to-nm fit.
+            max_fit_rms_nm: Refuse to save a fit whose residual exceeds this.
+            source_action_uuid: The action driving this calibration, if any.
+
+        Returns:
+            A :class:`DriverResponse` whose ``data`` carries ``coeffs``,
+            ``fit_rms_nm``, ``n_lines``, ``lamp``, ``path`` and ``applied``.
+            Never raises: an action handler must not see an exception.
+        """
+        try:
+            lines = list(lamp_lines_nm) if lamp_lines_nm else []
+            if not lines:
+                return self._refused(
+                    "no lamp_lines_nm given. This action has no default line "
+                    "table: which lines are on the detector depends on the "
+                    "grating and central wavelength, and a line that is not "
+                    "there still gets a noise maximum fitted to it. Pass the "
+                    "lines actually visible in the lamp spectrum -- "
+                    "HG_AR_REFERENCE_LINES_NM in this module is an Hg-Ar list "
+                    "to choose from, not a default."
+                )
+            counts = self._capture_lamp_frame(n_frames, exp_time)
+            calib = wl_calibration.fit_wavelength(
+                # fit_wavelength takes a Sequence[float]; an ndarray is not
+                # one, and the copy is a few thousand floats once per
+                # calibration.
+                counts.tolist(),
+                lines,
+                degree=degree,
+                lamp=lamp,
+                wl_source=(
+                    "calibration" if self.uses_lamp_calibration else "spectrograph"
+                ),
+                source_action_uuid=source_action_uuid,
+            )
+            if calib.fit_rms_nm > max_fit_rms_nm:
+                return self._refused(
+                    f"fit residual {calib.fit_rms_nm:.4f} nm exceeds "
+                    f"max_fit_rms_nm={max_fit_rms_nm:.4f} over "
+                    f"{calib.n_lines} line(s). Nothing was written and the "
+                    "existing calibration is untouched. Check the lamp "
+                    "alignment and that every line passed is on the "
+                    "detector.",
+                    data={
+                        "fit_rms_nm": calib.fit_rms_nm,
+                        "max_fit_rms_nm": max_fit_rms_nm,
+                        "n_lines": calib.n_lines,
+                    },
+                )
+            if not wl_calibration.is_monotonic(wl_calibration.evaluate(calib)):
+                return self._refused(
+                    f"the fitted axis is not monotonic across "
+                    f"{calib.n_pixels} pixels, so two pixels would claim the "
+                    "same wavelength. Nothing was written. A degree "
+                    f"({degree}) higher than the lines can support is the "
+                    "usual cause.",
+                    data={
+                        "fit_rms_nm": calib.fit_rms_nm,
+                        "n_lines": calib.n_lines,
+                        "degree": degree,
+                    },
+                )
+            path = self.calibration_file()
+            wl_calibration.save(calib, path)
+            LOGGER.info(
+                "wavelength calibration written to %s (rms %.4f nm over %d lines)",
+                path,
+                calib.fit_rms_nm,
+                calib.n_lines,
+            )
+            # Take effect now, not at the next connect(): the variant that
+            # uses the lamp fit reports `applied: True` here, and an operator
+            # who then finds `acquire` still refusing reads that as a broken
+            # station. Guarded because the spectrograph variant's
+            # _wavelengths() re-drives the ATSpectrograph -- calling it here
+            # would touch hardware to compute an axis it does not use.
+            if self.uses_lamp_calibration:
+                self.wl_arr = self._wavelengths()
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok,
+                data={
+                    "coeffs": calib.coeffs,
+                    "fit_rms_nm": calib.fit_rms_nm,
+                    "n_lines": calib.n_lines,
+                    "lamp": calib.lamp,
+                    "path": str(path),
+                    "applied": self.uses_lamp_calibration,
+                },
+            )
+        except Exception:
+            LOGGER.error("run_wl_calibration failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
     def connect(self) -> DriverResponse:
-        """Open the camera, configure imaging and prime spectrograph metadata.
+        """Open the camera, configure imaging and prime frame metadata.
 
         Instantiates the Andor SDK on first call (create-once; reused across
         reconnects), then opens the camera.
@@ -106,15 +360,16 @@ class AndorDriver(HelaoDriver):
         """
         try:
             if self.sdk3 is None:
-                _load_andor()
+                _load_camera()
                 self.sdk3 = AndorSDK3()
             self.cam = self.sdk3.GetCamera(self.device_id)
             LOGGER.debug(f"connected to {self.device_id}")
             self.pixel_width = self.setup_image()
-            self.wl_arr = self.setup_spectroscope(self.pixel_width)
+            self.wl_arr = self._wavelengths()
             self.horiz_pixels, self.vert_pixels, self.stride, self.clock_hz = (
                 self.get_meta_data()
             )
+            self._warn_if_axis_does_not_span_the_detector()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -125,6 +380,32 @@ class AndorDriver(HelaoDriver):
             )
 
         return response
+
+    def _warn_if_axis_does_not_span_the_detector(self) -> None:
+        """Warn when the wavelength axis is not one entry per detector column.
+
+        A calibration recorded at one AOI width and applied at another leaves
+        the header's ``optional.wl`` a different length from the ``ch_*``
+        columns beside it, and nothing downstream compares the two. A warning
+        rather than a refusal: which of the two is wrong depends on what the
+        station meant to change, and refusing here would take out a station
+        that had simply narrowed its AOI deliberately.
+        """
+        if self.wl_arr is None or self.horiz_pixels is None:
+            return
+        try:
+            width = int(self.horiz_pixels)
+        except (TypeError, ValueError):
+            return
+        if len(self.wl_arr) != width:
+            LOGGER.warning(
+                "wavelength axis has %d points but the detector AOI is %d "
+                "pixels wide; the recorded header wl array will not line up "
+                "with the ch_* columns. Re-run /%s/calibrate_wl at this AOI.",
+                len(self.wl_arr),
+                width,
+                self.server_key,
+            )
 
     def cool(self):
         """Enable sensor cooling and block until the temperature stabilises.
@@ -310,270 +591,6 @@ class AndorDriver(HelaoDriver):
             acq.metadata.stride,
             self.cam.TimestampClockFrequency,
         )
-
-    def setup_spectroscope(
-        self,
-        PixelWidth,
-        centralWL=697.26,
-        NumHorizPixels=2560,
-        ND_filter_num=1,
-        slit_width_um=200,
-    ) -> np.ndarray:
-        """Initialise the ATSpectrograph and return the wavelength array.
-
-        Sets the detector offset, grating, central wavelength, slit width
-        and ND filter, then reads the calibrated wavelength array for the
-        requested number of horizontal pixels.
-
-        Args:
-            PixelWidth: Detector pixel width (from :meth:`setup_image`).
-            centralWL: Central wavelength in nm.
-            NumHorizPixels: Number of horizontal pixels in the AOI.
-            ND_filter_num: ND filter position in ``1..6``.
-            slit_width_um: Slit width in micrometres (``10..200``).
-
-        Returns:
-            Calibrated wavelength array of length ``NumHorizPixels``, or
-            ``None`` when the filter/slit arguments are out of range.
-        """
-        ## the return from GetWavelengthLimits looks weird to me :Wavelength Min: 0.0 Wavelength Max: 11127.045898
-        # everything else looks fine and will get calibrated in the next block
-        if ND_filter_num > 6:
-            LOGGER.info("Filter number is too high")
-            return
-        elif ND_filter_num < 1:
-            LOGGER.info("Filter number is too low")
-            return
-        elif slit_width_um > 200:
-            LOGGER.info("Slit width is too high")
-            return
-        elif slit_width_um < 10:
-            LOGGER.info("Slit width is too low")
-            return
-        # Load libraries
-        _load_andor()
-        spc = ATSpectrograph()
-
-        # Initialize libraries
-        shm = spc.Initialize("")
-
-        LOGGER.info(
-            "Function Initialize returned {}".format(
-                spc.GetFunctionReturnDescription(shm, 64)[1]
-            )
-        )
-
-        LOGGER.info("Function Initialize returned {}".format(shm))
-
-        if True:
-            if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
-
-                shm = spc.GetDetectorOffset(0, 0, 0)
-                LOGGER.info(
-                    f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}"
-                )
-                shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                LOGGER.info(
-                    f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes"
-                )
-
-                # Configure Spectrograph
-                shm = spc.SetGrating(0, 1)
-                LOGGER.info(
-                    "Function SetGrating returned {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1]
-                    )
-                )
-
-                shm, grat = spc.GetGrating(0)
-                LOGGER.info("Function GetGrating returned: {} Grat".format(grat))
-
-                shm = spc.SetWavelength(0, centralWL)
-                LOGGER.info(
-                    "Function SetWavelength returned: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1]
-                    )
-                )
-
-                shm, wave = spc.GetWavelength(0)
-                LOGGER.info(
-                    "Function GetWavelength returned: {} Wavelength: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1], wave
-                    )
-                )
-
-                shm, min, max = spc.GetWavelengthLimits(0, grat)
-                LOGGER.info(
-                    "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1], min, max
-                    )
-                )
-
-                # (shm, c0, c1, c2, c3) = spc.GetPixelCalibrationCoefficients(0) # these dont seem to be usefull for me
-                # coeff = [c0,c1,c2,c3]
-                if shm == 20202:
-                    LOGGER.info("return code is Success:")
-                LOGGER.info(shm)
-                LOGGER.info("::::::::::::::::::::::::")
-                LOGGER.info(spc.IsFilterPresent(shm))
-                if spc.IsSlitPresent(0, 1) == (20202, 1):
-                    spc.SetSlitWidth(0, 1, slit_width_um)
-                    LOGGER.info("slit set")
-                if spc.IsFilterPresent(0) == (20202, 1):
-                    spc.SetFilter(0, ND_filter_num)
-                    LOGGER.info("filter set")
-
-            else:
-                LOGGER.info("Cannot continue, could not initialise Spectrograph")
-
-            # important calibration stuff I keep out of the big block just to make it easier
-
-            spc.SetNumberPixels(0, NumHorizPixels)
-            LOGGER.info(PixelWidth)
-            spc.SetPixelWidth(0, PixelWidth)
-            LOGGER.info(spc.GetNumberPixels(0))
-            LOGGER.info(spc.GetPixelWidth(0))
-            WL_array = np.array(spc.GetCalibration(0, 2560)[1])
-            shm = spc.Close()
-            return WL_array
-
-    def adjust_ND(self) -> DriverResponse:
-        """Sweep the ND filter wheel and pick the most optimal position.
-
-        Iterates filters 1..6, evaluates each via
-        :meth:`image_and_check_dynamic_range`, discards positions whose max
-        pixel exceeds 54000, and applies the best filter. Returns the per-
-        filter ``max_array``/``optimality_array`` and the chosen position.
-
-        Returns:
-            A :class:`DriverResponse` whose ``data`` contains ``max_array``,
-            ``optimality_array`` and ``ND_filter_num``.
-        """
-
-        adjust_success = False
-        try:
-            # Load libraries
-            _load_andor()
-            spc = ATSpectrograph()
-
-            # Initialize libraries
-            shm = spc.Initialize("")
-
-            LOGGER.info(
-                "Function Initialize returned {}".format(
-                    spc.GetFunctionReturnDescription(shm, 64)[1]
-                )
-            )
-
-            LOGGER.info("Function Initialize returned {}".format(shm))
-
-            if ATSpectrograph.ATSPECTROGRAPH_SUCCESS == shm:
-
-                shm = spc.GetDetectorOffset(0, 0, 0)
-                LOGGER.info(
-                    f"success code and detector offset is currently {spc.GetDetectorOffset(0, 0, 0)}"
-                )
-                shm = spc.SetDetectorOffset(0, 0, 0, 170)
-                LOGGER.info(
-                    f"Offset was set to {spc.GetDetectorOffset(0, 0, 0)} This is system specific and should be changed if the system changes"
-                )
-
-                # Configure Spectrograph
-                shm = spc.SetGrating(0, 1)
-                LOGGER.info(
-                    "Function SetGrating returned {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1]
-                    )
-                )
-
-                shm, grat = spc.GetGrating(0)
-                LOGGER.info("Function GetGrating returned: {} Grat".format(grat))
-
-                shm = spc.SetWavelength(0, 672.26)
-                LOGGER.info(
-                    "Function SetWavelength returned: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1]
-                    )
-                )
-
-                shm, wave = spc.GetWavelength(0)
-                LOGGER.info(
-                    "Function GetWavelength returned: {} Wavelength: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1], wave
-                    )
-                )
-
-                shm, min, max = spc.GetWavelengthLimits(0, grat)
-                LOGGER.info(
-                    "Function GetWavelengthLimits returned: {} Wavelength Min: {} Wavelength Max: {}".format(
-                        spc.GetFunctionReturnDescription(shm, 64)[1], min, max
-                    )
-                )
-
-                shm, c0, c1, c2, c3 = spc.GetPixelCalibrationCoefficients(
-                    0
-                )  # these dont seem to be usefull for me
-                coeff = [c0, c1, c2, c3]
-                LOGGER.debug(f"pixel calibration coefficients: {coeff}")
-                if shm == 20202:
-                    LOGGER.info("return code is Success:")
-                LOGGER.info(shm)
-                LOGGER.info("::::::::::::::::::::::::")
-                LOGGER.info(spc.IsFilterPresent(shm))
-                if spc.IsSlitPresent(0, 1) == (20202, 1):
-                    spc.SetSlitWidth(0, 1, 10)
-                    LOGGER.info("slit set")
-                if spc.IsFilterPresent(0) == (20202, 1):
-                    spc.SetFilter(0, 1)
-                    LOGGER.info("filter set")
-                    # create a np array of zeros of length 6
-                    optimality_array = np.zeros(6)
-                    max_array = np.zeros(6)
-                    # create a for loop iterating from 1 to 6, setting each filter and getting the optimality value
-                    for i in range(1, 7):
-                        spc.SetFilter(0, i)
-                        _, max, _, optimality = self.image_and_check_dynamic_range()
-                        optimality_array[i - 1] = optimality
-                        max_array[i - 1] = max
-                    # find the filter with the maximum optimality value
-                    ND_filter_num = np.argmin(optimality_array)
-                    # if max_array[ND_filter_num] is above 54000, set optimality[ND_filter_num] to 999
-                    for i in range(7):
-                        if max_array[ND_filter_num] > 54000:
-                            optimality_array[ND_filter_num] = 999
-                            ND_filter_num = np.argmin(optimality_array)
-                    else:
-                        ND_filter_num = np.argmin(optimality_array)
-                    spc.SetFilter(0, ND_filter_num)
-
-                    LOGGER.info(
-                        f"filter number set to {ND_filter_num}, with optimality value of {optimality_array[ND_filter_num]} and a max intensity of {max_array[ND_filter_num]}"
-                    )
-                adjust_success = True
-                data = {
-                    "max_array": max_array,
-                    "optimality_array": optimality_array,
-                    "ND_filter_num": ND_filter_num,
-                }
-            else:
-                LOGGER.info("Cannot continue, could not initialise Spectrograph")
-                data = {}
-            shm = spc.Close()
-            response = DriverResponse(
-                response=(
-                    DriverResponseType.success
-                    if adjust_success
-                    else DriverResponseType.failed
-                ),
-                data=data,
-                status=DriverStatus.ok,
-            )
-        except Exception:
-            LOGGER.error("adjust_ND failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        return response
 
     def warm_and_close(self, warmup: bool):
         """Optionally warm the sensor then close the camera handle.
