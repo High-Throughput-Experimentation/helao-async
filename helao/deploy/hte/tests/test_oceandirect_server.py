@@ -19,11 +19,14 @@ of ``run_unit_tests.py``.
 
 import asyncio
 import inspect
+import threading
+import time
 from typing import Optional
 from uuid import uuid4
 
 import pytest
 
+from helao.core.drivers.helao_driver import DriverResponseType
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
 from helao.deploy.hte.drivers.spec import oceandirect_sim as sim
@@ -247,10 +250,12 @@ def test_action_endpoints_are_prefixed_and_tagged_action(built):
         "acquire_spec_adv",
         "acquire_spec_corrected",
         "acquire_spec_buffered",
+        "acquire_spec_extrig",
         "calibrate_intensity",
         "store_dark_spectrum",
         "set_corrections",
         "stop_buffered_after",
+        "stop_extrig_after",
         "set_trigger_mode",
         "set_tec",
         "set_shutter",
@@ -289,6 +294,7 @@ def test_every_acquisition_handler_declares_microsecond_integration_time(built):
         "acquire_spec_adv",
         "acquire_spec_corrected",
         "acquire_spec_buffered",
+        "acquire_spec_extrig",
     ):
         route = built.routes[f"/{built.server.server_name}/{name}"]
         params = inspect.signature(route.fn).parameters
@@ -758,6 +764,232 @@ def test_stop_buffered_after_signals_only_matching_executors(built):
     assert other.stopped is False
     assert len(ctx.session.action.action_params["stopped_executors"]) == 1
     assert result["finished"] is True
+
+
+# ----------------------------------------------------------------------
+# Externally-triggered capture: the path for a device with no buffer
+# ----------------------------------------------------------------------
+def _bufferless_driver() -> OceanDirectSpec:
+    """A connected driver for a device with no DATA_BUFFER/BACK_TO_BACK.
+
+    This is the real OCEANSR4's shape, and the reason the triggered path
+    exists: OceanDirectBufferExec cannot arm on it at all.
+    """
+    features = set(sim.SR_SERIES_FEATURES) - {
+        sim.FeatureID.DATA_BUFFER,
+        sim.FeatureID.BACK_TO_BACK,
+    }
+    sim.set_sim_config(sim.SimConfig(model="OCEANSR4", features=frozenset(features)))
+    driver = OceanDirectSpec(config={"simulate": True})
+    driver.connect()
+    return driver
+
+
+def test_a_bufferless_device_is_told_where_to_go_instead():
+    """The refusal must name the alternative, or a station finds a dead
+    endpoint and no way forward."""
+    resp = _bufferless_driver().start_buffered(n_scans=10)
+
+    assert resp.response == DriverResponseType.failed
+    assert "DATA_BUFFER" in resp.message
+    assert "acquire_spec_extrig" in resp.message
+
+
+def _extrig_exec(driver, **params):
+    """Build the triggered executor over a fake session."""
+    defaults = {
+        "trigger_mode": 3,
+        "n_spectra": None,
+        "duration": -1,
+        "read_timeout_s": 0.2,
+        "poll_rate": 0.0,
+    }
+    defaults.update(params)
+    action = _FakeAction(action_name="acquire_spec_extrig", action_params=defaults)
+    session = _FakeSession(action, driver, {})
+    return srv.OceanDirectExtrigExec(active=session, oneoff=False, poll_rate=0.0)
+
+
+def test_the_triggered_path_works_without_a_buffer():
+    """The whole point: an OCEANSR4 can still run a long acquisition."""
+    driver = _bufferless_driver()
+    ex = _extrig_exec(driver, n_spectra=3)
+
+    assert asyncio.run(ex._pre_exec())["error"] == ErrorCodes.none
+    assert driver.armed_trigger_mode == 3
+
+    payloads = []
+    for _ in range(10):
+        result = asyncio.run(ex._poll())
+        if result["data"]:
+            payloads.append(result["data"])
+        if result["status"] == HloStatus.finished:
+            break
+    assert ex.emitted == 3
+    # No dev_ts_ns: get_spectrum() carries no metadata on this path.
+    assert all(list(pl) == SINGLE_SHOT_KEYS for pl in payloads)
+    assert [sorted(set(pl["spec_idx"]))[0] for pl in payloads] == [0, 1, 2]
+
+    asyncio.run(ex._post_exec())
+    # Disarmed, or the next unrelated read on this server would block forever.
+    assert driver.armed_trigger_mode is None
+    assert ex.active.action.action_params["spectra_emitted"] == 3
+
+
+def test_a_trigger_that_never_comes_keeps_waiting_rather_than_failing(built):
+    """A timed-out read is the normal "still waiting" state. Treating it as an
+    error would end a run whose trigger was merely late."""
+    driver = built.driver
+    ex = _extrig_exec(driver, read_timeout_s=0.02)
+    asyncio.run(ex._pre_exec())
+
+    def _slow(*args, **kwargs):
+        time.sleep(0.4)  # outlives read_timeout_s, but bounded for the suite
+        return [0.0] * driver.n_pixels
+
+    driver.dev.get_spectrum = _slow  # type: ignore[method-assign]
+    result = asyncio.run(ex._poll())
+
+    assert result["status"] == HloStatus.active
+    assert result["error"] == ErrorCodes.none
+    assert result["data"] == {}
+    assert ex.waits == 1
+    assert ex.emitted == 0
+
+
+def test_the_triggered_run_finishes_on_duration(built):
+    ex = _extrig_exec(built.driver, duration=0.01)
+    asyncio.run(ex._pre_exec())
+    ex.start_time -= 1.0
+
+    assert asyncio.run(ex._poll())["status"] == HloStatus.finished
+    asyncio.run(ex._post_exec())
+    assert built.driver.armed_trigger_mode is None
+
+
+def test_a_failed_arming_does_not_poll(built):
+    driver = built.driver
+
+    def _boom(*args, **kwargs):
+        raise sim.OceanDirectError(-11, "trigger mode unsupported")
+
+    driver.dev.set_trigger_mode = _boom  # type: ignore[method-assign]
+    ex = _extrig_exec(driver)
+
+    assert asyncio.run(ex._pre_exec())["error"] == ErrorCodes.critical_error
+    assert ex.armed is False
+    assert asyncio.run(ex._poll())["status"] == HloStatus.finished
+
+
+def test_manual_stop_disarms_the_trigger(built):
+    """Leaving the device armed would hang the next read on this server."""
+    ex = _extrig_exec(built.driver)
+    asyncio.run(ex._pre_exec())
+    assert built.driver.armed_trigger_mode is not None
+
+    assert asyncio.run(ex._manual_stop())["error"] == ErrorCodes.none
+
+    assert built.driver.armed_trigger_mode is None
+    assert ex.armed is False
+
+
+def test_the_triggered_read_does_not_hold_the_driver_lock(built):
+    """A minutes-long wait must not serialize disconnect() behind it, or
+    server shutdown hangs until someone fires a trigger."""
+    driver = built.driver
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking():
+        entered.set()
+        release.wait(timeout=5)
+        return [0.0] * driver.n_pixels
+
+    driver.dev.get_spectrum = _blocking  # type: ignore[method-assign]
+    worker = threading.Thread(
+        target=lambda: driver.acquire_spectrum(serialize=False), daemon=True
+    )
+    worker.start()
+    assert entered.wait(timeout=5)
+
+    # The lock must be free while that read is in flight.
+    assert driver._lock.acquire(blocking=False) is True
+    driver._lock.release()
+    release.set()
+    worker.join(timeout=5)
+
+
+def test_a_serialized_read_does_hold_the_lock(built):
+    """The unserialized path is an opt-in for the triggered case only."""
+    driver = built.driver
+    entered = threading.Event()
+    release = threading.Event()
+
+    def _blocking():
+        entered.set()
+        release.wait(timeout=5)
+        return [0.0] * driver.n_pixels
+
+    driver.dev.get_spectrum = _blocking  # type: ignore[method-assign]
+    worker = threading.Thread(target=driver.acquire_spectrum, daemon=True)
+    worker.start()
+    assert entered.wait(timeout=5)
+
+    assert driver._lock.acquire(blocking=False) is False
+    release.set()
+    worker.join(timeout=5)
+
+
+def test_stop_extrig_after_disarms_and_signals_only_its_own_executors(built):
+    class _StubExec:
+        def __init__(self):
+            self.stopped = False
+
+        def stop_action_task(self):
+            self.stopped = True
+
+    matching = _StubExec()
+    other = _StubExec()
+    built.executors = {
+        f"acquire_spec_extrig {uuid4()}": matching,
+        f"acquire_spec_buffered {uuid4()}": other,
+    }
+    built.driver.arm_trigger(3)
+
+    ctx, result = _call(built, "stop_extrig_after", delay=0)
+
+    assert matching.stopped is True
+    assert other.stopped is False
+    assert built.driver.armed_trigger_mode is None
+    assert len(ctx.session.action.action_params["stopped_executors"]) == 1
+    assert result["finished"] is True
+
+
+def _extrig_call(app):
+    """Invoke the acquire_spec_extrig endpoint the way the host would."""
+    route = app.routes[f"/{app.server.server_name}/acquire_spec_extrig"]
+    params = collect_default_params(inspect.signature(route.fn))
+    params.pop("fast_samples_in", None)
+    action = _FakeAction(action_name="acquire_spec_extrig", action_params=dict(params))
+    ctx = _FakeContext(action, app.driver)
+    return ctx, asyncio.run(route.fn(ctx))
+
+
+def test_the_extrig_endpoint_rejects_no_sample_without_a_session(built):
+    built.driver.allow_no_sample = False
+    ctx, result = _extrig_call(built)
+
+    assert result["error_code"] == ErrorCodes.no_sample
+    assert ctx.session is None  # no session, therefore no artifacts
+
+
+def test_the_extrig_endpoint_declares_the_timestamp_free_column_set(built):
+    built.driver.allow_no_sample = True
+    ctx, _result = _extrig_call(built)
+
+    assert ctx.session.begin_kwargs["json_data_keys"] == SINGLE_SHOT_KEYS
+    assert isinstance(ctx.session.started_executor, srv.OceanDirectExtrigExec)
+    assert ctx.session.started_executor.oneoff is False
 
 
 # ----------------------------------------------------------------------

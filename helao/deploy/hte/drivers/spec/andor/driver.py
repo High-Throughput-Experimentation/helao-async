@@ -212,9 +212,9 @@ class AndorDriver(HelaoDriver):
         """Measure a calibration lamp, fit pixel-to-nm, and persist the result.
 
         Available on both variants. On a lamp-calibrated station the result
-        becomes the live wavelength axis at the next ``connect()``; on a
+        becomes the live wavelength axis immediately, with no restart; on a
         spectrograph station it is recorded for comparison against
-        ``GetCalibration`` and does not change what ``acquire`` uses.
+        ``GetCalibration`` and leaves the live axis unchanged.
 
         Returns:
             A :class:`DriverResponse` whose ``data`` carries ``coeffs``,

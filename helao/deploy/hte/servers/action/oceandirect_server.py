@@ -1,9 +1,22 @@
 """FastAPI action server for an Ocean Insight (OceanDirect) spectrometer.
 
 Provides single-shot and averaged acquisition, an integration-time
-intensity calibration, on-device dark/nonlinearity correction, buffered
-back-to-back burst capture, and the optional device controls (TEC, shutter,
+intensity calibration, on-device dark/nonlinearity correction, two
+long-running capture paths, and the optional device controls (TEC, shutter,
 lamp, light source, strobes) that the device reports as available.
+
+The two long-running paths are not interchangeable, and which one a station
+can use is a property of its hardware:
+
+* ``acquire_spec_buffered`` drains the device's hardware buffer and is the
+  only way to capture gaplessly at the detector's own frame rate. It needs
+  ``DATA_BUFFER``/``BACK_TO_BACK``, which plenty of devices lack -- an
+  OCEANSR4 among them.
+* ``acquire_spec_extrig`` needs no buffer. It performs one blocking read per
+  external trigger (or free-running with ``trigger_mode=0``), which is how
+  ``spec_server.py``'s SM303 path works. Software polling costs a USB round
+  trip per spectrum and loses frames arriving between reads, so it replaces
+  the buffered path's *duration*, not its rate.
 
 Two design points are worth reading before editing:
 
@@ -188,6 +201,142 @@ class OceanDirectBufferExec(Executor):
             await loop.run_in_executor(None, self.driver.stop_buffered)
             self.armed = False
         return {"error": ErrorCodes.none}
+
+
+class OceanDirectExtrigExec(Executor):
+    """Externally-triggered (or free-running) acquisition without a buffer.
+
+    The OceanDirect counterpart of ``spec_server.py``'s ``SM303Exec``, and the
+    answer for a device with no ``DATA_BUFFER`` -- an OCEANSR4, for instance,
+    where :class:`OceanDirectBufferExec` cannot arm at all. Instead of draining
+    hardware, each ``_poll`` performs one blocking ``get_spectrum()``: in an
+    external trigger mode that call returns when a trigger fires, so the poll
+    loop *is* the trigger loop, exactly as the SM303's ``read_data`` loop is.
+
+    Three properties of the vendor API shape this, and the first is a genuine
+    limitation rather than a detail:
+
+    * **The SDK has no acquisition timeout.** Its only ``timeout`` parameter is
+      on ``open_device2``; nothing bounds a read waiting on a trigger, and
+      ``abort_spectrum_acquisition`` is documented buffer-only ("applicable to
+      OBP2 enabled devices"), so it cannot cancel one here. The read is
+      therefore bounded with ``asyncio.wait_for``, which frees *this coroutine*
+      on a timeout but leaves the worker thread blocked in the vendor call
+      until a trigger arrives or the device is closed. That is the same trade
+      ``SM303Exec`` makes. It is why ``_post_exec`` disarms the trigger:
+      returning the device to free-running is what lets a pending read
+      complete and the thread retire.
+    * **The read must not hold the driver lock** (``serialize=False``). A wait
+      of minutes would otherwise serialize the whole driver behind it,
+      including ``disconnect()``, and server shutdown would hang until someone
+      fired a trigger.
+    * **No device timestamp is available on this path.** ``get_spectrum()``
+      carries no metadata, so rows come back with ``SINGLE_SHOT_KEYS`` and no
+      ``dev_ts_ns`` column.
+
+    A timed-out poll is not an error and not the end of the run -- it is the
+    normal "still waiting for a trigger" state, and the loop keeps waiting
+    until ``duration`` expires or ``n_spectra`` is reached.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Bind the server's driver and zero the per-run counters."""
+        super().__init__(*args, **kwargs)
+        self.driver: OceanDirectSpec = self.active.driver
+        self.emitted = 0
+        self.waits = 0
+        self.armed = False
+
+    async def _pre_exec(self) -> dict:
+        """Arm the requested trigger mode from ``action_params``."""
+        # Read from action_params (subscript), never the endpoint fn-args.
+        p = self.active.action.action_params
+        self.driver.reset_spec_idx()
+        self.emitted = 0
+        self.waits = 0
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None, lambda: self.driver.arm_trigger(p["trigger_mode"])
+        )
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(f"could not arm trigger mode: {resp.message}")
+            return {"error": ErrorCodes.critical_error}
+        self.armed = True
+        LOGGER.info(f"trigger armed: {resp.data}")
+        return {"error": ErrorCodes.none}
+
+    async def _poll(self) -> dict:
+        """Wait for one triggered spectrum and emit it."""
+        p = self.active.action.action_params
+        if not self.armed:
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.finished}
+
+        duration = p["duration"]
+        if duration is not None and duration > 0:
+            if time.time() - self.start_time >= duration:
+                LOGGER.info(
+                    f"triggered acquisition duration reached after "
+                    f"{self.emitted} spectra, finishing"
+                )
+                return {
+                    "error": ErrorCodes.none,
+                    "status": HloStatus.finished,
+                    "data": {},
+                }
+
+        loop = asyncio.get_event_loop()
+        try:
+            spectrum, epoch_s = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: self.driver.acquire_spectrum(serialize=False),
+                ),
+                timeout=p["read_timeout_s"],
+            )
+        except asyncio.TimeoutError:
+            # No trigger within the window. Expected, not an error: stay active
+            # so the run continues waiting until duration or count says stop.
+            self.waits += 1
+            return {"error": ErrorCodes.none, "status": HloStatus.active, "data": {}}
+        except Exception as exc:
+            LOGGER.error(f"triggered read failed: {exc!r}")
+            return {"error": ErrorCodes.critical_error, "status": HloStatus.finished}
+
+        rows = self.driver.build_rows(spectra=[spectrum], epochs=[epoch_s])
+        self.emitted += 1
+
+        n_spectra = p["n_spectra"]
+        status = HloStatus.active
+        if n_spectra is not None and n_spectra > 0 and self.emitted >= n_spectra:
+            LOGGER.info(f"triggered acquisition reached {self.emitted} spectra")
+            status = HloStatus.finished
+        return {"error": ErrorCodes.none, "status": status, "data": rows}
+
+    async def _post_exec(self) -> dict:
+        """Disarm the trigger, returning the device to free-running."""
+        await self._disarm()
+        p = self.active.action.action_params
+        p["spectra_emitted"] = self.emitted
+        p["trigger_waits"] = self.waits
+        return {"error": ErrorCodes.none, "data": {}}
+
+    async def _manual_stop(self) -> dict:
+        """Disarm on estop or manual stop."""
+        await self._disarm()
+        return {"error": ErrorCodes.none}
+
+    async def _disarm(self) -> None:
+        """Return the device to free-running, once."""
+        if not self.armed:
+            return
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(None, self.driver.disarm_trigger)
+        if resp.response != DriverResponseType.success:
+            LOGGER.error(
+                f"could not disarm trigger; the device may still be waiting "
+                f"on one: {resp.message}"
+            )
+        self.armed = False
 
 
 def _resp_error(resp: DriverResponse) -> ErrorCodes:
@@ -805,6 +954,145 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
         active.action.action_params["stopped_executors"] = stopped
         await active.enqueue_data_dflt(
             datadict={"stop": resp.response, "message": resp.message}
+        )
+        finished = await active.finish()
+        return finished.as_dict()
+
+    # ------------------------------------------------------------------
+    # Externally-triggered capture (no hardware buffer required)
+    # ------------------------------------------------------------------
+    @app.action()
+    @action_version(1)
+    async def acquire_spec_extrig(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        int_time_us: int = 100_000,
+        trigger_mode: int = int(ODTrigMode.ext_hardware_edge),
+        n_spectra: Optional[int] = None,
+        duration: float = -1,
+        read_timeout_s: float = 5.0,
+        poll_rate: float = 0.01,
+    ):
+        """Capture one spectrum per external trigger, for as long as asked.
+
+        The counterpart of ``spec_server.py``'s ``acquire_spec_extrig``, and
+        the path to use on a device with no ``DATA_BUFFER`` -- an OCEANSR4, for
+        instance, where ``acquire_spec_buffered`` cannot arm. The device is put
+        into ``trigger_mode`` and :class:`OceanDirectExtrigExec` then performs
+        one blocking read per trigger, so this returns immediately with an
+        active action rather than holding the HTTP request open.
+
+        With ``trigger_mode=0`` (free-running) the same loop gives a long
+        continuous acquisition without an HTTP timeout, which is the other
+        thing the buffered path was for. Note what it cannot give: software
+        polling reads one spectrum per USB round trip, so frames arriving
+        between reads are lost. Gapless capture at the detector's own frame
+        rate needs the hardware buffer, and no amount of polling substitutes
+        for it.
+
+        Args:
+            ctx: Per-request action context supplied by the host.
+            fast_samples_in: Sample references associated with this action.
+            int_time_us: Integration time in microseconds.
+            trigger_mode: Trigger mode integer. **Defined by the device
+                manual, not the SDK** -- see ``ODTrigMode`` for the family's
+                usual values, and check the applied value in the log, since
+                the driver reads it back and warns on a mismatch.
+            n_spectra: Finish after this many spectra; ``None`` runs until
+                ``duration`` expires or the action is stopped.
+            duration: Total run duration in seconds; negative runs until
+                ``n_spectra`` is reached or the action is stopped.
+            read_timeout_s: How long one poll waits for a trigger before
+                giving up on *that* poll. A timeout is the normal
+                "still waiting" state, not an error, and does not end the run.
+            poll_rate: Seconds between polls.
+
+        Returns:
+            The active action dictionary, or a finished-with-error action dict
+            when setup or sample validation failed.
+        """
+        # The setup and no-sample branches must answer with an error code and
+        # no artifacts, so the Action is needed before any session exists.
+        A = ctx.action
+        A.action_abbr = "OPT"
+        p = A.action_params
+
+        int_resp = app.driver.set_integration_time_us(p["int_time_us"])  # type: ignore[attr-defined]
+        if int_resp.response != DriverResponseType.success:
+            LOGGER.error(f"could not set integration time: {int_resp.message}")
+            A.error_code = ErrorCodes.critical_error
+            return A.as_dict()
+        A.error_code = ErrorCodes.none
+
+        samples_in = await app.unified_db.get_samples(A.samples_in)
+        if not samples_in and not app.driver.allow_no_sample:  # type: ignore[attr-defined]
+            LOGGER.error(
+                "OceanDirect server got no valid sample, cannot start measurement!"
+            )
+            A.samples_in = []
+            A.error_code = ErrorCodes.no_sample
+            return A.as_dict()
+
+        active = await ctx.begin(
+            action_abbr="OPT",
+            # No device timestamp on this path: get_spectrum() has no metadata.
+            json_data_keys=SINGLE_SHOT_KEYS,
+            file_type="spec_helao__file",
+            hloheader=_header(),
+            sample_global_labels=[s.get_global_label() for s in samples_in],
+        )
+        for sample in samples_in:
+            sample.reset_sample_status(SampleStatus.preserved)
+            sample.inheritance = SampleInheritance.allow_both
+        active.action.samples_in = []
+        await active.append_sample(samples=samples_in, IO="in")
+        active.finish_hlo_header(
+            realtime=active.get_realtime_nowait(),
+            file_conn_keys=active.action.file_conn_keys,
+        )
+
+        LOGGER.info("externally-triggered acquisition initiated.")
+        executor = OceanDirectExtrigExec(
+            active=active,
+            oneoff=False,
+            poll_rate=active.action.action_params["poll_rate"],
+        )
+        return active.start_executor(executor)
+
+    @app.action()
+    @action_version(1)
+    async def stop_extrig_after(
+        ctx: ActionContext,
+        delay: int = 0,
+    ):
+        """Stop any running triggered acquisition after ``delay`` seconds.
+
+        Disarms the trigger on the device, then signals in-progress
+        ``acquire_spec_extrig`` executors to stop. Disarming first is
+        deliberate: it is what allows a read already blocked on a trigger that
+        never came to complete, so the executor can retire rather than sit
+        waiting.
+
+        Args:
+            ctx: Per-request action context supplied by the host.
+            delay: Seconds to wait before stopping.
+
+        Returns:
+            The finished action dictionary.
+        """
+        active = await ctx.begin(action_abbr="OPT")
+        await asyncio.sleep(active.action.action_params["delay"])
+        resp = app.driver.disarm_trigger()  # type: ignore[attr-defined]
+        stopped = []
+        for exec_id, exec_active in list(app.executors.items()):
+            if exec_id.split()[0] == "acquire_spec_extrig":
+                exec_active.stop_action_task()
+                stopped.append(exec_id)
+        active.action.action_params["stopped_executors"] = stopped
+        await active.enqueue_data_dflt(
+            datadict={"disarm": resp.response, "message": resp.message}
         )
         finished = await active.finish()
         return finished.as_dict()

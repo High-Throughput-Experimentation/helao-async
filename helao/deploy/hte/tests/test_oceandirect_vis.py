@@ -300,6 +300,7 @@ def test_the_streaming_actions_are_accepted_and_the_control_ones_are_not():
         "acquire_spec_adv",
         "acquire_spec_buffered",
         "acquire_spec_corrected",
+        "acquire_spec_extrig",
         "calibrate_intensity",
     ):
         assert name in module.VALID_ACTION_NAME
