@@ -24,9 +24,10 @@ def _synthetic_lamp(coeffs, n_pixels, line_pixels, width=2.0):
     return counts
 
 
-TRUE_COEFFS = [400.0, 0.2, 1e-6, 0.0]
+TRUE_COEFFS = [400.0, 0.2, 1e-6, 1e-10]
 N_PIXELS = 2560
 LINE_PIXELS = [200, 700, 1300, 1900, 2400]
+OFF_GRID_PIXELS = [200.37, 700.62, 1300.15, 1900.88, 2400.41]
 
 
 def _true_nm(pixel):
@@ -146,3 +147,67 @@ def test_module_imports_no_vendor_or_server_package():
     src = Path(wlc.__file__).read_text()
     for banned in ("pyAndor", "helao.core", "helao.helpers", "fastapi"):
         assert banned not in src, f"{banned} must not appear in wl_calibration.py"
+
+
+def test_sub_pixel_refinement_actually_runs():
+    """Lines off the pixel grid: raw integer peaks are not good enough.
+
+    Every other test puts lines at exact integer pixels with symmetric
+    peaks, so y0 == y2 and the parabolic offset is identically 0.0 --
+    find_peaks could skip refinement entirely and pass. Here the true
+    centres are up to 0.5 px off-grid, so an unrefined integer index
+    carries a real wavelength error.
+    """
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, OFF_GRID_PIXELS)
+    found = wlc.find_peaks(counts, len(OFF_GRID_PIXELS))
+    assert len(found) == len(OFF_GRID_PIXELS)
+    for got, want in zip(found, OFF_GRID_PIXELS):
+        assert abs(got - want) < 0.15, f"{got} vs {want}: refinement is off"
+    assert any(
+        abs(got - round(got)) > 0.05 for got in found
+    ), "every centroid landed on an integer -- refinement did not run"
+
+
+def test_off_grid_lines_still_fit_tightly():
+    """The residual must stay small when the lines are not on the grid.
+
+    An unrefined peak finder rounds to the nearest pixel, up to 0.5 px of
+    error, which at this dispersion is ~0.1 nm -- an order of magnitude
+    above this bound.
+    """
+    lines = [_true_nm(p) for p in OFF_GRID_PIXELS]
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, OFF_GRID_PIXELS)
+    calib = wlc.fit_wavelength(counts, lines, degree=3, lamp="synthetic")
+    assert calib.fit_rms_nm < 0.02, calib.fit_rms_nm
+
+
+def test_lines_closer_than_the_separation_are_refused_not_guessed():
+    """Two lines 3 px apart are inside find_peaks' 5 px exclusion.
+
+    The safe outcome is that fit_wavelength cannot locate one peak per
+    reference line and RAISES, rather than quietly pairing a peak with
+    the wrong wavelength.
+    """
+    close = [200.0, 203.0, 700.0, 1300.0, 1900.0, 2400.0]
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, close)
+    lines = [_true_nm(p) for p in close]
+    with pytest.raises(ValueError, match="peak"):
+        wlc.fit_wavelength(counts, lines, degree=3)
+
+
+def test_a_brighter_non_reference_feature_shows_up_as_a_bad_residual():
+    """find_peaks has no outlier rejection: it takes the strongest maxima.
+
+    A cosmic-ray spike brighter than the lamp lines displaces the weakest
+    real line from the selection, so a peak is paired with the wrong
+    reference wavelength. Nothing raises. What the operator has to catch
+    it is fit_rms_nm, so pin that the residual actually blows up.
+    """
+    counts = _synthetic_lamp(TRUE_COEFFS, N_PIXELS, LINE_PIXELS)
+    counts[1000] += 50000.0  # a spike well above every line
+    lines = [_true_nm(p) for p in LINE_PIXELS]
+    calib = wlc.fit_wavelength(counts, lines, degree=3)
+    assert calib.fit_rms_nm > 1.0, (
+        f"a mis-assigned peak produced rms {calib.fit_rms_nm}, which an "
+        "operator would read as a good calibration"
+    )
