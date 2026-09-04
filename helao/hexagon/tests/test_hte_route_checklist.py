@@ -133,3 +133,23 @@ def test_the_gate_covers_the_whole_measured_surface() -> None:
     assert resolved == len(
         _load_additions()
     ), f"{len(_load_additions()) - resolved} listed addition(s) resolve to no route"
+
+
+def test_no_addition_entry_is_stale() -> None:
+    """An entry naming a route that is gone pre-authorizes a future one.
+
+    A listed route that is later renamed or deleted leaves an entry that
+    silently allows any future route appearing at the same path and method.
+    Nothing else would catch that: the gate would be green, and the hole
+    would be invisible because it is green.
+    """
+    by_module = dict(SERVERS)
+    for entry in _load_additions():
+        current = extract_routes(
+            HTE_ACTION / entry["module"], server_key=by_module[entry["module"]]
+        )
+        present = {(r["path"], r["method"]) for r in current}
+        assert (entry["path"], entry["method"]) in present, (
+            f"{entry['path']} ({entry['method']}) is listed in _additions.json "
+            f"but no longer exists in {entry['module']}; remove the entry"
+        )
