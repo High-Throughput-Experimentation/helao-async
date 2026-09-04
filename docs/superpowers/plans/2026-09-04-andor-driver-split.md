@@ -1870,56 +1870,76 @@ committed file.
 Create `helao/hexagon/tests/test_andor_vendor_isolation.py`:
 
 ```python
-"""`spectrograph.py` is the only module naming pyAndorSpectrograph.
+"""`spectrograph.py` is the only module that IMPORTS pyAndorSpectrograph.
 
 This is the property the whole split exists for, and it is the one that
 would rot silently: an import added to driver.py or calibrated.py breaks a
 spectrograph-free station at connect() and nothing else would notice on
 Linux, because the package is absent here either way.
+
+Checked by parsing imports, not by grepping source text. A grep for the
+bare package name also matches the docstrings that explain the rule --
+calibrated.py says "pyAndorSpectrograph need not be installed", which is
+documentation, not a dependency. Import statements are the actual hazard.
 """
 
+import ast
 from pathlib import Path
 
 ANDOR = Path("helao/deploy/hte/drivers/spec/andor")
 ALLOWED = {"spectrograph.py"}
 
 
-def test_only_spectrograph_py_names_the_spectrograph_package():
+def _imported_modules(path: Path) -> set[str]:
+    """Every module name this file imports, however it spells the import."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text())):
+        if isinstance(node, ast.Import):
+            names.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            # level>0 is a relative import; node.module is None for `from . import x`
+            prefix = "." * node.level + (node.module or "")
+            names.add(prefix)
+            names.update(f"{prefix}.{a.name}".lstrip(".") for a in node.names)
+    return names
+
+
+def test_only_spectrograph_py_imports_the_vendor_package():
     offenders = []
-    for path in ANDOR.glob("*.py"):
+    for path in sorted(ANDOR.glob("*.py")):
         if path.name in ALLOWED:
             continue
-        if "pyAndorSpectrograph" in path.read_text():
+        if any(n.startswith("pyAndorSpectrograph") for n in _imported_modules(path)):
             offenders.append(path.name)
-    assert offenders == [], f"{offenders} must not name pyAndorSpectrograph"
+    assert offenders == [], f"{offenders} must not import pyAndorSpectrograph"
 
 
-def test_spectrograph_py_actually_names_it():
+def test_spectrograph_py_actually_imports_it():
     """A guard that passes because the target moved is not a guard."""
-    assert "pyAndorSpectrograph" in (ANDOR / "spectrograph.py").read_text()
+    names = _imported_modules(ANDOR / "spectrograph.py")
+    assert any(n.startswith("pyAndorSpectrograph") for n in names), names
 
 
 def test_the_calibrated_driver_does_not_import_the_spectrograph_module():
-    src = (ANDOR / "calibrated.py").read_text()
-    assert "spectrograph" not in src, "the calibrated path must not reach it"
+    names = _imported_modules(ANDOR / "calibrated.py")
+    assert not any("spectrograph" in n for n in names), names
 
 
 def test_the_base_does_not_import_either_subclass():
     """A base importing its subclasses would defeat the whole split."""
-    src = (ANDOR / "driver.py").read_text()
-    assert "from .spectrograph" not in src
-    assert "from .calibrated" not in src
+    names = _imported_modules(ANDOR / "driver.py")
+    assert not any("spectrograph" in n or "calibrated" in n for n in names), names
 ```
 
 - [ ] **Step 2: Run to verify it passes**
 
 Run: `conda run -n helao python -m pytest helao/hexagon/tests/test_andor_vendor_isolation.py -v`
 
-Expected: 4 passed. If `test_only_spectrograph_py_names_the_spectrograph_package` fails, an earlier task left a reference behind — fix that module, do not widen `ALLOWED`.
+Expected: 4 passed. If `test_only_spectrograph_py_imports_the_vendor_package` fails, an earlier task left a real import behind — fix that module, do not widen `ALLOWED`.
 
 - [ ] **Step 3: Prove the guard goes red**
 
-Temporarily add the comment `# pyAndorSpectrograph` to the top of `calibrated.py`, re-run the test, confirm it fails naming `calibrated.py`, then remove the comment and re-run to confirm green.
+Temporarily add `from pyAndorSpectrograph.spectrograph import ATSpectrograph` inside a function in `calibrated.py` (module scope would trip the import sweep instead), re-run the test, confirm it fails naming `calibrated.py`, then remove the line and re-run to confirm green. A bare `# pyAndorSpectrograph` comment must NOT trip it — that is the false positive this guard was rewritten to avoid.
 
 - [ ] **Step 4: Document it in CLAUDE.md**
 
@@ -1936,8 +1956,9 @@ selected by the action server's `wl_source` param (`spectrograph` | `calibration
   forgot the hook would acquire against a fabricated wavelength axis, which is
   invisible in the recorded data, so it is `@abstractmethod` rather than a
   defaulted hook.
-- **`spectrograph.py` is the only module naming `pyAndorSpectrograph`**, pinned by
-  `test_andor_vendor_isolation.py`. What actually makes a spectrograph-free station
+- **`spectrograph.py` is the only module that imports `pyAndorSpectrograph`**, pinned by
+  `test_andor_vendor_isolation.py`, which parses imports rather than grepping source —
+  a grep also matches the docstrings explaining the rule. What actually makes a spectrograph-free station
   possible is that `_load_andor()` was split into `_load_camera()` and
   `_load_spectrograph()`: the combined loader was called unconditionally from
   `connect()`, so the class split alone would have changed nothing — a subclass
@@ -2024,5 +2045,5 @@ None of these can run on Linux. They belong on a Windows station with the hardwa
 - Every Linux test in Step 6 of Task 8 passes and `run_unit_tests.py` exits 0.
 - `git diff unstable...HEAD -- helao/hexagon/tests/checklists/hte/` shows only `_additions.json`.
 - `git diff unstable...HEAD -- helao/deploy/hte/configs/` is empty.
-- `grep -rn "pyAndorSpectrograph" helao/deploy/hte/drivers/spec/andor/*.py` names only `spectrograph.py`.
+- `conda run -n helao python -m pytest helao/hexagon/tests/test_andor_vendor_isolation.py -v` passes: only `spectrograph.py` imports the vendor package.
 - The six at-station gates above are listed for the station owner and none is claimed as passed.
