@@ -116,6 +116,22 @@ class AndorAdjustND(Executor):
 
     driver: AndorSpectrographDriver
 
+    def __init__(self, *args, **kwargs):
+        """Bind the driver handle this executor's ``_exec`` needs.
+
+        Without this the endpoint cannot run at all. ``Executor`` defines no
+        ``driver`` attribute and no ``__getattr__``, so the class annotation
+        above binds nothing at runtime and ``_exec`` raised ``AttributeError``
+        on every call -- ``/ANDOR/adjust_nd`` had never worked. ``AndorCooling``
+        and ``AndorAcquire`` each bind it in their own ``__init__``; this class
+        was the one that did not.
+        """
+        super().__init__(*args, **kwargs)
+        try:
+            self.driver = self.active.driver
+        except Exception:
+            LOGGER.error("AndorAdjustND init failed", exc_info=True)
+
     async def _exec(self) -> dict:
         """Call :meth:`AndorDriver.adjust_ND` and forward its data payload."""
         LOGGER.debug("Running driver.adjust_ND()")

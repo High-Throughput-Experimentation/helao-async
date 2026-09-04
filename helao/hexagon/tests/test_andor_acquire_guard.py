@@ -358,3 +358,71 @@ async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch)
     assert result["error"] == ErrorCodes.none
     assert result["data"]["fit_rms_nm"] > 0.5
     assert driver.calibration_file().exists()
+
+
+# --- every executor must BIND its driver, not merely annotate it -------------
+#
+# `/ANDOR/adjust_nd` had never worked. `Executor` defines no `driver`
+# attribute and no `__getattr__`, so `driver: AndorSpectrographDriver` on the
+# class bound nothing at runtime and `_exec` raised AttributeError on every
+# call. `AndorCooling` and `AndorAcquire` each bound it in their own
+# `__init__`; `AndorAdjustND` did not, and nothing caught the difference
+# because the annotation reads exactly like the working ones.
+#
+# Parametrised over every Executor subclass in the module so the next one
+# added is covered without anyone remembering to extend this.
+
+
+def _executor_classes():
+    import inspect
+
+    from helao.helpers.executor import Executor
+
+    from helao.deploy.hte.servers.action import andor_server as mod
+
+    return [
+        obj
+        for _, obj in inspect.getmembers(mod, inspect.isclass)
+        if issubclass(obj, Executor) and obj is not Executor
+    ]
+
+
+def _fake_active(driver):
+    """The subset of ``Active`` that ``Executor.__init__`` touches."""
+    return SimpleNamespace(
+        driver=driver,
+        action=SimpleNamespace(
+            action_name="fake",
+            action_uuid="fake-uuid",
+            exec_id=None,
+            action_output_dir="/tmp/fake",
+            # AndorAcquire reads these before it is done with __init__; a
+            # missing key lands in its swallow-all except. Supply the real
+            # defaults so this test measures driver binding and nothing else.
+            action_params={
+                "external_trigger": False,
+                "duration": 1.0,
+                "timeout": 5000,
+                "frames_per_poll": 10,
+                "buffer_count": 2,
+                "exp_time": 0.0098,
+                "framerate": 98,
+            },
+        ),
+    )
+
+
+def test_the_module_actually_defines_executors():
+    """A broken discovery helper would make the sweep below vacuous."""
+    names = {c.__name__ for c in _executor_classes()}
+    assert {"AndorAdjustND", "AndorCooling", "AndorAcquire"} <= names, names
+
+
+@pytest.mark.parametrize("cls", _executor_classes(), ids=lambda c: c.__name__)
+def test_every_executor_binds_its_driver(cls):
+    driver = SimpleNamespace(cam=object(), wl_arr=np.array([1.0, 2.0]))
+    executor = cls(active=_fake_active(driver), oneoff=True)
+    assert getattr(executor, "driver", None) is driver, (
+        f"{cls.__name__} did not bind self.driver; a class annotation alone "
+        "binds nothing and _exec will raise AttributeError at runtime"
+    )
