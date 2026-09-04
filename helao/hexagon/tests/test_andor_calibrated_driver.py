@@ -7,6 +7,7 @@ and a refusing connect() would make the station uncalibratable forever. It is
 """
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -112,3 +113,40 @@ def test_an_unreadable_model_is_refused_not_guessed(tmp_path):
     )
     with pytest.raises(wlc.UnknownCalibrationModel):
         d._wavelengths()
+
+
+def test_states_root_prefers_base_hook_helaodirs(tmp_path):
+    """Branch 1: `_base_hook.helaodirs.states_root` wins, even over config."""
+
+    class _FakeHelaodirs:
+        states_root = str(tmp_path / "from_hook")
+
+    class _FakeBaseHook:
+        helaodirs = _FakeHelaodirs()
+
+    d = _driver(tmp_path, states_root=str(tmp_path / "from_config"))
+    d._base_hook = _FakeBaseHook()
+    assert d.calibration_file().parent == tmp_path / "from_hook"
+
+
+def test_states_root_falls_back_to_config_without_a_base_hook(tmp_path):
+    """Branch 2: no `_base_hook`, so `config["states_root"]` is used."""
+    d = _driver(tmp_path, states_root=str(tmp_path / "from_config"))
+    assert getattr(d, "_base_hook", None) is None
+    assert d.calibration_file().parent == tmp_path / "from_config"
+
+
+def test_states_root_falls_back_to_cwd_relative_and_warns(
+    tmp_path, monkeypatch, caplog
+):
+    """Branch 3: neither a hook nor a configured root -- loudly cwd-relative."""
+    config = {"dev_id": 0, "host": "teststation"}
+    d = AndorCalibratedDriver(config=config, server_key="ANDOR")
+    monkeypatch.chdir(tmp_path)
+    with caplog.at_level("WARNING"):
+        path = d.calibration_file()
+    assert path.parent == Path("STATES")
+    assert any(
+        "states_root" in r.getMessage() and str(tmp_path / "STATES") in r.getMessage()
+        for r in caplog.records
+    )

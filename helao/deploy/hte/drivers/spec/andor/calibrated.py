@@ -38,8 +38,31 @@ class AndorCalibratedDriver(AndorDriver):
         self.server_key = server_key
 
     def calibration_file(self) -> Path:
-        """Where this server's persisted wavelength calibration lives."""
-        states_root = self.config.get("states_root") or "STATES"
+        """Where this server's persisted wavelength calibration lives.
+
+        ``states_root`` is resolved in three steps, in order:
+
+        1. ``self._base_hook.helaodirs.states_root`` -- the production path,
+           once the base-hook/server_key wiring lands in a later task.
+        2. ``config["states_root"]`` -- lets a test or a config pin it.
+        3. The bare relative string ``"STATES"``, resolved against the
+           process cwd. This is a last resort, not a normal case: a driver
+           constructed as ``driver_class(config=self.server_params)`` (no
+           ``_base_hook``, no ``states_root`` in ``params:``) hits it on
+           every station today, so it logs a WARNING naming the absolute
+           path actually used rather than failing silently.
+        """
+        helaodirs = getattr(getattr(self, "_base_hook", None), "helaodirs", None)
+        states_root = getattr(helaodirs, "states_root", None)
+        if states_root is None:
+            states_root = self.config.get("states_root")
+        if states_root is None:
+            states_root = "STATES"
+            LOGGER.warning(
+                "no states_root from _base_hook.helaodirs or config; falling "
+                "back to cwd-relative %s",
+                Path(states_root).resolve(),
+            )
         host = self.config.get("host") or socket.gethostname()
         return wlc.calibration_path(states_root, host, self.server_key)
 
