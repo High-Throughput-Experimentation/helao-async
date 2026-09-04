@@ -26,12 +26,19 @@ from helao.core.drivers.helao_driver import (
 )
 
 
-# Andor SDKs (pyAndorSDK3 / pyAndorSpectrograph) are vendor runtimes; import
-# them lazily so the module imports on a vendor-less Linux box (§11.1).
-# Called before the camera/spectrograph is first touched.
-def _load_andor():
-    global AndorSDK3, CameraException, ATSpectrograph
+# The Andor SDKs are vendor runtimes; import them lazily so the module imports
+# on a vendor-less Linux box (§11.1). Two loaders, not one: a station may have
+# the camera without the spectrograph, and a combined loader made connect()
+# demand both before it had touched anything.
+def _load_camera():
+    """Bind the camera SDK. Called before the camera is first touched."""
+    global AndorSDK3, CameraException
     from pyAndorSDK3 import AndorSDK3, CameraException
+
+
+def _load_spectrograph():
+    """Bind the spectrograph SDK. Called before the spectrograph is touched."""
+    global ATSpectrograph
     from pyAndorSpectrograph.spectrograph import ATSpectrograph
 
 
@@ -106,7 +113,7 @@ class AndorDriver(HelaoDriver):
         """
         try:
             if self.sdk3 is None:
-                _load_andor()
+                _load_camera()
                 self.sdk3 = AndorSDK3()
             self.cam = self.sdk3.GetCamera(self.device_id)
             LOGGER.debug(f"connected to {self.device_id}")
@@ -351,7 +358,7 @@ class AndorDriver(HelaoDriver):
             LOGGER.info("Slit width is too low")
             return
         # Load libraries
-        _load_andor()
+        _load_spectrograph()
         spc = ATSpectrograph()
 
         # Initialize libraries
@@ -453,7 +460,7 @@ class AndorDriver(HelaoDriver):
         adjust_success = False
         try:
             # Load libraries
-            _load_andor()
+            _load_spectrograph()
             spc = ATSpectrograph()
 
             # Initialize libraries
