@@ -138,6 +138,10 @@ class OceanDirectSpec(HelaoDriver):
         # Buffered-capture state, owned by the server's executor.
         self.buffering: bool = False
         self.spec_idx: int = 0
+        #: Trigger mode currently armed, or None while free-running. Tracked so
+        #: teardown can put the device back: a device left armed on an external
+        #: trigger answers no later acquisition until one arrives.
+        self.armed_trigger_mode: Optional[int] = None
 
     # ------------------------------------------------------------------
     # SDK loading
@@ -289,18 +293,30 @@ class OceanDirectSpec(HelaoDriver):
             return DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.uninitialized
             )
-        try:
-            self._abort_acquisition()
-            return DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception as exc:
-            LOGGER.error(f"OceanDirect stop failed: {self._err_detail(exc)}")
+        errors = []
+        # Disarming comes first and is unconditional: it is the only one of the
+        # two that a bufferless device supports, and the one that matters most
+        # -- a device left armed blocks every later read. `abort_acquisition`
+        # is buffer-only ("applicable to OBP2 enabled devices" per the vendor),
+        # so on an SR4 it is expected to fail and must not mask the disarm.
+        disarm = self.disarm_trigger()
+        if disarm.response != DriverResponseType.success:
+            errors.append(f"disarm_trigger: {disarm.message}")
+        if self.buffering:
+            try:
+                self._abort_acquisition()
+            except Exception as exc:
+                errors.append(f"abort_acquisition: {self._err_detail(exc)}")
+        if errors:
+            LOGGER.error(f"OceanDirect stop incomplete: {'; '.join(errors)}")
             return DriverResponse(
                 response=DriverResponseType.failed,
-                message=self._err_detail(exc),
+                message="; ".join(errors),
                 status=DriverStatus.error,
             )
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
 
     def reset(self) -> DriverResponse:
         """Close and reopen the device.
@@ -322,6 +338,16 @@ class OceanDirectSpec(HelaoDriver):
         """
         try:
             with self._lock:
+                if self.dev is not None and self.armed_trigger_mode is not None:
+                    # Closing while armed leaves the hardware waiting on a
+                    # trigger; the next open would inherit that state.
+                    try:
+                        self.disarm_trigger()
+                    except Exception as exc:
+                        LOGGER.warning(
+                            "could not disarm trigger during disconnect: "
+                            f"{self._err_detail(exc)}"
+                        )
                 if self.dev is not None and self.buffering:
                     # Leaving the hardware buffer armed would keep the device
                     # acquiring after the server is gone.
@@ -763,6 +789,42 @@ class OceanDirectSpec(HelaoDriver):
         except Exception as exc:
             return self._failed("set_trigger_mode", exc)
 
+    def arm_trigger(self, mode: int) -> DriverResponse:
+        """Put the device into ``mode`` and remember that it is armed.
+
+        Args:
+            mode: Trigger mode integer from the device manual. See
+                :class:`ODTrigMode` for the family's usual values.
+
+        Returns:
+            ``DriverResponse`` with the requested and read-back modes.
+        """
+        resp = self.set_trigger_mode(mode)
+        if resp.response == DriverResponseType.success:
+            self.armed_trigger_mode = int(mode)
+        return resp
+
+    def disarm_trigger(self) -> DriverResponse:
+        """Return the device to free-running mode.
+
+        Called from the triggered executor's teardown, from :meth:`stop` and
+        from :meth:`disconnect`. Leaving a device armed is not a cosmetic
+        problem: every later ``get_spectrum()`` would block waiting for a
+        trigger, so the next unrelated action on this server would hang.
+
+        Returns:
+            ``DriverResponse``; success when nothing was armed.
+        """
+        if self.armed_trigger_mode is None:
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        resp = self.set_trigger_mode(int(ODTrigMode.normal))
+        # Cleared regardless of the outcome: a failed disarm must not leave the
+        # driver believing it is still armed and skipping later attempts.
+        self.armed_trigger_mode = None
+        return resp
+
     def set_corrections(
         self,
         electric_dark: Optional[bool] = None,
@@ -845,24 +907,40 @@ class OceanDirectSpec(HelaoDriver):
     # Single-shot acquisition
     # ------------------------------------------------------------------
     def acquire_spectrum(
-        self, dark_corrected: bool = False
+        self, dark_corrected: bool = False, serialize: bool = True
     ) -> tuple[list[float], float]:
         """Read one spectrum from the device.
 
         Args:
             dark_corrected: When true, use the device's stored-dark path
                 (``get_dark_corrected_spectrum2``) instead of the raw read.
+            serialize: Hold the driver lock across the read. Pass ``False``
+                **only** on an externally-triggered read -- see below.
 
         Returns:
             ``(spectrum, epoch_s)`` where ``spectrum`` is a list of floats.
         """
         self._require_ready("acquire_spectrum")
+        if not serialize:
+            # An externally-triggered read blocks inside the vendor call until
+            # a trigger arrives, which may be minutes or never. Holding the
+            # lock across it would serialize the entire driver behind that
+            # wait -- including `disconnect()`, so server shutdown would hang
+            # until someone fired a trigger. The server sets
+            # `allow_concurrent_actions = False`, so no second action can race
+            # this read; what must stay reachable is the private endpoints and
+            # teardown, and those are exactly what the lock would block.
+            return self._read_spectrum(dark_corrected)
         with self._lock:
-            epoch_s = time.time()
-            if dark_corrected:
-                spectrum = self.dev.get_dark_corrected_spectrum2()
-            else:
-                spectrum = self.dev.get_spectrum()
+            return self._read_spectrum(dark_corrected)
+
+    def _read_spectrum(self, dark_corrected: bool) -> tuple[list[float], float]:
+        """The bare vendor read, with no locking of its own."""
+        epoch_s = time.time()
+        if dark_corrected:
+            spectrum = self.dev.get_dark_corrected_spectrum2()
+        else:
+            spectrum = self.dev.get_spectrum()
         return ([float(x) for x in spectrum], epoch_s)
 
     def store_dark_spectrum(self) -> DriverResponse:
@@ -1039,8 +1117,17 @@ class OceanDirectSpec(HelaoDriver):
         """
         try:
             self._require_ready("start_buffered")
-            self._require("DATA_BUFFER", "start_buffered")
-            self._require("BACK_TO_BACK", "start_buffered")
+            # A device without these cannot buffer at all -- an OCEANSR4, for
+            # one. The message names the alternative rather than leaving the
+            # caller to discover that a bufferless device has another path.
+            try:
+                self._require("DATA_BUFFER", "start_buffered")
+                self._require("BACK_TO_BACK", "start_buffered")
+            except RuntimeError as exc:
+                raise RuntimeError(
+                    f"{exc}. This device cannot buffer; use acquire_spec_extrig "
+                    "for triggered or long continuous acquisition instead."
+                ) from exc
             with self._lock:
                 adv = self.dev.Advanced
                 adv.set_data_buffer_enable(True)
