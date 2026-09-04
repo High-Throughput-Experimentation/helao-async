@@ -16,9 +16,11 @@ from helao.core.models.file import HloHeaderModel
 from helao.core.models.hlostatus import HloStatus
 from helao.hexagon.app.action_context import ActionContext, action_version
 from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.executor import Executor
 
+from ...drivers.spec.andor.calibrated import AndorCalibratedDriver
 from ...drivers.spec.andor.driver import AndorDriver, DriverStatus
 from ...drivers.spec.andor.spectrograph import AndorSpectrographDriver
 
@@ -243,6 +245,17 @@ async def andor_dyn_endpoints(app: ActionHost):
     server_key = app.server.server_name
     app.server_params["allow_concurrent_actions"] = False
 
+    # ActionHost constructs the driver as driver_class(config=server_params)
+    # (action_host.py's startup handler), which passes it neither the
+    # server's real key nor anything that knows where the station's STATES
+    # directory is -- app.driver does not exist until that handler runs, so
+    # this cannot be wired any earlier than here. Without it, the wavelength
+    # calibration is written to a cwd-relative path and every andor server on
+    # a host shares one filename. Must run before connect(): the calibrated
+    # variant's connect() reads calibration_file() to load the lamp fit.
+    app.driver.server_key = server_key
+    app.driver._base_hook = app
+
     # P3a-2 constructor-connect fix: AndorDriver.__init__ no longer opens the
     # camera (disconnected construct); open it here at startup before any
     # acquire request reads app.driver.wl_arr.
@@ -336,12 +349,53 @@ async def andor_dyn_endpoints(app: ActionHost):
         return active_action_dict
 
 
+#: `wl_source` value -> driver class. An absent key yields the spectrograph
+#: driver so every existing station config keeps working unedited; a station
+#: opts into the lamp-calibrated path by adding the key.
+WL_SOURCES: dict[str, type] = {
+    "spectrograph": AndorSpectrographDriver,
+    "calibration": AndorCalibratedDriver,
+}
+DEFAULT_WL_SOURCE = "spectrograph"
+
+
+def _driver_class(server_key: str) -> type:
+    """The driver class this server's config selects.
+
+    Reads the global CONFIG, which ``fast_launcher.py`` populates before it
+    imports this module and calls ``makeApp``. Tolerates a missing CONFIG or
+    server entry, because capture scripts and build tests call ``makeApp``
+    outside the launcher.
+
+    Raises:
+        ValueError: On an unrecognized ``wl_source``. A typo must not fall
+            through to the default -- a station meaning to run the calibrated
+            path would silently get the spectrograph one and fail at
+            ``connect()`` with a vendor import error instead.
+    """
+    config = getattr(config_loader, "CONFIG", None) or {}
+    params = (config.get("servers") or {}).get(server_key, {}).get("params", {}) or {}
+    name = params.get("wl_source", DEFAULT_WL_SOURCE)
+    if name not in WL_SOURCES:
+        raise ValueError(
+            f"unknown wl_source {name!r} for server {server_key!r}; "
+            f"expected one of {sorted(WL_SOURCES)}"
+        )
+    return WL_SOURCES[name]
+
+
 def makeApp(server_key) -> ActionHost:
     """Build the Andor camera FastAPI app.
 
     Constructs a :class:`ActionHost` backed by :class:`AndorDriver` and uses
     :func:`andor_dyn_endpoints` to register the action endpoints once the
     driver finishes initialising.
+
+    The driver class is selected by the server's ``wl_source`` param
+    (``spectrograph`` or ``calibration``), defaulting to ``spectrograph`` so an
+    existing station config needs no edit. Note that ``base_api`` names the
+    driver namedtuple field from the class name, so ``app.drivers.<Name>``
+    differs between the two -- use ``app.driver``.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
@@ -355,7 +409,7 @@ def makeApp(server_key) -> ActionHost:
         server_title=server_key,
         description="Andor camera/action server",
         version=0.1,
-        driver_classes=[AndorSpectrographDriver],
+        driver_classes=[_driver_class(server_key)],
         dyn_endpoints=andor_dyn_endpoints,
     )
     app.driver: AndorDriver  # type hint for convenience
