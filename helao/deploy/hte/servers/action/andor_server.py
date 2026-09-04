@@ -20,6 +20,7 @@ from helao.helpers import helao_logging as logging  # get LOGGER from the host i
 from helao.helpers.executor import Executor
 
 from ...drivers.spec.andor.driver import AndorDriver, DriverStatus
+from ...drivers.spec.andor.spectrograph import AndorSpectrographDriver
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -110,7 +111,7 @@ class AndorAdjustND(Executor):
     returns its result data.
     """
 
-    driver: AndorDriver
+    driver: AndorSpectrographDriver
 
     async def _exec(self) -> dict:
         """Call :meth:`AndorDriver.adjust_ND` and forward its data payload."""
@@ -337,7 +338,7 @@ def makeApp(server_key) -> ActionHost:
         server_title=server_key,
         description="Andor camera/action server",
         version=0.1,
-        driver_classes=[AndorDriver],
+        driver_classes=[AndorSpectrographDriver],
         dyn_endpoints=andor_dyn_endpoints,
     )
     app.driver: AndorDriver  # type hint for convenience
