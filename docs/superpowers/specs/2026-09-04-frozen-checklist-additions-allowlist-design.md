@@ -156,3 +156,8 @@ Parent repo only. A private deployment's twin gate is a separate repository with
 its own branch and remote; it can adopt `filter_allowed_additions` when it next
 needs to add a route, and does not need to change for this. That follow-up is worth
 recording where that deployment's own notes live, not here.
+
+Implemented 2026-09-04. `filter_allowed_additions` is in `harness/endpoints.py`
+and is called only by `test_hte_route_checklist.py`. The private deployment's
+twin gate is unchanged and still fails on any `extra` diff; adopting the helper
+there is a one-line change in that repository when it next needs it.
