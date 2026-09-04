@@ -21,6 +21,8 @@ SLICE1_MODULES = [
     "robot.pal_driver",
     "io.nidaqmx_driver",
     "spec.andor.driver",
+    # The only module naming pyAndorSpectrograph; it must import without it.
+    "spec.andor.spectrograph",
 ]
 SLICE2_MODULES = [
     "pstat.biologic.driver",
