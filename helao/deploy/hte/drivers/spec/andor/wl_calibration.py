@@ -45,6 +45,13 @@ class WavelengthCalibration:
     lamp: str
     created: str
     source_action_uuid: Optional[str]
+    #: Which variant wrote this record: ``"calibration"`` if the fit is that
+    #: station's live wavelength axis, ``"spectrograph"`` if it was recorded
+    #: only to compare against ``GetCalibration``. Defaulted because records
+    #: written before this field existed carry no value at all, and the
+    #: station that wrote one is not going to be re-calibrated just to gain a
+    #: string -- see ``load``.
+    wl_source: str = "unknown"
 
 
 def evaluate(calib: WavelengthCalibration) -> np.ndarray:
@@ -53,6 +60,24 @@ def evaluate(calib: WavelengthCalibration) -> np.ndarray:
         raise UnknownCalibrationModel(calib.model)
     pixels = np.arange(calib.n_pixels, dtype=float)
     return np.polyval(list(reversed(calib.coeffs)), pixels)
+
+
+def is_monotonic(arr) -> bool:
+    """Whether ``arr`` increases, or decreases, strictly across its length.
+
+    A real wavelength axis is one or the other: pixels map onto the detector
+    in order. A fit that doubles back describes an axis on which two pixels
+    claim the same wavelength, which is not a calibration at all -- and it
+    plots as a perfectly plausible spectrum, so nothing downstream will ever
+    catch it. Its own function so it can be tested without a camera.
+    """
+    values = np.asarray(arr, dtype=float)
+    if values.size < 2:
+        return True
+    deltas = np.diff(values)
+    # `not (a or b)` rather than `a and b`: a NaN makes both comparisons
+    # False, so a fit that produced one is refused rather than accepted.
+    return bool(np.all(deltas > 0) or np.all(deltas < 0))
 
 
 def find_peaks(counts: Sequence[float], n_expected: int) -> list[float]:
@@ -93,6 +118,7 @@ def fit_wavelength(
     *,
     degree: int = 3,
     lamp: str = "unknown",
+    wl_source: str = "unknown",
     source_action_uuid: Optional[str] = None,
 ) -> WavelengthCalibration:
     """Fit pixel-to-nm from a lamp spectrum and its known reference lines.
@@ -103,6 +129,8 @@ def fit_wavelength(
             peak is located per entry.
         degree: Polynomial degree.
         lamp: Free-text lamp identifier, recorded in the calibration.
+        wl_source: Which driver variant is fitting, recorded so a later
+            reader can tell a live calibration from a comparison-only one.
         source_action_uuid: The action that produced ``counts``, if any.
 
     Returns:
@@ -137,12 +165,29 @@ def fit_wavelength(
         lamp=lamp,
         created=_utc_now(),
         source_action_uuid=source_action_uuid,
+        wl_source=wl_source,
     )
 
 
 def save(calib: WavelengthCalibration, path: Path) -> None:
-    """Write the calibration as indented JSON, atomically."""
+    """Write the calibration as indented JSON, atomically, keeping one backup.
+
+    The outgoing record is copied to a sibling ``<name>.prev`` first. An
+    overwrite is otherwise irreversible, and the thing being overwritten is a
+    calibration that was, as far as anyone knows, good -- while the thing
+    overwriting it has only just been measured. One generation is enough to
+    put a station back where it was; a rolling history would be a filing
+    system nobody asked for.
+
+    Backing up is a copy, not a rename, so a failure between the two steps
+    leaves the live calibration in place rather than removed.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        prev = path.with_name(path.name + ".prev")
+        prev_tmp = path.with_name(f".{prev.name}.tmp")
+        prev_tmp.write_bytes(path.read_bytes())
+        prev_tmp.replace(prev)
     tmp = path.with_name(f".{path.name}.tmp")
     tmp.write_text(json.dumps(asdict(calib), indent=2) + "\n")
     tmp.replace(path)
@@ -164,6 +209,11 @@ def load(path: Path) -> WavelengthCalibration:
         lamp=str(raw["lamp"]),
         created=str(raw["created"]),
         source_action_uuid=raw.get("source_action_uuid"),
+        # Absent on every record written before the field existed. Defaulted
+        # rather than required: a station that legitimately calibrated last
+        # month must keep loading, and "unknown" is exactly what a reader
+        # should be told about it.
+        wl_source=str(raw.get("wl_source", "unknown")),
     )
 
 

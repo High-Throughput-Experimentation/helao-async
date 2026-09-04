@@ -274,8 +274,8 @@ async def test_the_executor_reports_a_failed_calibration_without_raising(
 
 @pytest.mark.asyncio
 async def test_the_executor_defaults_an_empty_lamp_line_list_to_none(tmp_path):
-    """`lamp_lines_nm: list = []` is the route default; [] must mean "use the
-    reference table", not "fit against no lines"."""
+    """`lamp_lines_nm: list = []` is the route default; [] reaches the driver
+    as None, which the driver refuses -- there is no default line table."""
     driver = AndorCalibratedDriver(config={"dev_id": 0, "states_root": str(tmp_path)})
     executor = AndorCalibrateWavelength(
         active=_FakeCalibActive(driver, {"lamp_lines_nm": []}), oneoff=True
@@ -284,4 +284,77 @@ async def test_the_executor_defaults_an_empty_lamp_line_list_to_none(tmp_path):
     assert executor.lamp == "Hg-Ar"
     assert executor.n_frames == 1
     assert executor.degree == 3
+    assert executor.max_fit_rms_nm == 0.5
     assert executor.driver is driver
+
+
+@pytest.mark.asyncio
+async def test_the_executor_reports_a_calibration_the_driver_refused(
+    tmp_path, monkeypatch
+):
+    """A refused fit is a reported failure carrying the number that refused it.
+
+    Distinct from the raising path above: the driver rejected a fit it
+    successfully computed, so `data` is populated and `applied` is False --
+    an operator has to be able to see WHY nothing was written, or they will
+    read a bare failure as a broken lamp and re-run it unchanged.
+    """
+    driver = AndorCalibratedDriver(
+        config={"dev_id": 0, "states_root": str(tmp_path), "host": "teststation"}
+    )
+    line_pixels = [200, 700, 1300, 1900, 2400]
+
+    def _spiked(n_frames, exp_time):
+        counts = _fake_lamp_frame(2560, line_pixels)
+        counts[1000] += 50000.0  # displaces a real line from the selection
+        return counts
+
+    monkeypatch.setattr(driver, "_capture_lamp_frame", _spiked)
+    active = _FakeCalibActive(
+        driver,
+        {
+            "lamp_lines_nm": [400.0 + 0.2 * p for p in line_pixels],
+            "degree": 3,
+        },
+    )
+
+    result = await AndorCalibrateWavelength(active=active, oneoff=True)._exec()
+
+    assert result["error"] == ErrorCodes.critical_error
+    assert result["data"]["applied"] is False
+    assert result["data"]["max_fit_rms_nm"] == 0.5
+    assert not driver.calibration_file().exists()
+
+
+@pytest.mark.asyncio
+async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch):
+    """The action param has to reach the driver, or the gate is unadjustable."""
+    driver = AndorCalibratedDriver(
+        config={"dev_id": 0, "states_root": str(tmp_path), "host": "teststation"}
+    )
+    line_pixels = [200, 700, 1300, 1900, 2400]
+
+    def _spiked(n_frames, exp_time):
+        counts = _fake_lamp_frame(2560, line_pixels)
+        counts[1000] += 50000.0
+        return counts
+
+    monkeypatch.setattr(driver, "_capture_lamp_frame", _spiked)
+    # The same measurement the previous test watched the DEFAULT limit refuse.
+    # Only a limit that actually reached the driver can let it through.
+    active = _FakeCalibActive(
+        driver,
+        {
+            "lamp_lines_nm": [400.0 + 0.2 * p for p in line_pixels],
+            "degree": 3,
+            "max_fit_rms_nm": 1e6,
+        },
+    )
+    executor = AndorCalibrateWavelength(active=active, oneoff=True)
+    assert executor.max_fit_rms_nm == 1e6
+
+    result = await executor._exec()
+
+    assert result["error"] == ErrorCodes.none
+    assert result["data"]["fit_rms_nm"] > 0.5
+    assert driver.calibration_file().exists()

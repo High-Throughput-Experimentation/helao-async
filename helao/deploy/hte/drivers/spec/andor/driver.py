@@ -29,9 +29,16 @@ from helao.core.drivers.helao_driver import (
 
 from . import wl_calibration
 
-#: Hg-Ar pen-lamp lines, nm, in air. The default reference set so a routine
-#: recalibration is a bare POST. Override per-action with `lamp_lines_nm`.
-DEFAULT_LAMP_LINES_NM: list[float] = [
+#: Hg-Ar pen-lamp lines, nm, in air. A reference list to CHOOSE FROM, and
+#: deliberately not a default: which of these actually land on the detector
+#: depends on the grating and the central wavelength. This span is 404.7-912.3
+#: nm, while a 2560 x 6.5 um Zyla covers something on the order of 150-350 nm
+#: at one setting -- so most of these lines are off the detector at any given
+#: station. `find_peaks` has no notion of "absent": asked for nine peaks it
+#: returns the nine strongest maxima, noise included, and the fit then
+#: succeeds against wavelengths that were never measured. `run_wl_calibration`
+#: therefore refuses an empty `lamp_lines_nm` rather than substituting this.
+HG_AR_REFERENCE_LINES_NM: list[float] = [
     404.6565,
     435.8335,
     546.0750,
@@ -199,6 +206,21 @@ class AndorDriver(HelaoDriver):
             frames.append(image.sum(axis=0))
         return np.mean(np.vstack(frames), axis=0)
 
+    def _refused(self, why: str, data: Optional[dict] = None) -> DriverResponse:
+        """A ``failed`` response for a calibration that was rejected, not lost.
+
+        Logged as well as returned: the message is the only account of what
+        went wrong that reaches the station's log, and the caller may only
+        ever see ``failed``.
+        """
+        LOGGER.error("wavelength calibration REFUSED: %s", why)
+        return DriverResponse(
+            response=DriverResponseType.failed,
+            message=f"wavelength calibration refused: {why}",
+            data=dict(data or {}, applied=False),
+            status=DriverStatus.error,
+        )
+
     def run_wl_calibration(
         self,
         lamp_lines_nm: Optional[list] = None,
@@ -207,6 +229,7 @@ class AndorDriver(HelaoDriver):
         n_frames: int = 1,
         exp_time: float = 0.0098,
         degree: int = 3,
+        max_fit_rms_nm: float = 0.5,
         source_action_uuid: Optional[str] = None,
     ) -> DriverResponse:
         """Measure a calibration lamp, fit pixel-to-nm, and persist the result.
@@ -216,13 +239,41 @@ class AndorDriver(HelaoDriver):
         spectrograph station it is recorded for comparison against
         ``GetCalibration`` and leaves the live axis unchanged.
 
+        Nothing reaches disk until the fit has passed both quality gates. This
+        is the whole point of them: ``save`` overwrites the station's existing
+        calibration, and a wrong wavelength axis is invisible afterwards --
+        the spectra it produces look entirely plausible and carry no evidence
+        of the error. A misaligned lamp still yields one "peak" per requested
+        line, so the fit succeeding is not evidence that it is right.
+
+        Args:
+            lamp_lines_nm: Wavelengths of the lines visible on THIS detector
+                at its current grating and central wavelength. Required; see
+                :data:`HG_AR_REFERENCE_LINES_NM`.
+            lamp: Free-text lamp identifier, recorded in the calibration.
+            n_frames: Frames to average into the lamp spectrum.
+            exp_time: Exposure time per frame, seconds.
+            degree: Polynomial degree of the pixel-to-nm fit.
+            max_fit_rms_nm: Refuse to save a fit whose residual exceeds this.
+            source_action_uuid: The action driving this calibration, if any.
+
         Returns:
             A :class:`DriverResponse` whose ``data`` carries ``coeffs``,
             ``fit_rms_nm``, ``n_lines``, ``lamp``, ``path`` and ``applied``.
             Never raises: an action handler must not see an exception.
         """
         try:
-            lines = list(lamp_lines_nm) if lamp_lines_nm else DEFAULT_LAMP_LINES_NM
+            lines = list(lamp_lines_nm) if lamp_lines_nm else []
+            if not lines:
+                return self._refused(
+                    "no lamp_lines_nm given. This action has no default line "
+                    "table: which lines are on the detector depends on the "
+                    "grating and central wavelength, and a line that is not "
+                    "there still gets a noise maximum fitted to it. Pass the "
+                    "lines actually visible in the lamp spectrum -- "
+                    "HG_AR_REFERENCE_LINES_NM in this module is an Hg-Ar list "
+                    "to choose from, not a default."
+                )
             counts = self._capture_lamp_frame(n_frames, exp_time)
             calib = wl_calibration.fit_wavelength(
                 # fit_wavelength takes a Sequence[float]; an ndarray is not
@@ -232,8 +283,38 @@ class AndorDriver(HelaoDriver):
                 lines,
                 degree=degree,
                 lamp=lamp,
+                wl_source=(
+                    "calibration" if self.uses_lamp_calibration else "spectrograph"
+                ),
                 source_action_uuid=source_action_uuid,
             )
+            if calib.fit_rms_nm > max_fit_rms_nm:
+                return self._refused(
+                    f"fit residual {calib.fit_rms_nm:.4f} nm exceeds "
+                    f"max_fit_rms_nm={max_fit_rms_nm:.4f} over "
+                    f"{calib.n_lines} line(s). Nothing was written and the "
+                    "existing calibration is untouched. Check the lamp "
+                    "alignment and that every line passed is on the "
+                    "detector.",
+                    data={
+                        "fit_rms_nm": calib.fit_rms_nm,
+                        "max_fit_rms_nm": max_fit_rms_nm,
+                        "n_lines": calib.n_lines,
+                    },
+                )
+            if not wl_calibration.is_monotonic(wl_calibration.evaluate(calib)):
+                return self._refused(
+                    f"the fitted axis is not monotonic across "
+                    f"{calib.n_pixels} pixels, so two pixels would claim the "
+                    "same wavelength. Nothing was written. A degree "
+                    f"({degree}) higher than the lines can support is the "
+                    "usual cause.",
+                    data={
+                        "fit_rms_nm": calib.fit_rms_nm,
+                        "n_lines": calib.n_lines,
+                        "degree": degree,
+                    },
+                )
             path = self.calibration_file()
             wl_calibration.save(calib, path)
             LOGGER.info(
@@ -288,6 +369,7 @@ class AndorDriver(HelaoDriver):
             self.horiz_pixels, self.vert_pixels, self.stride, self.clock_hz = (
                 self.get_meta_data()
             )
+            self._warn_if_axis_does_not_span_the_detector()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
@@ -298,6 +380,32 @@ class AndorDriver(HelaoDriver):
             )
 
         return response
+
+    def _warn_if_axis_does_not_span_the_detector(self) -> None:
+        """Warn when the wavelength axis is not one entry per detector column.
+
+        A calibration recorded at one AOI width and applied at another leaves
+        the header's ``optional.wl`` a different length from the ``ch_*``
+        columns beside it, and nothing downstream compares the two. A warning
+        rather than a refusal: which of the two is wrong depends on what the
+        station meant to change, and refusing here would take out a station
+        that had simply narrowed its AOI deliberately.
+        """
+        if self.wl_arr is None or self.horiz_pixels is None:
+            return
+        try:
+            width = int(self.horiz_pixels)
+        except (TypeError, ValueError):
+            return
+        if len(self.wl_arr) != width:
+            LOGGER.warning(
+                "wavelength axis has %d points but the detector AOI is %d "
+                "pixels wide; the recorded header wl array will not line up "
+                "with the ch_* columns. Re-run /%s/calibrate_wl at this AOI.",
+                len(self.wl_arr),
+                width,
+                self.server_key,
+            )
 
     def cool(self):
         """Enable sensor cooling and block until the temperature stabilises.

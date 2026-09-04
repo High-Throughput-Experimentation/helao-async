@@ -383,10 +383,10 @@ server, `POST /ANDOR/calibrate_wl`. It is intentional and recorded in
 `helao/hexagon/tests/checklists/hte/_additions.json`. `adjust_nd` is unchanged.
 Any *other* ANDOR route delta is a regression, not this.
 
-### Two things this branch could not verify on Linux
+### Three things this branch could not verify on Linux
 
-Both are gates for the first Andor station, on top of the six already listed in
-the driver-split plan. Neither can be checked without the camera.
+All three are gates for the first Andor station, on top of the six already listed
+in the driver-split plan. None can be checked without the camera.
 
 1. **The 2-D sum axis is inferred, never measured.** `_capture_lamp_frame` sums
    `acquisition.image` down axis 0, reasoning that `setup_spectroscope`'s
@@ -397,7 +397,16 @@ the driver-split plan. Neither can be checked without the camera.
    still report an `fit_rms_nm`. Check the orientation against one real frame before
    trusting any fit.
 2. **Every fit in this branch ran against a synthetic Gaussian comb.** No real Hg-Ar
-   lamp has been through `fit_wavelength`, so the bundled `DEFAULT_LAMP_LINES_NM`
-   table has never been matched against real optics. Confirm at the station that the
-   default table resolves against a real lamp, and that after a successful
-   `calibrate_wl` the refreshed axis lets `acquire` proceed **without a restart**.
+   lamp has been through `fit_wavelength`. There is deliberately no default line
+   table — `calibrate_wl` refuses an empty `lamp_lines_nm` — so the first thing to
+   do at the station is work out which of `HG_AR_REFERENCE_LINES_NM` actually land
+   on the detector at that grating and central wavelength, and pass exactly those.
+   Then confirm that after a successful `calibrate_wl` the refreshed axis lets
+   `acquire` proceed **without a restart**.
+3. **`max_fit_rms_nm=0.5` is a chosen number, not a measured one.** It is the
+   threshold below which a fit is written and made live, and no real lamp has been
+   through it. Record the residual of the first few good calibrations at the
+   station and move the default if 0.5 nm turns out to be either unreachable or so
+   loose that a visibly misaligned lamp still clears it. The same run should
+   confirm the refusal path: a deliberately bad calibration must leave the previous
+   record in place and write a `<name>.json.prev` only on a fit that is accepted.
