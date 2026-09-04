@@ -196,3 +196,51 @@ def test_run_wl_calibration_reports_failure_without_raising(tmp_path, monkeypatc
     resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=3)
     assert resp.response == "failed"
     assert not d.calibration_file().exists()
+
+
+def test_a_successful_calibration_takes_effect_without_a_reconnect(
+    tmp_path, monkeypatch
+):
+    """`applied: True` must mean applied NOW, not at the next connect().
+
+    The driver reports `applied` from `uses_lamp_calibration`, which is a
+    property of the variant, not of what just happened. Left unrefreshed,
+    `wl_arr` stays whatever connect() found -- so an operator sees
+    `applied: true` and then watches `acquire` refuse anyway, which reads as
+    a broken station rather than as a missing restart.
+    """
+    d = _driver(tmp_path)
+    assert d.wl_arr is None, "no calibration on disk yet"
+    line_pixels = [200, 700, 1300, 1900, 2400]
+    true_nm = [400.0 + 0.2 * p for p in line_pixels]
+    monkeypatch.setattr(
+        d,
+        "_capture_lamp_frame",
+        lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
+    )
+
+    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+
+    assert resp.data["applied"] is True
+    # no connect() in between
+    assert d.wl_arr is not None, "`applied: True` while acquire would still refuse"
+    assert d.wl_arr.shape == (2560,)
+    assert d.wl_arr[0] == pytest.approx(400.0, abs=1.0)
+
+
+def test_a_failed_calibration_leaves_the_live_axis_alone(tmp_path, monkeypatch):
+    """A bad fit must not blank an axis that was working."""
+    d = _driver(tmp_path)
+    wlc.save(CALIB, d.calibration_file())
+    d.wl_arr = d._wavelengths()
+    before = d.wl_arr.copy()
+    monkeypatch.setattr(
+        d,
+        "_capture_lamp_frame",
+        lambda n_frames, exp_time: _fake_lamp_frame(2560, [200]),
+    )
+
+    resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=3)
+
+    assert resp.response == "failed"
+    np.testing.assert_array_equal(d.wl_arr, before)

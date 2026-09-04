@@ -1,9 +1,10 @@
 # shell: uvicorn motion_server:app --reload
 """Andor spectrograph/camera action server.
 
-Wraps :class:`AndorDriver` and exposes acquisition, cooling and ND-filter
-adjustment endpoints. Uses the :class:`Executor` model so the hardware driver
-remains decoupled from the action-server base class.
+Wraps :class:`AndorDriver` and exposes acquisition, cooling, ND-filter
+adjustment and lamp wavelength-calibration endpoints. Uses the
+:class:`Executor` model so the hardware driver remains decoupled from the
+action-server base class.
 """
 
 __all__ = ["makeApp"]
@@ -125,6 +126,54 @@ class AndorAdjustND(Executor):
         return {"error": error, "data": resp.data}
 
 
+class AndorCalibrateWavelength(Executor):
+    """Executor that measures a calibration lamp and fits the wavelength axis.
+
+    One-shot: ``_exec`` calls :meth:`AndorDriver.run_wl_calibration` and
+    forwards its data payload, which reports whether the fit became the live
+    axis on this station.
+    """
+
+    driver: AndorDriver
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        try:
+            # Executor defines no `driver` and no __getattr__, so the class
+            # annotation above binds nothing at runtime; _exec would raise
+            # AttributeError without this. AndorCooling and AndorAcquire do
+            # the same.
+            self.driver = self.active.driver
+            self.action_params = self.active.action.action_params
+            self.lamp_lines_nm = self.action_params.get("lamp_lines_nm") or None
+            self.lamp = self.action_params.get("lamp", "Hg-Ar")
+            self.n_frames = self.action_params.get("n_frames", 1)
+            self.exp_time = self.action_params.get("exp_time", 0.0098)
+            self.degree = self.action_params.get("degree", 3)
+        except Exception:
+            LOGGER.error("AndorCalibrateWavelength init failed", exc_info=True)
+
+    async def _exec(self) -> dict:
+        """Call :meth:`AndorDriver.run_wl_calibration` and forward its data."""
+        LOGGER.debug("Running driver.run_wl_calibration()")
+        resp = self.driver.run_wl_calibration(
+            self.lamp_lines_nm,
+            lamp=self.lamp,
+            n_frames=self.n_frames,
+            exp_time=self.exp_time,
+            degree=self.degree,
+            source_action_uuid=str(self.active.action.action_uuid),
+        )
+        error = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
+        # The failed branch of run_wl_calibration builds a DriverResponse with
+        # no `data` at all, so every field here is absent on exactly the path
+        # an operator most needs a result on. Reading one unguarded would
+        # raise out of the executor and turn a reported failure into a crash.
+        return {"error": error, "data": resp.data or {}}
+
+
 class AndorAcquire(Executor):
     """Executor that acquires spectra from the Andor camera.
 
@@ -237,7 +286,12 @@ async def andor_dyn_endpoints(app: ActionHost):
     """Register Andor action endpoints on ``app`` after the driver is ready.
 
     Disables concurrent actions on this server and attaches the ``acquire``,
-    ``cancel_acquire``, ``cooling`` and ``adjust_nd`` POST routes.
+    ``cancel_acquire``, ``cooling``, ``adjust_nd`` and ``calibrate_wl`` POST
+    routes. All are registered unconditionally: the frozen route checklist is
+    an AST extraction of source, so a decorator wrapped in a config test would
+    keep the source surface uniform while the live OpenAPI silently differed
+    per station -- a divergence no gate can observe. ``adjust_nd`` refuses at
+    runtime instead, on a station with no software-controlled ND wheel.
 
     Args:
         app: The :class:`ActionHost` instance being constructed by ``makeApp``.
@@ -288,7 +342,8 @@ async def andor_dyn_endpoints(app: ActionHost):
         if app.driver.wl_arr is None:
             LOGGER.error(
                 "acquire refused: no wavelength calibration on this station. "
-                "Run POST /%s/calibrate_wl, then restart this server.",
+                "Run POST /%s/calibrate_wl; on a wl_source=calibration station "
+                "the fit becomes the live axis immediately.",
                 server_key,
             )
             active = await ctx.begin()
@@ -343,8 +398,37 @@ async def andor_dyn_endpoints(app: ActionHost):
     @app.action()
     async def adjust_nd(ctx: ActionContext):
         """Run the ND-filter auto-selection routine via :class:`AndorAdjustND`."""
+        if not isinstance(app.driver, AndorSpectrographDriver):
+            LOGGER.error(
+                "adjust_nd refused: this station has no software-controlled ND "
+                "filter wheel (wl_source=calibration). Set the filter by hand."
+            )
+            active = await ctx.begin()
+            active.action.error_code = ErrorCodes.critical_error
+            finished_action = await active.finish()
+            return finished_action.as_dict()
         active = await ctx.begin()
         executor = AndorAdjustND(active=active, oneoff=True)
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.action()
+    async def calibrate_wl(
+        ctx: ActionContext,
+        lamp_lines_nm: list = [],
+        lamp: str = "Hg-Ar",
+        n_frames: int = 1,
+        exp_time: float = 0.0098,
+        degree: int = 3,
+    ):
+        """Measure a calibration lamp and fit this detector's wavelength axis.
+
+        Works on both driver variants. On a spectrograph station the fit is
+        recorded for comparison against ``GetCalibration`` and the live axis is
+        unchanged; the response's ``applied`` field says which happened.
+        """
+        active = await ctx.begin()
+        executor = AndorCalibrateWavelength(active=active, oneoff=True)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
