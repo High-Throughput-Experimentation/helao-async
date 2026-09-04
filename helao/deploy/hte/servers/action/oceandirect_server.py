@@ -13,7 +13,7 @@ can use is a property of its hardware:
   ``DATA_BUFFER``/``BACK_TO_BACK``, which plenty of devices lack -- an
   OCEANSR4 among them.
 * ``acquire_spec_extrig`` needs no buffer. It performs one blocking read per
-  external trigger (or free-running with ``trigger_mode=0``), which is how
+  external trigger (or one per request with ``trigger_mode=0``), which is how
   ``spec_server.py``'s SM303 path works. Software polling costs a USB round
   trip per spectrum and loses frames arriving between reads, so it replaces
   the buffered path's *duration*, not its rate.
@@ -204,7 +204,7 @@ class OceanDirectBufferExec(Executor):
 
 
 class OceanDirectExtrigExec(Executor):
-    """Externally-triggered (or free-running) acquisition without a buffer.
+    """Externally- or software-triggered acquisition without a buffer.
 
     The OceanDirect counterpart of ``spec_server.py``'s ``SM303Exec``, and the
     answer for a device with no ``DATA_BUFFER`` -- an OCEANSR4, for instance,
@@ -224,7 +224,7 @@ class OceanDirectExtrigExec(Executor):
       on a timeout but leaves the worker thread blocked in the vendor call
       until a trigger arrives or the device is closed. That is the same trade
       ``SM303Exec`` makes. It is why ``_post_exec`` disarms the trigger:
-      returning the device to free-running is what lets a pending read
+      returning the device to software triggering is what lets a pending read
       complete and the thread retire.
     * **The read must not hold the driver lock** (``serialize=False``). A wait
       of minutes would otherwise serialize the whole driver behind it,
@@ -345,7 +345,7 @@ class OceanDirectExtrigExec(Executor):
         return {"error": ErrorCodes.none, "status": status, "data": rows}
 
     async def _post_exec(self) -> dict:
-        """Disarm the trigger, returning the device to free-running."""
+        """Disarm the trigger, returning the device to software triggering."""
         await self._disarm()
         p = self.active.action.action_params
         p["spectra_emitted"] = self.emitted
@@ -359,7 +359,7 @@ class OceanDirectExtrigExec(Executor):
         return {"error": ErrorCodes.none}
 
     async def _disarm(self) -> None:
-        """Return the device to free-running, once."""
+        """Return the device to software triggering, once."""
         if not self.armed:
             return
         loop = asyncio.get_event_loop()
@@ -1002,7 +1002,14 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
             Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
         ] = Body([], embed=True),
         int_time_us: int = 100_000,
-        trigger_mode: int = int(SRTrigMode.ext_edge),
+        # Software, not ext_edge. Mode 0 is the power-on mode and the only one
+        # supported by *every* SR device, including an SR4 with the default
+        # Option 1 firmware -- confirmed on SR404456, where mode 0 takes and
+        # mode 1 is refused. Defaulting to external triggering made the
+        # endpoint fail out of the box on the very hardware it was added for,
+        # and this endpoint's value on a bufferless device is the long run;
+        # the external trigger is what a caller asks for explicitly.
+        trigger_mode: int = int(SRTrigMode.software),
         acquisition_delay_us: Optional[int] = None,
         n_spectra: Optional[int] = None,
         duration: float = -1,
@@ -1018,7 +1025,8 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
         one blocking read per trigger, so this returns immediately with an
         active action rather than holding the HTTP request open.
 
-        With ``trigger_mode=0`` (free-running) the same loop gives a long
+        With ``trigger_mode=0`` (software; one spectrum per request) the same
+        loop gives a long
         continuous acquisition without an HTTP timeout, which is the other
         thing the buffered path was for. Note what it cannot give: software
         polling reads one spectrum per USB round trip, so frames arriving
@@ -1030,12 +1038,15 @@ async def oceandirect_dyn_endpoints(app: ActionHost):
             ctx: Per-request action context supplied by the host.
             fast_samples_in: Sample references associated with this action.
             int_time_us: Integration time in microseconds.
-            trigger_mode: SR-series trigger mode: ``0`` software, ``1``
-                external edge (the default here), ``2`` external level. In
-                mode 2 the trigger pulse width *is* the integration time, so
-                ``int_time_us`` is ignored -- the action records
-                ``int_time_ignored`` when that applies. An SR4 with the
-                default Option 1 firmware supports only mode 0.
+            trigger_mode: SR-series trigger mode: ``0`` software (the default
+                here, and the only mode every SR device supports), ``1``
+                external edge, ``2`` external level. In mode 2 the trigger
+                pulse width *is* the integration time, so ``int_time_us`` is
+                ignored -- the action records ``int_time_ignored`` when that
+                applies. **An SR4 with the default Option 1 firmware supports
+                only mode 0**, and refuses 1 and 2 with a transport-level
+                error; confirmed on SR404456. Pass 1 or 2 only on a unit whose
+                firmware was ordered for external triggering.
             acquisition_delay_us: Delay between the Trigger Event and the
                 start of integration (``t_ACQDLY``; 0-335,500 us on an SR4).
                 ``None`` leaves the device's current value alone. This is the
