@@ -208,11 +208,13 @@ carries `Trigger` and a delay `td (h:m:s)` and no channel**, so `TTLwait` and
 `TTLduration` map cleanly but `TTLsend`'s channel has nowhere to go and is
 reported rather than dropped.
 
-**The templates cannot be produced on Linux.** They must be authored in the
-EC-Lab GUI and checked in. Three of the nine now exist — `CV.mps` real, and
-`TI.mps`/`TO.mps` extracted from the real `TI_CV_TO.mps` — leaving OCV, CA,
-CP, PEIS, GEIS and CAOCV. This is the one artifact this repo cannot generate
-for itself, and it stays on the implementation critical path.
+**The templates cannot be produced on Linux, and all nine now exist.** They
+were authored in the EC-Lab GUI (v11.72, SP-200) and committed: OCV, CA, CP,
+CV, PEIS, GEIS and CAOCV, plus TI and TO extracted from a real `TI_CV_TO.mps`.
+Every caption in the technique registry is checked against them by a test that
+runs on Linux, so this stopped being an at-station gate and became a
+regression guard. One template-side question survives — see CV's
+`AcqInterval__V` below.
 
 ### 3. `run_protocol`: an additive endpoint for GUI-authored protocols
 
@@ -493,11 +495,11 @@ station.
 
 None of these can be discharged from here.
 
-1. **Author the six remaining `.mps` templates** (OCV, CA, CP, PEIS, GEIS,
-   CAOCV) in the EC-Lab GUI and check them in, giving every parameter a
-   distinct value so the file disambiguates its own captions. Also settle
-   CV's `AcqInterval__V`, which has no EC-Lab row. Blocking: nothing
-   downstream of the patcher can be verified without the templates.
+1. **Settle CV's `AcqInterval__V`.** EC-Lab's Cyclic Voltammetry has no
+   `dE (mV)` row; `Step percent` and `N` govern recording, and the real
+   template holds `50` and `10`. Left unmapped rather than guessed, so those
+   template values stand on every CV. The station owner's call. All nine
+   templates are otherwise present and every caption is verified on Linux.
 2. **The ProgID** EC-Lab registers for `comtypes.client.CreateObject`.
 3. **The `MeasureDcValue` bulk-return probe** — does it return one point or
    every point from the index?
