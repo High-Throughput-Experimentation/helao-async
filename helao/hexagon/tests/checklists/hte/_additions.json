@@ -5,5 +5,19 @@
     "method": "post",
     "date": "2026-09-04",
     "why": "lamp wavelength calibration for stations without a software-controlled spectrograph; see docs/superpowers/specs/2026-09-04-andor-driver-split-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_protocol",
+    "method": "post",
+    "date": "2026-09-07",
+    "why": "run an EC-Lab GUI-authored .mps protocol as-is; OLE COM backend only; see docs/superpowers/specs/2026-09-07-biologic-olecom-driver-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_plan",
+    "method": "post",
+    "date": "2026-09-07",
+    "why": "run several techniques as one EC-Lib 2.0 experiment, with LOOP_START/LOOP_END repeats; eclib2 backend only, since neither sibling backend can load a multi-technique experiment in one call"
   }
 ]

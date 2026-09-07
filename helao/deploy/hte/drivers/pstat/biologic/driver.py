@@ -30,6 +30,7 @@ from helao.core.drivers.helao_driver import (
     HelaoDriver,
 )
 
+from .enum import ec_bandwidth, ec_erange, ec_irange
 from .technique import BiologicTechnique, resolve_easy_class
 
 
@@ -178,6 +179,7 @@ class BiologicDriver(HelaoDriver):
         self,
         technique: BiologicTechnique,
         action_params: dict = {},  # for mapping action keys to signal keys
+        output_dir: Optional[str] = None,
     ) -> DriverResponse:
         """Configure a channel for an upcoming measurement.
 
@@ -192,6 +194,9 @@ class BiologicDriver(HelaoDriver):
             action_params: Parameter dictionary supplied by the action server.
                 Must include ``channel`` and the technique-specific keys
                 listed in ``technique.parameter_map``.
+            output_dir: Absolute path of the action's output directory.
+                Accepted for signature parity with the OLE backend, which
+                ships its vendor artifacts there. Unused here.
 
         Returns:
             ``DriverResponse`` reporting setup success or failure.
@@ -203,6 +208,22 @@ class BiologicDriver(HelaoDriver):
             if self.channels[channel] is not None:
                 raise ValueError(f"Channel {channel} is in use.")
             parmap = technique.parameter_map
+            # The endpoints used to do this before dispatching the executor, but
+            # that put easy-biologic-specific objects in the layer the OLE backend
+            # also uses. Coercing here keeps action_params carrying the plain
+            # string -- which is also the more legible thing to record.
+            coercers = {
+                "IRange": ec_irange,
+                "ERange": ec_erange,
+                "Bandwidth": ec_bandwidth,
+                "CA_IRange": ec_irange,
+                "CA_ERange": ec_erange,
+                "CA_Bandwidth": ec_bandwidth,
+            }
+            action_params = {
+                key: coercers[key](value) if key in coercers else value
+                for key, value in action_params.items()
+            }
             mapped_params = {
                 parmap[k]: v for k, v in action_params.items() if k in parmap
             }
@@ -285,18 +306,23 @@ class BiologicDriver(HelaoDriver):
             types=self.channels[channel]._parameter_types,
         )
 
-    def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
+    def start_channel(
+        self, channel: int = 0, ttl_params: Optional[dict] = None
+    ) -> DriverResponse:
         """Start the previously configured technique on a channel.
 
         Args:
             channel: Channel index to start.
             ttl_params: TTL configuration forwarded to the easy-biologic
-                program's ``run`` call.
+                program's ``run`` call. ``None`` means no TTL, and is
+                normalized to an empty dict before forwarding -- the vendor
+                call takes a dict.
 
         Returns:
             ``DriverResponse`` with ``status=busy`` and the wall-clock
             ``start_time`` in ``data`` on success.
         """
+        ttl_params = ttl_params or {}
         try:
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")

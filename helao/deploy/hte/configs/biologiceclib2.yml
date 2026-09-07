@@ -1,0 +1,70 @@
+# Development config for the BioLogic EC-Lib 2.0 (eclib2) backend.
+#
+# Not a station config and not meant to become one. It exists so the whole
+# group -- orchestrator, action server, visualizer -- comes up on a machine
+# with no potentiostat, no EC-Lib DLL and no license file, which is how the
+# eclib2 backend is exercised off-station:
+#
+#     python launch.py biologiceclib2
+#
+# `simulate: true` selects `biologic_eclib2/sim.py` in place of the vendor SDK,
+# so `sdk_path` is not needed here. A real station sets `simulate: false` and
+# points `sdk_path` at its unpacked `biologic_ec_sdk` root -- the SDK ships no
+# installable distribution, so there is nothing to pin in `helao_dev_win-64.yml`
+# and the path is the only way to find it. The license file
+# (`license_biologic_<hexblob>.lic`) belongs at that root; without it every call
+# fails with EC_SDK_ERROR_LICENSE_NOT_VALID (-99900).
+#
+# `pstat_backend: eclib2` is what selects this backend. Omitting the key yields
+# `eclib` (easy-biologic), which is why every existing station config keeps
+# working unedited. The three backends are not versions of one thing: EC-Lib 2.0
+# is not backwards compatible with the EClib1 DLLs easy-biologic bundles, and
+# the OLE backend automates the EC-Lab application instead of either.
+#
+# The address is loopback and unused while simulating. On a station it is the
+# instrument's IP: EC-Lib 2.0 supports Ethernet only, not USB, and only the
+# VMP-300 / VSP-300 / SP-300 / SP-200 premium series with "P" boards.
+dummy: true
+simulation: true
+run_type: simulation
+# HELAO does not expand `~`; a tilde here creates a literal '~' directory in
+# the working directory, which for a dev launch is the repo itself.
+root: /tmp/helao-biologiceclib2
+experiment_libraries: []
+sequence_libraries: []
+servers:
+  ORCH:
+    host: 127.0.0.1
+    port: 8131
+    group: orchestrator
+    fast: async_orch2
+    params:
+      enable_op: false
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8132
+    group: action
+    deployment: hte
+    fast: biologic_server
+    action_vis: biologic_vis
+    params:
+      # Selects biologic_eclib2. Without this key the server would build the
+      # easy-biologic driver and fail at connect() with a vendor import error
+      # naming the wrong problem.
+      pstat_backend: eclib2
+      simulate: true
+      # Loopback: unused while simulating. A station puts its instrument IP here.
+      address: 127.0.0.1
+      # The simulated SP-300 reports a board in slot 0 only, so a larger value
+      # would log the extra channels as not plugged and expose them as such.
+      num_channels: 1
+      allow_no_sample: true
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5031
+    group: visualizer
+    deployment: hte
+    bokeh: action_visualizer
+    params:
+      doc_name: 'BIOLOGIC eclib2 Visualizer'
+      launch_browser: false
