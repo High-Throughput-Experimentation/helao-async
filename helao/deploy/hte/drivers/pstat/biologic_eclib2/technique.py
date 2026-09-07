@@ -54,6 +54,18 @@ READER_BY_IDENTIFIER: dict[str, str] = {
 
 TECHNIQUE_NAMES: tuple[str, ...] = ("OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV")
 
+#: Columns each technique emits. Known without any action parameters, so a
+#: station can check the contract against the eclib backend without a device.
+COLUMNS_BY_TECHNIQUE: dict[str, tuple[str, ...]] = {
+    "OCV": ec2data.OCV_COLUMNS,
+    "CA": ec2data.STEP_COLUMNS,
+    "CP": ec2data.STEP_COLUMNS,
+    "CV": ec2data.STEP_COLUMNS,
+    "PEIS": ec2data.EIS_COLUMNS,
+    "GEIS": ec2data.EIS_COLUMNS,
+    "CAOCV": ec2data.STEP_COLUMNS,
+}
+
 SWEEP_MODES: dict[str, str] = {
     "log": "EC_SDK_SWEEP_LOG",
     "lin": "EC_SDK_SWEEP_LINEAR",
@@ -125,6 +137,47 @@ class ActionPlan:
     technique_name: str
     techniques: tuple[TechniquePlan, ...]
     columns: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Eclib2Technique:
+    """This backend's registry entry, resolved by name before an action runs.
+
+    The counterpart of the eclib backend's ``BiologicTechnique`` and the OLE
+    backend's ``OleTechnique``, and as thin as it can be: a
+    ``BiologicTechnique`` names an easy-biologic program class and an
+    ``OleTechnique`` names an ``.mps`` template, but an EClib2 action is a
+    *plan* that cannot be built until the action's parameters are known -- the
+    step count decides how many array entries every step parameter needs. So
+    this carries the name, and :meth:`plan` builds the rest at ``setup`` time.
+
+    Attributes:
+        technique_name: The HELAO technique caption.
+        columns: Columns the action emits, known without any parameters.
+    """
+
+    technique_name: str
+    columns: tuple[str, ...]
+
+    def plan(self, action_params: dict) -> ActionPlan:
+        """Build the plan for this technique from an action's parameters."""
+        return build_plan(self.technique_name, action_params)
+
+
+def resolve(name: str) -> Eclib2Technique:
+    """The registry entry for ``name``.
+
+    Raises:
+        ValueError: On an unknown technique. Naming the alternatives matters
+            because the caller is usually a station config or an experiment
+            library, where a typo is otherwise diagnosed at the instrument.
+    """
+    if name not in TECHNIQUE_NAMES:
+        raise ValueError(
+            f"unknown eclib2 technique {name!r}; "
+            f"expected one of {sorted(TECHNIQUE_NAMES)}"
+        )
+    return Eclib2Technique(technique_name=name, columns=COLUMNS_BY_TECHNIQUE[name])
 
 
 # ---------------------------------------------------------------------------
