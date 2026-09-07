@@ -259,3 +259,37 @@ def test_setup_protocol_refuses_a_missing_file(tmp_path):
     driver.connect()
     response = driver.setup_protocol("absent.mps", {"channel": 0})
     assert response.response == "failed"
+
+
+def test_the_simulated_config_loads_and_selects_the_ole_backend():
+    from helao.helpers.config_loader import read_config
+
+    config = read_config("biologicole")
+    params = config["servers"]["BIOLOGIC"]["params"]
+    assert params["pstat_backend"] == "olecom"
+    assert params["simulate"] is True
+
+
+def test_the_simulated_config_has_no_duplicate_host_ports():
+    from helao.helpers.config_loader import read_config
+
+    config = read_config("biologicole")
+    endpoints = [
+        (server["host"], server["port"]) for server in config["servers"].values()
+    ]
+    assert len(endpoints) == len(set(endpoints)), endpoints
+
+
+def test_the_simulated_config_names_a_visualizer_the_panels_answer_to():
+    from helao.helpers.config_loader import read_config
+
+    config = read_config("biologicole")
+    assert config["servers"]["BIOLOGIC"]["action_vis"] == "biologic_vis"
+
+
+def test_the_templates_directory_exists_and_explains_itself():
+    from pathlib import Path
+
+    readme = Path("helao/deploy/hte/drivers/pstat/biologic_ole/templates/README.md")
+    assert readme.is_file()
+    assert "EC-Lab" in readme.read_text()

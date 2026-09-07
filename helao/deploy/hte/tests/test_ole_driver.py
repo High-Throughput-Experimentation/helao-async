@@ -274,6 +274,31 @@ def test_cleanup_moves_the_artifacts_into_the_action_directory(tmp_path, ca_temp
     assert list(action_dir.glob("*.mps")), list(action_dir.iterdir())
 
 
+def test_the_simulator_reports_the_configured_channel_count():
+    """A multi-channel server must not out-range its own fake device.
+
+    get_status() iterates range(num_channels); the sim defaults to one
+    channel. Left unthreaded, a `num_channels: 2` config logged a traceback
+    on every teardown -- caught inside get_status, so the group still shut
+    down and nothing failed, which is exactly why it survived until a real
+    `launch.py biologicole` run surfaced it.
+    """
+    driver = connected(num_channels=3)
+    response = driver.get_status()
+    assert response.response == DriverResponseType.success
+    assert sorted(response.data) == [0, 1, 2]
+    assert driver.disconnect().response == DriverResponseType.success
+
+
+def test_a_test_supplied_sim_config_survives_the_channel_override():
+    """The driver imposes n_channels without discarding run_seconds/kind."""
+    set_sim_config(SimConfig(run_seconds=0.0, kind="eis", n_eis_points=7))
+    driver = connected(num_channels=2)
+    assert sorted(driver.get_status().data) == [0, 1]
+    assert driver.client.com.config.kind == "eis"
+    assert driver.client.com.config.n_eis_points == 7
+
+
 def test_disconnect_clears_ready():
     driver = connected()
     assert driver.disconnect().response == DriverResponseType.success

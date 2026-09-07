@@ -3236,6 +3236,16 @@ def set_sim_config(config: SimConfig) -> None:
     _CONFIG = config
 
 
+def current_config() -> SimConfig:
+    """The module-level default configuration.
+
+    Exposed so a caller can derive from it rather than replace it -- the
+    driver imposes its own channel count without discarding whatever a test
+    set for run length or technique kind.
+    """
+    return _CONFIG
+
+
 def reset_sim() -> None:
     """Restore the stock default configuration."""
     set_sim_config(SimConfig())
@@ -4364,7 +4374,9 @@ class BiologicOleDriver(HelaoDriver):
 
     def _make_client(self) -> OleComClient:
         if self.simulate:
-            from .sim import make_factory
+            from dataclasses import replace
+
+            from . import sim as sim_module
 
             # WARNING, not INFO: a station left on `simulate: true` produces
             # plausible data from no instrument at all.
@@ -4372,7 +4384,18 @@ class BiologicOleDriver(HelaoDriver):
                 "BiologicOleDriver is SIMULATED (`simulate: true` on this "
                 "server's params). No instrument is being driven."
             )
-            return OleComClient(progid=self.progid, factory=make_factory())
+            # The fake device must report the channel count this server is
+            # configured for. get_status() iterates range(num_channels), so a
+            # sim left at its one-channel default makes every teardown log a
+            # traceback -- caught, so nothing fails, which is why it survives
+            # until someone reads the log. Derived from the module default so
+            # a test that set run length or technique kind keeps them.
+            sim_config = replace(
+                sim_module.current_config(), n_channels=self.num_channels
+            )
+            return OleComClient(
+                progid=self.progid, factory=sim_module.make_factory(sim_config)
+            )
         return OleComClient(progid=self.progid)
 
     def _read_version(self) -> str:
