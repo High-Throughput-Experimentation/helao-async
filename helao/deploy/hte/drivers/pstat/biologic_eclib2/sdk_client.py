@@ -421,8 +421,24 @@ class SdkClient:
             )
 
         from helao.deploy.hte.drivers.pstat.biologic_eclib2.technique import (
+            LOOP_IDENTIFIERS,
             READER_BY_IDENTIFIER,
         )
+
+        if identifier in LOOP_IDENTIFIERS:
+            # A loop measures nothing, so the firmware should not tag a buffer
+            # with one. Skipped rather than refused: handing these rows to a
+            # BL_ProcessRawTo* would decode whatever happens to be in the
+            # buffer as a measurement, and refusing would end an otherwise
+            # healthy plan over a control technique.
+            LOGGER.debug("eclib2 skipped a buffer tagged %s", identifier)
+            return PollResult(
+                running=running,
+                rows=0,
+                table={c: [] for c in columns},
+                technique_index=int(info.technique_index),
+                technique_identifier=identifier,
+            )
 
         reader = READER_BY_IDENTIFIER.get(identifier)
         if reader is None:

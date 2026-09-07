@@ -49,6 +49,8 @@ TechniqueIdentifier = Enum(
         "EC_SDK_TECHNIQUE_CV": 103,
         "EC_SDK_TECHNIQUE_PEIS": 104,
         "EC_SDK_TECHNIQUE_GEIS": 107,
+        "EC_SDK_TECHNIQUE_LOOP_START": 500,
+        "EC_SDK_TECHNIQUE_LOOP_END": 501,
     },
 )
 
@@ -171,6 +173,8 @@ IntParameter = Enum(
                 "EC_SDK_N_CYCLES",
                 "EC_SDK_SCAN_NUMBER",
                 "EC_SDK_STEP_NUMBER",
+                "EC_SDK_LOOP_ID",
+                "EC_SDK_LOOP_N_TIMES",
             ]
         )
     },
@@ -566,7 +570,26 @@ class SimECLibAPI:
             I_range=IRangeValue.EC_SDK_IRANGE_1mA,
         )
 
+    #: Loop control techniques carry no measurement, so the firmware never
+    #: emits a data buffer tagged with one. The simulator skips them for the
+    #: same reason. It does *not* simulate the repetition itself -- a plan with
+    #: a loop yields one pass of its span here, so a test that asserted "the
+    #: loop repeated" would be testing this file rather than the driver.
+    LOOP_NAMES = frozenset({"EC_SDK_TECHNIQUE_LOOP_START", "EC_SDK_TECHNIQUE_LOOP_END"})
+
+    def _skip_loops(self, chan: _Channel) -> None:
+        """Advance the cursor past any loop control technique."""
+        while (
+            chan.experiment is not None
+            and chan.cursor < len(chan.experiment.techniques)
+            and chan.experiment.techniques[chan.cursor].identifier.name
+            in self.LOOP_NAMES
+        ):
+            chan.cursor += 1
+            chan.served = 0
+
     def _has_more(self, chan: _Channel) -> bool:
+        self._skip_loops(chan)
         return chan.experiment is not None and chan.cursor < len(
             chan.experiment.techniques
         )
