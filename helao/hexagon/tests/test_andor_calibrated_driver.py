@@ -92,7 +92,60 @@ def test_connect_succeeds_without_a_calibration(tmp_path, monkeypatch, caplog):
 
     resp = d.connect()
     assert resp.response == "success"
-    assert d.wl_arr is None
+    # Not None: connect() substitutes the bare channel index so acquire can
+    # run before the station has ever been calibrated. get_meta_data is
+    # stubbed to report a 1-pixel AOI here, so the index is [0.0].
+    assert d.wl_arr is not None
+    assert list(d.wl_arr) == [0.0]
+    assert d.wl_calibrated is False
+
+
+def test_the_channel_index_is_one_entry_per_detector_column(tmp_path, monkeypatch):
+    """The substitute axis must line up with the ch_* columns beside it."""
+
+    class _FakeCam:
+        pass
+
+    class _FakeSDK:
+        def GetCamera(self, dev_id):
+            return _FakeCam()
+
+    monkeypatch.setattr(andor_driver, "_load_camera", lambda: None)
+    monkeypatch.setattr(andor_driver, "AndorSDK3", _FakeSDK, raising=False)
+
+    d = _driver(tmp_path)
+    monkeypatch.setattr(d, "setup_image", lambda: 1024)
+    monkeypatch.setattr(d, "get_meta_data", lambda: (2560, 2160, 1, 1))
+
+    d.connect()
+    assert d.wl_arr is not None
+    assert len(d.wl_arr) == 2560
+    assert d.wl_arr[0] == 0.0 and d.wl_arr[-1] == 2559.0
+    assert d.wl_calibrated is False
+
+
+def test_a_real_calibration_is_not_replaced_by_the_index(tmp_path, monkeypatch):
+    """The substitution must never overwrite a measured axis."""
+
+    class _FakeCam:
+        pass
+
+    class _FakeSDK:
+        def GetCamera(self, dev_id):
+            return _FakeCam()
+
+    monkeypatch.setattr(andor_driver, "_load_camera", lambda: None)
+    monkeypatch.setattr(andor_driver, "AndorSDK3", _FakeSDK, raising=False)
+
+    d = _driver(tmp_path)
+    wlc.save(CALIB, d.calibration_file())
+    monkeypatch.setattr(d, "setup_image", lambda: 1024)
+    monkeypatch.setattr(d, "get_meta_data", lambda: (16, 1, 1, 1))
+
+    d.connect()
+    assert d.wl_calibrated is True
+    assert d.wl_arr is not None
+    assert d.wl_arr[0] == pytest.approx(400.0)
 
 
 def test_an_unreadable_model_is_refused_not_guessed(tmp_path):

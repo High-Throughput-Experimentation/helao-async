@@ -351,17 +351,27 @@ async def andor_dyn_endpoints(app: ActionHost):
         Channel columns ``ch_0000..ch_NNNN`` carry per-pixel intensities and the
         ``wl`` array from the driver is embedded in the file header.
 
-        Refuses outright when the driver has no wavelength axis. It cannot
-        fall back to a bare pixel index: the channel names come from
-        ``wl_arr.shape[0]`` and the header's ``optional.wl`` is the array
-        itself, so a fallback would record a run against a fabricated axis
-        that looks entirely healthy afterwards.
+        Runs whether or not the station has been wavelength-calibrated. When
+        it has not, the driver puts the bare channel index in ``wl_arr`` and
+        ``wl`` carries ``0..n-1`` instead of nanometres.
+
+        Every action records ``calibrated`` in its params, and that parameter
+        is what makes the substitution safe: an uncalibrated run is
+        indistinguishable from a real one in the recorded numbers alone, so
+        the flag is the only thing that tells them apart afterwards. It is
+        written on BOTH paths -- an absent key would be ambiguous, and older
+        records predate it.
+
+        Refuses only when the driver has no axis at all, which means
+        ``connect()`` never succeeded and there is no camera to read.
         """
         if app.driver.wl_arr is None:
             LOGGER.error(
-                "acquire refused: no wavelength calibration on this station. "
-                "Run POST /%s/calibrate_wl; on a wl_source=calibration station "
-                "the fit becomes the live axis immediately.",
+                "acquire refused: the driver has no wavelength axis at all, "
+                "so connect() did not succeed on /%s. This is a camera or "
+                "vendor-SDK fault, not a missing calibration -- an "
+                "uncalibrated station still acquires, against the channel "
+                "index. Check the server's startup log.",
                 server_key,
             )
             active = await ctx.begin()
@@ -381,6 +391,19 @@ async def andor_dyn_endpoints(app: ActionHost):
                 optional={"wl": list(app.driver.wl_arr)},
             ),
         )
+
+        # Recorded on both paths: `False` says `wl` is the channel index, not
+        # nanometres. Written after ctx.begin so it lands in the action params
+        # the record keeps, the same way AndorAcquire writes `action_path`.
+        active.action.action_params["calibrated"] = bool(
+            getattr(app.driver, "wl_calibrated", False)
+        )
+        if not active.action.action_params["calibrated"]:
+            LOGGER.warning(
+                "acquiring on /%s without a wavelength calibration: `wl` is "
+                "the channel index and this action records calibrated=False",
+                server_key,
+            )
 
         # decide on abbreviated action name
         active.action.action_abbr = "ANDORSPEC"
