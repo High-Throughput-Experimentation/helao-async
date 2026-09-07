@@ -43,7 +43,7 @@
 | `helao/deploy/hte/drivers/pstat/biologic_ole/sim.py` | Fake COM server over synthetic MPR value tables. |
 | `helao/deploy/hte/drivers/pstat/biologic_ole/mpr_cursor.py` | Point cursor and column assembly over the `Measure*` reads. |
 | `helao/deploy/hte/drivers/pstat/biologic_ole/driver.py` | `BiologicOleDriver`, the ten-method surface. |
-| `helao/deploy/hte/drivers/pstat/biologic_ole/templates/*.mps` | Nine templates. **Three already committed** — `CV.mps` (real, GUI-authored) plus `TI.mps`/`TO.mps` derived from a real `TI_CV_TO.mps`. Six remain (at-station gate 1). |
+| `helao/deploy/hte/drivers/pstat/biologic_ole/templates/*.mps` | Nine templates. **Eight already committed**, all real GUI-authored EC-Lab v11.72 / SP-200 files (`TI`/`TO` extracted from a real `TI_CV_TO.mps`). Only `CAOCV.mps` remains. |
 | `helao/deploy/hte/configs/biologicole.yml` | Simulated dev config, launchable on Linux. |
 | `helao/deploy/hte/tests/test_ole_status.py` | Task 1 tests. |
 | `helao/deploy/hte/tests/test_ole_mps_template.py` | Task 2 tests. |
@@ -393,7 +393,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Create: `helao/deploy/hte/drivers/pstat/biologic_ole/mps_template.py`
-- Already present: `helao/deploy/hte/tests/fixtures/ole/CV.mps`, `helao/deploy/hte/tests/fixtures/ole/TI_CV_TO.mps` — **real GUI-authored EC-Lab v11.72 files from an SP-200**, committed as fixtures
+- Already present: `helao/deploy/hte/tests/fixtures/ole/{CV,TI_CV_TO,LSV}.mps` — **real GUI-authored EC-Lab v11.72 files from an SP-200**, committed as fixtures. `LSV.mps` is not a technique this backend runs; it is kept because it spells a caption `step percent` where `CV.mps` spells it `Step percent`, from the same EC-Lab build — the evidence that captions must be read, never derived
 - Create: `helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps`
 - Test: `helao/deploy/hte/tests/test_ole_mps_template.py`
 
@@ -1101,10 +1101,14 @@ right column name.
 
 import pytest
 
+from pathlib import Path
+
 from helao.deploy.hte.drivers.pstat.biologic.technique import BIOTECHS
 from helao.deploy.hte.drivers.pstat.biologic_ole import technique as ot
 
 TECHNIQUE_NAMES = ["OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"]
+TEMPLATES = Path("helao/deploy/hte/drivers/pstat/biologic_ole/templates")
+FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
 
 
 def test_every_eclib_technique_has_an_ole_counterpart():
@@ -1224,15 +1228,99 @@ def test_cv_does_not_map_a_voltage_recording_interval():
     assert "AcqInterval__V" not in ot.resolve("CV").parameter_map
 
 
-def test_the_cv_captions_exist_in_the_real_template():
-    """Read off tests/fixtures/ole/CV.mps, not inferred."""
+#: Every technique in the registry has a real GUI-authored template
+#: committed, so the caption guard below covers the whole surface.
+TEMPLATED = ["OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"]
+
+
+@pytest.mark.parametrize("name", TEMPLATED)
+def test_every_caption_exists_in_the_real_template(name):
+    """The guard the whole registry rests on, and it runs on Linux.
+
+    Each caption is read off a GUI-authored EC-Lab v11.72 file rather than
+    inferred. A caption that drifts -- or a template replaced by one from a
+    different EC-Lab version that renamed a row -- fails here instead of at a
+    station, where the symptom is an experiment that ran on the template's
+    defaults with nothing to show it.
+    """
     from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
 
-    doc = mt.load("helao/deploy/hte/tests/fixtures/ole/CV.mps")
-    for param in ot.resolve("CV").parameter_map.values():
-        mt.get_param(doc, param.param_id)  # raises if the row is absent
+    tech = ot.resolve(name)
+    doc = mt.load(TEMPLATES / tech.template)
+    for key, param in tech.parameter_map.items():
+        mt.get_param(doc, param.param_id, technique=param.technique)
         if param.unit_param_id:
-            mt.get_param(doc, param.unit_param_id)
+            mt.get_param(doc, param.unit_param_id, technique=param.technique)
+
+
+@pytest.mark.parametrize("name", TEMPLATED)
+def test_the_erange_pair_exists_in_every_real_template(name):
+    """erange_rows writes both, and OCV has them despite having no I Range."""
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    doc = mt.load(TEMPLATES / ot.resolve(name).template)
+    for caption in ("E range min (V)", "E range max (V)"):
+        mt.get_param(doc, caption)
+
+
+def test_caocv_is_the_only_two_technique_template():
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    counts = {
+        name: mt.n_techniques(mt.load(TEMPLATES / ot.resolve(name).template))
+        for name in TEMPLATED
+    }
+    assert counts.pop("CAOCV") == 2
+    assert set(counts.values()) == {1}, counts
+
+
+def test_caocv_scoping_is_not_optional():
+    """Both of its blocks carry `E range min (V)`, `E range max (V)`, `record`.
+
+    Unscoped, every one of those patches lands in the CA block and the OCV
+    step silently keeps the template's values.
+    """
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    doc = mt.load(TEMPLATES / "CAOCV.mps")
+    for caption in ("E range min (V)", "E range max (V)", "record"):
+        mt.get_param(doc, caption, technique=0)
+        mt.get_param(doc, caption, technique=1)
+
+
+def test_every_caocv_parameter_declares_its_block():
+    for key, param in ot.resolve("CAOCV").parameter_map.items():
+        assert param.technique in (0, 1), (key, param.technique)
+        assert param.technique == (0 if key.startswith("CA_") else 1), key
+
+
+def test_the_templates_agree_on_one_eclab_version():
+    """A template from another build may have renamed a row silently."""
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    versions = set()
+    for path in sorted(TEMPLATES.glob("*.mps")):
+        for line in mt.load(path).lines:
+            if line.startswith("EC-LAB for windows"):
+                versions.add(line.strip())
+                break
+    assert len(versions) == 1, versions
+
+
+def test_captions_are_case_sensitive_and_inconsistent_across_techniques():
+    """CV spells it `Step percent`; LSV spells it `step percent`.
+
+    Both are real, in files from the same EC-Lab build. This is why every
+    caption is read from a template rather than derived from a convention.
+    """
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    cv = mt.load(FIXTURES / "CV.mps")
+    lsv = mt.load(FIXTURES / "LSV.mps")
+    assert mt.get_param(cv, "Step percent") == "50"
+    assert mt.get_param(lsv, "step percent") == "50"
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(cv, "step percent")
 
 
 def test_the_scan_rate_scales_to_the_unit_the_template_carries():
@@ -1287,6 +1375,26 @@ def test_a_volts_parameter_landing_in_a_millivolt_row_is_scaled():
     assert ot.format_value(0.01, "V_to_mV") == "10.000"
     assert ot.resolve("PEIS").parameter_map["Vamp__V"].param_id == "Va (mV)"
     assert ot.resolve("PEIS").parameter_map["Vamp__V"].fmt == "V_to_mV"
+
+
+def test_the_current_range_is_written_as_eclabs_display_string():
+    """The real templates hold `Auto`, `100 µA`, `1 mA` -- not `u100`."""
+    assert ot.format_value("AUTO", "irange") == "Auto"
+    assert ot.format_value("u100", "irange") == "100 \u00b5A"
+    assert ot.format_value("m1", "irange") == "1 mA"
+    assert ot.resolve("CA").parameter_map["IRange"].fmt == "irange"
+
+
+def test_an_irange_eclab_cannot_spell_is_refused():
+    """KEEP and BOOSTER have no observed spelling; guessing one is worse."""
+    for alias in ("KEEP", "BOOSTER", "nonsense"):
+        with pytest.raises(ValueError, match=alias):
+            ot.format_value(alias, "irange")
+
+
+def test_every_irange_spelling_uses_the_latin1_micro_sign():
+    for alias in ("u1", "u10", "u100"):
+        assert ot.IRANGE_VALUES[alias].encode("latin-1").count(b"\xb5") == 1
 
 
 def test_the_sweep_mode_row_is_spacing_and_its_values_are_words():
@@ -1364,9 +1472,11 @@ __all__ = [
     "OleTechnique",
     "SPACING_VALUES",
     "UNIT_PREFIXES",
+    "IRANGE_VALUES",
     "VAR_CODES",
     "columns",
     "erange_rows",
+    "irange_value",
     "resolve",
     "scale_to_unit",
     "spacing_value",
@@ -1600,6 +1710,48 @@ def erange_rows(value: str) -> dict[str, str]:
     }
 
 
+#: How each ``EC_IRange`` alias is spelled in the ``.mps`` ``I Range`` row.
+#: EC-Lab writes a **display string**, not the alias -- the real templates
+#: hold ``Auto``, ``100 µA`` and ``1 mA``. Writing ``u100`` gives a file that
+#: loads and runs on whatever range the template carried.
+#:
+#: ``KEEP`` and ``BOOSTER`` are absent deliberately: no observed template
+#: shows how EC-Lab spells them, and ``irange_value`` refuses rather than
+#: inventing a string the device would silently reject or misread.
+IRANGE_VALUES = {
+    "p100": "100 pA",
+    "n1": "1 nA",
+    "n10": "10 nA",
+    "n100": "100 nA",
+    "u1": "1 \u00b5A",
+    "u10": "10 \u00b5A",
+    "u100": "100 \u00b5A",
+    "m1": "1 mA",
+    "m10": "10 mA",
+    "m100": "100 mA",
+    "a1": "1 A",
+    "AUTO": "Auto",
+}
+
+
+def irange_value(value: str) -> str:
+    """EC-Lab's ``I Range`` display string for an ``EC_IRange`` alias.
+
+    Raises:
+        ValueError: On ``KEEP``, ``BOOSTER`` or an unknown alias. Refusing is
+            the point: this row silently determines the measurement range, so
+            a value EC-Lab does not recognise is a wrong experiment rather
+            than an error, and a guessed spelling is the same thing.
+    """
+    try:
+        return IRANGE_VALUES[str(value)]
+    except KeyError:
+        raise ValueError(
+            f"no EC-Lab I Range spelling for {value!r}; expected one of "
+            f"{sorted(IRANGE_VALUES)}"
+        ) from None
+
+
 #: How each HELAO ``SweepMode`` value is spelled in the ``.mps`` ``spacing``
 #: row. The caption is ``spacing``, not ``sweep``, and the values are words.
 SPACING_VALUES = {"lin": "Linear", "log": "Logarithmic"}
@@ -1618,7 +1770,7 @@ def spacing_value(value: str) -> str:
 #: onto a single caption would write the string "AUTO" into a field EC-Lab
 #: reads as a voltage.
 _RANGES = {
-    "IRange": MpsParam(param_id="I Range"),
+    "IRange": MpsParam(param_id="I Range", fmt="irange"),
     "Bandwidth": MpsParam(param_id="Bandwidth", fmt="bandwidth"),
 }
 
@@ -1773,7 +1925,7 @@ OLE_TECHS: dict[str, OleTechnique] = {
             "CA_AcqInterval__A": MpsParam(
                 param_id="dI", unit_param_id="unit dI", base_unit="A", technique=0
             ),
-            "CA_IRange": MpsParam(param_id="I Range", technique=0),
+            "CA_IRange": MpsParam(param_id="I Range", fmt="irange", technique=0),
             "CA_Bandwidth": MpsParam(
                 param_id="Bandwidth", fmt="bandwidth", technique=0
             ),
@@ -2014,6 +2166,8 @@ def format_value(value, fmt: str) -> str:
     * ``"V_to_mV"`` -- a volts parameter landing in a millivolts row
       (``Va (mV)``, ``dER (mV)``, ``dEs (mV)``). Otherwise a 1000x error.
     * ``"spacing"`` -- a sweep mode as EC-Lab's word, "Linear"/"Logarithmic".
+    * ``"irange"`` -- a current range as EC-Lab's display string, e.g.
+      ``100 µA``. Writing the ``u100`` alias runs on the template's range.
 
     Anything else is a plain spec applied verbatim. Values needing a companion
     unit row never come through here -- see ``scale_to_unit``.
@@ -2039,6 +2193,8 @@ def format_value(value, fmt: str) -> str:
         return f"{float(value) * 1000.0:.3f}"
     if fmt == "spacing":
         return spacing_value(value)
+    if fmt == "irange":
+        return irange_value(value)
     return fmt.format(value)
 ```
 
@@ -6162,22 +6318,28 @@ Nine files belong here. They are EC-Lab settings files, authored in the EC-Lab
 GUI against the instrument that will run them, then saved and committed —
 **this repository cannot generate them.**
 
-| File | Technique | Status |
-|---|---|---|
-| `CV.mps` | Cyclic Voltammetry | **present** — real, EC-Lab v11.72, SP-200 |
-| `TI.mps` | Trigger In | **present** — block extracted from a real `TI_CV_TO.mps` |
-| `TO.mps` | Trigger Out | **present** — same |
-| `OCV.mps` | Open Circuit Voltage | needed |
-| `CA.mps` | Chronoamperometry | needed |
-| `CP.mps` | Chronopotentiometry | needed |
-| `PEIS.mps` | Potentio Electrochemical Impedance Spectroscopy | needed |
-| `GEIS.mps` | Galvano Electrochemical Impedance Spectroscopy | needed |
-| `CAOCV.mps` | Chronoamperometry then Open Circuit Voltage, two techniques | needed |
+**All nine are present**, and all are real GUI-authored EC-Lab v11.72 files
+from an SP-200:
 
-Author the missing six with **distinct, recognizable values on every
-parameter**. A file whose vertices are all `0.000` proves nothing about which
-caption is which; the `CV.mps` here works as a reference precisely because
-`Ei`, `E1`, `E2` and `Ef` hold four different numbers.
+| File | Technique | Note |
+|---|---|---|
+| `OCV.mps` | Open Circuit Voltage | |
+| `CA.mps` | Chronoamperometry / Chronocoulometry | |
+| `CP.mps` | Chronopotentiometry | |
+| `CV.mps` | Cyclic Voltammetry | |
+| `PEIS.mps` | Potentio Electrochemical Impedance Spectroscopy | |
+| `GEIS.mps` | Galvano Electrochemical Impedance Spectroscopy | |
+| `CAOCV.mps` | Chronoamperometry then Open Circuit Voltage | **two** blocks, saved as `CA_OCV.mps` |
+| `TI.mps` | Trigger In | block extracted from a real `TI_CV_TO.mps` |
+| `TO.mps` | Trigger Out | same |
+
+`test_ole_technique.py` checks every caption in the registry against these
+files on Linux, so a template replaced by one from a different EC-Lab build
+that renamed a row fails in CI rather than at a station. If you re-export any
+of them, give every parameter a **distinct** value — a file whose steps are
+all `0.000` cannot disambiguate its own captions, which is exactly what makes
+`CV.mps` usable as a reference (`Ei`, `E1`, `E2`, `Ef` hold four different
+numbers).
 
 Authoring them in the GUI is not a convenience — it is the only way to be sure
 the settings are ones the hardware accepts. `LoadSettings` returns 0 for
@@ -6355,15 +6517,13 @@ None of these can be discharged on Linux and none are part of the tasks above.
 Every task completes and verifies without them; what they unblock is a *real*
 station, not the plan.
 
-1. **Author the six remaining `.mps` templates** — OCV, CA, CP, PEIS, GEIS,
-   CAOCV — in the EC-Lab GUI and commit them. `CV.mps`, `TI.mps` and `TO.mps`
-   are already present and real. Give every parameter a distinct value, or the
-   file cannot disambiguate its own captions. Then check each against
-   `technique.py`'s `parameter_map`. Blocking for everything downstream of the
-   patcher.
-1b. **Settle CV's `AcqInterval__V`.** EC-Lab's CV has no `dE (mV)` row;
-   `Step percent` and `N` govern recording instead. Currently unmapped, so the
-   template's values stand. Needs the station owner's judgement, not a guess.
+1. **Settle CV's `AcqInterval__V`.** EC-Lab's Cyclic Voltammetry has no
+   `dE (mV)` row — `Step percent` and `N` govern recording instead, and the
+   real `CV.mps` holds `50` and `10`. `AcqInterval__V` is unmapped, so those
+   template values stand on every CV this backend runs. Needs the station
+   owner's judgement, not a guess. **This is the only remaining
+   template-side question**; all nine templates are present and every
+   registry caption is verified against them on Linux.
 2. **The ProgID.** `DEFAULT_PROGID = "EC-Lab.Application"` is conventional, not
    documented. Confirm it, or set the `progid` server param.
 3. **The `MeasureDcValue` bulk-return probe.** Read one index from a file with
