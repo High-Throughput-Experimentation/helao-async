@@ -64,8 +64,34 @@ class _FakeApp:
 
 class _FakeActive:
     def __init__(self):
-        self.action = SimpleNamespace(error_code=ErrorCodes.none, action_abbr=None)
+        self.action = SimpleNamespace(
+            error_code=ErrorCodes.none,
+            action_abbr=None,
+            # The real Action carries this; acquire writes `calibrated` into
+            # it, the same way AndorAcquire writes `action_path`.
+            action_params={
+                # AndorAcquire reads these in its own __init__, which the
+                # calibrated-flag tests reach because they run the handler
+                # past ctx.begin rather than stopping at it.
+                "external_trigger": False,
+                "duration": 1.0,
+                "timeout": 5000,
+                "frames_per_poll": 10,
+                "buffer_count": 2,
+                "exp_time": 0.0098,
+                "framerate": 98,
+            },
+            action_name="acquire",
+            action_uuid="fake-uuid",
+            exec_id=None,
+            action_output_dir="/tmp/fake",
+        )
         self.finished = False
+        self.started_executor = None
+
+    def start_executor(self, executor):
+        self.started_executor = executor
+        return {"started": True}
 
     async def finish(self):
         self.finished = True
@@ -92,8 +118,14 @@ async def _registered_acquire(wl_arr):
 
 
 @pytest.mark.asyncio
-async def test_acquire_refuses_without_a_wavelength_axis():
-    """A fallback pixel index would record a run against a fabricated axis."""
+async def test_acquire_refuses_when_the_driver_has_no_axis_at_all():
+    """`wl_arr is None` now means connect() failed, not "uncalibrated".
+
+    An uncalibrated station acquires against the channel index, which
+    connect() substitutes once it knows the AOI width. So a driver that
+    still has no axis never got that far -- there is no camera to read and
+    refusing is the only honest answer.
+    """
     _app, acquire = await _registered_acquire(None)
     ctx = _FakeCtx()
 
@@ -426,3 +458,57 @@ def test_every_executor_binds_its_driver(cls):
         f"{cls.__name__} did not bind self.driver; a class annotation alone "
         "binds nothing and _exec will raise AttributeError at runtime"
     )
+
+
+# --- the calibrated flag ------------------------------------------------------
+#
+# An uncalibrated run and a real one are indistinguishable in the recorded
+# numbers: both carry a `wl` array and per-pixel counts. The action param is
+# the ONLY thing that tells them apart afterwards, which is what makes running
+# uncalibrated safe rather than a silent-wrong-axis hazard. It is recorded on
+# both paths -- an absent key would be ambiguous with records predating it.
+
+
+@pytest.mark.asyncio
+async def test_acquire_records_calibrated_false_on_the_channel_index():
+    app, acquire = await _registered_acquire(np.arange(4, dtype=float))
+    app.driver.wl_calibrated = False
+    ctx = _FakeCtx()
+
+    await acquire(ctx)
+
+    assert ctx.active.action.action_params["calibrated"] is False
+    # The index still sizes the columns and fills the header, so the record
+    # is well-formed -- it is just indices rather than nanometres.
+    assert ctx.begin_kwargs["json_data_keys"] == [
+        "elapsed_time_s",
+        "ch_0000",
+        "ch_0001",
+        "ch_0002",
+        "ch_0003",
+    ]
+    assert ctx.begin_kwargs["hloheader"].optional["wl"] == [0.0, 1.0, 2.0, 3.0]
+
+
+@pytest.mark.asyncio
+async def test_acquire_records_calibrated_true_on_a_real_axis():
+    app, acquire = await _registered_acquire(np.linspace(400.0, 900.0, 4))
+    app.driver.wl_calibrated = True
+    ctx = _FakeCtx()
+
+    await acquire(ctx)
+
+    assert ctx.active.action.action_params["calibrated"] is True
+
+
+@pytest.mark.asyncio
+async def test_calibrated_defaults_to_false_on_a_driver_without_the_flag():
+    """A driver predating the flag must not read as calibrated."""
+    app, acquire = await _registered_acquire(np.arange(4, dtype=float))
+    if hasattr(app.driver, "wl_calibrated"):
+        delattr(app.driver, "wl_calibrated")
+    ctx = _FakeCtx()
+
+    await acquire(ctx)
+
+    assert ctx.active.action.action_params["calibrated"] is False

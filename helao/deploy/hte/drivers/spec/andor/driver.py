@@ -90,6 +90,11 @@ class AndorDriver(HelaoDriver):
     # calibration, so _wavelengths() legitimately returns None there. acquire
     # refuses on None rather than measuring against a fabricated axis.
     wl_arr: Optional[np.ndarray]
+    #: False when `wl_arr` is the bare channel index rather than a measured
+    #: axis. `acquire` copies it into the action params as `calibrated`, which
+    #: is the only thing distinguishing an uncalibrated run from a real one in
+    #: the recorded data.
+    wl_calibrated: bool
     horiz_pixels: float
     vert_pixels: float
     stride: float
@@ -126,6 +131,7 @@ class AndorDriver(HelaoDriver):
         self.cam = None
         self.pixel_width = None
         self.wl_arr = None
+        self.wl_calibrated = False
         self.horiz_pixels = None
         self.vert_pixels = None
         self.stride = None
@@ -330,7 +336,13 @@ class AndorDriver(HelaoDriver):
             # _wavelengths() re-drives the ATSpectrograph -- calling it here
             # would touch hardware to compute an axis it does not use.
             if self.uses_lamp_calibration:
-                self.wl_arr = self._wavelengths()
+                refreshed = self._wavelengths()
+                if refreshed is not None:
+                    # Clear the channel-index substitution too, or every
+                    # subsequent acquire would keep recording calibrated=False
+                    # against the real axis it just installed.
+                    self.wl_arr = refreshed
+                    self.wl_calibrated = True
             return DriverResponse(
                 response=DriverResponseType.success,
                 status=DriverStatus.ok,
@@ -369,6 +381,7 @@ class AndorDriver(HelaoDriver):
             self.horiz_pixels, self.vert_pixels, self.stride, self.clock_hz = (
                 self.get_meta_data()
             )
+            self._fall_back_to_channel_index()
             self._warn_if_axis_does_not_span_the_detector()
             response = DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
@@ -380,6 +393,45 @@ class AndorDriver(HelaoDriver):
             )
 
         return response
+
+    def _fall_back_to_channel_index(self) -> None:
+        """Substitute the bare channel index when there is no calibration.
+
+        A lamp-calibrated station has no wavelength axis until its first
+        calibration, and ``acquire`` runs anyway rather than refusing: a
+        station should be able to take data before it has been calibrated.
+        What makes that safe is that the substitution is *recorded* --
+        ``acquire`` writes ``calibrated`` into the action params, so a run
+        taken on the index is distinguishable from a real one forever after.
+        Without that marker this would be the silent-wrong-axis failure the
+        rest of this module exists to prevent.
+
+        Runs after ``get_meta_data``, not beside ``_wavelengths()``: the pixel
+        count comes from the AOI, which is not known until then.
+
+        The index is ``float``, matching a real axis, so nothing downstream
+        has to care which one it got -- ``get_data`` sizes its ``ch_*``
+        columns off ``wl_arr.size`` either way.
+        """
+        if self.wl_arr is not None:
+            self.wl_calibrated = True
+            return
+        if self.horiz_pixels is None:
+            return
+        try:
+            width = int(self.horiz_pixels)
+        except (TypeError, ValueError):
+            return
+        self.wl_arr = np.arange(width, dtype=float)
+        self.wl_calibrated = False
+        LOGGER.warning(
+            "no wavelength calibration on this station: acquire will record "
+            "the bare channel index 0..%d as `wl`, and every action it takes "
+            "carries calibrated=False. Run POST /%s/calibrate_wl to replace "
+            "it with a real axis.",
+            width - 1,
+            self.server_key,
+        )
 
     def _warn_if_axis_does_not_span_the_detector(self) -> None:
         """Warn when the wavelength axis is not one entry per detector column.
