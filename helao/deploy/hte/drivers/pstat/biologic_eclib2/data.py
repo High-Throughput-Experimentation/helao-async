@@ -50,6 +50,49 @@ EIS_COLUMNS: tuple[str, ...] = (
     "R_ohm",
 )
 
+#: Canonical order for every column this backend can emit. Used to give a
+#: multi-technique plan a *deterministic* column order: a plan mixing CA and
+#: PEIS emits the union of their columns, and an order derived from whichever
+#: technique came first would make the same plan produce different-looking
+#: files depending on how it was written.
+ALL_COLUMNS: tuple[str, ...] = (
+    "process",
+    "t_s",
+    "Ewe_V",
+    "I_A",
+    "P_W",
+    "cycle",
+    "AbsEwe_V",
+    "AbsI_A",
+    "phase",
+    "modulus",
+    "Ece_V",
+    "AbsEce_V",
+    "AbsIce_A",
+    "phase_ce",
+    "modulus_ce",
+    "f_Hz",
+    "X_ohm",
+    "R_ohm",
+)
+
+
+def union(*column_sets: Sequence[str]) -> tuple[str, ...]:
+    """The union of several column sets, in :data:`ALL_COLUMNS` order.
+
+    Raises:
+        ValueError: On a column outside :data:`ALL_COLUMNS`, which would
+            otherwise be silently dropped from the emitted table.
+    """
+    wanted: set[str] = set()
+    for columns in column_sets:
+        wanted.update(columns)
+    unknown = wanted - set(ALL_COLUMNS)
+    if unknown:
+        raise ValueError(f"columns outside the contract: {sorted(unknown)}")
+    return tuple(column for column in ALL_COLUMNS if column in wanted)
+
+
 #: A row carrying no frequency -- the time-domain leg of a composite.
 PROCESS_TIME_DOMAIN = 0
 #: A row from an impedance sweep.

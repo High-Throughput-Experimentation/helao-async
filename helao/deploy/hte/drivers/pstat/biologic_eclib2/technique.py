@@ -24,6 +24,7 @@ current amplitude is ``AMPLITUDE_CURRENT_IN_AMP`` rather than the table's
 ``EC_SDK_ANALOG_GAIN`` (which is not a member of anything).
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -139,6 +140,53 @@ class ActionPlan:
     columns: tuple[str, ...]
 
 
+#: Loop control techniques. They carry no measurement, so they produce no
+#: rows and have no reader; :mod:`sdk_client` skips a buffer tagged with one.
+LOOP_START_IDENTIFIER = "EC_SDK_TECHNIQUE_LOOP_START"
+LOOP_END_IDENTIFIER = "EC_SDK_TECHNIQUE_LOOP_END"
+LOOP_IDENTIFIERS = frozenset({LOOP_START_IDENTIFIER, LOOP_END_IDENTIFIER})
+
+#: "There is a total of 10 unique loop ID: from 0 to 9", and up to 10 may be
+#: nested.
+MAX_LOOP_ID = 9
+MAX_NESTED_LOOPS = 10
+
+
+@dataclass(frozen=True)
+class PlanEntry:
+    """One technique in a multi-technique plan.
+
+    Attributes:
+        name: A HELAO technique caption from :data:`TECHNIQUE_NAMES`.
+        params: That technique's full parameter dict, keyed as its ``run_*``
+            endpoint keys them. Per-entry rather than shared, so one plan can
+            run two techniques at different current ranges.
+    """
+
+    name: str
+    params: dict
+
+
+@dataclass(frozen=True)
+class PlanLoop:
+    """A repeat over a contiguous span of entries.
+
+    Indices are into the *entry* list, not the flattened technique list: an
+    entry can expand to more than one technique (PEIS becomes CA+PEIS), and
+    making the caller count expansions would leak that detail into every
+    caller.
+
+    Attributes:
+        start: First entry inside the loop.
+        end: Last entry inside the loop, inclusive.
+        n: Total times the span runs, counting the first pass.
+    """
+
+    start: int
+    end: int
+    n: int
+
+
 @dataclass(frozen=True)
 class Eclib2Technique:
     """This backend's registry entry, resolved by name before an action runs.
@@ -158,9 +206,14 @@ class Eclib2Technique:
 
     technique_name: str
     columns: tuple[str, ...]
+    #: Set only for a multi-technique plan built by :func:`plan_technique`.
+    entries: tuple[PlanEntry, ...] | None = None
+    loops: tuple[PlanLoop, ...] = ()
 
     def plan(self, action_params: dict) -> ActionPlan:
         """Build the plan for this technique from an action's parameters."""
+        if self.entries is not None:
+            return build_plan_from_entries(self.entries, self.loops)
         return build_plan(self.technique_name, action_params)
 
 
@@ -638,6 +691,159 @@ _BUILDERS = {
     "GEIS": _plan_geis,
     "CAOCV": _plan_caocv,
 }
+
+
+def _loop_technique(identifier: str, params: tuple[ParamSet, ...]) -> TechniquePlan:
+    """A LOOP_START/LOOP_END control technique.
+
+    ``reader`` is the loop identifier rather than one of :data:`READERS`,
+    because a loop measures nothing and must never be handed to a
+    ``BL_ProcessRawTo*``.
+    """
+    return TechniquePlan(identifier=identifier, reader=identifier, params=params)
+
+
+def _validate_loops(loops: Sequence[PlanLoop], n_entries: int) -> None:
+    """Reject a loop set EClib2 would run wrongly or refuse.
+
+    Every rule here is one the SDK states and the firmware then interprets
+    loosely: an empty loop is "a valid construction" that "may result in
+    unexpected execution results", and partially-overlapping loops are
+    "intricated" and rejected by an event rather than by the load. Catching
+    them here means a bad plan fails before the cell is polarised.
+    """
+    if len(loops) > MAX_NESTED_LOOPS:
+        raise ValueError(
+            f"at most {MAX_NESTED_LOOPS} loops are supported, got {len(loops)}"
+        )
+    for loop in loops:
+        if not 0 <= loop.start < n_entries:
+            raise ValueError(
+                f"loop start {loop.start} is outside the plan's {n_entries} entries"
+            )
+        if not 0 <= loop.end < n_entries:
+            raise ValueError(
+                f"loop end {loop.end} is outside the plan's {n_entries} entries"
+            )
+        if loop.end < loop.start:
+            raise ValueError(f"loop end {loop.end} precedes its start {loop.start}")
+        if loop.n < 1:
+            raise ValueError(f"a loop must run at least once, got n={loop.n}")
+    # Spans must nest, never straddle: EC_SDK_EVENT_LOOP_INTRICATED_LOOPS.
+    for i, outer in enumerate(loops):
+        for inner in loops[i + 1 :]:
+            a = set(range(outer.start, outer.end + 1))
+            b = set(range(inner.start, inner.end + 1))
+            if a & b and not (a <= b or b <= a):
+                raise ValueError(
+                    f"loops ({outer.start}..{outer.end}) and "
+                    f"({inner.start}..{inner.end}) overlap without nesting"
+                )
+
+
+def build_plan_from_entries(
+    entries: Sequence[PlanEntry], loops: Sequence[PlanLoop] = ()
+) -> ActionPlan:
+    """Build one experiment from an ordered list of techniques.
+
+    This is the capability the per-technique endpoints cannot reach: EClib2
+    runs a whole experiment of techniques on one channel in one load, and has
+    LOOP_START/LOOP_END techniques for repeats. The eclib backend had no
+    equivalent, so there is no parity constraint on the shape here.
+
+    Args:
+        entries: Techniques in execution order.
+        loops: Repeats over spans of ``entries``.
+
+    Returns:
+        An :class:`ActionPlan` whose ``columns`` are the union of the entries'
+        columns, in :data:`~.data.ALL_COLUMNS` order, and whose techniques are
+        the entries' expansions with loop controls inserted.
+
+    Raises:
+        ValueError: On no entries, an unknown technique, a bad parameter, or a
+            loop set EClib2 would refuse.
+    """
+    if not entries:
+        raise ValueError("a plan needs at least one technique")
+    _validate_loops(loops, len(entries))
+
+    # An entry can expand to several techniques -- PEIS becomes CA+PEIS -- so
+    # loop bounds given over entries have to be mapped onto the flattened
+    # list. Getting this wrong would wrap the wrong techniques, which the
+    # instrument would run without complaint.
+    expanded: list[list[TechniquePlan]] = []
+    columns: list[Sequence[str]] = []
+    for position, entry in enumerate(entries):
+        try:
+            sub = build_plan(entry.name, entry.params)
+        except ValueError as exc:
+            raise ValueError(f"plan entry {position} ({entry.name}): {exc}") from None
+        expanded.append(list(sub.techniques))
+        columns.append(sub.columns)
+
+    starts_at: dict[int, int] = {}
+    ends_at: dict[int, int] = {}
+    flat_index = 0
+    for position, group in enumerate(expanded):
+        starts_at[position] = flat_index
+        flat_index += len(group)
+        ends_at[position] = flat_index - 1
+
+    # Assign loop IDs outermost-first so a nested loop never reuses an id that
+    # is still open; ids are unique per plan, which the SDK recommends.
+    ordered = sorted(enumerate(loops), key=lambda pair: (pair[1].start, -pair[1].end))
+    opens: dict[int, list[TechniquePlan]] = {}
+    closes: dict[int, list[TechniquePlan]] = {}
+    for loop_id, (_, loop) in enumerate(ordered):
+        if loop_id > MAX_LOOP_ID:
+            raise ValueError(f"loop id {loop_id} exceeds the maximum {MAX_LOOP_ID}")
+        opens.setdefault(starts_at[loop.start], []).append(
+            _loop_technique(
+                LOOP_START_IDENTIFIER,
+                (ParamSet("int", "EC_SDK_LOOP_ID", loop_id),),
+            )
+        )
+        closes.setdefault(ends_at[loop.end], []).append(
+            _loop_technique(
+                LOOP_END_IDENTIFIER,
+                (
+                    ParamSet("int", "EC_SDK_LOOP_ID", loop_id),
+                    ParamSet("int", "EC_SDK_LOOP_N_TIMES", loop.n),
+                ),
+            )
+        )
+
+    techniques: list[TechniquePlan] = []
+    for position, group in enumerate(expanded):
+        techniques.extend(opens.get(starts_at[position], []))
+        techniques.extend(group)
+        # Innermost loop closes first, so reverse the order they were opened.
+        techniques.extend(reversed(closes.get(ends_at[position], [])))
+
+    return ActionPlan(
+        technique_name="PLAN",
+        techniques=tuple(techniques),
+        columns=ec2data.union(*columns),
+    )
+
+
+def plan_technique(
+    entries: Sequence[PlanEntry], loops: Sequence[PlanLoop] = ()
+) -> Eclib2Technique:
+    """A registry-shaped technique object for a multi-technique plan.
+
+    Built from a request body rather than resolved by name, so it carries the
+    entries with it. Validated eagerly: a plan that cannot be built must fail
+    the endpoint call, not the executor's ``_pre_exec``.
+    """
+    built = build_plan_from_entries(entries, loops)
+    return Eclib2Technique(
+        technique_name="PLAN",
+        columns=built.columns,
+        entries=tuple(entries),
+        loops=tuple(loops),
+    )
 
 
 def build_plan(technique_name: str, params: dict) -> ActionPlan:

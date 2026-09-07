@@ -41,6 +41,7 @@ from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
 from ...drivers.pstat.biologic.technique import BIOTECHS
 from ...drivers.pstat.biologic_backend import BiologicBackend
+from ...drivers.pstat.biologic_eclib2 import technique as ec2tech
 from ...drivers.pstat.biologic_eclib2.driver import BiologicEclib2Driver
 from ...drivers.pstat.biologic_eclib2.technique import (
     resolve as resolve_eclib2_technique,
@@ -620,6 +621,71 @@ async def biologic_dyn_endpoints(app: ActionHost):
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
+
+    # `run_plan` is eclib2-only, the way `run_protocol` is olecom-only: it is
+    # not a technique but a whole *experiment* of them, which is a capability
+    # EC-Lib 2.0 has and the other two backends do not. easy-biologic runs one
+    # program per action, and the OLE backend's multi-technique unit is an
+    # `.mps` file, which `run_protocol` covers. Registering it on those
+    # backends would advertise a route that could only fail.
+    if getattr(app, "pstat_backend", None) == "eclib2":
+
+        @app.action()
+        @action_version(1)
+        async def run_plan(
+            ctx: ActionContext,
+            fast_samples_in: list[
+                Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+            ] = Body([], embed=True),
+            plan: list[dict] = Body([], embed=True),
+            loops: list[dict] = Body([], embed=True),
+            channel: int = 0,
+        ):
+            """Run several techniques on one channel as a single experiment.
+
+            One ``BL_LoadExperiment`` for the whole plan, so the techniques run
+            back to back with no gap for a round trip between them -- which is
+            the point, and is not reachable by chaining ``run_*`` actions.
+
+            Args:
+                plan: Techniques in execution order, each
+                    ``{"name": <technique>, "params": {...}}`` where ``params``
+                    are keyed exactly as that technique's own ``run_*``
+                    endpoint keys them. Ranges are per entry, so one plan may
+                    run two techniques at different current ranges.
+                loops: Repeats, each ``{"start": i, "end": j, "n": k}`` over
+                    *plan* indices, inclusive. Spans must nest rather than
+                    straddle. An entry may expand to more than one EClib2
+                    technique (PEIS becomes CA+PEIS); the indices here are into
+                    ``plan``, and the expansion is mapped for you.
+                channel: Channel to run on.
+
+            The emitted columns are the union of the entries' columns, so a
+            plan mixing CA and PEIS emits both sets with NaN where a technique
+            does not report one.
+            """
+            entries = [
+                ec2tech.PlanEntry(
+                    name=str(item.get("name", "")), params=dict(item.get("params", {}))
+                )
+                for item in plan
+            ]
+            spans = [
+                ec2tech.PlanLoop(
+                    start=int(item["start"]), end=int(item["end"]), n=int(item["n"])
+                )
+                for item in loops
+            ]
+            # Built here, not in the executor: an unbuildable plan must fail
+            # the call rather than start an action that then aborts in
+            # _pre_exec with the cell already claimed.
+            technique = ec2tech.plan_technique(entries, spans)
+
+            active = await ctx.begin()
+            active.action.action_abbr = "PLAN"
+            executor = BiologicExec(active=active, oneoff=False, technique=technique)
+            active_action_dict = active.start_executor(executor)
+            return active_action_dict
 
 
 #: `pstat_backend` value -> driver class. An absent key yields the
