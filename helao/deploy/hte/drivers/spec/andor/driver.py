@@ -10,7 +10,7 @@ import socket
 import time as time
 from abc import abstractmethod
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -27,28 +27,7 @@ from helao.core.drivers.helao_driver import (
     HelaoDriver,
 )
 
-from . import wl_calibration
-
-#: Hg-Ar pen-lamp lines, nm, in air. A reference list to CHOOSE FROM, and
-#: deliberately not a default: which of these actually land on the detector
-#: depends on the grating and the central wavelength. This span is 404.7-912.3
-#: nm, while a 2560 x 6.5 um Zyla covers something on the order of 150-350 nm
-#: at one setting -- so most of these lines are off the detector at any given
-#: station. `find_peaks` has no notion of "absent": asked for nine peaks it
-#: returns the nine strongest maxima, noise included, and the fit then
-#: succeeds against wavelengths that were never measured. `run_wl_calibration`
-#: therefore refuses an empty `lamp_lines_nm` rather than substituting this.
-HG_AR_REFERENCE_LINES_NM: list[float] = [
-    404.6565,
-    435.8335,
-    546.0750,
-    576.9610,
-    579.0670,
-    696.5431,
-    763.5106,
-    811.5311,
-    912.2967,
-]
+from . import kr_lines, wl_calibration, wl_fit
 
 
 # The Andor SDK is a vendor runtime; import it lazily so the module imports on
@@ -212,6 +191,87 @@ class AndorDriver(HelaoDriver):
             frames.append(image.sum(axis=0))
         return np.mean(np.vstack(frames), axis=0)
 
+    def set_wl_from_pairs(
+        self,
+        pairs: Sequence[tuple[float, float]],
+        *,
+        degree: int = 2,
+    ) -> DriverResponse:
+        """Install an axis fitted directly from ``(channel, wavelength)`` pairs.
+
+        The direct route: no lamp exposure, no peak finding, no catalogue.
+        The caller has already decided which channel is which wavelength and
+        this only fits and installs them.
+
+        Use it when the line identities are known by other means -- a previous
+        calibration, a vendor sheet, a hand-read spectrum. It cannot check
+        them: with no independent evidence, a mislabelled pair is fitted as
+        faithfully as a correct one. :meth:`run_wl_calibration` is the route
+        that can, because the catalogue disagrees with a bad identification.
+
+        Passes the same two gates as the lamp fit -- a monotonic axis, and a
+        residual that is not absurd -- and keeps the outgoing calibration as a
+        ``.prev`` sibling. Never raises.
+        """
+        try:
+            if self.horiz_pixels is None:
+                return self._refused(
+                    "the detector width is unknown, so connect() has not "
+                    "succeeded; there is nothing to fit an axis onto."
+                )
+            calib = wl_fit.fit_from_pairs(
+                pairs,
+                int(self.horiz_pixels),
+                degree=degree,
+                lamp="manual",
+                wl_source=(
+                    "calibration" if self.uses_lamp_calibration else "spectrograph"
+                ),
+            )
+            axis = wl_calibration.evaluate(calib)
+            if not wl_calibration.is_monotonic(axis):
+                return self._refused(
+                    "the fitted axis is not monotonic: two channels would "
+                    "claim the same wavelength. Check the pairs -- one is "
+                    "probably out of order or mistyped.",
+                    {"n_pairs": calib.n_lines, "degree": degree},
+                )
+            path = self.calibration_file()
+            wl_calibration.save(calib, path)
+            LOGGER.info(
+                "wavelength axis set from %d pairs (degree %d, rms %.4f nm) -> %s",
+                calib.n_lines,
+                degree,
+                calib.fit_rms_nm,
+                path,
+            )
+            if self.uses_lamp_calibration:
+                self.wl_arr = axis
+                self.wl_calibrated = True
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.ok,
+                data={
+                    "coeffs": calib.coeffs,
+                    "domain": calib.domain,
+                    "degree": degree,
+                    "n_pairs": calib.n_lines,
+                    "fit_rms_nm": calib.fit_rms_nm,
+                    "max_residual_nm": calib.max_residual_nm,
+                    "wl_min_nm": float(axis[0]),
+                    "wl_max_nm": float(axis[-1]),
+                    "path": str(path),
+                    "applied": self.uses_lamp_calibration,
+                },
+            )
+        except wl_fit.CalibrationFitError as exc:
+            return self._refused(str(exc))
+        except Exception:
+            LOGGER.error("set_wl_from_pairs failed", exc_info=True)
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
+
     def _refused(self, why: str, data: Optional[dict] = None) -> DriverResponse:
         """A ``failed`` response for a calibration that was rejected, not lost.
 
@@ -229,13 +289,14 @@ class AndorDriver(HelaoDriver):
 
     def run_wl_calibration(
         self,
-        lamp_lines_nm: Optional[list] = None,
+        anchors: Optional[list] = None,
         *,
-        lamp: str = "Hg-Ar",
+        lamp: str = kr_lines.LAMP_NAME,
         n_frames: int = 1,
         exp_time: float = 0.0098,
-        degree: int = 3,
+        degree: int = 4,
         max_fit_rms_nm: float = 0.5,
+        saturation: Optional[float] = None,
         source_action_uuid: Optional[str] = None,
     ) -> DriverResponse:
         """Measure a calibration lamp, fit pixel-to-nm, and persist the result.
@@ -253,14 +314,20 @@ class AndorDriver(HelaoDriver):
         line, so the fit succeeding is not evidence that it is right.
 
         Args:
-            lamp_lines_nm: Wavelengths of the lines visible on THIS detector
-                at its current grating and central wavelength. Required; see
-                :data:`HG_AR_REFERENCE_LINES_NM`.
+            anchors: At least two ``[pixel, wavelength_nm]`` pairs the
+                operator has identified by eye in the lamp spectrum. Required.
+                Both halves are approximate: the pixel is snapped to the
+                nearest detected line and the wavelength to the nearest
+                catalogue entry. Everything else is identified automatically
+                from the solution these seed, then sigma-clipped.
             lamp: Free-text lamp identifier, recorded in the calibration.
             n_frames: Frames to average into the lamp spectrum.
             exp_time: Exposure time per frame, seconds.
-            degree: Polynomial degree of the pixel-to-nm fit.
+            degree: Chebyshev degree of the pixel-to-nm fit.
             max_fit_rms_nm: Refuse to save a fit whose residual exceeds this.
+            saturation: Count at which the detector saturates. Lines reaching
+                it are excluded -- a flat top has no well-defined centre, so a
+                saturated line centroids badly and drags the solution.
             source_action_uuid: The action driving this calibration, if any.
 
         Returns:
@@ -269,25 +336,22 @@ class AndorDriver(HelaoDriver):
             Never raises: an action handler must not see an exception.
         """
         try:
-            lines = list(lamp_lines_nm) if lamp_lines_nm else []
-            if not lines:
+            pairs = [tuple(a) for a in anchors] if anchors else []
+            if len(pairs) < 2:
                 return self._refused(
-                    "no lamp_lines_nm given. This action has no default line "
-                    "table: which lines are on the detector depends on the "
-                    "grating and central wavelength, and a line that is not "
-                    "there still gets a noise maximum fitted to it. Pass the "
-                    "lines actually visible in the lamp spectrum -- "
-                    "HG_AR_REFERENCE_LINES_NM in this module is an Hg-Ar list "
-                    "to choose from, not a default."
+                    f"need at least 2 anchors, got {len(pairs)}. Read two "
+                    "widely separated lines off the raw lamp spectrum and "
+                    "pass [[pixel, wavelength_nm], ...]. There is no default: "
+                    "which lines land on the detector depends on the grating "
+                    "and central wavelength, which this station's optics are "
+                    "set to by hand and HELAO cannot read back."
                 )
             counts = self._capture_lamp_frame(n_frames, exp_time)
-            calib = wl_calibration.fit_wavelength(
-                # fit_wavelength takes a Sequence[float]; an ndarray is not
-                # one, and the copy is a few thousand floats once per
-                # calibration.
-                counts.tolist(),
-                lines,
+            calib = wl_fit.fit_wavelength(
+                counts,
+                pairs,
                 degree=degree,
+                saturation=saturation,
                 lamp=lamp,
                 wl_source=(
                     "calibration" if self.uses_lamp_calibration else "spectrograph"

@@ -16,7 +16,7 @@ import pytest
 from helao.deploy.hte.drivers.spec.andor import driver as andor_driver
 from helao.deploy.hte.drivers.spec.andor import wl_calibration as wlc
 from helao.deploy.hte.drivers.spec.andor.calibrated import AndorCalibratedDriver
-from helao.deploy.hte.drivers.spec.andor.driver import HG_AR_REFERENCE_LINES_NM
+from helao.deploy.hte.drivers.spec.andor import wl_fit
 
 CALIB = wlc.WavelengthCalibration(
     model=wlc.MODEL_POLY,
@@ -215,25 +215,63 @@ def _fake_lamp_frame(n_pixels, line_pixels):
     return counts
 
 
-def test_the_hg_ar_table_is_a_reference_list_not_a_default():
-    """It is a menu, and nothing may reach into it on the calibration path.
+#: Enough anchors to seed a degree-4 fit. Their values do not matter in this
+#: file: every test here stubs the fit itself, because what these tests are
+#: about is the driver's gating -- refuse a bad residual, refuse a
+#: non-monotonic axis, keep a .prev, apply live on the right variant. The
+#: numerics that turn a frame into a calibration are `test_andor_wl_fit`'s
+#: subject, and coupling both files to them would mean one fit change
+#: breaking two suites for one reason.
+ANCHORS = [[200 + 300 * i, 440.0 + 55.0 * i] for i in range(8)]
 
-    Its span is 404.7-912.3 nm; a 2560 x 6.5 um Zyla covers a few hundred nm
-    at one grating and central wavelength, so most of these lines are off the
-    detector at any given station. `find_peaks` cannot report a line as
-    absent -- asked for nine peaks it returns the nine strongest maxima,
-    noise included -- so substituting this table produces a fit that succeeds
-    against wavelengths that were never measured.
-    """
-    assert len(HG_AR_REFERENCE_LINES_NM) >= 5
-    assert HG_AR_REFERENCE_LINES_NM == sorted(HG_AR_REFERENCE_LINES_NM)
+
+def _stub_fit(monkeypatch, **overrides):
+    """Make `wl_fit.fit_wavelength` return a canned calibration."""
+    fields = dict(
+        model=wlc.MODEL_CHEB,
+        coeffs=[660.0, 232.0, 6.0, 1.2, 0.4],
+        domain=[0.0, 2559.0],
+        n_pixels=2560,
+        fit_rms_nm=0.01,
+        max_residual_nm=0.02,
+        n_lines=30,
+        n_rejected=2,
+        n_saturated=0,
+        medium="air",
+        lamp="Ocean Insight KR-2",
+        created="2026-09-07T00:00:00+00:00",
+        wl_source="unknown",
+        source_action_uuid=None,
+    )
+    fields.update(overrides)
+
+    def _fake(counts, anchors, **kwargs):
+        return wlc.WavelengthCalibration(
+            **{**fields, "wl_source": kwargs.get("wl_source", fields["wl_source"])}
+        )
+
+    monkeypatch.setattr(wl_fit, "fit_wavelength", _fake)
+
+
+def test_the_bundled_catalogue_is_krypton_in_air():
+    """The lamp list is data, not a guess, and its medium is recorded."""
+    from helao.deploy.hte.drivers.spec.andor import kr_lines
+
+    assert kr_lines.MEDIUM == "air"
+    assert len(kr_lines.KR_LINES_AIR_NM) > 50
+    lo, hi = kr_lines.LAMP_RANGE_NM
+    assert all(lo <= w <= hi for w, _i, _s in kr_lines.KR_LINES_AIR_NM)
     assert not hasattr(
         andor_driver, "DEFAULT_LAMP_LINES_NM"
     ), "the old name read as a default and must not come back"
+    assert not hasattr(
+        andor_driver, "HG_AR_REFERENCE_LINES_NM"
+    ), "the Hg-Ar menu is superseded by the krypton catalogue"
 
 
 def test_run_wl_calibration_persists_and_reports(tmp_path, monkeypatch):
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch)
     line_pixels = [200, 700, 1300, 1900, 2400]
     true_nm = [400.0 + 0.2 * p for p in line_pixels]
     monkeypatch.setattr(
@@ -242,10 +280,10 @@ def test_run_wl_calibration_persists_and_reports(tmp_path, monkeypatch):
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+    resp = d.run_wl_calibration(ANCHORS)
     assert resp.response == "success"
     assert resp.data["fit_rms_nm"] < 0.5
-    assert resp.data["n_lines"] == 5
+    assert resp.data["n_lines"] == 30
     assert resp.data["applied"] is True  # calibrated driver uses it live
     assert d.calibration_file().exists()
 
@@ -253,12 +291,13 @@ def test_run_wl_calibration_persists_and_reports(tmp_path, monkeypatch):
 def test_run_wl_calibration_reports_failure_without_raising(tmp_path, monkeypatch):
     """An action handler must never see an exception out of the driver."""
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch, fit_rms_nm=99.0, max_residual_nm=99.0)
     monkeypatch.setattr(
         d,
         "_capture_lamp_frame",
         lambda n_frames, exp_time: _fake_lamp_frame(2560, [200]),
     )
-    resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=3)
+    resp = d.run_wl_calibration(ANCHORS)
     assert resp.response == "failed"
     assert not d.calibration_file().exists()
 
@@ -275,6 +314,7 @@ def test_a_successful_calibration_takes_effect_without_a_reconnect(
     a broken station rather than as a missing restart.
     """
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch)
     assert d.wl_arr is None, "no calibration on disk yet"
     line_pixels = [200, 700, 1300, 1900, 2400]
     true_nm = [400.0 + 0.2 * p for p in line_pixels]
@@ -284,18 +324,22 @@ def test_a_successful_calibration_takes_effect_without_a_reconnect(
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+    resp = d.run_wl_calibration(ANCHORS)
 
     assert resp.data["applied"] is True
     # no connect() in between
     assert d.wl_arr is not None, "`applied: True` while acquire would still refuse"
     assert d.wl_arr.shape == (2560,)
-    assert d.wl_arr[0] == pytest.approx(400.0, abs=1.0)
+    # The stubbed fit's coefficients evaluated at pixel 0. What this
+    # test is about is that the axis was replaced at all, without a
+    # reconnect -- not what value it took.
+    assert d.wl_arr[0] == pytest.approx(433.2, abs=0.1)
 
 
 def test_a_failed_calibration_leaves_the_live_axis_alone(tmp_path, monkeypatch):
     """A bad fit must not blank an axis that was working."""
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch, fit_rms_nm=99.0, max_residual_nm=99.0)
     wlc.save(CALIB, d.calibration_file())
     d.wl_arr = d._wavelengths()
     before = d.wl_arr.copy()
@@ -305,7 +349,7 @@ def test_a_failed_calibration_leaves_the_live_axis_alone(tmp_path, monkeypatch):
         lambda n_frames, exp_time: _fake_lamp_frame(2560, [200]),
     )
 
-    resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=3)
+    resp = d.run_wl_calibration(ANCHORS)
 
     assert resp.response == "failed"
     np.testing.assert_array_equal(d.wl_arr, before)
@@ -317,26 +361,27 @@ def _good_calibration_args():
     return line_pixels, [400.0 + 0.2 * p for p in line_pixels]
 
 
-def test_an_absent_lamp_line_list_is_refused_not_defaulted(tmp_path, monkeypatch):
-    """The route default is `lamp_lines_nm: list = []`, which reaches here None.
+def test_too_few_anchors_is_refused_not_defaulted(tmp_path, monkeypatch):
+    """The route default is `anchors: list = []`, which reaches here as None.
 
-    Substituting a reference table would fit noise maxima to lines that are
-    off this detector, and the resulting axis is wrong in a way no recorded
-    spectrum ever reveals.
+    There is no default anchor set and there cannot be one: an anchor names a
+    pixel on THIS detector at THIS grating, which no table can know. The
+    refusal fires before the lamp is even exposed.
     """
     d = _driver(tmp_path)
-    captured = []
-    monkeypatch.setattr(
-        d,
-        "_capture_lamp_frame",
-        lambda n_frames, exp_time: captured.append(1) or _fake_lamp_frame(2560, [200]),
-    )
-    for empty in (None, []):
+    exposed = {"n": 0}
+
+    def _count(n_frames, exp_time):
+        exposed["n"] += 1
+        return _fake_lamp_frame(2560, [200])
+
+    monkeypatch.setattr(d, "_capture_lamp_frame", _count)
+    for empty in (None, [], [[100, 450.0]]):
         resp = d.run_wl_calibration(empty)
         assert resp.response == "failed"
-        assert "lamp_lines_nm" in resp.message
-    assert captured == [], "the lamp must not even be exposed without lines"
-    assert not d.calibration_file().exists()
+        assert "anchors" in resp.message
+        assert not d.calibration_file().exists()
+    assert exposed["n"] == 0, "refused before exposing the lamp"
 
 
 def test_a_fit_worse_than_the_limit_is_not_saved(tmp_path, monkeypatch):
@@ -348,6 +393,7 @@ def test_a_fit_worse_than_the_limit_is_not_saved(tmp_path, monkeypatch):
     residual is the only evidence there is.
     """
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch, fit_rms_nm=5.0, max_residual_nm=9.0)
     wlc.save(CALIB, d.calibration_file())
     before = d.calibration_file().read_bytes()
     line_pixels, true_nm = _good_calibration_args()
@@ -359,7 +405,7 @@ def test_a_fit_worse_than_the_limit_is_not_saved(tmp_path, monkeypatch):
 
     monkeypatch.setattr(d, "_capture_lamp_frame", _spiked)
 
-    resp = d.run_wl_calibration(true_nm, degree=3)
+    resp = d.run_wl_calibration(ANCHORS)
 
     assert resp.response == "failed"
     assert resp.data["fit_rms_nm"] > 0.5
@@ -376,6 +422,7 @@ def test_a_fit_worse_than_the_limit_is_not_saved(tmp_path, monkeypatch):
 def test_the_rms_limit_is_the_callers_to_set(tmp_path, monkeypatch):
     """Same measurement, looser limit: it must be the gate doing the refusing."""
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch, fit_rms_nm=99.0, max_residual_nm=99.0)
     line_pixels, true_nm = _good_calibration_args()
 
     def _spiked(n_frames, exp_time):
@@ -385,8 +432,10 @@ def test_the_rms_limit_is_the_callers_to_set(tmp_path, monkeypatch):
 
     monkeypatch.setattr(d, "_capture_lamp_frame", _spiked)
 
-    assert d.run_wl_calibration(true_nm, degree=3).response == "failed"
-    resp = d.run_wl_calibration(true_nm, degree=3, max_fit_rms_nm=1e6)
+    assert d.run_wl_calibration(ANCHORS).response == "failed"
+    # Same stubbed measurement, a limit loose enough to admit it: the gate is
+    # what refused, not the fit.
+    resp = d.run_wl_calibration(ANCHORS, max_fit_rms_nm=1e6)
     assert resp.response == "success"
 
 
@@ -397,6 +446,7 @@ def test_a_non_monotonic_axis_is_refused_however_tight_the_fit(tmp_path, monkeyp
     it produces looks entirely ordinary.
     """
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch, coeffs=[660.0, 232.0, -400.0, 0.0, 0.0])
     line_pixels = [700, 1200, 1700, 2100, 2500]
     turning = [1e-9 * p**3 + 1.05e-6 * p**2 - 9e-4 * p + 400.0 for p in line_pixels]
     monkeypatch.setattr(
@@ -405,7 +455,7 @@ def test_a_non_monotonic_axis_is_refused_however_tight_the_fit(tmp_path, monkeyp
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    resp = d.run_wl_calibration(turning, degree=3)
+    resp = d.run_wl_calibration(ANCHORS)
 
     assert resp.response == "failed"
     assert "monotonic" in resp.message
@@ -416,6 +466,7 @@ def test_a_non_monotonic_axis_is_refused_however_tight_the_fit(tmp_path, monkeyp
 
 def test_an_overwrite_keeps_the_previous_calibration(tmp_path, monkeypatch):
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch)
     wlc.save(CALIB, d.calibration_file())
     line_pixels, true_nm = _good_calibration_args()
     monkeypatch.setattr(
@@ -424,7 +475,7 @@ def test_an_overwrite_keeps_the_previous_calibration(tmp_path, monkeypatch):
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    assert d.run_wl_calibration(true_nm, degree=1).response == "success"
+    assert d.run_wl_calibration(ANCHORS).response == "success"
 
     prev = d.calibration_file().with_name(d.calibration_file().name + ".prev")
     assert prev.exists()
@@ -433,13 +484,14 @@ def test_an_overwrite_keeps_the_previous_calibration(tmp_path, monkeypatch):
 
 def test_a_saved_calibration_records_which_variant_wrote_it(tmp_path, monkeypatch):
     d = _driver(tmp_path)
+    _stub_fit(monkeypatch)
     line_pixels, true_nm = _good_calibration_args()
     monkeypatch.setattr(
         d,
         "_capture_lamp_frame",
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
-    assert d.run_wl_calibration(true_nm, degree=1).response == "success"
+    assert d.run_wl_calibration(ANCHORS).response == "success"
     assert wlc.load(d.calibration_file()).wl_source == "calibration"
 
 

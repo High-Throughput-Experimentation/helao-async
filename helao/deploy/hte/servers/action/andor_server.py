@@ -21,6 +21,7 @@ from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.executor import Executor
 
+from ...drivers.spec.andor import kr_lines
 from ...drivers.spec.andor.calibrated import AndorCalibratedDriver
 from ...drivers.spec.andor.driver import AndorDriver, DriverStatus
 from ...drivers.spec.andor.spectrograph import AndorSpectrographDriver
@@ -161,12 +162,14 @@ class AndorCalibrateWavelength(Executor):
             # the same.
             self.driver = self.active.driver
             self.action_params = self.active.action.action_params
-            self.lamp_lines_nm = self.action_params.get("lamp_lines_nm") or None
-            self.lamp = self.action_params.get("lamp", "Hg-Ar")
+            self.anchors = self.action_params.get("anchors") or None
+            self.lamp = self.action_params.get("lamp", kr_lines.LAMP_NAME)
             self.n_frames = self.action_params.get("n_frames", 1)
             self.exp_time = self.action_params.get("exp_time", 0.0098)
-            self.degree = self.action_params.get("degree", 3)
+            self.degree = self.action_params.get("degree", 4)
             self.max_fit_rms_nm = self.action_params.get("max_fit_rms_nm", 0.5)
+            # 0 disables the check; the driver takes None for that.
+            self.saturation = self.action_params.get("saturation") or None
         except Exception:
             LOGGER.error("AndorCalibrateWavelength init failed", exc_info=True)
 
@@ -174,12 +177,13 @@ class AndorCalibrateWavelength(Executor):
         """Call :meth:`AndorDriver.run_wl_calibration` and forward its data."""
         LOGGER.debug("Running driver.run_wl_calibration()")
         resp = self.driver.run_wl_calibration(
-            self.lamp_lines_nm,
+            self.anchors,
             lamp=self.lamp,
             n_frames=self.n_frames,
             exp_time=self.exp_time,
             degree=self.degree,
             max_fit_rms_nm=self.max_fit_rms_nm,
+            saturation=self.saturation,
             source_action_uuid=str(self.active.action.action_uuid),
         )
         error = (
@@ -456,26 +460,40 @@ async def andor_dyn_endpoints(app: ActionHost):
     @app.action()
     async def calibrate_wl(
         ctx: ActionContext,
-        lamp_lines_nm: list = [],
-        lamp: str = "Hg-Ar",
+        anchors: list = [],
+        lamp: str = kr_lines.LAMP_NAME,
         n_frames: int = 1,
         exp_time: float = 0.0098,
-        degree: int = 3,
+        degree: int = 4,
         max_fit_rms_nm: float = 0.5,
+        saturation: float = 0.0,
     ):
         """Measure a calibration lamp and fit this detector's wavelength axis.
 
-        Works on both driver variants. On a spectrograph station the fit is
-        recorded for comparison against ``GetCalibration`` and the live axis is
-        unchanged; the response's ``applied`` field says which happened.
+        The standard arc-lamp procedure: detect the emission lines, centroid
+        each by a Gaussian fit, identify them against the bundled NIST
+        krypton catalogue, fit a Chebyshev polynomial, and sigma-clip the
+        mis-identifications out.
 
-        ``lamp_lines_nm`` is REQUIRED -- the action refuses when it is empty
-        rather than falling back to a reference table. Pass the wavelengths of
-        the lines actually visible on this detector at its current grating and
-        central wavelength; ``HG_AR_REFERENCE_LINES_NM`` in the driver module
-        is an Hg-Ar list to choose from. A line that is off the detector still
-        gets a noise maximum fitted to it, and the resulting axis is wrong in
-        a way no recorded spectrum will ever reveal.
+        Works on both driver variants. On a spectrograph station the fit is
+        recorded for comparison against ``GetCalibration`` and the live axis
+        is unchanged; the response's ``applied`` field says which happened.
+
+        ``anchors`` is REQUIRED: ``[[pixel, wavelength_nm], ...]``, at least
+        ``degree + 4`` of them, spread across the detector. Read them off the
+        raw lamp spectrum -- pick lines you can point at unambiguously, not
+        ones crowded by a neighbour. Both halves are approximate and are
+        snapped, the pixel to the nearest detected line and the wavelength to
+        the nearest catalogue entry, so reading them off a plot is enough.
+
+        Why so many: the anchors seed the solution that identifies every other
+        line, and a degree-N fit through exactly N+1 points reproduces their
+        centroid error rather than averaging it. Measured on a representative
+        430-900 nm solution over 2560 columns, five anchors left the axis
+        8.9 nm out and eight brought it to 0.002 nm.
+
+        ``saturation`` excludes lines that reached it -- a flat top has no
+        well-defined centre. ``0`` disables the check.
 
         Nothing is written unless the fit clears both quality gates: a
         residual no worse than ``max_fit_rms_nm``, and a strictly monotonic
@@ -558,5 +576,46 @@ def makeApp(server_key) -> ActionHost:
     def stop_private():
         """Invoke :meth:`AndorDriver.stop` to halt the camera."""
         app.driver.stop()
+
+    @app.post("/set_wl_from_pairs", tags=["private"])
+    def set_wl_from_pairs(pairs: list, degree: int = 2):
+        """Fit and install a wavelength axis from ``(channel, wavelength_nm)``.
+
+        The direct route, for when the line identities are already known: no
+        lamp exposure, no peak detection, no catalogue matching. Second order
+        by default.
+
+        Private rather than an action, and deliberately: it drives no
+        hardware, produces no data, and takes no measurement, so an action
+        record of it would carry nothing worth keeping. What it does change is
+        persisted -- the fit is written to the same file the lamp calibration
+        writes, with the outgoing one kept as ``.prev``, and on a
+        lamp-calibrated station it becomes the live axis immediately.
+
+        It cannot check the pairs. With no independent evidence a mislabelled
+        pair is fitted exactly as faithfully as a correct one, which is why
+        ``/ANDOR/calibrate_wl`` exists beside it -- there the catalogue
+        disagrees with a bad identification and sigma-clipping removes it.
+
+        Args:
+            pairs: ``[[channel, wavelength_nm], ...]``, at least ``degree + 1``
+                of them, each channel distinct.
+            degree: Polynomial order. Three pairs at degree 2 interpolate, so
+                the reported residual is 0 and means nothing; pass more if you
+                want the number to carry information.
+
+        Returns:
+            The driver's response dict, including the fitted coefficients, the
+            residual, the resulting wavelength span, and whether the axis was
+            applied live on this station.
+        """
+        resp = app.driver.set_wl_from_pairs(
+            [tuple(pair) for pair in pairs], degree=degree
+        )
+        return {
+            "response": resp.response,
+            "message": resp.message,
+            "data": resp.data,
+        }
 
     return app

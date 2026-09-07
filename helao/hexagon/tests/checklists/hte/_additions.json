@@ -19,5 +19,12 @@
     "method": "post",
     "date": "2026-09-07",
     "why": "run several techniques as one EC-Lib 2.0 experiment, with LOOP_START/LOOP_END repeats; eclib2 backend only, since neither sibling backend can load a multi-technique experiment in one call"
+  },
+  {
+    "module": "andor_server.py",
+    "path": "/set_wl_from_pairs",
+    "method": "post",
+    "date": "2026-09-07",
+    "why": "private direct wavelength fit from (channel, wavelength) pairs, for when the line identities are already known; see 2026-09-04-andor-driver-split-design.md"
   }
 ]
