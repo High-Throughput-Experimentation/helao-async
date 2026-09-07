@@ -6126,6 +6126,14 @@ def test_ocv_emits_only_time_and_potential():
     assert declared_ole("OCV") == {"t_s", "Ewe_V"}
 
 
+# NOTE (superseded): this synthetic fixture predates the real templates.
+# All nine are now committed under
+# helao/deploy/hte/drivers/pstat/biologic_ole/templates/, so pass
+# templates_dir pointing there instead. It makes no difference to what this
+# test exercises -- run_once passes only {"channel": 0} and _patch skips
+# every parameter absent from action_params, so no caption is ever
+# substituted -- but driving the real per-technique files costs nothing and
+# exercises what a station will actually run.
 @pytest.fixture
 def ca_templates(tmp_path_factory):
     directory = tmp_path_factory.mktemp("contract_templates")
