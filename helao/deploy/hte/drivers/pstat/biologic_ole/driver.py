@@ -57,7 +57,13 @@ from . import mps_assemble, mps_template
 from .mpr_cursor import MprCursor
 from .olecom_client import DEFAULT_PROGID, OleComClient, OleComError
 from .status import ChannelStatus, SafetyLimit, decode_status
-from .technique import OleTechnique, erange_rows, format_value, scale_to_unit
+from .technique import (
+    OleTechnique,
+    erange_rows,
+    format_value,
+    protocol_technique,
+    scale_to_unit,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -389,6 +395,70 @@ class BiologicOleDriver(HelaoDriver):
             )
         except Exception as exc:
             LOGGER.error("setup failed", exc_info=True)
+            self.cleanup(channel)
+            return DriverResponse(
+                response=DriverResponseType.failed,
+                message=str(exc),
+                status=DriverStatus.error,
+            )
+
+    def setup_protocol(
+        self,
+        mps_path: str,
+        action_params: dict,
+        output_dir: Optional[str] = None,
+    ) -> DriverResponse:
+        """Load a station-authored ``.mps`` onto a channel, unpatched.
+
+        The file is resolved against ``protocol_dir`` and must stay inside it:
+        a station's protocol library is a declared location, not whatever an
+        experiment passes. The technique record -- and therefore the column
+        set -- is derived from status index 5 *after* loading, because the
+        file decides the techniques and nothing here can know them first.
+        """
+        channel = action_params.get("channel", -1)
+        try:
+            if channel not in self.channels:
+                raise ValueError(f"Channel {channel} does not exist.")
+            if self.channels[channel] is not None:
+                raise ValueError(f"Channel {channel} is in use.")
+            root = self.protocol_dir.resolve()
+            resolved = (root / mps_path).resolve()
+            if not resolved.is_relative_to(root):
+                raise ValueError(f"{mps_path!r} resolves outside protocol_dir {root}")
+            if not resolved.is_file():
+                raise FileNotFoundError(f"no protocol file at {resolved}")
+            run_dir = self.scratch_dir / f"ch{channel}" / uuid.uuid4().hex
+            run_dir.mkdir(parents=True, exist_ok=True)
+            self._bounded(
+                self.client.load_settings,
+                self.device_number,
+                channel,
+                str(resolved),
+            )
+            loaded = self._status_of(channel)
+            technique = protocol_technique(loaded.technique_code)
+            LOGGER.info(
+                "loaded protocol %s on channel %s; technique code %s -> %s plan",
+                resolved.name,
+                channel,
+                loaded.technique_code,
+                technique.column_plan.kind,
+            )
+            self.channels[channel] = technique
+            self.channel_params[channel] = dict(action_params)
+            self.scratch[channel] = run_dir
+            self.output_dirs[channel] = Path(output_dir) if output_dir else None
+            # Ship the protocol itself as provenance -- an unpatched copy is
+            # still the exact settings this action ran.
+            shutil.copy2(resolved, run_dir / resolved.name)
+            return DriverResponse(
+                response=DriverResponseType.success,
+                message="protocol loaded",
+                status=DriverStatus.ok,
+            )
+        except Exception as exc:
+            LOGGER.error("setup_protocol failed", exc_info=True)
             self.cleanup(channel)
             return DriverResponse(
                 response=DriverResponseType.failed,
