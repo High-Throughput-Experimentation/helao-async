@@ -1130,22 +1130,47 @@ def test_every_technique_names_a_template_file(name):
     assert ot.resolve(name).template.endswith(".mps")
 
 
+#: X_ohm and R_ohm are part of the frozen EIS contract but are NOT in the
+#: eclib registry's field_map -- that driver computes them in get_data from
+#: modulus and phase, after remapping. The OLE side declares them in its
+#: column plan instead, because it gets them straight off MeasureEisValue.
+#: Same emitted columns, declared in different places.
+ECLIB_DERIVED_IN_CODE = {"X_ohm", "R_ohm"}
+
+
+def eclib_columns(name: str) -> set:
+    columns = set(BIOTECHS[name].field_map.values())
+    if "modulus" in columns:
+        columns |= ECLIB_DERIVED_IN_CODE
+    return columns
+
+
 @pytest.mark.parametrize("name", TECHNIQUE_NAMES)
 def test_emitted_columns_match_the_eclib_field_map(name):
     """The frozen contract: both backends emit the same column key set."""
-    eclib_columns = set(BIOTECHS[name].field_map.values())
+    expected = eclib_columns(name)
     ole_columns = set(ot.columns(ot.resolve(name).column_plan))
-    assert ole_columns == eclib_columns, {
-        "only_eclib": sorted(eclib_columns - ole_columns),
-        "only_ole": sorted(ole_columns - eclib_columns),
+    assert ole_columns == expected, {
+        "only_eclib": sorted(expected - ole_columns),
+        "only_ole": sorted(ole_columns - expected),
     }
 
 
 @pytest.mark.parametrize("name", ["CA", "CP", "CV", "CAOCV"])
-def test_dc_techniques_derive_power_and_cycle(name):
+def test_dc_techniques_fetch_nothing_by_code(name):
+    """A DC point costs one MeasureDcValue call and no MeasureValueByCode.
+
+    `derived` means "not fetched by variable code" -- it holds both the three
+    columns MeasureDcValue returns directly and the two computed from them.
+    What matters is that `var_codes` is empty: P_W is |Ewe*I|, which is
+    EC-Lab's own definition of variable 70, and cycle comes from the status
+    array, so fetching either would cost a round trip per point to learn a
+    number we already have.
+    """
     plan = ot.resolve(name).column_plan
     assert plan.kind == "dc"
-    assert set(plan.derived) == {"P_W", "cycle"}
+    assert plan.var_codes == {}
+    assert {"P_W", "cycle"} <= set(plan.derived)
 
 
 @pytest.mark.parametrize("name", ["PEIS", "GEIS"])
@@ -2987,6 +3012,11 @@ def test_a_running_channel_reports_run_then_stop(tmp_path):
     import time
 
     time.sleep(0.08)
+    # Stop_rec1 is exactly one poll wide, so the first poll after run_seconds
+    # elapses reports the tail and only the next reports Stop. Consuming it
+    # here is not a timing workaround -- asserting Stop on the first
+    # post-threshold poll fails 100% of the time, at any run_seconds.
+    decode_status(cli.measure_status(dev, 0))
     assert decode_status(cli.measure_status(dev, 0)).state is ChannelState.STOP
 
 
@@ -6177,7 +6207,7 @@ Run: `pytest helao/hexagon/tests/test_biologic_column_contract.py -v`
 
 Expected: all pass. Two likely failures and what they mean:
 
-- `test_the_two_registries_declare_the_same_columns` failing on `PEIS`/`GEIS` with `only_eclib: ['X_ohm', 'R_ohm']` means `ECLIB_DERIVED_IN_CODE` is not being applied — those two are computed in the eclib driver's `get_data`, not declared in its `field_map`.
+- `test_the_two_registries_declare_the_same_columns` failing on `PEIS`/`GEIS` with `only_ole: ['X_ohm', 'R_ohm']` means `ECLIB_DERIVED_IN_CODE` is not being applied — those two are computed in the eclib driver's `get_data`, not declared in its `field_map`.
 - `test_the_driver_delivers_no_column_it_did_not_declare` failing with an extra `_State`-prefixed key means the OLE driver is emitting the eclib path's `_`-prefixed status values. It should not: those come from `getdict(segment.values)` in the eclib driver and have no OLE equivalent. If a `biologic_vis` panel turns out to require them, that is a spec amendment, not a quiet addition here.
 
 - [ ] **Step 3: Format and commit**
