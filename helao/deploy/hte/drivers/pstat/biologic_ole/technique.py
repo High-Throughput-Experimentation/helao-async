@@ -37,6 +37,7 @@ __all__ = [
     "VAR_CODES",
     "columns",
     "erange_rows",
+    "format_value",
     "irange_value",
     "resolve",
     "scale_to_unit",
@@ -508,3 +509,48 @@ def resolve(name: str) -> OleTechnique:
         raise ValueError(
             f"unknown OLE technique {name!r}; expected one of {sorted(OLE_TECHS)}"
         ) from None
+
+
+def format_value(value, fmt: str) -> str:
+    """Render ``value`` as EC-Lab spells it in an ``.mps`` table.
+
+    Four sentinels stand in for things no single ``str.format`` spec produces,
+    and each exists because writing the obvious thing yields a file EC-Lab
+    accepts and then runs wrongly:
+
+    * ``"hms"`` -- EC-Lab's duration spelling, ``h:mm:s.ffff``.
+    * ``"bandwidth"`` -- the bare integer 1-9. Writing ``"BW4"`` gives a file
+      that loads and runs at whatever bandwidth the template carried.
+    * ``"V_to_mV"`` -- a volts parameter landing in a millivolts row
+      (``Va (mV)``, ``dER (mV)``, ``dEs (mV)``). Otherwise a 1000x error.
+    * ``"spacing"`` -- a sweep mode as EC-Lab's word, "Linear"/"Logarithmic".
+    * ``"irange"`` -- a current range as EC-Lab's display string, e.g.
+      ``100 µA``. Writing the ``u100`` alias runs on the template's range.
+
+    Anything else is a plain spec applied verbatim. Values needing a companion
+    unit row never come through here -- see ``scale_to_unit``.
+    """
+    if fmt == "hms":
+        # The one real duration in a GUI-authored file is `0:00:0.0010`
+        # (TI_CV_TO.mps, Trigger Out's `td`): hours and seconds unpadded,
+        # minutes padded to two. A third-party writer emits `00:00:00.0010`
+        # instead and reportedly works, so EC-Lab is probably lenient on
+        # read -- but what it *writes* is the only evidence there is, and a
+        # patched file that differs from a GUI-authored one for no reason is
+        # a difference nobody will remember making. Confirm with a
+        # longer-than-a-minute duration at at-station gate 1.
+        total = float(value)
+        hours = int(total / 3600.0)
+        minutes = int((total % 3600.0) / 60.0)
+        seconds = int(total % 60.0)
+        fraction = "{:.4f}".format(round(total % 1, 4)).split(".")[1]
+        return f"{hours}:{minutes:02d}:{seconds}.{fraction}"
+    if fmt == "bandwidth":
+        return str(BANDWIDTH_VALUES[str(value)])
+    if fmt == "V_to_mV":
+        return f"{float(value) * 1000.0:.3f}"
+    if fmt == "spacing":
+        return spacing_value(value)
+    if fmt == "irange":
+        return irange_value(value)
+    return fmt.format(value)
