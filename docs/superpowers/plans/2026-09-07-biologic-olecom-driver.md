@@ -5319,7 +5319,24 @@ def with_config(monkeypatch):
         monkeypatch.setattr(
             config_loader,
             "CONFIG",
-            {"servers": {"BIOLOGIC": {"group": "action", "params": params}}},
+            {
+                # `root`, `host` and `port` are not decoration: the first
+                # ActionHost built in a process initializes the logger under
+                # <root>/LOGS and reads host/port from the server entry, so a
+                # config without them raises before any route is registered.
+                # `test_action_host_surface.py`'s `_host()` does the same, for
+                # the same reason. It bites here because tests are run one
+                # file per pytest process, so nothing has warmed the logger.
+                "root": tempfile.mkdtemp(prefix="helao_biologic_backend_test_"),
+                "servers": {
+                    "BIOLOGIC": {
+                        "group": "action",
+                        "host": "127.0.0.1",
+                        "port": 8000,
+                        "params": params,
+                    }
+                },
+            },
         )
 
     return _set

@@ -15,7 +15,7 @@ import itertools
 import os
 import time
 from collections import defaultdict, deque
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -32,22 +32,16 @@ from helao.core.models.sample import (
 )
 from helao.hexagon.app.action_context import ActionContext, action_version
 from helao.hexagon.app.action_host import ActionHost
+from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging  # get LOGGER from the host instance
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
 
 from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
-from ...drivers.pstat.biologic.technique import (
-    TECH_CA,
-    TECH_CAOCV,
-    TECH_CP,
-    TECH_CV,
-    TECH_GEIS,
-    TECH_OCV,
-    TECH_PEIS,
-    BiologicTechnique,
-)
+from ...drivers.pstat.biologic.technique import BIOTECHS
+from ...drivers.pstat.biologic_ole.driver import BiologicOleDriver
+from ...drivers.pstat.biologic_ole.technique import resolve as resolve_ole_technique
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -63,7 +57,10 @@ class BiologicExec(Executor):
     OCV traces. ``_manual_stop`` aborts the measurement.
     """
 
-    technique: BiologicTechnique
+    #: Backend-specific technique object -- a BiologicTechnique (eclib) or an
+    #: OleTechnique (olecom); the two backends' registries resolve different
+    #: types, so this cannot be pinned to one of them.
+    technique: Any
     driver: BiologicDriver
 
     def __init__(self, *args, **kwargs):
@@ -76,7 +73,7 @@ class BiologicExec(Executor):
         Args:
             *args: Positional arguments forwarded to :class:`Executor`.
             **kwargs: Keyword arguments forwarded to :class:`Executor`; must
-                include ``technique`` (a :class:`BiologicTechnique`).
+                include ``technique`` (a backend-specific technique object).
         """
         super().__init__(*args, **kwargs)
         try:
@@ -372,14 +369,16 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """Run chronoamperometry (current response to a stepped potential).
 
         Maps the I/E/Bandwidth range enums to their driver values and dispatches
-        a :class:`BiologicExec` configured with :data:`TECH_CA`. Use a 4-bit
+        a :class:`BiologicExec` configured with the ``"CA"`` technique. Use a 4-bit
         bitmask for trigger arguments; valid I/E ranges depend on the
         Biologic model.
         """
         active = await ctx.begin()
         active.action.action_abbr = "CA"
         active.action.action_params["AcqInterval__A"] = 10.0
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CA")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -408,13 +407,15 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """Run chronopotentiometry (potential response to a controlled current).
 
         Maps I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
-        configured with :data:`TECH_CP`. Use a 4-bit bitmask for trigger
+        configured with the ``"CP"`` technique. Use a 4-bit bitmask for trigger
         arguments; valid I/E ranges depend on the Biologic model.
         """
         active = await ctx.begin()
         active.action.action_abbr = "CP"
         active.action.action_params["AcqInterval__V"] = 10.0
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_CP)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CP")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -449,7 +450,7 @@ async def biologic_dyn_endpoints(app: ActionHost):
         Subtracts one from ``Cycles`` (the driver expects additional cycles),
         derives ``AcqInterval__V`` from the time interval and scan rate, maps
         I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
-        configured with :data:`TECH_CV`.
+        configured with the ``"CV"`` technique.
         """
         active = await ctx.begin()
         active.action.action_params["Cycles"] -= 1  # i.e. additional cycles
@@ -458,7 +459,9 @@ async def biologic_dyn_endpoints(app: ActionHost):
             * active.action.action_params["ScanRate__V_s"]
         )
         active.action.action_abbr = "CV"
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CV")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -482,14 +485,16 @@ async def biologic_dyn_endpoints(app: ActionHost):
     ):
         """Measure open-circuit potential for ``Tval__s`` seconds.
 
-        Dispatches a :class:`BiologicExec` configured with :data:`TECH_OCV`;
+        Dispatches a :class:`BiologicExec` configured with the ``"OCV"`` technique;
         the ``*_threshold`` parameters are forwarded to bubble detection during
         ``_post_exec``.
         """
         active = await ctx.begin()
         active.action.action_abbr = "OCV"
         active.action.action_params["AcqInterval__V"] = 10.0
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_OCV)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("OCV")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -522,11 +527,13 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """Run potentiostatic electrochemical impedance spectroscopy (PEIS).
 
         Maps the I/E/Bandwidth range enums and dispatches a
-        :class:`BiologicExec` configured with :data:`TECH_PEIS`.
+        :class:`BiologicExec` configured with the ``"PEIS"`` technique.
         """
         active = await ctx.begin()
         active.action.action_abbr = "PEIS"
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("PEIS")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -559,11 +566,13 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """Run galvanostatic electrochemical impedance spectroscopy (GEIS).
 
         Maps the I/E/Bandwidth range enums and dispatches a
-        :class:`BiologicExec` configured with :data:`TECH_GEIS`.
+        :class:`BiologicExec` configured with the ``"GEIS"`` technique.
         """
         active = await ctx.begin()
         active.action.action_abbr = "GEIS"
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("GEIS")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
@@ -595,23 +604,77 @@ async def biologic_dyn_endpoints(app: ActionHost):
 
         Iterates the ``CA_Vval__V_list`` / ``CA_Tval__s_list`` lists; maps the
         CA I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
-        configured with :data:`TECH_CAOCV`.
+        configured with the ``"CAOCV"`` technique.
         """
         active = await ctx.begin()
         active.action.action_abbr = "CAOCV"
         active.action.action_params["CA_AcqInterval__A"] = 10.0
         active.action.action_params["OCV_AcqInterval__V"] = 10.0
-        executor = BiologicExec(active=active, oneoff=False, technique=TECH_CAOCV)
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CAOCV")
+        )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
+
+
+#: `pstat_backend` value -> driver class. An absent key yields the
+#: easy-biologic driver, so every existing station config keeps working
+#: unedited; a station opts into EC-Lab by adding the key.
+BACKENDS: dict[str, type] = {
+    "eclib": BiologicDriver,
+    "olecom": BiologicOleDriver,
+}
+DEFAULT_BACKEND = "eclib"
+
+#: Technique-object resolver per backend. The two backends take different
+#: technique objects -- a BiologicTechnique names an easy-biologic program
+#: class, an OleTechnique names an .mps template -- so the endpoints pass a
+#: technique *name* and the executor resolves it against the selected
+#: backend's registry. A shared object would have to know both.
+TECHNIQUE_REGISTRIES = {
+    "eclib": lambda name: BIOTECHS[name],
+    "olecom": resolve_ole_technique,
+}
+
+
+def _backend_name(server_key: str) -> str:
+    """The backend this server's config selects.
+
+    Reads the global CONFIG, which ``fast_launcher.py`` populates before it
+    imports this module and calls ``makeApp``. Tolerates a missing CONFIG or
+    server entry, because capture scripts and build tests call ``makeApp``
+    outside the launcher.
+
+    Raises:
+        ValueError: On an unrecognized value. A typo must not fall through to
+            the default -- a station meaning to drive EC-Lab would silently
+            get the easy-biologic driver and fail at connect() with a vendor
+            import error that names the wrong problem.
+    """
+    config = getattr(config_loader, "CONFIG", None) or {}
+    params = (config.get("servers") or {}).get(server_key, {}).get("params", {}) or {}
+    name = params.get("pstat_backend", DEFAULT_BACKEND)
+    if name not in BACKENDS:
+        raise ValueError(
+            f"unknown pstat_backend {name!r} for server {server_key!r}; "
+            f"expected one of {sorted(BACKENDS)}"
+        )
+    return name
+
+
+def _driver_class(server_key: str) -> type:
+    """The driver class this server's config selects."""
+    return BACKENDS[_backend_name(server_key)]
 
 
 def makeApp(server_key) -> ActionHost:
     """Build the Biologic potentiostat FastAPI app.
 
-    Constructs a :class:`ActionHost` backed by :class:`BiologicDriver`, defers
-    technique endpoint registration to :func:`biologic_dyn_endpoints`, and adds
-    the ``get_meas_status``, ``stop`` and private ``stop_private`` routes.
+    Constructs a :class:`ActionHost` backed by the driver class the server's
+    ``pstat_backend`` param selects (``eclib`` or ``olecom``, defaulting to
+    ``eclib`` so an existing station config needs no edit), defers technique
+    endpoint registration to :func:`biologic_dyn_endpoints`, and adds the
+    ``get_meas_status``, ``stop`` and private ``stop_private`` routes.
 
     Args:
         server_key: Key identifying this server in the orchestration group.
@@ -620,14 +683,20 @@ def makeApp(server_key) -> ActionHost:
         The configured :class:`ActionHost` application.
     """
 
+    backend = _backend_name(server_key)
     app = ActionHost(
         server_key=server_key,
         server_title=server_key,
         description="Biologic instrument/action server",
         version=3.0,
-        driver_classes=[BiologicDriver],
+        driver_classes=[BACKENDS[backend]],
         dyn_endpoints=biologic_dyn_endpoints,
     )
+    #: Which backend this app was built for. `base_api` names the driver
+    #: namedtuple field from the class name, so `app.drivers.<Name>` differs
+    #: between backends -- use `app.driver`.
+    app.pstat_backend = backend
+    app.resolve_technique = TECHNIQUE_REGISTRIES[backend]
 
     @app.action()
     async def get_meas_status(ctx: ActionContext):
