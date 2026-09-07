@@ -400,7 +400,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 - Consumes: nothing.
 - Produces: `MpsDocument` (frozen dataclass, field `lines: tuple[str, ...]`), `MpsParameterNotFound(KeyError)`, `load(path: str | Path) -> MpsDocument`, `loads(text: str) -> MpsDocument`, `get_param(doc: MpsDocument, name: str, seq: int = 0) -> str`, `set_param(doc: MpsDocument, name: str, value: str, seq: int = 0) -> MpsDocument`, `n_sequences(doc: MpsDocument) -> int`, `render(doc: MpsDocument) -> str`, `write_patched(doc: MpsDocument, dest: str | Path) -> Path`.
 
-**Context the implementer needs.** An EC-Lab `.mps` is plain-text ASCII. After a header block it carries one `Technique : N` line per technique, the technique's short name, and then a parameter table: one line per parameter, whose label is the text before the first run of two-or-more spaces, followed by one whitespace-separated column per sequence. `eclabfiles` parses them the same way. Patching must replace one column of one row and leave every other byte alone, because EC-Lab reads the file positionally and the surrounding header carries values this code has no business touching.
+**Context the implementer needs.** An EC-Lab `.mps` is plain text in **latin-1** (EC-Lab writes `µ` as the single byte 0xB5, so `unit Is  µA` is unreadable as UTF-8). After a header block it carries one `Technique : N` line per technique, the technique's short name, and then a **fixed-width** parameter table: the label occupies columns 0-19, each sequence value the 20 columns after it. Parse by column, never by splitting on a run of spaces — EC-Lab has a caption with two consecutive spaces (`unit  Ia`, on GEIS) and captions with single spaces everywhere (`E range min (V)`), so no gap width is safe. Patching must replace one column of one row and leave every other byte alone, because EC-Lab reads the file positionally and the surrounding header carries values this code has no business touching.
 
 - [ ] **Step 1: Write the fixture**
 
@@ -419,14 +419,17 @@ Safety Limits :
 	Do not start on E overload
 
 Technique : 1
-Chronoamperometry
+Chronoamperometry / Chronocoulometry
+Ns                  0                   1
 Ei (V)              0.000               0.500
 vs.                 Eoc                 Eoc
-ti (h:m:s)          0:00:10.0000        0:00:20.0000
+ti (h:m:s)          00:00:10.0000       00:00:20.0000
 Imax                pass                pass
 unit Imax           mA                  mA
+record              <I>                 <I>
+dI                  10.000              10.000
+unit dI             mA                  mA
 dta (s)             0.0100              0.0100
-dtq (mA)            10.000              10.000
 E range min (V)     -10.000
 E range max (V)     10.000
 I Range             Auto
@@ -436,8 +439,9 @@ nc cycles           0
 
 Technique : 2
 Open Circuit Voltage
-tR (h:m:s)          0:00:10.0000
+tR (h:m:s)          00:00:10.0000
 dER/dt (mV/h)       0.0
+record              Ewe
 dER (mV)            10.00
 dtR (s)             0.1000
 E range min (V)     -10.000
@@ -480,6 +484,41 @@ def test_a_single_column_parameter_reads_back(doc):
 def test_a_multi_sequence_parameter_reads_the_requested_column(doc):
     assert mt.get_param(doc, "Ei (V)", seq=0) == "0.000"
     assert mt.get_param(doc, "Ei (V)", seq=1) == "0.500"
+
+
+def test_a_two_space_caption_in_the_fixture_reads_back(doc):
+    assert mt.get_param(doc, "unit dI") == "mA"
+
+
+def test_a_caption_with_two_consecutive_spaces_is_matched_whole():
+    """EC-Lab really has one: GEIS's `unit  Ia`.
+
+    Any parser that splits label from value on a run of spaces truncates this
+    to `unit`, then reports the real caption as absent -- which at a station
+    reads as "the template is wrong" rather than "the parser is".
+    """
+    doc = mt.loads("unit  Ia            mA                  \n")
+    assert mt.get_param(doc, "unit  Ia") == "mA"
+    patched = mt.set_param(doc, "unit  Ia", "\u00b5A")
+    assert mt.get_param(patched, "unit  Ia") == "\u00b5A"
+
+
+def test_a_header_line_is_not_mistaken_for_a_parameter_row():
+    """Header lines are long enough to slice but must never be patched."""
+    doc = mt.loads(
+        "Number of linked techniques : 2\n"
+        "Ecell ctrl range : min = -10.00 V, max = 10.00 V\n"
+        "Technique : 1\n"
+    )
+    assert mt.n_sequences(doc) == 0
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(doc, "Number of linked tec")
+
+
+def test_a_caption_longer_than_the_label_field_is_refused():
+    doc = mt.loads("Bandwidth           4\n")
+    with pytest.raises(mt.MpsParameterNotFound, match="20-column"):
+        mt.set_param(doc, "a" * 21, "1")
 
 
 def test_a_label_containing_spaces_is_matched_whole(doc):
@@ -541,9 +580,38 @@ def test_write_patched_creates_parents_and_returns_the_path(tmp_path, doc):
     assert mt.get_param(mt.load(dest), "Bandwidth") == "7"
 
 
+def test_a_micro_prefix_round_trips_as_one_byte(tmp_path):
+    """EC-Lab writes µ as latin-1 0xB5. Read as UTF-8 this file raises.
+
+    Not hypothetical: every current or charge row on a µA-scale setpoint
+    carries it, so a GUI-authored CA template hits this immediately.
+    """
+    source = tmp_path / "micro.mps"
+    source.write_bytes(
+        b"Technique : 1\nChronoamperometry\n"
+        b"Is                  1.000\n"
+        b"unit Is             \xb5A\n"
+    )
+    doc = mt.load(source)
+    assert mt.get_param(doc, "unit Is") == "\u00b5A"
+    dest = tmp_path / "out.mps"
+    mt.write_patched(doc, dest)
+    assert dest.read_bytes() == source.read_bytes()
+
+
+def test_a_patched_file_keeps_single_byte_micro(tmp_path):
+    source = tmp_path / "micro.mps"
+    source.write_bytes(b"Is                  1.000\nunit Is             \xb5A\n")
+    patched = mt.set_param(mt.load(source), "Is", "2.500")
+    dest = tmp_path / "out.mps"
+    mt.write_patched(patched, dest)
+    assert b"\xb5A" in dest.read_bytes()
+    assert b"\xc2\xb5" not in dest.read_bytes()
+
+
 def test_loads_accepts_text_directly():
-    doc = mt.loads("Technique : 1\nOCV\ntR (h:m:s)          0:00:05.0000\n")
-    assert mt.get_param(doc, "tR (h:m:s)") == "0:00:05.0000"
+    doc = mt.loads("Technique : 1\nOCV\ntR (h:m:s)          00:00:05.0000\n")
+    assert mt.get_param(doc, "tR (h:m:s)") == "00:00:05.0000"
 ```
 
 - [ ] **Step 3: Run the tests and verify they fail**
@@ -562,10 +630,14 @@ channel -- the OLE COM API has no function that builds a technique from
 arguments -- so every parameterised endpoint patches a template and hands
 EC-Lab the result.
 
-The file is plain ASCII. After a header block it carries, per technique, a
-``Technique : N`` line, the technique name, and a parameter table: one row per
-parameter whose **label is the text before the first run of two or more
-spaces**, followed by one whitespace-separated column per sequence.
+The file is latin-1 text (see ``ENCODING``). After a header block it carries,
+per technique, a
+``Technique : N`` line, the technique name, and a **fixed-width** parameter
+table: the label occupies columns 0-19 and each sequence value 20 columns
+after it. It has to be parsed by column, not by splitting on a run of spaces:
+EC-Lab has at least one caption containing two consecutive spaces
+(``unit  Ia``, on GEIS), which a gap-splitting parser truncates to ``unit``
+and then reports as absent.
 
 Patching rewrites one column of one row and leaves every other byte untouched,
 including the header, because EC-Lab reads the file positionally and this code
@@ -573,12 +645,12 @@ has no business editing values it was not asked about. ``render`` on an
 unpatched document is byte-identical to what was loaded, and a test pins that.
 """
 
-import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Union
 
 __all__ = [
+    "COLUMN_WIDTH",
     "MpsDocument",
     "MpsParameterNotFound",
     "get_param",
@@ -590,10 +662,13 @@ __all__ = [
     "write_patched",
 ]
 
-#: A parameter row: a label, then two-or-more spaces, then the columns.
-#: Two spaces rather than one, because labels contain single spaces
-#: ("E range min (V)") and splitting on one would truncate every such label.
-_ROW = re.compile(r"^(?P<label>\S.*?\S)(?P<gap>  +)(?P<rest>\S.*)$")
+#: The parameter table is fixed-width: EC-Lab pads each label to 20 columns
+#: and each value to 20 after it. Parsing by column rather than by whitespace
+#: runs is not a stylistic choice -- **at least one real caption contains two
+#: consecutive spaces** (``unit  Ia``, on GEIS), which any split-on-a-gap
+#: parser truncates to ``unit``, and single spaces are everywhere
+#: ("E range min (V)"), so no gap width is safe.
+COLUMN_WIDTH = 20
 
 
 class MpsParameterNotFound(KeyError):
@@ -612,14 +687,24 @@ class MpsDocument:
     lines: tuple[str, ...]
 
 
+#: ``.mps`` files are latin-1 / cp1252, **not** UTF-8. EC-Lab writes the micro
+#: prefix as the single byte 0xB5 (``µ`` in latin-1), so a current range row
+#: reads ``unit Is  µA``. Reading such a file as UTF-8 raises
+#: UnicodeDecodeError; writing one as UTF-8 emits two bytes where EC-Lab
+#: expects one. latin-1 is chosen over cp1252 deliberately: it round-trips
+#: every byte 0x00-0xFF losslessly, which is what a patcher that must not
+#: disturb bytes it was not asked about actually needs.
+ENCODING = "latin-1"
+
+
 def loads(text: str) -> MpsDocument:
     """Parse ``.mps`` text. ``keepends`` preserves the original line endings."""
     return MpsDocument(lines=tuple(text.splitlines(keepends=True)))
 
 
 def load(path: Union[str, Path]) -> MpsDocument:
-    """Read an ``.mps`` file from disk."""
-    return loads(Path(path).read_text())
+    """Read an ``.mps`` file from disk. See ``ENCODING``."""
+    return loads(Path(path).read_text(encoding=ENCODING))
 
 
 def render(doc: MpsDocument) -> str:
@@ -627,19 +712,31 @@ def render(doc: MpsDocument) -> str:
     return "".join(doc.lines)
 
 
-def _columns(line: str) -> Union[tuple[str, str, list[str]], None]:
-    """Split a parameter row into ``(label, gap, columns)``, or None."""
-    match = _ROW.match(line.rstrip("\r\n"))
-    if match is None:
+def _columns(line: str) -> Union[tuple[str, list[str]], None]:
+    """Split a parameter row into ``(label, columns)``, or None if not one.
+
+    A row qualifies only when the label is padded to exactly ``COLUMN_WIDTH``
+    -- column 19 a space, column 20 not. That is what distinguishes a
+    parameter row from a header line like ``Ecell ctrl range : min = ...``,
+    which is long enough to slice but is not a table row and must never be
+    patched.
+    """
+    body = line.rstrip("\r\n")
+    if len(body) <= COLUMN_WIDTH:
         return None
-    return match["label"], match["gap"], match["rest"].split()
+    if body[0] == " " or body[COLUMN_WIDTH - 1] != " " or body[COLUMN_WIDTH] == " ":
+        return None
+    label = body[:COLUMN_WIDTH].rstrip()
+    if not label:
+        return None
+    return label, body[COLUMN_WIDTH:].split()
 
 
-def _find_row(doc: MpsDocument, name: str) -> tuple[int, str, list[str]]:
+def _find_row(doc: MpsDocument, name: str) -> tuple[int, list[str]]:
     for index, line in enumerate(doc.lines):
         parsed = _columns(line)
         if parsed is not None and parsed[0] == name:
-            return index, parsed[1], parsed[2]
+            return index, parsed[1]
     raise MpsParameterNotFound(f"no parameter row labelled {name!r}")
 
 
@@ -649,7 +746,7 @@ def get_param(doc: MpsDocument, name: str, seq: int = 0) -> str:
     Raises:
         MpsParameterNotFound: If the row is absent, or has no column ``seq``.
     """
-    _, _, columns = _find_row(doc, name)
+    _, columns = _find_row(doc, name)
     if seq >= len(columns):
         raise MpsParameterNotFound(
             f"parameter {name!r} has {len(columns)} column(s), no seq {seq}"
@@ -668,24 +765,26 @@ def set_param(doc: MpsDocument, name: str, value: str, seq: int = 0) -> MpsDocum
     Raises:
         MpsParameterNotFound: If the row is absent, or has no column ``seq``.
     """
-    index, gap, columns = _find_row(doc, name)
+    index, columns = _find_row(doc, name)
     if seq >= len(columns):
         raise MpsParameterNotFound(
             f"parameter {name!r} has {len(columns)} column(s), no seq {seq}"
         )
+    if len(name) > COLUMN_WIDTH:
+        # EC-Lab pads to 20; a longer label leaves the value with no separator
+        # and makes the row unparseable on the next read.
+        raise MpsParameterNotFound(
+            f"parameter {name!r} exceeds the {COLUMN_WIDTH}-column label field"
+        )
     original = doc.lines[index]
     ending = original[len(original.rstrip("\r\n")) :]
-    widths = [len(column) for column in columns]
     columns = list(columns)
     columns[seq] = value
-    padded = [
-        column.ljust(width) if position < len(columns) - 1 else column
-        for position, (column, width) in enumerate(zip(columns, widths))
-    ]
-    # Columns are separated by the same two-space minimum the parser requires.
-    rebuilt = f"{name}{gap}{'  '.join(padded).rstrip()}{ending}"
+    rebuilt = name.ljust(COLUMN_WIDTH) + "".join(
+        column.ljust(COLUMN_WIDTH) for column in columns
+    )
     lines = list(doc.lines)
-    lines[index] = rebuilt
+    lines[index] = rebuilt.rstrip() + ending
     return MpsDocument(lines=tuple(lines))
 
 
@@ -695,7 +794,7 @@ def n_sequences(doc: MpsDocument) -> int:
     for line in doc.lines:
         parsed = _columns(line)
         if parsed is not None:
-            widest = max(widest, len(parsed[2]))
+            widest = max(widest, len(parsed[1]))
     return widest
 
 
@@ -708,7 +807,7 @@ def write_patched(doc: MpsDocument, dest: Union[str, Path]) -> Path:
     """
     path = Path(dest)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render(doc))
+    path.write_text(render(doc), encoding=ENCODING)
     return path
 ```
 
@@ -884,12 +983,52 @@ def test_no_technique_maps_erange_to_a_single_caption():
         assert "CA_ERange" not in tech.parameter_map, tech.technique_name
 
 
-def test_a_parameter_with_a_unit_declares_both_captions():
-    """ModifyOnTheFly and the .mps table both spell the unit as its own row."""
-    param = ot.resolve("CA").parameter_map["IRange"]
-    assert param.param_id
-    current = ot.resolve("CA").parameter_map["Tval__s"]
-    assert current.fmt  # a duration needs h:m:s formatting, not str()
+def test_a_scaled_parameter_declares_a_unit_row_and_a_base_unit():
+    """EC-Lab writes a current as a magnitude row plus a unit row."""
+    param = ot.resolve("CP").parameter_map["Ival__A"]
+    assert param.param_id == "Is"
+    assert param.unit_param_id == "unit Is"
+    assert param.base_unit == "A"
+
+
+def test_geis_spells_its_amplitude_unit_row_with_two_spaces():
+    """`unit  Ia` is EC-Lab's own spelling, not a typo here."""
+    assert ot.resolve("GEIS").parameter_map["Iamp__A"].unit_param_id == "unit  Ia"
+
+
+def test_scale_to_unit_keeps_a_microamp_out_of_the_third_decimal():
+    """Unscaled, 1 uA formats to 0.000 -- the whole reason this exists."""
+    assert ot.scale_to_unit(1e-6, "A") == ("1.000", "\u00b5A")
+    assert ot.scale_to_unit(-2.5e-3, "A") == ("-2.500", "mA")
+    assert ot.scale_to_unit(1.0, "A") == ("1.000", "A")
+    assert ot.scale_to_unit(1e6, "Hz") == ("1.000", "MHz")
+    assert ot.scale_to_unit(1000.0, "Hz") == ("1.000", "kHz")
+    assert ot.scale_to_unit(0.0, "A") == ("0.000", "A")
+
+
+def test_the_micro_prefix_is_the_single_latin1_byte():
+    """0xB5, not the UTF-8 two-byte sequence EC-Lab would not recognise."""
+    _, unit = ot.scale_to_unit(1e-6, "A")
+    assert unit.encode("latin-1") == b"\xb5A"
+
+
+def test_bandwidth_is_written_as_an_integer():
+    """"BW4" loads fine and runs at the template's bandwidth instead."""
+    assert ot.format_value("BW4", "bandwidth") == "4"
+    assert ot.format_value("BW7", "bandwidth") == "7"
+    assert ot.resolve("CA").parameter_map["Bandwidth"].fmt == "bandwidth"
+
+
+def test_a_volts_parameter_landing_in_a_millivolt_row_is_scaled():
+    assert ot.format_value(0.01, "V_to_mV") == "10.000"
+    assert ot.resolve("PEIS").parameter_map["Vamp__V"].param_id == "Va (mV)"
+    assert ot.resolve("PEIS").parameter_map["Vamp__V"].fmt == "V_to_mV"
+
+
+def test_the_sweep_mode_row_is_spacing_and_its_values_are_words():
+    assert ot.resolve("PEIS").parameter_map["SweepMode"].param_id == "spacing"
+    assert ot.format_value("log", "spacing") == "Logarithmic"
+    assert ot.format_value("lin", "spacing") == "Linear"
 
 
 def test_variable_codes_are_the_documented_ones():
@@ -951,6 +1090,7 @@ from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 __all__ = [
+    "BANDWIDTH_VALUES",
     "ColumnPlan",
     "DC_COLUMNS",
     "EIS_COLUMNS",
@@ -958,10 +1098,14 @@ __all__ = [
     "MpsParam",
     "OLE_TECHS",
     "OleTechnique",
+    "SPACING_VALUES",
+    "UNIT_PREFIXES",
     "VAR_CODES",
     "columns",
     "erange_rows",
     "resolve",
+    "scale_to_unit",
+    "spacing_value",
 ]
 
 #: EC-Lab variable codes, appendix 7.2, keyed by the HELAO column they fill.
@@ -991,19 +1135,23 @@ class MpsParam:
     Attributes:
         param_id: The parameter's caption -- its label in the ``.mps`` table,
             and the ``ParamID`` ``ModifyOnTheFly`` would take.
-        unit_param_id: Caption of the companion unit row, where the technique
-            has one. EC-Lab spells a value and its unit as two separate rows,
-            so a value written without its unit is interpreted in whatever
-            unit the template carried.
-        unit: The unit string to write into ``unit_param_id``.
-        fmt: A ``str.format`` spec applied to the value. ``{:h:m:s}`` is not a
-            real format spec; durations use the sentinel ``"hms"`` and are
-            converted by ``format_value``.
+        unit_param_id: Caption of the companion unit row. EC-Lab spells a
+            current, charge or frequency as a magnitude row plus a unit row,
+            and formats every number to three decimals -- so a 1 uA setpoint
+            written unscaled lands as ``0.000``. Set together with
+            ``base_unit``; the driver then calls ``scale_to_unit``.
+        base_unit: The unscaled unit symbol (``"A"``, ``"Hz"``). Its presence
+            is what selects the scale-and-unit path over ``fmt``.
+        fmt: How to render the value when there is no unit row. A
+            ``str.format`` spec, or one of the sentinels ``"hms"`` (EC-Lab's
+            ``hh:mm:ss.ffff``), ``"bandwidth"`` (the bare integer 1-9),
+            ``"V_to_mV"`` (a volts parameter landing in a millivolts row), or
+            ``"spacing"`` (a sweep mode as "Linear"/"Logarithmic").
     """
 
     param_id: str
     unit_param_id: Optional[str] = None
-    unit: Optional[str] = None
+    base_unit: Optional[str] = None
     fmt: str = "{}"
 
 
@@ -1113,8 +1261,53 @@ def _eis_plan() -> ColumnPlan:
 
 #: The full-scale voltage each ``EC_ERange`` alias selects, used to write the
 #: ``.mps`` file's symmetric min/max pair. ``AUTO`` has no numeric equivalent,
-#: so it is handled by ``_erange_rows`` rather than appearing here.
+#: so it is handled by ``erange_rows`` rather than appearing here.
 ERANGE_VOLTS = {"v2_5": 2.5, "v5": 5.0, "v10": 10.0}
+
+#: EC-Lab writes bandwidth as a bare integer 1-9, **not** as "BW4". Verified
+#: against a working third-party writer; writing the alias string produces a
+#: file EC-Lab loads and then runs at whatever bandwidth it defaulted to.
+BANDWIDTH_VALUES = {f"BW{i}": i for i in range(1, 10)}
+
+#: SI prefixes EC-Lab accepts on a unit row, with the latin-1 micro sign.
+#: Ordered large to small; the first whose scaled magnitude is >= 1 wins.
+UNIT_PREFIXES = (
+    ("M", 1e6),
+    ("k", 1e3),
+    ("", 1.0),
+    ("m", 1e-3),
+    ("\u00b5", 1e-6),
+    ("n", 1e-9),
+    ("p", 1e-12),
+)
+
+
+def scale_to_unit(value: float, base_unit: str) -> tuple[str, str]:
+    """Split a physical value into the magnitude and unit EC-Lab writes.
+
+    EC-Lab spells a current, charge or frequency as **two rows** -- a
+    magnitude and a matching unit -- and formats every number to three
+    decimals. So a 1 uA setpoint written straight into ``Is`` would land as
+    ``0.000``: the value has to be scaled and the prefix written alongside it.
+    This is the mechanism, not a nicety.
+
+    Args:
+        value: The value in base SI units (A, Hz, C ...).
+        base_unit: The unscaled unit symbol, e.g. ``"A"`` or ``"Hz"``.
+
+    Returns:
+        ``(magnitude, unit)`` -- e.g. ``(1e-6, "A")`` yields
+        ``("1.000", "\u00b5A")``. Zero yields the unprefixed unit, since no
+        prefix is more correct than any other for it.
+    """
+    magnitude = abs(float(value))
+    if magnitude == 0:
+        return "0.000", base_unit
+    for prefix, scale in UNIT_PREFIXES:
+        if magnitude >= scale:
+            return f"{float(value) / scale:.3f}", f"{prefix}{base_unit}"
+    prefix, scale = UNIT_PREFIXES[-1]
+    return f"{float(value) / scale:.3f}", f"{prefix}{base_unit}"
 
 
 def erange_rows(value: str) -> dict[str, str]:
@@ -1138,16 +1331,26 @@ def erange_rows(value: str) -> dict[str, str]:
     }
 
 
-#: Shared range/bandwidth captions. Present on every technique that exposes
-#: them; OCV has none, which is why its map is the short one.
+#: How each HELAO ``SweepMode`` value is spelled in the ``.mps`` ``spacing``
+#: row. The caption is ``spacing``, not ``sweep``, and the values are words.
+SPACING_VALUES = {"lin": "Linear", "log": "Logarithmic"}
+
+
+def spacing_value(value: str) -> str:
+    """EC-Lab's ``spacing`` word for a HELAO ``SweepMode``."""
+    return SPACING_VALUES.get(str(value), "Logarithmic")
+
+
+#: Shared current-range and bandwidth captions. Present on every technique
+#: that exposes them; OCV has neither, which is why its map is the short one.
 #:
-#: ``ERange`` is deliberately absent: unlike IRange and Bandwidth it is not one
-#: row but a min/max pair, so the driver applies it through ``erange_rows``.
-#: Mapping it onto a single caption would write the string "AUTO" into a field
-#: EC-Lab reads as a voltage.
+#: ``ERange`` is deliberately absent: unlike these it is not one row but a
+#: min/max pair, so the driver applies it through ``erange_rows``. Mapping it
+#: onto a single caption would write the string "AUTO" into a field EC-Lab
+#: reads as a voltage.
 _RANGES = {
     "IRange": MpsParam(param_id="I Range"),
-    "Bandwidth": MpsParam(param_id="Bandwidth"),
+    "Bandwidth": MpsParam(param_id="Bandwidth", fmt="bandwidth"),
 }
 
 OLE_TECHS: dict[str, OleTechnique] = {
@@ -1157,7 +1360,8 @@ OLE_TECHS: dict[str, OleTechnique] = {
         parameter_map={
             "Tval__s": MpsParam(param_id="tR (h:m:s)", fmt="hms"),
             "AcqInterval__s": MpsParam(param_id="dtR (s)", fmt="{:.4f}"),
-            "AcqInterval__V": MpsParam(param_id="dER (mV)", fmt="{:.2f}"),
+            # EC-Lab's dER is in millivolts; the HELAO parameter is volts.
+            "AcqInterval__V": MpsParam(param_id="dER (mV)", fmt="V_to_mV"),
         },
         column_plan=ColumnPlan(kind="dc", derived=("t_s", "Ewe_V")),
         technique_codes=frozenset({11, 55}),
@@ -1169,9 +1373,9 @@ OLE_TECHS: dict[str, OleTechnique] = {
             "Vval__V": MpsParam(param_id="Ei (V)", fmt="{:.3f}"),
             "Tval__s": MpsParam(param_id="ti (h:m:s)", fmt="hms"),
             "AcqInterval__s": MpsParam(param_id="dta (s)", fmt="{:.4f}"),
+            # The current-change record threshold is a magnitude/unit pair.
             "AcqInterval__A": MpsParam(
-                param_id="dtq (mA)", unit_param_id="unit dtq", unit="mA",
-                fmt="{:.3f}",
+                param_id="dI", unit_param_id="unit dI", base_unit="A"
             ),
             **_RANGES,
         },
@@ -1183,16 +1387,21 @@ OLE_TECHS: dict[str, OleTechnique] = {
         template="CP.mps",
         parameter_map={
             "Ival__A": MpsParam(
-                param_id="Is", unit_param_id="unit Is", unit="A", fmt="{:.6f}"
+                param_id="Is", unit_param_id="unit Is", base_unit="A"
             ),
             "Tval__s": MpsParam(param_id="ts (h:m:s)", fmt="hms"),
             "AcqInterval__s": MpsParam(param_id="dts (s)", fmt="{:.4f}"),
-            "AcqInterval__V": MpsParam(param_id="dEs (mV)", fmt="{:.2f}"),
+            "AcqInterval__V": MpsParam(param_id="dEs (mV)", fmt="V_to_mV"),
             **_RANGES,
         },
         column_plan=_dc_plan(),
         technique_codes=frozenset({25, 56}),
     ),
+    # UNVERIFIED CAPTIONS. The reference writer this registry was checked
+    # against implements OCV, CA, CP, PEIS, GEIS, GCPL, Loop and Modulo Bat --
+    # but not CV. These follow the same conventions the verified techniques
+    # use (Ei/E1/E2/Ef, dE/dt with its own unit row) and are the first thing
+    # to check against the real template at at-station gate 1.
     "CV": OleTechnique(
         technique_name="CV",
         template="CV.mps",
@@ -1202,11 +1411,10 @@ OLE_TECHS: dict[str, OleTechnique] = {
             "Vapex2__V": MpsParam(param_id="E2 (V)", fmt="{:.3f}"),
             "Vfinal__V": MpsParam(param_id="Ef (V)", fmt="{:.3f}"),
             "ScanRate__V_s": MpsParam(
-                param_id="dE/dt", unit_param_id="dE/dt unit", unit="V/s",
-                fmt="{:.3f}",
+                param_id="dE/dt", unit_param_id="dE/dt unit", base_unit="V/s"
             ),
             "Cycles": MpsParam(param_id="nc cycles", fmt="{:d}"),
-            "AcqInterval__V": MpsParam(param_id="dE (mV)", fmt="{:.2f}"),
+            "AcqInterval__V": MpsParam(param_id="dE (mV)", fmt="V_to_mV"),
             **_RANGES,
         },
         column_plan=_dc_plan(),
@@ -1217,15 +1425,21 @@ OLE_TECHS: dict[str, OleTechnique] = {
         template="PEIS.mps",
         parameter_map={
             "Vinit__V": MpsParam(param_id="E (V)", fmt="{:.3f}"),
-            "Vamp__V": MpsParam(param_id="Va (mV)", fmt="{:.2f}"),
-            "Finit__Hz": MpsParam(param_id="fi", unit_param_id="unit fi",
-                                  unit="Hz", fmt="{:.3f}"),
-            "Ffinal__Hz": MpsParam(param_id="ff", unit_param_id="unit ff",
-                                   unit="Hz", fmt="{:.3f}"),
+            # Va is millivolts. Writing volts here is a 1000x error that
+            # EC-Lab accepts without complaint.
+            "Vamp__V": MpsParam(param_id="Va (mV)", fmt="V_to_mV"),
+            "Finit__Hz": MpsParam(
+                param_id="fi", unit_param_id="unit fi", base_unit="Hz"
+            ),
+            "Ffinal__Hz": MpsParam(
+                param_id="ff", unit_param_id="unit ff", base_unit="Hz"
+            ),
             "FrequencyNumber": MpsParam(param_id="Nd", fmt="{:d}"),
             "Duration__s": MpsParam(param_id="tE (h:m:s)", fmt="hms"),
             "AcqInterval__s": MpsParam(param_id="dt (s)", fmt="{:.4f}"),
-            "SweepMode": MpsParam(param_id="sweep"),
+            # The caption is `spacing`, not `sweep`, and the values are the
+            # words "Linear" / "Logarithmic".
+            "SweepMode": MpsParam(param_id="spacing", fmt="spacing"),
             "Repeats": MpsParam(param_id="Na", fmt="{:d}"),
             "DelayFraction": MpsParam(param_id="pw", fmt="{:.2f}"),
             **_RANGES,
@@ -1237,18 +1451,26 @@ OLE_TECHS: dict[str, OleTechnique] = {
         technique_name="GEIS",
         template="GEIS.mps",
         parameter_map={
-            "Iinit__A": MpsParam(param_id="Is", unit_param_id="unit Is",
-                                 unit="A", fmt="{:.6f}"),
-            "Iamp__A": MpsParam(param_id="Ia", unit_param_id="unit Ia",
-                                unit="A", fmt="{:.6f}"),
-            "Finit__Hz": MpsParam(param_id="fi", unit_param_id="unit fi",
-                                  unit="Hz", fmt="{:.3f}"),
-            "Ffinal__Hz": MpsParam(param_id="ff", unit_param_id="unit ff",
-                                   unit="Hz", fmt="{:.3f}"),
+            "Iinit__A": MpsParam(
+                param_id="Is", unit_param_id="unit Is", base_unit="A"
+            ),
+            # GEIS spells the AC amplitude's unit row with TWO spaces --
+            # `unit  Ia`. That is EC-Lab's, not a typo here, and it is why
+            # mps_template parses by column rather than by whitespace runs.
+            "Iamp__A": MpsParam(
+                param_id="Ia", unit_param_id="unit  Ia", base_unit="A"
+            ),
+            "Finit__Hz": MpsParam(
+                param_id="fi", unit_param_id="unit fi", base_unit="Hz"
+            ),
+            "Ffinal__Hz": MpsParam(
+                param_id="ff", unit_param_id="unit ff", base_unit="Hz"
+            ),
             "FrequencyNumber": MpsParam(param_id="Nd", fmt="{:d}"),
-            "Duration__s": MpsParam(param_id="tI (h:m:s)", fmt="hms"),
+            # GEIS's conditioning-time caption is tIs, not tE.
+            "Duration__s": MpsParam(param_id="tIs (h:m:s)", fmt="hms"),
             "AcqInterval__s": MpsParam(param_id="dt (s)", fmt="{:.4f}"),
-            "SweepMode": MpsParam(param_id="sweep"),
+            "SweepMode": MpsParam(param_id="spacing", fmt="spacing"),
             "Repeats": MpsParam(param_id="Na", fmt="{:d}"),
             "DelayFraction": MpsParam(param_id="pw", fmt="{:.2f}"),
             **_RANGES,
@@ -1263,15 +1485,14 @@ OLE_TECHS: dict[str, OleTechnique] = {
             "CA_Vval__V_list": MpsParam(param_id="Ei (V)", fmt="{:.3f}"),
             "CA_Tval__s_list": MpsParam(param_id="ti (h:m:s)", fmt="hms"),
             "CA_AcqInterval__s": MpsParam(param_id="dta (s)", fmt="{:.4f}"),
-            "CA_AcqInterval__A": MpsParam(param_id="dtq (mA)",
-                                          unit_param_id="unit dtq", unit="mA",
-                                          fmt="{:.3f}"),
+            "CA_AcqInterval__A": MpsParam(
+                param_id="dI", unit_param_id="unit dI", base_unit="A"
+            ),
             "CA_IRange": MpsParam(param_id="I Range"),
-            # CA_ERange is applied by erange_rows, like ERange -- see _RANGES.
-            "CA_Bandwidth": MpsParam(param_id="Bandwidth"),
+            "CA_Bandwidth": MpsParam(param_id="Bandwidth", fmt="bandwidth"),
             "OCV_Tval__s": MpsParam(param_id="tR (h:m:s)", fmt="hms"),
             "OCV_AcqInterval__s": MpsParam(param_id="dtR (s)", fmt="{:.4f}"),
-            "OCV_AcqInterval__V": MpsParam(param_id="dER (mV)", fmt="{:.2f}"),
+            "OCV_AcqInterval__V": MpsParam(param_id="dER (mV)", fmt="V_to_mV"),
         },
         column_plan=_dc_plan(),
         technique_codes=frozenset({24, 54, 11, 55}),
@@ -1295,7 +1516,14 @@ def resolve(name: str) -> OleTechnique:
         ) from None
 ```
 
-**Note for the implementer.** The `param_id` captions above are this plan's best reading of EC-Lab's parameter table and **are the single most likely thing in the whole package to be wrong**. They are verified in two stages: `test_ole_technique.py` only checks that every eclib parameter is mapped (Step 1), and at-station gate 1 replaces each caption with the one the real template actually carries. When the real templates land, a caption that no row matches raises `MpsParameterNotFound` at setup rather than running a default — which is why `set_param` raises instead of appending a row.
+**Where these captions come from.** Not guesses. They were checked against [`jdhuang-csm/biologic-com`](https://github.com/jdhuang-csm/biologic-com), a working third-party package that generates `.mps` files for EC-Lab over the same OLE COM interface — specifically its `biocom/mps/techniques/{ocv,chrono,eis}.py` parameter maps and `biocom/mps/write_utils.py` formatters.
+
+That repository has **no LICENSE file**, so it is all-rights-reserved and none of its code may be copied into this one. What is taken here is factual: the caption strings EC-Lab writes, the field order, and the value encodings. Those are properties of the vendor's file format, not of anyone's source.
+
+Two caveats that matter:
+
+- **CV is not covered by that reference.** It implements OCV, CA, CP, PEIS, GEIS, GCPL, Loop and Modulo Bat — not CV. The CV captions above follow the conventions the verified techniques establish, but they remain unverified and are the first thing to check at at-station gate 1.
+- **A caption no template row matches raises `MpsParameterNotFound` at setup**, deliberately, rather than appending a row or running the template's default. That is what turns a wrong caption into a failed action instead of a wrong experiment.
 
 - [ ] **Step 4: Run the tests and verify they pass**
 
@@ -1343,19 +1571,30 @@ Append to `helao/deploy/hte/tests/test_ole_technique.py`:
 from helao.deploy.hte.drivers.pstat.biologic_ole import mps_assemble as ma
 from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
 
+def row(label: str, *values: str) -> str:
+    """One fixed-width .mps table row, as EC-Lab writes it (20 columns)."""
+    return label.ljust(20) + "".join(v.ljust(20) for v in values) + "\n"
+
+
 TRIGGER_IN = mt.loads(
-    "Technique : 1\nTrigger In\nSet I/O          0\ntw (h:m:s)       0:00:01.0000\n"
+    "Technique : 1\nTrigger In\n"
+    + row("Set I/O", "0")
+    + row("tw (h:m:s)", "00:00:01.0000")
 )
 TRIGGER_OUT = mt.loads(
-    "Technique : 1\nTrigger Out\nSet I/O          0\ntw (h:m:s)       0:00:01.0000\n"
+    "Technique : 1\nTrigger Out\n"
+    + row("Set I/O", "0")
+    + row("tw (h:m:s)", "00:00:01.0000")
 )
 MAIN = mt.load("helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps")
 
 
 def test_hms_formats_a_duration_as_eclab_spells_it():
-    assert ot.format_value(10.0, "hms") == "0:00:10.0000"
-    assert ot.format_value(3725.5, "hms") == "1:02:05.5000"
-    assert ot.format_value(0.25, "hms") == "0:00:00.2500"
+    """Zero-padded hour and a 4-digit fraction: 01:01:01.5000."""
+    assert ot.format_value(10.0, "hms") == "00:00:10.0000"
+    assert ot.format_value(3725.5, "hms") == "01:02:05.5000"
+    assert ot.format_value(0.25, "hms") == "00:00:00.2500"
+    assert ot.format_value(3661.5, "hms") == "01:01:01.5000"
 
 
 def test_a_plain_format_spec_is_applied_verbatim():
@@ -1414,7 +1653,7 @@ def test_the_io_line_carries_the_requested_channel():
 def test_the_duration_lands_on_the_trigger_technique():
     plan = ma.TtlPlan(send=1, duration=2.5)
     out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
-    assert mt.get_param(out, "tw (h:m:s)") == "0:00:02.5000"
+    assert mt.get_param(out, "tw (h:m:s)") == "00:00:02.5000"
 
 
 def test_techniques_are_renumbered_consecutively_from_one():
@@ -1448,17 +1687,33 @@ Append to `helao/deploy/hte/drivers/pstat/biologic_ole/technique.py`, and add `"
 def format_value(value, fmt: str) -> str:
     """Render ``value`` as EC-Lab spells it in an ``.mps`` table.
 
-    ``"hms"`` is a sentinel rather than a format spec: EC-Lab writes durations
-    as ``h:mm:ss.ffff`` with an unpadded hour, which no single ``str.format``
-    spec produces. Everything else is a plain spec applied verbatim, so a
-    caller controls precision per parameter -- a current written as ``{:.3f}``
-    would round a 1 uA setpoint to zero.
+    Four sentinels stand in for things no single ``str.format`` spec produces,
+    and each exists because writing the obvious thing yields a file EC-Lab
+    accepts and then runs wrongly:
+
+    * ``"hms"`` -- EC-Lab's ``hh:mm:ss.ffff``, zero-padded hour.
+    * ``"bandwidth"`` -- the bare integer 1-9. Writing ``"BW4"`` gives a file
+      that loads and runs at whatever bandwidth the template carried.
+    * ``"V_to_mV"`` -- a volts parameter landing in a millivolts row
+      (``Va (mV)``, ``dER (mV)``, ``dEs (mV)``). Otherwise a 1000x error.
+    * ``"spacing"`` -- a sweep mode as EC-Lab's word, "Linear"/"Logarithmic".
+
+    Anything else is a plain spec applied verbatim. Values needing a companion
+    unit row never come through here -- see ``scale_to_unit``.
     """
     if fmt == "hms":
         total = float(value)
-        hours, remainder = divmod(total, 3600.0)
-        minutes, seconds = divmod(remainder, 60.0)
-        return f"{int(hours)}:{int(minutes):02d}:{seconds:07.4f}"
+        hours = int(total / 3600.0)
+        minutes = int((total % 3600.0) / 60.0)
+        seconds = int(total % 60.0)
+        fraction = "{:.4f}".format(round(total % 1, 4)).split(".")[1]
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{fraction}"
+    if fmt == "bandwidth":
+        return str(BANDWIDTH_VALUES[str(value)])
+    if fmt == "V_to_mV":
+        return f"{float(value) * 1000.0:.3f}"
+    if fmt == "spacing":
+        return spacing_value(value)
     return fmt.format(value)
 ```
 
@@ -3130,8 +3385,11 @@ def test_get_status_of_an_unknown_channel_is_uninitialized():
 def test_setup_writes_a_patched_mps_and_loads_it(tmp_path):
     driver = connected(scratch_dir=str(tmp_path), templates_dir=str(tmp_path))
     (tmp_path / "CA.mps").write_text(
-        "Technique : 1\nChronoamperometry\nEi (V)        0.000\n"
-        "ti (h:m:s)    0:00:10.0000\ndta (s)       0.0100\n"
+        "Technique : 1\nChronoamperometry\n"
+        + mps_row("Ei (V)", "0.000")
+        + mps_row("ti (h:m:s)", "00:00:10.0000")
+        + mps_row("dta (s)", "0.0100"),
+        encoding="latin-1",
     )
     response = driver.setup(
         technique=ot.resolve("CA"),
@@ -3141,8 +3399,9 @@ def test_setup_writes_a_patched_mps_and_loads_it(tmp_path):
     written = list(tmp_path.rglob("*.mps"))
     patched = [p for p in written if p.name != "CA.mps"]
     assert len(patched) == 1
-    assert "0.750" in patched[0].read_text()
-    assert "0:00:05.0000" in patched[0].read_text()
+    written = patched[0].read_text(encoding="latin-1")
+    assert "0.750" in written
+    assert "00:00:05.0000" in written
 
 
 def test_setup_refuses_a_channel_that_does_not_exist(tmp_path):
@@ -3319,6 +3578,16 @@ def test_the_module_imports_without_comtypes():
 Add this fixture at the top of the file, after the imports:
 
 ```python
+def mps_row(label: str, *values: str) -> str:
+    """One fixed-width .mps table row, as EC-Lab writes it (20 columns).
+
+    Written this way rather than as a literal because the table is
+    column-positional: a fixture with the wrong padding does not fail as a
+    fixture, it fails as "the parser is broken".
+    """
+    return label.ljust(20) + "".join(v.ljust(20) for v in values) + "\n"
+
+
 @pytest.fixture
 def ca_template(tmp_path_factory):
     """A directory holding a minimal CA.mps the patcher can work on."""
@@ -3326,14 +3595,16 @@ def ca_template(tmp_path_factory):
     (directory / "CA.mps").write_text(
         "EC-LAB SETTING FILE\n\nNumber of linked techniques : 1\n\n"
         "Technique : 1\nChronoamperometry\n"
-        "Ei (V)              0.000\n"
-        "ti (h:m:s)          0:00:10.0000\n"
-        "dta (s)             0.0100\n"
-        "dtq (mA)            10.000\n"
-        "unit dtq            mA\n"
-        "I Range             Auto\n"
-        "E range max (V)     10.000\n"
-        "Bandwidth           4\n"
+        + mps_row("Ei (V)", "0.000")
+        + mps_row("ti (h:m:s)", "00:00:10.0000")
+        + mps_row("dta (s)", "0.0100")
+        + mps_row("dI", "10.000")
+        + mps_row("unit dI", "mA")
+        + mps_row("I Range", "Auto")
+        + mps_row("E range min (V)", "-10.000")
+        + mps_row("E range max (V)", "10.000")
+        + mps_row("Bandwidth", "4"),
+        encoding="latin-1",
     )
     return directory
 ```
@@ -3408,7 +3679,7 @@ from . import mps_assemble, mps_template
 from .mpr_cursor import MprCursor
 from .olecom_client import DEFAULT_PROGID, OleComClient, OleComError
 from .status import ChannelStatus, SafetyLimit, decode_status
-from .technique import OleTechnique, erange_rows, format_value
+from .technique import OleTechnique, erange_rows, format_value, scale_to_unit
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -3639,21 +3910,27 @@ class BiologicOleDriver(HelaoDriver):
             if key not in action_params:
                 continue
             value = action_params[key]
-            if isinstance(value, (list, tuple)):
-                # CAOCV's list parameters: one .mps sequence column each.
-                for seq, item in enumerate(value):
+            # A list parameter (CAOCV's steps) fills one sequence column each.
+            values = value if isinstance(value, (list, tuple)) else [value]
+            for seq, item in enumerate(values):
+                if param.base_unit:
+                    # EC-Lab spells a current, charge or frequency as a
+                    # magnitude row plus a unit row, at three decimals -- so a
+                    # 1 uA setpoint written unscaled lands as 0.000, and one
+                    # written without its unit is read in whatever unit the
+                    # template happened to carry.
+                    magnitude, unit = scale_to_unit(item, param.base_unit)
+                    doc = mps_template.set_param(
+                        doc, param.param_id, magnitude, seq=seq
+                    )
+                    if param.unit_param_id:
+                        doc = mps_template.set_param(
+                            doc, param.unit_param_id, unit, seq=seq
+                        )
+                else:
                     doc = mps_template.set_param(
                         doc, param.param_id, format_value(item, param.fmt), seq=seq
                     )
-            else:
-                doc = mps_template.set_param(
-                    doc, param.param_id, format_value(value, param.fmt)
-                )
-            if param.unit_param_id and param.unit:
-                # EC-Lab spells a value and its unit as two rows. A value
-                # written without its unit is read in whatever unit the
-                # template carried -- a 1000x error with nothing to show it.
-                doc = mps_template.set_param(doc, param.unit_param_id, param.unit)
         # ERange is not one row but a symmetric min/max pair, so it is applied
         # here rather than through parameter_map. AUTO yields no rows and
         # leaves the template's own window standing.
@@ -4725,8 +5002,8 @@ def test_setup_protocol_loads_the_named_file_without_patching(tmp_path):
     from helao.deploy.hte.drivers.pstat.biologic_ole.driver import BiologicOleDriver
 
     protocol = tmp_path / "my_protocol.mps"
-    original = "Technique : 1\nChronoamperometry\nEi (V)     0.000\n"
-    protocol.write_text(original)
+    original = "Technique : 1\nChronoamperometry\n" + "Ei (V)".ljust(20) + "0.000\n"
+    protocol.write_text(original, encoding="latin-1")
     driver = BiologicOleDriver(
         config={"address": "1.2.3.4", "num_channels": 1, "simulate": True,
                 "protocol_dir": str(tmp_path), "scratch_dir": str(tmp_path / "s")}
@@ -4734,7 +5011,7 @@ def test_setup_protocol_loads_the_named_file_without_patching(tmp_path):
     driver.connect()
     response = driver.setup_protocol("my_protocol.mps", {"channel": 0})
     assert response.response == "success"
-    assert protocol.read_text() == original
+    assert protocol.read_text(encoding="latin-1") == original
 
 
 def test_setup_protocol_refuses_a_path_outside_the_protocol_dir(tmp_path):
@@ -5213,20 +5490,55 @@ def test_ocv_emits_only_time_and_potential():
 @pytest.fixture
 def ca_templates(tmp_path_factory):
     directory = tmp_path_factory.mktemp("contract_templates")
+
+    def r(label, *values):
+        return label.ljust(20) + "".join(v.ljust(20) for v in values) + "\n"
+
+    # Every caption any technique's parameter_map names, in one template.
+    # One file per technique keeps the fixture trivial; a real station has
+    # seven genuinely different ones.
     body = (
         "EC-LAB SETTING FILE\n\nNumber of linked techniques : 1\n\n"
         "Technique : 1\nT\n"
-        "Ei (V)              0.000\nti (h:m:s)          0:00:10.0000\n"
-        "dta (s)             0.0100\ndtq (mA)            10.000\n"
-        "unit dtq            mA\nI Range             Auto\n"
-        "E range max (V)     10.000\nBandwidth           4\n"
-        "tR (h:m:s)          0:00:10.0000\ndtR (s)             0.1000\n"
-        "dER (mV)            10.00\nE (V)               0.000\n"
-        "Va (mV)             10.00\nfi                  1000.000\n"
-        "unit fi             Hz\nff                  100000.000\n"
-        "unit ff             Hz\nNd                  60\n"
-        "tE (h:m:s)          0:00:00.0000\ndt (s)              0.1000\n"
-        "sweep               log\nNa                  10\npw                  0.10\n"
+        + r("Ei (V)", "0.000")
+        + r("E1 (V)", "1.000")
+        + r("E2 (V)", "-1.000")
+        + r("Ef (V)", "0.000")
+        + r("dE/dt", "1.000")
+        + r("dE/dt unit", "V/s")
+        + r("dE (mV)", "1.00")
+        + r("ti (h:m:s)", "00:00:10.0000")
+        + r("ts (h:m:s)", "00:00:10.0000")
+        + r("tR (h:m:s)", "00:00:10.0000")
+        + r("tE (h:m:s)", "00:00:00.0000")
+        + r("tIs (h:m:s)", "00:00:00.0000")
+        + r("dta (s)", "0.0100")
+        + r("dts (s)", "0.0100")
+        + r("dtR (s)", "0.1000")
+        + r("dt (s)", "0.1000")
+        + r("dEs (mV)", "10.00")
+        + r("dER (mV)", "10.00")
+        + r("dI", "10.000")
+        + r("unit dI", "mA")
+        + r("Is", "1.000")
+        + r("unit Is", "mA")
+        + r("Ia", "1.000")
+        + r("unit  Ia", "mA")
+        + r("E (V)", "0.000")
+        + r("Va (mV)", "10.00")
+        + r("fi", "1000.000")
+        + r("unit fi", "Hz")
+        + r("ff", "100.000")
+        + r("unit ff", "kHz")
+        + r("Nd", "60")
+        + r("spacing", "Logarithmic")
+        + r("Na", "10")
+        + r("pw", "0.10")
+        + r("nc cycles", "0")
+        + r("I Range", "Auto")
+        + r("E range min (V)", "-10.000")
+        + r("E range max (V)", "10.000")
+        + r("Bandwidth", "4")
     )
     for name in ("OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"):
         (directory / f"{name}.mps").write_text(body)
@@ -5467,10 +5779,21 @@ settings incompatible with the bandwidth or current range, and that refusal is
 the only pre-run validation the OLE COM API offers.
 
 When they land, check each one's parameter captions against
-`technique.py`'s `parameter_map`. Those captions are this package's best
-reading of the EC-Lab table and are the most likely thing in it to be wrong. A
-caption no row matches raises `MpsParameterNotFound` at setup, deliberately,
-rather than silently running the template's own default value on a real cell.
+`technique.py`'s `parameter_map`. Those captions were verified against a
+working third-party `.mps` writer for OCV, CA, CP, PEIS and GEIS — but **not
+for CV**, which that reference does not implement, so CV is the one to read
+carefully. A caption no row matches raises `MpsParameterNotFound` at setup,
+deliberately, rather than silently running the template's own default value on
+a real cell.
+
+Three encodings to preserve when you save them, all of which a well-meaning
+editor will destroy:
+
+- The files are **latin-1**, not UTF-8. `µ` is the single byte 0xB5.
+- The parameter table is **fixed-width**: label in columns 0-19, each sequence
+  value in the 20 columns after it. Do not reflow it.
+- At least one caption contains **two consecutive spaces** (`unit  Ia`, on
+  GEIS). Do not "tidy" it.
 ```
 
 - [ ] **Step 5: Run the tests, then launch the group**
@@ -5619,10 +5942,10 @@ station, not the plan.
 
 1. **Author the nine `.mps` templates** in the EC-Lab GUI and commit them to
    `biologic_ole/templates/`. Then check each file's parameter captions
-   against `technique.py`'s `parameter_map` and correct the map where they
-   differ — those captions are the plan's best reading and the most likely
-   thing in the package to be wrong. Blocking for everything downstream of the
-   patcher.
+   against `technique.py`'s `parameter_map`. OCV, CA, CP, PEIS and GEIS were
+   verified against a working third-party writer; **CV was not** — that
+   reference does not implement it — so CV is where a mismatch is most likely.
+   Blocking for everything downstream of the patcher.
 2. **The ProgID.** `DEFAULT_PROGID = "EC-Lab.Application"` is conventional, not
    documented. Confirm it, or set the `progid` server param.
 3. **The `MeasureDcValue` bulk-return probe.** Read one index from a file with
