@@ -5569,14 +5569,37 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Append to `helao/hexagon/tests/test_biologic_backend_select.py`:
 
 ```python
-def test_run_protocol_registers_only_on_the_ole_backend(with_config):
-    """It is additive; the eclib backend has no .mps and must not grow it."""
+def test_run_protocol_registers_only_on_the_ole_backend(with_config, monkeypatch):
+    """It is additive; the eclib backend has no .mps and must not grow it.
+
+    Two things this test has to stand in for, neither of which `makeApp`
+    does. `app.driver` is built in ActionHost's FastAPI **startup event**, so
+    a freshly-made app has `driver is None`. And `biologic_dyn_endpoints`
+    then does an unbounded `while not app.driver.ready: await sleep(1)` --
+    pre-existing, present before this branch -- while the eclib driver's
+    connect() imports easy_biologic unconditionally and so can never become
+    ready on Linux. Left as-is rather than bounded here: that wait is on the
+    startup path of six live stations and changing it is not this task's
+    call.
+    """
     import asyncio
+
+    from helao.deploy.hte.drivers.pstat.biologic.driver import BiologicDriver
+
+    def _connected(self):
+        self.ready = True
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    monkeypatch.setattr(BiologicDriver, "connect", _connected)
 
     def routes(backend):
         with_config({"pstat_backend": backend, "address": "127.0.0.1",
                      "num_channels": 1, "simulate": True})
         app = biologic_server.makeApp("BIOLOGIC")
+        # Exactly what the startup event does.
+        app.driver = biologic_server.BACKENDS[backend](config=app.server_params)
         asyncio.run(biologic_server.biologic_dyn_endpoints(app))
         return {route.path for route in app.routes}
 

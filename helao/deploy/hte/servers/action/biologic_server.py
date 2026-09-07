@@ -321,6 +321,30 @@ class BiologicExec(Executor):
         return {"error": error}
 
 
+class BiologicProtocolExec(BiologicExec):
+    """Runs a station-authored .mps instead of a parameterised technique.
+
+    Differs from its parent in exactly one place -- ``_pre_exec`` calls
+    ``setup_protocol`` rather than ``setup`` -- so start, poll, alerting and
+    teardown stay one implementation.
+    """
+
+    async def _pre_exec(self) -> dict:
+        try:
+            resp = self.driver.setup_protocol(
+                mps_path=self.action_params["mps_path"],
+                action_params=self.action_params,
+                output_dir=self._action_output_path(),
+            )
+            error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
+            if error is not ErrorCodes.none:
+                LOGGER.error("protocol setup failed: %s", resp.message)
+        except Exception:
+            error = ErrorCodes.critical_error
+            LOGGER.error("BiologicProtocolExec pre-exec error", exc_info=True)
+        return {"error": error}
+
+
 async def biologic_dyn_endpoints(app: ActionHost):
     """Register the Biologic technique endpoints once the driver is ready.
 
@@ -615,6 +639,37 @@ async def biologic_dyn_endpoints(app: ActionHost):
         )
         active_action_dict = active.start_executor(executor)
         return active_action_dict
+
+    if getattr(app, "pstat_backend", DEFAULT_BACKEND) != "olecom":
+        return
+
+    @app.action()
+    @action_version(1)
+    async def run_protocol(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        mps_path: str = "",
+        channel: int = 0,
+        TTLwait: int = -1,
+        TTLsend: int = -1,
+        TTLduration: float = 1.0,
+    ):
+        """Run an EC-Lab protocol authored in the GUI, exactly as saved.
+
+        ``mps_path`` is resolved against the server's ``protocol_dir`` param
+        and must stay inside it. Nothing is patched, so every setting is the
+        one the file carries; the emitted columns are chosen from the loaded
+        technique's code, and an unrecognized technique emits time, potential
+        and current only.
+
+        OLE COM backend only.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "PROT"
+        executor = BiologicProtocolExec(active=active, oneoff=False, technique=None)
+        return active.start_executor(executor)
 
 
 #: `pstat_backend` value -> driver class. An absent key yields the
