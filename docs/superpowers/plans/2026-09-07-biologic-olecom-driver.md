@@ -4996,7 +4996,7 @@ In `helao/deploy/hte/drivers/pstat/biologic/enum.py`, delete the module-scope im
 from easy_biologic.lib.ec_lib import Bandwidth, ERange, IRange
 ```
 
-Keep the three `StrEnum` classes exactly as they are. Replace the three `EC_*_map` dicts at the bottom of the file with:
+Keep the three `StrEnum` classes exactly as they are, add `from functools import lru_cache` to the top, and replace the three `EC_*_map` dicts at the bottom of the file with:
 
 ```python
 from functools import lru_cache
@@ -5017,29 +5017,36 @@ def _ec_lib():
 
 
 @lru_cache(maxsize=1)
-def _maps() -> tuple[dict, dict, dict]:
-    """The three alias-to-vendor-enum maps, built once on first use."""
-    IRange, ERange, Bandwidth = _ec_lib()
-    return (
-        {alias: getattr(IRange, alias.value) for alias in EC_IRange},
-        {alias: getattr(ERange, alias.value) for alias in EC_ERange},
-        {alias: getattr(Bandwidth, alias.value) for alias in EC_Bandwidth},
-    )
+def _maps() -> tuple:
+    """The vendor ``(IRange, ERange, Bandwidth)`` classes, cached on first use.
+
+    Resolution is **per member**, not eager whole-map construction. Building
+    dicts here would force every alias to resolve against the vendor package
+    on the first call, which is more than "resolve when called" requires --
+    and it breaks any caller or test holding a partial stand-in for the
+    vendor module, since a missing member raises before the wanted one is
+    ever reached. Kept named ``_maps`` because the laziness test clears its
+    cache by that name.
+    """
+    return _ec_lib()
 
 
 def ec_irange(value):
     """The vendor ``IRange`` member for a string alias or ``EC_IRange``."""
-    return _maps()[0][EC_IRange(value)]
+    IRange, _, _ = _maps()
+    return getattr(IRange, EC_IRange(value).value)
 
 
 def ec_erange(value):
     """The vendor ``ERange`` member for a string alias or ``EC_ERange``."""
-    return _maps()[1][EC_ERange(value)]
+    _, ERange, _ = _maps()
+    return getattr(ERange, EC_ERange(value).value)
 
 
 def ec_bandwidth(value):
     """The vendor ``Bandwidth`` member for a string alias or ``EC_Bandwidth``."""
-    return _maps()[2][EC_Bandwidth(value)]
+    _, _, Bandwidth = _maps()
+    return getattr(Bandwidth, EC_Bandwidth(value).value)
 ```
 
 Note that `getattr(IRange, alias.value)` works because every `EC_IRange` member's value is spelled identically to the vendor member's name (`p100`, `n1`, ..., `AUTO`) — that correspondence is what the original hand-written dicts encoded, and a test in Step 1 pins it through the fake.

@@ -12,6 +12,7 @@ __all__ = ["makeApp"]
 
 import asyncio
 import itertools
+import os
 import time
 from collections import defaultdict, deque
 from typing import Optional, Union
@@ -36,14 +37,7 @@ from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
 
 from ...drivers.pstat.biologic.driver import BiologicDriver
-from ...drivers.pstat.biologic.enum import (
-    EC_Bandwidth,
-    EC_Bandwidth_map,
-    EC_ERange,
-    EC_ERange_map,
-    EC_IRange,
-    EC_IRange_map,
-)
+from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
 from ...drivers.pstat.biologic.technique import (
     TECH_CA,
     TECH_CAOCV,
@@ -135,12 +129,34 @@ class BiologicExec(Executor):
         except Exception:
             LOGGER.error("BiologicExec was not initialized.", exc_info=True)
 
+    def _action_output_path(self) -> Optional[str]:
+        """Absolute path of this action's output directory, or None.
+
+        ``action_output_dir`` is stored *relative* to the run root, so it must
+        be joined with ``helaodirs.save_root`` -- and a manual action's root
+        is redirected from ACTIVE to DIAG, exactly as ``ActionSession`` does
+        when it creates the directory. Returns None rather than guessing if
+        the action is not saving, so the OLE backend simply keeps its vendor
+        artifacts in scratch.
+        """
+        action = self.active.action
+        if not action.save_act or not action.action_output_dir:
+            return None
+        try:
+            save_root = str(self.active.base.helaodirs.save_root)
+        except AttributeError:
+            return None
+        if action.manual_action:
+            save_root = save_root.replace("ACTIVE", "DIAG")
+        return os.path.join(save_root, str(action.action_output_dir))
+
     async def _pre_exec(self) -> dict:
         """Load the configured technique and action parameters into the driver."""
         try:
             resp = self.driver.setup(
                 technique=self.technique,
                 action_params=self.action_params,
+                output_dir=self._action_output_path(),
             )
             error = ErrorCodes.none if resp.response == "success" else ErrorCodes.setup
             LOGGER.info("BiologicExec setup successful.")
@@ -363,15 +379,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
         active = await ctx.begin()
         active.action.action_abbr = "CA"
         active.action.action_params["AcqInterval__A"] = 10.0
-        active.action.action_params["IRange"] = EC_IRange_map[
-            active.action.action_params["IRange"]
-        ]
-        active.action.action_params["ERange"] = EC_ERange_map[
-            active.action.action_params["ERange"]
-        ]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["Bandwidth"]
-        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CA)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -407,15 +414,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
         active = await ctx.begin()
         active.action.action_abbr = "CP"
         active.action.action_params["AcqInterval__V"] = 10.0
-        active.action.action_params["IRange"] = EC_IRange_map[
-            active.action.action_params["IRange"]
-        ]
-        active.action.action_params["ERange"] = EC_ERange_map[
-            active.action.action_params["ERange"]
-        ]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["Bandwidth"]
-        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CP)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -460,15 +458,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
             * active.action.action_params["ScanRate__V_s"]
         )
         active.action.action_abbr = "CV"
-        active.action.action_params["IRange"] = EC_IRange_map[
-            active.action.action_params["IRange"]
-        ]
-        active.action.action_params["ERange"] = EC_ERange_map[
-            active.action.action_params["ERange"]
-        ]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["Bandwidth"]
-        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CV)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -537,15 +526,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """
         active = await ctx.begin()
         active.action.action_abbr = "PEIS"
-        active.action.action_params["IRange"] = EC_IRange_map[
-            active.action.action_params["IRange"]
-        ]
-        active.action.action_params["ERange"] = EC_ERange_map[
-            active.action.action_params["ERange"]
-        ]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["Bandwidth"]
-        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_PEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -583,15 +563,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
         """
         active = await ctx.begin()
         active.action.action_abbr = "GEIS"
-        active.action.action_params["IRange"] = EC_IRange_map[
-            active.action.action_params["IRange"]
-        ]
-        active.action.action_params["ERange"] = EC_ERange_map[
-            active.action.action_params["ERange"]
-        ]
-        active.action.action_params["Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["Bandwidth"]
-        ]
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_GEIS)
         active_action_dict = active.start_executor(executor)
         return active_action_dict
@@ -629,15 +600,6 @@ async def biologic_dyn_endpoints(app: ActionHost):
         active = await ctx.begin()
         active.action.action_abbr = "CAOCV"
         active.action.action_params["CA_AcqInterval__A"] = 10.0
-        active.action.action_params["CA_IRange"] = EC_IRange_map[
-            active.action.action_params["CA_IRange"]
-        ]
-        active.action.action_params["CA_ERange"] = EC_ERange_map[
-            active.action.action_params["CA_ERange"]
-        ]
-        active.action.action_params["CA_Bandwidth"] = EC_Bandwidth_map[
-            active.action.action_params["CA_Bandwidth"]
-        ]
         active.action.action_params["OCV_AcqInterval__V"] = 10.0
         executor = BiologicExec(active=active, oneoff=False, technique=TECH_CAOCV)
         active_action_dict = active.start_executor(executor)
