@@ -3976,8 +3976,13 @@ def test_setup_writes_a_patched_mps_and_loads_it(tmp_path):
         action_params={"channel": 0, "Vval__V": 0.75, "Tval__s": 5.0},
     )
     assert response.response == DriverResponseType.success
+    # By path, not by name: setup() writes the patched copy as
+    # <scratch>/ch0/<uuid>/CA.mps -- technique_name is "CA" and the template
+    # is "CA.mps", so the two share a basename and a name filter excludes the
+    # very file it is looking for.
+    template_path = tmp_path / "CA.mps"
     written = list(tmp_path.rglob("*.mps"))
-    patched = [p for p in written if p.name != "CA.mps"]
+    patched = [p for p in written if p != template_path]
     assert len(patched) == 1
     written = patched[0].read_text(encoding="latin-1")
     assert "0.750" in written
@@ -4838,7 +4843,7 @@ Run: `pytest helao/deploy/hte/tests/test_ole_driver.py -v`
 
 Expected: all pass. Two notes for when they do not:
 
-- `test_setup_writes_a_patched_mps_and_loads_it` uses `tmp_path` as *both* templates and scratch dir; the assertion counts `.mps` files that are not the template itself.
+- `test_setup_writes_a_patched_mps_and_loads_it` uses `tmp_path` as *both* templates and scratch dir, so it must exclude the template **by path**. The patched copy is `ch0/<uuid>/CA.mps` — same basename as the template, because `technique_name` is `CA`.
 - `test_a_tripped_safety_limit_is_reported_on_the_response` monkeypatches the fake's `MeasureStatus`. If the run has already finished by then, the `or` branch of its assertion covers it — the point is that a tripped limit does not crash the poll.
 
 - [ ] **Step 5: Format and commit**
