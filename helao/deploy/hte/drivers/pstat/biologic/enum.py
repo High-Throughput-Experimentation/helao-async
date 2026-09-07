@@ -1,13 +1,17 @@
 """String enums mirroring easy-biologic IRange / ERange / Bandwidth values.
 
-Provides serializable ``StrEnum`` aliases plus lookup dictionaries that map
+Provides serializable ``StrEnum`` aliases plus resolver functions that map
 each alias to the corresponding ``easy_biologic.lib.ec_lib`` enum member, so
 the rest of the driver can accept plain strings from configs and actions.
+
+The vendor import is deliberately lazy. ``biologic_server.py`` imports this
+module, and a station running the OLE COM backend has EC-Lab but not
+necessarily easy-biologic -- an eager import here made that station's action
+server unimportable.
 """
 
 from enum import StrEnum
-
-from easy_biologic.lib.ec_lib import Bandwidth, ERange, IRange
+from functools import lru_cache
 
 
 class EC_IRange(StrEnum):
@@ -93,38 +97,48 @@ class EC_Bandwidth(StrEnum):
     BW9 = "BW9"
 
 
-EC_IRange_map = {
-    EC_IRange.p100: IRange.p100,
-    EC_IRange.n1: IRange.n1,
-    EC_IRange.n10: IRange.n10,
-    EC_IRange.n100: IRange.n100,
-    EC_IRange.u1: IRange.u1,
-    EC_IRange.u10: IRange.u10,
-    EC_IRange.u100: IRange.u100,
-    EC_IRange.m1: IRange.m1,
-    EC_IRange.m10: IRange.m10,
-    EC_IRange.m100: IRange.m100,
-    EC_IRange.a1: IRange.a1,
-    EC_IRange.KEEP: IRange.KEEP,
-    EC_IRange.BOOSTER: IRange.BOOSTER,
-    EC_IRange.AUTO: IRange.AUTO,
-}
+def _ec_lib():
+    """The vendor enum module, imported on first use.
 
-EC_ERange_map = {
-    EC_ERange.v2_5: ERange.v2_5,
-    EC_ERange.v5: ERange.v5,
-    EC_ERange.v10: ERange.v10,
-    EC_ERange.AUTO: ERange.AUTO,
-}
+    Imported lazily because ``biologic_server.py`` imports this module, and a
+    station running the OLE COM backend has EC-Lab but not necessarily
+    easy-biologic. An eager import there made that station's action server
+    unimportable. ``driver.py`` and ``technique.py`` were made hermetic in
+    P3a-2; this module was missed because nothing then needed it to be.
+    """
+    from easy_biologic.lib.ec_lib import Bandwidth, ERange, IRange
 
-EC_Bandwidth_map = {
-    EC_Bandwidth.BW1: Bandwidth.BW1,
-    EC_Bandwidth.BW2: Bandwidth.BW2,
-    EC_Bandwidth.BW3: Bandwidth.BW3,
-    EC_Bandwidth.BW4: Bandwidth.BW4,
-    EC_Bandwidth.BW5: Bandwidth.BW5,
-    EC_Bandwidth.BW6: Bandwidth.BW6,
-    EC_Bandwidth.BW7: Bandwidth.BW7,
-    EC_Bandwidth.BW8: Bandwidth.BW8,
-    EC_Bandwidth.BW9: Bandwidth.BW9,
-}
+    return IRange, ERange, Bandwidth
+
+
+@lru_cache(maxsize=1)
+def _maps() -> tuple:
+    """The vendor ``(IRange, ERange, Bandwidth)`` classes, cached on first use.
+
+    Resolved per member rather than built into eager dicts: every
+    ``EC_IRange``/``EC_ERange``/``EC_Bandwidth`` member's value is spelled
+    identically to the vendor member's name, so ``getattr`` on the cached
+    vendor class is all a lookup needs. Building full dicts here would force
+    every alias to resolve against the vendor package on the very first call
+    (and on every model the map is used with), which is more than "resolve
+    against the vendor package only when called" requires.
+    """
+    return _ec_lib()
+
+
+def ec_irange(value):
+    """The vendor ``IRange`` member for a string alias or ``EC_IRange``."""
+    IRange, _, _ = _maps()
+    return getattr(IRange, EC_IRange(value).value)
+
+
+def ec_erange(value):
+    """The vendor ``ERange`` member for a string alias or ``EC_ERange``."""
+    _, ERange, _ = _maps()
+    return getattr(ERange, EC_ERange(value).value)
+
+
+def ec_bandwidth(value):
+    """The vendor ``Bandwidth`` member for a string alias or ``EC_Bandwidth``."""
+    _, _, Bandwidth = _maps()
+    return getattr(Bandwidth, EC_Bandwidth(value).value)

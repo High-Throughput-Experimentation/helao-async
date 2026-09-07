@@ -82,3 +82,7 @@ helao/ui/reflex/_app/.reflex-build.lock.owner
 # Reflex's own per-session state pickles, written under the app directory when
 # the backend runs. Runtime state, never source.
 helao/ui/reflex/_app/.states/
+
+# Launch scratch from the hardware-free dev configs (e.g. biologicole).
+# A relative `root:` puts the run tree in the repo; it is never an artifact.
+INST_hlo_*/

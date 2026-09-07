@@ -6,10 +6,15 @@ imports, which is its strength -- it covers Windows-only modules and
 renames a driver keyword, drops a poller class or breaks an import passes the
 checklist and fails here.
 
-Measured at ``5c05c8d2``, 16 of the 17 station-live modules build on Linux. The
-one that does not is recorded by name and by the exception it raises, not
-skipped: "it did not build" and "it built" must stay distinguishable, and a
-bare skip makes a genuine breakage look like the known Windows case.
+Measured at ``5c05c8d2``, 16 of the 17 station-live modules built on Linux, the
+exception being ``biologic_server``. All 17 build as of the BioLogic backend
+split, which made ``biologic/enum.py`` hermetic and left the eclib driver's
+``easy_biologic`` import lazy, so ``WINDOWS_ONLY`` is now empty.
+
+It is kept rather than removed: a module that cannot build here must be
+recorded by name and by the exception it raises, not skipped, so "it did not
+build" and "it built" stay distinguishable -- a bare skip makes a genuine
+breakage look like a known platform case.
 
 Deliberately NOT asserted: the number of routes on the built app. Most of these
 servers register their action routes inside ``dyn_endpoints``, which runs at
@@ -45,12 +50,21 @@ BUILDS: list[tuple[str, str, str]] = [
     ("spec_server", "eche10", "SPEC_T"),
     ("sync_server", "adss3", "SYNC"),
     ("syringe_server", "adss3", "WORKSYRINGE"),
+    # Moved out of WINDOWS_ONLY when the BioLogic backend split made
+    # biologic/enum.py hermetic: the eclib driver's easy_biologic import is
+    # lazy now, so the module builds on Linux like the rest. `PSTAT`, not
+    # `BIOLOGIC` -- hispec keys its potentiostat PSTAT whichever backend it is.
+    ("biologic_server", "hispec", "PSTAT"),
 ]
 
 #: Module -> the substring of the exception it is EXPECTED to raise on Linux.
-WINDOWS_ONLY: dict[str, str] = {
-    "biologic_server": "can only be used on Windows",
-}
+#:
+#: Intentionally empty. It held ``biologic_server`` until that module became
+#: importable on Linux, and the table is kept rather than deleted because the
+#: distinction it encodes is still worth having: a module that cannot build
+#: here must be recorded by the exception it raises, not skipped, so "it did
+#: not build" and "it built" stay distinguishable.
+WINDOWS_ONLY: dict[str, str] = {}
 
 
 def _not_yet_ported() -> frozenset[str]:
