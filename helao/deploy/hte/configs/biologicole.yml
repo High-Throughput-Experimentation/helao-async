@@ -1,0 +1,41 @@
+# Hardware-free dev config for the EC-Lab OLE COM BioLogic backend.
+#
+# `python launch.py biologicole` brings up a BIOLOGIC action server on the
+# simulated backend (`simulate: true` selects sim.py's fake COM server, so no
+# EC-Lab, no comtypes and no instrument are needed) plus the action
+# visualizer, which answers to the same `biologic_vis` key both UI stacks use.
+#
+# This is a development config, not a station config. A real EC-Lab station
+# adds `pstat_backend: olecom` to its existing BIOLOGIC params, keeps its real
+# `address`, and does NOT set `simulate`.
+dummy: true
+simulation: true
+run_type: biologic_ole
+root: INST_hlo_biologicole
+servers:
+  BIOLOGIC:
+    host: 127.0.0.1
+    port: 8016
+    group: action
+    deployment: hte
+    fast: biologic_server
+    action_vis: biologic_vis
+    params:
+      allow_no_sample: true
+      pstat_backend: olecom
+      simulate: true
+      address: 127.0.0.1
+      num_channels: 2
+      grounded: true
+      # Empty until the templates are authored at a station; the simulated
+      # backend never opens them, so the group still comes up.
+      # templates_dir: helao/deploy/hte/drivers/pstat/biologic_ole/templates
+  ACTVIS:
+    host: 127.0.0.1
+    port: 5001
+    group: visualizer
+    deployment: hte
+    bokeh: action_visualizer
+    params:
+      doc_name: 'BIOLOGIC OLE Visualizer'
+      launch_browser: false

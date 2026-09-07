@@ -63,3 +63,100 @@ def test_resolve_easy_class_is_lazy(monkeypatch):
     assert resolved is _FakeOCV
     # driver re-exports the resolver it uses in setup()
     assert biologic_driver.resolve_easy_class("OCV") is _FakeOCV
+
+
+def test_enum_module_does_not_load_the_vendor_sdk():
+    """An EC-Lab-only Windows station must be able to import the server.
+
+    enum.py imported easy_biologic at module scope, and biologic_server.py
+    imports enum.py -- so a station running the OLE backend without
+    easy-biologic installed could not import its own action server. driver.py
+    and technique.py were made hermetic in P3a-2; this one was missed.
+    """
+    from helao.deploy.hte.drivers.pstat.biologic import enum as biologic_enum
+
+    assert "easy_biologic" not in sys.modules
+    assert biologic_enum.EC_IRange.AUTO == "AUTO"
+
+
+def test_the_enum_resolvers_are_lazy(monkeypatch):
+    """The maps resolve against the vendor package only when called."""
+    import types
+
+    from helao.deploy.hte.drivers.pstat.biologic import enum as biologic_enum
+
+    fake = types.ModuleType("easy_biologic.lib.ec_lib")
+
+    class _IRange:
+        AUTO = "vendor-auto"
+
+    class _ERange:
+        AUTO = "vendor-erange"
+
+    class _Bandwidth:
+        BW4 = "vendor-bw4"
+
+    fake.IRange = _IRange
+    fake.ERange = _ERange
+    fake.Bandwidth = _Bandwidth
+    monkeypatch.setitem(sys.modules, "easy_biologic", types.ModuleType("easy_biologic"))
+    monkeypatch.setitem(
+        sys.modules, "easy_biologic.lib", types.ModuleType("easy_biologic.lib")
+    )
+    monkeypatch.setitem(sys.modules, "easy_biologic.lib.ec_lib", fake)
+    # _maps() is lru_cached, so a cache populated by an earlier test would
+    # make this pass or fail by test ordering rather than by behaviour.
+    biologic_enum._maps.cache_clear()
+    monkeypatch.setattr(
+        biologic_enum._maps, "cache_clear", biologic_enum._maps.cache_clear
+    )
+
+    assert biologic_enum.ec_irange("AUTO") == "vendor-auto"
+    assert biologic_enum.ec_erange("AUTO") == "vendor-erange"
+    assert biologic_enum.ec_bandwidth("BW4") == "vendor-bw4"
+    # Leave no fake-derived entries behind for the next test.
+    biologic_enum._maps.cache_clear()
+
+
+def test_the_ole_package_imports_without_any_vendor_package():
+    from helao.deploy.hte.drivers.pstat.biologic_ole.driver import BiologicOleDriver
+
+    driver = BiologicOleDriver(config={"num_channels": 3, "simulate": True})
+    assert driver.ready is False
+    assert driver.client is None
+    assert len(driver.channels) == 3
+    assert "comtypes" not in sys.modules
+    assert "easy_biologic" not in sys.modules
+
+
+def test_both_drivers_satisfy_the_backend_protocol():
+    """The contract the action server calls, made explicit."""
+    from helao.deploy.hte.drivers.pstat.biologic.driver import BiologicDriver
+    from helao.deploy.hte.drivers.pstat.biologic_backend import BiologicBackend
+    from helao.deploy.hte.drivers.pstat.biologic_ole.driver import BiologicOleDriver
+
+    for cls in (BiologicDriver, BiologicOleDriver):
+        for name in (
+            "connect",
+            "get_status",
+            "setup",
+            "start_channel",
+            "get_data",
+            "stop",
+            "cleanup",
+            "disconnect",
+            "reset",
+            "shutdown",
+        ):
+            assert callable(getattr(cls, name)), (cls.__name__, name)
+    assert BiologicBackend is not None
+
+
+def test_the_endpoints_no_longer_coerce_the_range_enums():
+    """Coercion belongs in each backend's setup(), not the shared layer."""
+    from pathlib import Path
+
+    source = Path("helao/deploy/hte/servers/action/biologic_server.py").read_text()
+    assert "EC_IRange_map[" not in source
+    assert "EC_ERange_map[" not in source
+    assert "EC_Bandwidth_map[" not in source
