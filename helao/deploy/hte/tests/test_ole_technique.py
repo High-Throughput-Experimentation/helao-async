@@ -325,3 +325,169 @@ def test_no_module_scope_vendor_import():
     import sys
 
     assert "comtypes" not in sys.modules
+
+
+def test_bandwidth_is_written_as_an_integer():
+    """ "BW4" loads fine and runs at the template's bandwidth instead."""
+    assert ot.format_value("BW4", "bandwidth") == "4"
+    assert ot.format_value("BW7", "bandwidth") == "7"
+    assert ot.resolve("CA").parameter_map["Bandwidth"].fmt == "bandwidth"
+
+
+def test_a_volts_parameter_landing_in_a_millivolt_row_is_scaled():
+    assert ot.format_value(0.01, "V_to_mV") == "10.000"
+    assert ot.resolve("PEIS").parameter_map["Vamp__V"].param_id == "Va (mV)"
+    assert ot.resolve("PEIS").parameter_map["Vamp__V"].fmt == "V_to_mV"
+
+
+def test_the_current_range_is_written_as_eclabs_display_string():
+    """The real templates hold `Auto`, `100 µA`, `1 mA` -- not `u100`."""
+    assert ot.format_value("AUTO", "irange") == "Auto"
+    assert ot.format_value("u100", "irange") == "100 µA"
+    assert ot.format_value("m1", "irange") == "1 mA"
+    assert ot.resolve("CA").parameter_map["IRange"].fmt == "irange"
+
+
+def test_an_irange_eclab_cannot_spell_is_refused():
+    """KEEP and BOOSTER have no observed spelling; guessing one is worse."""
+    for alias in ("KEEP", "BOOSTER", "nonsense"):
+        with pytest.raises(ValueError, match=alias):
+            ot.format_value(alias, "irange")
+
+
+def test_the_sweep_mode_row_is_spacing_and_its_values_are_words():
+    assert ot.resolve("PEIS").parameter_map["SweepMode"].param_id == "spacing"
+    assert ot.format_value("log", "spacing") == "Logarithmic"
+    assert ot.format_value("lin", "spacing") == "Linear"
+
+
+from helao.deploy.hte.drivers.pstat.biologic_ole import mps_assemble as ma
+from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+# The real GUI-authored templates, and the real three-technique file the
+# assembler is trying to reproduce.
+TRIGGER_IN = mt.load(TEMPLATES / "TI.mps")
+TRIGGER_OUT = mt.load(TEMPLATES / "TO.mps")
+MAIN = mt.load(FIXTURES / "CV.mps")
+REFERENCE = mt.load(FIXTURES / "TI_CV_TO.mps")
+
+
+def test_the_real_trigger_templates_hold_one_technique_each():
+    assert [b.name for b in mt.technique_blocks(TRIGGER_IN)] == ["Trigger In"]
+    assert [b.name for b in mt.technique_blocks(TRIGGER_OUT)] == ["Trigger Out"]
+
+
+def test_trigger_in_carries_a_channel_and_no_duration():
+    assert mt.get_param(TRIGGER_IN, "Channel") == "-1"
+    assert mt.get_param(TRIGGER_IN, "Trigger") == "Rising Edge"
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(TRIGGER_IN, "td (h:m:s)")
+
+
+def test_trigger_out_carries_a_delay_and_no_channel():
+    """Which is why TTLsend selects nothing -- see UNMAPPED_TTLSEND."""
+    assert mt.get_param(TRIGGER_OUT, "td (h:m:s)") == "0:00:0.0010"
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(TRIGGER_OUT, "Channel")
+
+
+def test_a_disabled_ttl_plan_is_inactive():
+    assert ma.ttl_plan_from_params({"TTLwait": -1, "TTLsend": -1}).is_active is False
+
+
+def test_an_absent_ttl_key_reads_as_disabled():
+    assert ma.ttl_plan_from_params({}).is_active is False
+
+
+def test_either_direction_activates_the_plan():
+    assert ma.ttl_plan_from_params({"TTLwait": 0}).is_active is True
+    assert ma.ttl_plan_from_params({"TTLsend": 3}).is_active is True
+
+
+def test_an_inactive_plan_returns_the_main_document_unchanged():
+    out = ma.assemble(MAIN, ma.TtlPlan(), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.render(out) == mt.render(MAIN)
+
+
+def test_ttlwait_prepends_a_trigger_in_technique():
+    plan = ma.TtlPlan(wait=2)
+    out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        "Trigger In",
+        "Cyclic Voltammetry",
+    ]
+
+
+def test_ttlsend_appends_a_trigger_out_technique():
+    plan = ma.TtlPlan(send=1)
+    out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        "Cyclic Voltammetry",
+        "Trigger Out",
+    ]
+
+
+def test_both_directions_reproduce_the_reference_block_order():
+    """The assembled file must match a GUI-authored TI -> CV -> TO."""
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        b.name for b in mt.technique_blocks(REFERENCE)
+    ]
+
+
+def test_the_header_appears_exactly_once():
+    """Each template is a whole .mps; splicing documents would repeat it."""
+    out = mt.render(
+        ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    )
+    assert out.count("EC-LAB SETTING FILE") == 1
+    assert out.count("Number of linked techniques") == 1
+
+
+def test_the_in_channel_lands_on_trigger_in(triggered_out=None):
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "Channel", technique=0) == "2"
+
+
+def test_the_duration_lands_on_trigger_outs_delay_row():
+    out = ma.assemble(MAIN, ma.TtlPlan(send=1, duration=2.5), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "td (h:m:s)", technique=1) == "0:00:2.5000"
+
+
+def test_configuring_one_trigger_leaves_the_others_trigger_row_alone():
+    """Both blocks carry a `Trigger` row; a first-match patch hits the wrong one."""
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "Trigger", technique=0) == "Rising Edge"
+    assert mt.get_param(out, "Trigger", technique=2) == "Rising Edge"
+
+
+def test_techniques_are_renumbered_consecutively_from_one():
+    out = mt.render(
+        ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    )
+    numbers = [
+        int(line.split(":")[1])
+        for line in out.splitlines()
+        if line.startswith("Technique :")
+    ]
+    assert numbers == [1, 2, 3]
+
+
+def test_the_linked_technique_count_header_is_updated():
+    out = mt.render(
+        ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    )
+    assert "Number of linked techniques : 3" in out
+
+
+def test_the_assembled_file_keeps_crlf_throughout():
+    out = mt.render(
+        ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    )
+    raw = out.encode(mt.ENCODING)
+    assert raw.count(b"\r\n") == raw.count(b"\n") > 0
+
+
+def test_a_trigger_template_with_more_than_one_technique_is_refused():
+    with pytest.raises(ValueError, match="exactly one technique"):
+        ma.assemble(MAIN, ma.TtlPlan(wait=0), REFERENCE, TRIGGER_OUT)
