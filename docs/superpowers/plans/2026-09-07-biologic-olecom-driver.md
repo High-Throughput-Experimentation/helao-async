@@ -5321,11 +5321,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Create `helao/hexagon/tests/test_biologic_backend_select.py`:
 
 ```python
-"""`pstat_backend` picks the driver class, and its default keeps six configs valid.
+"""`pstat_backend` picks the driver class, and its default keeps four configs valid.
 
-The default matters more than the key. hispec, odspechw, clad, adss3,
-htereflex and htehexreflex all declare a BIOLOGIC server with no
-`pstat_backend`, and none of them may need editing for this to land.
+The default matters more than the key. hispec, odspechw, clad and adss3 each
+declare a `fast: biologic_server` with no `pstat_backend`, and none of them
+may need editing for this to land. (htereflex and htehexreflex name
+`biologic_vis` but run no BioLogic action server, so they are unaffected
+either way.)
 """
 
 import pytest
@@ -5366,7 +5368,7 @@ def with_config(monkeypatch):
 
 
 def test_an_absent_key_yields_the_eclib_driver(with_config):
-    """Six live configs declare no pstat_backend and must keep working."""
+    """The four configs with a biologic_server declare no pstat_backend."""
     with_config({"address": "192.168.200.100", "num_channels": 1})
     assert biologic_server._driver_class("BIOLOGIC") is BiologicDriver
 
@@ -6508,7 +6510,8 @@ technique endpoints from either of two drivers, chosen by the server's
 `pstat_backend` param — `eclib` (default, `drivers/pstat/biologic/`, via
 easy-biologic over TCP) or `olecom` (`drivers/pstat/biologic_ole/`, by
 piloting the EC-Lab application over OLE COM). An absent key yields `eclib`,
-so all six live configs keep working unedited; an *unrecognized* value raises,
+so the four station configs that declare one (`hispec`, `odspechw`, `clad`,
+`adss3`) keep working unedited; an *unrecognized* value raises,
 because a typo must not hand an EC-Lab station the easy-biologic driver.
 Both satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`.
 
