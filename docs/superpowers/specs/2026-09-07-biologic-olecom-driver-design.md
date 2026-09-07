@@ -119,8 +119,9 @@ global `CONFIG` and **raises on an unrecognized value rather than falling back
 to the default**. A typo must not hand an EC-Lab station the EClib driver, to
 fail much later at `connect()` with a vendor import error.
 
-An absent key yields `eclib`, so all six live configs (`hispec`, `odspechw`,
-`clad`, `adss3`, `htereflex`, `htehexreflex`) keep working with no edit.
+An absent key yields `eclib`, so all four live configs (`hispec`, `odspechw`, `clad`, `adss3`) that
+declare a `biologic_server` keep working with no edit. (`htereflex` and
+`htehexreflex` reference `biologic_vis` but run no BioLogic action server.)
 
 There is deliberately **no shared base class**. The two backends have almost no
 implementation in common — one is a TCP/DLL program model, the other is
