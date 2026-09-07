@@ -8,6 +8,41 @@ import numpy as np
 
 from helao.deploy.hte.drivers.spec.andor.spectrograph import AndorSpectrographDriver
 
+from helao.deploy.hte.drivers.spec.andor import wl_calibration as wlc
+from helao.deploy.hte.drivers.spec.andor import wl_fit
+
+#: Enough to seed a degree-4 fit. Values are irrelevant here: the fit is
+#: stubbed, because this file is about which variant APPLIES a calibration,
+#: not about how one is computed.
+ANCHORS = [[200 + 300 * i, 440.0 + 55.0 * i] for i in range(8)]
+
+
+def _stub_fit(monkeypatch, **overrides):
+    fields = dict(
+        model=wlc.MODEL_CHEB,
+        coeffs=[660.0, 232.0, 6.0, 1.2, 0.4],
+        domain=[0.0, 2559.0],
+        n_pixels=2560,
+        fit_rms_nm=0.01,
+        max_residual_nm=0.02,
+        n_lines=30,
+        n_rejected=2,
+        n_saturated=0,
+        medium="air",
+        lamp="Ocean Insight KR-2",
+        created="2026-09-07T00:00:00+00:00",
+        wl_source="unknown",
+        source_action_uuid=None,
+    )
+    fields.update(overrides)
+
+    def _fake(counts, anchors, **kwargs):
+        return wlc.WavelengthCalibration(
+            **{**fields, "wl_source": kwargs.get("wl_source", fields["wl_source"])}
+        )
+
+    monkeypatch.setattr(wl_fit, "fit_wavelength", _fake)
+
 
 def _fake_lamp_frame(n_pixels, line_pixels):
     pixels = np.arange(n_pixels, dtype=float)
@@ -20,6 +55,7 @@ def _fake_lamp_frame(n_pixels, line_pixels):
 def test_a_spectrograph_station_can_calibrate_but_does_not_apply_it(
     tmp_path, monkeypatch
 ):
+    _stub_fit(monkeypatch)
     d = AndorSpectrographDriver(
         config={"states_root": str(tmp_path), "host": "teststation"},
         server_key="ANDOR",
@@ -32,7 +68,7 @@ def test_a_spectrograph_station_can_calibrate_but_does_not_apply_it(
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+    resp = d.run_wl_calibration(ANCHORS)
     assert resp.response == "success"
     assert resp.data["applied"] is False, "the spectrograph remains the live axis"
     assert d.calibration_file().exists()
@@ -66,6 +102,7 @@ def test_capture_averages_frames_by_summing_down_the_spatial_axis(
 
 
 def test_a_one_dimensional_acquisition_is_refused(tmp_path, monkeypatch):
+    _stub_fit(monkeypatch)
     d = AndorSpectrographDriver(config={"states_root": str(tmp_path)})
 
     class _Acq:
@@ -77,7 +114,7 @@ def test_a_one_dimensional_acquisition_is_refused(tmp_path, monkeypatch):
         lambda exposure_time: (_Acq(), 0, True, 1.0),
     )
     # surfaced as a failed DriverResponse, never as an exception at the handler
-    resp = d.run_wl_calibration([400.0, 500.0, 600.0, 700.0, 800.0], degree=1)
+    resp = d.run_wl_calibration(ANCHORS)
     assert resp.response == "failed"
 
 
@@ -91,6 +128,7 @@ def test_a_spectrograph_station_keeps_its_live_axis_after_calibrating(
     vendor handle and reset the grating/slit/ND mid-run to compute an axis
     the station does not use.
     """
+    _stub_fit(monkeypatch)
     d = AndorSpectrographDriver(
         config={"states_root": str(tmp_path), "host": "teststation"},
         server_key="ANDOR",
@@ -110,7 +148,7 @@ def test_a_spectrograph_station_keeps_its_live_axis_after_calibrating(
 
     monkeypatch.setattr(d, "_wavelengths", _must_not_be_called)
 
-    resp = d.run_wl_calibration(true_nm, lamp="Hg-Ar", degree=1)
+    resp = d.run_wl_calibration(ANCHORS)
 
     # An ungated refresh trips `_must_not_be_called`, which run_wl_calibration
     # swallows into a `failed` response -- so this line, not the wl_arr one, is
@@ -127,6 +165,7 @@ def test_a_comparison_fit_records_that_it_is_one(tmp_path, monkeypatch):
     gratings, then flipped to ``wl_source: calibration`` adopts this fit as
     its live axis with nothing anywhere saying it was never meant to be one.
     """
+    _stub_fit(monkeypatch)
     from helao.deploy.hte.drivers.spec.andor import wl_calibration as wlc
 
     d = AndorSpectrographDriver(
@@ -140,9 +179,7 @@ def test_a_comparison_fit_records_that_it_is_one(tmp_path, monkeypatch):
         lambda n_frames, exp_time: _fake_lamp_frame(2560, line_pixels),
     )
 
-    resp = d.run_wl_calibration(
-        [400.0 + 0.2 * p for p in line_pixels], lamp="Hg-Ar", degree=1
-    )
+    resp = d.run_wl_calibration(ANCHORS)
 
     assert resp.response == "success"
     assert wlc.load(d.calibration_file()).wl_source == "spectrograph"

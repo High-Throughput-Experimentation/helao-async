@@ -25,6 +25,8 @@ import pytest
 
 from helao.core.error import ErrorCodes
 from helao.deploy.hte.drivers.spec.andor.calibrated import AndorCalibratedDriver
+from helao.deploy.hte.drivers.spec.andor import wl_calibration as wlc
+from helao.deploy.hte.drivers.spec.andor import wl_fit
 from helao.deploy.hte.drivers.spec.andor.spectrograph import (
     AndorSpectrographDriver,
 )
@@ -34,6 +36,34 @@ from helao.deploy.hte.servers.action.andor_server import (
 )
 
 SERVER_KEY = "ANDOR"
+
+
+def _stub_calibration_fit(monkeypatch, **overrides):
+    """Canned fit, so these tests measure the executor, not the numerics."""
+    fields = dict(
+        model=wlc.MODEL_CHEB,
+        coeffs=[660.0, 232.0, 6.0, 1.2, 0.4],
+        domain=[0.0, 2559.0],
+        n_pixels=2560,
+        fit_rms_nm=0.01,
+        max_residual_nm=0.02,
+        n_lines=30,
+        n_rejected=2,
+        n_saturated=0,
+        medium="air",
+        lamp="Ocean Insight KR-2",
+        created="2026-09-07T00:00:00+00:00",
+        wl_source="unknown",
+        source_action_uuid=None,
+    )
+    fields.update(overrides)
+
+    def _fake(counts, anchors, **kwargs):
+        return wlc.WavelengthCalibration(
+            **{**fields, "wl_source": kwargs.get("wl_source", fields["wl_source"])}
+        )
+
+    monkeypatch.setattr(wl_fit, "fit_wavelength", _fake)
 
 
 class _ReachedBegin(Exception):
@@ -247,6 +277,7 @@ def _fake_lamp_frame(n_pixels, line_pixels):
 
 @pytest.mark.asyncio
 async def test_the_executor_forwards_a_successful_calibration(tmp_path, monkeypatch):
+    _stub_calibration_fit(monkeypatch)
     driver = AndorCalibratedDriver(
         config={"dev_id": 0, "states_root": str(tmp_path), "host": "teststation"}
     )
@@ -259,8 +290,8 @@ async def test_the_executor_forwards_a_successful_calibration(tmp_path, monkeypa
     active = _FakeCalibActive(
         driver,
         {
-            "lamp_lines_nm": [400.0 + 0.2 * p for p in line_pixels],
-            "lamp": "Hg-Ar",
+            "anchors": [[p, 400.0 + 0.2 * p] for p in line_pixels],
+            "lamp": "Ocean Insight KR-2",
             "degree": 1,
         },
     )
@@ -269,9 +300,9 @@ async def test_the_executor_forwards_a_successful_calibration(tmp_path, monkeypa
     result = await executor._exec()
 
     assert result["error"] == ErrorCodes.none
-    assert result["data"]["n_lines"] == 5
+    assert result["data"]["n_lines"] == 30
     assert result["data"]["applied"] is True
-    assert result["data"]["lamp"] == "Hg-Ar"
+    assert result["data"]["lamp"] == "Ocean Insight KR-2"
 
 
 @pytest.mark.asyncio
@@ -294,7 +325,7 @@ async def test_the_executor_reports_a_failed_calibration_without_raising(
         lambda n_frames, exp_time: _fake_lamp_frame(2560, [200]),
     )
     active = _FakeCalibActive(
-        driver, {"lamp_lines_nm": [400.0, 500.0, 600.0, 700.0, 800.0], "degree": 3}
+        driver, {"anchors": [[200 + 300 * i, 440.0 + 55.0 * i] for i in range(8)]}
     )
     executor = AndorCalibrateWavelength(active=active, oneoff=True)
 
@@ -305,17 +336,17 @@ async def test_the_executor_reports_a_failed_calibration_without_raising(
 
 
 @pytest.mark.asyncio
-async def test_the_executor_defaults_an_empty_lamp_line_list_to_none(tmp_path):
-    """`lamp_lines_nm: list = []` is the route default; [] reaches the driver
+async def test_the_executor_defaults_an_empty_anchor_list_to_none(tmp_path):
+    """`anchors: list = []` is the route default; [] reaches the driver
     as None, which the driver refuses -- there is no default line table."""
     driver = AndorCalibratedDriver(config={"dev_id": 0, "states_root": str(tmp_path)})
     executor = AndorCalibrateWavelength(
-        active=_FakeCalibActive(driver, {"lamp_lines_nm": []}), oneoff=True
+        active=_FakeCalibActive(driver, {"anchors": []}), oneoff=True
     )
-    assert executor.lamp_lines_nm is None
-    assert executor.lamp == "Hg-Ar"
+    assert executor.anchors is None
+    assert executor.lamp == "Ocean Insight KR-2"
     assert executor.n_frames == 1
-    assert executor.degree == 3
+    assert executor.degree == 4
     assert executor.max_fit_rms_nm == 0.5
     assert executor.driver is driver
 
@@ -342,10 +373,11 @@ async def test_the_executor_reports_a_calibration_the_driver_refused(
         return counts
 
     monkeypatch.setattr(driver, "_capture_lamp_frame", _spiked)
+    _stub_calibration_fit(monkeypatch, fit_rms_nm=99.0, max_residual_nm=99.0)
     active = _FakeCalibActive(
         driver,
         {
-            "lamp_lines_nm": [400.0 + 0.2 * p for p in line_pixels],
+            "anchors": [[p, 400.0 + 0.2 * p] for p in line_pixels],
             "degree": 3,
         },
     )
@@ -361,6 +393,9 @@ async def test_the_executor_reports_a_calibration_the_driver_refused(
 @pytest.mark.asyncio
 async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch):
     """The action param has to reach the driver, or the gate is unadjustable."""
+    # A residual the default 0.5 would refuse and the 1e6 limit admits:
+    # the point is which gate decided, not what the fit measured.
+    _stub_calibration_fit(monkeypatch, fit_rms_nm=1.5, max_residual_nm=2.0)
     driver = AndorCalibratedDriver(
         config={"dev_id": 0, "states_root": str(tmp_path), "host": "teststation"}
     )
@@ -377,7 +412,7 @@ async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch)
     active = _FakeCalibActive(
         driver,
         {
-            "lamp_lines_nm": [400.0 + 0.2 * p for p in line_pixels],
+            "anchors": [[p, 400.0 + 0.2 * p] for p in line_pixels],
             "degree": 3,
             "max_fit_rms_nm": 1e6,
         },
@@ -388,7 +423,7 @@ async def test_the_executor_threads_the_rms_limit_through(tmp_path, monkeypatch)
     result = await executor._exec()
 
     assert result["error"] == ErrorCodes.none
-    assert result["data"]["fit_rms_nm"] > 0.5
+    assert result["data"]["fit_rms_nm"] > 0.5  # refused by the default
     assert driver.calibration_file().exists()
 
 

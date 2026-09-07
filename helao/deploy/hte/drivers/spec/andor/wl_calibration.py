@@ -23,10 +23,12 @@ import numpy as np
 
 MODEL_POLY: Final[str] = "poly"
 
-#: Minimum reference lines required above the polynomial degree. A fit with
-#: exactly degree+1 points interpolates and reports rms 0, which reads as a
-#: perfect calibration and is no evidence at all.
-MIN_EXCESS_LINES: Final[int] = 1
+#: Chebyshev coefficients over a normalised pixel domain -- what `wl_fit`
+#: produces. A raw-power fit of the same order over a 2560-wide detector
+#: carries terms of order 4e13, which conditions badly and reads as noise on
+#: the page. `poly` is still evaluated so records written before the change
+#: keep loading.
+MODEL_CHEB: Final[str] = "cheb"
 
 
 class UnknownCalibrationModel(Exception):
@@ -45,6 +47,23 @@ class WavelengthCalibration:
     lamp: str
     created: str
     source_action_uuid: Optional[str]
+    #: Pixel range the Chebyshev basis is normalised over. `None` means the
+    #: whole detector, which is what every fit this code produces uses; it is
+    #: a field rather than an assumption so a record stays evaluable if a
+    #: future fit is ever restricted to part of the array.
+    domain: Optional[list[float]] = None
+    #: `air` or `vacuum`. Which one is not recoverable from the numbers -- the
+    #: two conventions differ by ~0.03%, about 0.2 nm at 700 nm, which is
+    #: larger than the fit residual and invisible without this field.
+    medium: str = "unknown"
+    #: Lines discarded by sigma-clipping, and lines dropped for reaching
+    #: saturation. Both are how a fit that succeeded on too little evidence is
+    #: told apart from one that succeeded on plenty.
+    n_rejected: int = 0
+    n_saturated: int = 0
+    #: The worst single residual. RMS alone hides one badly-placed line among
+    #: many good ones.
+    max_residual_nm: float = 0.0
     #: Which variant wrote this record: ``"calibration"`` if the fit is that
     #: station's live wavelength axis, ``"spectrograph"`` if it was recorded
     #: only to compare against ``GetCalibration``. Defaulted because records
@@ -56,10 +75,13 @@ class WavelengthCalibration:
 
 def evaluate(calib: WavelengthCalibration) -> np.ndarray:
     """The wavelength array this calibration describes, one entry per pixel."""
-    if calib.model != MODEL_POLY:
-        raise UnknownCalibrationModel(calib.model)
     pixels = np.arange(calib.n_pixels, dtype=float)
-    return np.polyval(list(reversed(calib.coeffs)), pixels)
+    if calib.model == MODEL_CHEB:
+        domain = calib.domain or [0.0, float(calib.n_pixels - 1)]
+        return np.polynomial.chebyshev.Chebyshev(calib.coeffs, domain=domain)(pixels)
+    if calib.model == MODEL_POLY:
+        return np.polyval(list(reversed(calib.coeffs)), pixels)
+    raise UnknownCalibrationModel(calib.model)
 
 
 def is_monotonic(arr) -> bool:
@@ -78,95 +100,6 @@ def is_monotonic(arr) -> bool:
     # `not (a or b)` rather than `a and b`: a NaN makes both comparisons
     # False, so a fit that produced one is refused rather than accepted.
     return bool(np.all(deltas > 0) or np.all(deltas < 0))
-
-
-def find_peaks(counts: Sequence[float], n_expected: int) -> list[float]:
-    """The ``n_expected`` strongest local maxima, as sub-pixel centroids.
-
-    Deliberately simple: a parabolic refinement of the strongest well-separated
-    local maxima. Replace this with the station's own peak finder by editing
-    this function alone -- ``fit_wavelength`` is its only caller.
-    """
-    arr = np.asarray(counts, dtype=float)
-    if arr.ndim != 1:
-        raise ValueError("counts must be one-dimensional")
-    interior = np.arange(1, arr.size - 1)
-    is_max = (arr[interior] > arr[interior - 1]) & (arr[interior] >= arr[interior + 1])
-    candidates = interior[is_max]
-    candidates = candidates[np.argsort(arr[candidates])[::-1]]
-
-    chosen: list[int] = []
-    for c in candidates:
-        if all(abs(c - k) > 5 for k in chosen):
-            chosen.append(int(c))
-        if len(chosen) == n_expected:
-            break
-    chosen.sort()
-
-    refined: list[float] = []
-    for c in chosen:
-        y0, y1, y2 = arr[c - 1], arr[c], arr[c + 1]
-        denom = y0 - 2.0 * y1 + y2
-        offset = 0.0 if denom == 0 else 0.5 * (y0 - y2) / denom
-        refined.append(c + float(offset))
-    return refined
-
-
-def fit_wavelength(
-    counts: Sequence[float],
-    lamp_lines_nm: Sequence[float],
-    *,
-    degree: int = 3,
-    lamp: str = "unknown",
-    wl_source: str = "unknown",
-    source_action_uuid: Optional[str] = None,
-) -> WavelengthCalibration:
-    """Fit pixel-to-nm from a lamp spectrum and its known reference lines.
-
-    Args:
-        counts: The measured lamp spectrum, one value per detector pixel.
-        lamp_lines_nm: Known wavelengths of the lamp's lines, ascending. One
-            peak is located per entry.
-        degree: Polynomial degree.
-        lamp: Free-text lamp identifier, recorded in the calibration.
-        wl_source: Which driver variant is fitting, recorded so a later
-            reader can tell a live calibration from a comparison-only one.
-        source_action_uuid: The action that produced ``counts``, if any.
-
-    Returns:
-        A :class:`WavelengthCalibration` whose ``fit_rms_nm`` is the residual
-        of the located peaks against ``lamp_lines_nm``.
-
-    Raises:
-        ValueError: If ``degree`` leaves too few lines to be evidence, or if
-            the expected number of peaks could not be located.
-    """
-    lines = sorted(float(x) for x in lamp_lines_nm)
-    if len(lines) < degree + 1 + MIN_EXCESS_LINES:
-        raise ValueError(
-            f"degree {degree} needs at least {degree + 1 + MIN_EXCESS_LINES} "
-            f"reference lines; got {len(lines)}"
-        )
-
-    peaks = find_peaks(counts, len(lines))
-    if len(peaks) != len(lines):
-        raise ValueError(
-            f"located {len(peaks)} peak(s) for {len(lines)} reference line(s)"
-        )
-
-    coeffs_desc = np.polyfit(np.array(peaks), np.array(lines), degree)
-    residuals = np.polyval(coeffs_desc, np.array(peaks)) - np.array(lines)
-    return WavelengthCalibration(
-        model=MODEL_POLY,
-        coeffs=[float(c) for c in reversed(coeffs_desc)],
-        n_pixels=len(counts),
-        fit_rms_nm=float(np.sqrt(np.mean(residuals**2))),
-        n_lines=len(lines),
-        lamp=lamp,
-        created=_utc_now(),
-        source_action_uuid=source_action_uuid,
-        wl_source=wl_source,
-    )
 
 
 def save(calib: WavelengthCalibration, path: Path) -> None:
@@ -196,9 +129,10 @@ def save(calib: WavelengthCalibration, path: Path) -> None:
 def load(path: Path) -> WavelengthCalibration:
     """Read a calibration, refusing a model this build cannot evaluate."""
     raw = json.loads(path.read_text())
-    if raw.get("model") != MODEL_POLY:
+    if raw.get("model") not in (MODEL_CHEB, MODEL_POLY):
         raise UnknownCalibrationModel(
-            f"{raw.get('model')!r} in {path}; this build evaluates {MODEL_POLY!r}"
+            f"{raw.get('model')!r} in {path}; this build evaluates "
+            f"{MODEL_CHEB!r} and {MODEL_POLY!r}"
         )
     return WavelengthCalibration(
         model=raw["model"],
@@ -214,6 +148,16 @@ def load(path: Path) -> WavelengthCalibration:
         # month must keep loading, and "unknown" is exactly what a reader
         # should be told about it.
         wl_source=str(raw.get("wl_source", "unknown")),
+        # All absent on pre-Chebyshev records. A `poly` record has no domain
+        # (it is evaluated in raw pixels) and no medium anyone recorded, so
+        # "unknown" is the honest reading rather than a guess at "air".
+        domain=(
+            [float(x) for x in raw["domain"]] if raw.get("domain") is not None else None
+        ),
+        medium=str(raw.get("medium", "unknown")),
+        n_rejected=int(raw.get("n_rejected", 0)),
+        n_saturated=int(raw.get("n_saturated", 0)),
+        max_residual_nm=float(raw.get("max_residual_nm", 0.0)),
     )
 
 

@@ -184,24 +184,24 @@ def test_adjust_nd_is_still_frozen_and_calibrate_wl_is_listed():
     assert entry[0]["method"] == "post"
 
 
-# --- odspechw.yml is the first real config to select the calibrated variant --
+# --- hispec2.yml is the first real config to select the calibrated variant ---
 #
 # `test_hte_builds_on_linux` covers `("andor_server", "hispec", "ANDOR")`, i.e.
 # the DEFAULT spectrograph path. Nothing there exercises a config that actually
-# sets `wl_source`, so without these the odspechw switch would ship unverified
+# sets `wl_source`, so without these the hispec2 switch would ship unverified
 # and a typo in the key or its value would only surface at the bench.
 
 
-def test_odspechw_selects_the_calibrated_driver(monkeypatch):
-    """The odspechw bench has no software-controlled spectrograph."""
+def test_hispec2_selects_the_calibrated_driver(monkeypatch):
+    """The hispec2 bench (was odspechw) has no software-controlled spectrograph."""
     from helao.helpers.config_loader import load_global_config
 
-    load_global_config("odspechw", set_global=True)
+    load_global_config("hispec2", set_global=True)
     monkeypatch.setattr(config_loader, "CONFIG", config_loader.CONFIG)
     assert andor_server._driver_class("ANDOR") is AndorCalibratedDriver
 
 
-def test_odspechw_andor_declares_wl_source_explicitly():
+def test_hispec2_andor_declares_wl_source_explicitly():
     """Pin the key in the config, not just the class it resolves to.
 
     `_driver_class` falls back to the spectrograph driver when the key is
@@ -212,8 +212,7 @@ def test_odspechw_andor_declares_wl_source_explicitly():
 
     cfg = yaml.safe_load(
         (
-            Path(__file__).resolve().parents[3]
-            / "helao/deploy/hte/configs/odspechw.yml"
+            Path(__file__).resolve().parents[3] / "helao/deploy/hte/configs/hispec2.yml"
         ).read_text()
     )
     params = cfg["servers"]["ANDOR"]["params"]
