@@ -27,6 +27,7 @@ __all__ = [
     "ColumnPlan",
     "DC_COLUMNS",
     "EIS_COLUMNS",
+    "EIS_TECHNIQUE_CODES",
     "ERANGE_VOLTS",
     "MpsParam",
     "OLE_TECHS",
@@ -39,6 +40,7 @@ __all__ = [
     "erange_rows",
     "format_value",
     "irange_value",
+    "protocol_technique",
     "resolve",
     "scale_to_unit",
     "spacing_value",
@@ -493,6 +495,37 @@ OLE_TECHS: dict[str, OleTechnique] = {
         technique_codes=frozenset({24, 54, 11, 55}),
     ),
 }
+
+
+#: Appendix 7.1 codes that identify an EIS technique. A protocol whose first
+#: technique is one of these is read with MeasureEisValue.
+EIS_TECHNIQUE_CODES = frozenset({29, 30, 45, 46, 60, 61, 62, 63, 64, 65, 87})
+
+
+def protocol_technique(technique_code: int) -> OleTechnique:
+    """A technique record for a station-authored protocol.
+
+    ``run_protocol`` cannot know its columns in advance -- the ``.mps``
+    decides the techniques -- so the driver reads status index 5 after
+    ``LoadSettings`` and calls this with the code it found.
+
+    An unrecognized code yields the bare ``MeasureDcValue`` triple rather
+    than a guess. Emitting columns a technique does not record would fill
+    them with NaN under names a consumer would treat as real.
+    """
+    if technique_code in EIS_TECHNIQUE_CODES:
+        plan = _eis_plan()
+    elif any(technique_code in tech.technique_codes for tech in OLE_TECHS.values()):
+        plan = _dc_plan()
+    else:
+        plan = ColumnPlan(kind="dc", derived=("t_s", "Ewe_V", "I_A"))
+    return OleTechnique(
+        technique_name="PROTOCOL",
+        template="",
+        parameter_map={},
+        column_plan=plan,
+        technique_codes=frozenset({technique_code}),
+    )
 
 
 def resolve(name: str) -> OleTechnique:

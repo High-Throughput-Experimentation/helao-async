@@ -3236,6 +3236,16 @@ def set_sim_config(config: SimConfig) -> None:
     _CONFIG = config
 
 
+def current_config() -> SimConfig:
+    """The module-level default configuration.
+
+    Exposed so a caller can derive from it rather than replace it -- the
+    driver imposes its own channel count without discarding whatever a test
+    set for run length or technique kind.
+    """
+    return _CONFIG
+
+
 def reset_sim() -> None:
     """Restore the stock default configuration."""
     set_sim_config(SimConfig())
@@ -4364,7 +4374,9 @@ class BiologicOleDriver(HelaoDriver):
 
     def _make_client(self) -> OleComClient:
         if self.simulate:
-            from .sim import make_factory
+            from dataclasses import replace
+
+            from . import sim as sim_module
 
             # WARNING, not INFO: a station left on `simulate: true` produces
             # plausible data from no instrument at all.
@@ -4372,7 +4384,18 @@ class BiologicOleDriver(HelaoDriver):
                 "BiologicOleDriver is SIMULATED (`simulate: true` on this "
                 "server's params). No instrument is being driven."
             )
-            return OleComClient(progid=self.progid, factory=make_factory())
+            # The fake device must report the channel count this server is
+            # configured for. get_status() iterates range(num_channels), so a
+            # sim left at its one-channel default makes every teardown log a
+            # traceback -- caught, so nothing fails, which is why it survives
+            # until someone reads the log. Derived from the module default so
+            # a test that set run length or technique kind keeps them.
+            sim_config = replace(
+                sim_module.current_config(), n_channels=self.num_channels
+            )
+            return OleComClient(
+                progid=self.progid, factory=sim_module.make_factory(sim_config)
+            )
         return OleComClient(progid=self.progid)
 
     def _read_version(self) -> str:
@@ -5298,11 +5321,13 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Create `helao/hexagon/tests/test_biologic_backend_select.py`:
 
 ```python
-"""`pstat_backend` picks the driver class, and its default keeps six configs valid.
+"""`pstat_backend` picks the driver class, and its default keeps four configs valid.
 
-The default matters more than the key. hispec, odspechw, clad, adss3,
-htereflex and htehexreflex all declare a BIOLOGIC server with no
-`pstat_backend`, and none of them may need editing for this to land.
+The default matters more than the key. hispec, odspechw, clad and adss3 each
+declare a `fast: biologic_server` with no `pstat_backend`, and none of them
+may need editing for this to land. (htereflex and htehexreflex name
+`biologic_vis` but run no BioLogic action server, so they are unaffected
+either way.)
 """
 
 import pytest
@@ -5343,7 +5368,7 @@ def with_config(monkeypatch):
 
 
 def test_an_absent_key_yields_the_eclib_driver(with_config):
-    """Six live configs declare no pstat_backend and must keep working."""
+    """The four configs with a biologic_server declare no pstat_backend."""
     with_config({"address": "192.168.200.100", "num_channels": 1})
     assert biologic_server._driver_class("BIOLOGIC") is BiologicDriver
 
@@ -5569,14 +5594,37 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Append to `helao/hexagon/tests/test_biologic_backend_select.py`:
 
 ```python
-def test_run_protocol_registers_only_on_the_ole_backend(with_config):
-    """It is additive; the eclib backend has no .mps and must not grow it."""
+def test_run_protocol_registers_only_on_the_ole_backend(with_config, monkeypatch):
+    """It is additive; the eclib backend has no .mps and must not grow it.
+
+    Two things this test has to stand in for, neither of which `makeApp`
+    does. `app.driver` is built in ActionHost's FastAPI **startup event**, so
+    a freshly-made app has `driver is None`. And `biologic_dyn_endpoints`
+    then does an unbounded `while not app.driver.ready: await sleep(1)` --
+    pre-existing, present before this branch -- while the eclib driver's
+    connect() imports easy_biologic unconditionally and so can never become
+    ready on Linux. Left as-is rather than bounded here: that wait is on the
+    startup path of six live stations and changing it is not this task's
+    call.
+    """
     import asyncio
+
+    from helao.deploy.hte.drivers.pstat.biologic.driver import BiologicDriver
+
+    def _connected(self):
+        self.ready = True
+        return DriverResponse(
+            response=DriverResponseType.success, status=DriverStatus.ok
+        )
+
+    monkeypatch.setattr(BiologicDriver, "connect", _connected)
 
     def routes(backend):
         with_config({"pstat_backend": backend, "address": "127.0.0.1",
                      "num_channels": 1, "simulate": True})
         app = biologic_server.makeApp("BIOLOGIC")
+        # Exactly what the startup event does.
+        app.driver = biologic_server.BACKENDS[backend](config=app.server_params)
         asyncio.run(biologic_server.biologic_dyn_endpoints(app))
         return {route.path for route in app.routes}
 
@@ -6103,6 +6151,14 @@ def test_ocv_emits_only_time_and_potential():
     assert declared_ole("OCV") == {"t_s", "Ewe_V"}
 
 
+# NOTE (superseded): this synthetic fixture predates the real templates.
+# All nine are now committed under
+# helao/deploy/hte/drivers/pstat/biologic_ole/templates/, so pass
+# templates_dir pointing there instead. It makes no difference to what this
+# test exercises -- run_once passes only {"channel": 0} and _patch skips
+# every parameter absent from action_params, so no caption is ever
+# substituted -- but driving the real per-technique files costs nothing and
+# exercises what a station will actually run.
 @pytest.fixture
 def ca_templates(tmp_path_factory):
     directory = tmp_path_factory.mktemp("contract_templates")
@@ -6454,7 +6510,8 @@ technique endpoints from either of two drivers, chosen by the server's
 `pstat_backend` param — `eclib` (default, `drivers/pstat/biologic/`, via
 easy-biologic over TCP) or `olecom` (`drivers/pstat/biologic_ole/`, by
 piloting the EC-Lab application over OLE COM). An absent key yields `eclib`,
-so all six live configs keep working unedited; an *unrecognized* value raises,
+so the four station configs that declare one (`hispec`, `odspechw`, `clad`,
+`adss3`) keep working unedited; an *unrecognized* value raises,
 because a typo must not hand an EC-Lab station the easy-biologic driver.
 Both satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`.
 
