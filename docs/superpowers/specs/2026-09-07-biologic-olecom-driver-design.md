@@ -149,9 +149,11 @@ biologic_ole/templates/
     TI.mps   TO.mps
 ```
 
-`.mps` is plain-text ASCII: the parameter table lists parameter names in a
-fixed order with one column per sequence, which is how
-[eclabfiles](https://github.com/vetschn/eclabfiles) parses them. `mps_template.py`
+`.mps` is plain text in **latin-1**, not ASCII or UTF-8: the parameter table
+lists parameter names in a fixed order with one column per sequence, which is
+how [eclabfiles](https://github.com/vetschn/eclabfiles) parses them, and EC-Lab
+writes the micro prefix as the single byte 0xB5 (`unit Is  µA`). Reading such
+a file as UTF-8 raises. `mps_template.py`
 loads a template, substitutes the action's parameter values, and writes a
 patched copy; `technique.py` holds the per-technique mapping from HELAO
 parameter key to `.mps` parameter caption and unit.
@@ -162,6 +164,25 @@ bump a risk. Loading a fixed template and then pushing values with
 `ModifyOnTheFly` was rejected because the experiment would start on the
 template's values before the real ones arrive, which on a real cell is not an
 acceptable transient.
+
+The caption tables and value encodings were checked against
+[`jdhuang-csm/biologic-com`](https://github.com/jdhuang-csm/biologic-com), a
+working third-party `.mps` writer for the same OLE COM interface. It covers
+OCV, CA, CP, PEIS and GEIS but **not CV**, which therefore stays unverified
+until a real template lands. That repository carries no license, so nothing is
+copied from it — only facts about the vendor's file format, which are not
+anyone's to license. It also independently corroborates the motivation for
+this whole design from a different angle: its author reports that the EC-Lab
+Development Package easy-biologic uses "loads different firmware to the
+instrument, which in my experience results in a lower signal-to-noise ratio
+for certain experiments compared to the standard firmware."
+
+Three properties of the format that any patcher must respect, each of which
+fails silently when got wrong: the files are **latin-1** (EC-Lab writes `µ` as
+the single byte 0xB5); the parameter table is **fixed-width**, label in
+columns 0-19 and each sequence value in the 20 after it; and at least one
+caption contains **two consecutive spaces** (`unit  Ia`, on GEIS), so the
+table must be parsed by column and never by splitting on a run of whitespace.
 
 **The templates cannot be produced on Linux.** They must be authored in the
 EC-Lab GUI at the station and checked in. This is on the implementation
