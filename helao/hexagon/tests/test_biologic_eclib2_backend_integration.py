@@ -60,21 +60,56 @@ def test_the_driver_satisfies_the_backend_protocol_at_runtime(driver):
     assert isinstance(driver, BiologicBackend)
 
 
-def test_every_protocol_method_signature_is_call_compatible():
-    # `runtime_checkable` only checks that the names exist, so the shapes have
-    # to be compared explicitly -- a `setup` missing `output_dir` would pass
-    # isinstance and then fail when BiologicExec calls it by keyword.
-    for name, expected in inspect.getmembers(
-        BiologicBackend, predicate=inspect.isfunction
-    ):
-        if name.startswith("_"):
-            continue
-        actual = getattr(BiologicEclib2Driver, name, None)
-        assert actual is not None, f"missing {name}"
+def _protocol_methods():
+    return [
+        (name, member)
+        for name, member in inspect.getmembers(
+            BiologicBackend, predicate=inspect.isfunction
+        )
+        if not name.startswith("_")
+    ]
+
+
+def _backend_classes():
+    from helao.deploy.hte.servers.action import biologic_server
+
+    return biologic_server.BACKENDS
+
+
+@pytest.mark.parametrize("backend_name", ["eclib", "olecom", "eclib2"])
+def test_every_backend_matches_every_protocol_signature(backend_name):
+    # The runtime half of the check that `BACKENDS: dict[str, type[
+    # BiologicBackend]]` makes pyright do. `isinstance` against the
+    # runtime_checkable protocol is not enough on its own: it compares method
+    # *names* only, so a `setup` missing `output_dir` passes it and then fails
+    # when BiologicExec calls it by keyword.
+    cls = _backend_classes()[backend_name]
+    for name, expected in _protocol_methods():
+        actual = getattr(cls, name, None)
+        assert actual is not None, f"{backend_name} is missing {name}"
         expected_params = inspect.signature(expected).parameters
         actual_params = inspect.signature(actual).parameters
         for param in expected_params:
-            assert param in actual_params, f"{name} is missing {param!r}"
+            assert param in actual_params, f"{backend_name}.{name} is missing {param!r}"
+
+
+@pytest.mark.parametrize("backend_name", ["eclib", "olecom", "eclib2"])
+def test_every_backend_accepts_a_none_ttl_params(backend_name):
+    # The protocol declares `ttl_params: Optional[dict] = None`, so a caller
+    # may pass None. The eclib driver declared a bare `dict = {}` and would
+    # have forwarded None straight to easy-biologic; found by the type check.
+    cls = _backend_classes()[backend_name]
+    parameter = inspect.signature(cls.start_channel).parameters["ttl_params"]
+    assert parameter.default is None, f"{backend_name} defaults ttl_params wrongly"
+    annotation = str(parameter.annotation)
+    assert "None" in annotation or "Optional" in annotation, annotation
+
+
+@pytest.mark.parametrize("backend_name", ["eclib", "olecom", "eclib2"])
+def test_every_backend_shutdown_returns_none(backend_name):
+    cls = _backend_classes()[backend_name]
+    annotation = inspect.signature(cls.shutdown).return_annotation
+    assert annotation in (None, "None", type(None)), annotation
 
 
 def test_setup_is_callable_the_way_the_executor_calls_it(driver):

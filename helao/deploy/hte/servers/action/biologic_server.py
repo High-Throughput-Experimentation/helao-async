@@ -40,6 +40,7 @@ from helao.helpers.executor import Executor
 from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
 from ...drivers.pstat.biologic.technique import BIOTECHS
+from ...drivers.pstat.biologic_backend import BiologicBackend
 from ...drivers.pstat.biologic_eclib2.driver import BiologicEclib2Driver
 from ...drivers.pstat.biologic_eclib2.technique import (
     resolve as resolve_eclib2_technique,
@@ -627,7 +628,16 @@ async def biologic_dyn_endpoints(app: ActionHost):
 #: (`eclib2`) by adding the key. `eclib` and `eclib2` are not versions of one
 #: backend: EC-Lib 2.0 is not backwards compatible with the EClib1 DLLs
 #: easy-biologic bundles, so they are separate drivers over separate SDKs.
-BACKENDS: dict[str, type] = {
+#:
+#: Annotated `type[BiologicBackend]` rather than bare `type`, which is what
+#: makes the protocol's conformance claim true: the drivers are structural
+#: implementers that inherit nothing from it, so nothing checks their shapes
+#: unless something assigns them to it in a typed position. This dict is that
+#: position -- it is also the one the server actually reads, so a driver whose
+#: `setup` lost `output_dir` fails the type check here rather than at the first
+#: action. `isinstance` against the runtime_checkable protocol would not do:
+#: it compares only method *names*.
+BACKENDS: dict[str, type[BiologicBackend]] = {
     "eclib": BiologicDriver,
     "olecom": BiologicOleDriver,
     "eclib2": BiologicEclib2Driver,

@@ -306,18 +306,23 @@ class BiologicDriver(HelaoDriver):
             types=self.channels[channel]._parameter_types,
         )
 
-    def start_channel(self, channel: int = 0, ttl_params: dict = {}) -> DriverResponse:
+    def start_channel(
+        self, channel: int = 0, ttl_params: Optional[dict] = None
+    ) -> DriverResponse:
         """Start the previously configured technique on a channel.
 
         Args:
             channel: Channel index to start.
             ttl_params: TTL configuration forwarded to the easy-biologic
-                program's ``run`` call.
+                program's ``run`` call. ``None`` means no TTL, and is
+                normalized to an empty dict before forwarding -- the vendor
+                call takes a dict.
 
         Returns:
             ``DriverResponse`` with ``status=busy`` and the wall-clock
             ``start_time`` in ``data`` on success.
         """
+        ttl_params = ttl_params or {}
         try:
             if channel not in self.channels:
                 raise ValueError(f"Channel {channel} does not exist.")
