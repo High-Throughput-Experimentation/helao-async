@@ -218,7 +218,8 @@ technique endpoints from either of two drivers, chosen by the server's
 `pstat_backend` param — `eclib` (default, `drivers/pstat/biologic/`, via
 easy-biologic over TCP) or `olecom` (`drivers/pstat/biologic_ole/`, by
 piloting the EC-Lab application over OLE COM). An absent key yields `eclib`,
-so all six live configs keep working unedited; an *unrecognized* value raises,
+so the four station configs that declare one (`hispec`, `odspechw`, `clad`,
+`adss3`) keep working unedited; an *unrecognized* value raises,
 because a typo must not hand an EC-Lab station the easy-biologic driver.
 Both satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`.
 

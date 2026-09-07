@@ -1,8 +1,9 @@
-"""`pstat_backend` picks the driver class, and its default keeps six configs valid.
+"""`pstat_backend` picks the driver class, and its default keeps four configs valid.
 
-The default matters more than the key. hispec, odspechw, clad, adss3,
-htereflex and htehexreflex all declare a BIOLOGIC server with no
-`pstat_backend`, and none of them may need editing for this to land.
+The default matters more than the key. hispec, odspechw, clad and adss3 each
+declare a `fast: biologic_server` with no `pstat_backend`, and none of them may
+need editing for this to land. (htereflex and htehexreflex name `biologic_vis`
+but run no BioLogic action server, so they are unaffected either way.)
 """
 
 import tempfile
@@ -45,7 +46,7 @@ def with_config(monkeypatch):
 
 
 def test_an_absent_key_yields_the_eclib_driver(with_config):
-    """Six live configs declare no pstat_backend and must keep working."""
+    """The four configs with a biologic_server declare no pstat_backend."""
     with_config({"address": "192.168.200.100", "num_channels": 1})
     assert biologic_server._driver_class("BIOLOGIC") is BiologicDriver
 

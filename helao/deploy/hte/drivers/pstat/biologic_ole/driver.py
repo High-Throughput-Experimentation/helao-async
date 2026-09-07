@@ -147,6 +147,33 @@ class BiologicOleDriver(HelaoDriver):
 
     # -- COM plumbing ----------------------------------------------------
 
+    @property
+    def _com(self) -> OleComClient:
+        """The COM client, or a refusal naming why there isn't one.
+
+        Every method below this point requires a connection. Narrowing it in
+        one place is what lets the type checker see that, and turns a call
+        before ``connect()`` into a message rather than an AttributeError on
+        None.
+        """
+        if self.client is None:
+            raise ConnectionError("BiologicOleDriver is not connected; connect() first")
+        return self.client
+
+    def _run_dir(self, channel: int) -> Path:
+        """The scratch directory for the run set up on ``channel``."""
+        run_dir = self.scratch.get(channel)
+        if run_dir is None:
+            raise ValueError(f"Channel {channel} has not been set up.")
+        return run_dir
+
+    def _technique(self, channel: int) -> OleTechnique:
+        """The technique loaded on ``channel``."""
+        technique = self.channels.get(channel)
+        if technique is None:
+            raise ValueError(f"Channel {channel} has not been set up.")
+        return technique
+
     def _bounded(self, call, *args):
         """Run a COM call with a ceiling.
 
@@ -184,7 +211,7 @@ class BiologicOleDriver(HelaoDriver):
         return OleComClient(progid=self.progid)
 
     def _read_version(self) -> str:
-        return self.client.get_software_version()
+        return self._com.get_software_version()
 
     # -- lifecycle -------------------------------------------------------
 
@@ -218,13 +245,13 @@ class BiologicOleDriver(HelaoDriver):
                 self.address,
             )
             self.device_number = self._bounded(
-                self.client.connect_device_by_ip, str(self.address)
+                self._com.connect_device_by_ip, str(self.address)
             )
             self.device_name = self._bounded(
-                self.client.get_device_type, self.device_number
+                self._com.get_device_type, self.device_number
             )
             present = self._bounded(
-                self.client.get_device_channel_list, self.device_number
+                self._com.get_device_channel_list, self.device_number
             )
             LOGGER.info(
                 "connected to %s (EC-Lab %s) at %s as device %s; channels present: %s",
@@ -248,7 +275,7 @@ class BiologicOleDriver(HelaoDriver):
 
     def _status_of(self, channel: int) -> ChannelStatus:
         return decode_status(
-            self._bounded(self.client.measure_status, self.device_number, channel)
+            self._bounded(self._com.measure_status, self.device_number, channel)
         )
 
     def get_status(self, channel: Optional[int] = None) -> DriverResponse:
@@ -371,7 +398,7 @@ class BiologicOleDriver(HelaoDriver):
                 doc, run_dir / f"{technique.technique_name}.mps"
             )
             self._bounded(
-                self.client.load_settings,
+                self._com.load_settings,
                 self.device_number,
                 channel,
                 str(path.resolve()),
@@ -444,7 +471,7 @@ class BiologicOleDriver(HelaoDriver):
             run_dir = self.scratch_dir / f"ch{channel}" / uuid.uuid4().hex
             run_dir.mkdir(parents=True, exist_ok=True)
             self._bounded(
-                self.client.load_settings,
+                self._com.load_settings,
                 self.device_number,
                 channel,
                 str(resolved),
@@ -495,16 +522,14 @@ class BiologicOleDriver(HelaoDriver):
                 raise ValueError(f"Channel {channel} has not been set up.")
             if self._status_of(channel).is_busy:
                 raise ValueError(f"Channel {channel} is busy.")
-            out_base = str((self.scratch[channel] / "run").resolve())
+            out_base = str((self._run_dir(channel) / "run").resolve())
             start_time = time.time()
-            self._bounded(
-                self.client.run_channel, self.device_number, channel, out_base
-            )
+            self._bounded(self._com.run_channel, self.device_number, channel, out_base)
             mpr = self._bounded(
-                self.client.get_data_file_name, self.device_number, channel, 0
+                self._com.get_data_file_name, self.device_number, channel, 0
             )
             self.cursors[channel] = MprCursor(
-                self.client, self.channels[channel].column_plan, mpr
+                self._com, self._technique(channel).column_plan, mpr
             )
             return DriverResponse(
                 response=DriverResponseType.success,
@@ -547,7 +572,9 @@ class BiologicOleDriver(HelaoDriver):
             for name, values in tail.items():
                 data.setdefault(name, []).extend(values)
             if reading.safety_limit not in (None, SafetyLimit.OK):
-                LOGGER.alert(
+                # `alert` is attached to Logger via setattr in helao_logging,
+                # so pyright cannot see it; two existing call sites do the same.
+                LOGGER.alert(  # type: ignore[attr-defined]
                     "channel %s hit safety limit %s",
                     channel,
                     reading.safety_limit.name,
@@ -593,7 +620,7 @@ class BiologicOleDriver(HelaoDriver):
                         LOGGER.warning("Channel %s does not exist.", target)
                         continue
                     if not self._bounded(
-                        self.client.stop_channel, self.device_number, target
+                        self._com.stop_channel, self.device_number, target
                     ):
                         LOGGER.info("Channel %s was already stopped.", target)
             finally:
@@ -662,7 +689,7 @@ class BiologicOleDriver(HelaoDriver):
         """Detach from the instrument. EC-Lab itself is left running."""
         try:
             if self.client is not None and self.device_number is not None:
-                self._bounded(self.client.disconnect_device, self.device_number)
+                self._bounded(self._com.disconnect_device, self.device_number)
             LOGGER.info("disconnected from %s at %s", self.device_name, self.address)
             return DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
