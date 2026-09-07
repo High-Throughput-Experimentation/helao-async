@@ -40,6 +40,10 @@ from helao.helpers.executor import Executor
 from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
 from ...drivers.pstat.biologic.technique import BIOTECHS
+from ...drivers.pstat.biologic_eclib2.driver import BiologicEclib2Driver
+from ...drivers.pstat.biologic_eclib2.technique import (
+    resolve as resolve_eclib2_technique,
+)
 from ...drivers.pstat.biologic_ole.driver import BiologicOleDriver
 from ...drivers.pstat.biologic_ole.technique import resolve as resolve_ole_technique
 
@@ -619,10 +623,14 @@ async def biologic_dyn_endpoints(app: ActionHost):
 
 #: `pstat_backend` value -> driver class. An absent key yields the
 #: easy-biologic driver, so every existing station config keeps working
-#: unedited; a station opts into EC-Lab by adding the key.
+#: unedited; a station opts into EC-Lab (`olecom`) or the EC-Lib 2.0 SDK
+#: (`eclib2`) by adding the key. `eclib` and `eclib2` are not versions of one
+#: backend: EC-Lib 2.0 is not backwards compatible with the EClib1 DLLs
+#: easy-biologic bundles, so they are separate drivers over separate SDKs.
 BACKENDS: dict[str, type] = {
     "eclib": BiologicDriver,
     "olecom": BiologicOleDriver,
+    "eclib2": BiologicEclib2Driver,
 }
 DEFAULT_BACKEND = "eclib"
 
@@ -634,6 +642,7 @@ DEFAULT_BACKEND = "eclib"
 TECHNIQUE_REGISTRIES = {
     "eclib": lambda name: BIOTECHS[name],
     "olecom": resolve_ole_technique,
+    "eclib2": resolve_eclib2_technique,
 }
 
 

@@ -1,19 +1,17 @@
 """``BiologicEclib2Driver`` -- a BioLogic driver over the EC-Lib 2.0 SDK.
 
-Mirrors the method surface and ``DriverResponse`` shapes of the EClib1 backend
-(``biologic/driver.py``) so it can stand in for it: ``connect``, ``get_status``,
-``setup``, ``start_channel``, ``get_data``, ``stop``, ``cleanup``,
-``disconnect``, ``reset``, ``update_parameters``, ``list_techniques``. Where the
-two differ, the difference is forced by the SDK:
+Satisfies ``biologic_backend.BiologicBackend`` structurally, alongside the
+eclib (easy-biologic) and olecom (EC-Lab OLE) backends, and is selected by
+``pstat_backend: eclib2``. Two differences from the eclib backend are forced by
+the SDK, and neither changes the protocol surface:
 
-- ``setup`` takes a technique *name* rather than an easy-biologic program class,
-  because an EClib2 action can be several techniques (see :mod:`technique`).
 - ``get_data`` returns whole columns per poll rather than easy-biologic's
-  segment objects, and carries no ``_``-prefixed live-value columns: the EClib1
+  segment objects, and carries no ``_``-prefixed live-value columns: the eclib
   driver copied a ``segment.values`` struct onto every row, which EClib2 has no
   equivalent of -- ``BL_GetLiveValues`` is a separate, non-popping call.
-- ``start_channel`` takes no ``ttl_params``. EClib2 has no TTL or digital-output
-  capability at all; see the note on :meth:`BiologicEclib2Driver.start_channel`.
+- ``start_channel`` accepts ``ttl_params`` and **refuses** an active TTL
+  request rather than ignoring it. EClib2 has no TTL capability at all; see the
+  note on :meth:`BiologicEclib2Driver.start_channel`.
 
 Config keys (on the action server's ``params``):
 
@@ -251,38 +249,56 @@ class BiologicEclib2Driver(HelaoDriver):
         self.disconnect()
         return self.connect()
 
-    def shutdown(self) -> DriverResponse:
-        """Disconnect and stop the SDK worker thread.
+    def shutdown(self) -> None:
+        """Stop every running channel, clean up, disconnect, stop the worker.
 
-        Separate from :meth:`disconnect` because the worker thread is not
-        recoverable once stopped, while a disconnected driver can reconnect.
+        Called by ``BaseAPI`` at server exit. Returns None, matching the
+        ``BiologicBackend`` protocol and both sibling backends. Stopping the
+        worker thread is the last step and is not recoverable, which is why
+        this is separate from :meth:`disconnect`.
         """
-        response = self.disconnect()
-        if self._client is not None:
-            self._client.close()
-            self._client = None
-        return response
+        try:
+            states = self.get_status().data
+            for channel, state in states.items():
+                if state == "EC_SDK_CHANNEL_STATE_RUNNING":
+                    self.stop(channel=channel)
+                    self.cleanup(channel=channel)
+        except Exception:
+            LOGGER.error("eclib2 shutdown could not quiesce channels", exc_info=True)
+        finally:
+            self.disconnect()
+            if self._client is not None:
+                self._client.close()
+                self._client = None
 
     # -- setup and run -----------------------------------------------------
 
     def setup(
         self,
-        technique_name: str,
-        channel: int = 0,
+        technique: ec2tech.Eclib2Technique,
         action_params: dict = {},
+        output_dir: Optional[str] = None,
     ) -> DriverResponse:
         """Build and load the experiment for a technique on a channel.
 
+        Signature matches the ``BiologicBackend`` protocol: the channel comes
+        from ``action_params["channel"]``, as it does for both sibling
+        backends, because ``BiologicExec`` reads it from there too.
+
         Args:
-            technique_name: One of :data:`~.technique.TECHNIQUE_NAMES`.
-            channel: Channel to configure.
-            action_params: Action parameters, keyed as the EClib1 backend keys
-                them.
+            technique: Registry entry from :func:`~.technique.resolve`.
+            action_params: Action parameters, keyed as the eclib backend keys
+                them, including ``channel``.
+            output_dir: Accepted for protocol compatibility and unused. The OLE
+                backend needs it because EC-Lab writes files into the record
+                directory; EClib2 returns its data over the wire, so this
+                backend writes nothing of its own.
 
         Returns:
             ``DriverResponse`` whose ``data`` reports the techniques the plan
             expanded to and the columns the action will emit.
         """
+        channel = action_params.get("channel", -1)
         try:
             self._require_usable_channel(channel)
             if not self.ready or self._client is None:
@@ -290,16 +306,16 @@ class BiologicEclib2Driver(HelaoDriver):
             if self._client.is_running(channel):
                 raise ValueError(f"channel {channel} is busy")
 
-            plan = ec2tech.build_plan(technique_name, action_params)
+            plan = technique.plan(action_params)
             self._client.apply_plan(channel, plan)
-            self.channel_technique[channel] = technique_name
+            self.channel_technique[channel] = technique.technique_name
             self.channel_params[channel] = dict(action_params)
             self._done[channel] = False
             return DriverResponse(
                 response=DriverResponseType.success,
-                message=f"{technique_name} loaded on channel {channel}",
+                message=f"{technique.technique_name} loaded on channel {channel}",
                 data={
-                    "technique": technique_name,
+                    "technique": technique.technique_name,
                     "techniques": [t.identifier for t in plan.techniques],
                     "columns": list(plan.columns),
                 },
@@ -313,15 +329,34 @@ class BiologicEclib2Driver(HelaoDriver):
                 status=DriverStatus.error,
             )
 
-    def start_channel(self, channel: int = 0) -> DriverResponse:
+    def start_channel(
+        self, channel: int = 0, ttl_params: Optional[dict] = None
+    ) -> DriverResponse:
         """Start the loaded experiment on a channel.
 
-        Takes no ``ttl_params``, unlike the EClib1 backend: EClib2 exposes no
-        TTL or digital-output capability whatsoever -- there is no such function
-        in its 53-call API, nor any mention in its headers or documentation. A
-        station that needs hardware triggering from the potentiostat cannot use
-        this backend for it.
+        **A TTL request is refused, not ignored.** EClib2 exposes no TTL or
+        digital-output capability whatsoever -- no such call in its 53-function
+        API, and no mention in its headers or documentation. The eclib backend
+        passes TTL to easy-biologic and the OLE backend writes trigger
+        techniques into the ``.mps``; this backend can do neither. Accepting
+        the parameter and quietly dropping it would leave a station believing
+        it was triggering an instrument that never fires, so an *active*
+        request fails the action. The executor's default (``ttl="none"``) is
+        what every non-triggered action sends, and passes through.
         """
+        requested = (ttl_params or {}).get("ttl", "none")
+        if requested not in ("none", None):
+            message = (
+                f"eclib2 cannot honour ttl={requested!r}: the EC-Lib 2.0 SDK has "
+                "no TTL or digital-output capability. Use the eclib or olecom "
+                "backend for hardware triggering."
+            )
+            LOGGER.error(message)
+            return DriverResponse(
+                response=DriverResponseType.not_implemented,
+                message=message,
+                status=DriverStatus.error,
+            )
         try:
             self._require_usable_channel(channel)
             if not self.ready or self._client is None:
@@ -524,8 +559,16 @@ class BiologicEclib2Driver(HelaoDriver):
                 raise ValueError(
                     f"channel {channel} is running; stop it before changing parameters"
                 )
-            merged = {**self.channel_params[channel], **new_params}
-            return self.setup(technique_name, channel=channel, action_params=merged)
+            merged = {
+                **self.channel_params[channel],
+                **new_params,
+                # setup() reads the channel from the params, so a caller that
+                # passed only changed values must not lose it.
+                "channel": channel,
+            }
+            return self.setup(
+                technique=ec2tech.resolve(technique_name), action_params=merged
+            )
         except Exception as exc:
             LOGGER.error("eclib2 update_parameters failed", exc_info=True)
             return DriverResponse(
@@ -537,18 +580,10 @@ class BiologicEclib2Driver(HelaoDriver):
     def emitted_columns(self, technique_name: str) -> tuple[str, ...]:
         """Columns a technique emits, without needing a device.
 
-        Lets the column contract be checked against the EClib1 backend
+        Lets the column contract be checked against the eclib backend
         statically.
         """
-        return {
-            "OCV": ec2data.OCV_COLUMNS,
-            "CA": ec2data.STEP_COLUMNS,
-            "CP": ec2data.STEP_COLUMNS,
-            "CV": ec2data.STEP_COLUMNS,
-            "PEIS": ec2data.EIS_COLUMNS,
-            "GEIS": ec2data.EIS_COLUMNS,
-            "CAOCV": ec2data.STEP_COLUMNS,
-        }[technique_name]
+        return ec2tech.COLUMNS_BY_TECHNIQUE[technique_name]
 
     # -- helpers -----------------------------------------------------------
 

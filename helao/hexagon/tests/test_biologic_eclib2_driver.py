@@ -21,9 +21,22 @@ from helao.deploy.hte.drivers.pstat.biologic_eclib2.driver import (
     NOT_PLUGGED,
     BiologicEclib2Driver,
 )
-from helao.hexagon.tests.biologic_eclib2_sample_params import params
+from helao.hexagon.tests.biologic_eclib2_sample_params import params as _raw_params
 
 CHANNEL = 0
+
+
+def params(name, channel=CHANNEL, **overrides):
+    """Sample params with `channel`, which is where setup() reads it from."""
+    return {**_raw_params(name, **overrides), "channel": channel}
+
+
+def setup(driver, name, channel=CHANNEL, **overrides):
+    """Resolve the technique through the registry, as the server does."""
+    return driver.setup(
+        technique=ec2tech.resolve(name),
+        action_params=params(name, channel=channel, **overrides),
+    )
 
 
 @pytest.fixture
@@ -46,9 +59,7 @@ def connected(driver):
 async def _run(driver, technique_name, channel=CHANNEL, limit=200):
     """Set up, start, and drain a technique; return the combined table."""
     assert (
-        driver.setup(
-            technique_name, channel=channel, action_params=params(technique_name)
-        ).response
+        setup(driver, technique_name, channel=channel).response
         == DriverResponseType.success
     )
     assert driver.start_channel(channel).response == DriverResponseType.success
@@ -165,7 +176,7 @@ def test_connect_fails_when_no_configured_channel_is_plugged():
 def test_an_unplugged_channel_is_refused_with_its_own_message(connected):
     # "not in the config" and "configured but no board fitted" need different
     # fixes, so they must not share a message.
-    response = connected.setup("OCV", channel=1, action_params=params("OCV"))
+    response = setup(connected, "OCV", channel=1)
     assert response.response == DriverResponseType.failed
     assert "not plugged" in response.message
 
@@ -195,7 +206,7 @@ def test_disconnect_then_reset_reconnects(connected):
 
 
 def test_an_unknown_channel_is_refused_rather_than_created(connected):
-    assert connected.setup("OCV", channel=7).response == DriverResponseType.failed
+    assert setup(connected, "OCV", channel=7).response == DriverResponseType.failed
     assert connected.start_channel(7).response == DriverResponseType.failed
     assert connected.cleanup(7).response == DriverResponseType.failed
     assert connected.get_status(channel=7).status == DriverStatus.uninitialized
@@ -207,7 +218,7 @@ def test_an_unknown_channel_is_refused_rather_than_created(connected):
 
 
 def test_setup_reports_the_techniques_the_plan_expanded_to(connected):
-    response = connected.setup("PEIS", action_params=params("PEIS"))
+    response = setup(connected, "PEIS")
     assert response.response == DriverResponseType.success
     # A PEIS action is a CA bias leg plus the sweep.
     assert response.data["techniques"] == [
@@ -220,15 +231,16 @@ def test_setup_reports_the_techniques_the_plan_expanded_to(connected):
 def test_setup_with_a_bad_parameter_fails_and_names_it(connected):
     bad = params("OCV")
     del bad["Tval__s"]
-    response = connected.setup("OCV", action_params=bad)
+    response = connected.setup(technique=ec2tech.resolve("OCV"), action_params=bad)
     assert response.response == DriverResponseType.failed
     assert "Tval__s" in response.message
 
 
-def test_setup_with_an_unknown_technique_fails(connected):
-    response = connected.setup("VSCAN", action_params={})
-    assert response.response == DriverResponseType.failed
-    assert "VSCAN" in response.message
+def test_an_unknown_technique_is_refused_by_the_registry(connected):
+    # resolve() is what the server calls, so a typo fails before any driver
+    # method runs -- and before a channel is reconfigured.
+    with pytest.raises(ValueError, match="VSCAN"):
+        ec2tech.resolve("VSCAN")
 
 
 def test_starting_a_channel_that_was_never_set_up_is_refused(connected):
@@ -238,7 +250,7 @@ def test_starting_a_channel_that_was_never_set_up_is_refused(connected):
 
 
 def test_start_reports_busy_and_a_start_time(connected):
-    connected.setup("OCV", action_params=params("OCV"))
+    setup(connected, "OCV")
     response = connected.start_channel(CHANNEL)
     assert response.status == DriverStatus.busy
     assert response.data["start_time"] > 0
@@ -246,9 +258,9 @@ def test_start_reports_busy_and_a_start_time(connected):
 
 
 def test_setup_is_refused_while_the_channel_is_running(connected):
-    connected.setup("CAOCV", action_params=params("CAOCV"))
+    setup(connected, "CAOCV")
     connected.start_channel(CHANNEL)
-    response = connected.setup("OCV", action_params=params("OCV"))
+    response = setup(connected, "OCV")
     assert response.response == DriverResponseType.failed
     assert "busy" in response.message
 
@@ -270,7 +282,7 @@ def test_every_technique_acquires_and_emits_its_contract_columns(connected, name
 
 def test_get_data_marks_measuring_until_the_channel_goes_idle(connected):
     async def go():
-        connected.setup("CAOCV", action_params=params("CAOCV"))
+        setup(connected, "CAOCV")
         connected.start_channel(CHANNEL)
         messages = []
         for _ in range(50):
@@ -294,7 +306,7 @@ def test_get_data_before_setup_fails_rather_than_returning_empty(connected):
 def test_the_drain_loop_is_bounded(connected):
     # A channel producing rows faster than we read must not hold get_data, and
     # the single SDK worker thread, forever.
-    connected.setup("OCV", action_params=params("OCV"))
+    setup(connected, "OCV")
     connected.start_channel(CHANNEL)
 
     calls = {"n": 0}
@@ -355,14 +367,14 @@ def test_a_caocv_run_pads_the_ocv_leg_rather_than_reporting_zero_current(connect
 
 
 def test_stop_ends_a_running_channel(connected):
-    connected.setup("CAOCV", action_params=params("CAOCV"))
+    setup(connected, "CAOCV")
     connected.start_channel(CHANNEL)
     assert connected.stop(channel=CHANNEL).response == DriverResponseType.success
     assert connected.get_status(channel=CHANNEL).status == DriverStatus.ok
 
 
 def test_stop_with_no_channel_stops_every_set_up_channel(connected):
-    connected.setup("CAOCV", action_params=params("CAOCV"))
+    setup(connected, "CAOCV")
     connected.start_channel(CHANNEL)
     assert connected.stop().response == DriverResponseType.success
     stops = [c for c in connected._client._api.calls if c[0] == "BL_StopChannel"]
@@ -376,7 +388,7 @@ def test_stop_before_connecting_is_not_an_error(driver):
 
 
 def test_cleanup_clears_the_plan_and_params(connected):
-    connected.setup("CA", action_params=params("CA"))
+    setup(connected, "CA")
     assert connected.channel_technique[CHANNEL] == "CA"
     assert connected.cleanup(CHANNEL).response == DriverResponseType.success
     assert connected.channel_technique[CHANNEL] is None
@@ -385,7 +397,7 @@ def test_cleanup_clears_the_plan_and_params(connected):
 
 
 def test_cleanup_is_refused_while_running(connected):
-    connected.setup("CAOCV", action_params=params("CAOCV"))
+    setup(connected, "CAOCV")
     connected.start_channel(CHANNEL)
     response = connected.cleanup(CHANNEL)
     assert response.response == DriverResponseType.failed
@@ -393,7 +405,7 @@ def test_cleanup_is_refused_while_running(connected):
 
 
 def test_list_techniques_reports_the_expansion_in_order(connected):
-    connected.setup("GEIS", action_params=params("GEIS"))
+    setup(connected, "GEIS")
     assert connected.list_techniques(CHANNEL) == [
         (0, "EC_SDK_TECHNIQUE_CP"),
         (1, "EC_SDK_TECHNIQUE_GEIS"),
@@ -401,7 +413,7 @@ def test_list_techniques_reports_the_expansion_in_order(connected):
 
 
 def test_update_parameters_rebuilds_the_experiment(connected):
-    connected.setup("CA", action_params=params("CA"))
+    setup(connected, "CA")
     response = connected.update_parameters(CHANNEL, {"Vval__V": 0.9})
     assert response.response == DriverResponseType.success
     assert connected.channel_params[CHANNEL]["Vval__V"] == 0.9
@@ -414,7 +426,7 @@ def test_update_parameters_rebuilds_the_experiment(connected):
 def test_update_parameters_is_refused_while_running(connected):
     # Reloading an experiment under a live acquisition would silently discard
     # it.
-    connected.setup("CAOCV", action_params=params("CAOCV"))
+    setup(connected, "CAOCV")
     connected.start_channel(CHANNEL)
     response = connected.update_parameters(CHANNEL, {"OCV_Tval__s": 9.0})
     assert response.response == DriverResponseType.failed
@@ -513,11 +525,29 @@ def test_the_driver_exposes_the_eclib1_method_surface():
         assert callable(getattr(BiologicEclib2Driver, name, None)), name
 
 
-def test_start_channel_takes_no_ttl_params():
-    # EClib2 has no TTL or digital-output capability at all, so the EClib1
-    # signature cannot be honoured. A silently-ignored ttl_params would be
-    # worse: a station would believe it was triggering.
+def test_start_channel_accepts_ttl_params_for_the_shared_call_surface():
     import inspect
 
     signature = inspect.signature(BiologicEclib2Driver.start_channel)
-    assert "ttl_params" not in signature.parameters
+    assert "ttl_params" in signature.parameters
+
+
+def test_a_non_triggered_action_passes_the_executors_default_through(connected):
+    # BiologicExec always sends a ttl dict; ttl="none" is what every
+    # non-triggered action carries.
+    setup(connected, "OCV")
+    response = connected.start_channel(CHANNEL, {"ttl": "none", "ttl_logic": 1})
+    assert response.response == DriverResponseType.success
+
+
+@pytest.mark.parametrize("ttl", ["in", "out"])
+def test_an_active_ttl_request_is_refused_not_ignored(connected, ttl):
+    # EClib2 has no TTL or digital-output capability anywhere in its API.
+    # Dropping the request quietly would leave a station believing it was
+    # triggering an instrument that never fires.
+    setup(connected, "OCV")
+    response = connected.start_channel(CHANNEL, {"ttl": ttl, "ttl_duration": 1.0})
+    assert response.response == DriverResponseType.not_implemented
+    assert "no TTL" in response.message
+    # And the channel was not started.
+    assert connected.get_status(channel=CHANNEL).status == DriverStatus.ok
