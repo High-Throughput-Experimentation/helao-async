@@ -14,7 +14,10 @@ that matter at the stations:
 
 * **Instrument and firmware support.** A unit whose firmware EClib will not
   negotiate is unreachable, and there is nothing to be done about it from this
-  side.
+  side. The ceiling is not moving, either: BioLogic's EClib2 SDK (v2.0.2) is
+  not back-compatible -- it drops `blfind`, `BL_GetData` and `.ecc` files --
+  so easy-biologic cannot import against it and vendors its own EClib1
+  regardless.
 * **Technique coverage.** easy-biologic exposes a handful of
   `base_programs`; the seven HELAO endpoints (`run_OCV`, `run_CA`, `run_CP`,
   `run_CV`, `run_PEIS`, `run_GEIS`, `run_CAOCV`) are close to all of it.
