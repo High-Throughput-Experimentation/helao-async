@@ -367,7 +367,7 @@ def decode_status(values: Sequence[float]) -> ChannelStatus:
 
 Run: `pytest helao/deploy/hte/tests/test_ole_status.py -v`
 
-Expected: 11 passed.
+Expected: 15 passed (the parametrized state cases expand).
 
 - [ ] **Step 5: Format and commit**
 
@@ -1050,7 +1050,7 @@ def write_patched(doc: MpsDocument, dest: Union[str, Path]) -> Path:
 
 Run: `pytest helao/deploy/hte/tests/test_ole_mps_template.py -v`
 
-Expected: 13 passed. If `test_rendering_an_unpatched_document_round_trips_byte_for_byte` fails, the fixture's trailing newline is being dropped — `splitlines(keepends=True)` plus `"".join` is exact, so investigate the fixture rather than relaxing the assertion. This test is the guard that the patcher never reflows a file it was not asked to change.
+Expected: 35 passed. If a real-file round-trip test fails, the fixture's trailing newline is being dropped — `splitlines(keepends=True)` plus `"".join` is exact, so investigate the fixture rather than relaxing the assertion. This test is the guard that the patcher never reflows a file it was not asked to change.
 
 - [ ] **Step 6: Format and commit**
 
