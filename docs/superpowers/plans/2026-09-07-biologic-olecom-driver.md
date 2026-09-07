@@ -43,7 +43,7 @@
 | `helao/deploy/hte/drivers/pstat/biologic_ole/sim.py` | Fake COM server over synthetic MPR value tables. |
 | `helao/deploy/hte/drivers/pstat/biologic_ole/mpr_cursor.py` | Point cursor and column assembly over the `Measure*` reads. |
 | `helao/deploy/hte/drivers/pstat/biologic_ole/driver.py` | `BiologicOleDriver`, the ten-method surface. |
-| `helao/deploy/hte/drivers/pstat/biologic_ole/templates/*.mps` | Nine station-authored templates (at-station gate; a synthetic fixture stands in for tests). |
+| `helao/deploy/hte/drivers/pstat/biologic_ole/templates/*.mps` | Nine templates. **Three already committed** — `CV.mps` (real, GUI-authored) plus `TI.mps`/`TO.mps` derived from a real `TI_CV_TO.mps`. Six remain (at-station gate 1). |
 | `helao/deploy/hte/configs/biologicole.yml` | Simulated dev config, launchable on Linux. |
 | `helao/deploy/hte/tests/test_ole_status.py` | Task 1 tests. |
 | `helao/deploy/hte/tests/test_ole_mps_template.py` | Task 2 tests. |
@@ -393,6 +393,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Files:**
 - Create: `helao/deploy/hte/drivers/pstat/biologic_ole/mps_template.py`
+- Already present: `helao/deploy/hte/tests/fixtures/ole/CV.mps`, `helao/deploy/hte/tests/fixtures/ole/TI_CV_TO.mps` — **real GUI-authored EC-Lab v11.72 files from an SP-200**, committed as fixtures
 - Create: `helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps`
 - Test: `helao/deploy/hte/tests/test_ole_mps_template.py`
 
@@ -402,9 +403,11 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 
 **Context the implementer needs.** An EC-Lab `.mps` is plain text in **latin-1** (EC-Lab writes `µ` as the single byte 0xB5, so `unit Is  µA` is unreadable as UTF-8). After a header block it carries one `Technique : N` line per technique, the technique's short name, and then a **fixed-width** parameter table: the label occupies columns 0-19, each sequence value the 20 columns after it. Parse by column, never by splitting on a run of spaces — EC-Lab has a caption with two consecutive spaces (`unit  Ia`, on GEIS) and captions with single spaces everywhere (`E range min (V)`), so no gap width is safe. Patching must replace one column of one row and leave every other byte alone, because EC-Lab reads the file positionally and the surrounding header carries values this code has no business touching.
 
-- [ ] **Step 1: Write the fixture**
+- [ ] **Step 1: Write the synthetic multi-sequence fixture**
 
-Create `helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps`. This is a *test* fixture, deliberately minimal — the real templates are authored in EC-Lab at the station (at-station gate 1). It reproduces the shape the patcher must handle: a header, a technique header, a single-sequence parameter table, and a two-sequence one.
+Two **real** fixtures are already committed and are what most of these tests run against: `CV.mps` (one Cyclic Voltammetry technique) and `TI_CV_TO.mps` (Trigger In, CV, Trigger Out), both GUI-authored in EC-Lab v11.72 on an SP-200. Read one before writing any code — every trap this module handles was found by running a parser over them.
+
+Neither has a *multi-sequence* technique, though, and column indexing has to be covered, so add one synthetic file. Write it with **CRLF terminators and 20-column padding**, or it will not parse:
 
 ```
 EC-LAB SETTING FILE
@@ -460,88 +463,245 @@ path and nothing in the OLE COM API builds a technique from arguments. So a
 wrong substitution here is a wrong experiment on a real cell, with no error
 from either EC-Lab or the API -- which is why this module is pure text with no
 COM dependency, and why it is the most heavily tested unit in the package.
+
+Most of these run against two **real GUI-authored files** rather than a
+synthetic fixture. That matters: every one of the format's traps -- CRLF, the
+latin-1 superscripts, a value containing a space, header lines shaped like
+parameter rows, a caption repeated four times in one block -- was found by
+running an earlier version of this parser over them, not by reading the
+vendor manual.
 """
 
+import io
 from pathlib import Path
 
 import pytest
 
 from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
 
-FIXTURE = Path("helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps")
+FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
+CV = FIXTURES / "CV.mps"          # real: one Cyclic Voltammetry technique
+TI_CV_TO = FIXTURES / "TI_CV_TO.mps"  # real: Trigger In, CV, Trigger Out
+SYNTHETIC = FIXTURES / "synthetic_CA.mps"  # two sequence columns; see below
+
+
+@pytest.fixture
+def cv() -> mt.MpsDocument:
+    return mt.load(CV)
+
+
+@pytest.fixture
+def triggered() -> mt.MpsDocument:
+    return mt.load(TI_CV_TO)
 
 
 @pytest.fixture
 def doc() -> mt.MpsDocument:
-    return mt.load(FIXTURE)
+    """The synthetic two-sequence CA file.
+
+    Kept alongside the real ones because neither real file has a
+    multi-sequence technique, and column indexing has to be covered.
+    """
+    return mt.load(SYNTHETIC)
 
 
-def test_a_single_column_parameter_reads_back(doc):
-    assert mt.get_param(doc, "I Range") == "Auto"
-    assert mt.get_param(doc, "Bandwidth") == "4"
+# -- encoding and round-trip ------------------------------------------------
+
+
+@pytest.mark.parametrize("path", [CV, TI_CV_TO])
+def test_a_real_file_round_trips_byte_for_byte(path):
+    """The whole patcher rests on this. CRLF and latin-1 both matter."""
+    assert mt.render(mt.load(path)).encode(mt.ENCODING) == path.read_bytes()
+
+
+@pytest.mark.parametrize("path", [CV, TI_CV_TO])
+def test_the_real_files_are_not_utf8(path):
+    """0xB2/0xB3 -- the superscripts in `0.001 cm²` and `0.001 cm³`."""
+    with pytest.raises(UnicodeDecodeError):
+        path.read_bytes().decode("utf-8")
+
+
+@pytest.mark.parametrize("path", [CV, TI_CV_TO])
+def test_the_real_files_use_crlf(path):
+    raw = path.read_bytes()
+    assert raw.count(b"\r\n") == raw.count(b"\n") > 0
+
+
+def test_universal_newline_translation_would_break_the_round_trip():
+    """Pins why load() passes newline="": the default silently rewrites CRLF.
+
+    Without this test the bug reappears the moment someone simplifies load()
+    back to Path.read_text(), and it fails nowhere visible -- the patched file
+    just stops matching the one EC-Lab wrote.
+    """
+    with io.open(CV, "r", encoding=mt.ENCODING) as handle:  # newline=None
+        translated = handle.read()
+    assert mt.render(mt.loads(translated)).encode(mt.ENCODING) != CV.read_bytes()
+
+
+def test_write_patched_preserves_crlf_and_high_bytes(tmp_path):
+    dest = tmp_path / "out.mps"
+    mt.write_patched(mt.load(CV), dest)
+    assert dest.read_bytes() == CV.read_bytes()
+
+
+# -- technique blocks -------------------------------------------------------
+
+
+def test_a_single_technique_file_has_one_block(cv):
+    blocks = mt.technique_blocks(cv)
+    assert [b.name for b in blocks] == ["Cyclic Voltammetry"]
+    assert mt.n_techniques(cv) == 1
+
+
+def test_the_triggered_file_has_three_blocks_in_order(triggered):
+    assert [b.name for b in mt.technique_blocks(triggered)] == [
+        "Trigger In",
+        "Cyclic Voltammetry",
+        "Trigger Out",
+    ]
+
+
+def test_a_header_line_shaped_like_a_row_is_not_one(cv):
+    """`Reference electrode : SCE ...` passes a naive column test.
+
+    It is 19 characters, then a space at column 19 and a colon at 20 -- so an
+    unscoped parser reads it as a row with seven columns, and n_sequences
+    returns 7 for a single-sequence file.
+    """
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(cv, "Reference electrode")
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(cv, "Characteristic mass")
+
+
+def test_n_sequences_is_one_for_the_real_single_sequence_files(cv, triggered):
+    assert mt.n_sequences(cv) == 1
+    assert mt.n_sequences(triggered) == 1
+
+
+# -- reading values ---------------------------------------------------------
+
+
+def test_the_cv_vertices_read_back(cv):
+    assert mt.get_param(cv, "Ei (V)") == "0.000"
+    assert mt.get_param(cv, "E1 (V)") == "1.000"
+    assert mt.get_param(cv, "E2 (V)") == "-1.000"
+    assert mt.get_param(cv, "Ef (V)") == "0.000"
+
+
+def test_the_scan_rate_is_a_magnitude_and_a_unit_row(cv):
+    assert mt.get_param(cv, "dE/dt") == "20.000"
+    assert mt.get_param(cv, "dE/dt unit") == "mV/s"
+
+
+def test_bandwidth_reads_back_as_a_bare_integer(cv):
+    assert mt.get_param(cv, "Bandwidth") == "8"
+
+
+def test_a_label_containing_spaces_is_matched_whole(cv):
+    """`E range min (V)` must not be confused with `E range max (V)`."""
+    assert mt.get_param(cv, "E range min (V)") == "-2.500"
+    assert mt.get_param(cv, "E range max (V)") == "2.500"
+
+
+def test_a_value_containing_a_space_is_one_value_not_two_columns(triggered):
+    """`Trigger  Rising Edge`. Splitting on whitespace yields two columns."""
+    assert mt.get_param(triggered, "Trigger", technique=0) == "Rising Edge"
+    assert mt.n_sequences(triggered, technique=0) == 1
+
+
+# -- duplicate captions -----------------------------------------------------
+
+
+def test_a_caption_repeated_within_one_block_needs_an_occurrence(cv):
+    """Cyclic Voltammetry has four `vs.` rows, one per vertex."""
+    assert [mt.get_param(cv, "vs.", occurrence=k) for k in range(4)] == [
+        "Eoc",
+        "Ref",
+        "Ref",
+        "Eoc",
+    ]
+
+
+def test_asking_past_the_last_occurrence_says_how_many_there_are(cv):
+    with pytest.raises(mt.MpsParameterNotFound, match="occurs 4"):
+        mt.get_param(cv, "vs.", occurrence=4)
+
+
+def test_a_caption_repeated_across_blocks_is_selected_by_technique(triggered):
+    """`Trigger` is in both the Trigger In and Trigger Out blocks."""
+    assert mt.get_param(triggered, "Channel", technique=0) == "-1"
+    assert mt.get_param(triggered, "td (h:m:s)", technique=2) == "0:00:0.0010"
+    with pytest.raises(mt.MpsParameterNotFound, match="technique 0"):
+        mt.get_param(triggered, "td (h:m:s)", technique=0)
+
+
+def test_patching_without_a_technique_scope_hits_the_first_block(triggered):
+    """Documented, not accidental -- and why the driver always passes one."""
+    patched = mt.set_param(triggered, "Trigger", "Falling Edge")
+    assert mt.get_param(patched, "Trigger", technique=0) == "Falling Edge"
+    assert mt.get_param(patched, "Trigger", technique=2) == "Rising Edge"
+
+
+def test_patching_a_scoped_row_leaves_its_namesakes_alone(triggered):
+    patched = mt.set_param(triggered, "Trigger", "Falling Edge", technique=2)
+    assert mt.get_param(patched, "Trigger", technique=0) == "Rising Edge"
+    assert mt.get_param(patched, "Trigger", technique=2) == "Falling Edge"
+
+
+# -- patching ---------------------------------------------------------------
+
+
+def test_setting_a_parameter_changes_only_that_value(cv):
+    patched = mt.set_param(cv, "E1 (V)", "0.750")
+    assert mt.get_param(patched, "E1 (V)") == "0.750"
+    assert mt.get_param(patched, "E2 (V)") == "-1.000"
+    assert mt.get_param(patched, "Bandwidth") == "8"
+
+
+def test_patching_changes_exactly_one_line_and_no_others(cv):
+    before = mt.render(cv).splitlines()
+    after = mt.render(mt.set_param(cv, "E1 (V)", "0.750")).splitlines()
+    differing = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
+    assert len(differing) == 1
+    assert len(before) == len(after)
+
+
+def test_a_patched_row_keeps_its_trailing_padding(cv):
+    """EC-Lab pads the value column to 20. rstrip breaks byte-identity."""
+    patched = mt.set_param(cv, "E1 (V)", "0.750")
+    line = [l for l in patched.lines if l.startswith("E1 (V)")][0]
+    assert line.rstrip("\r\n") == "E1 (V)".ljust(20) + "0.750".ljust(20)
+
+
+def test_a_same_width_patch_preserves_the_file_length(cv):
+    patched = mt.set_param(cv, "E1 (V)", "0.750")
+    assert len(mt.render(patched)) == len(mt.render(cv))
+
+
+def test_the_document_is_immutable(cv):
+    before = mt.render(cv)
+    mt.set_param(cv, "E1 (V)", "0.750")
+    assert mt.render(cv) == before
+
+
+def test_an_absent_parameter_names_itself(cv):
+    with pytest.raises(mt.MpsParameterNotFound, match="Nonesuch"):
+        mt.get_param(cv, "Nonesuch")
+
+
+def test_a_caption_longer_than_the_label_field_is_refused(cv):
+    with pytest.raises(mt.MpsParameterNotFound, match="20-column"):
+        mt.set_param(cv, "a" * 21, "1")
+
+
+# -- multiple sequence columns ---------------------------------------------
 
 
 def test_a_multi_sequence_parameter_reads_the_requested_column(doc):
     assert mt.get_param(doc, "Ei (V)", seq=0) == "0.000"
     assert mt.get_param(doc, "Ei (V)", seq=1) == "0.500"
-
-
-def test_a_two_space_caption_in_the_fixture_reads_back(doc):
-    assert mt.get_param(doc, "unit dI") == "mA"
-
-
-def test_a_caption_with_two_consecutive_spaces_is_matched_whole():
-    """EC-Lab really has one: GEIS's `unit  Ia`.
-
-    Any parser that splits label from value on a run of spaces truncates this
-    to `unit`, then reports the real caption as absent -- which at a station
-    reads as "the template is wrong" rather than "the parser is".
-    """
-    doc = mt.loads("unit  Ia            mA                  \n")
-    assert mt.get_param(doc, "unit  Ia") == "mA"
-    patched = mt.set_param(doc, "unit  Ia", "\u00b5A")
-    assert mt.get_param(patched, "unit  Ia") == "\u00b5A"
-
-
-def test_a_header_line_is_not_mistaken_for_a_parameter_row():
-    """Header lines are long enough to slice but must never be patched."""
-    doc = mt.loads(
-        "Number of linked techniques : 2\n"
-        "Ecell ctrl range : min = -10.00 V, max = 10.00 V\n"
-        "Technique : 1\n"
-    )
-    assert mt.n_sequences(doc) == 0
-    with pytest.raises(mt.MpsParameterNotFound):
-        mt.get_param(doc, "Number of linked tec")
-
-
-def test_a_caption_longer_than_the_label_field_is_refused():
-    doc = mt.loads("Bandwidth           4\n")
-    with pytest.raises(mt.MpsParameterNotFound, match="20-column"):
-        mt.set_param(doc, "a" * 21, "1")
-
-
-def test_a_label_containing_spaces_is_matched_whole(doc):
-    """'E range min (V)' must not be confused with 'E range max (V)'."""
-    assert mt.get_param(doc, "E range min (V)") == "-10.000"
-    assert mt.get_param(doc, "E range max (V)") == "10.000"
-
-
-def test_an_absent_parameter_names_itself(doc):
-    with pytest.raises(mt.MpsParameterNotFound, match="Nonesuch"):
-        mt.get_param(doc, "Nonesuch")
-
-
-def test_a_column_beyond_the_row_is_refused(doc):
-    with pytest.raises(mt.MpsParameterNotFound, match="seq 5"):
-        mt.get_param(doc, "Ei (V)", seq=5)
-
-
-def test_setting_a_parameter_changes_only_that_value(doc):
-    patched = mt.set_param(doc, "Bandwidth", "7")
-    assert mt.get_param(patched, "Bandwidth") == "7"
-    assert mt.get_param(patched, "I Range") == "Auto"
-    assert mt.get_param(patched, "Ei (V)", seq=1) == "0.500"
 
 
 def test_setting_one_sequence_leaves_the_other_alone(doc):
@@ -550,68 +710,25 @@ def test_setting_one_sequence_leaves_the_other_alone(doc):
     assert mt.get_param(patched, "Ei (V)", seq=1) == "1.250"
 
 
-def test_the_document_is_immutable(doc):
-    before = mt.render(doc)
-    mt.set_param(doc, "Bandwidth", "7")
-    assert mt.render(doc) == before
-
-
-def test_rendering_an_unpatched_document_round_trips_byte_for_byte(doc):
-    assert mt.render(doc) == FIXTURE.read_text()
-
-
-def test_patching_changes_exactly_one_line(doc):
-    before = mt.render(doc).splitlines()
-    after = mt.render(mt.set_param(doc, "Bandwidth", "7")).splitlines()
-    differing = [i for i, (a, b) in enumerate(zip(before, after)) if a != b]
-    assert len(differing) == 1
-    assert len(before) == len(after)
+def test_a_column_beyond_the_row_is_refused(doc):
+    with pytest.raises(mt.MpsParameterNotFound, match="no seq 5"):
+        mt.get_param(doc, "Ei (V)", seq=5)
 
 
 def test_n_sequences_counts_the_widest_parameter_row(doc):
     assert mt.n_sequences(doc) == 2
 
 
-def test_write_patched_creates_parents_and_returns_the_path(tmp_path, doc):
+def test_write_patched_creates_parents_and_returns_the_path(tmp_path, cv):
     dest = tmp_path / "nested" / "out.mps"
-    written = mt.write_patched(mt.set_param(doc, "Bandwidth", "7"), dest)
+    written = mt.write_patched(mt.set_param(cv, "Bandwidth", "7"), dest)
     assert written == dest
-    assert "Bandwidth" in dest.read_text()
     assert mt.get_param(mt.load(dest), "Bandwidth") == "7"
 
 
-def test_a_micro_prefix_round_trips_as_one_byte(tmp_path):
-    """EC-Lab writes µ as latin-1 0xB5. Read as UTF-8 this file raises.
-
-    Not hypothetical: every current or charge row on a µA-scale setpoint
-    carries it, so a GUI-authored CA template hits this immediately.
-    """
-    source = tmp_path / "micro.mps"
-    source.write_bytes(
-        b"Technique : 1\nChronoamperometry\n"
-        b"Is                  1.000\n"
-        b"unit Is             \xb5A\n"
-    )
-    doc = mt.load(source)
-    assert mt.get_param(doc, "unit Is") == "\u00b5A"
-    dest = tmp_path / "out.mps"
-    mt.write_patched(doc, dest)
-    assert dest.read_bytes() == source.read_bytes()
-
-
-def test_a_patched_file_keeps_single_byte_micro(tmp_path):
-    source = tmp_path / "micro.mps"
-    source.write_bytes(b"Is                  1.000\nunit Is             \xb5A\n")
-    patched = mt.set_param(mt.load(source), "Is", "2.500")
-    dest = tmp_path / "out.mps"
-    mt.write_patched(patched, dest)
-    assert b"\xb5A" in dest.read_bytes()
-    assert b"\xc2\xb5" not in dest.read_bytes()
-
-
 def test_loads_accepts_text_directly():
-    doc = mt.loads("Technique : 1\nOCV\ntR (h:m:s)          00:00:05.0000\n")
-    assert mt.get_param(doc, "tR (h:m:s)") == "00:00:05.0000"
+    doc = mt.loads("Technique : 1\r\nOCV\r\n" + "tR (h:m:s)".ljust(20) + "0:00:5.0000\r\n")
+    assert mt.get_param(doc, "tR (h:m:s)") == "0:00:5.0000"
 ```
 
 - [ ] **Step 3: Run the tests and verify they fail**
@@ -630,54 +747,102 @@ channel -- the OLE COM API has no function that builds a technique from
 arguments -- so every parameterised endpoint patches a template and hands
 EC-Lab the result.
 
-The file is latin-1 text (see ``ENCODING``). After a header block it carries,
-per technique, a
-``Technique : N`` line, the technique name, and a **fixed-width** parameter
-table: the label occupies columns 0-19 and each sequence value 20 columns
-after it. It has to be parsed by column, not by splitting on a run of spaces:
-EC-Lab has at least one caption containing two consecutive spaces
-(``unit  Ia``, on GEIS), which a gap-splitting parser truncates to ``unit``
-and then reports as absent.
+Everything below was verified against two real GUI-authored files
+(``tests/fixtures/ole/CV.mps`` and ``TI_CV_TO.mps``, EC-Lab v11.72, SP-200).
+Five properties of the format each break a reasonable implementation, and
+none of them announces itself:
 
-Patching rewrites one column of one row and leaves every other byte untouched,
-including the header, because EC-Lab reads the file positionally and this code
-has no business editing values it was not asked about. ``render`` on an
-unpatched document is byte-identical to what was loaded, and a test pins that.
+* **latin-1, CRLF.** The files are ISO-8859 with ``\r\n`` terminators, and
+  they really do carry high bytes -- 0xB2 and 0xB3, the superscripts in
+  ``0.001 cm²`` and ``0.001 cm³``. ``read_text()`` without ``newline=""``
+  silently rewrites CRLF to LF, so the round-trip is not byte-identical; on
+  Windows the write side then turns LF back into CRLF and a naive read/write
+  cycle doubles nothing but a patched one loses the file's own line endings.
+* **Fixed-width columns.** Label in columns 0-19, each sequence value in the
+  20 after it, trailing padding included. The padding must be preserved:
+  ``rstrip``-ing a rebuilt row breaks byte-identity against the original.
+* **Values can contain spaces.** ``Trigger  Rising Edge`` is one value, not
+  two sequence columns, so the value field is *sliced* by column rather than
+  split on whitespace.
+* **Header lines can look exactly like parameter rows.**
+  ``Reference electrode : SCE ...`` and ``Characteristic mass : 0.001 g`` both
+  pass a naive column test and were mis-parsed as rows in the real files. The
+  parameter table only exists *inside* technique blocks, so parsing is scoped
+  to them.
+* **Captions are not unique.** ``vs.`` appears **four times** in a single
+  Cyclic Voltammetry block (once per vertex), and ``Trigger`` appears in both
+  the Trigger In and Trigger Out blocks of a three-technique file. A
+  first-match lookup patches the wrong row, so every accessor takes an
+  optional ``technique`` scope and an ``occurrence`` index.
 """
 
+import io
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 __all__ = [
     "COLUMN_WIDTH",
+    "ENCODING",
     "MpsDocument",
     "MpsParameterNotFound",
+    "TechniqueBlock",
     "get_param",
     "load",
     "loads",
     "n_sequences",
+    "n_techniques",
     "render",
     "set_param",
+    "technique_blocks",
     "write_patched",
 ]
 
 #: The parameter table is fixed-width: EC-Lab pads each label to 20 columns
-#: and each value to 20 after it. Parsing by column rather than by whitespace
-#: runs is not a stylistic choice -- **at least one real caption contains two
-#: consecutive spaces** (``unit  Ia``, on GEIS), which any split-on-a-gap
-#: parser truncates to ``unit``, and single spaces are everywhere
-#: ("E range min (V)"), so no gap width is safe.
+#: and each value to 20 after it.
 COLUMN_WIDTH = 20
+
+#: ``.mps`` files are latin-1 / cp1252, **not** UTF-8. Verified: the real
+#: files carry 0xB2 and 0xB3 (``cm²``, ``cm³``) and fail to decode as UTF-8.
+#: latin-1 is chosen over cp1252 deliberately -- it round-trips every byte
+#: 0x00-0xFF losslessly, which is what a patcher that must not disturb bytes
+#: it was not asked about actually needs.
+ENCODING = "latin-1"
+
+#: Line terminators are CRLF and must survive untouched, so every open()
+#: disables universal-newline translation.
+NEWLINE = ""
+
+_TECHNIQUE_LINE = re.compile(r"^Technique : (\d+)")
 
 
 class MpsParameterNotFound(KeyError):
-    """A parameter row, or a sequence column within one, is not in the file."""
+    """A parameter row -- or a column, occurrence or technique of one."""
+
+
+@dataclass(frozen=True)
+class TechniqueBlock:
+    """One ``Technique : N`` section's extent within a document.
+
+    Attributes:
+        index: 0-based position in the file. Not the ``N`` in the header
+            line, which is 1-based and which a hand-assembled file may have
+            got wrong -- position is what actually orders the techniques.
+        name: The technique name line, e.g. ``"Cyclic Voltammetry"``.
+        start: Index of the ``Technique : N`` line.
+        stop: Index one past the block's last line.
+    """
+
+    index: int
+    name: str
+    start: int
+    stop: int
 
 
 @dataclass(frozen=True)
 class MpsDocument:
-    """The lines of an ``.mps`` file, held verbatim.
+    """The lines of an ``.mps`` file, held verbatim with line endings.
 
     Immutable: ``set_param`` returns a new document. A patcher that mutated in
     place would let one action's substitution leak into the next action that
@@ -687,24 +852,15 @@ class MpsDocument:
     lines: tuple[str, ...]
 
 
-#: ``.mps`` files are latin-1 / cp1252, **not** UTF-8. EC-Lab writes the micro
-#: prefix as the single byte 0xB5 (``µ`` in latin-1), so a current range row
-#: reads ``unit Is  µA``. Reading such a file as UTF-8 raises
-#: UnicodeDecodeError; writing one as UTF-8 emits two bytes where EC-Lab
-#: expects one. latin-1 is chosen over cp1252 deliberately: it round-trips
-#: every byte 0x00-0xFF losslessly, which is what a patcher that must not
-#: disturb bytes it was not asked about actually needs.
-ENCODING = "latin-1"
-
-
 def loads(text: str) -> MpsDocument:
-    """Parse ``.mps`` text. ``keepends`` preserves the original line endings."""
+    """Parse ``.mps`` text. ``keepends`` preserves the original terminators."""
     return MpsDocument(lines=tuple(text.splitlines(keepends=True)))
 
 
 def load(path: Union[str, Path]) -> MpsDocument:
-    """Read an ``.mps`` file from disk. See ``ENCODING``."""
-    return loads(Path(path).read_text(encoding=ENCODING))
+    """Read an ``.mps`` file. See ``ENCODING`` and ``NEWLINE``."""
+    with io.open(path, "r", encoding=ENCODING, newline=NEWLINE) as handle:
+        return loads(handle.read())
 
 
 def render(doc: MpsDocument) -> str:
@@ -712,14 +868,32 @@ def render(doc: MpsDocument) -> str:
     return "".join(doc.lines)
 
 
-def _columns(line: str) -> Union[tuple[str, list[str]], None]:
+def technique_blocks(doc: MpsDocument) -> list[TechniqueBlock]:
+    """Every ``Technique : N`` block, in file order."""
+    starts = [
+        index
+        for index, line in enumerate(doc.lines)
+        if _TECHNIQUE_LINE.match(line.rstrip("\r\n"))
+    ]
+    blocks = []
+    for position, start in enumerate(starts):
+        stop = starts[position + 1] if position + 1 < len(starts) else len(doc.lines)
+        name = doc.lines[start + 1].strip() if start + 1 < len(doc.lines) else ""
+        blocks.append(TechniqueBlock(position, name, start, stop))
+    return blocks
+
+
+def n_techniques(doc: MpsDocument) -> int:
+    """How many technique blocks the document holds."""
+    return len(technique_blocks(doc))
+
+
+def _row(line: str) -> Optional[tuple[str, list[str]]]:
     """Split a parameter row into ``(label, columns)``, or None if not one.
 
     A row qualifies only when the label is padded to exactly ``COLUMN_WIDTH``
-    -- column 19 a space, column 20 not. That is what distinguishes a
-    parameter row from a header line like ``Ecell ctrl range : min = ...``,
-    which is long enough to slice but is not a table row and must never be
-    patched.
+    -- column 19 a space, column 20 not. Values are then sliced by column,
+    never split on whitespace: ``Trigger  Rising Edge`` is one value.
     """
     body = line.rstrip("\r\n")
     if len(body) <= COLUMN_WIDTH:
@@ -729,24 +903,69 @@ def _columns(line: str) -> Union[tuple[str, list[str]], None]:
     label = body[:COLUMN_WIDTH].rstrip()
     if not label:
         return None
-    return label, body[COLUMN_WIDTH:].split()
+    rest = body[COLUMN_WIDTH:]
+    columns = [
+        rest[i : i + COLUMN_WIDTH].strip() for i in range(0, len(rest), COLUMN_WIDTH)
+    ]
+    while columns and columns[-1] == "":
+        columns.pop()
+    return (label, columns) if columns else None
 
 
-def _find_row(doc: MpsDocument, name: str) -> tuple[int, list[str]]:
-    for index, line in enumerate(doc.lines):
-        parsed = _columns(line)
-        if parsed is not None and parsed[0] == name:
-            return index, parsed[1]
-    raise MpsParameterNotFound(f"no parameter row labelled {name!r}")
+def _find_row(
+    doc: MpsDocument,
+    name: str,
+    technique: Optional[int] = None,
+    occurrence: int = 0,
+) -> tuple[int, list[str]]:
+    """Locate one parameter row.
 
-
-def get_param(doc: MpsDocument, name: str, seq: int = 0) -> str:
-    """The value of parameter ``name`` in sequence column ``seq``.
+    Scoped to technique blocks, so a header line that happens to look like a
+    row -- ``Reference electrode : SCE ...`` does -- is never a candidate.
 
     Raises:
-        MpsParameterNotFound: If the row is absent, or has no column ``seq``.
+        MpsParameterNotFound: If no such row, or fewer occurrences than asked.
     """
-    _, columns = _find_row(doc, name)
+    hits: list[tuple[int, list[str]]] = []
+    for block in technique_blocks(doc):
+        if technique is not None and block.index != technique:
+            continue
+        for index in range(block.start, block.stop):
+            parsed = _row(doc.lines[index])
+            if parsed is not None and parsed[0] == name:
+                hits.append((index, parsed[1]))
+    if not hits:
+        scope = "" if technique is None else f" in technique {technique}"
+        raise MpsParameterNotFound(f"no parameter row labelled {name!r}{scope}")
+    if occurrence >= len(hits):
+        raise MpsParameterNotFound(
+            f"parameter {name!r} occurs {len(hits)} time(s), no occurrence "
+            f"{occurrence}"
+        )
+    return hits[occurrence]
+
+
+def get_param(
+    doc: MpsDocument,
+    name: str,
+    seq: int = 0,
+    technique: Optional[int] = None,
+    occurrence: int = 0,
+) -> str:
+    """The value of parameter ``name`` in sequence column ``seq``.
+
+    Args:
+        doc: The document to read.
+        name: The parameter's caption, exactly as the file spells it.
+        seq: Which sequence column, 0-based.
+        technique: Restrict to one technique block by position, 0-based.
+        occurrence: Which matching row, when the caption repeats. Cyclic
+            Voltammetry has four ``vs.`` rows, one per vertex.
+
+    Raises:
+        MpsParameterNotFound: If the row, occurrence or column is absent.
+    """
+    _, columns = _find_row(doc, name, technique, occurrence)
     if seq >= len(columns):
         raise MpsParameterNotFound(
             f"parameter {name!r} has {len(columns)} column(s), no seq {seq}"
@@ -754,27 +973,34 @@ def get_param(doc: MpsDocument, name: str, seq: int = 0) -> str:
     return columns[seq]
 
 
-def set_param(doc: MpsDocument, name: str, value: str, seq: int = 0) -> MpsDocument:
+def set_param(
+    doc: MpsDocument,
+    name: str,
+    value: str,
+    seq: int = 0,
+    technique: Optional[int] = None,
+    occurrence: int = 0,
+) -> MpsDocument:
     """A copy of ``doc`` with one column of one parameter row replaced.
 
-    Column alignment is preserved by padding each rewritten column back to the
-    width it had, so the patched file stays visually identical to a
-    GUI-authored one and a human diff shows one changed value rather than a
-    reflowed table.
+    The row is rebuilt at 20-column spacing **including its trailing
+    padding**, which is what EC-Lab itself writes and what keeps an unpatched
+    render byte-identical to the file that was loaded.
 
     Raises:
-        MpsParameterNotFound: If the row is absent, or has no column ``seq``.
+        MpsParameterNotFound: If the row, occurrence or column is absent, or
+            the caption is too long for the label field.
     """
-    index, columns = _find_row(doc, name)
-    if seq >= len(columns):
-        raise MpsParameterNotFound(
-            f"parameter {name!r} has {len(columns)} column(s), no seq {seq}"
-        )
     if len(name) > COLUMN_WIDTH:
         # EC-Lab pads to 20; a longer label leaves the value with no separator
         # and makes the row unparseable on the next read.
         raise MpsParameterNotFound(
             f"parameter {name!r} exceeds the {COLUMN_WIDTH}-column label field"
+        )
+    index, columns = _find_row(doc, name, technique, occurrence)
+    if seq >= len(columns):
+        raise MpsParameterNotFound(
+            f"parameter {name!r} has {len(columns)} column(s), no seq {seq}"
         )
     original = doc.lines[index]
     ending = original[len(original.rstrip("\r\n")) :]
@@ -784,17 +1010,25 @@ def set_param(doc: MpsDocument, name: str, value: str, seq: int = 0) -> MpsDocum
         column.ljust(COLUMN_WIDTH) for column in columns
     )
     lines = list(doc.lines)
-    lines[index] = rebuilt.rstrip() + ending
+    lines[index] = rebuilt + ending
     return MpsDocument(lines=tuple(lines))
 
 
-def n_sequences(doc: MpsDocument) -> int:
-    """The widest parameter row's column count -- the sequence count."""
+def n_sequences(doc: MpsDocument, technique: Optional[int] = None) -> int:
+    """The widest parameter row's column count -- the sequence count.
+
+    Scoped to technique blocks, so header lines cannot inflate it. On the real
+    ``CV.mps`` an unscoped count returns 7, from
+    ``Reference electrode : SCE Saturated Calomel Electrode (0.241 V)``.
+    """
     widest = 0
-    for line in doc.lines:
-        parsed = _columns(line)
-        if parsed is not None:
-            widest = max(widest, len(parsed[1]))
+    for block in technique_blocks(doc):
+        if technique is not None and block.index != technique:
+            continue
+        for index in range(block.start, block.stop):
+            parsed = _row(doc.lines[index])
+            if parsed is not None:
+                widest = max(widest, len(parsed[1]))
     return widest
 
 
@@ -807,7 +1041,8 @@ def write_patched(doc: MpsDocument, dest: Union[str, Path]) -> Path:
     """
     path = Path(dest)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render(doc), encoding=ENCODING)
+    with io.open(path, "w", encoding=ENCODING, newline=NEWLINE) as handle:
+        handle.write(render(doc))
     return path
 ```
 
@@ -953,6 +1188,9 @@ def test_every_action_parameter_the_eclib_registry_maps_is_also_mapped(name):
     eclib_keys = set(BIOTECHS[name].parameter_map)
     ole_keys = set(ot.resolve(name).parameter_map)
     handled_elsewhere = {"ERange", "CA_ERange"}
+    if name == "CV":
+        # EC-Lab's CV has no dE (mV) row at all -- see the registry comment.
+        handled_elsewhere = handled_elsewhere | {"AcqInterval__V"}
     assert eclib_keys - ole_keys <= handled_elsewhere, sorted(
         eclib_keys - ole_keys - handled_elsewhere
     )
@@ -974,6 +1212,32 @@ def test_auto_erange_writes_nothing_rather_than_guessing():
     """AUTO has no numeric equivalent; the template's own window stands."""
     assert ot.erange_rows("AUTO") == {}
     assert ot.erange_rows("nonsense") == {}
+
+
+def test_cv_does_not_map_a_voltage_recording_interval():
+    """EC-Lab's CV has no `dE (mV)` row; Step percent and N govern it.
+
+    Pinned as a test rather than left implicit, because the obvious fix --
+    inventing a `dE (mV)` mapping -- silently changes the sampling of every
+    CV the station runs.
+    """
+    assert "AcqInterval__V" not in ot.resolve("CV").parameter_map
+
+
+def test_the_cv_captions_exist_in_the_real_template():
+    """Read off tests/fixtures/ole/CV.mps, not inferred."""
+    from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
+
+    doc = mt.load("helao/deploy/hte/tests/fixtures/ole/CV.mps")
+    for param in ot.resolve("CV").parameter_map.values():
+        mt.get_param(doc, param.param_id)  # raises if the row is absent
+        if param.unit_param_id:
+            mt.get_param(doc, param.unit_param_id)
+
+
+def test_the_scan_rate_scales_to_the_unit_the_template_carries():
+    """The real file holds `dE/dt 20.000` with `dE/dt unit mV/s`."""
+    assert ot.scale_to_unit(0.02, "V/s") == ("20.000", "mV/s")
 
 
 def test_no_technique_maps_erange_to_a_single_caption():
@@ -1144,15 +1408,20 @@ class MpsParam:
             is what selects the scale-and-unit path over ``fmt``.
         fmt: How to render the value when there is no unit row. A
             ``str.format`` spec, or one of the sentinels ``"hms"`` (EC-Lab's
-            ``hh:mm:ss.ffff``), ``"bandwidth"`` (the bare integer 1-9),
+            ``h:mm:s.ffff``), ``"bandwidth"`` (the bare integer 1-9),
             ``"V_to_mV"`` (a volts parameter landing in a millivolts row), or
             ``"spacing"`` (a sweep mode as "Linear"/"Logarithmic").
+        technique: Which technique block the row lives in, 0-based, for
+            multi-technique templates. ``None`` means the first match
+            anywhere. CAOCV needs it: its template holds a CA block and an
+            OCV block, and both carry ``E range min (V)``.
     """
 
     param_id: str
     unit_param_id: Optional[str] = None
     base_unit: Optional[str] = None
     fmt: str = "{}"
+    technique: Optional[int] = None
 
 
 @dataclass(frozen=True)
@@ -1397,11 +1666,19 @@ OLE_TECHS: dict[str, OleTechnique] = {
         column_plan=_dc_plan(),
         technique_codes=frozenset({25, 56}),
     ),
-    # UNVERIFIED CAPTIONS. The reference writer this registry was checked
-    # against implements OCV, CA, CP, PEIS, GEIS, GCPL, Loop and Modulo Bat --
-    # but not CV. These follow the same conventions the verified techniques
-    # use (Ei/E1/E2/Ef, dE/dt with its own unit row) and are the first thing
-    # to check against the real template at at-station gate 1.
+    # Every caption below is read off the real CV.mps fixture, including the
+    # `dE/dt` + `dE/dt unit` pair (which the file spells `20.000` / `mV/s`,
+    # so the scan rate is a scale-and-unit parameter like a current).
+    #
+    # `AcqInterval__V` is deliberately ABSENT. EC-Lab's Cyclic Voltammetry
+    # has **no `dE (mV)` row** -- the recording interval is governed by
+    # `Step percent` and `N`, whose relationship to a volts-per-point
+    # interval is not documented anywhere available here. The endpoint still
+    # computes `AcqInterval__V` (`AcqInterval__s * ScanRate__V_s`) for the
+    # eclib backend, which maps it to easy-biologic's `step`; on this backend
+    # the template's own `Step percent`/`N` stand. Mapping it onto a guessed
+    # row would change the sampling of every CV on the station. Resolve at
+    # at-station gate 1, with the station owner.
     "CV": OleTechnique(
         technique_name="CV",
         template="CV.mps",
@@ -1414,7 +1691,6 @@ OLE_TECHS: dict[str, OleTechnique] = {
                 param_id="dE/dt", unit_param_id="dE/dt unit", base_unit="V/s"
             ),
             "Cycles": MpsParam(param_id="nc cycles", fmt="{:d}"),
-            "AcqInterval__V": MpsParam(param_id="dE (mV)", fmt="V_to_mV"),
             **_RANGES,
         },
         column_plan=_dc_plan(),
@@ -1482,17 +1758,34 @@ OLE_TECHS: dict[str, OleTechnique] = {
         technique_name="CAOCV",
         template="CAOCV.mps",
         parameter_map={
-            "CA_Vval__V_list": MpsParam(param_id="Ei (V)", fmt="{:.3f}"),
-            "CA_Tval__s_list": MpsParam(param_id="ti (h:m:s)", fmt="hms"),
-            "CA_AcqInterval__s": MpsParam(param_id="dta (s)", fmt="{:.4f}"),
-            "CA_AcqInterval__A": MpsParam(
-                param_id="dI", unit_param_id="unit dI", base_unit="A"
+            # Two technique blocks in one template, so every row is scoped:
+            # both carry `E range min (V)`, and an unscoped patch would put
+            # the OCV settings into the CA step.
+            "CA_Vval__V_list": MpsParam(
+                param_id="Ei (V)", fmt="{:.3f}", technique=0
             ),
-            "CA_IRange": MpsParam(param_id="I Range"),
-            "CA_Bandwidth": MpsParam(param_id="Bandwidth", fmt="bandwidth"),
-            "OCV_Tval__s": MpsParam(param_id="tR (h:m:s)", fmt="hms"),
-            "OCV_AcqInterval__s": MpsParam(param_id="dtR (s)", fmt="{:.4f}"),
-            "OCV_AcqInterval__V": MpsParam(param_id="dER (mV)", fmt="V_to_mV"),
+            "CA_Tval__s_list": MpsParam(
+                param_id="ti (h:m:s)", fmt="hms", technique=0
+            ),
+            "CA_AcqInterval__s": MpsParam(
+                param_id="dta (s)", fmt="{:.4f}", technique=0
+            ),
+            "CA_AcqInterval__A": MpsParam(
+                param_id="dI", unit_param_id="unit dI", base_unit="A", technique=0
+            ),
+            "CA_IRange": MpsParam(param_id="I Range", technique=0),
+            "CA_Bandwidth": MpsParam(
+                param_id="Bandwidth", fmt="bandwidth", technique=0
+            ),
+            "OCV_Tval__s": MpsParam(
+                param_id="tR (h:m:s)", fmt="hms", technique=1
+            ),
+            "OCV_AcqInterval__s": MpsParam(
+                param_id="dtR (s)", fmt="{:.4f}", technique=1
+            ),
+            "OCV_AcqInterval__V": MpsParam(
+                param_id="dER (mV)", fmt="V_to_mV", technique=1
+            ),
         },
         column_plan=_dc_plan(),
         technique_codes=frozenset({24, 54, 11, 55}),
@@ -1568,44 +1861,43 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 Append to `helao/deploy/hte/tests/test_ole_technique.py`:
 
 ```python
+from pathlib import Path
+
 from helao.deploy.hte.drivers.pstat.biologic_ole import mps_assemble as ma
 from helao.deploy.hte.drivers.pstat.biologic_ole import mps_template as mt
 
-def row(label: str, *values: str) -> str:
-    """One fixed-width .mps table row, as EC-Lab writes it (20 columns)."""
-    return label.ljust(20) + "".join(v.ljust(20) for v in values) + "\n"
+TEMPLATES = Path("helao/deploy/hte/drivers/pstat/biologic_ole/templates")
+FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
+
+# The real GUI-authored templates, and the real three-technique file the
+# assembler is trying to reproduce.
+TRIGGER_IN = mt.load(TEMPLATES / "TI.mps")
+TRIGGER_OUT = mt.load(TEMPLATES / "TO.mps")
+MAIN = mt.load(FIXTURES / "CV.mps")
+REFERENCE = mt.load(FIXTURES / "TI_CV_TO.mps")
 
 
-TRIGGER_IN = mt.loads(
-    "Technique : 1\nTrigger In\n"
-    + row("Set I/O", "0")
-    + row("tw (h:m:s)", "00:00:01.0000")
-)
-TRIGGER_OUT = mt.loads(
-    "Technique : 1\nTrigger Out\n"
-    + row("Set I/O", "0")
-    + row("tw (h:m:s)", "00:00:01.0000")
-)
-MAIN = mt.load("helao/deploy/hte/tests/fixtures/ole/synthetic_CA.mps")
+def test_the_real_trigger_templates_hold_one_technique_each():
+    assert [b.name for b in mt.technique_blocks(TRIGGER_IN)] == ["Trigger In"]
+    assert [b.name for b in mt.technique_blocks(TRIGGER_OUT)] == ["Trigger Out"]
 
 
-def test_hms_formats_a_duration_as_eclab_spells_it():
-    """Zero-padded hour and a 4-digit fraction: 01:01:01.5000."""
-    assert ot.format_value(10.0, "hms") == "00:00:10.0000"
-    assert ot.format_value(3725.5, "hms") == "01:02:05.5000"
-    assert ot.format_value(0.25, "hms") == "00:00:00.2500"
-    assert ot.format_value(3661.5, "hms") == "01:01:01.5000"
+def test_trigger_in_carries_a_channel_and_no_duration():
+    assert mt.get_param(TRIGGER_IN, "Channel") == "-1"
+    assert mt.get_param(TRIGGER_IN, "Trigger") == "Rising Edge"
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(TRIGGER_IN, "td (h:m:s)")
 
 
-def test_a_plain_format_spec_is_applied_verbatim():
-    assert ot.format_value(0.5, "{:.3f}") == "0.500"
-    assert ot.format_value(3, "{:d}") == "3"
-    assert ot.format_value("Auto", "{}") == "Auto"
+def test_trigger_out_carries_a_delay_and_no_channel():
+    """Which is why TTLsend selects nothing -- see UNMAPPED_TTLSEND."""
+    assert mt.get_param(TRIGGER_OUT, "td (h:m:s)") == "0:00:0.0010"
+    with pytest.raises(mt.MpsParameterNotFound):
+        mt.get_param(TRIGGER_OUT, "Channel")
 
 
 def test_a_disabled_ttl_plan_is_inactive():
-    plan = ma.ttl_plan_from_params({"TTLwait": -1, "TTLsend": -1})
-    assert plan.is_active is False
+    assert ma.ttl_plan_from_params({"TTLwait": -1, "TTLsend": -1}).is_active is False
 
 
 def test_an_absent_ttl_key_reads_as_disabled():
@@ -1623,54 +1915,79 @@ def test_an_inactive_plan_returns_the_main_document_unchanged():
 
 
 def test_ttlwait_prepends_a_trigger_in_technique():
-    plan = ma.TtlPlan(wait=2, duration=1.5)
-    out = mt.render(ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT))
-    assert out.index("Trigger In") < out.index("Chronoamperometry")
-    assert "Trigger Out" not in out
+    plan = ma.TtlPlan(wait=2)
+    out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        "Trigger In",
+        "Cyclic Voltammetry",
+    ]
 
 
 def test_ttlsend_appends_a_trigger_out_technique():
-    plan = ma.TtlPlan(send=1, duration=0.5)
-    out = mt.render(ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT))
-    assert out.index("Chronoamperometry") < out.index("Trigger Out")
-    assert "Trigger In" not in out
-
-
-def test_both_directions_bracket_the_main_technique():
-    plan = ma.TtlPlan(wait=2, send=1)
-    out = mt.render(ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT))
-    assert out.index("Trigger In") < out.index("Chronoamperometry") < out.index(
-        "Trigger Out"
-    )
-
-
-def test_the_io_line_carries_the_requested_channel():
-    plan = ma.TtlPlan(wait=2)
+    plan = ma.TtlPlan(send=1)
     out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
-    assert mt.get_param(out, "Set I/O") == "2"
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        "Cyclic Voltammetry",
+        "Trigger Out",
+    ]
 
 
-def test_the_duration_lands_on_the_trigger_technique():
-    plan = ma.TtlPlan(send=1, duration=2.5)
-    out = ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT)
-    assert mt.get_param(out, "tw (h:m:s)") == "00:00:02.5000"
+def test_both_directions_reproduce_the_reference_block_order():
+    """The assembled file must match a GUI-authored TI -> CV -> TO."""
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    assert [b.name for b in mt.technique_blocks(out)] == [
+        b.name for b in mt.technique_blocks(REFERENCE)
+    ]
+
+
+def test_the_header_appears_exactly_once():
+    """Each template is a whole .mps; splicing documents would repeat it."""
+    out = mt.render(ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT))
+    assert out.count("EC-LAB SETTING FILE") == 1
+    assert out.count("Number of linked techniques") == 1
+
+
+def test_the_in_channel_lands_on_trigger_in(triggered_out=None):
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "Channel", technique=0) == "2"
+
+
+def test_the_duration_lands_on_trigger_outs_delay_row():
+    out = ma.assemble(MAIN, ma.TtlPlan(send=1, duration=2.5), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "td (h:m:s)", technique=1) == "0:00:2.5000"
+
+
+def test_configuring_one_trigger_leaves_the_others_trigger_row_alone():
+    """Both blocks carry a `Trigger` row; a first-match patch hits the wrong one."""
+    out = ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT)
+    assert mt.get_param(out, "Trigger", technique=0) == "Rising Edge"
+    assert mt.get_param(out, "Trigger", technique=2) == "Rising Edge"
 
 
 def test_techniques_are_renumbered_consecutively_from_one():
-    plan = ma.TtlPlan(wait=2, send=1)
-    out = mt.render(ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT))
+    out = mt.render(ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT))
     numbers = [
         int(line.split(":")[1])
         for line in out.splitlines()
         if line.startswith("Technique :")
     ]
-    assert numbers == [1, 2, 3, 4]
+    assert numbers == [1, 2, 3]
 
 
 def test_the_linked_technique_count_header_is_updated():
-    plan = ma.TtlPlan(wait=2, send=1)
-    out = mt.render(ma.assemble(MAIN, plan, TRIGGER_IN, TRIGGER_OUT))
-    assert "Number of linked techniques : 4" in out
+    out = mt.render(ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT))
+    assert "Number of linked techniques : 3" in out
+
+
+def test_the_assembled_file_keeps_crlf_throughout():
+    out = mt.render(ma.assemble(MAIN, ma.TtlPlan(wait=2, send=1), TRIGGER_IN, TRIGGER_OUT))
+    raw = out.encode(mt.ENCODING)
+    assert raw.count(b"\r\n") == raw.count(b"\n") > 0
+
+
+def test_a_trigger_template_with_more_than_one_technique_is_refused():
+    with pytest.raises(ValueError, match="exactly one technique"):
+        ma.assemble(MAIN, ma.TtlPlan(wait=0), REFERENCE, TRIGGER_OUT)
 ```
 
 - [ ] **Step 2: Run the tests and verify they fail**
@@ -1691,7 +2008,7 @@ def format_value(value, fmt: str) -> str:
     and each exists because writing the obvious thing yields a file EC-Lab
     accepts and then runs wrongly:
 
-    * ``"hms"`` -- EC-Lab's ``hh:mm:ss.ffff``, zero-padded hour.
+    * ``"hms"`` -- EC-Lab's duration spelling, ``h:mm:s.ffff``.
     * ``"bandwidth"`` -- the bare integer 1-9. Writing ``"BW4"`` gives a file
       that loads and runs at whatever bandwidth the template carried.
     * ``"V_to_mV"`` -- a volts parameter landing in a millivolts row
@@ -1702,12 +2019,20 @@ def format_value(value, fmt: str) -> str:
     unit row never come through here -- see ``scale_to_unit``.
     """
     if fmt == "hms":
+        # The one real duration in a GUI-authored file is `0:00:0.0010`
+        # (TI_CV_TO.mps, Trigger Out's `td`): hours and seconds unpadded,
+        # minutes padded to two. A third-party writer emits `00:00:00.0010`
+        # instead and reportedly works, so EC-Lab is probably lenient on
+        # read -- but what it *writes* is the only evidence there is, and a
+        # patched file that differs from a GUI-authored one for no reason is
+        # a difference nobody will remember making. Confirm with a
+        # longer-than-a-minute duration at at-station gate 1.
         total = float(value)
         hours = int(total / 3600.0)
         minutes = int((total % 3600.0) / 60.0)
         seconds = int(total % 60.0)
         fraction = "{:.4f}".format(round(total % 1, 4)).split(".")[1]
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{fraction}"
+        return f"{hours}:{minutes:02d}:{seconds}.{fraction}"
     if fmt == "bandwidth":
         return str(BANDWIDTH_VALUES[str(value)])
     if fmt == "V_to_mV":
@@ -1727,6 +2052,22 @@ The OLE COM API has no trigger functions. Trigger In and Trigger Out are
 ``TTLwait``/``TTLsend``/``TTLduration`` parameters means assembling a
 multi-technique settings file rather than making an extra call.
 
+Verified against ``tests/fixtures/ole/TI_CV_TO.mps``, a real GUI-authored
+Trigger In -> CV -> Trigger Out file. Four things it settles that guessing got
+wrong:
+
+* **Trigger In carries ``Trigger`` and ``Channel``, and no duration at all.**
+  Its channel row holds ``-1`` in the real file -- the same "disabled"
+  convention HELAO's own ``TTLwait`` uses.
+* **Trigger Out carries ``Trigger`` and ``td (h:m:s)``, and no channel row.**
+  ``td`` is a *delay*, not a pulse width. So ``TTLduration`` lands there, and
+  ``TTLsend``'s channel has nowhere to go -- see ``UNMAPPED_TTLSEND``.
+* **Each template is a whole ``.mps`` with its own header.** Only the
+  technique *block* may be spliced in; concatenating the documents would
+  repeat ``EC-LAB SETTING FILE`` three times.
+* **A block includes the blank line that follows it**, which is what keeps
+  the assembled file's separation identical to a GUI-authored one.
+
 Two bookkeeping details a ``.mps`` requires and EC-Lab will not repair: the
 ``Technique : N`` lines must run consecutively from 1, and the
 ``Number of linked techniques : N`` header must agree with them.
@@ -1735,17 +2076,38 @@ Two bookkeeping details a ``.mps`` requires and EC-Lab will not repair: the
 import re
 from dataclasses import dataclass
 
-from .mps_template import MpsDocument, set_param
+from .mps_template import MpsDocument, set_param, technique_blocks
 from .technique import format_value
 
-__all__ = ["TtlPlan", "assemble", "renumber_techniques", "ttl_plan_from_params"]
+__all__ = [
+    "TtlPlan",
+    "UNMAPPED_TTLSEND",
+    "assemble",
+    "renumber_techniques",
+    "ttl_plan_from_params",
+]
 
 _TECHNIQUE_LINE = re.compile(r"^Technique : \d+")
 _COUNT_LINE = re.compile(r"^(Number of linked techniques : )\d+")
 
-#: Caption of the trigger technique's I/O line and its duration row.
-IO_PARAM = "Set I/O"
-DURATION_PARAM = "tw (h:m:s)"
+#: Trigger In's channel row. Holds -1 when disabled, as HELAO's own TTLwait
+#: does.
+IN_CHANNEL_PARAM = "Channel"
+
+#: Trigger Out's delay row. Note this is a delay before the pulse, not the
+#: pulse width -- ``TTLduration``'s name is inherited from the Gamry-style
+#: parameter set and does not describe what EC-Lab does with it.
+OUT_DELAY_PARAM = "td (h:m:s)"
+
+#: The real Trigger Out block has **no channel row**, so a station that needs
+#: to select which output line fires cannot express it here. Recorded rather
+#: than silently dropped: a station passing TTLsend gets a warning naming
+#: this, and the fix is a TO template authored for the right output.
+UNMAPPED_TTLSEND = (
+    "EC-Lab's Trigger Out technique carries no channel row, so TTLsend "
+    "cannot select an output line; the TO.mps template's own wiring decides "
+    "which line fires"
+)
 
 
 @dataclass(frozen=True)
@@ -1754,9 +2116,9 @@ class TtlPlan:
 
     Attributes:
         wait: TTL-in channel to wait on. ``-1`` disables.
-        send: TTL-out channel to pulse. ``-1`` disables.
-        duration: Pulse width in seconds. Only meaningful when a direction is
-            enabled; the default matches the endpoints' ``TTLduration``.
+        send: TTL-out channel to pulse. ``-1`` disables. See
+            ``UNMAPPED_TTLSEND`` -- the value selects nothing today.
+        duration: Trigger Out delay in seconds, written to ``td (h:m:s)``.
     """
 
     wait: int = -1
@@ -1772,8 +2134,7 @@ class TtlPlan:
 def ttl_plan_from_params(params: dict) -> TtlPlan:
     """Read a ``TtlPlan`` out of an action's parameter dict.
 
-    Absent keys read as disabled, so an endpoint that never declared them --
-    ``run_protocol`` before its TTL parameters were added, for instance --
+    Absent keys read as disabled, so an endpoint that never declared them
     yields an inactive plan rather than a KeyError.
     """
     return TtlPlan(
@@ -1783,29 +2144,44 @@ def ttl_plan_from_params(params: dict) -> TtlPlan:
     )
 
 
-def _configured(trigger: MpsDocument, channel: int, duration: float) -> MpsDocument:
-    """A trigger technique with its I/O line and pulse width filled in."""
-    configured = set_param(trigger, IO_PARAM, str(channel))
-    return set_param(configured, DURATION_PARAM, format_value(duration, "hms"))
+def _block_lines(doc: MpsDocument) -> tuple[str, ...]:
+    """Just the technique block of a single-technique template.
+
+    A template is a complete ``.mps`` with its own header; splicing the whole
+    document in would repeat ``EC-LAB SETTING FILE`` once per trigger.
+
+    Raises:
+        ValueError: If the template does not hold exactly one technique.
+    """
+    blocks = technique_blocks(doc)
+    if len(blocks) != 1:
+        raise ValueError(
+            f"a trigger template must hold exactly one technique, found "
+            f"{len(blocks)}"
+        )
+    return doc.lines[blocks[0].start : blocks[0].stop]
 
 
 def renumber_techniques(doc: MpsDocument) -> MpsDocument:
     """Renumber ``Technique : N`` consecutively and fix the count header.
 
-    Concatenating documents leaves several techniques numbered 1. EC-Lab reads
-    the numbers positionally, so a duplicate is not an error it reports -- it
-    is an experiment that runs the wrong technique list.
+    Splicing blocks together leaves several numbered 1. EC-Lab reads the
+    numbers positionally, so a duplicate is not an error it reports -- it is
+    an experiment that runs the wrong technique list.
     """
     lines = list(doc.lines)
     seen = 0
     for index, line in enumerate(lines):
-        if _TECHNIQUE_LINE.match(line):
+        if _TECHNIQUE_LINE.match(line.rstrip("\r\n")):
             seen += 1
             ending = line[len(line.rstrip("\r\n")) :]
             lines[index] = f"Technique : {seen}{ending}"
     for index, line in enumerate(lines):
-        if _COUNT_LINE.match(line):
-            lines[index] = _COUNT_LINE.sub(rf"\g<1>{seen}", line)
+        if _COUNT_LINE.match(line.rstrip("\r\n")):
+            ending = line[len(line.rstrip("\r\n")) :]
+            lines[index] = (
+                _COUNT_LINE.sub(rf"\g<1>{seen}", line.rstrip("\r\n")) + ending
+            )
             break
     return MpsDocument(lines=tuple(lines))
 
@@ -1821,15 +2197,33 @@ def assemble(
     An inactive plan returns ``main`` unchanged -- identically, not merely
     equivalently -- so the overwhelmingly common no-TTL case cannot be
     perturbed by this code path at all.
+
+    The trigger blocks are configured *before* splicing, while each is still
+    a single-technique document, so no caption lookup has to disambiguate
+    between the two ``Trigger`` rows the assembled file will contain.
     """
     if not ttl.is_active:
         return main
+
     parts: list[str] = []
     if ttl.wait >= 0:
-        parts.extend(_configured(trigger_in, ttl.wait, ttl.duration).lines)
-    parts.extend(main.lines)
+        configured = set_param(
+            trigger_in, IN_CHANNEL_PARAM, str(ttl.wait), technique=0
+        )
+        parts.extend(_block_lines(configured))
+
+    header_end = technique_blocks(main)[0].start
+    parts = list(main.lines[:header_end]) + parts + list(main.lines[header_end:])
+
     if ttl.send >= 0:
-        parts.extend(_configured(trigger_out, ttl.send, ttl.duration).lines)
+        configured = set_param(
+            trigger_out,
+            OUT_DELAY_PARAM,
+            format_value(ttl.duration, "hms"),
+            technique=0,
+        )
+        parts.extend(_block_lines(configured))
+
     return renumber_techniques(MpsDocument(lines=tuple(parts)))
 ```
 
@@ -3387,7 +3781,7 @@ def test_setup_writes_a_patched_mps_and_loads_it(tmp_path):
     (tmp_path / "CA.mps").write_text(
         "Technique : 1\nChronoamperometry\n"
         + mps_row("Ei (V)", "0.000")
-        + mps_row("ti (h:m:s)", "00:00:10.0000")
+        + mps_row("ti (h:m:s)", "0:00:10.0000")
         + mps_row("dta (s)", "0.0100"),
         encoding="latin-1",
     )
@@ -3401,7 +3795,7 @@ def test_setup_writes_a_patched_mps_and_loads_it(tmp_path):
     assert len(patched) == 1
     written = patched[0].read_text(encoding="latin-1")
     assert "0.750" in written
-    assert "00:00:05.0000" in written
+    assert "0:00:5.0000" in written
 
 
 def test_setup_refuses_a_channel_that_does_not_exist(tmp_path):
@@ -3596,7 +3990,7 @@ def ca_template(tmp_path_factory):
         "EC-LAB SETTING FILE\n\nNumber of linked techniques : 1\n\n"
         "Technique : 1\nChronoamperometry\n"
         + mps_row("Ei (V)", "0.000")
-        + mps_row("ti (h:m:s)", "00:00:10.0000")
+        + mps_row("ti (h:m:s)", "0:00:10.0000")
         + mps_row("dta (s)", "0.0100")
         + mps_row("dI", "10.000")
         + mps_row("unit dI", "mA")
@@ -3913,6 +4307,7 @@ class BiologicOleDriver(HelaoDriver):
             # A list parameter (CAOCV's steps) fills one sequence column each.
             values = value if isinstance(value, (list, tuple)) else [value]
             for seq, item in enumerate(values):
+                scope = param.technique
                 if param.base_unit:
                     # EC-Lab spells a current, charge or frequency as a
                     # magnitude row plus a unit row, at three decimals -- so a
@@ -3921,23 +4316,29 @@ class BiologicOleDriver(HelaoDriver):
                     # template happened to carry.
                     magnitude, unit = scale_to_unit(item, param.base_unit)
                     doc = mps_template.set_param(
-                        doc, param.param_id, magnitude, seq=seq
+                        doc, param.param_id, magnitude, seq=seq, technique=scope
                     )
                     if param.unit_param_id:
                         doc = mps_template.set_param(
-                            doc, param.unit_param_id, unit, seq=seq
+                            doc, param.unit_param_id, unit, seq=seq, technique=scope
                         )
                 else:
                     doc = mps_template.set_param(
-                        doc, param.param_id, format_value(item, param.fmt), seq=seq
+                        doc,
+                        param.param_id,
+                        format_value(item, param.fmt),
+                        seq=seq,
+                        technique=scope,
                     )
         # ERange is not one row but a symmetric min/max pair, so it is applied
         # here rather than through parameter_map. AUTO yields no rows and
         # leaves the template's own window standing.
-        for key in ("ERange", "CA_ERange"):
+        for key, scope in (("ERange", None), ("CA_ERange", 0)):
             if key in action_params:
                 for caption, value in erange_rows(action_params[key]).items():
-                    doc = mps_template.set_param(doc, caption, value)
+                    doc = mps_template.set_param(
+                        doc, caption, value, technique=scope
+                    )
         return doc
 
     def setup(
@@ -5507,11 +5908,11 @@ def ca_templates(tmp_path_factory):
         + r("dE/dt", "1.000")
         + r("dE/dt unit", "V/s")
         + r("dE (mV)", "1.00")
-        + r("ti (h:m:s)", "00:00:10.0000")
-        + r("ts (h:m:s)", "00:00:10.0000")
-        + r("tR (h:m:s)", "00:00:10.0000")
-        + r("tE (h:m:s)", "00:00:00.0000")
-        + r("tIs (h:m:s)", "00:00:00.0000")
+        + r("ti (h:m:s)", "0:00:10.0000")
+        + r("ts (h:m:s)", "0:00:10.0000")
+        + r("tR (h:m:s)", "0:00:10.0000")
+        + r("tE (h:m:s)", "0:00:0.0000")
+        + r("tIs (h:m:s)", "0:00:0.0000")
         + r("dta (s)", "0.0100")
         + r("dts (s)", "0.0100")
         + r("dtR (s)", "0.1000")
@@ -5757,21 +6158,26 @@ Create `helao/deploy/hte/drivers/pstat/biologic_ole/templates/README.md`:
 ```markdown
 # `.mps` templates
 
-Nine files belong here, and **none of them can be produced from this
-repository.** They are EC-Lab settings files, authored in the EC-Lab GUI at a
-station against the instrument that will run them, then saved and committed:
+Nine files belong here. They are EC-Lab settings files, authored in the EC-Lab
+GUI against the instrument that will run them, then saved and committed —
+**this repository cannot generate them.**
 
-| File | Technique |
-|---|---|
-| `OCV.mps` | Open Circuit Voltage |
-| `CA.mps` | Chronoamperometry |
-| `CP.mps` | Chronopotentiometry |
-| `CV.mps` | Cyclic Voltammetry |
-| `PEIS.mps` | Potentio Electrochemical Impedance Spectroscopy |
-| `GEIS.mps` | Galvano Electrochemical Impedance Spectroscopy |
-| `CAOCV.mps` | Chronoamperometry then Open Circuit Voltage, two techniques |
-| `TI.mps` | Trigger In |
-| `TO.mps` | Trigger Out |
+| File | Technique | Status |
+|---|---|---|
+| `CV.mps` | Cyclic Voltammetry | **present** — real, EC-Lab v11.72, SP-200 |
+| `TI.mps` | Trigger In | **present** — block extracted from a real `TI_CV_TO.mps` |
+| `TO.mps` | Trigger Out | **present** — same |
+| `OCV.mps` | Open Circuit Voltage | needed |
+| `CA.mps` | Chronoamperometry | needed |
+| `CP.mps` | Chronopotentiometry | needed |
+| `PEIS.mps` | Potentio Electrochemical Impedance Spectroscopy | needed |
+| `GEIS.mps` | Galvano Electrochemical Impedance Spectroscopy | needed |
+| `CAOCV.mps` | Chronoamperometry then Open Circuit Voltage, two techniques | needed |
+
+Author the missing six with **distinct, recognizable values on every
+parameter**. A file whose vertices are all `0.000` proves nothing about which
+caption is which; the `CV.mps` here works as a reference precisely because
+`Ei`, `E1`, `E2` and `Ef` hold four different numbers.
 
 Authoring them in the GUI is not a convenience — it is the only way to be sure
 the settings are ones the hardware accepts. `LoadSettings` returns 0 for
@@ -5779,21 +6185,30 @@ settings incompatible with the bandwidth or current range, and that refusal is
 the only pre-run validation the OLE COM API offers.
 
 When they land, check each one's parameter captions against
-`technique.py`'s `parameter_map`. Those captions were verified against a
-working third-party `.mps` writer for OCV, CA, CP, PEIS and GEIS — but **not
-for CV**, which that reference does not implement, so CV is the one to read
-carefully. A caption no row matches raises `MpsParameterNotFound` at setup,
-deliberately, rather than silently running the template's own default value on
-a real cell.
+`technique.py`'s `parameter_map`. CV's are read off the real file here; the
+other six were verified against a working third-party `.mps` writer, which is
+good evidence but not the same thing. A caption no row matches raises
+`MpsParameterNotFound` at setup, deliberately, rather than silently running
+the template's own default value on a real cell.
 
-Three encodings to preserve when you save them, all of which a well-meaning
-editor will destroy:
+**One known-open question, on CV.** EC-Lab's Cyclic Voltammetry has no
+`dE (mV)` row — the recording interval is governed by `Step percent` and `N`,
+and how those relate to HELAO's `AcqInterval__V` is not documented anywhere
+available. `AcqInterval__V` is therefore unmapped on this backend and the
+template's own values stand. Settle it with the station owner before the first
+production CV.
 
-- The files are **latin-1**, not UTF-8. `µ` is the single byte 0xB5.
-- The parameter table is **fixed-width**: label in columns 0-19, each sequence
-  value in the 20 columns after it. Do not reflow it.
-- At least one caption contains **two consecutive spaces** (`unit  Ia`, on
-  GEIS). Do not "tidy" it.
+Four things to preserve when you save these, each of which a well-meaning
+editor destroys silently:
+
+- **latin-1, not UTF-8.** The real files carry 0xB2 and 0xB3 (`cm²`, `cm³`),
+  and `µ` is the single byte 0xB5.
+- **CRLF line terminators.**
+- **Fixed-width columns**: label 0-19, each sequence value in the 20 after it,
+  *including trailing padding*. Do not reflow or strip.
+- **Captions are neither unique nor tidy.** `vs.` appears four times in one CV
+  block; `Trigger` appears in both trigger blocks; GEIS has a caption with two
+  consecutive spaces (`unit  Ia`). Do not deduplicate or "fix" any of them.
 ```
 
 - [ ] **Step 5: Run the tests, then launch the group**
@@ -5940,12 +6355,15 @@ None of these can be discharged on Linux and none are part of the tasks above.
 Every task completes and verifies without them; what they unblock is a *real*
 station, not the plan.
 
-1. **Author the nine `.mps` templates** in the EC-Lab GUI and commit them to
-   `biologic_ole/templates/`. Then check each file's parameter captions
-   against `technique.py`'s `parameter_map`. OCV, CA, CP, PEIS and GEIS were
-   verified against a working third-party writer; **CV was not** — that
-   reference does not implement it — so CV is where a mismatch is most likely.
-   Blocking for everything downstream of the patcher.
+1. **Author the six remaining `.mps` templates** — OCV, CA, CP, PEIS, GEIS,
+   CAOCV — in the EC-Lab GUI and commit them. `CV.mps`, `TI.mps` and `TO.mps`
+   are already present and real. Give every parameter a distinct value, or the
+   file cannot disambiguate its own captions. Then check each against
+   `technique.py`'s `parameter_map`. Blocking for everything downstream of the
+   patcher.
+1b. **Settle CV's `AcqInterval__V`.** EC-Lab's CV has no `dE (mV)` row;
+   `Step percent` and `N` govern recording instead. Currently unmapped, so the
+   template's values stand. Needs the station owner's judgement, not a guess.
 2. **The ProgID.** `DEFAULT_PROGID = "EC-Lab.Application"` is conventional, not
    documented. Confirm it, or set the `progid` server param.
 3. **The `MeasureDcValue` bulk-return probe.** Read one index from a file with

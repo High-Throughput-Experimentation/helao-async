@@ -165,28 +165,54 @@ bump a risk. Loading a fixed template and then pushing values with
 template's values before the real ones arrive, which on a real cell is not an
 acceptable transient.
 
-The caption tables and value encodings were checked against
+The caption tables and value encodings were checked twice. First against
 [`jdhuang-csm/biologic-com`](https://github.com/jdhuang-csm/biologic-com), a
-working third-party `.mps` writer for the same OLE COM interface. It covers
-OCV, CA, CP, PEIS and GEIS but **not CV**, which therefore stays unverified
-until a real template lands. That repository carries no license, so nothing is
-copied from it — only facts about the vendor's file format, which are not
-anyone's to license. It also independently corroborates the motivation for
-this whole design from a different angle: its author reports that the EC-Lab
-Development Package easy-biologic uses "loads different firmware to the
-instrument, which in my experience results in a lower signal-to-noise ratio
-for certain experiments compared to the standard firmware."
+working third-party `.mps` writer for the same OLE COM interface, which covers
+OCV, CA, CP, PEIS and GEIS but not CV. That repository carries no license, so
+nothing is copied from it — only facts about the vendor's file format, which
+are not anyone's to license. It also corroborates the motivation for this
+design from a different angle: its author reports that the EC-Lab Development
+Package easy-biologic uses "loads different firmware to the instrument, which
+in my experience results in a lower signal-to-noise ratio for certain
+experiments compared to the standard firmware."
 
-Three properties of the format that any patcher must respect, each of which
-fails silently when got wrong: the files are **latin-1** (EC-Lab writes `µ` as
-the single byte 0xB5); the parameter table is **fixed-width**, label in
-columns 0-19 and each sequence value in the 20 after it; and at least one
-caption contains **two consecutive spaces** (`unit  Ia`, on GEIS), so the
-table must be parsed by column and never by splitting on a run of whitespace.
+Then against **two real GUI-authored files** — a single-technique `CV.mps` and
+a three-technique `TI_CV_TO.mps`, EC-Lab v11.72 on an SP-200, both now
+committed as fixtures (and `CV.mps` doubling as the CV template). Running a
+parser over them found five properties of the format, every one of which
+breaks a reasonable implementation without saying so:
+
+- **latin-1 with CRLF terminators.** The files carry 0xB2 and 0xB3 — the
+  superscripts in `0.001 cm²` and `0.001 cm³` — and genuinely fail to decode
+  as UTF-8. Reading without disabling universal-newline translation rewrites
+  CRLF to LF and breaks byte-identity.
+- **Fixed-width columns**, label in 0-19 and each sequence value in the 20
+  after it, *trailing padding included*. Stripping it breaks the round-trip.
+- **A value may contain a space.** `Trigger  Rising Edge` is one value;
+  splitting on whitespace makes it two sequence columns.
+- **Header lines can look exactly like parameter rows.**
+  `Reference electrode : SCE ...` and `Characteristic mass : 0.001 g` were
+  both mis-parsed as rows, which made an unscoped sequence count return 7 for
+  a single-sequence file. Parsing is scoped to technique blocks.
+- **Captions are not unique.** `vs.` appears **four times** in one Cyclic
+  Voltammetry block, once per vertex; `Trigger` appears in both trigger blocks
+  of the three-technique file; GEIS has a caption with two consecutive spaces
+  (`unit  Ia`). Every accessor therefore takes a technique scope and an
+  occurrence index, and a first-match lookup is never safe.
+
+Two substantive findings beyond formatting. **EC-Lab's CV has no `dE (mV)`
+row** — `Step percent` and `N` govern recording — so `AcqInterval__V` is left
+unmapped rather than guessed, and settling it is an at-station question.
+**Trigger In carries `Trigger` and `Channel` and no duration; Trigger Out
+carries `Trigger` and a delay `td (h:m:s)` and no channel**, so `TTLwait` and
+`TTLduration` map cleanly but `TTLsend`'s channel has nowhere to go and is
+reported rather than dropped.
 
 **The templates cannot be produced on Linux.** They must be authored in the
-EC-Lab GUI at the station and checked in. This is on the implementation
-critical path and is the one artifact this repo cannot generate for itself.
+EC-Lab GUI and checked in. Three of the nine now exist — `CV.mps` real, and
+`TI.mps`/`TO.mps` extracted from the real `TI_CV_TO.mps` — leaving OCV, CA,
+CP, PEIS, GEIS and CAOCV. This is the one artifact this repo cannot generate
+for itself, and it stays on the implementation critical path.
 
 ### 3. `run_protocol`: an additive endpoint for GUI-authored protocols
 
@@ -467,8 +493,11 @@ station.
 
 None of these can be discharged from here.
 
-1. **Author the nine `.mps` templates** in the EC-Lab GUI and check them in.
-   Blocking: nothing downstream of the patcher can be verified without them.
+1. **Author the six remaining `.mps` templates** (OCV, CA, CP, PEIS, GEIS,
+   CAOCV) in the EC-Lab GUI and check them in, giving every parameter a
+   distinct value so the file disambiguates its own captions. Also settle
+   CV's `AcqInterval__V`, which has no EC-Lab row. Blocking: nothing
+   downstream of the patcher can be verified without the templates.
 2. **The ProgID** EC-Lab registers for `comtypes.client.CreateObject`.
 3. **The `MeasureDcValue` bulk-return probe** — does it return one point or
    every point from the index?
