@@ -21,7 +21,14 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
-__all__ = ["SimConfig", "SimEcLab", "make_factory", "reset_sim", "set_sim_config"]
+__all__ = [
+    "SimConfig",
+    "SimEcLab",
+    "current_config",
+    "make_factory",
+    "reset_sim",
+    "set_sim_config",
+]
 
 #: Slot count EC-Lab reports per device, per manual section 5.2.4.
 CHANNEL_SLOTS = 16
@@ -84,6 +91,16 @@ def set_sim_config(config: SimConfig) -> None:
     """Replace the module-level default configuration."""
     global _CONFIG
     _CONFIG = config
+
+
+def current_config() -> SimConfig:
+    """The module-level default configuration.
+
+    Exposed so a caller can derive from it rather than replace it -- the
+    driver has to impose its own channel count without discarding whatever a
+    test set for run length or technique kind.
+    """
+    return _CONFIG
 
 
 def reset_sim() -> None:
