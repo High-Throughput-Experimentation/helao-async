@@ -1,7 +1,7 @@
 """A fake EC-Lib 2.0 SDK, so the backend runs with no DLL and no instrument.
 
 Selected by ``simulate: true`` on the action server's params, the same way
-``oceandirect_sim.py`` stands in for OceanDirect. Two things it is deliberately
+``oceandirect_sim.py`` (in a private deployment) stands in for OceanDirect. Two things it is deliberately
 faithful about, because they are what the code above it gets wrong:
 
 - **It raises like the vendor layer does.** Every real ``BL_*`` wrapper raises
