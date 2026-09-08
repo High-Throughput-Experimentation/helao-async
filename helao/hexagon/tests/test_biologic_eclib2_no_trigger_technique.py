@@ -20,11 +20,23 @@ identifier space is EClib2's own, *not* EC-Lab's appendix 7.1 numbering (where
 TI/TO are 38/39 and 88/89), so the appendix codes the OLE backend relies on do
 not carry over.
 
+BioLogic have confirmed the gap directly (2026-09-08): Trigger In and Trigger
+Out are missing from the SDK 2 technique set. It is a known vendor omission,
+not an undocumented feature -- which is exactly why this is a ratchet rather
+than a permanent assertion.
+
 So this file does not test a feature. It pins the *absence* that forces
 eclib2's ``start_channel`` to refuse an active TTL request rather than ignore
 it, and it is written to fail if BioLogic ever ships a trigger technique --
 at which point the eclib/olecom bracketing approach becomes implementable here
 and this file should be replaced by it.
+
+**Settled 2026-09-08: reaching for an appendix 7.1 code to work around the
+absence is ruled out.** Those codes are not in this SDK's namespace, so
+honouring one would be unspecified firmware behaviour on a cell-polarising
+device, and one the firmware silently ignored would produce precisely the
+false-triggering failure the refusal exists to prevent. When the ratchet
+fires, implement against the real identifier -- not before.
 
 The strict half needs a real SDK (``HELAO_ECLIB2_SDK_PATH``); the rest holds
 anywhere, so the guarantee is not silently unchecked off-station.
