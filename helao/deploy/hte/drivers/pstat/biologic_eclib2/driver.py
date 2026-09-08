@@ -344,14 +344,25 @@ class BiologicEclib2Driver(HelaoDriver):
 
         That approach cannot be ported here, and not for want of a call:
         **EClib2's technique vocabulary has no trigger technique to add.**
+        BioLogic have confirmed this directly (2026-09-08): Trigger In and
+        Trigger Out are missing from the SDK 2 technique set. So this is a
+        known vendor gap rather than an undocumented feature, which is why the
+        ratchet below watches for it appearing rather than assuming it never
+        will.
         ``BL_AddTechnique`` takes a ``TechniqueIdentifier``, and that enum
         holds nine measurement techniques plus ``LOOP_START``/``LOOP_END`` --
         no TI, TO or TOS -- while no parameter enum carries ``Trigger_Logic``
         or ``Trigger_Duration``. The identifier space is also EClib2's own
         rather than EC-Lab's appendix 7.1 numbering (where TI/TO are 38/39 and
-        88/89), so the codes the OLE backend relies on do not carry over;
-        passing one anyway would be a guess at firmware behaviour on hardware
-        that polarises a cell.
+        88/89), so the codes the OLE backend relies on do not carry over.
+
+        **Settled decision (2026-09-08): do not pass an appendix 7.1 trigger
+        code to BL_AddTechnique to get around this.** It is not a documented
+        value in this SDK's namespace, so honouring it would be firmware
+        behaviour nobody has specified, on hardware that polarises a cell --
+        and a code the firmware silently ignored would give exactly the
+        false-triggering failure this refusal exists to prevent. A station
+        needing hardware triggering uses the eclib or olecom backend.
 
         Accepting the parameter and quietly dropping it would leave a station
         believing it was triggering an instrument that never fires, so an
