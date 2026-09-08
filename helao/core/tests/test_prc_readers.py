@@ -96,3 +96,21 @@ def test_processors_picks_the_experiment_yml_not_the_process(tmp_path):
     proc = _Proc(action, str(tmp_path / "RUNS_ACTIVE"))
     assert proc.exp_yml_path.endswith("-exp.yml")
     assert proc.seq_yml_path.endswith("-seq.yml")
+
+
+def test_a_record_copied_outside_a_runs_tree_is_indexed_once(tmp_path):
+    """Outside RUNS_*, the four state dirs collapse to one and used to duplicate."""
+    from helao.core.drivers.data.loaders.localfs import LocalLoader
+
+    expdir = tmp_path / "copied" / "260828.120000__SIM_exp"
+    actdir = expdir / "00__0__SIM_server__SIM_act"
+    actdir.mkdir(parents=True)
+    exp_yml = expdir / "260828.120000000000-exp.yml"
+    exp_yml.write_text("experiment_name: SIM_exp\n")
+    (actdir / "260828.120001000000-act.yml").write_text("action_name: SIM_act\n")
+
+    loader = LocalLoader(str(exp_yml))
+    assert (
+        len(loader.experiments) == 1
+    ), loader.experiments.experiment_localpath.tolist()
+    assert len(loader.actions) == 1, loader.actions.action_localpath.tolist()

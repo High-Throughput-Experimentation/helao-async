@@ -269,6 +269,12 @@ class LocalLoader:
                     recursive=True,
                 )
 
+        # check_dirs collapse to the same directory whenever the target is not
+        # under a RUNS_* tree (the RUNS_* -> state replacements are then no-ops),
+        # so the same yml is globbed several times. Dedupe, first hit wins --
+        # that keeps the in-zip process copy ahead of its PROCESSES mirror.
+        _yml_paths = list(dict.fromkeys(_yml_paths))
+
         for suffix in ("seq", "exp", "act", "prc"):
             self._yml_paths[suffix] = [
                 x for x in _yml_paths if x.endswith(f"-{suffix}.yml")
