@@ -334,15 +334,35 @@ class BiologicEclib2Driver(HelaoDriver):
     ) -> DriverResponse:
         """Start the loaded experiment on a channel.
 
-        **A TTL request is refused, not ignored.** EClib2 exposes no TTL or
-        digital-output capability whatsoever -- no such call in its 53-function
-        API, and no mention in its headers or documentation. The eclib backend
-        passes TTL to easy-biologic and the OLE backend writes trigger
-        techniques into the ``.mps``; this backend can do neither. Accepting
-        the parameter and quietly dropping it would leave a station believing
-        it was triggering an instrument that never fires, so an *active*
-        request fails the action. The executor's default (``ttl="none"``) is
-        what every non-triggered action sends, and passes through.
+        **A TTL request is refused, not ignored.**
+
+        Both sibling backends honour TTL the same way, because neither SDK has
+        a trigger *call*: Trigger In and Trigger Out are **techniques**, so you
+        bracket the measurement with them. eclib prepends a ``TI``/``TO``
+        ``.ecc`` technique; olecom splices the ``TI``/``TO`` blocks into the
+        ``.mps`` (see ``biologic_ole/mps_assemble.py``).
+
+        That approach cannot be ported here, and not for want of a call:
+        **EClib2's technique vocabulary has no trigger technique to add.**
+        ``BL_AddTechnique`` takes a ``TechniqueIdentifier``, and that enum
+        holds nine measurement techniques plus ``LOOP_START``/``LOOP_END`` --
+        no TI, TO or TOS -- while no parameter enum carries ``Trigger_Logic``
+        or ``Trigger_Duration``. The identifier space is also EClib2's own
+        rather than EC-Lab's appendix 7.1 numbering (where TI/TO are 38/39 and
+        88/89), so the codes the OLE backend relies on do not carry over;
+        passing one anyway would be a guess at firmware behaviour on hardware
+        that polarises a cell.
+
+        Accepting the parameter and quietly dropping it would leave a station
+        believing it was triggering an instrument that never fires, so an
+        *active* request fails the action. The executor's default
+        (``ttl="none"``) is what every non-triggered action sends, and passes
+        through.
+
+        ``test_biologic_eclib2_no_trigger_technique.py`` pins that absence
+        against the shipped SDK and fails if a future EC-Lib version adds a
+        trigger technique -- at which point the bracketing approach becomes
+        implementable here.
         """
         requested = (ttl_params or {}).get("ttl", "none")
         if requested not in ("none", None):
