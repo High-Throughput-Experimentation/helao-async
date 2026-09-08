@@ -578,7 +578,7 @@ def makeApp(server_key) -> ActionHost:
         app.driver.stop()
 
     @app.post("/set_wl_from_pairs", tags=["private"])
-    def set_wl_from_pairs(pairs: list, degree: int = 2):
+    def set_wl_from_pairs(pairs: list[tuple[float, float]], degree: int = 2):
         """Fit and install a wavelength axis from ``(channel, wavelength_nm)``.
 
         The direct route, for when the line identities are already known: no
@@ -597,9 +597,21 @@ def makeApp(server_key) -> ActionHost:
         ``/ANDOR/calibrate_wl`` exists beside it -- there the catalogue
         disagrees with a bad identification and sigma-clipping removes it.
 
+        The ``pairs`` annotation must stay parameterized. A bare ``list``
+        makes FastAPI classify the field as a *file* upload -- both
+        ``is_uploadfile_sequence_annotation`` and
+        ``is_bytes_sequence_annotation`` test ``all(...)`` over
+        ``get_args(annotation)``, which for an unparameterized ``list`` is
+        empty and so vacuously true. The endpoint then advertises
+        ``multipart/form-data``, Swagger renders a string-array widget for it,
+        and every request dies in ``_extract_form_body`` at
+        ``await sub_value.read()`` with ``AttributeError: 'str' object has no
+        attribute 'read'`` -- a traceback that names neither this endpoint nor
+        the annotation that caused it.
+
         Args:
-            pairs: ``[[channel, wavelength_nm], ...]``, at least ``degree + 1``
-                of them, each channel distinct.
+            pairs: ``[[channel, wavelength_nm], ...]`` as a JSON body, at least
+                ``degree + 1`` of them, each channel distinct.
             degree: Polynomial order. Three pairs at degree 2 interpolate, so
                 the reported residual is 0 and means nothing; pass more if you
                 want the number to carry information.
@@ -610,7 +622,7 @@ def makeApp(server_key) -> ActionHost:
             applied live on this station.
         """
         resp = app.driver.set_wl_from_pairs(
-            [tuple(pair) for pair in pairs], degree=degree
+            [(float(ch), float(wl)) for ch, wl in pairs], degree=degree
         )
         return {
             "response": resp.response,
