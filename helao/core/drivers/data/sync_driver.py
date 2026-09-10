@@ -475,7 +475,7 @@ class HelaoYml:
         The uploader learns an action's non-hlo files by globbing the record
         directory, so **anything transiently present there gets uploaded**.
         Every meta and data writer in this codebase writes atomically by
-        staging ``.<name>.<uuid1hex>.tmp`` beside its target and renaming it
+        staging ``.<hex>.tmp`` beside its target and renaming it
         into place, so a glob landing mid-write captures a name that no longer
         exists by the time boto3 stats it -- and one that can never upload used
         to spin the push loop forever, wedging the rest of the action behind

@@ -5,6 +5,7 @@ Consolidates the former file_in_use, zip_dir, and zstd_io modules.
 
 __all__ = [
     "file_in_use",
+    "staging_path",
     "rm_tree",
     "rm_tree_async",
     "zip_dir",
@@ -17,6 +18,7 @@ import os
 import zipfile
 from pathlib import Path
 from typing import Union
+from uuid import uuid1
 
 import anyio
 import pyzstd
@@ -24,6 +26,33 @@ import pyzstd
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def staging_path(output_file: Union[Path, str]) -> str:
+    """Return a sibling temp path for atomically staging ``output_file``.
+
+    The name is a fixed 13 characters (``.<8 hex>.tmp``) and deliberately does
+    *not* echo the target's own name. The previous
+    ``.{basename}.{uuid1().hex}.tmp`` convention added 38 characters to a path
+    that on a station is already close to Windows' 260-character ``MAX_PATH``:
+    an action whose final ``-act.yml`` fitted at 232 characters had its staging
+    write fail at 270 with ``FileNotFoundError: [Errno 2]``, so atomic writing
+    turned a writable path into an unwritable one. A staging name shorter than
+    the file it stages cannot do that.
+
+    Both the leading dot and the ``.tmp`` suffix are load-bearing: they are what
+    keeps a transiently-present staging file out of ``HelaoYml.misc_files``'s
+    upload glob, which ships anything in a record directory that is not
+    ``.yml``/``.hlo``/``.lock``/``.tmp`` and not a dotfile.
+
+    Args:
+        output_file: Final destination path the caller will ``os.replace`` onto.
+
+    Returns:
+        A path in the same directory as ``output_file``, safe to write and then
+        rename over it.
+    """
+    return str(Path(output_file).parent / f".{uuid1().hex[:8]}.tmp")
 
 
 def file_in_use(file_path) -> bool:

@@ -50,7 +50,6 @@ import os
 import threading
 import shutil
 from typing import Any, Optional, Union
-from uuid import uuid1
 
 from helao.core.models.file import FileInfo, HloFileGroup
 from helao.core.models.run_dir import RunDir
@@ -62,6 +61,7 @@ from helao.core.models.sample import (
     SolidSample,
 )
 from helao.helpers import helao_logging as logging
+from helao.helpers.file_utils import staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 
 from .data_file import NativeDataFileWriter
@@ -114,10 +114,7 @@ def _atomic_write_text(output_file: str, content: str) -> None:
     """
     output_path = os.path.dirname(output_file)
     os.makedirs(output_path, exist_ok=True)
-    tmp_file = os.path.join(
-        output_path,
-        f".{os.path.basename(output_file)}.{uuid1().hex}.tmp",
-    )
+    tmp_file = staging_path(output_file)
     try:
         with open(tmp_file, "w", encoding="utf-8") as handle:
             handle.write(content)
@@ -150,9 +147,7 @@ def _atomic_copy(src_path: "str | os.PathLike[str]", dest_path: str) -> None:
     """
     dest_dir = os.path.dirname(dest_path)
     os.makedirs(dest_dir, exist_ok=True)
-    tmp_path = os.path.join(
-        dest_dir, f".{os.path.basename(dest_path)}.{uuid1().hex}.tmp"
-    )
+    tmp_path = staging_path(dest_path)
     try:
         shutil.copyfile(src_path, tmp_path)
         os.replace(tmp_path, dest_path)

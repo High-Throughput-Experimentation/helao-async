@@ -35,7 +35,7 @@ import zipfile
 from collections.abc import Callable
 from copy import deepcopy
 from typing import Any, Optional, Union
-from uuid import UUID, uuid1
+from uuid import UUID
 
 import aiofiles
 import zmq
@@ -47,6 +47,7 @@ from helao.core.models.run_dir import RunDir
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
+from helao.helpers.file_utils import staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.time_utils import gen_uuid, set_time
 from helao.helpers.yml_tools import yml_dumps
@@ -908,9 +909,7 @@ class MicroOrch:
             output_str += "\n"
         output_path = os.path.dirname(output_file)
         os.makedirs(output_path, exist_ok=True)
-        tmp_file = os.path.join(
-            output_path, f".{os.path.basename(output_file)}.{uuid1().hex}.tmp"
-        )
+        tmp_file = staging_path(output_file)
         async with aiofiles.open(tmp_file, mode="w") as f:
             await f.write(output_str)
         os.replace(tmp_file, output_file)
