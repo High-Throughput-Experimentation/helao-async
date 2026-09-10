@@ -44,7 +44,7 @@ class PostProcess(HloPostProcessor):
                 if act_file.file_type == "andor_helao__file":
                     file_path = os.path.join(self.output_dir, act_file.file_name)
                     hd = HelaoData(self.exp_yml_path)
-                    if hd.exp[0].name == "HISPEC_sub_SpEC":
+                    if hd.name == "HISPEC_sub_SpEC":
                         cvact = hd.act[3]
                         with tempfile.NamedTemporaryFile(
                             mode="w+", delete=False, suffix=".csv"
