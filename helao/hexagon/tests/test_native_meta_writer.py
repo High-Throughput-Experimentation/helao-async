@@ -55,7 +55,7 @@ async def test_write_act_layout(tmp_path):
 
 @pytest.mark.asyncio
 async def test_write_meta_atomic_tmp_shape(tmp_path):
-    """Atomic write goes through .<basename>.<uuid1hex>.tmp then os.replace
+    """Atomic write goes through a short .<hex>.tmp sibling then os.replace
     (base_meta_writer.py:76-79)."""
     base = _swap(make_base(str(tmp_path)), tmp_path)
     seen = {}
@@ -70,13 +70,23 @@ async def test_write_meta_atomic_tmp_shape(tmp_path):
     orig = mw.os.replace
     mw.os.replace = spy
     try:
-        target = str(tmp_path / "sub" / "x-act.yml")
+        # A real meta filename, not a short stand-in: the length invariant
+        # below is only meaningful against the names actually written.
+        target = str(tmp_path / "sub" / "260909.091017525964-act.yml")
         await base.meta_writer._write_meta_atomic(target, "k: v")
     finally:
         mw.os.replace = orig
     assert seen["dst"] == target
     tmp_base = os.path.basename(seen["src"])
-    assert tmp_base.startswith(".x-act.yml.") and tmp_base.endswith(".tmp")
+    # Dotfile + .tmp: both shapes are what keep a staging file out of the
+    # syncer's upload glob.
+    assert tmp_base.startswith(".") and tmp_base.endswith(".tmp")
+    # The staging name must never be longer than the file it stages, or a
+    # run dir that fits under Windows MAX_PATH fails its staging write while
+    # the final path would have been writable (station bug, 2026-09-09:
+    # 232-char -act.yml, 270-char temp, FileNotFoundError).
+    assert len(tmp_base) <= len(os.path.basename(target))
+    assert os.path.dirname(seen["src"]) == os.path.dirname(target)
     assert open(target).read() == "k: v\n"
 
 

@@ -2,7 +2,7 @@
 
 The syncer learns an action's non-hlo files by globbing the record directory, so
 anything transiently present there gets uploaded. Every meta and data writer in
-this codebase stages ``.<name>.<uuid1hex>.tmp`` beside its target and renames it
+this codebase stages ``.<hex>.tmp`` beside its target and renames it
 into place, so a glob landing mid-write captures a name the rename has already
 consumed. That race has two outcomes, and this reports both:
 

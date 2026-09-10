@@ -8,7 +8,7 @@ The production failure this closes, on the XAFS batch-conversion path:
     93715df4a1b411f19630b07b2514b8fc.tmp
 
 Nothing was wrong with the data. ``posthoc_writer`` writes every artifact by
-staging ``.<name>.<uuid1hex>.tmp`` beside its target and renaming it into
+staging ``.<hex>.tmp`` beside its target and renaming it into
 place, and the syncer learns an action's non-hlo files by *globbing the record
 directory*. The glob landed inside that window, so the syncer recorded a name
 that the rename had already consumed.
