@@ -56,7 +56,7 @@ servers:
     group: action
     fast: nidaqmx_server
     control_vis: nidaqmx_control
-    action_vis: nidaqmx_vis
+    # action_vis: nidaqmx_vis
     params:
       dev_gasvalve:
         '1': dev1/port0/line0
@@ -78,6 +78,17 @@ servers:
         RecirculatingPeriPump2-dir: dev1/port1/line3
         RecirculatingPeriPump2: dev1/port1/line4
         RecirculatingPeriPump2-maxspd: dev1/port2/line0
+  PSTAT:
+    host: hte-ecms-03.htejcap.caltech.edu
+    port: 8004
+    group: action
+    fast: gamry_server2
+    action_vis: gamry_vis
+    params:
+      dev_id: 0
+      filterfreq_hz: 1000.0
+      grounded: true
+      allow_no_sample: true # would need to remove this later so all samples can be tracked
   SAMPLE:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8008
@@ -122,8 +133,6 @@ servers:
           port: COM7
           unit_id: A
     verbose: false
-
-
   CALIBRATIONMFC:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8012 
@@ -135,7 +144,6 @@ servers:
         Caligas:
           port: COM4 # needs to update
           unit_id: A
-
   CALIBRATIONMFCSECOND:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8005 
@@ -147,18 +155,6 @@ servers:
         Caligassecond:
           port: COM6 # needs to update
           unit_id: A
-
-  PSTAT:
-    host: hte-ecms-03.htejcap.caltech.edu
-    port: 8004
-    group: action
-    fast: gamry_server2
-    action_vis: gamry_vis
-    params:
-      dev_id: 0
-      filterfreq_hz: 1000.0
-      grounded: true
-      allow_no_sample: true # would need to remove this later so all samples can be tracked
   CALC:
     host: hte-ecms-03.htejcap.caltech.edu
     port: 8011
