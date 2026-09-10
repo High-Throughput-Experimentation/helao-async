@@ -1836,6 +1836,31 @@ def main():
 
     # save ntp time offset
     helaodirs = helao_dirs(config, "launcher")
+
+    # Windows only: report -- but do not enforce -- the 260-character path
+    # ceiling. A run tree is deep enough that a long experiment name breaches
+    # MAX_PATH mid-action, and the failure surfaces as a FileNotFoundError from
+    # a meta or data write rather than as anything that names a path length.
+    # Deliberately a warning: a station whose paths happen to fit runs
+    # correctly, and refusing to launch a production group over a machine
+    # setting is the worse trade. See helao/core/tests/check_long_paths.py for
+    # why this is an OS setting and not a \\?\ prefix in the writers.
+    config_root = config.get("root")
+    if sys.platform == "win32" and config_root:
+        from helao.core.tests.check_long_paths import probe_root
+
+        long_paths = probe_root(str(config_root))
+        if not long_paths.ok:
+            print(
+                "WARNING: this machine still has the 260-character path "
+                f"ceiling (longest usable path measured: {long_paths.reached}). "
+                "A deep run tree will fail mid-action when a meta or data file "
+                "breaches it. To remove it, from an elevated prompt run\n"
+                "    python -m helao.core.tests.check_long_paths "
+                f"{config_root} --enable\n"
+                "then reboot."
+            )
+
     get_ntp_time("time.nist.gov", os.path.join(helaodirs.log_root, "ntpLastSync.txt"))
 
     if len(positional) > 1:
