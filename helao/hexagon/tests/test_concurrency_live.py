@@ -385,6 +385,16 @@ async def test_item5_nonblocking_wait_full_lifecycle(tmp_path):
                 and not g.orch.action_dq
                 and not g.orch.experiment_dq
                 and not g.orch.sequence_dq
+                # `loop_state == stopped` is NOT park: the reducer applies the
+                # state delta before running the exiting iterate's commands, so
+                # stopped is published while CloseOutExperimentCmd is still
+                # inside finish_active_experiment -- which is where
+                # orch_wait_for_all_actions and the clear_nonblocking drain
+                # live. Park is the close-out having finished, i.e. the
+                # experiment released. Before the history-poll fix the loop
+                # could not get ahead of its own actions, so the two were
+                # ~1s apart and this predicate passed on timing alone.
+                and g.orch.active_experiment is None
             ):
                 break
             await asyncio.sleep(0.25)

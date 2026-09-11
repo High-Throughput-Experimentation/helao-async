@@ -147,6 +147,34 @@ async def test_finished_fold_emits_idle_and_puts_lbuf():
 
 
 @pytest.mark.asyncio
+async def test_active_package_registers_the_uuid_in_action_history():
+    """The dispatch loop polls action_history for the uuid it just dispatched
+    before evaluating the next action's start_condition. Registering only
+    terminal actions made that poll wait for the action to FINISH, so every
+    action ran serially and no_wait/wait_for_previous could never overlap
+    anything (regression: 9327ed29)."""
+    orch, spy, ing = _make()
+    u = uuid4()
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active]), last=u))
+    assert u in orch.registered, "active status package did not register history"
+    assert orch.registered[u]["action_status"] == [HloStatus.active]
+
+
+@pytest.mark.asyncio
+async def test_terminal_package_overwrites_the_active_history_entry():
+    """Registering on active must not leave the history stuck at 'active'."""
+    orch, spy, ing = _make()
+    u = uuid4()
+    await ing.update_status(actionservermodel=_asm(_act(u, [HloStatus.active]), last=u))
+    fin = _act(u, [HloStatus.active, HloStatus.finished])
+    await ing.update_status(actionservermodel=_asm(fin, active=False, last=u))
+    assert orch.registered[u]["action_status"] == [
+        HloStatus.active,
+        HloStatus.finished,
+    ]
+
+
+@pytest.mark.asyncio
 async def test_estopped_uuid_while_started_emits_estop_event_only():
     orch, spy, ing = _make()
     orch.globalstatusmodel.loop_state = LoopStatus.started

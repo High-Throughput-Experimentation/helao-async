@@ -140,6 +140,13 @@ def fold_status(
     # it can never fire while merely active. Mirror that: also require the
     # reported uuid to actually be present in one of the ASM's nonactive
     # buckets (finished/errored/estopped) after this push's sort.
+    #
+    # NOTE (unwired module): the live ingestion path no longer mirrors this.
+    # Registering only on a nonactive bucket is exactly what made the
+    # dispatch loop's history poll wait for each dispatched action to
+    # FINISH, serialising the whole queue and neutering every
+    # start_condition; orch_status_sync/ingestion now register on the
+    # ACTIVE package too. Before wiring this fold in, match them.
     reported_uuid = asm.last_action_uuid
     if (
         last_dispatched_action_uuid is not None

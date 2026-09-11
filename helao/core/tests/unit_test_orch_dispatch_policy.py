@@ -312,12 +312,20 @@ def _check_start_condition_predicates() -> bool:
     #   -> orch.last_action_uuid NOT in gsm.active_dict.keys()
     step = p.start_condition_step(ActionStartCondition.wait_for_previous)
     prev = uuid4()
+    # `orch.last_action_uuid` is the STRING the dispatch response carried
+    # (`as_dict` serialises a UUID) while `active_dict` is keyed by UUID
+    # objects -- the fixture used a UUID on both sides, which is why it
+    # passed while the live predicate never matched and wait_for_previous
+    # never waited for anything.
+    last_uuid = str(prev)
     # previous action still active -> uuid IS in active_dict -> predicate False (keep waiting)
     gsm_active = _FakeGSM(active_uuids=[prev])
-    res_active = step.predicate(gsm_active, A, SimpleNamespace(last_action_uuid=prev))
+    res_active = step.predicate(
+        gsm_active, A, SimpleNamespace(last_action_uuid=last_uuid)
+    )
     # previous action done -> uuid NOT in active_dict -> predicate True (proceed)
     gsm_done = _FakeGSM(active_uuids=[])
-    res_done = step.predicate(gsm_done, A, SimpleNamespace(last_action_uuid=prev))
+    res_done = step.predicate(gsm_done, A, SimpleNamespace(last_action_uuid=last_uuid))
     ok &= (res_active is False) and (res_done is True)
 
     return bool(ok)

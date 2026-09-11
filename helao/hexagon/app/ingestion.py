@@ -135,7 +135,14 @@ class HexStatusIngestion:
                     endpoint_name,
                     endpoint_model,
                 ) in actionservermodel.endpoints.items():
-                    for status, act_dict in endpoint_model.nonactive_dict.items():
+                    # ACTIVE packages register too -- see the twin in
+                    # orch_status_sync.py: the dispatch loop's history poll
+                    # blocks until the dispatched uuid lands here, so a
+                    # terminal-only registration serialises every dispatch.
+                    for act_dict in (
+                        *endpoint_model.nonactive_dict.values(),
+                        endpoint_model.active_dict,
+                    ):
                         for act_uuid, act_model in act_dict.items():
                             if act_uuid == actionservermodel.last_action_uuid:
                                 orch.register_action_uuid(

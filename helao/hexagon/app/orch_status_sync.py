@@ -199,7 +199,16 @@ class StatusIngester:
                     endpoint_name,
                     endpoint_model,
                 ) in actionservermodel.endpoints.items():
-                    for status, act_dict in endpoint_model.nonactive_dict.items():
+                    # ACTIVE packages register too. The dispatch loop polls
+                    # action_history for the uuid it just dispatched, so
+                    # registering only terminal actions makes every dispatch
+                    # block until its own action finishes -- every
+                    # start_condition then behaves like wait_for_all and
+                    # no_wait can never overlap anything.
+                    for act_dict in (
+                        *endpoint_model.nonactive_dict.values(),
+                        endpoint_model.active_dict,
+                    ):
                         for act_uuid, act_model in act_dict.items():
                             if act_uuid == actionservermodel.last_action_uuid:
                                 if (

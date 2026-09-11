@@ -5,7 +5,11 @@ Defines short experiments that combine ``wait``/``add_global_param``/
 non-blocking dispatch and conditional sequence termination.
 """
 
-EXPERIMENTS = ["TEST_sub_conditional_stop", "TEST_sub_noblocking"]
+EXPERIMENTS = [
+    "TEST_sub_conditional_stop",
+    "TEST_sub_noblocking",
+    "TEST_sub_no_wait_overlap",
+]
 
 
 from socket import gethostname
@@ -16,11 +20,13 @@ from helao.helpers.lib_decorators import experiment
 # from typing import Optional
 from helao.helpers.premodels import ActionPlanMaker
 
-# from helao.core.models.action_start_condition import ActionStartCondition
+from helao.core.models.action_start_condition import ActionStartCondition
+
 # from helao.core.models.process_contrib import ProcessContrib
 
 
 ORCH_server = MM(server_name="ORCH", machine_name=gethostname().lower()).as_dict()
+SIM_server = MM(server_name="SIM", machine_name=gethostname().lower()).as_dict()
 PAL_server = MM(server_name="PAL", machine_name=gethostname().lower()).as_dict()
 CALC_server = MM(server_name="CALC", machine_name=gethostname().lower()).as_dict()
 
@@ -83,3 +89,35 @@ def TEST_sub_conditional_stop():
     apm.add(ORCH_server, "wait", {"waittime": 1})
     apm.add(ORCH_server, "wait", {"waittime": 1})
     return apm.experiment
+
+
+@experiment(version=1)
+def TEST_sub_no_wait_overlap(
+    wait_time: float = 6.0,
+    data_duration: float = 6.0,
+):
+    """Build a blocking ORCH wait with a ``no_wait`` SIM acquisition under it.
+
+    The minimal shape of a SpEC-style experiment: something long is started,
+    and the next action must run *while* it runs rather than after it. Two
+    different servers, so nothing the action servers do can serialise the
+    pair -- if the two are not simultaneously active, the orchestrator
+    dispatched them serially and ``no_wait`` was not honoured.
+
+    Args:
+        wait_time: Duration of the blocking orchestrator wait.
+        data_duration: Duration of the simulated acquisition that must
+            overlap it.
+
+    Returns:
+        Planned actions: a blocking wait, then a ``no_wait`` acquisition.
+    """
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "wait", {"waittime": wait_time})
+    apm.add(
+        SIM_server,
+        "acquire_data",
+        {"duration": data_duration},
+        start_condition=ActionStartCondition.no_wait,
+    )
+    return apm.planned_actions
