@@ -327,6 +327,20 @@ async def test_dispatch_head_action_poll_breaks_on_pruned_uuid():
     assert rc == ErrorCodes.none
 
 
+@pytest.mark.asyncio
+async def test_dispatch_head_action_poll_skipped_on_failed_dispatch():
+    """An endpoint that errors before opening an action session never
+    publishes a status package, so nothing would ever register the uuid --
+    the poll must not be entered at all when the dispatch failed."""
+    orch = _StubOrch()
+    orch.last_dispatched_action_uuid = "never-reported"
+    orch.action_history = {}
+    orch.dispatch_rc = ErrorCodes.critical_error
+    runner = OrchCommandRunner(orch, PortWiring(logging=_AlertSpy()))
+    rc = await asyncio.wait_for(runner.execute(DispatchHeadAction()), timeout=3.0)
+    assert rc == ErrorCodes.critical_error
+
+
 class _FakeHeadAction:
     """Stand-in for the real Action model's ``.url`` property (action.py)."""
 

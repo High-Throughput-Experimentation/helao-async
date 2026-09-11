@@ -151,6 +151,25 @@ def test_start_condition_mapping():
     assert isinstance(P.start_condition_step(object()), WaitAllActions)
 
 
+def test_wait_for_previous_predicate_matches_a_str_uuid_against_uuid_keys():
+    """``orch.last_action_uuid`` is the STRING the dispatch response carried
+    (``as_dict`` serialises a UUID), while ``gsm.active_dict`` is keyed by
+    ``UUID`` objects. Compared raw, the membership test was always False and
+    wait_for_previous never waited for anything."""
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    u = uuid4()
+    step = P.start_condition_step(ActionStartCondition.wait_for_previous)
+    assert isinstance(step, AwaitPreviousActionDone)  # narrows for the type checker
+    orch = SimpleNamespace(last_action_uuid=str(u))
+    gsm_busy = SimpleNamespace(active_dict={u: object()})
+    gsm_idle = SimpleNamespace(active_dict={})
+    # predicate is the NEGATION: True means "previous is done, proceed"
+    assert step.predicate(gsm_busy, None, orch) is False
+    assert step.predicate(gsm_idle, None, orch) is True
+
+
 # --- step-thru sub-decision ---
 
 

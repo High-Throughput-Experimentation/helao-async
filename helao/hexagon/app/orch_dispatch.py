@@ -463,8 +463,13 @@ class DispatchPolicy:
             # is `while not predicate`, so the predicate is the NEGATION.
             return AwaitPreviousActionDone(
                 log_msg="orch is waiting for previous action to finish",
-                predicate=lambda gsm, A, orch: orch.last_action_uuid
-                not in gsm.active_dict.keys(),
+                # str(...) on both sides: orch.last_action_uuid is the *string*
+                # the dispatch response carried (as_dict serialises a UUID),
+                # while gsm.active_dict is keyed by UUID objects. Compared raw
+                # the membership test is always False, so wait_for_previous
+                # never waited.
+                predicate=lambda gsm, A, orch: str(orch.last_action_uuid)
+                not in {str(u) for u in gsm.active_dict.keys()},
             )
         if sc == ActionStartCondition.wait_for_all:  # :897
             return WaitAllActions()
@@ -619,8 +624,17 @@ class DispatchRunner:
         if isinstance(step, LaunchAction):  # :1171-1205
             LOGGER.info("!!!checking conditions for next action")
             error_code = await orch.loop_task_dispatch_action()
-            while orch.last_dispatched_action_uuid not in orch.action_history.keys():
-                await asyncio.sleep(0.2)  # :1174-1178 history-poll
+            # :1174-1178 history-poll -- wait until the action server has
+            # acknowledged the dispatched action in a status package, so the
+            # next iteration's start condition reads current status. Skipped
+            # on a failed dispatch: an endpoint that errors before opening an
+            # action session never publishes a status, and the poll would
+            # then never be released.
+            if error_code is ErrorCodes.none:
+                while (
+                    orch.last_dispatched_action_uuid not in orch.action_history.keys()
+                ):
+                    await asyncio.sleep(0.2)
             pause = self.policy.evaluate_step_thru(self._snapshot())
             if pause is not None:
                 await self._exec_pause(pause)

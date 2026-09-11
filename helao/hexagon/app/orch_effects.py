@@ -203,7 +203,13 @@ class OrchCommandRunner:
             # the uuid. P2a health-aware exit (Q3): a dead peer's pruned
             # uuid breaks the poll (the prune also registers history, so
             # either condition releases it).
-            while orch.last_dispatched_action_uuid not in orch.action_history.keys():
+            # Skipped on a failed dispatch: an endpoint that errors before
+            # opening an action session never publishes a status package, so
+            # nothing would ever register the uuid and release the poll.
+            while (
+                rc is ErrorCodes.none
+                and orch.last_dispatched_action_uuid not in orch.action_history.keys()
+            ):
                 if str(orch.last_dispatched_action_uuid) in self.pruned_uuids:
                     break
                 await asyncio.sleep(0.2)
