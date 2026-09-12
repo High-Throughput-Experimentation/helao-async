@@ -463,32 +463,38 @@ class OrchHost(ActionHost):
         @self.post("/move_sequence", tags=["private"])
         async def move_sequence(from_idx: int, to_idx: int):
             """Move a queued sequence. Indices are ABSOLUTE."""
-            return await self.move_sequence(from_idx, to_idx)
+            await self.move_sequence(from_idx, to_idx)
+            return {"n_sequences": len(self.sequence_dq)}
 
         @self.post("/remove_sequence", tags=["private"])
         async def remove_sequence(idx: int):
             """Remove a queued sequence. Index is ABSOLUTE."""
-            return await self.remove_sequence(idx)
+            await self.remove_sequence(idx)
+            return {"n_sequences": len(self.sequence_dq)}
 
         @self.post("/move_experiment", tags=["private"])
         async def move_experiment(from_idx: int, to_idx: int):
             """Move a queued experiment. Indices are ABSOLUTE."""
-            return await self.move_experiment(from_idx, to_idx)
+            await self.move_experiment(from_idx, to_idx)
+            return {"n_experiments": len(self.experiment_dq)}
 
         @self.post("/remove_experiment", tags=["private"])
         async def remove_experiment(idx: int):
             """Remove a queued experiment. Index is ABSOLUTE."""
-            return await self.remove_experiment(idx)
+            await self.remove_experiment(idx)
+            return {"n_experiments": len(self.experiment_dq)}
 
         @self.post("/move_action", tags=["private"])
         async def move_action(from_idx: int, to_idx: int):
             """Move a queued action. Indices are ABSOLUTE."""
-            return await self.move_action(from_idx, to_idx)
+            await self.move_action(from_idx, to_idx)
+            return {"n_actions": len(self.action_dq)}
 
         @self.post("/remove_action", tags=["private"])
         async def remove_action(idx: int):
             """Remove a queued action. Index is ABSOLUTE."""
-            return await self.remove_action(idx)
+            await self.remove_action(idx)
+            return {"n_actions": len(self.action_dq)}
 
         @self.post("/append_experiment", tags=["private"])
         async def append_experiment(experiment: Experiment = Body({}, embed=True)):

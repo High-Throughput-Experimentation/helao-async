@@ -1027,6 +1027,34 @@ class ActionHost(HelaoFastAPI):
                     self.stop_executor(executor_id)
             return await http_exception_handler(request, exc)
 
+    def _loop_exception_handler(self, loop, context) -> None:
+        """Log an exception that escaped a fire-and-forget task (legacy parity).
+
+        Restores ``Base.myinit``/``Orch.myinit``'s
+        ``aloop.set_exception_handler``, which no native host installed. HELAO
+        fires a lot of work with ``create_task`` and never awaits it --
+        ``move_dir`` on both finalize paths, the monitors, the dispatch loop
+        -- and without this the traceback goes to asyncio's default handler,
+        whose ``asyncio`` logger has no HELAO handler attached
+        (``make_logger`` binds handlers to a *named* logger, never the root).
+        The failure was therefore invisible in the server's own log and to
+        email/webhook alerting.
+
+        **Not named ``exception_handler``.** Legacy ``Base`` was a plain class
+        held by the FastAPI app; a host IS the app, and Starlette already owns
+        that name as the decorator :meth:`_register_exception_handler` uses.
+        Shadowing it would silently disable the action-route estop handler.
+        """
+        LOGGER.error(f"Got exception from coroutine: {context}")
+        exc = context.get("exception")
+        # Guarded, unlike legacy: asyncio also calls this with no exception
+        # ("Task was destroyed but it is pending!"), where legacy's
+        # `exc.__traceback__` raised *inside* the handler and lost the report.
+        if exc is not None:
+            LOGGER.error(
+                "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+            )
+
     def _register_websockets(self) -> None:
         """Register the three broadcast channels.
 
@@ -1242,6 +1270,7 @@ class ActionHost(HelaoFastAPI):
             # Captured here rather than at __init__: there is no running loop
             # until the app starts, and the executor runner needs this one.
             self.aloop = asyncio.get_running_loop()
+            self.aloop.set_exception_handler(self._loop_exception_handler)
             if self.root_dir is not None:
                 self.fault_dir = os.path.join(self.root_dir, "FAULTS")
                 os.makedirs(self.fault_dir, exist_ok=True)
