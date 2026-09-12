@@ -630,9 +630,16 @@ class DispatchRunner:
             # on a failed dispatch: an endpoint that errors before opening an
             # action session never publishes a status, and the poll would
             # then never be released.
+            # `is not None` guard: _launch_action can return without
+            # dispatching (loop-intent short-circuit, or the start-condition
+            # bail-out that re-queues the head action). If that happens before
+            # anything has ever dispatched, last_dispatched_action_uuid is None
+            # and polling for it in action_history would never terminate.
             if error_code is ErrorCodes.none:
                 while (
-                    orch.last_dispatched_action_uuid not in orch.action_history.keys()
+                    orch.last_dispatched_action_uuid is not None
+                    and orch.last_dispatched_action_uuid
+                    not in orch.action_history.keys()
                 ):
                     await asyncio.sleep(0.2)
             pause = self.policy.evaluate_step_thru(self._snapshot())
@@ -826,7 +833,14 @@ class DispatchRunner:
         LOGGER.info(step.log_msg)  # :852/:863/:874/:885
         predicate = step.predicate
         while not predicate(orch.globalstatusmodel, A, orch):
-            if not await orch.wait_for_interrupt():
+            # `A` has already been popped from action_dq. Passing it is what
+            # lets wait_for_interrupt push it back on a stop intent and answer
+            # False, so the caller bails before dispatching -- without it the
+            # call always returns True, the branch below is unreachable, and a
+            # /stop arriving mid-wait still runs this action once its condition
+            # is met. The parameter has existed since 2022 and no production
+            # caller ever supplied it; only the golden master did.
+            if not await orch.wait_for_interrupt(pending_action=A):
                 return ErrorCodes.none  # :858/:869/:880/:892
         return None
 
