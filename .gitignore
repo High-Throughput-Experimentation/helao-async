@@ -39,8 +39,11 @@ C:*
 
 .pytest_cache
 # understand-anything knowledge-graph output (regenerated on demand;
-# ~9.5 MB of generated JSON, not worth versioning)
+# ~9.5 MB of generated JSON, not worth versioning). Two names: the plugin
+# writes .ua/ on a fresh project and keeps .understand-anything/ only where
+# that directory already exists, so both have to be ignored.
 .understand-anything/
+.ua/
 
 # Exported Reflex frontend bundle; built per-machine, shipped as a release
 # artifact rather than tracked. See reflex_launcher.py.
