@@ -9,6 +9,7 @@ EXPERIMENTS = [
     "TEST_sub_conditional_stop",
     "TEST_sub_noblocking",
     "TEST_sub_no_wait_overlap",
+    "TEST_sub_stop_during_condition_wait",
 ]
 
 
@@ -119,5 +120,38 @@ def TEST_sub_no_wait_overlap(
         "acquire_data",
         {"duration": data_duration},
         start_condition=ActionStartCondition.no_wait,
+    )
+    return apm.planned_actions
+
+
+@experiment(version=1)
+def TEST_sub_stop_during_condition_wait(
+    wait_time: float = 8.0,
+    data_duration: float = 2.0,
+):
+    """Park a second action on a start condition long enough to stop the loop.
+
+    The first action holds the orchestrator's own ``wait`` endpoint for
+    ``wait_time``; the second asks for ``wait_for_orch``, so it is popped from
+    ``action_dq`` and then blocks in the start-condition wait for that whole
+    window. That window is the only place a graceful stop can be requested
+    against an action that has already left the queue -- which is what decides
+    whether the action is pushed back or runs anyway.
+
+    Args:
+        wait_time: How long the orchestrator ``wait`` action holds its
+            endpoint, and so how long the second action stays parked.
+        data_duration: Duration of the acquisition that must NOT run.
+
+    Returns:
+        Planned actions: a long ORCH wait, then a ``wait_for_orch`` acquisition.
+    """
+    apm = ActionPlanMaker()
+    apm.add(ORCH_server, "wait", {"waittime": wait_time})
+    apm.add(
+        SIM_server,
+        "acquire_data",
+        {"duration": data_duration},
+        start_condition=ActionStartCondition.wait_for_orch,
     )
     return apm.planned_actions

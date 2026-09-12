@@ -206,8 +206,12 @@ class OrchCommandRunner:
             # Skipped on a failed dispatch: an endpoint that errors before
             # opening an action session never publishes a status package, so
             # nothing would ever register the uuid and release the poll.
+            # `is not None`: see the twin in orch_dispatch.py -- a dispatch
+            # that bailed before dispatching leaves the uuid unset, and polling
+            # for None would never terminate.
             while (
                 rc is ErrorCodes.none
+                and orch.last_dispatched_action_uuid is not None
                 and orch.last_dispatched_action_uuid not in orch.action_history.keys()
             ):
                 if str(orch.last_dispatched_action_uuid) in self.pruned_uuids:
