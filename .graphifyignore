@@ -1,0 +1,5 @@
+# Standing sweep exclusions. Both are already covered by .gitignore's
+# `helao/deploy/*` rule today; named here so the exclusion survives a change
+# to that rule or a run with gitignore handling off.
+helao/deploy/mea/notes/
+helao/deploy/lila_gl/

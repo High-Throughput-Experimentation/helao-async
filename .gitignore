@@ -86,3 +86,6 @@ helao/ui/reflex/_app/.states/
 # Launch scratch from the hardware-free dev configs (e.g. biologicole).
 # A relative `root:` puts the run tree in the repo; it is never an artifact.
 INST_hlo_*/
+
+# knowledge-graph build artifacts (graphify)
+graphify-out/
