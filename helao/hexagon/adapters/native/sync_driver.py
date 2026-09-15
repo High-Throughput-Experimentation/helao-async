@@ -2200,25 +2200,45 @@ class SyncDriver:
                 return True
             if isinstance(msg, dict):
                 LOGGER.debug("Converting dict to json.")
-                uploadee = dict2json(msg)
                 uploader = self.s3.upload_fileobj
-                if compress:
-                    if not target.endswith(".gz"):
-                        target = f"{target}.gz"
-                    buffer = io.BytesIO()
-                    with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
-                        f.write(uploadee.read())
-                    buffer.seek(0)
-                    uploadee = buffer
+                if compress and not target.endswith(".gz"):
+                    target = f"{target}.gz"
+
+                def next_body() -> Union[io.BytesIO, str]:
+                    """A fresh payload buffer for one attempt.
+
+                    Built per attempt, never reused. A failed
+                    ``upload_fileobj`` leaves the buffer partly consumed, so a
+                    retry that sent it again would upload a truncated body --
+                    and report it as a success. s3transfer's cleanup may also
+                    *close* it, where rewinding instead raises ``ValueError:
+                    I/O operation on closed file``.
+                    """
+                    body: Union[io.BytesIO, str] = dict2json(msg)
+                    if compress:
+                        gzipped = io.BytesIO()
+                        with gzip.GzipFile(fileobj=gzipped, mode="wb") as f:
+                            f.write(body.read())
+                        gzipped.seek(0)
+                        body = gzipped
+                    return body
+
             else:
                 LOGGER.debug("Converting path to str")
-                uploadee = str(msg)
                 uploader = self.s3.upload_file
+                path_str = str(msg)
+
+                def next_body() -> Union[io.BytesIO, str]:
+                    """The source path. ``upload_file`` re-opens it per attempt."""
+                    return path_str
+
             for i in range(retries + 1):
                 if i > 0:
                     LOGGER.info(f"S3 retry [{i}/{retries}]: {self.bucket}, {target}")
                 try:
-                    await asyncio.to_thread(uploader, uploadee, self.bucket, target)
+                    await asyncio.to_thread(
+                        uploader, next_body(), self.bucket, target
+                    )
                     return True
                 except Exception:
                     LOGGER.error(
