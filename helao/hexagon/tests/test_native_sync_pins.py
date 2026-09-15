@@ -47,6 +47,7 @@ HELAO_YML = [
     "misc_files",
     "lock_files",
     "hlo_files",
+    "parent_yml",
     "parent_path",
     "write_meta",
 ]
