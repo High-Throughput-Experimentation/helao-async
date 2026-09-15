@@ -326,6 +326,11 @@ def test_enqueue_defers_publication_and_flush_performs_it(tmp_path):
 # --- uploader -------------------------------------------------------------
 
 
+async def _nap():
+    """An awaitable for a sleep stub that must record, not wait."""
+    return None
+
+
 class FlakyClient:
     """Fails ``fail_times`` uploads, then records what it finally received."""
 
@@ -361,6 +366,45 @@ def test_upload_json_rewinds_before_a_retry(monkeypatch):
 
 def test_upload_json_treats_an_unconfigured_client_as_success():
     assert asyncio.run(upload_json(None, BUCKET, {"a": 1}, "k")) is True
+
+
+def test_upload_json_refuses_an_unset_bucket_without_retrying(monkeypatch):
+    """boto3 rejects an empty bucket before any request, so retrying it only
+    burns the 30s schedule six times over and reports a transport failure for
+    what is a missing AWS_BUCKET."""
+    slept = []
+    monkeypatch.setattr(asyncio, "sleep", lambda d: slept.append(d) or _nap())
+    client = FlakyClient()
+    assert asyncio.run(upload_json(client, "", {"a": 1}, "k")) is False
+    assert client.attempts == 0
+    assert slept == []
+
+
+class ClosingClient:
+    """Closes the fileobj on a failed upload, as s3transfer's cleanup does."""
+
+    def __init__(self, fail_times: int = 1):
+        self.fail_times = fail_times
+        self.attempts = 0
+        self.received: bytes = b""
+
+    def upload_fileobj(self, fileobj, bucket, key):
+        self.attempts += 1
+        if self.attempts <= self.fail_times:
+            fileobj.close()
+            raise RuntimeError("boom")
+        self.received = fileobj.read()
+
+
+def test_upload_json_retries_after_the_client_closed_the_body(monkeypatch):
+    """A retry used to seek the closed buffer, raising ValueError out of the
+    loop -- retiring every remaining attempt under the wrong error."""
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(asyncio, "sleep", lambda *_: real_sleep(0))
+    client = ClosingClient(fail_times=2)
+    assert asyncio.run(upload_json(client, BUCKET, {"a": 1}, "k")) is True
+    assert client.attempts == 3
+    assert json.loads(client.received) == {"a": 1}
 
 
 def test_publish_outputs_writes_group_bodies_without_an_uploader(tmp_path):
