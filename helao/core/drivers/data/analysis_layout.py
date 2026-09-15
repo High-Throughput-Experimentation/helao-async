@@ -336,24 +336,48 @@ async def upload_json(
         if client is None:
             LOGGER.info("S3 is not configured. Skipping to S3 upload.")
             return True
-        uploadee: Any = io.BytesIO(json.dumps(msg).encode("utf-8"))
-        if compress:
-            if not target.endswith(".gz"):
-                target = f"{target}.gz"
-            buffer = io.BytesIO()
-            with gzip.GzipFile(fileobj=buffer, mode="wb") as f:
-                f.write(uploadee.read())
-            buffer.seek(0)
-            uploadee = buffer
+        if not bucket:
+            # Not transient, so it does not get the retry schedule: boto3
+            # rejects an empty bucket in parameter validation before a request
+            # is made, and every one of the six attempts fails identically --
+            # 150s per body, on a converter that publishes one analysis per
+            # sample. A station carries two independent AWS sources: SYNC takes
+            # ``aws_bucket`` from the AWS_CONFIG_PATH ini, while this path takes
+            # ``AWS_BUCKET`` from the HelaoCredentials env file, which defaults
+            # to "" when the key is absent. Reads never notice the difference,
+            # because the loader's fetch helpers name their bucket literally.
+            LOGGER.error(
+                f"Cannot push {target}: no S3 bucket is configured. Set "
+                "AWS_BUCKET in the credentials env file this process loads."
+            )
+            return False
+        if compress and not target.endswith(".gz"):
+            target = f"{target}.gz"
+
+        def _body() -> Any:
+            """A fresh payload buffer for one attempt.
+
+            Rebuilt rather than rewound. A failed ``upload_fileobj`` leaves the
+            buffer partly consumed -- so an attempt that reused it would upload
+            a truncated body and call it a success -- and s3transfer may also
+            *close* it, where ``seek(0)`` raises ``ValueError: I/O operation on
+            closed file`` out of the loop entirely. That retired every
+            remaining attempt and replaced the real error with the seek's.
+            """
+            buf: Any = io.BytesIO(json.dumps(msg).encode("utf-8"))
+            if compress:
+                gzipped = io.BytesIO()
+                with gzip.GzipFile(fileobj=gzipped, mode="wb") as f:
+                    f.write(buf.read())
+                gzipped.seek(0)
+                buf = gzipped
+            return buf
+
         for i in range(retries + 1):
             if i > 0:
                 LOGGER.info(f"S3 retry [{i}/{retries}]: {bucket}, {target}")
-            # A failed upload_fileobj leaves the buffer partly or wholly
-            # consumed, so a retry that did not rewind would upload a truncated
-            # body -- or nothing -- and call it a success.
-            uploadee.seek(0)
             try:
-                await asyncio.to_thread(client.upload_fileobj, uploadee, bucket, target)
+                await asyncio.to_thread(client.upload_fileobj, _body(), bucket, target)
                 return True
             except Exception:
                 LOGGER.error(
