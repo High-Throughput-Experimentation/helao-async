@@ -542,25 +542,50 @@ class HelaoYml:
         ]
 
     @property
-    def parent_path(self) -> Path:
-        """Path of this record's parent yml.
+    def parent_yml(self) -> Optional[Path]:
+        """Path of this record's parent yml, or ``None`` when there is not one yet.
 
         For sequences this is ``self.target`` (sequences have no parent); for
         actions/experiments it is the first yml found two directories up in
         any of the active/finished/synced trees.
+
+        A missing parent is a "not yet", not a corrupt record, so it is
+        reported rather than raised: a post-hoc converter writes an
+        experiment's ``-act.yml`` files into RUNS_FINISHED one at a time and
+        only writes the ``-exp.yml`` once that experiment's last action is
+        done, so a scan landing mid-conversion sees actions whose parent
+        record does not exist in any tree.
         """
         if self.type == "sequence":
             return self.target
-        else:
-            possible_parents = [
-                [
-                    p
-                    for p in x.parent.parent.glob("*.yml")
-                    if p.stem.endswith(("-seq", "-exp", "-act"))
-                ]
-                for x in (self.active_path, self.finished_path, self.synced_path)
+        for x in (self.active_path, self.finished_path, self.synced_path):
+            found = [
+                p
+                for p in x.parent.parent.glob("*.yml")
+                if p.stem.endswith(("-seq", "-exp", "-act"))
             ]
-            return [p[0] for p in possible_parents if p][0]
+            if found:
+                return found[0]
+        return None
+
+    @property
+    def parent_path(self) -> Path:
+        """Path of this record's parent yml.
+
+        See :attr:`parent_yml`, which this asserts is present.
+
+        Raises:
+            FileNotFoundError: When no parent record yml exists in any tree.
+                Callers that can defer instead of failing test
+                :attr:`parent_yml`.
+        """
+        parent = self.parent_yml
+        if parent is None:
+            raise FileNotFoundError(
+                f"{self.target} has no parent record yml under RUNS_ACTIVE, "
+                "RUNS_FINISHED, or RUNS_SYNCED"
+            )
+        return parent
 
     # @property
     # def meta(self):
@@ -1387,6 +1412,20 @@ class SyncDriver:
             return False
 
         LOGGER.debug(f"{str(prog.yml.target)} status is finished, proceeding.")
+
+        if prog.yml.type == "action" and prog.yml.parent_yml is None:
+            # Syncing an orphan is worse than deferring it. The upload and the
+            # move to RUNS_SYNCED both succeed, and only then does
+            # update_process need the parent -- so the record lands in
+            # RUNS_SYNCED having never been folded into a process, and the
+            # worker dies on the way out. Leave it in RUNS_FINISHED; the
+            # parent's own sync re-enqueues every finished child once the
+            # parent exists.
+            LOGGER.info(
+                f"Cannot sync {str(prog.yml.target)}, its parent record yml is "
+                "not on disk yet."
+            )
+            return False
 
         # first check if child objects are registered with API (non-actions).
         # Concurrency with descendants is prevented by the hierarchical sync
