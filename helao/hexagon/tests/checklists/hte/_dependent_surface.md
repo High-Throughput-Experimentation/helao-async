@@ -195,7 +195,7 @@ eche5.yml: fast=['async_orch2', 'gamry_server2', 'sample_server'] bokeh=['action
 eche6.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 eche7.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
 eche8.yml: fast=['async_orch2', 'sync_server', 'galil_io', 'galil_motion', 'gamry_server2', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
-ecms1.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'gamry_server2', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
+ecms3.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'gamry_server2', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 ecms2.yml: fast=['async_orch2', 'calc_server', 'sync_server', 'mfc_server', 'nidaqmx_server', 'sample_server'] bokeh=['action_visualizer', 'live_visualizer', 'standalone_operator'] bokeh_port=[]
 gamry.yml: fast=['gamry_server2'] bokeh=['action_visualizer'] bokeh_port=[]
 hispec.yml: fast=['andor_server', 'async_orch2', 'biologic_server', 'calc_server', 'sync_server', 'galil_io', 'galil_motion', 'kinesis_server', 'sample_server'] bokeh=['action_visualizer', 'standalone_operator'] bokeh_port=['5003']
@@ -251,7 +251,7 @@ resolved at composition time (P3e) rather than assumed absent.
 
 Configs with a `standalone_operator` bokeh app **and no explicit
 `bokeh_port`**: `ccsi1.yml`, `ccsi2.yml`, `eche4.yml`, `eche5.yml`,
-`ecms1.yml`, `ecms2.yml`, `icpm1.yml`, `partialccsi1.yml`,
+`ecms3.yml`, `ecms2.yml`, `icpm1.yml`, `partialccsi1.yml`,
 `power_supply_test.yml`, `xrfs1.yml` — **10 configs**. (`gamry.yml` has no
 `standalone_operator` bokeh app at all, so it is not part of this hazard
 set.) These 10 configs are the concrete "invisible port" instances P3e must
