@@ -2,7 +2,7 @@
 
 ```
 python -m helao.core.tests.set_run_use <RUNS_SYNCED/.../<sequence>.zip> \
-    [--run-use data] [--dry-run] [--process-dir DIR]
+    [--run-use data] [--dry-run] [--no-reset] [--process-dir DIR]
 ```
 
 Retags a record whose ``run_use`` was wrong when it ran -- a plate measured as
@@ -38,16 +38,29 @@ Things worth knowing before editing this:
   ``PROCESSES`` mirror is derived from the zip's own path, but every candidate
   is checked against the zip's sequence uuid and skipped (reported, not
   rewritten) if it belongs to something else.
-- **This is a local retag only.** Whatever has already been uploaded to S3 and
-  the API still carries the old tag; this tool does not re-sync the record or
-  touch the database.
+- **The retag reaches S3 and the API only by re-syncing, so the run ends by
+  handing the record back.** The zip is extracted into the parallel
+  ``RUNS_FINISHED`` directory without its ``.prg``/``.progress``/``.lock``
+  members and renamed to ``.orig``; the syncer then picks the record up as
+  unfinished work and re-uploads it. **Dropping the ``.prg`` sidecars is the
+  whole mechanism** -- a ``.prg`` records which of a record's files already
+  reached S3 and the API, so a record restored with them intact reads as
+  finished and is never re-uploaded. ``--no-reset`` skips this and leaves the
+  zip where it was, which retags the archive and nothing else. See
+  :func:`reset_to_finished` for why this does not call the syncer's own
+  ``reset_sync``.
+- **The upload is the syncer's job, not this tool's.** Nothing here talks to
+  S3 or the database; the record simply becomes eligible again. Until the
+  station's SYNC server processes it, the old tag stands downstream.
 """
 
 __all__ = [
     "Edit",
     "apply_run_use",
+    "finished_dir_for",
     "kind_for",
     "process_dir_for",
+    "reset_to_finished",
     "rewrite_processes",
     "rewrite_zip",
     "main",
@@ -60,6 +73,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from helao.core.models.run_dir import RunDir
 from helao.core.models.run_use import RunUse
 from helao.helpers.file_utils import staging_path
 from helao.helpers.yml_tools import yml_dumps, yml_load
@@ -230,6 +244,83 @@ def rewrite_zip(
     return edits, sequence_uuid
 
 
+#: Suffixes dropped on the way out of the zip. ``.prg``/``.progress`` are the
+#: syncer's own progress sidecars and ``.lock`` its file lock; a record
+#: restored with them reads as already finished.
+_SYNC_STATE_SUFFIXES = (".prg", ".progress", ".lock")
+
+
+def reset_to_finished(
+    zip_path: "str | os.PathLike[str]", *, dry_run: bool = False
+) -> "tuple[bool, Path | None, str]":
+    """Hand the retagged record back to the syncer.
+
+    Extracts the zip into the parallel ``RUNS_FINISHED`` directory **without
+    its ``.prg``/``.progress``/``.lock`` members** and renames the zip to
+    ``.orig``. Dropping the progress sidecars is the whole mechanism: a
+    ``.prg`` records which of a record's files already reached S3 and the API,
+    so a record restored with them intact reads as finished and is never
+    re-uploaded.
+
+    **Why not just call ``SyncDriver.reset_sync``, which does this.** It
+    refuses any zip with no ``-seq.prg`` member, and a batch-converted record
+    has none: the XRFS record measured while writing this is 506 members, 203
+    ymls and 303 hlos, and not one ``.prg``. Those are exactly the records a
+    retag is most likely to be aimed at. The validity check here is a readable
+    ``-seq.yml`` instead, which this tool has already parsed by the time it
+    gets here. Everything else matches ``reset_sync``'s zip branch, including
+    leaving the zip alone when an ``.orig`` is already beside it.
+
+    Returns:
+        ``(ok, dest, note)``. ``dest`` is where the record was (or would be)
+        extracted, ``None`` when the path is not under ``RUNS_SYNCED``.
+    """
+    zip_path = Path(zip_path)
+    dest = finished_dir_for(zip_path)
+    if dest is None:
+        return False, None, f"not under {RunDir.SYNCED.value}; not reset"
+
+    with zipfile.ZipFile(zip_path) as zf:
+        names = zf.namelist()
+        if not any(n.endswith("-seq.yml") for n in names):
+            return False, dest, "no -seq.yml member; not a sequence record"
+        keep = [n for n in names if not n.endswith(_SYNC_STATE_SUFFIXES)]
+        dropped = len(names) - len(keep)
+        if dry_run:
+            return (
+                True,
+                dest,
+                f"would extract {len(keep)} member(s) here, dropping {dropped} "
+                "sync-state file(s), and rename the zip .orig",
+            )
+        dest.mkdir(parents=True, exist_ok=True)
+        zf.extractall(dest, members=keep)
+
+    note = f"extracted {len(keep)} member(s), dropped {dropped} sync-state file(s)"
+    orig = zip_path.with_suffix(".orig")
+    if orig.exists():
+        # Same rule as reset_sync: an .orig already there is an earlier
+        # reset's, and overwriting it would destroy the only copy of the
+        # record as it was before that one.
+        return True, dest, note + "; zip left in place (an .orig already exists)"
+    os.replace(zip_path, orig)
+    return True, dest, note + f"; zip renamed {orig.name}"
+
+
+def finished_dir_for(zip_path: "str | os.PathLike[str]") -> "Path | None":
+    """Where a reset record goes: ``zip_path``'s ``RUNS_FINISHED`` twin.
+
+    Computed the same way ``SyncDriver.reset_sync`` computes it -- character
+    for character, as the ECMS backlog converter's ``_finished_dir_for_zip``
+    also does, because that method returns a bool and never the path it used.
+    """
+    zip_path = Path(zip_path)
+    if RunDir.SYNCED.value not in zip_path.parts:
+        return None
+    parent = str(zip_path.parent).replace(RunDir.SYNCED.value, RunDir.FINISHED.value)
+    return Path(parent) / zip_path.stem
+
+
 def process_dir_for(zip_path: "str | os.PathLike[str]") -> "Path | None":
     """The ``PROCESSES`` directory mirroring ``zip_path``'s own run tree.
 
@@ -334,6 +425,15 @@ def main(argv=None) -> int:
             "RUNS_* segment to mirror"
         ),
     )
+    parser.add_argument(
+        "--no-reset",
+        action="store_true",
+        help=(
+            "leave the retagged zip in RUNS_SYNCED instead of extracting it "
+            "back to RUNS_FINISHED for the syncer to pick up. The retag then "
+            "reaches nothing downstream: S3 and the API keep the old tag"
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -380,6 +480,22 @@ def main(argv=None) -> int:
         f"{len([e for e in retagged if e.kind == 'experiment'])} experiment, "
         f"{len([e for e in retagged if e.kind == 'process'])} process)"
     )
+
+    if args.no_reset:
+        print("--no-reset: the record stays in RUNS_SYNCED and will not re-sync.")
+    else:
+        ok, dest, note = reset_to_finished(zip_path, dry_run=args.dry_run)
+        print(f"{'would reset' if args.dry_run else 'reset'} -> {dest}: {note}")
+        if not ok:
+            # The retag is already on disk and is not undone by this: the zip
+            # is simply still in RUNS_SYNCED, which is where it started.
+            print(
+                "the record was NOT handed back to the syncer -- it keeps the "
+                "old tag everywhere downstream",
+                file=sys.stderr,
+            )
+            return 1
+
     if args.dry_run:
         print("--dry-run: nothing written.")
     return 0
