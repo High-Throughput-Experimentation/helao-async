@@ -15,6 +15,7 @@ from helao.core.tests.set_run_use import (
     kind_for,
     main,
     process_dir_for,
+    reset_to_finished,
     rewrite_processes,
     rewrite_zip,
 )
@@ -263,7 +264,9 @@ def test_main_retags_zip_and_processes_together(tmp_path, capsys):
 
     assert main([str(z), "--run-use", "data"]) == 0
 
-    assert yml_load(_member(z, ACT_MEMBER))["run_use"] == "data"
+    # The zip is gone by now: a default run hands the record back, so the
+    # retagged copy to read is the one in RUNS_FINISHED.
+    assert yml_load(_finished_dir(tmp_path) / ACT_MEMBER)["run_use"] == "data"
     assert yml_load(next(prc_dir.glob("*-prc.yml")))["run_use"] == "data"
     out = capsys.readouterr().out
     assert "retagged 3 yml(s) to run_use=data" in out
@@ -271,7 +274,7 @@ def test_main_retags_zip_and_processes_together(tmp_path, capsys):
 
 def test_main_defaults_to_data(tmp_path):
     z = _build_zip(tmp_path, run_use="ref")
-    assert main([str(z)]) == 0
+    assert main([str(z), "--no-reset"]) == 0
     assert yml_load(_member(z, ACT_MEMBER))["run_use"] == "data"
 
 
@@ -286,3 +289,126 @@ def test_main_refuses_a_run_use_the_enum_does_not_define(tmp_path):
 
 def test_main_refuses_a_path_that_is_not_a_file(tmp_path):
     assert main([str(tmp_path / "nope.zip")]) == 1
+
+
+def _finished_dir(tmp_path: Path) -> Path:
+    return (
+        tmp_path
+        / "RUNS_FINISHED"
+        / "25.39"
+        / "1003"
+        / "120155__XRDS_generic_scan__CoO-100034"
+    )
+
+
+def test_the_record_is_extracted_to_runs_finished_without_its_prg(tmp_path):
+    """Dropping the .prg is what makes the record re-syncable: it records
+    which files already reached S3, so one restored with it reads as done."""
+    z = _build_zip(tmp_path)
+    with zipfile.ZipFile(z) as zf:
+        hlo_before = zf.read(HLO_MEMBER)
+
+    assert main([str(z), "--run-use", "data"]) == 0
+
+    dest = _finished_dir(tmp_path)
+    assert dest.is_dir()
+    assert not list(dest.rglob("*.prg"))
+    assert not list(dest.rglob("*.lock"))
+    assert (dest / SEQ_MEMBER).is_file()
+    assert (dest / HLO_MEMBER).read_bytes() == hlo_before
+    # The retag is in the extracted copy, not only in the archive.
+    assert yml_load(dest / ACT_MEMBER)["run_use"] == "data"
+    assert yml_load(dest / EXP_MEMBER)["run_use"] == "data"
+
+    assert not z.exists()
+    assert z.with_suffix(".orig").is_file()
+
+
+def test_no_reset_leaves_the_record_in_runs_synced(tmp_path):
+    z = _build_zip(tmp_path)
+    assert main([str(z), "--no-reset"]) == 0
+    assert z.is_file()
+    assert not z.with_suffix(".orig").exists()
+    assert not _finished_dir(tmp_path).exists()
+    assert yml_load(_member(z, ACT_MEMBER))["run_use"] == "data"
+
+
+def test_dry_run_extracts_nothing(tmp_path):
+    z = _build_zip(tmp_path)
+    before = z.read_bytes()
+    assert main([str(z), "--dry-run"]) == 0
+    assert z.read_bytes() == before
+    assert not _finished_dir(tmp_path).exists()
+    assert not z.with_suffix(".orig").exists()
+
+
+def test_reset_reports_where_it_would_go_without_touching_disk(tmp_path):
+    z = _build_zip(tmp_path)
+    ok, dest, note = reset_to_finished(z, dry_run=True)
+    assert ok
+    assert dest == _finished_dir(tmp_path)
+    assert "dropping 1 sync-state file(s)" in note
+    assert not dest.exists()
+
+
+def test_a_record_carrying_no_prg_at_all_is_still_handed_back(tmp_path):
+    """A batch-converted record has no .prg anywhere -- 0 of 506 members on
+    the one measured -- and those are exactly the records a retag aims at.
+    SyncDriver.reset_sync refuses them; this must not."""
+    day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
+    day.mkdir(parents=True)
+    z = day / "120155__XRDS_generic_scan__CoO-100034.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr(SEQ_MEMBER, _seq_yml())
+        zf.writestr(ACT_MEMBER, _act_yml("ref"))
+
+    assert main([str(z)]) == 0
+
+    dest = _finished_dir(tmp_path)
+    assert yml_load(dest / ACT_MEMBER)["run_use"] == "data"
+    assert not z.exists()
+    assert z.with_suffix(".orig").is_file()
+
+
+def test_a_zip_with_no_seq_yml_is_reported_as_not_reset(tmp_path):
+    """The validity check is a sequence yml: without one there is no record
+    here to hand back, and the retag has nothing to identify either."""
+    day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
+    day.mkdir(parents=True)
+    z = day / "120155__XRDS_generic_scan__CoO-100034.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr(ACT_MEMBER, _act_yml("ref"))
+
+    assert main([str(z)]) == 1
+
+    assert z.is_file()
+    assert not _finished_dir(tmp_path).exists()
+    # The retag itself still happened.
+    assert yml_load(_member(z, ACT_MEMBER))["run_use"] == "data"
+
+
+def test_an_existing_orig_is_never_overwritten(tmp_path):
+    """An .orig beside the zip is an earlier reset's copy of the record as it
+    was; replacing it would destroy the only pre-retag copy."""
+    z = _build_zip(tmp_path)
+    orig = z.with_suffix(".orig")
+    orig.write_bytes(b"an earlier reset's archive")
+
+    assert main([str(z)]) == 0
+
+    assert orig.read_bytes() == b"an earlier reset's archive"
+    assert z.is_file()
+    assert _finished_dir(tmp_path).is_dir()
+
+
+def test_a_zip_outside_runs_synced_is_not_reset(tmp_path):
+    loose = tmp_path / "loose.zip"
+    with zipfile.ZipFile(loose, "w") as zf:
+        zf.writestr(SEQ_MEMBER, _seq_yml())
+        zf.writestr(PRG_MEMBER, "yml: /x/y-seq.yml\n")
+        zf.writestr(ACT_MEMBER, _act_yml("ref"))
+
+    ok, dest, note = reset_to_finished(loose)
+    assert not ok
+    assert dest is None
+    assert "RUNS_SYNCED" in note
