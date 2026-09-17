@@ -108,6 +108,11 @@ def test_ocv_voltage_interval_default_is_the_one_easy_biologic_supplied():
     assert BIOTECHS["OCV"].defaults["AcqInterval__V"] == 0.01
 
 
+def test_ocv_time_interval_default_is_the_one_easy_biologic_supplied():
+    """easy-biologic's OCV.__init__ defaults time_interval=1."""
+    assert BIOTECHS["OCV"].defaults["AcqInterval__s"] == 1.0
+
+
 def test_ocv_sends_no_hardware_range_parameters():
     """The endpoint exposes none, and OCV never drives the cell."""
     labels = {label for label, _, _ in flat("OCV", Tval__s=1.0)}
@@ -115,6 +120,24 @@ def test_ocv_sends_no_hardware_range_parameters():
 
 
 # --- CA ---------------------------------------------------------------------
+
+
+def test_ca_time_interval_default_is_the_one_easy_biologic_supplied():
+    """easy-biologic's CA.__init__ defaults time_interval=1.0."""
+    assert BIOTECHS["CA"].defaults["AcqInterval__s"] == 1.0
+
+
+def test_ca_current_interval_default_is_the_one_easy_biologic_supplied():
+    """easy-biologic's CA.__init__ defaults current_interval=1e-3."""
+    assert BIOTECHS["CA"].defaults["AcqInterval__A"] == 1e-3
+
+
+def test_ca_vs_initial_default_is_the_one_easy_biologic_supplied():
+    assert BIOTECHS["CA"].defaults["vs_initial"] is False
+
+
+def test_ca_n_cycles_default_is_the_one_easy_biologic_supplied():
+    assert BIOTECHS["CA"].defaults["N_Cycles"] == 0
 
 
 def test_ca_wraps_the_scalar_step_and_sets_step_number_to_len_minus_one():
@@ -173,6 +196,24 @@ def test_ca_refuses_mismatched_step_and_duration_lists():
 
 
 # --- CP ---------------------------------------------------------------------
+
+
+def test_cp_time_interval_default_is_the_one_easy_biologic_supplied():
+    """easy-biologic's CP.__init__ defaults time_interval=1.0."""
+    assert BIOTECHS["CP"].defaults["AcqInterval__s"] == 1.0
+
+
+def test_cp_voltage_interval_default_is_the_one_easy_biologic_supplied():
+    """easy-biologic's CP.__init__ defaults voltage_interval=1e-3."""
+    assert BIOTECHS["CP"].defaults["AcqInterval__V"] == 1e-3
+
+
+def test_cp_vs_initial_default_is_the_one_easy_biologic_supplied():
+    assert BIOTECHS["CP"].defaults["vs_initial"] is False
+
+
+def test_cp_n_cycles_default_is_the_one_easy_biologic_supplied():
+    assert BIOTECHS["CP"].defaults["N_Cycles"] == 0
 
 
 def test_cp_sends_current_steps_and_records_on_potential():
