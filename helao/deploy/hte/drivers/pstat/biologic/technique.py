@@ -274,6 +274,137 @@ TECH_CP = BiologicTechnique(
     build=_build_cp,
 )
 
+
+def ec_sweep(value) -> bool:
+    """The ECC ``sweep`` flag for a ``SweepMode``.
+
+    PDF section 7.11.2 declares ``sweep`` boolean, "TRUE for linear points
+    spacing". easy-biologic cast the action value with ``bool(...)``, and
+    ``bool("log")`` is ``True`` -- so every PEIS and GEIS run swept linearly
+    while the recorded ``SweepMode`` said ``log``.
+
+    A bare bool is refused rather than passed through: accepting one would let
+    the old ``bool(value)`` call site keep working and silently mean linear.
+    """
+    if isinstance(value, bool):
+        raise ValueError(
+            "sweep takes a SweepMode ('lin'/'log'), not a bool -- bool('log') "
+            "is True, which is what this function exists to stop"
+        )
+    return SweepMode(value) is SweepMode.LINEAR
+
+
+_EIS_SHARED_PARAMS = {
+    "vs_initial": Param("vs_initial", "bool", 1),
+    "vs_final": Param("vs_final", "bool", 1),
+    "Duration_step": Param("Duration_step", "float", 1),
+    "Step_number": Param("Step_number", "int", 1),
+    "Record_every_dT": Param("Record_every_dT", "float", 1),
+    "Final_frequency": Param("Final_frequency", "float", 1),
+    "Initial_frequency": Param("Initial_frequency", "float", 1),
+    "sweep": Param("sweep", "bool", 1),
+    "Frequency_number": Param("Frequency_number", "int", 1),
+    "Average_N_times": Param("Average_N_times", "int", 1),
+    "Correction": Param("Correction", "bool", 1),
+    "Wait_for_steady": Param("Wait_for_steady", "float", 1),
+    "I_Range": Param("I_Range", "int", 1),
+    "E_Range": Param("E_Range", "int", 1),
+    "Bandwidth": Param("Bandwidth", "int", 1),
+}
+
+
+def _build_peis(p: dict) -> dict[str, Any]:
+    return {
+        "vs_initial": p["vs_initial"],
+        "vs_final": p["vs_initial"],
+        "Initial_Voltage_step": p["Vinit__V"],
+        "Final_Voltage_step": p["Vinit__V"],
+        "Duration_step": p["Duration__s"],
+        "Step_number": 0,
+        "Record_every_dT": p["AcqInterval__s"],
+        "Record_every_dI": p["AcqInterval__A"],
+        "Final_frequency": p["Ffinal__Hz"],
+        "Initial_frequency": p["Finit__Hz"],
+        "sweep": ec_sweep(p["SweepMode"]),
+        "Amplitude_Voltage": p["Vamp__V"],
+        "Frequency_number": p["FrequencyNumber"],
+        "Average_N_times": p["Repeats"],
+        "Correction": p["Correction"],
+        "Wait_for_steady": p["DelayFraction"],
+        **_ranges(p),
+    }
+
+
+def _build_geis(p: dict) -> dict[str, Any]:
+    return {
+        "vs_initial": p["vs_initial"],
+        "vs_final": p["vs_initial"],
+        "Initial_Current_step": p["Iinit__A"],
+        "Final_Current_step": p["Iinit__A"],
+        "Duration_step": p["Duration__s"],
+        "Step_number": 0,
+        "Record_every_dT": p["AcqInterval__s"],
+        "Record_every_dE": p["AcqInterval__V"],
+        "Final_frequency": p["Ffinal__Hz"],
+        "Initial_frequency": p["Finit__Hz"],
+        "sweep": ec_sweep(p["SweepMode"]),
+        "Amplitude_Current": p["Iamp__A"],
+        "Frequency_number": p["FrequencyNumber"],
+        "Average_N_times": p["Repeats"],
+        "Correction": p["Correction"],
+        "Wait_for_steady": p["DelayFraction"],
+        **_ranges(p),
+    }
+
+
+TECH_PEIS = BiologicTechnique(
+    technique_name="PEIS",
+    ecc_stem="peis",
+    tech_id=vendor.TECH_ID.PEIS,
+    param_table={
+        "Initial_Voltage_step": Param("Initial_Voltage_step", "float", 1),
+        "Final_Voltage_step": Param("Final_Voltage_step", "float", 1),
+        "Amplitude_Voltage": Param("Amplitude_Voltage", "float", 1),
+        "Record_every_dI": Param("Record_every_dI", "float", 1),
+        **_EIS_SHARED_PARAMS,
+    },
+    # easy-biologic's PEIS.__init__ defaults: {"vs_initial": False,
+    # "current_interval": 0.001, "correction": False}. time_interval, sweep,
+    # repeat, and wait are all supplied by the endpoint (AcqInterval__s,
+    # SweepMode, Repeats, DelayFraction).
+    defaults={
+        "vs_initial": False,
+        "Correction": False,
+        "AcqInterval__A": 0.001,
+    },
+    build=_build_peis,
+)
+
+TECH_GEIS = BiologicTechnique(
+    technique_name="GEIS",
+    ecc_stem="geis",
+    tech_id=vendor.TECH_ID.GEIS,
+    param_table={
+        "Initial_Current_step": Param("Initial_Current_step", "float", 1),
+        "Final_Current_step": Param("Final_Current_step", "float", 1),
+        "Amplitude_Current": Param("Amplitude_Current", "float", 1),
+        "Record_every_dE": Param("Record_every_dE", "float", 1),
+        **_EIS_SHARED_PARAMS,
+    },
+    # easy-biologic's GEIS.__init__ defaults: {"vs_initial": False,
+    # "vs_final": False, "potential_interval": 0.001, "correction": False}.
+    # time_interval, sweep, repeat, and wait are all supplied by the endpoint
+    # (AcqInterval__s, SweepMode, Repeats, DelayFraction); vs_final is derived
+    # from vs_initial in the build, same as PEIS.
+    defaults={
+        "vs_initial": False,
+        "Correction": False,
+        "AcqInterval__V": 0.001,
+    },
+    build=_build_geis,
+)
+
+
 TECH_CV = BiologicTechnique(
     technique_name="CV",
     ecc_stem="cv",
@@ -303,5 +434,6 @@ TECH_CV = BiologicTechnique(
 )
 
 BIOTECHS: dict[str, BiologicTechnique] = {
-    x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV]
+    x.technique_name: x
+    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_PEIS, TECH_GEIS]
 }
