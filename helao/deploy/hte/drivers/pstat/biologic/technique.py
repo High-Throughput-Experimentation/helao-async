@@ -1,60 +1,40 @@
-"""Dataclass and instances for Biologic potentiostat techniques.
+"""ECC parameter tables and per-technique builds for the EClib1 driver.
 
-Defines the ``BiologicTechnique`` dataclass that pairs an easy-biologic
-program class with the action-parameter and data-field name remaps used by
-``BiologicDriver``, plus pre-built instances for OCV, CA, CP, CV, PEIS, GEIS,
-and CAOCV. The ``BIOTECHS`` dict at module bottom indexes the instances by
-technique name.
+Each ``BiologicTechnique`` carries the ``.ecc`` stem and vendor technique id
+BL_LoadTechnique needs, a ``param_table`` declaring the ECC label/kind/array
+width for every parameter the technique accepts, a ``defaults`` dict for
+action keys no endpoint supplies, and a ``build`` callable that turns merged
+action params into ECC label -> value(s). ``entries()`` expands a build's
+output into ``(label, value, index)`` triples, casting each value to its
+declared kind, because the DLL has one setter per type
+(``BL_DefineSglParameter`` / ``BL_DefineIntParameter`` /
+``BL_DefineBoolParameter``) and a value of the wrong Python type would target
+the wrong one.
+
+``defaults`` is load-bearing: it reproduces the defaults easy-biologic's
+per-program classes supplied when an endpoint left a key unset, since four
+production stations' archives were produced under those defaults.
+
+``BIOTECHS`` is the module-level registry ``TECHNIQUE_REGISTRIES["eclib"]``
+resolves against; the name and role are unchanged from the easy-biologic
+driver this replaces.
 """
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Optional
+from typing import Any, Callable, NamedTuple
 
-# P3a-2: the easy-biologic vendor runtime is imported lazily (see
-# `resolve_easy_class`) rather than at module import, so this registry — and
-# the BiologicDriver that imports it — load without the SDK present (hermetic
-# disconnected-construct; the SDK is only needed when a technique is actually
-# instantiated in `BiologicDriver.setup`).
-
-
-def resolve_easy_class(easy_class_name: str):
-    """Lazily import ``easy_biologic.base_programs`` and return a program class.
-
-    Args:
-        easy_class_name: Attribute name of the ``BiologicProgram`` subclass in
-            ``easy_biologic.base_programs`` (e.g. ``"OCV"``, ``"CA"``).
-
-    Returns:
-        The requested easy-biologic ``BiologicProgram`` subclass.
-    """
-    import easy_biologic.base_programs as blp
-
-    return getattr(blp, easy_class_name)
+from helao.deploy.hte.drivers.pstat.biologic import data, vendor
+from helao.deploy.hte.drivers.pstat.biologic.enum import (
+    ec_bandwidth,
+    ec_erange,
+    ec_irange,
+)
 
 
-# class IRange(StrEnum):
-#     p100 = "p100"
-#     n1   = "n1"
-#     n10  = "n10"
-#     n100 = "n100"
-#     u1   = "u1"
-#     u10  = "u10"
-#     u100 = "u100"
-#     m1   = "m1"
-#     m10  = "m10"
-#     m100 = "m100"
-#     a1   = "a1"    # 1 amp
-
-#     KEEP    = "KEEP"
-#     BOOSTER = "BOOSTER"
-#     AUTO    = "AUTO"
-
-# class ERange(StrEnum):
-#     v2_5 = "v2_5"
-#     v5 = "v5"
-#     v10 = "v10"
-#     AUTO = "AUTO"
+class TechniqueError(RuntimeError):
+    """A build produced a parameter this technique does not declare, or too
+    many values for one it does."""
 
 
 class SweepMode(StrEnum):
@@ -69,206 +49,251 @@ class SweepMode(StrEnum):
     LOG = "log"
 
 
+Param = NamedTuple("Param", [("label", str), ("kind", str), ("arity", int)])
+
+_KIND_CAST = {"float": float, "int": int, "bool": bool}
+
+
 @dataclass
 class BiologicTechnique:
-    """Description of a Biologic technique runnable through easy-biologic.
+    """One EClib1 technique: its .ecc file, id, parameters, and build.
 
     Attributes:
-        technique_name: Short name used as the lookup key in ``BIOTECHS``.
-        easy_class_name: Attribute name of the easy-biologic ``BiologicProgram``
-            subclass in ``easy_biologic.base_programs`` (resolved lazily via
-            :func:`resolve_easy_class` so this module imports without the SDK).
-        parameter_map: Mapping from action-server parameter keys to the
-            easy-biologic program parameter names.
-        field_map: Mapping from easy-biologic data field names to the HELAO
-            canonical column names used in the emitted data dict.
+        technique_name: Lookup key in ``BIOTECHS``, and into ``data.COLUMNS``.
+        ecc_stem: Base filename (without extension) of the .ecc technique file
+            BL_LoadTechnique loads.
+        tech_id: Vendor technique id (``vendor.TECH_ID`` member), used to
+            confirm the loaded technique against ``GetCurrentValues``.
+        param_table: ECC label -> ``Param`` (kind and array width), for
+            validating and casting a build's output.
+        defaults: Action-key -> value, applied for keys the endpoint omits.
+        build: Merged action params -> {ECC label: value or list of values}.
     """
 
     technique_name: str
-    easy_class_name: str
-    parameter_map: Optional[dict[str, str]] = None
-    field_map: Optional[dict[str, str]] = None
+    ecc_stem: str
+    tech_id: int
+    param_table: dict[str, Param]
+    defaults: dict[str, Any]
+    build: Callable[[dict], dict[str, Any]]
+
+    @property
+    def column_plan(self) -> tuple[str, ...]:
+        return tuple(data.COLUMNS[self.technique_name])
+
+
+def entries(
+    technique: BiologicTechnique, action_params: dict
+) -> list[tuple[str, Any, int]]:
+    """Expand a build's output into (label, value, index) triples.
+
+    Casts each value to its declared ECC kind, because the DLL has one setter
+    per type and a float sent through `BL_DefineIntParameter` sets a different
+    parameter than the caller named.
+    """
+    out: list[tuple[str, Any, int]] = []
+    for label, value in technique.build(action_params).items():
+        try:
+            param = technique.param_table[label]
+        except KeyError:
+            raise TechniqueError(
+                f"{technique.technique_name}: {label!r} is not a declared "
+                f"parameter of {technique.ecc_stem}.ecc"
+            )
+        values = value if isinstance(value, list) else [value]
+        if len(values) > param.arity:
+            raise TechniqueError(
+                f"{technique.technique_name}: {label} takes at most "
+                f"{param.arity} values, got {len(values)}"
+            )
+        cast = _KIND_CAST[param.kind]
+        out.extend((label, cast(v), i) for i, v in enumerate(values))
+    return out
+
+
+def _ranges(p: dict) -> dict[str, int]:
+    """Hardware-range parameters, each included only if the caller gave it.
+
+    Not every technique's endpoint exposes all three (OCV exposes none), and
+    tests exercising other behavior omit them -- so absence, not a default,
+    is what "not supplied" means here.
+    """
+    out: dict[str, int] = {}
+    if "IRange" in p:
+        out["I_Range"] = ec_irange(p["IRange"])
+    if "ERange" in p:
+        out["E_Range"] = ec_erange(p["ERange"])
+    if "Bandwidth" in p:
+        out["Bandwidth"] = ec_bandwidth(p["Bandwidth"])
+    return out
+
+
+def _steps(p: dict, value_key: str, duration_key: str):
+    """Wrap scalar step params into aligned lists.
+
+    Returns (values, durations, vs_initial, last_index). Raises
+    `TechniqueError` naming `Duration_step` when the two lengths differ -- the
+    DLL would otherwise run the steps it has durations for and stop, silently.
+    """
+    values = p[value_key] if isinstance(p[value_key], list) else [p[value_key]]
+    durations = (
+        p[duration_key] if isinstance(p[duration_key], list) else [p[duration_key]]
+    )
+    if len(values) != len(durations):
+        raise TechniqueError(
+            f"{value_key} has {len(values)} step(s) but Duration_step has "
+            f"{len(durations)}"
+        )
+    vs_initial = [p["vs_initial"]] * len(values)
+    return values, durations, vs_initial, len(values) - 1
+
+
+def _build_ocv(p: dict) -> dict[str, Any]:
+    out = {
+        "Rest_time_T": p["Tval__s"],
+        "Record_every_dE": p["AcqInterval__V"],
+    }
+    if "AcqInterval__s" in p:
+        out["Record_every_dT"] = p["AcqInterval__s"]
+    return out
+
+
+def _build_ca(p: dict) -> dict[str, Any]:
+    steps, durations, vs_initial, last = _steps(p, "Vval__V", "Tval__s")
+    out = {
+        "Voltage_step": steps,
+        "vs_initial": vs_initial,
+        "Duration_step": durations,
+        "Step_number": last,
+        "N_Cycles": p["N_Cycles"],
+    }
+    if "AcqInterval__s" in p:
+        out["Record_every_dT"] = p["AcqInterval__s"]
+    if "AcqInterval__A" in p:
+        out["Record_every_dI"] = p["AcqInterval__A"]
+    out.update(_ranges(p))
+    return out
+
+
+def _build_cp(p: dict) -> dict[str, Any]:
+    steps, durations, vs_initial, last = _steps(p, "Ival__A", "Tval__s")
+    out = {
+        "Current_step": steps,
+        "vs_initial": vs_initial,
+        "Duration_step": durations,
+        "Step_number": last,
+        "N_Cycles": p["N_Cycles"],
+    }
+    if "AcqInterval__s" in p:
+        out["Record_every_dT"] = p["AcqInterval__s"]
+    if "AcqInterval__V" in p:
+        out["Record_every_dE"] = p["AcqInterval__V"]
+    out.update(_ranges(p))
+    return out
+
+
+def _build_cv(p: dict) -> dict[str, Any]:
+    # PDF section 7.3.2: [Ei, E1, E2, Ei, Ef], and Scan_number is fixed at 2.
+    profile = [
+        p["Vinit__V"],
+        p["Vapex1__V"],
+        p["Vapex2__V"],
+        p["Vinit__V"],
+        p["Vfinal__V"],
+    ]
+    return {
+        "vs_initial": [p["vs_initial"]] * 5,
+        "Voltage_step": profile,
+        "Scan_Rate": [p["ScanRate__V_s"]] * 5,
+        "Scan_number": 2,
+        "Record_every_dE": p["AcqInterval__V"],
+        "Average_over_dE": p["Average_over_dE"],
+        "N_Cycles": p["Cycles"],
+        "Begin_measuring_I": p["Begin_measuring_I"],
+        "End_measuring_I": p["End_measuring_I"],
+        **_ranges(p),
+    }
 
 
 TECH_OCV = BiologicTechnique(
     technique_name="OCV",
-    easy_class_name="OCV",
-    parameter_map={
-        "Tval__s": "time",
-        "AcqInterval__s": "time_interval",
-        "AcqInterval__V": "voltage_interval",
+    ecc_stem="ocv",
+    tech_id=vendor.TECH_ID.OCV,
+    param_table={
+        "Rest_time_T": Param("Rest_time_T", "float", 1),
+        "Record_every_dE": Param("Record_every_dE", "float", 1),
+        "Record_every_dT": Param("Record_every_dT", "float", 1),
     },
-    field_map={
-        "time": "t_s",
-        "voltage": "Ewe_V",
-    },
+    defaults={"AcqInterval__V": 0.01},
+    build=_build_ocv,
 )
+
+_DC_STEP_PARAMS = {
+    "vs_initial": Param("vs_initial", "bool", 20),
+    "Duration_step": Param("Duration_step", "float", 20),
+    "Step_number": Param("Step_number", "int", 1),
+    "N_Cycles": Param("N_Cycles", "int", 1),
+    "I_Range": Param("I_Range", "int", 1),
+    "E_Range": Param("E_Range", "int", 1),
+    "Bandwidth": Param("Bandwidth", "int", 1),
+}
+
 TECH_CA = BiologicTechnique(
     technique_name="CA",
-    easy_class_name="CA",
-    parameter_map={
-        "Vval__V": "voltages",
-        "Tval__s": "durations",
-        "AcqInterval__s": "time_interval",
-        "AcqInterval__A": "current_interval",
-        "IRange": "current_range",
-        "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
+    ecc_stem="ca",
+    tech_id=vendor.TECH_ID.CA,
+    param_table={
+        "Voltage_step": Param("Voltage_step", "float", 20),
+        "Record_every_dT": Param("Record_every_dT", "float", 1),
+        "Record_every_dI": Param("Record_every_dI", "float", 1),
+        **_DC_STEP_PARAMS,
     },
-    field_map={
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "power": "P_W",
-        "cycle": "cycle",
-    },
+    defaults={"N_Cycles": 0, "vs_initial": False},
+    build=_build_ca,
 )
+
 TECH_CP = BiologicTechnique(
     technique_name="CP",
-    easy_class_name="CP",
-    parameter_map={
-        "Ival__A": "currents",
-        "Tval__s": "durations",
-        "AcqInterval__s": "time_interval",
-        "AcqInterval__V": "voltage_interval",
-        "IRange": "current_range",
-        "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
+    ecc_stem="cp",
+    tech_id=vendor.TECH_ID.CP,
+    param_table={
+        "Current_step": Param("Current_step", "float", 20),
+        "Record_every_dT": Param("Record_every_dT", "float", 1),
+        "Record_every_dE": Param("Record_every_dE", "float", 1),
+        **_DC_STEP_PARAMS,
     },
-    field_map={
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "power": "P_W",
-        "cycle": "cycle",
-    },
+    defaults={"N_Cycles": 0, "vs_initial": False},
+    build=_build_cp,
 )
+
 TECH_CV = BiologicTechnique(
     technique_name="CV",
-    easy_class_name="CV",
-    parameter_map={
-        "Vinit__V": "start",
-        "Vapex1__V": "end",
-        "Vapex2__V": "E2",
-        "Vfinal__V": "Ef",
-        "ScanRate__V_s": "rate",
-        "Cycles": "N_Cycles",
-        "AcqInterval__V": "step",
-        "IRange": "current_range",
-        "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
+    ecc_stem="cv",
+    tech_id=vendor.TECH_ID.CV,
+    param_table={
+        "vs_initial": Param("vs_initial", "bool", 5),
+        "Voltage_step": Param("Voltage_step", "float", 5),
+        "Scan_Rate": Param("Scan_Rate", "float", 5),
+        "Scan_number": Param("Scan_number", "int", 1),
+        "Record_every_dE": Param("Record_every_dE", "float", 1),
+        "Average_over_dE": Param("Average_over_dE", "bool", 1),
+        "N_Cycles": Param("N_Cycles", "int", 1),
+        "Begin_measuring_I": Param("Begin_measuring_I", "float", 1),
+        "End_measuring_I": Param("End_measuring_I", "float", 1),
+        "I_Range": Param("I_Range", "int", 1),
+        "E_Range": Param("E_Range", "int", 1),
+        "Bandwidth": Param("Bandwidth", "int", 1),
     },
-    field_map={
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "power": "P_W",
-        "cycle": "cycle",
+    defaults={
+        "AcqInterval__V": 0.01,
+        "Average_over_dE": False,
+        "Begin_measuring_I": 0.5,
+        "End_measuring_I": 1.0,
+        "vs_initial": False,
     },
+    build=_build_cv,
 )
 
-TECH_PEIS = BiologicTechnique(
-    technique_name="PEIS",
-    easy_class_name="PEIS",
-    parameter_map={
-        "Vinit__V": "voltage",
-        "Vamp__V": "amplitude_voltage",
-        "Finit__Hz": "initial_frequency",
-        "Ffinal__Hz": "final_frequency",
-        "FrequencyNumber": "frequency_number",
-        "Duration__s": "duration",
-        "AcqInterval__s": "time_interval",
-        "SweepMode": "sweep",
-        "Repeats": "repeat",
-        "DelayFraction": "wait",
-        # "vs_initial": "vs_initial",
-        "IRange": "current_range",
-        "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
-        # "DriftCorrection": "correction",
-        # "DelayFraction": "wait",
-    },
-    field_map={
-        "process": "process",
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "abs_voltage": "AbsEwe_V",
-        "abs_current": "AbsI_A",
-        "impedance_phase": "phase",
-        "impedance_modulus": "modulus",
-        "voltage_ce": "Ece_V",
-        "abs_voltage_ce": "AbsEce_V",
-        "abs_current_ce": "AbsIce_A",
-        "impedance_ce_phase": "phase_ce",
-        "impedance_ce_modulus": "modulus_ce",
-        "frequency": "f_Hz",
-    },
-)
-
-TECH_GEIS = BiologicTechnique(
-    technique_name="GEIS",
-    easy_class_name="GEIS",
-    parameter_map={
-        "Iinit__A": "current",
-        "Iamp__A": "amplitude_current",
-        "Finit__Hz": "initial_frequency",
-        "Ffinal__Hz": "final_frequency",
-        "FrequencyNumber": "frequency_number",
-        "Duration__s": "duration",
-        "AcqInterval__s": "time_interval",
-        "SweepMode": "sweep",
-        "Repeats": "repeat",
-        "DelayFraction": "wait",
-        # "vs_initial": "vs_initial",
-        "IRange": "current_range",
-        "ERange": "voltage_range",
-        "Bandwidth": "bandwidth",
-        # "AcqInterval__V": "voltage_interval",
-        # "DriftCorrection": "correction",
-    },
-    field_map={
-        "process": "process",
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "abs_voltage": "AbsEwe_V",
-        "abs_current": "AbsI_A",
-        "impedance_phase": "phase",
-        "impedance_modulus": "modulus",
-        "voltage_ce": "Ece_V",
-        "abs_voltage_ce": "AbsEce_V",
-        "abs_current_ce": "AbsIce_A",
-        "impedance_ce_phase": "phase_ce",
-        "impedance_ce_modulus": "modulus_ce",
-        "frequency": "f_Hz",
-    },
-)
-TECH_CAOCV = BiologicTechnique(
-    technique_name="CAOCV",
-    easy_class_name="CAOCV",
-    parameter_map={
-        "CA_Vval__V_list": "ca_voltages",
-        "CA_Tval__s_list": "ca_durations",
-        "CA_AcqInterval__s": "ca_time_interval",
-        "CA_AcqInterval__A": "ca_current_interval",
-        "CA_IRange": "ca_current_range",
-        "CA_ERange": "ca_voltage_range",
-        "CA_Bandwidth": "ca_bandwidth",
-        "OCV_Tval__s": "ocv_time",
-        "OCV_AcqInterval__s": "ocv_time_interval",
-        "OCV_AcqInterval__V": "ocv_voltage_interval",
-    },
-    field_map={
-        "time": "t_s",
-        "voltage": "Ewe_V",
-        "current": "I_A",
-        "power": "P_W",
-        "cycle": "cycle",
-    },
-)
-
-BIOTECHS = {
-    x.technique_name: x
-    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_GEIS, TECH_PEIS, TECH_CAOCV]
+BIOTECHS: dict[str, BiologicTechnique] = {
+    x.technique_name: x for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV]
 }
