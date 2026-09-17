@@ -41,13 +41,6 @@ __all__ = [
 NO_KERNEL_FIRMWARE_CODE = 0
 _LOADED_FIRMWARE_CODE = 4
 
-# PDF §5.4-ish param-type tags for EccParam.ParamType. Not (yet) transcribed
-# into vendor.py, so kept local -- BL_DefineSglParameter's own test does not
-# assert on ParamType, only on the label/index it writes.
-_PARAM_INT = 0
-_PARAM_BOOLEAN = 1
-_PARAM_SINGLE = 2
-
 _MULTI_PROCESS = {
     vendor.TECH_ID.PEIS,
     vendor.TECH_ID.GEIS,
@@ -362,7 +355,7 @@ class FakeDll:
     def _define_bool_parameter(self, label, value, index, parm_ptr) -> int:
         parm = parm_ptr.contents
         parm.ParamStr = _pack_str64(label)
-        parm.ParamType = _PARAM_BOOLEAN
+        parm.ParamType = vendor.PARAM_BOOLEAN
         parm.ParamVal = int(bool(value))
         parm.ParamIndex = index
         return 0
@@ -370,7 +363,7 @@ class FakeDll:
     def _define_sgl_parameter(self, label, value, index, parm_ptr) -> int:
         parm = parm_ptr.contents
         parm.ParamStr = _pack_str64(label)
-        parm.ParamType = _PARAM_SINGLE
+        parm.ParamType = vendor.PARAM_SINGLE
         parm.ParamVal = encode_single(value)
         parm.ParamIndex = index
         return 0
@@ -378,7 +371,7 @@ class FakeDll:
     def _define_int_parameter(self, label, value, index, parm_ptr) -> int:
         parm = parm_ptr.contents
         parm.ParamStr = _pack_str64(label)
-        parm.ParamType = _PARAM_INT
+        parm.ParamType = vendor.PARAM_INT
         parm.ParamVal = value & 0xFFFFFFFF
         parm.ParamIndex = index
         return 0

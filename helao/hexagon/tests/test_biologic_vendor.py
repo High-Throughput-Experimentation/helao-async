@@ -55,6 +55,10 @@ def test_i_range_keep_is_negative_one_and_auto_is_twelve():
     assert vendor.I_RANGE.I_RANGE_AUTO == 12
 
 
+def test_param_type_values_match_the_pdf():
+    assert (vendor.PARAM_INT, vendor.PARAM_BOOLEAN, vendor.PARAM_SINGLE) == (0, 1, 2)
+
+
 def test_e_range_and_bandwidth_values():
     assert vendor.E_RANGE.E_RANGE_2_5V == 0
     assert vendor.E_RANGE.E_RANGE_AUTO == 3
