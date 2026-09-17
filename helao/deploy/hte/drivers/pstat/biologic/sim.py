@@ -33,6 +33,7 @@ __all__ = [
     "SimConfig",
     "decode_single",
     "encode_single",
+    "firmware_loads",
     "load_dll",
     "push_message",
     "set_sim_config",
@@ -198,10 +199,21 @@ class _Sim:
 #: `FakeDll` will answer from.
 _STATE: _Sim | None = None
 
+#: Count of successful `BL_LoadFirmware` calls. Reset in `load_dll()` --
+#: per-run state, scoped to the same lifetime as `_STATE` -- and NOT in
+#: `set_sim_config()`, which deliberately resets nothing so a mid-run
+#: reconfigure doesn't zero a counter a test is about to assert on.
+_FIRMWARE_LOADS = 0
+
 
 def push_message(channel: int, text: str) -> None:
     if _STATE is not None:
         _STATE.channel(channel).messages.append(text)
+
+
+def firmware_loads() -> int:
+    """Number of `BL_LoadFirmware` calls since the last `load_dll()`."""
+    return _FIRMWARE_LOADS
 
 
 class FakeDll:
@@ -300,11 +312,13 @@ class FakeDll:
     def _load_firmware(
         self, idn, channels, results, length, showgauge, forceload, binfile, xlxfile
     ) -> int:
+        global _FIRMWARE_LOADS
         err = self._state.check(idn)
         if err:
             return err
         for i in range(min(length, vendor.MAX_SLOT_NB)):
             results[i] = 0
+        _FIRMWARE_LOADS += 1
         return 0
 
     # -- channel/board info -------------------------------------------
@@ -518,6 +532,7 @@ class FakeDll:
 
 def load_dll(sdk_path: str | None = None) -> FakeDll:
     """Ignore `sdk_path` entirely -- there is no file to find."""
-    global _STATE
+    global _STATE, _FIRMWARE_LOADS
     _STATE = _Sim()
+    _FIRMWARE_LOADS = 0
     return FakeDll(_STATE)

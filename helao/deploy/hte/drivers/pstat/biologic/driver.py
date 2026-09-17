@@ -1,559 +1,261 @@
-"""HelaoDriver wrapper around the easy-biologic package for Biologic potentiostats.
+"""HelaoDriver for Biologic potentiostats, calling the EClib1 DLL directly.
 
-Wraps a multi-channel Biologic instrument behind the HelaoDriver contract,
-delegating channel configuration and data retrieval to the easy-biologic
-``BiologicDevice`` and ``BiologicProgram`` classes. The driver tracks per-channel
-program objects, parameter dictionaries, and the active technique so that
-setup, start, get_data, stop, and cleanup can be issued independently for each
-channel of the device.
+Replaces the former easy-biologic-backed driver: connection, firmware, and
+status now go through `eclib_client.EclibClient`, which serializes every
+vendor call onto one worker thread and turns a vendor error code into
+`EclibError`. This module owns the connection half of the driver --
+``__init__``, ``connect``, ``get_status``, ``disconnect``, ``reset``, and
+``shutdown``. The measurement half (``setup``, ``start_channel``,
+``get_data``, ``stop``, ``cleanup``) is added alongside it, not stubbed here.
 
-See https://github.com/bicarlsen/easy-biologic for the underlying library.
+Unlike the easy-biologic driver, which opened a program per channel, this
+driver claims a single channel at a time (``self.channel``) -- see the
+measurement half for why.
 """
 
-import time
 from typing import Optional
 
-# save a default log file system temp
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-import numpy as np
-import pandas as pd
 
-# easy_biologic (the vendor SDK) is imported lazily in connect() / via
-# technique.resolve_easy_class so the driver imports and constructs without the
-# SDK present (P3a-2 hermetic disconnected-construct).
 from helao.core.drivers.helao_driver import (
     DriverResponse,
     DriverResponseType,
     DriverStatus,
     HelaoDriver,
 )
+from helao.deploy.hte.drivers.pstat.biologic import vendor
+from helao.deploy.hte.drivers.pstat.biologic.eclib_client import EclibClient, EclibError
 
-from .enum import ec_bandwidth, ec_erange, ec_irange
-from .technique import BiologicTechnique, resolve_easy_class
 
+def _kernel_loaded(ch: vendor.ChannelInfo) -> bool:
+    """A channel with no firmware kernel loaded reports ``FirmwareCode == 0``.
 
-# ctypes struct to dict (won't work with arrays, nested structs)
-def getdict(struct) -> dict:
-    """Convert a flat ``ctypes.Structure`` instance into a plain dict.
-
-    Only handles top-level scalar fields; arrays and nested structs are not
-    unpacked.
-
-    Args:
-        struct: A ``ctypes.Structure`` instance whose ``_fields_`` describes
-            scalar fields.
-
-    Returns:
-        Mapping of field name to attribute value.
+    Same check as the vendor example's ``is_kernel_loaded`` property; kept
+    here (not called from the example, which this repo does not vendor).
     """
-    return dict((field, getattr(struct, field)) for field, _ in struct._fields_)
+    return ch.FirmwareCode != 0
 
 
 class BiologicDriver(HelaoDriver):
-    """HelaoDriver implementation for a multi-channel Biologic potentiostat.
-
-    Holds one easy-biologic ``BiologicProgram`` per channel and exposes
-    setup/start/get_data/stop/cleanup methods scoped to a channel index. A
-    single TCP connection to the instrument is established at construction
-    time and reused for the lifetime of the driver.
+    """HelaoDriver implementation for a multi-channel Biologic potentiostat,
+    driven directly through the EClib1 DLL.
 
     Attributes:
+        ready: Whether ``connect()`` has succeeded and not since been undone.
+        address: Instrument IP address.
+        num_channels: Number of channels the instrument exposes.
+        sdk_path: Filesystem path to the EC-Lab Development Package's ``lib``
+            directory (or, under simulation, an unused placeholder).
+        simulate: Whether to load the in-process fake DLL instead of the
+            real one.
+        force_load_firmware: Reflash the channel's firmware kernel on every
+            connect, even when one is already loaded. Off by default -- see
+            module docstring for why the vendor example's ``force=True`` is
+            not the default here.
         device_name: Human-readable identifier for the connected instrument.
-        connection_raised: Whether a connection attempt has been made; used to
-            guard against double-open by another process.
+        channel: The single channel currently claimed for a measurement, or
+            ``None`` when free.
+        board_type: The connected channel's ``vendor.BOARD_TYPE`` value, or
+            ``None`` before a successful connect.
     """
 
     device_name: str
-    connection_raised: bool
 
     def __init__(self, config: dict = {}):
-        """Initialize the driver and open the connection to the instrument.
+        """Store configuration only. No device I/O here -- the action server
+        calls ``connect()`` at startup (P3a-2 constructor-connect fix).
 
         Args:
-            config: Driver configuration. Recognized keys are ``address``
-                (instrument IP, default ``"192.168.200.240"``) and
-                ``num_channels`` (default ``12``).
+            config: Driver configuration. Recognized keys: ``address``
+                (default ``"192.168.200.240"``), ``num_channels`` (default
+                ``12``), ``sdk_path`` (default ``vendor.DEFAULT_SDK_PATH``),
+                ``simulate`` (default ``False``), ``force_load_firmware``
+                (default ``False``), ``timeout`` (default ``5``).
         """
         super().__init__(config=config)
-        #
-        self.ready = False
         self.address = config.get("address", "192.168.200.240")
         self.num_channels = config.get("num_channels", 12)
+        self.sdk_path = config.get("sdk_path", vendor.DEFAULT_SDK_PATH)
+        self.simulate = config.get("simulate", False)
+        self.force_load_firmware = config.get("force_load_firmware", False)
+        self.timeout = config.get("timeout", 5)
+
+        self.ready = False
+        self.channel: Optional[int] = None
+        self.board_type: Optional[int] = None
         self.device_name = "unknown"
-        self.pstat = None
-        self.connection_raised = False
-        self.channels = {i: None for i in range(self.num_channels)}
-        self.channel_params = {i: {} for i in range(self.num_channels)}
-        self.channel_technique = {i: None for i in range(self.num_channels)}
-        # P3a-2 constructor-connect fix: no device I/O here. The action server
-        # (biologic_server.biologic_dyn_endpoints) calls connect() at startup;
-        # this keeps the driver constructible without the instrument/SDK.
-        self.stopping = False
-        self.connection_ctx = None
+        self._client: Optional[EclibClient] = None
+        self._tracker = None
+        self._technique = None
 
     def connect(self) -> DriverResponse:
-        """Open the TCP connection to the Biologic instrument.
+        """Open the connection to the instrument and load its firmware if
+        needed.
+
+        A second call on an already-live connection is a successful no-op,
+        checked via ``EclibClient.test_connection`` rather than a flag set
+        before the attempt -- a flag set early is what stranded the old
+        driver after a throwing connect.
 
         Returns:
             ``DriverResponse`` with ``status=ok`` on success, ``status=busy``
-            if another script holds the connection, otherwise ``status=error``.
+            if EC-Lab already holds the instrument, otherwise
+            ``status=error``. A failed attempt tears down any half-built
+            client so the driver stays retryable.
         """
-        try:
-            if self.connection_raised:
-                raise ConnectionError(
-                    "Connection already raised. In use by another script."
-                )
-            self.connection_raised = True
-            import easy_biologic as ebl
-
-            self.pstat = ebl.BiologicDevice(str(self.address))
-            self.connection_ctx = self.pstat.connect()
-            self.ready = True
-            LOGGER.info(f"connected to {self.device_name} on device_id {self.address}")
-            response = DriverResponse(
+        if self.ready and self._client is not None and self._client.test_connection():
+            return DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
-        except Exception as exc:
-            if "In use by another script" in exc.__str__():
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.busy
-                )
-            else:
-                LOGGER.error("get_status connection", exc_info=True)
-                response = DriverResponse(
-                    response=DriverResponseType.failed, status=DriverStatus.error
-                )
-        return response
+
+        client = None
+        try:
+            client = EclibClient(sdk_path=self.sdk_path, simulate=self.simulate)
+            info = client.connect(self.address, self.timeout)
+            self.device_name = f"{info.DeviceCode}/fw{info.FirmwareVersion}"
+            self.board_type = client.board_type(0)
+            LOGGER.info(
+                f"connected to {self.device_name} at {self.address} "
+                f"(board_type={vendor.BOARD_TYPE(self.board_type).name}, "
+                f"family={vendor.board_family(self.board_type).value})"
+            )
+
+            ch = client.channel_info(0)
+            if self.force_load_firmware or not _kernel_loaded(ch):
+                kernel, fpga = vendor.firmware_assets(self.board_type)
+                client.load_firmware(0, kernel, fpga, force=self.force_load_firmware)
+
+            for message in client.drain_messages(0):
+                LOGGER.warning(f"channel 0 firmware message: {message}")
+
+            self._client = client
+            self.ready = True
+            return DriverResponse(
+                response=DriverResponseType.success, status=DriverStatus.ok
+            )
+        except EclibError as exc:
+            LOGGER.error(f"connect failed: {exc}", exc_info=True)
+            status = (
+                DriverStatus.busy
+                if exc.name == "ERR_GEN_ECLAB_LOADED"
+                else DriverStatus.error
+            )
+            if client is not None:
+                client.close()
+            return DriverResponse(response=DriverResponseType.failed, status=status)
+        except Exception:
+            LOGGER.error("connect failed", exc_info=True)
+            if client is not None:
+                client.close()
+            return DriverResponse(
+                response=DriverResponseType.failed, status=DriverStatus.error
+            )
 
     def get_status(self, channel: Optional[int] = None) -> DriverResponse:
         """Return the driver status, optionally for a single channel.
 
         Args:
             channel: Channel index to query. When ``None``, queries every
-                channel and reports ``busy`` if any channel has a non-zero
-                state.
+                channel and reports ``busy`` if any is not ``STOP``.
 
         Returns:
             ``DriverResponse`` whose ``data`` maps channel index to the raw
-            Biologic ``State`` value, and whose ``status`` reflects whether
-            any queried channel is busy.
+            ``State`` int. An out-of-range channel (or a driver that has
+            never connected) reports ``uninitialized`` with ``data={}``.
         """
-        try:
-            if not self.ready:
-                # raise ConnectionError("Device not connected.")
-                status = DriverStatus.uninitialized
-                data = {}
-            if channel is None:
-                infos = [self.pstat.channel_info(i) for i in range(self.num_channels)]
-                states = [x.State for x in infos]
-                status = (
-                    DriverStatus.busy
-                    if any([x > 0 for x in states])
-                    else DriverStatus.ok
-                )
-
-                data = {i: x for i, x in enumerate(states)}
-            elif channel not in self.channels:
-                status = DriverStatus.uninitialized
-                data = {}
-                # raise ValueError(f"Channel {channel} does not exist.")
-            else:
-                info = self.pstat.channel_info(channel)
-                status = DriverStatus.busy if info.State > 0 else DriverStatus.ok
-                data = {channel: info.State}
-            response = DriverResponse(
+        if not self.ready or self._client is None:
+            return DriverResponse(
                 response=DriverResponseType.success,
-                status=status,
-                data=data,
+                status=DriverStatus.uninitialized,
+                data={},
             )
-        except Exception:
+        if channel is None:
+            channels = list(range(self.num_channels))
+        elif 0 <= channel < self.num_channels:
+            channels = [channel]
+        else:
+            return DriverResponse(
+                response=DriverResponseType.success,
+                status=DriverStatus.uninitialized,
+                data={},
+            )
+
+        try:
+            data = {}
+            for ch in channels:
+                info = self._client.channel_info(ch)
+                data[ch] = info.State
+                for message in self._client.drain_messages(ch):
+                    LOGGER.warning(f"channel {ch} firmware message: {message}")
+            status = (
+                DriverStatus.busy
+                if any(state != vendor.PROG_STATE.STOP for state in data.values())
+                else DriverStatus.ok
+            )
+            return DriverResponse(
+                response=DriverResponseType.success, status=status, data=data
+            )
+        except EclibError:
             LOGGER.error("get_status failed", exc_info=True)
-            response = DriverResponse(
+            return DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
-        return response
-
-    def setup(
-        self,
-        technique: BiologicTechnique,
-        action_params: dict = {},  # for mapping action keys to signal keys
-        output_dir: Optional[str] = None,
-    ) -> DriverResponse:
-        """Configure a channel for an upcoming measurement.
-
-        Translates action-server parameter keys into easy-biologic parameter
-        names using ``technique.parameter_map``, wraps scalar values for the
-        list-valued parameters (``voltages``, ``currents``, ``durations``),
-        and instantiates ``technique.easy_class`` for the target channel.
-
-        Args:
-            technique: Technique definition specifying the easy-biologic
-                program class and key remaps.
-            action_params: Parameter dictionary supplied by the action server.
-                Must include ``channel`` and the technique-specific keys
-                listed in ``technique.parameter_map``.
-            output_dir: Absolute path of the action's output directory.
-                Accepted for signature parity with the OLE backend, which
-                ships its vendor artifacts there. Unused here.
-
-        Returns:
-            ``DriverResponse`` reporting setup success or failure.
-        """
-        channel = action_params.get("channel", -1)
-        try:
-            if channel not in self.channels:
-                raise ValueError(f"Channel {channel} does not exist.")
-            if self.channels[channel] is not None:
-                raise ValueError(f"Channel {channel} is in use.")
-            parmap = technique.parameter_map
-            # The endpoints used to do this before dispatching the executor, but
-            # that put easy-biologic-specific objects in the layer the OLE backend
-            # also uses. Coercing here keeps action_params carrying the plain
-            # string -- which is also the more legible thing to record.
-            coercers = {
-                "IRange": ec_irange,
-                "ERange": ec_erange,
-                "Bandwidth": ec_bandwidth,
-                "CA_IRange": ec_irange,
-                "CA_ERange": ec_erange,
-                "CA_Bandwidth": ec_bandwidth,
-            }
-            action_params = {
-                key: coercers[key](value) if key in coercers else value
-                for key, value in action_params.items()
-            }
-            mapped_params = {
-                parmap[k]: v for k, v in action_params.items() if k in parmap
-            }
-            listed = ["voltages", "currents", "durations"]
-            listed_params = {
-                k: [v] if k in listed else v for k, v in mapped_params.items()
-            }
-            self.channels[channel] = resolve_easy_class(technique.easy_class_name)(
-                device=self.pstat, params=listed_params, channels=[channel]
-            )
-            self.channel_params[channel] = listed_params
-            self.channel_technique[channel] = technique
-            self.channels[channel].field_remap = technique.field_map
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message="setup complete",
-                status=DriverStatus.ok,
-            )
-        except Exception:
-            LOGGER.error("setup failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-            self.cleanup(channel)
-        return response
-
-    def list_techniques(self, channel: int = 0) -> list:
-        """Return the list of techniques currently loaded on a channel.
-
-        Args:
-            channel: Channel index to inspect.
-
-        Returns:
-            List of ``(index, technique_payload)`` tuples as reported by the
-            underlying easy-biologic device.
-
-        Raises:
-            ValueError: If the channel does not exist or has not been set up.
-        """
-        if channel not in self.channels:
-            raise ValueError(f"Channel {channel} does not exist.")
-        if self.channels[channel] is None:
-            raise ValueError(f"Channel {channel} has not been set up.")
-        techlist = [
-            (i, tp) for i, tp in enumerate(self.channels[channel].device.__techniques)
-        ]
-        return techlist
-
-    def update_parameters(self, channel: int = 0, new_params: dict = {}):
-        """Merge ``new_params`` into the currently loaded technique on a channel.
-
-        Translates action-server keys via the active technique's
-        ``parameter_map``, wraps list-valued parameters, and pushes the
-        combined parameter set down to the device.
-
-        Args:
-            channel: Channel index to update.
-            new_params: Action-server parameter overrides.
-
-        Raises:
-            ValueError: If the channel does not exist or has not been set up.
-        """
-        if channel not in self.channels:
-            raise ValueError(f"Channel {channel} does not exist.")
-        if self.channels[channel] is None:
-            raise ValueError(f"Channel {channel} has not been set up.")
-        technique = self.channel_technique[channel]
-        parmap = technique.parameter_map
-        mapped_params = {parmap[k]: v for k, v in new_params.items() if k in parmap}
-        listed = ["voltages", "currents", "durations"]
-        listed_params = {k: [v] if k in listed else v for k, v in mapped_params.items()}
-        techind, existing_tp = self.list_techniques(channel)[-1]
-        existing_tech, existing_params = existing_tp
-        updated_params = {**existing_params, **listed_params}
-        self.channels[channel].device.update_params(
-            ch=channel,
-            technique=existing_tech,
-            parameters=updated_params,
-            index=techind,
-            types=self.channels[channel]._parameter_types,
-        )
-
-    def start_channel(
-        self, channel: int = 0, ttl_params: Optional[dict] = None
-    ) -> DriverResponse:
-        """Start the previously configured technique on a channel.
-
-        Args:
-            channel: Channel index to start.
-            ttl_params: TTL configuration forwarded to the easy-biologic
-                program's ``run`` call. ``None`` means no TTL, and is
-                normalized to an empty dict before forwarding -- the vendor
-                call takes a dict.
-
-        Returns:
-            ``DriverResponse`` with ``status=busy`` and the wall-clock
-            ``start_time`` in ``data`` on success.
-        """
-        ttl_params = ttl_params or {}
-        try:
-            if channel not in self.channels:
-                raise ValueError(f"Channel {channel} does not exist.")
-            if self.channels[channel] is None:
-                raise ValueError(f"Channel {channel} has not been set up.")
-            channel_state = self.get_status(channel=channel).status
-            if channel_state == DriverStatus.busy:
-                raise ValueError(f"Channel {channel} is busy.")
-            if channel_state == DriverStatus.error:
-                raise ValueError(f"Channel {channel} encountered error.")
-
-            start_time = time.time()
-            self.channels[channel].run(retrieve_data=False, ttl_params=ttl_params)
-
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message="measurement started",
-                data={"start_time": start_time},
-                status=DriverStatus.busy,
-            )
-        except Exception:
-            LOGGER.error("start_channel failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-            )
-            self.cleanup(channel)
-        return response
-
-    async def get_data(self, channel: int = 0) -> DriverResponse:
-        """Retrieve buffered data from a running or just-finished channel.
-
-        Pulls one data segment from the channel, drains any remaining
-        segments once the channel reports ``done``, applies the technique's
-        ``field_remap`` to rename data columns, and for impedance techniques
-        derives ``X_ohm`` and ``R_ohm`` from ``modulus`` and ``phase``.
-
-        Args:
-            channel: Channel index to read.
-
-        Returns:
-            ``DriverResponse`` with column-oriented data in ``data`` and a
-            ``measuring``/``done`` marker in ``message``.
-        """
-        try:
-            if channel not in self.channels:
-                raise ValueError(f"Channel {channel} does not exist.")
-            if self.channels[channel] is None:
-                raise ValueError(f"Channel {channel} has not been set up.")
-            program = self.channels[channel]
-            segment = await program._retrieve_data_segment(channel)
-            if segment.values.State > 0:
-                status = DriverStatus.busy
-                program_state = "measuring"
-            else:
-                status = DriverStatus.ok
-                program_state = "done"
-            segment_data = segment.data
-            segment_values = getdict(segment.values)
-            values_list = []
-            if segment_data:
-                for _ in range(len(segment_data)):
-                    values_list.append(segment_values)
-
-            # empty buffer if program_state is done
-            if program_state == "done":
-                print("!!! retrieving last segment")
-                latest_segment = await program._retrieve_data_segment(channel)
-                while len(latest_segment.data) > 0:
-                    segment_data += latest_segment.data
-                    segment_values = getdict(latest_segment.values)
-                    for _ in range(len(latest_segment.data)):
-                        values_list.append(segment_values)
-                    latest_segment = await program._retrieve_data_segment(channel)
-
-            parsed = [
-                program._fields(*program._field_values(datum, segment))
-                for datum in segment_data
-            ]
-
-            data = pd.DataFrame(parsed).to_dict(orient="list")
-            data = {program.field_remap[k]: v for k, v in data.items()}
-            values = pd.DataFrame(values_list).to_dict(orient="list")
-            values = {f"_{k}": v for k, v in values.items()}
-
-            data.update(values)
-
-            if "modulus" in data.keys():
-                try:
-                    data["X_ohm"] = (
-                        -np.array(data["modulus"]) * np.sin(np.array(data["phase"]))
-                    ).tolist()
-                    data["R_ohm"] = (
-                        np.array(data["modulus"]) * np.cos(np.array(data["phase"]))
-                    ).tolist()
-                except Exception:
-                    LOGGER.warning(
-                        "Unexpected value in modulus or phase data, unable to calculate X_ohm and R_ohm."
-                    )
-                    data["X_ohm"] = [np.nan] * len(data["modulus"])
-                    data["R_ohm"] = [np.nan] * len(data["modulus"])
-
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                message=program_state,
-                data=data,
-                status=status,
-            )
-        except Exception:
-            LOGGER.error("get_data failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-            )
-        return response
-
-    def stop(self, channel: Optional[int] = None) -> DriverResponse:
-        """Abort the active technique on one or all channels.
-
-        Args:
-            channel: Channel index to stop. When ``None``, every channel with
-                an active program is stopped.
-
-        Returns:
-            ``DriverResponse`` reporting whether the stop call succeeded.
-        """
-        try:
-            running_channels = [k for k, c in self.channels.items() if c is not None]
-            if not self.stopping:
-                self.stopping = True
-                if channel is None and running_channels:
-                    for ch in running_channels:
-                        self.pstat.stop_channel(ch)
-                elif channel in running_channels:
-                    self.pstat.stop_channel(channel)
-                elif channel not in self.channels:
-                    LOGGER.warning(f"Channel {channel} does not exist.")
-                else:
-                    LOGGER.info(f"Channel {channel} is not running.")
-                self.stopping = False
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("stop failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        return response
-
-    def cleanup(self, channel: int) -> DriverResponse:
-        """Clear per-channel program, parameters, and technique state.
-
-        Does not disconnect the instrument.
-
-        Args:
-            channel: Channel index to clean up.
-
-        Returns:
-            ``DriverResponse`` reporting cleanup status. Fails with
-            ``status=error`` if the channel is currently busy.
-        """
-        try:
-            if channel not in self.channels:
-                raise ValueError(f"Channel {channel} does not exist.")
-            channel_state = self.get_status(channel=channel).status
-            if channel_state == DriverStatus.busy:
-                raise ValueError(f"Channel {channel} is busy.")
-            self.channels[channel] = None
-            self.channel_params[channel] = {}
-            self.channel_technique[channel] = None
-            response = DriverResponse(
-                response=DriverResponseType.success,
-                status=DriverStatus.ok,
-            )
-        except Exception:
-            LOGGER.error("cleanup failed", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed,
-                status=DriverStatus.error,
-            )
-        finally:
-            pass
-        return response
 
     def disconnect(self) -> DriverResponse:
-        """Close the TCP connection to the instrument and clear ready state."""
+        """Close the connection to the instrument and clear connected state."""
         try:
-            self.pstat.disconnect()
-            LOGGER.info(
-                f"disconnected from {self.device_name} on device_id {self.address}"
-            )
-            self.pstat = None
-            self.connection_ctx = None
-            self.ready = False
-            response = DriverResponse(
+            if self._client is not None:
+                self._client.close()
+            return DriverResponse(
                 response=DriverResponseType.success, status=DriverStatus.ok
             )
         except Exception:
             LOGGER.error("disconnect failed", exc_info=True)
-            response = DriverResponse(
+            return DriverResponse(
                 response=DriverResponseType.failed, status=DriverStatus.error
             )
         finally:
-            self.connection_raised = False
-        return response
+            self._client = None
+            self.ready = False
+            self.channel = None
+            self.board_type = None
+
+    def stop(self, channel: Optional[int] = None) -> DriverResponse:
+        """Not implemented here.
+
+        `HelaoDriver` declares `stop` abstract, so a concrete method must
+        exist for this class to be instantiable at all -- Task 14 (the
+        measurement half) replaces this with the real per-channel stop.
+        """
+        return DriverResponse(response=DriverResponseType.not_implemented)
 
     def reset(self) -> DriverResponse:
-        """Disconnect then reconnect the driver to recover from a bad state."""
-        try:
-            self.disconnect()
-            response = DriverResponse(
-                response=DriverResponseType.success, status=DriverStatus.ok
-            )
-        except Exception:
-            LOGGER.error("reset error", exc_info=True)
-            response = DriverResponse(
-                response=DriverResponseType.failed, status=DriverStatus.error
-            )
-        finally:
-            self.connect()
-        return response
+        """Disconnect then reconnect, reporting the reconnect's own result.
+
+        The previous implementation built a success response before
+        reconnecting in a ``finally``, so a failed reconnect still reported
+        success. This returns whatever ``connect()`` actually reports.
+        """
+        self.disconnect()
+        return self.connect()
 
     def shutdown(self) -> None:
-        """Stop any running channels, clean them up, and disconnect.
+        """Release a claimed channel, if any, then disconnect.
 
-        Invoked by ``BaseAPI`` when the action server is shutting down.
+        Safe to call on a driver that never connected. Stopping/cleaning up
+        a claimed channel is the measurement half's responsibility
+        (``stop``/``cleanup``); this only drives them when there is
+        something to release.
         """
-        state_dict = self.get_status().data
-        running_channels = [ch for ch, state in state_dict.items() if state > 0]
-        for ch in running_channels:
-            self.stop(channel=ch)
-            self.cleanup(channel=ch)
+        if self.channel is not None:
+            try:
+                self.stop(self.channel)
+            except Exception:
+                LOGGER.error("shutdown: stop failed", exc_info=True)
+            try:
+                self.cleanup(self.channel)  # type: ignore[attr-defined]  # Task 14
+            except Exception:
+                LOGGER.error("shutdown: cleanup failed", exc_info=True)
         self.disconnect()
