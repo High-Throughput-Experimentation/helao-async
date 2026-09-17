@@ -58,6 +58,8 @@ touch `biologic_eclib2` or `biologic_ole`.
 | D8 | CAOCV becomes a two-entry linked plan, keeping its endpoint keys | The plan machinery exists for `run_plan` anyway; a hardcoded pair is the special case |
 | D9 | Parameter labels and record layouts taken from the PDF, asserted against the DLL | The wrapper's tables disagree with the PDF in at least two places (§6.5) |
 | D10 | `loop_N_times = -1` refused | The PDF's "mandatory goto, unlimited" — an action that never terminates parks the orchestrator with no error anywhere |
+| D11 | Fix the `SweepMode` coercion; endpoint default stays `"log"` | The parameter has never reached the instrument (§6.8). Default EIS sweeps become logarithmic, which is what every caller and every record already claimed |
+| D12 | Honour CAOCV's `CA_ERange`; drop the derived override | Every other technique honours its `ERange` (§6.9) |
 
 ## 3. Architecture
 
@@ -250,6 +252,28 @@ serving HTTP and two WebSockets. §7 fixes it.
 **6.7 Firmware messages are never read.** EClib1 exposes per-channel messages
 via `BL_GetMessage`; easy-biologic never calls it, so a firmware complaint about
 a rejected parameter is invisible. §7 drains them into the log.
+
+**6.8 `SweepMode` has never reached the instrument.** Found while planning. The
+ECC parameter `sweep` is boolean and documented "TRUE for linear points
+spacing" (PDF §7.11.2); easy-biologic casts the action value with `bool(...)`
+at `lib/ec_lib.py:777`, and `bool("log")` is `True`. Every PEIS and GEIS run on
+all four stations has swept **linearly** while the recorded `SweepMode` said
+`log`. Fixed: `"lin"` → `True`, `"log"` → `False`, with a bare bool refused so
+the old shape cannot slip back in. The endpoint default stays `"log"`, so **the
+default sweep becomes logarithmic and new spectra are not frequency-comparable
+with the archive** (D11).
+
+**6.9 CAOCV's `CA_ERange` has never reached the instrument.** `CAOCV.__init__`
+did `ch_params["voltage_range"] = get_voltage_range(max(abs(voltages)))` — an
+unconditional overwrite — so the recorded `CA_ERange` was ignored and the
+hardware got `v2_5`/`v5`/`v10` derived from the voltage list. Fixed: the
+parameter applies, and CAOCV stops being the one technique that ignores its own
+range (D12). Behaviour change on CA steps, where a default of `AUTO` now
+reaches the hardware.
+
+CP's and GEIS's equivalents needed no decision: `set_current_range` only *warns*
+when a range is supplied, and the endpoints always supply one, so that path was
+already dead.
 
 ## 7. Driver lifecycle
 
