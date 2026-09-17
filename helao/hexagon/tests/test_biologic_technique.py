@@ -28,7 +28,6 @@ def flat(name, **action_params):
 # --- registry ---------------------------------------------------------------
 
 
-@pytest.mark.xfail(reason="PEIS/GEIS land in Task 8, CAOCV in Task 11")
 def test_the_registry_keys_are_the_names_the_endpoints_resolve():
     assert set(BIOTECHS) >= {"OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"}
 

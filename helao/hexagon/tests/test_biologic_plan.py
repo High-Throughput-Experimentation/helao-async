@@ -78,7 +78,6 @@ def test_protocol_number_is_the_loaded_index_not_the_plan_index():
     assert loop_params(plan.steps[-1])["protocol_number"] == 1
 
 
-@pytest.mark.xfail(reason="CAOCV lands in Task 11")
 def test_a_loop_over_a_multi_technique_entry_wraps_all_of_it():
     """CAOCV occupies two slots. A loop over that one entry must return to the
     CA, not to the OCV half."""
@@ -94,7 +93,6 @@ def test_a_loop_over_a_multi_technique_entry_wraps_all_of_it():
     assert loop_params(plan.steps[-1])["protocol_number"] == 1
 
 
-@pytest.mark.xfail(reason="CAOCV lands in Task 11")
 def test_a_loop_lands_after_the_last_technique_of_its_end_entry():
     plan = expand(
         [PlanEntry("CAOCV", _CAOCV), PlanEntry("CA", CA)],

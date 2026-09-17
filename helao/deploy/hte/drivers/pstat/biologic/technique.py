@@ -20,7 +20,7 @@ resolves against; the name and role are unchanged from the easy-biologic
 driver this replaces.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Callable, NamedTuple
 
@@ -696,3 +696,100 @@ def plan_technique(entries: list[PlanEntry], loops: list[PlanLoop]) -> PlanTechn
     if not entries:
         raise TechniqueError("plan is empty")
     return PlanTechnique("PLAN", entries, loops)
+
+
+#: `CA_`/`OCV_`-prefixed action key -> the sub-technique's own key.
+_CAOCV_RENAME = {"Vval__V_list": "Vval__V", "Tval__s_list": "Tval__s"}
+
+
+def caocv_sub_params(p: dict) -> tuple[dict, dict]:
+    """Split CAOCV's flat action params into a CA dict and an OCV dict.
+
+    The two `_list` keys are renamed because the CA build takes `Vval__V` and
+    `Tval__s` whether they are scalars or lists; everything else keeps its
+    name with the prefix removed. Each half starts from its own technique's
+    `defaults`, so the interval defaults Task 7 pinned to four stations'
+    archives still apply to whatever the flat CAOCV params don't override.
+    """
+
+    def strip(prefix, defaults):
+        out = dict(defaults)
+        for key, value in p.items():
+            if key.startswith(prefix):
+                bare = key[len(prefix) :]
+                out[_CAOCV_RENAME.get(bare, bare)] = value
+        return out
+
+    return (
+        strip("CA_", BIOTECHS["CA"].defaults),
+        strip("OCV_", BIOTECHS["OCV"].defaults),
+    )
+
+
+@dataclass
+class CaocvTechnique(PlanTechnique):
+    """CA followed by OCV, loaded together as one experiment.
+
+    Its two techniques come from splitting one flat `CA_`/`OCV_`-prefixed
+    action-param dict at call time (`caocv_sub_params`), not from a list of
+    pre-built `PlanEntry`s -- so `expand` is overridden outright instead of
+    being driven by `plan_entries`/`loops` (both left empty), and
+    `column_plan` reads `data.COLUMNS["CAOCV"]` (the frozen DC set) directly
+    instead of unioning per-entry columns.
+
+    The trigger block in `expand` below duplicates `PlanTechnique.expand`'s
+    (itself already duplicated once in `plan_for`) rather than extracting a
+    shared helper: `PlanTechnique.expand`'s body is out of scope for this
+    task, so there is nothing existing to call into.
+    """
+
+    defaults: dict[str, Any] = field(default_factory=dict)
+
+    def expand(self, action_params: dict, ttl_params=None) -> LoadPlan:
+        steps: list[LoadStep] = []
+        mode = (ttl_params or {}).get("ttl", "none")
+        if mode != "none":
+            try:
+                trigger = TTL_TECHS[mode]
+            except KeyError:
+                raise TechniqueError(
+                    f"unknown ttl mode {mode!r}; expected 'none', 'in' or 'out'"
+                )
+            steps.append(
+                LoadStep(
+                    trigger.ecc_stem,
+                    trigger.tech_id,
+                    entries(trigger, ttl_params or {}),
+                )
+            )
+        ca_params, ocv_params = caocv_sub_params(action_params)
+        steps.append(
+            LoadStep(
+                BIOTECHS["CA"].ecc_stem,
+                BIOTECHS["CA"].tech_id,
+                entries(BIOTECHS["CA"], ca_params),
+            )
+        )
+        steps.append(
+            LoadStep(
+                BIOTECHS["OCV"].ecc_stem,
+                BIOTECHS["OCV"].tech_id,
+                entries(BIOTECHS["OCV"], ocv_params),
+            )
+        )
+        return LoadPlan(steps)
+
+    @property
+    def column_plan(self) -> tuple[str, ...]:
+        return tuple(data.COLUMNS["CAOCV"])
+
+
+#: `CaocvTechnique` is a `PlanTechnique`, not a `BiologicTechnique` -- it
+#: expands to two loaded techniques -- so it does not fit `BIOTECHS`'s
+#: declared value type. `sub_steps`/`plan_for`'s `isinstance(technique,
+#: PlanTechnique)` dispatch is what actually routes it correctly at runtime;
+#: this registration is the one place that dispatch's target type is wider
+#: than the dict's annotation says.
+BIOTECHS["CAOCV"] = CaocvTechnique(  # type: ignore[assignment]
+    technique_name="CAOCV", plan_entries=[], loops=[]
+)
