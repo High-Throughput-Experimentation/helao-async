@@ -501,7 +501,7 @@ def plan_for(
     single-technique path below.
     """
     if isinstance(technique, PlanTechnique):
-        return technique.expand(ttl_params)
+        return technique.expand(action_params, ttl_params)
     steps: list[LoadStep] = []
     mode = (ttl_params or {}).get("ttl", "none")
     if mode != "none":
@@ -580,7 +580,17 @@ class PlanTechnique:
                     seen.append(column)
         return tuple(seen)
 
-    def expand(self, ttl_params=None) -> LoadPlan:
+    def expand(self, action_params: dict, ttl_params=None) -> LoadPlan:
+        """Build the flattened, LOOP-inserted load order.
+
+        `action_params` is unused by a plain multi-entry plan -- each
+        `PlanEntry` already carries its own params -- but is part of the
+        signature so a per-action expander shares this one dispatch instead
+        of growing a second path. A `PlanTechnique` subclass whose entries
+        are derived from the live action params at call time (Task 11's
+        CAOCV, which splits flat `CA_*`/`OCV_*` keys into two techniques)
+        overrides `expand` and reads it.
+        """
         if not self.plan_entries:
             raise TechniqueError("plan is empty")
 

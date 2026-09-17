@@ -24,7 +24,7 @@ TTL_IN = {"ttl": "in", "ttl_logic": 1, "ttl_duration": 1.0}
 
 
 def expand(entries, loops=(), ttl=None):
-    return plan_technique(list(entries), list(loops)).expand(ttl)
+    return plan_technique(list(entries), list(loops)).expand({}, ttl)
 
 
 def loop_params(step):
