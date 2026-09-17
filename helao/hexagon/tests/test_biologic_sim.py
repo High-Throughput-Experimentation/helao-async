@@ -67,6 +67,23 @@ def test_fail_on_takes_effect_on_an_already_bound_call():
     assert dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False) == -300
 
 
+def test_config_changes_after_connect_take_effect_immediately():
+    """Every `SimConfig` field is read live, not just `fail_on` -- a test
+    connects, loads a technique and starts a run, then perturbs config (here,
+    `rows_per_poll`) on the same already-bound driver without reconnecting."""
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    dll["BL_StartChannel"](idn, 0)
+
+    sim.set_sim_config(sim.SimConfig(rows_per_poll=3))
+
+    buf, di, cv = vendor.DataBuffer(), vendor.DataInfo(), vendor.CurrentValues()
+    dll["BL_GetData"](idn, 0, buf, ctypes.byref(di), ctypes.byref(cv))
+    assert di.NbRows == 3
+
+
 def test_channel_info_reports_the_configured_board_and_kernel_state():
     sim.set_sim_config(
         sim.SimConfig(board_type=vendor.BOARD_TYPE.ESSENTIAL, kernel_loaded=False)
