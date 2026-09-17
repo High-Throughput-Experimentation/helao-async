@@ -81,7 +81,7 @@ Every server listed is changed — B5 ported all of them. The orchestrator
 | `anec` | IO, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC |
 | `adss3` | CLEANSYRINGE, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC, WORKSYRINGE |
 | `clad` | CLEANSYRINGE, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC, WATERSYRINGE, WORKSYRINGE |
-| `ecms1` | CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI, ORCH, PSTAT (gamry), SAMPLE, SYNC |
+| `ecms3` | CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI, ORCH, PSTAT (gamry), SAMPLE, SYNC |
 | `hispec` | ANDOR, CALC, IO, KMOTOR, MOTOR, ORCH, PSTAT (**biologic**), SAMPLE, SYNC |
 
 ### Four more stations, whose configs live in private deployments
@@ -136,7 +136,7 @@ is the single highest-blast-radius module B5 touched. A `SYNC` fault is a fault
 almost everywhere.
 
 **Preferred order, where there is a choice: `ccsi2`, `eche10`, `anec`, `adss3`,
-`clad`, `ecms1`, `hispec`, then `uvis4`, `amts`, `note1`, `electrode-demo`.**
+`clad`, `ecms3`, `hispec`, then `uvis4`, `amts`, `note1`, `electrode-demo`.**
 `electrode-demo` sits last because it is a demo station rather than a production
 one, not because it is less informative — its five servers are covered nowhere
 else without an action server in front of them. Stations will come
@@ -297,7 +297,7 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | `anec` | | | | | | |
 | `adss3` | | | | | | |
 | `clad` | | | | | | |
-| `ecms1` | | | | | | |
+| `ecms3` | 2026-09-17 | `e02a7ff6` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `hispec` | | | | | | |
 | `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
 | `amts` | | | | | | |
@@ -374,7 +374,31 @@ What a soak does not do is compare against the pre-migration reference or
 exercise the abort path. As with `uvis4`, a regression visible only as a
 *difference* from legacy, or only under e-stop, would not have surfaced here.
 
-`uvis4` and `note1` are signed off. Two of eleven.
+### `ecms3`, 2026-09-17 — signed off on a soak (‡)
+
+**The station formerly listed here as `ecms1` is `ecms3`.** The config was
+renamed in `e02a7ff6` — it has always run on `hte-ecms-03`, and every `host:`
+line and every record it writes said so while the prefix did not. The station
+and its server list are unchanged; only the name in this table is corrected.
+Launch it as `python launch.py ecms3` (or `ecms3_hex`).
+
+`ecms3` ran its ECMS sequences on `unstable` at `e02a7ff6` with no issues
+reported by the station owner. That rev carries the September orchestrator and
+syncer fixes — `e1a611ce` (the history poll waited for completion, so
+`start_condition` and `no_wait` were inert), `dd986b2e` (a `/stop` arriving
+mid-wait ran the popped action anyway), `8fa0ef48` (the loop exception handler
+was lost in the host port), and the `to_s3` retry-body and deferred-parent sync
+fixes — so this soak is evidence for those as well as for B5. Its nine
+B5-changed servers are CALC, CALIBRATIONMFC, CALIBRATIONMFCSECOND, MFC, NI,
+ORCH, PSTAT (gamry), SAMPLE and SYNC; `PSTAT (gamry)` and the two calibration
+MFC servers are covered at no other signed-off station.
+
+Same caveat as `uvis4` and `note1`: a soak does not compare this build's routes
+and outputs against the pre-migration reference, and does not exercise the abort
+path. A regression visible only as a *difference* from legacy, or only under
+e-stop, would not have surfaced here.
+
+`uvis4`, `note1` and `ecms3` are signed off. Three of eleven.
 
 ## Expected delta: `/ANDOR/calibrate_wl` (2026-09-04)
 
