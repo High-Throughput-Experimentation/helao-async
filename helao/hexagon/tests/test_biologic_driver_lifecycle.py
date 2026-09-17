@@ -154,7 +154,9 @@ def test_get_status_reports_busy_while_a_channel_runs(connected):
     # refuses BL_StartChannel with ERR_TECH_LOADTECHNIQUEFAILED in that case.
     # Load an empty-params OCV technique first, via the raw client, so this
     # stays inside the connection-half driver under test here rather than
-    # reaching into setup() (Task 14).
+    # reaching into setup() (Task 14). OCV specifically, and deliberately:
+    # it's the one technique that never drives the cell, so if this shape
+    # ever gets copied toward real hardware it copies the non-perturbing one.
     sim.set_sim_config(sim.SimConfig(polls_until_stop=99))
     connected._client.load_technique(
         0, "ocv.ecc", connected._client.define_params([]), True, True
