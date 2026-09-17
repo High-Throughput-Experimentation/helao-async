@@ -365,13 +365,13 @@ ERROR_NAMES: dict[int, str] = {
     -405: "ERR_TECH_MEMFULL",
 }
 
-#: Export name -> (argtypes, [restype]). Absent restype means the call returns
-#: an int error code that the client checks.
+#: Export name -> argtypes. Every export returns an int error code that the
+#: client checks; none of the 24 entries needs a non-default restype.
 #:
 #: `blfind64.dll` is deliberately absent: device discovery is the module that
 #: makes the vendor layer unimportable off-Windows, and every station config
 #: names an explicit IP.
-ECL_API: list[tuple[str, list[Any], ...]] = [
+ECL_API: list[tuple[str, list[Any]]] = [
     ("BL_GetLibVersion", [c_char_p, c_uint32_p]),
     ("BL_Connect", [c_char_p, c_uint8, c_int32_p, DEVICE_INFO]),
     ("BL_Disconnect", [c_int32]),
@@ -465,11 +465,11 @@ def load_dll(sdk_path: str = DEFAULT_SDK_PATH) -> Any:
         if getattr(exc, "winerror", None) == 193:
             raise VendorError(f"{dll_path} is 32-bit; this Python is 64-bit")
         raise VendorError(f"could not load {dll_path}: {exc}")
-    for name, argtypes, *rest in ECL_API:
+    for name, argtypes in ECL_API:
         try:
             function = dll[name]
         except AttributeError:
             raise VendorError(f"{DLL_NAME} at {sdk_path!r} has no export {name}")
         function.argtypes = argtypes
-        function.restype = rest[0] if rest else c_int32
+        function.restype = c_int32
     return dll
