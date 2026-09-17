@@ -3,8 +3,9 @@
 
 Wraps :class:`BiologicDriver` and exposes electrochemistry technique endpoints
 (``run_CA``, ``run_CP``, ``run_CV``, ``run_OCV``, ``run_PEIS``, ``run_GEIS``,
-``run_CAOCV``) plus status/stop routes. Uses the :class:`Executor` model so
-the hardware driver stays decoupled from the action-server base class.
+``run_CAOCV``, ``run_CALIMIT``, ``run_CPLIMIT``, ``run_SPEIS``, ``run_SGEIS``)
+plus status/stop routes. Uses the :class:`Executor` model so the hardware
+driver stays decoupled from the action-server base class.
 """
 
 __all__ = ["makeApp"]
@@ -19,7 +20,7 @@ from typing import Any, Optional, Union
 
 import numpy as np
 import pandas as pd
-from fastapi import Body
+from fastapi import Body, Query
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
@@ -37,6 +38,7 @@ from helao.helpers import helao_logging as logging  # get LOGGER from the host i
 from helao.helpers.bubble_detection import bubble_detection
 from helao.helpers.executor import Executor
 
+from ...drivers.pstat.biologic import technique as bt
 from ...drivers.pstat.biologic.driver import BiologicDriver
 from ...drivers.pstat.biologic.enum import EC_Bandwidth, EC_ERange, EC_IRange
 from ...drivers.pstat.biologic.technique import BIOTECHS
@@ -477,8 +479,10 @@ async def biologic_dyn_endpoints(app: ActionHost):
     ):
         """Run cyclic voltammetry between two apex potentials.
 
-        Subtracts one from ``Cycles`` (the driver expects additional cycles),
-        derives ``AcqInterval__V`` from the time interval and scan rate, maps
+        ``Cycles`` passes straight through to the technique's ``N_Cycles`` --
+        no off-by-one adjustment. ``AcqInterval__V`` is not derived from
+        ``AcqInterval__s``/``ScanRate__V_s``; the technique's own default
+        (``0.01``) is used, since no endpoint parameter overrides it. Maps
         I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
         configured with the ``"CV"`` technique.
         """
@@ -646,13 +650,215 @@ async def biologic_dyn_endpoints(app: ActionHost):
         active_action_dict = active.start_executor(executor)
         return active_action_dict
 
-    # `run_plan` is eclib2-only, the way `run_protocol` is olecom-only: it is
-    # not a technique but a whole *experiment* of them, which is a capability
-    # EC-Lib 2.0 has and the other two backends do not. easy-biologic runs one
-    # program per action, and the OLE backend's multi-technique unit is an
-    # `.mps` file, which `run_protocol` covers. Registering it on those
-    # backends would advertise a route that could only fail.
-    if getattr(app, "pstat_backend", None) == "eclib2":
+    @app.action()
+    @action_version(1)
+    async def run_CALIMIT(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Vval__V: float = 0.0,
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.01,  # Time between data acq in seconds.
+        Cycles: int = 0,
+        ExitCondition: int = 0,
+        Test1: Optional[dict] = Body(None, embed=True),
+        Test2: Optional[dict] = Body(None, embed=True),
+        Test3: Optional[dict] = Body(None, embed=True),
+        IRange: EC_IRange = EC_IRange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        channel: int = 0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshI_A: float = 0,
+    ):
+        """Run CALIMIT: chronoamperometry that can exit early on a limit test.
+
+        Like ``run_CA``, but ``Test1``/``Test2``/``Test3`` (PDF section
+        7.36/7.37.2) each optionally carry
+        ``{"variable": "E"|"AUX1"|"AUX2"|"I", "above": bool, "value": float,
+        "logic": "OR"|"AND", "active": bool}``; ``Test2`` requires ``Test1``
+        active and ``Test3`` requires ``Test2`` active. ``ExitCondition``
+        selects what happens when a test trips (0 next step, 1 next
+        technique, 2 stop experiment). ``Cycles`` maps directly to the
+        technique's ``N_Cycles``, with no off-by-one adjustment. Maps the
+        I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with the ``"CALIMIT"`` technique.
+
+        TTL trigger arguments are intentionally omitted here -- the trigger's
+        electrical leg is untested, and this is a brand-new route.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "CALIM"
+        active.action.action_params["AcqInterval__A"] = 10.0
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CALIMIT")
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.action()
+    @action_version(1)
+    async def run_CPLIMIT(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Ival__A: float = 0.0,
+        Tval__s: float = 10.0,
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        Cycles: int = 0,
+        ExitCondition: int = 0,
+        Test1: Optional[dict] = Body(None, embed=True),
+        Test2: Optional[dict] = Body(None, embed=True),
+        Test3: Optional[dict] = Body(None, embed=True),
+        # EClib1 forbids I Auto-range for CPLIMIT (PDF section 7.36.2,
+        # "Warning: I Auto-range is not allowed") -- unlike every other
+        # technique's endpoint here, this default must NOT be
+        # EC_IRange.AUTO, or the route fails on its own default invocation.
+        IRange: EC_IRange = EC_IRange.m10,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        channel: int = 0,
+        alert_duration__s: float = -1,
+        alert_above: bool = True,
+        alert_sleep__s: float = -1,
+        alertThreshEwe_V: float = 0,
+    ):
+        """Run CPLIMIT: chronopotentiometry that can exit early on a limit test.
+
+        Like ``run_CP``, but ``Test1``/``Test2``/``Test3`` (PDF section
+        7.36/7.37.2) each optionally carry
+        ``{"variable": "E"|"AUX1"|"AUX2"|"I", "above": bool, "value": float,
+        "logic": "OR"|"AND", "active": bool}``; ``Test2`` requires ``Test1``
+        active and ``Test3`` requires ``Test2`` active. ``ExitCondition``
+        selects what happens when a test trips (0 next step, 1 next
+        technique, 2 stop experiment). ``Cycles`` maps directly to the
+        technique's ``N_Cycles``, with no off-by-one adjustment. Maps the
+        I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with the ``"CPLIMIT"`` technique.
+
+        ``IRange`` defaults to ``m10``, not ``AUTO`` -- CPLIMIT is
+        galvanostatic (current is driven, not measured), and the vendor
+        manual forbids Auto-range on this technique; ``build()`` refuses a
+        resolved Auto range outright.
+
+        TTL trigger arguments are intentionally omitted here -- the trigger's
+        electrical leg is untested, and this is a brand-new route.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "CPLIM"
+        active.action.action_params["AcqInterval__V"] = 10.0
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("CPLIMIT")
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.action()
+    @action_version(1)
+    async def run_SPEIS(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Vinit__V: float = 0.00,  # Initial value in volts.
+        Vfinal__V: float = 0.00,  # Final value in volts.
+        # PDF section 7.12.2: 0..98 staircase steps. No vendor default --
+        # must be supplied.
+        StepNumber: int = Query(..., ge=0, le=98),
+        Vamp__V: float = 0.01,  # Amplitude value in volts
+        Finit__Hz: float = 1000,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 1000000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        SweepMode: str = "log",
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        IRange: EC_IRange = EC_IRange.AUTO,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        channel: int = 0,
+    ):
+        """Run SPEIS: a staircase of potentiostatic EIS steps.
+
+        Steps the bias from ``Vinit__V`` to ``Vfinal__V`` over ``StepNumber``
+        steps (PDF section 7.12.2, bounded 0..98 with no vendor default), then
+        runs a PEIS-style amplitude/frequency sweep at each step. Maps the
+        I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
+        configured with the ``"SPEIS"`` technique.
+
+        TTL trigger arguments are intentionally omitted here -- the trigger's
+        electrical leg is untested, and this is a brand-new route.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "SPEIS"
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("SPEIS")
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    @app.action()
+    @action_version(1)
+    async def run_SGEIS(
+        ctx: ActionContext,
+        fast_samples_in: list[
+            Union[AssemblySample, LiquidSample, GasSample, SolidSample, NoneSample]
+        ] = Body([], embed=True),
+        Iinit__A: float = 0.01,  # Initial value in amps.
+        Ifinal__A: float = 0.01,  # Final value in amps.
+        # PDF section 7.14.2: 0..98 staircase steps (see SPEIS). No vendor
+        # default -- must be supplied.
+        StepNumber: int = Query(..., ge=0, le=98),
+        Iamp__A: float = 0.1,  # Amplitude value in amps.
+        Finit__Hz: float = 1,  # Initial frequency in Hz.
+        Ffinal__Hz: float = 10000,  # Final frequency in Hz.
+        FrequencyNumber: int = 60,
+        Duration__s: float = 0,  # Duration in seconds.
+        AcqInterval__s: float = 0.1,  # Time between data acq in seconds.
+        SweepMode: str = "log",
+        Repeats: int = 10,
+        DelayFraction: float = 0.1,
+        # EClib1 forbids I Auto-range for SGEIS (PDF section 7.14.2, "Warning:
+        # I Auto-range is not allowed") -- see run_CPLIMIT.
+        IRange: EC_IRange = EC_IRange.m10,
+        ERange: EC_ERange = EC_ERange.AUTO,
+        Bandwidth: EC_Bandwidth = EC_Bandwidth.BW4,
+        channel: int = 0,
+    ):
+        """Run SGEIS: a staircase of galvanostatic EIS steps.
+
+        Steps the bias from ``Iinit__A`` to ``Ifinal__A`` over ``StepNumber``
+        steps (PDF section 7.14.2, bounded 0..98 with no vendor default, "see
+        SPEIS"), then runs a GEIS-style amplitude/frequency sweep at each
+        step. Maps the I/E/Bandwidth range enums and dispatches a
+        :class:`BiologicExec` configured with the ``"SGEIS"`` technique.
+
+        ``IRange`` defaults to ``m10``, not ``AUTO`` -- SGEIS is
+        galvanostatic, and the vendor manual forbids Auto-range on this
+        technique; ``build()`` refuses a resolved Auto range outright.
+
+        TTL trigger arguments are intentionally omitted here -- the trigger's
+        electrical leg is untested, and this is a brand-new route.
+        """
+        active = await ctx.begin()
+        active.action.action_abbr = "SGEIS"
+        executor = BiologicExec(
+            active=active, oneoff=False, technique=app.resolve_technique("SGEIS")
+        )
+        active_action_dict = active.start_executor(executor)
+        return active_action_dict
+
+    # `run_plan` is registered on both SDK-backed backends (`eclib`,
+    # `eclib2`) -- each can load several techniques onto one channel as a
+    # single linked experiment. It stays absent on `olecom`, whose
+    # multi-technique unit is a GUI-authored `.mps` file, covered instead by
+    # `run_protocol`.
+    if getattr(app, "pstat_backend", None) in {"eclib", "eclib2"}:
 
         @app.action()
         @action_version(1)
@@ -667,7 +873,7 @@ async def biologic_dyn_endpoints(app: ActionHost):
         ):
             """Run several techniques on one channel as a single experiment.
 
-            One ``BL_LoadExperiment`` for the whole plan, so the techniques run
+            The techniques are loaded as one linked experiment, so they run
             back to back with no gap for a round trip between them -- which is
             the point, and is not reachable by chaining ``run_*`` actions.
 
@@ -679,7 +885,7 @@ async def biologic_dyn_endpoints(app: ActionHost):
                     run two techniques at different current ranges.
                 loops: Repeats, each ``{"start": i, "end": j, "n": k}`` over
                     *plan* indices, inclusive. Spans must nest rather than
-                    straddle. An entry may expand to more than one EClib2
+                    straddle. An entry may expand to more than one linked
                     technique (PEIS becomes CA+PEIS); the indices here are into
                     ``plan``, and the expansion is mapped for you.
                 channel: Channel to run on.
@@ -688,14 +894,15 @@ async def biologic_dyn_endpoints(app: ActionHost):
             plan mixing CA and PEIS emits both sets with NaN where a technique
             does not report one.
             """
+            plan_builder, plan_entry, plan_loop = PLAN_BUILDERS[app.pstat_backend]
             entries = [
-                ec2tech.PlanEntry(
+                plan_entry(
                     name=str(item.get("name", "")), params=dict(item.get("params", {}))
                 )
                 for item in plan
             ]
             spans = [
-                ec2tech.PlanLoop(
+                plan_loop(
                     start=int(item["start"]), end=int(item["end"]), n=int(item["n"])
                 )
                 for item in loops
@@ -703,7 +910,7 @@ async def biologic_dyn_endpoints(app: ActionHost):
             # Built here, not in the executor: an unbuildable plan must fail
             # the call rather than start an action that then aborts in
             # _pre_exec with the cell already claimed.
-            technique = ec2tech.plan_technique(entries, spans)
+            technique = plan_builder(entries, spans)
 
             active = await ctx.begin()
             active.action.action_abbr = "PLAN"
@@ -774,6 +981,14 @@ TECHNIQUE_REGISTRIES = {
     "eclib": lambda name: BIOTECHS[name],
     "olecom": resolve_ole_technique,
     "eclib2": resolve_eclib2_technique,
+}
+
+#: `run_plan`'s (builder, entry type, loop type) per SDK-backed backend.
+#: `olecom` has no entry -- it is not registered there (see `run_plan`'s
+#: guard).
+PLAN_BUILDERS = {
+    "eclib": (bt.plan_technique, bt.PlanEntry, bt.PlanLoop),
+    "eclib2": (ec2tech.plan_technique, ec2tech.PlanEntry, ec2tech.PlanLoop),
 }
 
 
