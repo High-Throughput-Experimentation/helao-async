@@ -35,7 +35,9 @@ __all__ = [
     "encode_single",
     "firmware_loads",
     "load_dll",
+    "loaded_ecc_files",
     "push_message",
+    "rows_emitted",
     "set_sim_config",
 ]
 
@@ -144,6 +146,23 @@ class SimConfig:
     board_type: int = vendor.BOARD_TYPE.PREMIUM
     kernel_loaded: bool = True
     fail_on: dict[str, int] | None = None
+    #: Number of `BL_GetData` polls after `BL_StartChannel` that report zero
+    #: rows and `PROG_STATE.STOP` -- the real start race where a channel
+    #: polled before the firmware actually runs reads STOP, not RUN.
+    idle_polls_before_run: int = 0
+    #: Keep emitting `rows_per_poll` rows (with `PROG_STATE.STOP`) forever
+    #: past `polls_until_stop` instead of dropping to zero. Exercises the
+    #: `RunTracker`/`MAX_DRAINS_PER_CALL` bound on a channel whose tail never
+    #: actually ends.
+    endless_tail: bool = False
+    #: `DataInfo.IRQskipped` to report on the first row-bearing poll after
+    #: `BL_StartChannel`. Reported once per run, not accumulated per poll --
+    #: real dropped-point counts are a single event, not a running total.
+    irq_skipped: int = 0
+    #: When set, `BL_GetTechniqueInfos` answers from this list instead of the
+    #: channel's actually-loaded technique list -- simulates a firmware that
+    #: reports back something other than what was requested.
+    technique_ids_override: list[int] | None = None
 
 
 _CONFIG = SimConfig()
@@ -160,6 +179,11 @@ class _Channel:
     state: int = vendor.PROG_STATE.STOP
     polls: int = 0
     messages: list[str] = field(default_factory=list)
+    #: Remaining `BL_GetData` polls to withhold rows for, set fresh by
+    #: `BL_StartChannel` from `SimConfig.idle_polls_before_run`.
+    idle_remaining: int = 0
+    #: Whether `IRQskipped` has already been reported once this run.
+    irq_reported: bool = False
 
 
 class _Sim:
@@ -178,6 +202,11 @@ class _Sim:
         self.idn = 1
         self.connected = False
         self._channels: dict[int, _Channel] = {}
+        #: The current load episode's `.ecc` filenames, in order. Reset
+        #: whenever `BL_LoadTechnique(first=True)` starts a new one -- same
+        #: boundary `_Channel.techniques` resets on -- so a re-load with a
+        #: trigger prepended does not carry over an earlier setup's load.
+        self.loaded_ecc: list[str] = []
 
     @property
     def cfg(self) -> SimConfig:
@@ -205,6 +234,10 @@ _STATE: _Sim | None = None
 #: reconfigure doesn't zero a counter a test is about to assert on.
 _FIRMWARE_LOADS = 0
 
+#: Total rows handed back across every `BL_GetData` call. Same reset rule as
+#: `_FIRMWARE_LOADS`: `load_dll()` only.
+_ROWS_EMITTED = 0
+
 
 def push_message(channel: int, text: str) -> None:
     if _STATE is not None:
@@ -214,6 +247,22 @@ def push_message(channel: int, text: str) -> None:
 def firmware_loads() -> int:
     """Number of `BL_LoadFirmware` calls since the last `load_dll()`."""
     return _FIRMWARE_LOADS
+
+
+def rows_emitted() -> int:
+    """Total rows returned by `BL_GetData` since the last `load_dll()`."""
+    return _ROWS_EMITTED
+
+
+def loaded_ecc_files() -> list[str]:
+    """The `.ecc` filenames loaded in the current load episode, in order.
+
+    Resets whenever a `BL_LoadTechnique(first=True)` starts a new episode --
+    the same boundary the channel's own technique list resets on -- so a
+    re-load with a trigger prepended reports only that reload, not whatever
+    an earlier `setup()` already loaded.
+    """
+    return list(_STATE.loaded_ecc) if _STATE is not None else []
 
 
 class FakeDll:
@@ -388,7 +437,9 @@ class FakeDll:
         channel = self._state.channel(ch)
         if first:
             channel.techniques = []
+            self._state.loaded_ecc = []
         channel.techniques.append(tech)
+        self._state.loaded_ecc.append(filename.decode())
         return 0
 
     def _define_bool_parameter(self, label, value, index, parm_ptr) -> int:
@@ -423,10 +474,12 @@ class FakeDll:
         if err:
             return err
         channel = self._state.channel(ch)
-        if not (0 <= index < len(channel.techniques)):
+        override = self._state.cfg.technique_ids_override
+        source = override if override is not None else channel.techniques
+        if not (0 <= index < len(source)):
             return -4  # ERR_GEN_INVALIDPARAMETERS
         info = info_ptr.contents
-        info.Id = channel.techniques[index]
+        info.Id = source[index]
         info.indx = index
         info.nbParams = 0
         info.nbSettings = 0
@@ -443,6 +496,8 @@ class FakeDll:
             return -403  # ERR_TECH_LOADTECHNIQUEFAILED
         channel.state = vendor.PROG_STATE.RUN
         channel.polls = 0
+        channel.idle_remaining = self._state.cfg.idle_polls_before_run
+        channel.irq_reported = False
         return 0
 
     def _stop_channel(self, idn, ch) -> int:
@@ -465,6 +520,7 @@ class FakeDll:
         return 0
 
     def _get_data(self, idn, ch, buf, di_ptr, cv_ptr) -> int:
+        global _ROWS_EMITTED
         err = self._state.check(idn, ch)
         if err:
             return err
@@ -474,9 +530,21 @@ class FakeDll:
         cv = cv_ptr.contents
         cv.TimeBase = 1e-3
 
-        if not channel.techniques or channel.polls > cfg.polls_until_stop:
+        if channel.idle_remaining > 0:
+            # The real start race: a channel polled before the firmware has
+            # actually begun running reads STOP with nothing recorded yet.
+            channel.idle_remaining -= 1
             di.NbRows = 0
             di.NbCols = 0
+            di.IRQskipped = 0
+            cv.State = channel.state
+            return 0
+
+        finished = channel.polls > cfg.polls_until_stop
+        if not channel.techniques or (finished and not cfg.endless_tail):
+            di.NbRows = 0
+            di.NbCols = 0
+            di.IRQskipped = 0
             cv.State = channel.state
             return 0
 
@@ -506,9 +574,16 @@ class FakeDll:
         di.TechniqueIndex = 0
         di.ProcessIndex = process_index
         di.StartTime = 0.0
-        di.IRQskipped = 0
+        # A dropped-point count is a single event, not a running total --
+        # reported once per run, on the first row-bearing poll.
+        if not channel.irq_reported:
+            di.IRQskipped = cfg.irq_skipped
+            channel.irq_reported = True
+        else:
+            di.IRQskipped = 0
         channel.polls += 1
         cv.State = channel.state
+        _ROWS_EMITTED += rows
         return 0
 
     # -- unit conversions -------------------------------------------------
@@ -532,7 +607,8 @@ class FakeDll:
 
 def load_dll(sdk_path: str | None = None) -> FakeDll:
     """Ignore `sdk_path` entirely -- there is no file to find."""
-    global _STATE, _FIRMWARE_LOADS
+    global _STATE, _FIRMWARE_LOADS, _ROWS_EMITTED
     _STATE = _Sim()
     _FIRMWARE_LOADS = 0
+    _ROWS_EMITTED = 0
     return FakeDll(_STATE)

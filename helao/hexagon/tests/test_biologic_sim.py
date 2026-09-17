@@ -279,6 +279,99 @@ def test_channel_indices_are_zero_based_here_too():
     assert dll["BL_GetChannelInfos"](idn, -1, ctypes.byref(info)) != 0
 
 
+def test_loaded_ecc_files_tracks_the_current_load_episode():
+    """`first=True` starts a new load episode, same boundary the channel's
+    own technique list resets on -- a re-load with a trigger prepended must
+    not carry over whatever an earlier `setup()` already loaded."""
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    assert sim.loaded_ecc_files() == ["ca4.ecc"]
+    dll["BL_LoadTechnique"](idn, 0, b"TI4.ecc", parms, True, False, False)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, False, True, False)
+    assert sim.loaded_ecc_files() == ["TI4.ecc", "ca4.ecc"]
+
+
+def test_rows_emitted_accumulates_across_polls():
+    sim.set_sim_config(sim.SimConfig(rows_per_poll=3, polls_until_stop=2))
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    dll["BL_StartChannel"](idn, 0)
+    assert sim.rows_emitted() == 0
+    for _ in range(3):
+        buf, di, cv = vendor.DataBuffer(), vendor.DataInfo(), vendor.CurrentValues()
+        dll["BL_GetData"](idn, 0, buf, ctypes.byref(di), ctypes.byref(cv))
+    assert sim.rows_emitted() == 9
+
+
+def test_idle_polls_before_run_withholds_rows_at_first():
+    sim.set_sim_config(sim.SimConfig(idle_polls_before_run=2, rows_per_poll=4))
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    dll["BL_StartChannel"](idn, 0)
+
+    widths = []
+    for _ in range(4):
+        buf, di, cv = vendor.DataBuffer(), vendor.DataInfo(), vendor.CurrentValues()
+        dll["BL_GetData"](idn, 0, buf, ctypes.byref(di), ctypes.byref(cv))
+        widths.append(di.NbRows)
+    assert widths[:2] == [0, 0]
+    assert widths[2] > 0
+
+
+def test_endless_tail_keeps_producing_rows_past_polls_until_stop():
+    sim.set_sim_config(
+        sim.SimConfig(polls_until_stop=1, endless_tail=True, rows_per_poll=2)
+    )
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    dll["BL_StartChannel"](idn, 0)
+
+    widths = []
+    for _ in range(10):
+        buf, di, cv = vendor.DataBuffer(), vendor.DataInfo(), vendor.CurrentValues()
+        dll["BL_GetData"](idn, 0, buf, ctypes.byref(di), ctypes.byref(cv))
+        widths.append(di.NbRows)
+    assert all(w == 2 for w in widths)  # never drops to zero
+
+
+def test_irq_skipped_is_reported_once():
+    sim.set_sim_config(sim.SimConfig(irq_skipped=7, polls_until_stop=3))
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False)
+    dll["BL_StartChannel"](idn, 0)
+
+    skipped = []
+    for _ in range(4):
+        buf, di, cv = vendor.DataBuffer(), vendor.DataInfo(), vendor.CurrentValues()
+        dll["BL_GetData"](idn, 0, buf, ctypes.byref(di), ctypes.byref(cv))
+        skipped.append(di.IRQskipped)
+    assert skipped[0] == 7
+    assert skipped[1:] == [0, 0, 0]
+
+
+def test_technique_ids_override_replaces_the_readback():
+    sim.set_sim_config(sim.SimConfig(technique_ids_override=[vendor.TECH_ID.CA]))
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    dll["BL_LoadTechnique"](idn, 0, b"TI4.ecc", parms, True, False, False)
+    dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, False, True, False)
+
+    info = vendor.TechniqueInfos()
+    assert dll["BL_GetTechniqueInfos"](idn, 0, 0, ctypes.byref(info)) == 0
+    assert info.Id == vendor.TECH_ID.CA  # not TI, though TI was loaded first
+
+
 def test_firmware_loads_are_counted():
     dll = sim.load_dll()
     idn = ctypes.c_int32()
