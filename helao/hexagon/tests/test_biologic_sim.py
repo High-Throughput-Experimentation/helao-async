@@ -277,3 +277,24 @@ def test_channel_indices_are_zero_based_here_too():
     assert dll["BL_GetChannelInfos"](idn, 0, ctypes.byref(info)) == 0
     assert info.Channel == 0
     assert dll["BL_GetChannelInfos"](idn, -1, ctypes.byref(info)) != 0
+
+
+def test_firmware_loads_are_counted():
+    dll = sim.load_dll()
+    idn = ctypes.c_int32()
+    info = vendor.DeviceInfo()
+    dll["BL_Connect"](b"1.2.3.4", 5, ctypes.byref(idn), ctypes.byref(info))
+    chans, results = vendor.ChannelsArray(), vendor.ResultsArray()
+    chans[0] = True
+    assert sim.firmware_loads() == 0
+    dll["BL_LoadFirmware"](
+        idn.value,
+        chans,
+        results,
+        len(results),
+        False,
+        True,
+        b"kernel4.bin",
+        b"vmp_iv_0395_aa.xlx",
+    )
+    assert sim.firmware_loads() == 1
