@@ -52,6 +52,9 @@ __all__ = [
     "EccParams",
     "E_RANGE",
     "I_RANGE",
+    "PARAM_BOOLEAN",
+    "PARAM_INT",
+    "PARAM_SINGLE",
     "PROG_STATE",
     "ResultsArray",
     "TECH_ID",
@@ -161,6 +164,12 @@ class DataInfo(ctypes.Structure):
         ("StartTime", c_double),
         ("MuxPad", c_int32),
     ]
+
+
+#: PDF: TEccParam.ParamType.
+PARAM_INT = 0
+PARAM_BOOLEAN = 1
+PARAM_SINGLE = 2
 
 
 class EccParam(ctypes.Structure):
