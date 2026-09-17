@@ -18,7 +18,7 @@ and the decoder that fills the buffer cannot drift apart.
 """
 
 import math
-from typing import Callable, NamedTuple
+from typing import Callable, NamedTuple, Optional
 
 from helao.deploy.hte.drivers.pstat.biologic import vendor
 
@@ -320,3 +320,62 @@ def decode(
             _project_dc(row, start, to_seconds, values, board_type, out)
 
     return out
+
+
+#: How many extra `BL_GetData` calls one `get_data` will make while draining
+#: the tail. Bounded because the loop it replaces was not: `to_s3`-style
+#: "retry until it works" on a call that can keep returning rows is how a
+#: worker wedges.
+MAX_DRAINS_PER_CALL = 20
+
+#: States that mean the channel is not finished. Named rather than tested with
+#: `State > 0`, which also swallows whatever a future firmware adds.
+_BUSY_STATES = frozenset(
+    {vendor.PROG_STATE.RUN, vendor.PROG_STATE.PAUSE, vendor.PROG_STATE.SYNC}
+)
+
+
+class RunTracker:
+    """Decides when a technique has finished, and how far to drain after.
+
+    One per started channel; the driver keeps it from `start_channel` to
+    `cleanup`.
+    """
+
+    def __init__(self, max_drains: int = MAX_DRAINS_PER_CALL):
+        self.max_drains = max_drains
+        self.seen_run = False
+        self.skipped = 0
+        self.drains = 0
+        self._done = False
+        self._drain_index: Optional[int] = None
+
+    def observe(self, values, info) -> str:
+        self.skipped += int(getattr(info, "IRQskipped", 0) or 0)
+        if self._done:
+            return "done"
+        state = int(values.State)
+        if state in _BUSY_STATES or state not in {int(vendor.PROG_STATE.STOP)}:
+            # Busy, or a state this build does not know -- either way not done.
+            self.seen_run = True
+            return "measuring"
+        if int(getattr(info, "NbRows", 0) or 0) > 0:
+            # Rows are proof it ran, even if RUN was never sampled.
+            self.seen_run = True
+        if not self.seen_run:
+            return "starting"
+        self._done = True
+        return "done"
+
+    def should_drain(self, info) -> bool:
+        if int(getattr(info, "NbRows", 0) or 0) <= 0:
+            return False
+        index = int(getattr(info, "TechniqueIndex", 0) or 0)
+        if self._drain_index is None:
+            self._drain_index = index
+        elif index != self._drain_index:
+            return False
+        if self.drains >= self.max_drains:
+            return False
+        self.drains += 1
+        return True
