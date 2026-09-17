@@ -14,6 +14,7 @@ measurement half for why.
 """
 
 import asyncio
+import os
 import time
 from typing import Any, Optional
 
@@ -282,9 +283,12 @@ class BiologicDriver(HelaoDriver):
         `first`/`last` are derived from a step's position: EClib1 has no
         unload, so `BL_LoadTechnique(first=True)` is what clears whatever a
         previous load left behind, and `last=True` closes the list. The
-        `.ecc` name is passed bare, not joined with `sdk_path` -- EC-Lab's
-        own technique templates ship beside `EClib64.dll`, which is where
-        `BL_LoadTechnique` looks for a name with no directory component.
+        `.ecc` name is joined with `sdk_path` -- easy-biologic gets away with
+        a bare name only because its vendored `.ecc` set is co-located with
+        `EClib64.dll`; that is not guaranteed for a station's own
+        `sdk_path` layout, and an absolute path fails with a path a human
+        can go and look at rather than depending on undocumented
+        DLL-relative resolution.
         """
         assert self._client is not None
         for i, step in enumerate(plan.steps):
@@ -292,7 +296,7 @@ class BiologicDriver(HelaoDriver):
             params = self._client.define_params(step.params)
             self._client.load_technique(
                 channel,
-                ecc,
+                os.path.join(self.sdk_path, ecc),
                 params,
                 first=(i == 0),
                 last=(i == len(plan.steps) - 1),
@@ -348,6 +352,12 @@ class BiologicDriver(HelaoDriver):
             defaults = getattr(technique, "defaults", {}) or {}
             params = {**defaults, **action_params}
             plan = bt.plan_for(technique, params, None)
+            # Deliberate first load, without a trigger: the trigger is not
+            # known until start_channel's ttl_params arrive, so this is a
+            # validation load only. start_channel reloads with the real
+            # ttl_params and BL_LoadTechnique(first=True) fully replaces
+            # this list -- do not delete either load, the first is what
+            # surfaces a bad technique/param here rather than at start.
             self._load_plan(channel, plan, board_type)
             self._technique = technique
             self._params = params
@@ -396,6 +406,11 @@ class BiologicDriver(HelaoDriver):
                 raise ValueError(f"channel {channel} encountered an error")
 
             plan = bt.plan_for(self._technique, self._params, ttl_params)
+            # Deliberate second load, this time with the real ttl_params:
+            # setup()'s earlier load had none to build from. This supersedes
+            # setup()'s load outright (BL_LoadTechnique(first=True) replaces
+            # the whole list) -- do not delete this thinking setup()'s load
+            # already covers it, or a requested trigger never gets loaded.
             self._load_plan(channel, plan, board_type)
 
             loaded = self._client.technique_ids(channel, len(plan.steps))
