@@ -45,7 +45,22 @@ class EclibError(RuntimeError):
 
 class EclibClient:
     """One dedicated worker thread per instrument connection. Every vendor
-    export -- real or simulated -- is called from that thread only."""
+    export -- real or simulated -- is called from that thread only.
+
+    Only the DLL invocation itself (`self._dll[name](*args)`, inside `_call`)
+    runs on the worker; a method's out-param structs/buffers and their
+    `byref(...)` wrappers are built on the caller's thread, before the call
+    is submitted. That is safe, not merely convenient: `_submit` blocks the
+    calling thread on `result.get()` for the whole round trip, so nothing
+    else ever touches those buffers while the worker is writing into them --
+    there is no concurrent access to guard against. It also means allocation
+    never contends with the DLL for the worker's attention, and there is
+    nothing here slow enough for that to matter regardless (it's a handful of
+    ctypes structs). The rule this leaves standing: anything added to this
+    class that would itself touch the DLL, or block, while building
+    arguments belongs *inside* the submitted call, not before it -- building
+    plain Python/ctypes values in the caller is fine forever.
+    """
 
     def __init__(self, sdk_path: str, simulate: bool = False):
         self.sdk_path = sdk_path
@@ -119,9 +134,15 @@ class EclibClient:
             self.idn = None
 
     def test_connection(self) -> bool:
-        if self.idn is None:
+        # A predicate, never an exception: `driver.connect` branches on this
+        # for idempotency, and closed / never-connected / a failing probe all
+        # mean the same thing to that caller -- "not connected".
+        if self._closed or self.idn is None:
             return False
-        return self._submit(self._call, "BL_TestConnection", self.idn) == 0
+        try:
+            return self._submit(self._call, "BL_TestConnection", self.idn) == 0
+        except EclibError:
+            return False
 
     # -- channel/board info ----------------------------------------------
 
@@ -286,11 +307,16 @@ class EclibClient:
     def close(self) -> None:
         if self._closed:
             return
-        if self.idn is not None:
-            try:
+        try:
+            if self.idn is not None:
                 self.disconnect()
-            except EclibError:
-                LOGGER.warning("BL_Disconnect failed during close", exc_info=True)
-        self._closed = True
-        self._requests.put(None)
-        self._worker.join(timeout=5)
+        except EclibError:
+            LOGGER.warning("BL_Disconnect failed during close", exc_info=True)
+        finally:
+            # A failed disconnect must not leave the object claiming a
+            # connection it no longer has -- `test_connection` and a later
+            # `connect` retry both depend on `idn` being cleared regardless.
+            self.idn = None
+            self._closed = True
+            self._requests.put(None)
+            self._worker.join(timeout=5)

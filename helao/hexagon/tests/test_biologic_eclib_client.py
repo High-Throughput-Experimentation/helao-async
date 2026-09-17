@@ -195,3 +195,13 @@ def test_a_call_after_close_raises_rather_than_hanging(client):
 
 def test_test_connection_reports_false_when_not_connected(client):
     assert client.test_connection() is False
+
+
+def test_close_survives_a_failing_disconnect_and_reports_not_connected(client):
+    """A disconnect that fails must not leave the client claiming a
+    connection it no longer has: idn is cleared and closed is set either
+    way, so test_connection reads False rather than raising."""
+    client.connect(ADDRESS)
+    sim.set_sim_config(sim.SimConfig(fail_on={"BL_Disconnect": -1}))
+    client.close()
+    assert client.test_connection() is False
