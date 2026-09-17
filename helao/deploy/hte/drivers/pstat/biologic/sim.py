@@ -162,13 +162,25 @@ class _Channel:
 
 
 class _Sim:
-    """One simulated device connection, fresh per `load_dll()` call."""
+    """One simulated device connection, fresh per `load_dll()` call.
 
-    def __init__(self, cfg: SimConfig):
-        self.cfg = cfg
+    `cfg` is a property reading the live module-level `_CONFIG`, not a value
+    snapshotted at construction. Every field is meant to be perturbed on an
+    already-connected, already-loaded simulator: a test connects, loads a
+    technique, then calls `set_sim_config` to inject a failure or change how
+    many rows a poll yields, the same way a station operator might change an
+    instrument setting without power-cycling it. A snapshot taken once at
+    `load_dll()` would make every such change silently a no-op.
+    """
+
+    def __init__(self):
         self.idn = 1
         self.connected = False
         self._channels: dict[int, _Channel] = {}
+
+    @property
+    def cfg(self) -> SimConfig:
+        return _CONFIG
 
     def channel(self, ch: int) -> _Channel:
         return self._channels.setdefault(ch, _Channel())
@@ -229,14 +241,15 @@ class FakeDll:
         if name not in self._bound:
             impl = self._impls[name]
 
-            # `fail_on` is resolved here, on every call, against the live
-            # module-level `_CONFIG` -- not captured once at bind time. A
-            # test can call `set_sim_config` on an already-connected driver
-            # (a fresh `SimConfig` instance, not a mutation of the one
-            # `self._state.cfg` already points at) and expect the next call
-            # through an already-bound name to see it.
+            # `fail_on` (like every other `SimConfig` field, via `_Sim.cfg`)
+            # is resolved here, on every call -- never captured once at bind
+            # time. `set_sim_config` rebinds the module-level `_CONFIG` name
+            # to a new `SimConfig` instance rather than mutating the one an
+            # already-connected `_Sim` was built with, so a value read once
+            # and cached in this closure would never see a config change
+            # made after the name was first looked up.
             def dispatch(*args, _name=name, _impl=impl):
-                forced = (_CONFIG.fail_on or {}).get(_name)
+                forced = (self._state.cfg.fail_on or {}).get(_name)
                 return _impl(*args) if forced is None else forced
 
             self._bound[name] = ctypes.CFUNCTYPE(ctypes.c_int32, *_ARGSPEC[name])(
@@ -506,5 +519,5 @@ class FakeDll:
 def load_dll(sdk_path: str | None = None) -> FakeDll:
     """Ignore `sdk_path` entirely -- there is no file to find."""
     global _STATE
-    _STATE = _Sim(_CONFIG)
+    _STATE = _Sim()
     return FakeDll(_STATE)
