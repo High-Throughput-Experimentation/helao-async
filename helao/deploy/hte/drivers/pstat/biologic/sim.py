@@ -227,9 +227,21 @@ class FakeDll:
         if name not in self._impls:
             raise KeyError(name)
         if name not in self._bound:
-            forced = (self._state.cfg.fail_on or {}).get(name)
-            impl = self._impls[name] if forced is None else (lambda *a, _rc=forced: _rc)
-            self._bound[name] = ctypes.CFUNCTYPE(ctypes.c_int32, *_ARGSPEC[name])(impl)
+            impl = self._impls[name]
+
+            # `fail_on` is resolved here, on every call, against the live
+            # module-level `_CONFIG` -- not captured once at bind time. A
+            # test can call `set_sim_config` on an already-connected driver
+            # (a fresh `SimConfig` instance, not a mutation of the one
+            # `self._state.cfg` already points at) and expect the next call
+            # through an already-bound name to see it.
+            def dispatch(*args, _name=name, _impl=impl):
+                forced = (_CONFIG.fail_on or {}).get(_name)
+                return _impl(*args) if forced is None else forced
+
+            self._bound[name] = ctypes.CFUNCTYPE(ctypes.c_int32, *_ARGSPEC[name])(
+                dispatch
+            )
         return self._bound[name]
 
     # -- connection --------------------------------------------------
@@ -483,7 +495,11 @@ class FakeDll:
         return 0
 
     def _convert_time_channel(self, words_ptr, out_ptr, timebase, channel_flag) -> int:
-        out_ptr.contents.value = words_ptr[0] + words_ptr[1] * timebase
+        # The two words are the high and low 32 bits of one 64-bit tick
+        # count, composed before scaling -- not a raw tick plus a
+        # separately-scaled one.
+        ticks = (words_ptr[0] << 32) + words_ptr[1]
+        out_ptr.contents.value = ticks * timebase
         return 0
 
 

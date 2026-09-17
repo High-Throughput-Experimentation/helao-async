@@ -54,6 +54,19 @@ def test_fail_on_forces_a_named_call_to_return_a_chosen_code():
     assert rc == -300
 
 
+def test_fail_on_takes_effect_on_an_already_bound_call():
+    """`fail_on` must be resolved per call, not cached the first time a name
+    is bound -- an already-connected driver that calls `set_sim_config` after
+    it has a live `FakeDll` (as a fault-injection test would) must still see
+    the injected failure on its next call through that same name."""
+    dll = sim.load_dll()
+    idn, _ = connect(dll)
+    parms = vendor.EccParams(0, None)
+    assert dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False) == 0
+    sim.set_sim_config(sim.SimConfig(fail_on={"BL_LoadTechnique": -300}))
+    assert dll["BL_LoadTechnique"](idn, 0, b"ca4.ecc", parms, True, True, False) == -300
+
+
 def test_channel_info_reports_the_configured_board_and_kernel_state():
     sim.set_sim_config(
         sim.SimConfig(board_type=vendor.BOARD_TYPE.ESSENTIAL, kernel_loaded=False)
@@ -195,6 +208,21 @@ def test_convert_time_uses_the_timebase_and_the_two_words():
         == 0
     )
     assert out.value == pytest.approx(1.0)
+
+
+def test_convert_time_composes_both_words_before_scaling():
+    """t_high and t_low are the two halves of one 64-bit tick count, composed
+    before scaling -- not a raw tick added to a separately-scaled one."""
+    dll = sim.load_dll()
+    words = (ctypes.c_uint32 * 2)(1, 0)  # t_high=1, t_low=0
+    out = ctypes.c_double()
+    assert (
+        dll["BL_ConvertTimeChannelNumericIntoSeconds"](
+            words, ctypes.byref(out), ctypes.c_float(1e-3), 2
+        )
+        == 0
+    )
+    assert out.value == pytest.approx((1 << 32) * 1e-3)
 
 
 def test_get_message_drains_once_then_returns_empty():
