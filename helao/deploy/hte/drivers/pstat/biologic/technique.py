@@ -21,7 +21,7 @@ driver this replaces.
 """
 
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 from typing import Any, Callable, NamedTuple
 
 from helao.deploy.hte.drivers.pstat.biologic import data, vendor
@@ -47,6 +47,18 @@ class SweepMode(StrEnum):
 
     LINEAR = "lin"
     LOG = "log"
+
+
+class ExitCond(IntEnum):
+    """CALIMIT/CPLIMIT ``Exit_Cond`` (PDF section 7.37.2).
+
+    An unrecognized value is refused rather than passed through -- the DLL
+    has no fourth behavior to fall back to.
+    """
+
+    NEXT_STEP = 0
+    NEXT_TECHNIQUE = 1
+    STOP = 2
 
 
 Param = NamedTuple("Param", [("label", str), ("kind", str), ("arity", int)])
@@ -275,6 +287,176 @@ TECH_CP = BiologicTechnique(
 )
 
 
+class LimitTest(NamedTuple):
+    """One CALIMIT/CPLIMIT ``TestN`` comparison (PDF section 7.37.2)."""
+
+    variable: str
+    above: bool
+    logic: str
+    active: bool
+
+
+#: Test configuration bit layout, read off the rendered PDF page 158/187
+#: (section 7.37.2) rather than its text layer, which flattens the header
+#: ambiguously: Variable occupies bits 31-5 (only 0-3 are assigned), Sign
+#: bits 4-2 (only bit 2 is meaningful), Logic bit 1, Active bit 0.
+_LIMIT_VARIABLE_SHIFT = 5
+_LIMIT_SIGN_BIT = 2
+_LIMIT_LOGIC_BIT = 1
+_LIMIT_ACTIVE_BIT = 0
+
+#: E (Voltage) = 0, AUX1 = 1, AUX2 = 2, I (Current) = 3.
+_LIMIT_VARIABLES = {"E": 0, "AUX1": 1, "AUX2": 2, "I": 3}
+#: OR = 0, AND = 1.
+_LIMIT_LOGIC = {"OR": 0, "AND": 1}
+
+
+def encode_test(test: LimitTest) -> int:
+    """Pack one ``LimitTest`` into the ``TestN_Config`` 32-bit integer.
+
+    An incorrectly packed limit is a cell driven past the threshold that was
+    supposed to stop it, so an unrecognized variable or logic is refused
+    rather than coerced to a plausible default.
+    """
+    try:
+        variable_code = _LIMIT_VARIABLES[test.variable]
+    except KeyError:
+        raise TechniqueError(
+            f"{test.variable!r} is not a known Test variable (expected one "
+            f"of {sorted(_LIMIT_VARIABLES)})"
+        )
+    try:
+        logic_code = _LIMIT_LOGIC[test.logic]
+    except KeyError:
+        raise TechniqueError(
+            f"{test.logic!r} is not a known Test logic (expected 'OR' or " f"'AND')"
+        )
+    return (
+        (variable_code << _LIMIT_VARIABLE_SHIFT)
+        | (int(test.above) << _LIMIT_SIGN_BIT)
+        | (logic_code << _LIMIT_LOGIC_BIT)
+        | (int(test.active) << _LIMIT_ACTIVE_BIT)
+    )
+
+
+def _limit_active(test: dict | None) -> bool:
+    return bool(test) and test.get("active", True)
+
+
+def _encode_limit(test: dict | None) -> tuple[int, float]:
+    """One TestN dict -> (config, value). Absent/None encodes as (0, 0.0)."""
+    if not test:
+        return 0, 0.0
+    limit = LimitTest(
+        variable=test["variable"],
+        above=test["above"],
+        logic=test["logic"],
+        active=test.get("active", True),
+    )
+    return encode_test(limit), float(test["value"])
+
+
+def _exit_cond(p: dict) -> int:
+    value = p.get("ExitCondition", int(ExitCond.NEXT_STEP))
+    try:
+        return int(ExitCond(value))
+    except ValueError:
+        raise TechniqueError(
+            f"{value} is not a known ExitCond (expected 0 Next Step, 1 Next "
+            f"Technique, or 2 STOP Experiment)"
+        )
+
+
+def _limit_arrays(p: dict, n: int) -> dict[str, Any]:
+    """The six per-step limit arrays plus ``Exit_Cond``, broadcast to `n`.
+
+    PDF section 7.37.2: Test3 is ignored if Test2 is inactive, and Test2 is
+    ignored if Test1 is inactive -- ignored, not refused, which is worse
+    because the caller's limit would silently not exist. Raise instead.
+    """
+    test1, test2, test3 = p.get("Test1"), p.get("Test2"), p.get("Test3")
+    if _limit_active(test2) and not _limit_active(test1):
+        raise TechniqueError("Test2 is active but Test1 is not")
+    if _limit_active(test3) and not _limit_active(test2):
+        raise TechniqueError("Test3 is active but Test2 is not")
+
+    c1, v1 = _encode_limit(test1)
+    c2, v2 = _encode_limit(test2)
+    c3, v3 = _encode_limit(test3)
+    return {
+        "Test1_Config": [c1] * n,
+        "Test1_Value": [v1] * n,
+        "Test2_Config": [c2] * n,
+        "Test2_Value": [v2] * n,
+        "Test3_Config": [c3] * n,
+        "Test3_Value": [v3] * n,
+        "Exit_Cond": [_exit_cond(p)] * n,
+    }
+
+
+def _build_calimit(p: dict) -> dict[str, Any]:
+    base = _build_ca(p)
+    base["N_Cycles"] = p["Cycles"]
+    base.update(_limit_arrays(p, base["Step_number"] + 1))
+    return base
+
+
+def _build_cplimit(p: dict) -> dict[str, Any]:
+    base = _build_cp(p)
+    base["N_Cycles"] = p["Cycles"]
+    base.update(_limit_arrays(p, base["Step_number"] + 1))
+    return base
+
+
+_LIMIT_PARAMS = {
+    "Test1_Config": Param("Test1_Config", "int", 20),
+    "Test1_Value": Param("Test1_Value", "float", 20),
+    "Test2_Config": Param("Test2_Config", "int", 20),
+    "Test2_Value": Param("Test2_Value", "float", 20),
+    "Test3_Config": Param("Test3_Config", "int", 20),
+    "Test3_Value": Param("Test3_Value", "float", 20),
+    "Exit_Cond": Param("Exit_Cond", "int", 20),
+}
+
+TECH_CALIMIT = BiologicTechnique(
+    technique_name="CALIMIT",
+    ecc_stem="calimit",
+    tech_id=vendor.TECH_ID.CALIMIT,
+    param_table={
+        "Voltage_step": Param("Voltage_step", "float", 20),
+        "Record_every_dT": Param("Record_every_dT", "float", 1),
+        "Record_every_dI": Param("Record_every_dI", "float", 1),
+        **_DC_STEP_PARAMS,
+        **_LIMIT_PARAMS,
+    },
+    defaults={
+        **TECH_CA.defaults,
+        "Cycles": 0,
+        "ExitCondition": int(ExitCond.NEXT_STEP),
+    },
+    build=_build_calimit,
+)
+
+TECH_CPLIMIT = BiologicTechnique(
+    technique_name="CPLIMIT",
+    ecc_stem="cplimit",
+    tech_id=vendor.TECH_ID.CPLIMIT,
+    param_table={
+        "Current_step": Param("Current_step", "float", 20),
+        "Record_every_dT": Param("Record_every_dT", "float", 1),
+        "Record_every_dE": Param("Record_every_dE", "float", 1),
+        **_DC_STEP_PARAMS,
+        **_LIMIT_PARAMS,
+    },
+    defaults={
+        **TECH_CP.defaults,
+        "Cycles": 0,
+        "ExitCondition": int(ExitCond.NEXT_STEP),
+    },
+    build=_build_cplimit,
+)
+
+
 def ec_sweep(value) -> bool:
     """The ECC ``sweep`` flag for a ``SweepMode``.
 
@@ -405,6 +587,49 @@ TECH_GEIS = BiologicTechnique(
 )
 
 
+def _staircase_step_number(p: dict) -> int:
+    """PDF section 7.12.2: number of staircase steps, bounded 0..98."""
+    n = p["StepNumber"]
+    if not (0 <= n <= 98):
+        raise TechniqueError(
+            f"StepNumber must be within 0..98 (PDF section 7.12.2), got {n}"
+        )
+    return n
+
+
+def _build_speis(p: dict) -> dict[str, Any]:
+    base = _build_peis(p)
+    base["Final_Voltage_step"] = p["Vfinal__V"]
+    base["Step_number"] = _staircase_step_number(p)
+    return base
+
+
+def _build_sgeis(p: dict) -> dict[str, Any]:
+    base = _build_geis(p)
+    base["Final_Current_step"] = p["Ifinal__A"]
+    base["Step_number"] = _staircase_step_number(p)
+    return base
+
+
+TECH_SPEIS = BiologicTechnique(
+    technique_name="SPEIS",
+    ecc_stem="seisp",
+    tech_id=vendor.TECH_ID.SPEIS,
+    param_table=dict(TECH_PEIS.param_table),
+    defaults=dict(TECH_PEIS.defaults),
+    build=_build_speis,
+)
+
+TECH_SGEIS = BiologicTechnique(
+    technique_name="SGEIS",
+    ecc_stem="seisg",
+    tech_id=vendor.TECH_ID.SGEIS,
+    param_table=dict(TECH_GEIS.param_table),
+    defaults=dict(TECH_GEIS.defaults),
+    build=_build_sgeis,
+)
+
+
 TECH_CV = BiologicTechnique(
     technique_name="CV",
     ecc_stem="cv",
@@ -435,7 +660,18 @@ TECH_CV = BiologicTechnique(
 
 BIOTECHS: dict[str, BiologicTechnique] = {
     x.technique_name: x
-    for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_PEIS, TECH_GEIS]
+    for x in [
+        TECH_OCV,
+        TECH_CA,
+        TECH_CP,
+        TECH_CV,
+        TECH_PEIS,
+        TECH_GEIS,
+        TECH_CALIMIT,
+        TECH_CPLIMIT,
+        TECH_SPEIS,
+        TECH_SGEIS,
+    ]
 }
 
 
