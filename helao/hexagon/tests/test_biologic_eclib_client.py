@@ -197,6 +197,14 @@ def test_test_connection_reports_false_when_not_connected(client):
     assert client.test_connection() is False
 
 
+def test_error_message_calls_through_without_raising(connected):
+    """The sim's BL_GetErrorMsg is a stub (returns success, writes nothing),
+    so this proves the plumbing -- buffer, size pointer, decode -- rather
+    than the vendor's wording; the real-SDK gate checks the wording."""
+    for code in (0, -1, -400, -9999):
+        assert connected.error_message(code) == ""
+
+
 def test_close_survives_a_failing_disconnect_and_reports_not_connected(client):
     """A disconnect that fails must not leave the client claiming a
     connection it no longer has: idn is cleared and closed is set either
