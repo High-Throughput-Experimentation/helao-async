@@ -149,47 +149,39 @@ def _steps(p: dict, value_key: str, duration_key: str):
 
 
 def _build_ocv(p: dict) -> dict[str, Any]:
-    out = {
+    return {
         "Rest_time_T": p["Tval__s"],
+        "Record_every_dT": p["AcqInterval__s"],
         "Record_every_dE": p["AcqInterval__V"],
     }
-    if "AcqInterval__s" in p:
-        out["Record_every_dT"] = p["AcqInterval__s"]
-    return out
 
 
 def _build_ca(p: dict) -> dict[str, Any]:
     steps, durations, vs_initial, last = _steps(p, "Vval__V", "Tval__s")
-    out = {
+    return {
         "Voltage_step": steps,
         "vs_initial": vs_initial,
         "Duration_step": durations,
         "Step_number": last,
+        "Record_every_dT": p["AcqInterval__s"],
+        "Record_every_dI": p["AcqInterval__A"],
         "N_Cycles": p["N_Cycles"],
+        **_ranges(p),
     }
-    if "AcqInterval__s" in p:
-        out["Record_every_dT"] = p["AcqInterval__s"]
-    if "AcqInterval__A" in p:
-        out["Record_every_dI"] = p["AcqInterval__A"]
-    out.update(_ranges(p))
-    return out
 
 
 def _build_cp(p: dict) -> dict[str, Any]:
     steps, durations, vs_initial, last = _steps(p, "Ival__A", "Tval__s")
-    out = {
+    return {
         "Current_step": steps,
         "vs_initial": vs_initial,
         "Duration_step": durations,
         "Step_number": last,
+        "Record_every_dT": p["AcqInterval__s"],
+        "Record_every_dE": p["AcqInterval__V"],
         "N_Cycles": p["N_Cycles"],
+        **_ranges(p),
     }
-    if "AcqInterval__s" in p:
-        out["Record_every_dT"] = p["AcqInterval__s"]
-    if "AcqInterval__V" in p:
-        out["Record_every_dE"] = p["AcqInterval__V"]
-    out.update(_ranges(p))
-    return out
 
 
 def _build_cv(p: dict) -> dict[str, Any]:
@@ -224,7 +216,9 @@ TECH_OCV = BiologicTechnique(
         "Record_every_dE": Param("Record_every_dE", "float", 1),
         "Record_every_dT": Param("Record_every_dT", "float", 1),
     },
-    defaults={"AcqInterval__V": 0.01},
+    # easy-biologic's OCV.__init__ defaults: {"time_interval": 1,
+    # "voltage_interval": 0.01}.
+    defaults={"AcqInterval__s": 1.0, "AcqInterval__V": 0.01},
     build=_build_ocv,
 )
 
@@ -248,7 +242,14 @@ TECH_CA = BiologicTechnique(
         "Record_every_dI": Param("Record_every_dI", "float", 1),
         **_DC_STEP_PARAMS,
     },
-    defaults={"N_Cycles": 0, "vs_initial": False},
+    # easy-biologic's CA.__init__ defaults: {"vs_initial": False,
+    # "time_interval": 1.0, "current_interval": 1e-3}.
+    defaults={
+        "N_Cycles": 0,
+        "vs_initial": False,
+        "AcqInterval__s": 1.0,
+        "AcqInterval__A": 1e-3,
+    },
     build=_build_ca,
 )
 
@@ -262,7 +263,14 @@ TECH_CP = BiologicTechnique(
         "Record_every_dE": Param("Record_every_dE", "float", 1),
         **_DC_STEP_PARAMS,
     },
-    defaults={"N_Cycles": 0, "vs_initial": False},
+    # easy-biologic's CP.__init__ defaults: {"vs_initial": False,
+    # "time_interval": 1.0, "voltage_interval": 1e-3}.
+    defaults={
+        "N_Cycles": 0,
+        "vs_initial": False,
+        "AcqInterval__s": 1.0,
+        "AcqInterval__V": 1e-3,
+    },
     build=_build_cp,
 )
 
