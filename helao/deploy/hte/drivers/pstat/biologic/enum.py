@@ -1,17 +1,22 @@
-"""String enums mirroring easy-biologic IRange / ERange / Bandwidth values.
+"""String enums for Biologic IRange / ERange / Bandwidth, and their integer
+values.
 
-Provides serializable ``StrEnum`` aliases plus resolver functions that map
-each alias to the corresponding ``easy_biologic.lib.ec_lib`` enum member, so
-the rest of the driver can accept plain strings from configs and actions.
+The aliases are what an action records and what the ``run_*`` endpoints
+annotate, so their spellings are a contract; the integers are what
+``BL_DefineIntParameter`` receives. Both live here so a reader can check one
+against the other, and so nothing else in the driver has to know that
+``"m1"`` means 7.
 
-The vendor import is deliberately lazy. ``biologic_server.py`` imports this
-module, and a station running the OLE COM backend has EC-Lab but not
-necessarily easy-biologic -- an eager import here made that station's action
-server unimportable.
+This module is hermetic. It used to lazy-import ``easy_biologic.lib.ec_lib``
+just to map each alias onto a vendor member spelled identically, with the
+import deferred because ``biologic_server.py`` imports this module on stations
+that have EC-Lab but not easy-biologic. With the numbers held here there is
+nothing to defer.
 """
 
 from enum import StrEnum
-from functools import lru_cache
+
+from helao.deploy.hte.drivers.pstat.biologic import vendor
 
 
 class EC_IRange(StrEnum):
@@ -97,48 +102,47 @@ class EC_Bandwidth(StrEnum):
     BW9 = "BW9"
 
 
-def _ec_lib():
-    """The vendor enum module, imported on first use.
+#: Alias -> vendor int. Spelled out rather than derived by `getattr` on a
+#: vendor enum, because these numbers are the contract: they are what four
+#: stations' recorded data was produced with, and a table can be diffed
+#: against the PDF while a `getattr` cannot.
+_IRANGE: dict[str, int] = {
+    "p100": vendor.I_RANGE.I_RANGE_100pA,
+    "n1": vendor.I_RANGE.I_RANGE_1nA,
+    "n10": vendor.I_RANGE.I_RANGE_10nA,
+    "n100": vendor.I_RANGE.I_RANGE_100nA,
+    "u1": vendor.I_RANGE.I_RANGE_1uA,
+    "u10": vendor.I_RANGE.I_RANGE_10uA,
+    "u100": vendor.I_RANGE.I_RANGE_100uA,
+    "m1": vendor.I_RANGE.I_RANGE_1mA,
+    "m10": vendor.I_RANGE.I_RANGE_10mA,
+    "m100": vendor.I_RANGE.I_RANGE_100mA,
+    "a1": vendor.I_RANGE.I_RANGE_1A,
+    "KEEP": vendor.I_RANGE.I_RANGE_KEEP,
+    "BOOSTER": vendor.I_RANGE.I_RANGE_BOOSTER,
+    "AUTO": vendor.I_RANGE.I_RANGE_AUTO,
+}
 
-    Imported lazily because ``biologic_server.py`` imports this module, and a
-    station running the OLE COM backend has EC-Lab but not necessarily
-    easy-biologic. An eager import there made that station's action server
-    unimportable. ``driver.py`` and ``technique.py`` were made hermetic in
-    P3a-2; this module was missed because nothing then needed it to be.
-    """
-    from easy_biologic.lib.ec_lib import Bandwidth, ERange, IRange
+_ERANGE: dict[str, int] = {
+    "v2_5": vendor.E_RANGE.E_RANGE_2_5V,
+    "v5": vendor.E_RANGE.E_RANGE_5V,
+    "v10": vendor.E_RANGE.E_RANGE_10V,
+    "AUTO": vendor.E_RANGE.E_RANGE_AUTO,
+}
 
-    return IRange, ERange, Bandwidth
-
-
-@lru_cache(maxsize=1)
-def _maps() -> tuple:
-    """The vendor ``(IRange, ERange, Bandwidth)`` classes, cached on first use.
-
-    Resolved per member rather than built into eager dicts: every
-    ``EC_IRange``/``EC_ERange``/``EC_Bandwidth`` member's value is spelled
-    identically to the vendor member's name, so ``getattr`` on the cached
-    vendor class is all a lookup needs. Building full dicts here would force
-    every alias to resolve against the vendor package on the very first call
-    (and on every model the map is used with), which is more than "resolve
-    against the vendor package only when called" requires.
-    """
-    return _ec_lib()
-
-
-def ec_irange(value):
-    """The vendor ``IRange`` member for a string alias or ``EC_IRange``."""
-    IRange, _, _ = _maps()
-    return getattr(IRange, EC_IRange(value).value)
+_BANDWIDTH: dict[str, int] = {f"BW{n}": vendor.BANDWIDTH(n) for n in range(1, 10)}
 
 
-def ec_erange(value):
-    """The vendor ``ERange`` member for a string alias or ``EC_ERange``."""
-    _, ERange, _ = _maps()
-    return getattr(ERange, EC_ERange(value).value)
+def ec_irange(value) -> int:
+    """The vendor current-range int for a string alias or ``EC_IRange``."""
+    return int(_IRANGE[EC_IRange(value).value])
 
 
-def ec_bandwidth(value):
-    """The vendor ``Bandwidth`` member for a string alias or ``EC_Bandwidth``."""
-    _, _, Bandwidth = _maps()
-    return getattr(Bandwidth, EC_Bandwidth(value).value)
+def ec_erange(value) -> int:
+    """The vendor voltage-range int for a string alias or ``EC_ERange``."""
+    return int(_ERANGE[EC_ERange(value).value])
+
+
+def ec_bandwidth(value) -> int:
+    """The vendor bandwidth int for a string alias or ``EC_Bandwidth``."""
+    return int(_BANDWIDTH[EC_Bandwidth(value).value])
