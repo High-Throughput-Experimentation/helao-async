@@ -490,11 +490,18 @@ TTL_TECHS = {"in": TECH_TI, "out": TECH_TO}
 
 
 def plan_for(
-    technique: BiologicTechnique,
+    technique: "BiologicTechnique | PlanTechnique",
     action_params: dict,
     ttl_params: dict | None = None,
-) -> LoadPlan:
-    """The load order for one technique, with a trigger ahead of it if asked."""
+):
+    """The load order for one technique, with a trigger ahead of it if asked.
+
+    A `PlanTechnique` (multi-technique plan) is dispatched to its own
+    `expand`, which builds the trigger itself rather than going through the
+    single-technique path below.
+    """
+    if isinstance(technique, PlanTechnique):
+        return technique.expand(ttl_params)
     steps: list[LoadStep] = []
     mode = (ttl_params or {}).get("ttl", "none")
     if mode != "none":
@@ -515,3 +522,154 @@ def plan_for(
         )
     )
     return LoadPlan(steps)
+
+
+PlanEntry = NamedTuple("PlanEntry", [("name", str), ("params", dict)])
+PlanLoop = NamedTuple("PlanLoop", [("start", int), ("end", int), ("n", int)])
+
+TECH_LOOP = BiologicTechnique(
+    technique_name="LOOP",
+    ecc_stem="loop",
+    tech_id=vendor.TECH_ID.LOOP,
+    param_table={
+        "loop_N_times": Param("loop_N_times", "int", 1),
+        "protocol_number": Param("protocol_number", "int", 1),
+    },
+    defaults={},
+    build=lambda p: {
+        "loop_N_times": p["loop_N_times"],
+        "protocol_number": p["protocol_number"],
+    },
+)
+
+
+def sub_steps(entry: "PlanEntry") -> list[LoadStep]:
+    """The loaded steps for one plan entry.
+
+    A plain technique loads as its own single step; Task 11 extends this for
+    the two-technique CAOCV entry.
+    """
+    try:
+        technique = BIOTECHS[entry.name]
+    except KeyError:
+        raise TechniqueError(f"{entry.name!r} is not a known technique")
+    merged = {**technique.defaults, **entry.params}
+    return plan_for(technique, merged, None).steps
+
+
+@dataclass
+class PlanTechnique:
+    """Several techniques on one channel as a single loaded experiment.
+
+    `technique_name` is `"PLAN"` so `data.decode` is called per *segment* with
+    the name of whatever technique that segment came from -- the driver reads
+    `DataInfo.TechniqueID` and looks the name up, rather than assuming one
+    technique for the whole action.
+    """
+
+    technique_name: str
+    plan_entries: list[PlanEntry]
+    loops: list[PlanLoop]
+
+    @property
+    def column_plan(self) -> tuple[str, ...]:
+        seen: list[str] = []
+        for entry in self.plan_entries:
+            for column in data.COLUMNS[entry.name]:
+                if column not in seen:
+                    seen.append(column)
+        return tuple(seen)
+
+    def expand(self, ttl_params=None) -> LoadPlan:
+        if not self.plan_entries:
+            raise TechniqueError("plan is empty")
+
+        steps: list[LoadStep] = []
+        mode = (ttl_params or {}).get("ttl", "none")
+        if mode != "none":
+            try:
+                trigger = TTL_TECHS[mode]
+            except KeyError:
+                raise TechniqueError(
+                    f"unknown ttl mode {mode!r}; expected 'none', 'in' or 'out'"
+                )
+            steps.append(
+                LoadStep(
+                    trigger.ecc_stem,
+                    trigger.tech_id,
+                    entries(trigger, ttl_params or {}),
+                )
+            )
+
+        first_loaded: list[int] = []
+        last_loaded: list[int] = []
+        for entry in self.plan_entries:
+            entry_steps = sub_steps(entry)
+            first_loaded.append(len(steps))
+            steps.extend(entry_steps)
+            last_loaded.append(len(steps) - 1)
+
+        n_entries = len(self.plan_entries)
+        for span in self.loops:
+            if not (0 <= span.start <= span.end < n_entries):
+                raise TechniqueError(
+                    f"loop span ({span.start}, {span.end}) out of range for "
+                    f"{n_entries} plan entries"
+                )
+            if span.n == -1:
+                raise TechniqueError(
+                    "loop_N_times must be >= 1; -1 is the PDF's unlimited "
+                    "goto and would never terminate"
+                )
+            if span.n < 1:
+                raise TechniqueError(f"loop_N_times must be >= 1, got {span.n}")
+
+        sorted_spans = sorted(self.loops, key=lambda s: s.start)
+        for i, a in enumerate(sorted_spans):
+            for b in sorted_spans[i + 1 :]:
+                if b.start > a.end:
+                    continue
+                # a and b overlap (they share at least one entry) -- one
+                # must contain the other.
+                if not (a.start <= b.start and b.end <= a.end):
+                    raise TechniqueError(
+                        "loop spans must nest, not straddle: "
+                        f"({a.start}, {a.end}) vs ({b.start}, {b.end})"
+                    )
+
+        # Innermost first: shortest span length, then latest start, so a loop
+        # nested inside another is inserted (and its shift accounted for)
+        # before the loop that contains it.
+        ordered = sorted(self.loops, key=lambda s: (s.end - s.start, -s.start))
+        for span in ordered:
+            insert_at = last_loaded[span.end] + 1
+            steps.insert(
+                insert_at,
+                LoadStep(
+                    TECH_LOOP.ecc_stem,
+                    TECH_LOOP.tech_id,
+                    entries(
+                        TECH_LOOP,
+                        {
+                            "loop_N_times": span.n,
+                            "protocol_number": first_loaded[span.start],
+                        },
+                    ),
+                ),
+            )
+            # Every loaded index at or after the insertion point shifts by
+            # one -- including spans not yet emitted, whose bounds are still
+            # expressed in loaded-index terms via first_loaded/last_loaded.
+            for i in range(n_entries):
+                if first_loaded[i] >= insert_at:
+                    first_loaded[i] += 1
+                if last_loaded[i] >= insert_at:
+                    last_loaded[i] += 1
+
+        return LoadPlan(steps)
+
+
+def plan_technique(entries: list[PlanEntry], loops: list[PlanLoop]) -> PlanTechnique:
+    if not entries:
+        raise TechniqueError("plan is empty")
+    return PlanTechnique("PLAN", entries, loops)
