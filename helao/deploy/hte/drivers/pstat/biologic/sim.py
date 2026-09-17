@@ -23,6 +23,7 @@ simulator that cheats here would let a client bug pass:
 """
 
 import ctypes
+import os
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -127,7 +128,14 @@ def decode_single(word: int) -> float:
 
 
 def _tech_for_ecc(filename: bytes) -> int:
-    stem = filename.decode().removesuffix(".ecc").rstrip("0123456789")
+    """Recognize a technique from a `.ecc` name -- bare or with a directory.
+
+    The real driver passes a full path (`BL_LoadTechnique` needs one to find
+    a file `EClib64.dll` may not be co-located with); the basename is what
+    carries the technique identity.
+    """
+    basename = os.path.basename(filename.decode())
+    stem = basename.removesuffix(".ecc").rstrip("0123456789")
     return _ECC_TO_TECH[stem]
 
 
@@ -439,7 +447,11 @@ class FakeDll:
             channel.techniques = []
             self._state.loaded_ecc = []
         channel.techniques.append(tech)
-        self._state.loaded_ecc.append(filename.decode())
+        # Recorded as a basename: the real driver passes a full path, but
+        # `loaded_ecc_files()` exists to check *which technique* loaded, not
+        # to check path construction -- that would make every ecc-tracking
+        # test depend on `sdk_path`, which is arbitrary in the fixtures.
+        self._state.loaded_ecc.append(os.path.basename(filename.decode()))
         return 0
 
     def _define_bool_parameter(self, label, value, index, parm_ptr) -> int:
