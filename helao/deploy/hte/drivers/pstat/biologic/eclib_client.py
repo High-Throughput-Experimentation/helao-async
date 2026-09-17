@@ -33,6 +33,9 @@ MAX_MESSAGES_PER_DRAIN = 100
 #: Capacity of the scratch buffer BL_GetMessage writes into per call.
 _MESSAGE_BUF_SIZE = 4096
 
+#: Capacity of the scratch buffer BL_GetErrorMsg writes into per call.
+_ERROR_MSG_BUF_SIZE = 256
+
 
 class EclibError(RuntimeError):
     def __init__(self, code: int, context: str = ""):
@@ -278,6 +281,18 @@ class EclibClient:
                 break
             messages.append(buf.value[: size.value].decode(errors="replace"))
         return messages
+
+    def error_message(self, code: int) -> str:
+        """The DLL's own text for a vendor error code (`BL_GetErrorMsg`).
+
+        `EclibError.name` is the transcribed name; this is the vendor's own
+        sentence, used only by the real-SDK gate to check the transcription
+        against the binary -- nothing in the driver's error path calls it.
+        """
+        buf = ctypes.create_string_buffer(_ERROR_MSG_BUF_SIZE)
+        size = ctypes.c_uint32(_ERROR_MSG_BUF_SIZE)
+        self._checked("BL_GetErrorMsg", code, buf, ctypes.byref(size))
+        return buf.value[: size.value].decode(errors="replace")
 
     # -- unit conversions ---------------------------------------------------
 
