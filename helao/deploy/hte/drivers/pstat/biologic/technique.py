@@ -437,3 +437,81 @@ BIOTECHS: dict[str, BiologicTechnique] = {
     x.technique_name: x
     for x in [TECH_OCV, TECH_CA, TECH_CP, TECH_CV, TECH_PEIS, TECH_GEIS]
 }
+
+
+LoadStep = NamedTuple(
+    "LoadStep", [("ecc_stem", str), ("tech_id", int), ("params", list)]
+)
+
+
+@dataclass
+class LoadPlan:
+    """The ordered technique list to load onto one channel.
+
+    EClib1 has no unload: `BL_LoadTechnique(..., first=True)` is what clears a
+    channel, and `last=True` closes the list. The driver derives both from a
+    step's position here rather than from the caller.
+    """
+
+    steps: list[LoadStep]
+
+    @property
+    def tech_ids(self) -> list[int]:
+        return [step.tech_id for step in self.steps]
+
+
+#: Trigger In / Trigger Out, PDF sections 7.32 and 7.33. Not calls -- techniques,
+#: which is why they need `.ecc` files and a slot in the load order.
+TECH_TI = BiologicTechnique(
+    technique_name="TI",
+    ecc_stem="TI",
+    tech_id=vendor.TECH_ID.TI,
+    param_table={"Trigger_Logic": Param("Trigger_Logic", "int", 1)},
+    defaults={},
+    build=lambda p: {"Trigger_Logic": p["ttl_logic"]},
+)
+
+TECH_TO = BiologicTechnique(
+    technique_name="TO",
+    ecc_stem="TO",
+    tech_id=vendor.TECH_ID.TO,
+    param_table={
+        "Trigger_Logic": Param("Trigger_Logic", "int", 1),
+        "Trigger_Duration": Param("Trigger_Duration", "float", 1),
+    },
+    defaults={},
+    build=lambda p: {
+        "Trigger_Logic": p["ttl_logic"],
+        "Trigger_Duration": p["ttl_duration"],
+    },
+)
+
+TTL_TECHS = {"in": TECH_TI, "out": TECH_TO}
+
+
+def plan_for(
+    technique: BiologicTechnique,
+    action_params: dict,
+    ttl_params: dict | None = None,
+) -> LoadPlan:
+    """The load order for one technique, with a trigger ahead of it if asked."""
+    steps: list[LoadStep] = []
+    mode = (ttl_params or {}).get("ttl", "none")
+    if mode != "none":
+        try:
+            trigger = TTL_TECHS[mode]
+        except KeyError:
+            raise TechniqueError(
+                f"unknown ttl mode {mode!r}; expected 'none', 'in' or 'out'"
+            )
+        steps.append(
+            LoadStep(
+                trigger.ecc_stem, trigger.tech_id, entries(trigger, ttl_params or {})
+            )
+        )
+    steps.append(
+        LoadStep(
+            technique.ecc_stem, technique.tech_id, entries(technique, action_params)
+        )
+    )
+    return LoadPlan(steps)
