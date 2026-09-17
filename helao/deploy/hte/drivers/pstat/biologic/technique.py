@@ -394,6 +394,22 @@ def _limit_arrays(p: dict, n: int) -> dict[str, Any]:
     }
 
 
+def _refuse_auto_irange(base: dict, technique: str, section: str) -> None:
+    """Refuse a resolved I_Range of Auto, PDF section `section`'s own
+    "Warning: I Auto-range is not allowed" on the technique's I_Range row.
+
+    Under galvanostatic control the instrument is driving the current, so it
+    cannot auto-range the quantity it is setting. Checked against the
+    resolved vendor int (post-`ec_irange`), not the source string, so an
+    `EC_IRange.AUTO` member and the literal `"AUTO"` are both caught.
+    """
+    if base.get("I_Range") == int(vendor.I_RANGE.I_RANGE_AUTO):
+        raise TechniqueError(
+            f"{technique}: EClib1 forbids I Auto-range for this technique "
+            f"(PDF section {section}); pass an explicit IRange"
+        )
+
+
 def _build_calimit(p: dict) -> dict[str, Any]:
     base = _build_ca(p)
     base["N_Cycles"] = p["Cycles"]
@@ -403,6 +419,7 @@ def _build_calimit(p: dict) -> dict[str, Any]:
 
 def _build_cplimit(p: dict) -> dict[str, Any]:
     base = _build_cp(p)
+    _refuse_auto_irange(base, "CPLIMIT", "7.36.2")
     base["N_Cycles"] = p["Cycles"]
     base.update(_limit_arrays(p, base["Step_number"] + 1))
     return base
@@ -606,6 +623,7 @@ def _build_speis(p: dict) -> dict[str, Any]:
 
 def _build_sgeis(p: dict) -> dict[str, Any]:
     base = _build_geis(p)
+    _refuse_auto_irange(base, "SGEIS", "7.14.2")
     base["Final_Current_step"] = p["Ifinal__A"]
     base["Step_number"] = _staircase_step_number(p)
     return base

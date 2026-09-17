@@ -20,7 +20,7 @@ LIMIT_ARGS = dict(
     Tval__s=[10.0],
     AcqInterval__s=0.01,
     AcqInterval__A=10.0,
-    IRange="AUTO",
+    IRange="m10",
     ERange="AUTO",
     Bandwidth="BW4",
     Cycles=0,
@@ -65,7 +65,7 @@ SGEIS_ARGS = dict(
     SweepMode="log",
     Repeats=10,
     DelayFraction=0.1,
-    IRange="AUTO",
+    IRange="m10",
     ERange="AUTO",
     Bandwidth="BW4",
 )
@@ -233,6 +233,30 @@ def test_calimit_stems_and_ids():
     )
 
 
+def test_cplimit_refuses_i_auto_range():
+    """PDF page 158 (I_Range row, §7.36.2): "Warning: I Auto-range is not
+    allowed" -- under galvanostatic control the instrument is driving the
+    current, so it cannot auto-range the quantity it is setting."""
+    with pytest.raises(TechniqueError, match="CPLIMIT"):
+        built(
+            "CPLIMIT",
+            {
+                **LIMIT_ARGS,
+                "Ival__A": [1e-3],
+                "AcqInterval__V": 0.001,
+                "IRange": "AUTO",
+            },
+        )
+
+
+def test_cplimit_builds_fine_with_an_explicit_i_range():
+    got = built(
+        "CPLIMIT",
+        {**LIMIT_ARGS, "Ival__A": [1e-3], "AcqInterval__V": 0.001},
+    )
+    assert got["I_Range"] != int(vendor.I_RANGE.I_RANGE_AUTO)
+
+
 # --- SPEIS / SGEIS ----------------------------------------------------------
 
 
@@ -277,6 +301,19 @@ def test_staircase_stems_and_ids():
         "seisg",
         vendor.TECH_ID.SGEIS,
     )
+
+
+def test_sgeis_refuses_i_auto_range():
+    """PDF §7.14.2's I_Range row carries the same warning as CPLIMIT's;
+    SGEIS is current-controlled the same way. GEIS itself is deliberately
+    left unchanged -- it is a production technique on four stations today."""
+    with pytest.raises(TechniqueError, match="SGEIS"):
+        built("SGEIS", {**SGEIS_ARGS, "IRange": "AUTO"})
+
+
+def test_sgeis_builds_fine_with_an_explicit_i_range():
+    got = built("SGEIS", SGEIS_ARGS)
+    assert got["I_Range"] != int(vendor.I_RANGE.I_RANGE_AUTO)
 
 
 def test_every_new_technique_only_emits_declared_labels():
