@@ -594,31 +594,6 @@ class PlanTechnique:
         if not self.plan_entries:
             raise TechniqueError("plan is empty")
 
-        steps: list[LoadStep] = []
-        mode = (ttl_params or {}).get("ttl", "none")
-        if mode != "none":
-            try:
-                trigger = TTL_TECHS[mode]
-            except KeyError:
-                raise TechniqueError(
-                    f"unknown ttl mode {mode!r}; expected 'none', 'in' or 'out'"
-                )
-            steps.append(
-                LoadStep(
-                    trigger.ecc_stem,
-                    trigger.tech_id,
-                    entries(trigger, ttl_params or {}),
-                )
-            )
-
-        first_loaded: list[int] = []
-        last_loaded: list[int] = []
-        for entry in self.plan_entries:
-            entry_steps = sub_steps(entry)
-            first_loaded.append(len(steps))
-            steps.extend(entry_steps)
-            last_loaded.append(len(steps) - 1)
-
         n_entries = len(self.plan_entries)
         for span in self.loops:
             if not (0 <= span.start <= span.end < n_entries):
@@ -640,41 +615,79 @@ class PlanTechnique:
                 if b.start > a.end:
                     continue
                 # a and b overlap (they share at least one entry) -- one
-                # must contain the other.
-                if not (a.start <= b.start and b.end <= a.end):
+                # must contain the other. Sorting by start alone does not
+                # order containment when two spans share a start (e.g.
+                # (0, 2) and (0, 4)): either can be the larger one, so both
+                # directions must be checked.
+                a_contains_b = a.start <= b.start and b.end <= a.end
+                b_contains_a = b.start <= a.start and a.end <= b.end
+                if not (a_contains_b or b_contains_a):
                     raise TechniqueError(
                         "loop spans must nest, not straddle: "
                         f"({a.start}, {a.end}) vs ({b.start}, {b.end})"
                     )
 
-        # Innermost first: shortest span length, then latest start, so a loop
-        # nested inside another is inserted (and its shift accounted for)
-        # before the loop that contains it.
-        ordered = sorted(self.loops, key=lambda s: (s.end - s.start, -s.start))
-        for span in ordered:
-            insert_at = last_loaded[span.end] + 1
-            steps.insert(
-                insert_at,
+        # Group spans by the entry they close on. Ties (two spans closing on
+        # the same entry, which validation above forces to be nested rather
+        # than merely coincident) are emitted innermost first, so an inner
+        # LOOP precedes the outer one that wraps it.
+        spans_by_end: dict[int, list[PlanLoop]] = {}
+        for span in self.loops:
+            spans_by_end.setdefault(span.end, []).append(span)
+        for spans in spans_by_end.values():
+            spans.sort(key=lambda s: (s.end - s.start, -s.start))
+
+        # A single append-only pass, entries in order. `protocol_number` for
+        # a span is read from `first_loaded[span.start]` at the moment the
+        # span's *end* entry finishes -- and since `start <= end` and entries
+        # are walked in order, `first_loaded[span.start]` was fixed on an
+        # earlier (or this) iteration and is never touched again, because
+        # nothing is ever inserted before the current write position. That
+        # is what the shift-and-patch version above got wrong: a LOOP
+        # inserted for one span could still slide a *later* span's already
+        # -captured `first_loaded` out from under it, which is exactly what
+        # happened to two independent (non-nested) spans -- the first LOOP's
+        # insertion shifted every following index, but the second span's
+        # `protocol_number` had already been read from the pre-shift
+        # position and was never revised. Building strictly left-to-right,
+        # inserting a LOOP only once its target position is permanent,
+        # removes the possibility of that class of bug rather than patching
+        # this one instance of it.
+        steps: list[LoadStep] = []
+        mode = (ttl_params or {}).get("ttl", "none")
+        if mode != "none":
+            try:
+                trigger = TTL_TECHS[mode]
+            except KeyError:
+                raise TechniqueError(
+                    f"unknown ttl mode {mode!r}; expected 'none', 'in' or 'out'"
+                )
+            steps.append(
                 LoadStep(
-                    TECH_LOOP.ecc_stem,
-                    TECH_LOOP.tech_id,
-                    entries(
-                        TECH_LOOP,
-                        {
-                            "loop_N_times": span.n,
-                            "protocol_number": first_loaded[span.start],
-                        },
-                    ),
-                ),
+                    trigger.ecc_stem,
+                    trigger.tech_id,
+                    entries(trigger, ttl_params or {}),
+                )
             )
-            # Every loaded index at or after the insertion point shifts by
-            # one -- including spans not yet emitted, whose bounds are still
-            # expressed in loaded-index terms via first_loaded/last_loaded.
-            for i in range(n_entries):
-                if first_loaded[i] >= insert_at:
-                    first_loaded[i] += 1
-                if last_loaded[i] >= insert_at:
-                    last_loaded[i] += 1
+
+        first_loaded: list[int] = [0] * n_entries
+        for i, entry in enumerate(self.plan_entries):
+            first_loaded[i] = len(steps)
+            steps.extend(sub_steps(entry))
+            for span in spans_by_end.get(i, []):
+                steps.append(
+                    LoadStep(
+                        TECH_LOOP.ecc_stem,
+                        TECH_LOOP.tech_id,
+                        entries(
+                            TECH_LOOP,
+                            {
+                                "loop_N_times": span.n,
+                                "protocol_number": first_loaded[span.start],
+                            },
+                        ),
+                    )
+                )
 
         return LoadPlan(steps)
 

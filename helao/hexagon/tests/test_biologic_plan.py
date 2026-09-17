@@ -31,6 +31,11 @@ def loop_params(step):
     return {label: value for label, value, _ in step.params}
 
 
+def resolved_technique(plan, loop_step):
+    """The tech_id a LOOP step's protocol_number actually points at."""
+    return plan.tech_ids[loop_params(loop_step)["protocol_number"]]
+
+
 def test_a_two_entry_plan_loads_two_techniques_in_order():
     plan = expand([PlanEntry("OCV", OCV), PlanEntry("CA", CA)])
     assert plan.tech_ids == [vendor.TECH_ID.OCV, vendor.TECH_ID.CA]
@@ -113,6 +118,83 @@ def test_two_nested_loops_both_resolve():
     inner, outer = plan.steps[2], plan.steps[-1]
     assert loop_params(inner)["protocol_number"] == 1
     assert loop_params(outer)["protocol_number"] == 0
+
+
+def test_two_disjoint_sibling_loops_each_resolve_to_their_own_entry():
+    """Neither span nests the other. The first LOOP's insertion must not
+    stale-out the second span's protocol_number."""
+    plan = expand(
+        [
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+        ],
+        [PlanLoop(start=0, end=1, n=2), PlanLoop(start=3, end=3, n=5)],
+    )
+    assert plan.tech_ids == [
+        vendor.TECH_ID.OCV,
+        vendor.TECH_ID.CA,
+        vendor.TECH_ID.LOOP,
+        vendor.TECH_ID.OCV,
+        vendor.TECH_ID.CA,
+        vendor.TECH_ID.LOOP,
+    ]
+    first_loop, second_loop = plan.steps[2], plan.steps[5]
+    assert resolved_technique(plan, first_loop) == vendor.TECH_ID.OCV
+    assert resolved_technique(plan, second_loop) == vendor.TECH_ID.CA
+
+
+def test_disjoint_sibling_loops_with_a_prepended_trigger():
+    """The trigger shift and the first LOOP's insertion both precede the
+    second span's target -- two levels of shift the fix must survive."""
+    plan = expand(
+        [
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+        ],
+        [PlanLoop(start=0, end=1, n=2), PlanLoop(start=3, end=3, n=5)],
+        ttl=TTL_IN,
+    )
+    assert plan.tech_ids == [
+        vendor.TECH_ID.TI,
+        vendor.TECH_ID.OCV,
+        vendor.TECH_ID.CA,
+        vendor.TECH_ID.LOOP,
+        vendor.TECH_ID.OCV,
+        vendor.TECH_ID.CA,
+        vendor.TECH_ID.LOOP,
+    ]
+    first_loop, second_loop = plan.steps[3], plan.steps[6]
+    assert resolved_technique(plan, first_loop) == vendor.TECH_ID.OCV
+    assert resolved_technique(plan, second_loop) == vendor.TECH_ID.CA
+
+
+def test_three_deep_nesting_all_resolve():
+    plan = expand(
+        [
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+            PlanEntry("OCV", OCV),
+            PlanEntry("CA", CA),
+            PlanEntry("OCV", OCV),
+        ],
+        [
+            PlanLoop(start=1, end=1, n=2),
+            PlanLoop(start=0, end=2, n=3),
+            PlanLoop(start=0, end=4, n=4),
+        ],
+    )
+    loop_indices = [i for i, t in enumerate(plan.tech_ids) if t == vendor.TECH_ID.LOOP]
+    assert len(loop_indices) == 3
+    inner, mid, outer = (plan.steps[i] for i in loop_indices)
+    # inner wraps just the CA at plan index 1
+    assert resolved_technique(plan, inner) == vendor.TECH_ID.CA
+    # mid and outer both start at plan index 0, an OCV
+    assert resolved_technique(plan, mid) == vendor.TECH_ID.OCV
+    assert resolved_technique(plan, outer) == vendor.TECH_ID.OCV
 
 
 def test_unlimited_goto_is_refused():
