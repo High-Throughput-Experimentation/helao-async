@@ -17,6 +17,7 @@ happened after the request reached the server is retried.
 """
 
 import asyncio
+import logging
 import socket
 
 import pytest
@@ -123,3 +124,47 @@ async def test_an_unreachable_peer_still_fails_within_the_connect_budget():
     # RPC probe (<=1 s) + one connect attempt (<=1 s) + no backoff on the last
     # retry. Generous, because the point is "bounded", not a tuned number.
     assert elapsed < 15, f"took {elapsed:.1f}s against a dead port"
+
+
+@pytest.mark.asyncio
+async def test_a_plain_text_500_is_reported_not_swallowed_as_transport_noise(
+    caplog,
+):
+    """FastAPI returns an unhandled endpoint exception as text/plain.
+
+    Decoding the body before checking the status raised
+
+        aiohttp.client_exceptions.ContentTypeError: 500, message='Attempt to
+        decode JSON with unexpected mimetype: text/plain; charset=utf-8'
+
+    which arrived at the generic except arm looking like a transport failure:
+    a stack trace, a retry sleep, and the server's own error message
+    discarded. Seen on every /get_status poll at teardown, when the action
+    server's driver was already disconnected.
+    """
+    port = _free_port()
+    calls = []
+    body = "RuntimeError: GamryComAdapter is not connected"
+
+    async def handler(request):
+        calls.append(1)
+        return web.Response(status=500, text=body)
+
+    runner = await _serve(handler, port)
+    try:
+        world_cfg = {"servers": {SERVER: {"host": "127.0.0.1", "port": port}}}
+        with caplog.at_level(logging.ERROR):
+            response, error_code = await async_action_dispatcher(
+                world_cfg, _action(), timeout=1, retries=5
+            )
+    finally:
+        await runner.cleanup()
+
+    assert error_code == ErrorCodes.http
+    assert response is None
+    assert len(calls) == 1
+    # Checking the status before decoding the body is what keeps the server's
+    # own message: decoding first raised ContentTypeError and threw it away.
+    assert any(
+        body in rec.getMessage() for rec in caplog.records
+    ), "the 500's text/plain body never reached the log"
