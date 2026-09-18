@@ -40,7 +40,7 @@ from helao.helpers.sample_api import UnifiedSampleDataAPI
 
 from ...drivers.io.enum import TriggerType
 from ...drivers.spec.enum import SpecTrigType
-from ...drivers.spec.spectral_products_driver import SM303
+from ...drivers.spec.spectral_products_driver import SM303, device_call
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -63,6 +63,8 @@ class SM303Exec(Executor):
         super().__init__(*args, **kwargs)
         LOGGER.info("SM303Exec initialized.")
         self.driver: SM303 = self.active.driver
+        #: The in-flight blocking read, if any (see :meth:`_poll`).
+        self._read_future: Optional[asyncio.Future] = None
 
     async def _pre_exec(self) -> dict:
         """Arm the driver's per-run acquisition state from ``action_params``."""
@@ -94,10 +96,18 @@ class SM303Exec(Executor):
             LOGGER.info("polling loop duration complete, finishing")
             return {"error": ErrorCodes.none, "status": HloStatus.finished, "data": {}}
 
-        loop = asyncio.get_event_loop()
+        # One outstanding read at a time. wait_for cancels the *await*, never
+        # the thread, so a read waiting on a trigger that never arrives stays
+        # parked -- and without this guard every poll (100/s at poll_rate
+        # 0.01) submitted another one behind it, each holding a pool worker.
+        if self._read_future is None or self._read_future.done():
+            loop = asyncio.get_event_loop()
+            self._read_future = asyncio.ensure_future(
+                loop.run_in_executor(None, driver.read_data)
+            )
         try:
             await asyncio.wait_for(
-                loop.run_in_executor(None, driver.read_data),
+                asyncio.shield(self._read_future),
                 timeout=driver.trigger_duration + driver.start_margin,
             )
         except asyncio.exceptions.TimeoutError:
@@ -114,17 +124,35 @@ class SM303Exec(Executor):
         return {"error": ErrorCodes.none, "status": HloStatus.active, "data": data}
 
     async def _post_exec(self) -> dict:
-        """Close the device channel and disable the trigger (ported ``IOloop`` tail)."""
+        """Close the device channel and disable the trigger (ported ``IOloop`` tail).
+
+        Both calls go through :func:`device_call`: they are the two that hung
+        the server, because the DLL will not service them while a read thread
+        is still parked on a trigger that never arrived.
+        """
         self.driver.trigger_duration = 0
         if self.driver.spec is not None:
-            self.driver.unset_external_trigger()
-            self.driver.spec.spCloseGivenChannel(self.driver.dev_num)
+            await device_call(
+                "unset_external_trigger", self.driver.unset_external_trigger
+            )
+            await device_call(
+                "spCloseGivenChannel",
+                self.driver.spec.spCloseGivenChannel,
+                self.driver.dev_num,
+            )
         return {"error": ErrorCodes.none, "data": {}}
 
     async def _manual_stop(self) -> dict:
-        """Disable the trigger on abort (estop/manual stop)."""
+        """Disable the trigger on abort (estop/manual stop).
+
+        Off the loop for the same reason as :meth:`_post_exec`, and more
+        urgently: this is the abort path, so it is reached precisely when the
+        device is misbehaving.
+        """
         if self.driver.spec is not None:
-            self.driver.unset_external_trigger()
+            await device_call(
+                "unset_external_trigger", self.driver.unset_external_trigger
+            )
         return {"error": ErrorCodes.none}
 
 
@@ -394,9 +422,19 @@ async def sm303_dyn_endpoints(app: ActionHost):
         p = A.action_params
 
         LOGGER.info("Setting up external trigger.")
-        trigset = app.driver.set_trigger_mode(SpecTrigType.external)
-        edgeset = app.driver.set_extedge_mode(p["edge_mode"])
-        inttset = app.driver.set_integration_time(p["int_time"])
+        # Each setter is a USB round-trip plus a 100 ms settle sleep in the
+        # driver, so inline they cost the event loop 0.3 s on every arm -- and
+        # they block outright if a previous run left a read parked on the
+        # device.
+        trigset = await device_call(
+            "set_trigger_mode", app.driver.set_trigger_mode, SpecTrigType.external
+        )
+        edgeset = await device_call(
+            "set_extedge_mode", app.driver.set_extedge_mode, p["edge_mode"]
+        )
+        inttset = await device_call(
+            "set_integration_time", app.driver.set_integration_time, p["int_time"]
+        )
         # TODO: can perform more checks like gamry technique wrapper...
         if not (trigset and edgeset and inttset):
             LOGGER.error(
