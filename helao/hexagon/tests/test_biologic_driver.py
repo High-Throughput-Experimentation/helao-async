@@ -78,20 +78,43 @@ def test_setup_refuses_a_channel_outside_num_channels(driver):
     assert resp.status == DriverStatus.error
 
 
-def test_setup_resolves_the_ecc_by_board_type(driver):
+def test_the_ecc_is_resolved_by_board_type(driver):
     sim.set_sim_config(sim.SimConfig(board_type=vendor.BOARD_TYPE.ESSENTIAL))
     d = BiologicDriver(dict(CONFIG))
     d.connect()
     try:
         setup(d)
+        d.start_channel(0)
         assert sim.loaded_ecc_files() == ["ca.ecc"]
     finally:
         d.shutdown()
 
 
-def test_setup_on_a_premium_board_loads_the_four_suffixed_ecc(driver):
+def test_a_premium_board_loads_the_four_suffixed_ecc(driver):
     setup(driver)
+    driver.start_channel(0)
     assert sim.loaded_ecc_files() == ["ca4.ecc"]
+
+
+def test_setup_sends_nothing_to_the_instrument(driver):
+    """The load belongs to `start_channel` alone. A validation load in
+    `setup` is still being "made" by the firmware ~170 ms later, and the
+    reload landing inside that window is what broke every linked plan at a
+    station on 2026-09-18."""
+    calls = _record_client_calls(driver, "load_technique", "define_params")
+    assert setup(driver).response == DriverResponseType.success
+
+    assert calls == []
+    assert sim.loaded_ecc_files() == []
+
+
+def test_a_run_loads_each_step_exactly_once(driver):
+    setup(driver)
+    calls = _record_client_calls(driver, "load_technique")
+    driver.start_channel(0, {"ttl": "out", "ttl_logic": 1, "ttl_duration": 1.0})
+
+    assert calls == ["load_technique", "load_technique"]  # TO, then CA
+    assert sim.loaded_ecc_files() == ["TO4.ecc", "ca4.ecc"]
 
 
 def test_setup_loads_the_trigger_first_when_ttl_is_requested(driver):
@@ -116,9 +139,19 @@ def test_start_fails_when_the_technique_list_reads_back_wrong(driver):
 
 
 def test_a_failed_setup_releases_the_claim(driver):
-    sim.set_sim_config(sim.SimConfig(fail_on={"BL_LoadTechnique": -400}))
-    assert setup(driver).response == DriverResponseType.failed
+    """Building the plan is what `setup` validates now that it sends
+    nothing, so an unbuildable parameter set is what fails it."""
+    resp = driver.setup(technique=bt.BIOTECHS["CA"], action_params={"channel": 0})
+    assert resp.response == DriverResponseType.failed
     assert driver.channel is None
+
+
+def test_a_vendor_rejection_now_fails_the_start_not_the_setup(driver):
+    """The one thing moving the load costs: a rejection of the parameter
+    values themselves surfaces one step later. The action still fails."""
+    sim.set_sim_config(sim.SimConfig(fail_on={"BL_LoadTechnique": -400}))
+    assert setup(driver).response == DriverResponseType.success
+    assert driver.start_channel(0).response == DriverResponseType.failed
 
 
 def test_setup_accepts_output_dir_and_ignores_it(driver):
@@ -469,8 +502,9 @@ def test_a_load_stops_a_running_channel_first(driver):
 def test_a_load_onto_a_stopped_channel_does_not_stop_it(driver):
     """One `BL_GetChannelInfos` and no `BL_StopChannel` -- the common path
     must not pay for the running one."""
-    calls = _record_client_calls(driver, "stop_channel", "load_technique")
     setup(driver)
+    calls = _record_client_calls(driver, "stop_channel", "load_technique")
+    driver.start_channel(0)
 
     assert "stop_channel" not in calls
     assert "load_technique" in calls
