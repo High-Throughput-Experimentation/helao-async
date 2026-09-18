@@ -358,6 +358,28 @@ _BUSY_STATES = frozenset(
 #: wait into a premature abort.
 MAX_STARTING_POLLS = 500
 
+#: Consecutive `PROG_STATE.STOP` observations before a run is called
+#: finished. A linked experiment is *one protocol per technique*, and the
+#: channel passes through STOP between them -- the station's firmware log
+#: for a CAOCV run:
+#:
+#:     [24:616] end protocol 0, ID = 101     <- CA
+#:     [24:617] start protocol 1, ID=100     <- OCV
+#:     [24:618] change mode from POT to OCV
+#:
+#: One STOP sample inside that ~2 ms window ended the action a second into a
+#: 10 s OCV that then ran to completion with nobody reading it. The
+#: `State > 0` rule this driver inherited cannot tell that gap from the end
+#: of the run, so the rule is now "STOP, and still STOP N polls later".
+#:
+#: 20 polls is ~200 ms at `BiologicExec`'s 10 ms rate: two orders of
+#: magnitude over the measured gap, and 200 ms of extra latency on an action
+#: that already runs for seconds. It is deliberately not the number of
+#: techniques loaded or the `TechniqueIndex` of the last one -- a LOOP plan
+#: revisits its last data-producing technique, so an index test would end
+#: the run on the first pass through it.
+STOP_POLLS_TO_FINISH = 20
+
 
 class RunTracker:
     """Decides when a technique has finished, and how far to drain after.
@@ -370,10 +392,13 @@ class RunTracker:
         self,
         max_drains: int = MAX_DRAINS_PER_CALL,
         max_starting_polls: Optional[int] = MAX_STARTING_POLLS,
+        stop_polls_to_finish: int = STOP_POLLS_TO_FINISH,
     ):
         self.max_drains = max_drains
         #: `None` means unbounded -- see MAX_STARTING_POLLS's docstring.
         self.max_starting_polls = max_starting_polls
+        self.stop_polls_to_finish = stop_polls_to_finish
+        self._stop_polls = 0
         self.seen_run = False
         self.skipped = 0
         self.drains = 0
@@ -393,6 +418,7 @@ class RunTracker:
             # Busy, or a state this build does not know -- either way not done.
             self.seen_run = True
             self._starting_polls = 0
+            self._stop_polls = 0
             return "measuring"
         if int(getattr(info, "NbRows", 0) or 0) > 0:
             # Rows are proof it ran, even if RUN was never sampled.
@@ -406,6 +432,12 @@ class RunTracker:
                 self._errored = True
                 return "error"
             return "starting"
+        self._stop_polls += 1
+        if self._stop_polls < self.stop_polls_to_finish:
+            # STOP, but a linked experiment passes through STOP between its
+            # techniques -- see STOP_POLLS_TO_FINISH. Keep polling: this is
+            # also what collects the next technique's rows.
+            return "measuring"
         self._done = True
         return "done"
 

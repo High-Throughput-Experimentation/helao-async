@@ -590,6 +590,7 @@ class BiologicDriver(HelaoDriver):
                 )
             )
             self._logged_skipped = 0
+            self._last_tech_index: Optional[int] = None
             start_time = time.time()
             self._client.start_channel(channel)
             return DriverResponse(
@@ -666,6 +667,18 @@ class BiologicDriver(HelaoDriver):
                     client.to_seconds,
                     board_type,
                 )
+                index = int(getattr(info, "TechniqueIndex", 0) or 0)
+                if index != self._last_tech_index:
+                    # One line per technique boundary in a linked plan. This
+                    # is the transition a single STOP sample used to be read
+                    # as the end of the run.
+                    LOGGER.info(
+                        f"channel {channel}: technique index "
+                        f"{self._last_tech_index} -> {index} (id "
+                        f"{int(info.TechniqueID)}, process "
+                        f"{int(info.ProcessIndex)}, state {int(values.State)})"
+                    )
+                    self._last_tech_index = index
                 row_n = len(next(iter(decoded.values()), []))
                 for col in plan_columns:
                     combined[col].extend(decoded.get(col, [float("nan")] * row_n))
@@ -698,6 +711,13 @@ class BiologicDriver(HelaoDriver):
                 self._logged_skipped = tracker.skipped
 
             done = state == "done"
+            if done:
+                LOGGER.info(
+                    f"channel {channel}: done at technique index "
+                    f"{int(getattr(info, 'TechniqueIndex', 0) or 0)} (id "
+                    f"{int(info.TechniqueID)}), after "
+                    f"{tracker.stop_polls_to_finish} polls reporting STOP"
+                )
             return DriverResponse(
                 response=DriverResponseType.success,
                 message="done" if done else "measuring",
