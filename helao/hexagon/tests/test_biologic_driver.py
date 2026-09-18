@@ -7,6 +7,7 @@ import pytest
 from helao.core.drivers.helao_driver import DriverResponseType, DriverStatus
 from helao.deploy.hte.drivers.pstat.biologic import data, sim, vendor
 from helao.deploy.hte.drivers.pstat.biologic import technique as bt
+from helao.deploy.hte.drivers.pstat.biologic import driver as driver_module
 from helao.deploy.hte.drivers.pstat.biologic.driver import BiologicDriver
 
 CONFIG = {
@@ -378,15 +379,20 @@ _PEIS = dict(
 )
 
 
-def test_start_warns_but_proceeds_when_the_channel_is_not_yet_stopped(driver, caplog):
+def test_start_warns_but_proceeds_when_the_channel_never_stops(
+    driver, caplog, monkeypatch
+):
     """Station failure, 2026-09-18: `run_OCV` raised "channel 0 is busy" here.
 
     `setup`'s own `BL_LoadTechnique(first=True)` halts whatever the channel
     was running -- the firmware logged "halt experiment"/"end protocol"
     immediately before the refusal -- so the state this reads can be the tail
     of the driver's own load. Refusing after the destructive step protects
-    nothing; `BL_StartChannel` is what gets to say no.
+    nothing; `BL_StartChannel` is what gets to say no. This is also the
+    branch where `_ensure_stopped`'s wait expires: a channel that never
+    reports STOP is still loaded onto, and warned about twice.
     """
+    monkeypatch.setattr(driver_module, "STOP_BEFORE_LOAD_TIMEOUT_S", 0.05)
     setup(driver)
     unpatched = driver._client.channel_info
 
@@ -403,6 +409,7 @@ def test_start_warns_but_proceeds_when_the_channel_is_not_yet_stopped(driver, ca
     assert response.response == DriverResponseType.success
     assert response.status == DriverStatus.busy
     assert "state 1 (RUN)" in caplog.text
+    assert "still reports state 1" in caplog.text
     assert driver.channel == 0
 
 
@@ -422,3 +429,63 @@ def test_start_still_fails_when_the_channel_state_cannot_be_read(driver):
     assert response.response == DriverResponseType.failed
     assert "encountered an error" in (response.message or "")
     assert driver.channel is None
+
+
+# --- loading onto a channel that is still running ---------------------------
+
+
+def _record_client_calls(driver, *names):
+    """Names of the client calls a driver makes, in order."""
+    calls: list[str] = []
+    client = driver._client
+    for name in names:
+        original = getattr(client, name)
+
+        def wrapper(*args, _name=name, _original=original, **kwargs):
+            calls.append(_name)
+            return _original(*args, **kwargs)
+
+        setattr(client, name, wrapper)
+    return calls
+
+
+def test_a_load_stops_a_running_channel_first(driver):
+    """Station failure, 2026-09-18, `run_OCV` with `TTLsend=0`: the trigger's
+    `BL_LoadTechnique(first=True, last=False)` drew `cannot load experiment
+    after make...` from the firmware while still returning 0, and the
+    technique's load then failed -403. A list that spans two calls is not
+    "made" between them, and the firmware will not begin one on a running
+    channel."""
+    setup(driver)
+    driver.start_channel(0)  # channel is now RUN
+
+    calls = _record_client_calls(driver, "stop_channel", "load_technique")
+    assert driver.start_channel(0).response == DriverResponseType.success
+
+    assert "stop_channel" in calls
+    assert calls.index("stop_channel") < calls.index("load_technique")
+
+
+def test_a_load_onto_a_stopped_channel_does_not_stop_it(driver):
+    """One `BL_GetChannelInfos` and no `BL_StopChannel` -- the common path
+    must not pay for the running one."""
+    calls = _record_client_calls(driver, "stop_channel", "load_technique")
+    setup(driver)
+
+    assert "stop_channel" not in calls
+    assert "load_technique" in calls
+
+
+def test_a_failed_load_names_the_step_that_failed(driver):
+    """`ERR_TECH_LOADTECHNIQUEFAILED` alone cannot say which technique of a
+    linked plan the firmware rejected."""
+    setup(driver)
+    sim.set_sim_config(sim.SimConfig(fail_on={"BL_LoadTechnique": -403}))
+
+    resp = driver.start_channel(0, {"ttl": "out", "ttl_logic": 1, "ttl_duration": 1.0})
+
+    assert resp.response == DriverResponseType.failed
+    message = resp.message or ""
+    assert "step 1/2" in message
+    assert "TO" in message
+    assert "first=True, last=False" in message
