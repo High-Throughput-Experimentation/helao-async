@@ -428,15 +428,29 @@ class BiologicDriver(HelaoDriver):
         action_params: dict = {},
         output_dir: Optional[str] = None,
     ) -> DriverResponse:
-        """Claim a channel and load its technique, without a trigger.
+        """Claim a channel and build its plan, without loading anything.
 
-        Loading here -- rather than deferring everything to `start_channel`
-        -- is what lets a bad technique build or a vendor rejection surface
-        at setup time, before an action believes the channel is ready. The
-        trigger is not known yet (it arrives with `start_channel`'s
-        `ttl_params`), so `start_channel` rebuilds and reloads the plan from
-        scratch once it does -- redundant against real firmware, but
-        harmless, since `first=True` always replaces whatever is loaded.
+        **Nothing is sent to the instrument here.** Until 2026-09-18 this
+        also loaded the plan, as a validation load, on the reasoning that
+        `start_channel`'s reload with the real `ttl_params` would replace it
+        and the first load was therefore harmless. It was not. A load takes
+        the firmware ~170 ms to "make" (its own messages timestamp it), and
+        the channel reads `PROG_STATE.RUN` for that whole time; the reload
+        landed inside that window. A single-call load survives it -- the
+        firmware halts the in-flight make and remakes -- so `run_OCV` worked.
+        A two-call load (any linked plan: a trigger, `CAOCV`, `run_plan`)
+        did not: the first call drew `cannot load experiment after make...`
+        and the second failed, with -403 or, once a `BL_StopChannel` was put
+        in front of it, `ERR_COMM_COMMFAILED` and a channel that had lost
+        its kernel. `easy_biologic` never hit this because it loads exactly
+        once per run, immediately before starting.
+
+        What is validated here is everything that does not need the
+        instrument: the technique builds its parameter entries (a missing or
+        out-of-range action param raises `TechniqueError`) and every step's
+        `.ecc` resolves for this board. A vendor rejection of the parameter
+        values themselves now surfaces from `start_channel` instead, which
+        fails the same action one step later.
 
         Args:
             technique: A `BiologicTechnique` (or `PlanTechnique`) from
@@ -472,13 +486,14 @@ class BiologicDriver(HelaoDriver):
             defaults = getattr(technique, "defaults", {}) or {}
             params = {**defaults, **action_params}
             plan = bt.plan_for(technique, params, None)
-            # Deliberate first load, without a trigger: the trigger is not
-            # known until start_channel's ttl_params arrive, so this is a
-            # validation load only. start_channel reloads with the real
-            # ttl_params and BL_LoadTechnique(first=True) fully replaces
-            # this list -- do not delete either load, the first is what
-            # surfaces a bad technique/param here rather than at start.
-            self._load_plan(channel, plan, board_type)
+            # Built and thrown away: building is the validation (see the
+            # docstring), and the plan `start_channel` loads is a different
+            # one -- it is rebuilt there with the `ttl_params` that only
+            # arrive with the start. Resolving each `.ecc` is part of the
+            # check: an unsupported board raises `VendorError` here rather
+            # than mid-load.
+            for step in plan.steps:
+                vendor.ecc_file(step.ecc_stem, board_type)
             self._technique = technique
             self._params = params
             return DriverResponse(
@@ -546,11 +561,10 @@ class BiologicDriver(HelaoDriver):
                 )
 
             plan = bt.plan_for(self._technique, self._params, ttl_params)
-            # Deliberate second load, this time with the real ttl_params:
-            # setup()'s earlier load had none to build from. This supersedes
-            # setup()'s load outright (BL_LoadTechnique(first=True) replaces
-            # the whole list) -- do not delete this thinking setup()'s load
-            # already covers it, or a requested trigger never gets loaded.
+            # The only load of the run. `setup` deliberately sends nothing
+            # (see its docstring): a second load arriving while the firmware
+            # is still making the first is what broke every linked plan at a
+            # station.
             self._load_plan(channel, plan, board_type)
 
             loaded = self._client.technique_ids(channel, len(plan.steps))
