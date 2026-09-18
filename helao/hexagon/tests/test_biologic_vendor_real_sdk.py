@@ -29,7 +29,15 @@ def test_the_dll_is_where_the_config_default_expects_it():
 
 def test_every_export_in_the_api_table_exists_in_the_dll():
     """load_dll binds every name and raises VendorError on a missing one."""
-    vendor.load_dll(SDK)
+    exports = vendor.load_dll(SDK)
+    # And every bound name is still typed when looked up, against the real
+    # library rather than a stand-in: `ctypes.CDLL.__getitem__` returns a
+    # fresh unconfigured function pointer per lookup, which is how the first
+    # station run of this driver reached `BL_DefineSglParameter` with no
+    # `argtypes` and raised "Don't know how to convert parameter 2".
+    for name, argtypes in vendor.ECL_API:
+        assert exports[name].argtypes == argtypes, name
+        assert exports[name].restype is vendor.c_int32, name
 
 
 def test_every_ecc_file_every_technique_can_ask_for_is_present():

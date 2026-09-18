@@ -5,6 +5,7 @@ licence header on every one of those files forbids it in a public repo.
 """
 
 import ctypes
+import ctypes.util
 
 import pytest
 
@@ -186,3 +187,117 @@ def test_import_loads_no_dll():
 def test_load_dll_reports_the_path_it_could_not_find(tmp_path):
     with pytest.raises(vendor.VendorError, match=str(tmp_path)):
         vendor.load_dll(str(tmp_path))
+
+
+# -- the typed-lookup seam ------------------------------------------------
+#
+# Station failure, 2026-09-18, hispec `run_OCV`: every vendor call went out
+# with no `argtypes`, because `load_dll` assigned them to the throwaway
+# function object `dll[name]` returns and then handed back the `WinDLL`, whose
+# next `dll[name]` builds another unconfigured one. Untyped calls taking ints,
+# bools, bytes and pointers all worked, so the first float parameter was the
+# first symptom: `BL_DefineSglParameter` raised `ArgumentError: argument 2:
+# TypeError: Don't know how to convert parameter 2`. `sim.FakeDll` binds
+# through `CFUNCTYPE`, so no simulated test could see it.
+
+
+class _Fn:
+    """Stands in for a ctypes function pointer: settable, born untyped, and
+    callable so a call can be traced back to the object it landed on."""
+
+    def __init__(self, name: str):
+        self.name = name
+        self.argtypes = None
+        self.restype = None
+        self.calls: list[tuple] = []
+
+    def __call__(self, *args):
+        self.calls.append(args)
+        return 0
+
+
+class _FreshLookupDll:
+    """A `WinDLL` as ctypes actually behaves: `__getitem__` yields a **new**
+    unconfigured function object every time, and an unknown export raises
+    `AttributeError`."""
+
+    def __init__(self, path, missing=()):
+        self.path = path
+        self._missing = set(missing)
+        self.lookups: list[str] = []
+
+    def __getitem__(self, name):
+        if name in self._missing:
+            raise AttributeError(name)
+        self.lookups.append(name)
+        return _Fn(name)
+
+
+def _fake_sdk(tmp_path, monkeypatch, missing=()):
+    (tmp_path / vendor.DLL_NAME).write_bytes(b"")
+    monkeypatch.setattr(
+        ctypes,
+        "WinDLL",
+        lambda path: _FreshLookupDll(path, missing),
+        raising=False,
+    )
+    return str(tmp_path)
+
+
+def test_ctypes_getitem_does_not_carry_argtypes(tmp_path):
+    """Why `Exports` exists, asserted against real ctypes rather than a model
+    of it. Uses libm because it is present wherever this test can run at all;
+    the semantics under test belong to `CDLL`, not to any one library."""
+    libm_path = ctypes.util.find_library("m")
+    try:
+        libm = ctypes.CDLL(libm_path or "libm.so.6")
+    except OSError:
+        pytest.skip("no libm to characterize ctypes against")
+
+    typed = libm["sqrt"]
+    typed.argtypes = [ctypes.c_double]
+    typed.restype = ctypes.c_double
+
+    again = libm["sqrt"]
+    assert again is not typed
+    assert again.argtypes is None
+
+    with pytest.raises(ctypes.ArgumentError, match="Don't know how to convert"):
+        again(4.0)
+    assert typed(4.0) == 2.0
+
+
+def test_load_dll_returns_exports_whose_every_lookup_is_typed(tmp_path, monkeypatch):
+    exports = vendor.load_dll(_fake_sdk(tmp_path, monkeypatch))
+
+    for name, argtypes in vendor.ECL_API:
+        function = exports[name]
+        assert function.argtypes == argtypes, name
+        assert function.restype is vendor.c_int32, name
+
+
+def test_exports_hands_back_the_same_typed_function_every_time(tmp_path, monkeypatch):
+    """The property the `WinDLL` itself does not have."""
+    exports = vendor.load_dll(_fake_sdk(tmp_path, monkeypatch))
+    assert exports["BL_DefineSglParameter"] is exports["BL_DefineSglParameter"]
+
+
+def test_load_dll_names_a_missing_export(tmp_path, monkeypatch):
+    sdk = _fake_sdk(tmp_path, monkeypatch, missing={"BL_DefineSglParameter"})
+    with pytest.raises(vendor.VendorError, match="BL_DefineSglParameter"):
+        vendor.load_dll(sdk)
+
+
+def test_the_client_calls_through_the_typed_lookup(tmp_path, monkeypatch):
+    """`EclibClient._call` must index whatever `load_dll` returned -- not the
+    raw library, which is what re-introduces the untyped call."""
+    from helao.deploy.hte.drivers.pstat.biologic import eclib_client
+
+    exports = vendor.load_dll(_fake_sdk(tmp_path, monkeypatch))
+    client = eclib_client.EclibClient.__new__(eclib_client.EclibClient)
+    client._dll = exports
+
+    assert client._call("BL_GetLibVersion", b"buf", 64) == 0
+    reached = exports["BL_GetLibVersion"]
+    assert reached.calls == [(b"buf", 64)]
+    assert reached.argtypes is not None

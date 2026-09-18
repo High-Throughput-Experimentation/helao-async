@@ -50,6 +50,7 @@ __all__ = [
     "ERROR_NAMES",
     "EccParam",
     "EccParams",
+    "Exports",
     "E_RANGE",
     "I_RANGE",
     "PARAM_BOOLEAN",
@@ -449,7 +450,40 @@ def board_family(board_type: int) -> BoardFamily:
     return family
 
 
-def load_dll(sdk_path: str = DEFAULT_SDK_PATH) -> Any:
+class Exports:
+    """Name-indexed, *already typed* vendor exports.
+
+    `load_dll` hands back one of these rather than the `WinDLL` itself,
+    because `ctypes.CDLL.__getitem__` builds a **fresh, unconfigured**
+    function pointer on every lookup -- only `__getattr__` caches one. So
+    `argtypes` assigned to `dll[name]` is set on an object the next
+    `dll[name]` does not return, and the call goes out untyped.
+
+    Untyped is not the same as broken-everywhere, which is what made this
+    hard to see: with no `argtypes`, ctypes still accepts `int`, `bool`,
+    `bytes` and `byref(...)` and passes them in the shapes those exports
+    happen to want, so connecting, reading the board type and defining an
+    integer parameter all work. It has no conversion for a Python `float` at
+    all, so the *first* `BL_DefineSglParameter` -- i.e. the first real
+    technique parameter, on the first action a station runs -- raises
+    ``ArgumentError: argument 2: TypeError: Don't know how to convert
+    parameter 2``. `sim.FakeDll.__getitem__` binds through `CFUNCTYPE` and
+    returns a typed callable, so the simulator could not reproduce it.
+
+    Indexing a plain dict is what makes the bug unavailable here: the
+    typing happens once, at load, and lookup cannot undo it.
+    """
+
+    def __init__(self, dll: Any, functions: dict[str, Any]):
+        # Keeps the library loaded for as long as any caller holds this.
+        self._dll = dll
+        self._functions = functions
+
+    def __getitem__(self, name: str) -> Any:
+        return self._functions[name]
+
+
+def load_dll(sdk_path: str = DEFAULT_SDK_PATH) -> Exports:
     """Load ``EClib64.dll`` from an SDK install and bind every export.
 
     Raises `VendorError` naming the path, because "the DLL is not where the
@@ -465,6 +499,7 @@ def load_dll(sdk_path: str = DEFAULT_SDK_PATH) -> Any:
         if getattr(exc, "winerror", None) == 193:
             raise VendorError(f"{dll_path} is 32-bit; this Python is 64-bit")
         raise VendorError(f"could not load {dll_path}: {exc}")
+    functions: dict[str, Any] = {}
     for name, argtypes in ECL_API:
         try:
             function = dll[name]
@@ -472,4 +507,5 @@ def load_dll(sdk_path: str = DEFAULT_SDK_PATH) -> Any:
             raise VendorError(f"{DLL_NAME} at {sdk_path!r} has no export {name}")
         function.argtypes = argtypes
         function.restype = c_int32
-    return dll
+        functions[name] = function
+    return Exports(dll, functions)
