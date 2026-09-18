@@ -241,8 +241,16 @@ class NativeDataStreamer:
                         if isinstance(sample_data, dict):
                             try:
                                 output_str = hlo_json_dumps(sample_data)
-                            except TypeError:
-                                LOGGER.error("Data is not json serializable.")
+                            except TypeError as exc:
+                                # Name the type. The bare message stood for two
+                                # months over a ruamel ScalarFloat read out of
+                                # the config, and said nothing about which key
+                                # or which type -- while an error stub went into
+                                # the hlo in place of the row.
+                                LOGGER.error(
+                                    f"Data is not json serializable: {exc}",
+                                    exc_info=True,
+                                )
                                 output_str = hlo_json_dumps(
                                     {"error": "data was not serializable"}
                                 )
