@@ -68,8 +68,11 @@ class KinesisMotorExec(Executor):
         super().__init__(*args, **kwargs)
         # shortcut attribs
         self.base = self.active.base
-        self.driver = self.base.app.driver
-        self.live_dict = self.base.app.poller.live_dict
+        # The host IS the app on a native ActionHost -- there is no `.app`
+        # attribute to go through (deliberately absent, see
+        # test_action_host_member_coverage). The session carries the driver.
+        self.driver = self.active.driver
+        self.live_dict = self.base.poller.live_dict
 
         # action params and axis config
         self.action_params = self.active.action.action_params
