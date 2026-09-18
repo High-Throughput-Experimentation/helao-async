@@ -164,6 +164,21 @@ def test_a_failed_start_releases_the_claim_and_fails_get_data(driver):
     assert resp.response == DriverResponseType.failed
 
 
+def test_an_untriggered_start_keeps_the_starting_cap(driver):
+    setup(driver)
+    driver.start_channel(0)
+    assert driver._tracker.max_starting_polls == data.MAX_STARTING_POLLS
+
+
+def test_a_triggered_start_lifts_the_starting_cap(driver):
+    """A channel parked on a requested Trigger In/Out waits on an external
+    instrument, deliberately indefinitely -- MAX_STARTING_POLLS must not
+    abort that wait."""
+    setup(driver)
+    driver.start_channel(0, {"ttl": "in", "ttl_logic": 1, "ttl_duration": 1.0})
+    assert driver._tracker.max_starting_polls is None
+
+
 # --- get_data ---------------------------------------------------------------
 
 

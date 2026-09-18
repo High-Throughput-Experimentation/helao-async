@@ -341,10 +341,20 @@ _BUSY_STATES = frozenset(
 )
 
 #: How many `observe()` calls a channel may report "starting" before
-#: `RunTracker` gives up and reports "error" instead. Without this a channel
-#: that accepts `BL_StartChannel` and never reaches `RUN` (or `STOP` with
-#: rows) polls "starting" forever at `BiologicExec`'s 10 ms rate, with
-#: nothing anywhere reporting a fault.
+#: `RunTracker` gives up and reports "error" instead -- targets a firmware
+#: start failure, which is a sub-second event, not a legitimate wait. Without
+#: this a channel that accepts `BL_StartChannel` and never reaches `RUN` (or
+#: `STOP` with rows) polls "starting" forever at `BiologicExec`'s 10 ms rate,
+#: with nothing anywhere reporting a fault.
+#:
+#: This bound must NOT apply to a channel parked on a requested trigger
+#: (Trigger In/Out loaded ahead of the real technique): that wait is on an
+#: external instrument and is deliberately unbounded, so `start_channel`
+#: passes `max_starting_polls=None` whenever a trigger was requested --
+#: `None` disables the cap outright rather than raising it to a second
+#: guessed number. Conflating "firmware never started" (sub-second) with "a
+#: trigger the operator asked for" (indefinite) under one cap turns a correct
+#: wait into a premature abort.
 MAX_STARTING_POLLS = 500
 
 
@@ -358,9 +368,10 @@ class RunTracker:
     def __init__(
         self,
         max_drains: int = MAX_DRAINS_PER_CALL,
-        max_starting_polls: int = MAX_STARTING_POLLS,
+        max_starting_polls: Optional[int] = MAX_STARTING_POLLS,
     ):
         self.max_drains = max_drains
+        #: `None` means unbounded -- see MAX_STARTING_POLLS's docstring.
         self.max_starting_polls = max_starting_polls
         self.seen_run = False
         self.skipped = 0
@@ -387,7 +398,10 @@ class RunTracker:
             self.seen_run = True
         if not self.seen_run:
             self._starting_polls += 1
-            if self._starting_polls > self.max_starting_polls:
+            if (
+                self.max_starting_polls is not None
+                and self._starting_polls > self.max_starting_polls
+            ):
                 self._errored = True
                 return "error"
             return "starting"
