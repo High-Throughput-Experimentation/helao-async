@@ -132,8 +132,8 @@
       },
       {
         "name": "out_name_gamry",
-        "annotation": "app.driver.dev_doitems",
-        "default": "'gamry_aux'"
+        "annotation": "Optional[app.driver.dev_doitems]",
+        "default": "None"
       },
       {
         "name": "toggle_init_delay",

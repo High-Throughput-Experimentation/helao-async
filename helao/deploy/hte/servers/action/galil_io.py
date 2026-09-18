@@ -308,7 +308,7 @@ async def galil_dyn_endpoints(app: ActionHost):
                 out_name: Optional[
                     Union[app.driver.dev_doitems, list[app.driver.dev_doitems]]
                 ] = "led",
-                out_name_gamry: app.driver.dev_doitems = "gamry_aux",
+                out_name_gamry: Optional[app.driver.dev_doitems] = None,
                 toggle_init_delay: Union[float, list[float]] = 0,
                 toggle_duty: Union[float, list[float]] = 0.5,
                 toggle_period: Union[float, list[float]] = 2.0,
@@ -329,7 +329,13 @@ async def galil_dyn_endpoints(app: ActionHost):
                     trigger_name: Digital input that arms/starts the toggle.
                     triggertype: Edge polarity recognised on ``trigger_name``.
                     out_name: Digital output(s) to be toggled.
-                    out_name_gamry: Digital output connected to the Gamry aux.
+                    out_name_gamry: Digital output connected to the Gamry aux,
+                        or ``None`` on a station that has no such line. The
+                        default was ``"gamry_aux"``, which is not a member of
+                        the dev_do enum unless the config declares that name --
+                        so on a station without it, every call failed
+                        validation before reaching the driver, whatever the
+                        caller passed.
                     toggle_init_delay: Seconds to wait after the trigger before
                         beginning the first ON pulse.
                     toggle_duty: Fraction of the period in the ON state

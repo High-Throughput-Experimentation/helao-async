@@ -482,6 +482,25 @@ class Galil(HelaoDriver):
             else int(round(toggle_init_delay * 1e3))
         )
 
+        # A single output with no Gamry companion is just the list case with
+        # one entry. Without this, out_name_gamry=None with a bare string
+        # out_name fell through both branches to "parameters are not valid",
+        # so a station with no gamry_aux line could only cycle outputs by
+        # passing a list.
+        if (
+            out_name_gamry is None
+            and isinstance(out_name, str)
+            and isinstance(t_on, int)
+            and isinstance(t_off, int)
+            and isinstance(t_offset, int)
+            and isinstance(t_duration, int)
+        ):
+            out_name = [out_name]
+            t_on = [t_on]
+            t_off = [t_off]
+            t_offset = [t_offset]
+            t_duration = [t_duration]
+
         err_code = ErrorCodes.none
         valid_trig = False
         if trigger_name in self.dev_di:
@@ -507,7 +526,10 @@ class Galil(HelaoDriver):
             and isinstance(t_duration, int)
             and out_name in self.dev_do
             and out_name_gamry in self.dev_do
-            and self.dev_do[out_name_gamry] is not None
+            # The port, not just the key. A config line like `gamry_aux: None`
+            # is the *string* "None" in YAML (null is `null`/`~`/empty), which
+            # is truthy and reaches the DMC program as `CB None`.
+            and isinstance(self.dev_do[out_name_gamry], int)
         ):
             out_port = self.dev_do[out_name]
             out_port_gamry = self.dev_do[out_name_gamry]
