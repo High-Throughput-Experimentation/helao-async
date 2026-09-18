@@ -176,8 +176,25 @@ class BiologicDriver(HelaoDriver):
                 f"family={vendor.board_family(self.board_type).value})"
             )
 
-            ch = client.channel_info(0)
-            if self.force_load_firmware or not _kernel_loaded(ch):
+            try:
+                needs_kernel = not _kernel_loaded(client.channel_info(0))
+            except EclibError as exc:
+                if exc.name != "ERR_FIRM_FIRMWARENOTLOADED":
+                    raise
+                # BL_GetChannelInfos needs the kernel it is being asked
+                # about, so a channel that has lost its firmware answers
+                # -308 instead of reporting a FirmwareCode of 0. Treated as
+                # a failure, that made a channel whose firmware crashed
+                # unrecoverable from here: connect aborted on the very probe
+                # it uses to decide whether to reload, and no later call
+                # could get further. Observed at a station on 2026-09-18,
+                # where a BL_LoadTechnique that returned -200 took the
+                # channel's kernel with it.
+                LOGGER.warning(
+                    f"channel 0 reports no firmware ({exc}); loading the kernel"
+                )
+                needs_kernel = True
+            if self.force_load_firmware or needs_kernel:
                 kernel, fpga = vendor.firmware_assets(self.board_type)
                 client.load_firmware(
                     0,

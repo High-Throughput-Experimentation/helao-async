@@ -227,3 +227,55 @@ def test_firmware_messages_are_drained_on_status_polls(connected, caplog):
     with caplog.at_level("WARNING"):
         connected.get_status(channel=0)
     assert any("clamped" in r.message for r in caplog.records)
+
+
+def test_connect_reloads_the_kernel_when_the_channel_reports_none(monkeypatch):
+    """`BL_GetChannelInfos` needs the kernel it reports on, so a channel whose
+    firmware has crashed answers `ERR_FIRM_FIRMWARENOTLOADED` rather than a
+    zero `FirmwareCode`. Read as a failure that made the channel
+    unrecoverable: connect aborted on the probe it uses to decide whether to
+    reload. Seen at a station on 2026-09-18 after a `BL_LoadTechnique`
+    returned -200 and took the channel's kernel with it."""
+    from helao.deploy.hte.drivers.pstat.biologic.eclib_client import (
+        EclibClient,
+        EclibError,
+    )
+
+    sim.set_sim_config(sim.SimConfig(kernel_loaded=True))
+    unpatched = EclibClient.channel_info
+    calls = {"n": 0}
+
+    def crashed_once(self, channel):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise EclibError(-308, "BL_GetChannelInfos")
+        return unpatched(self, channel)
+
+    monkeypatch.setattr(EclibClient, "channel_info", crashed_once)
+
+    d = BiologicDriver(dict(CONFIG))
+    try:
+        assert d.connect().status == DriverStatus.ok
+        assert sim.firmware_loads() == 1
+    finally:
+        d.shutdown()
+
+
+def test_connect_still_fails_on_an_error_that_is_not_a_missing_kernel(monkeypatch):
+    """Only -308 means "reload"; every other code stays a failed connect."""
+    from helao.deploy.hte.drivers.pstat.biologic.eclib_client import (
+        EclibClient,
+        EclibError,
+    )
+
+    def refused(self, channel):
+        raise EclibError(-200, "BL_GetChannelInfos")
+
+    monkeypatch.setattr(EclibClient, "channel_info", refused)
+
+    d = BiologicDriver(dict(CONFIG))
+    try:
+        assert d.connect().response == DriverResponseType.failed
+        assert sim.firmware_loads() == 0
+    finally:
+        d.shutdown()
