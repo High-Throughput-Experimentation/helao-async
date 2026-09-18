@@ -87,8 +87,9 @@ def test_an_unknown_label_from_a_build_is_refused():
 
 
 def test_exceeding_a_declared_array_width_is_refused():
-    with pytest.raises(TechniqueError, match="20"):
-        flat("CA", Vval__V=[0.1] * 21, Tval__s=[1.0] * 21)
+    """CA's step arrays are 100-wide (PDF 7.6.2), not 20 -- see M1."""
+    with pytest.raises(TechniqueError, match="100"):
+        flat("CA", Vval__V=[0.1] * 101, Tval__s=[1.0] * 101)
 
 
 # --- OCV --------------------------------------------------------------------
@@ -150,6 +151,20 @@ def test_ca_wraps_the_scalar_step_and_sets_step_number_to_len_minus_one():
     assert got["N_Cycles"] == 0
     assert got["Record_every_dT"] == 0.01
     assert got["Record_every_dI"] == 10.0
+
+
+def test_ca_and_cp_step_arrays_are_100_wide_but_the_limit_variants_stay_20():
+    """PDF 7.6.2 (CA) and 7.5 (CP) are `Array of 100`; CALIMIT (7.37) and
+    CPLIMIT (7.36) are `Array of 20`. A shared width would either truncate a
+    long CA/CP profile or over-declare the limit variants."""
+    for label in ("Voltage_step", "vs_initial", "Duration_step"):
+        assert BIOTECHS["CA"].param_table[label].arity == 100
+    for label in ("Current_step", "vs_initial", "Duration_step"):
+        assert BIOTECHS["CP"].param_table[label].arity == 100
+    for label in ("Voltage_step", "vs_initial", "Duration_step"):
+        assert BIOTECHS["CALIMIT"].param_table[label].arity == 20
+    for label in ("Current_step", "vs_initial", "Duration_step"):
+        assert BIOTECHS["CPLIMIT"].param_table[label].arity == 20
 
 
 def test_ca_maps_the_three_range_enums_to_vendor_ints():

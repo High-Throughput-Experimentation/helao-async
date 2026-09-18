@@ -479,12 +479,14 @@ async def biologic_dyn_endpoints(app: ActionHost):
     ):
         """Run cyclic voltammetry between two apex potentials.
 
-        ``Cycles`` passes straight through to the technique's ``N_Cycles`` --
-        no off-by-one adjustment. ``AcqInterval__V`` is not derived from
-        ``AcqInterval__s``/``ScanRate__V_s``; the technique's own default
-        (``0.01``) is used, since no endpoint parameter overrides it. Maps
-        I/E/Bandwidth range enums and dispatches a :class:`BiologicExec`
-        configured with the ``"CV"`` technique.
+        ``Cycles`` is decremented by one before reaching the technique (i.e.
+        it counts *additional* cycles past the first) -- exact parity with the
+        old driver's mapping, which four stations' CV archives were produced
+        under; do not remove it to match a "no off-by-one" reading of this
+        docstring. ``AcqInterval__V`` is derived from
+        ``AcqInterval__s * ScanRate__V_s`` rather than left at the technique's
+        own default. Maps I/E/Bandwidth range enums and dispatches a
+        :class:`BiologicExec` configured with the ``"CV"`` technique.
         """
         active = await ctx.begin()
         active.action.action_params["Cycles"] -= 1  # i.e. additional cycles

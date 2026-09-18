@@ -34,6 +34,7 @@ __all__ = [
     "SimConfig",
     "decode_single",
     "encode_single",
+    "firmware_load_flags",
     "firmware_loads",
     "load_dll",
     "loaded_ecc_files",
@@ -43,7 +44,12 @@ __all__ = [
 ]
 
 NO_KERNEL_FIRMWARE_CODE = 0
-_LOADED_FIRMWARE_CODE = 4
+#: The vendor's FIRMWARE.KERNEL code (`kbio_types.py`) -- see
+#: `driver.KERNEL_FIRMWARE_CODE`. This used to be 4 (UNKNOWN), which made
+#: `_kernel_loaded`'s old `!= 0` bug invisible: UNKNOWN is nonzero, so the
+#: buggy check and the correct one agreed on every case this simulator ever
+#: produced.
+_LOADED_FIRMWARE_CODE = 5
 
 _MULTI_PROCESS = {
     vendor.TECH_ID.PEIS,
@@ -51,6 +57,32 @@ _MULTI_PROCESS = {
     vendor.TECH_ID.SPEIS,
     vendor.TECH_ID.SGEIS,
 }
+
+#: Loaded but carry no data-format layout of their own (see
+#: `driver._segment_name`'s docstring) -- excluded when deciding which
+#: technique a poll is currently "in", so a plan's trigger/LOOP steps don't
+#: get selected as the reported `TechniqueID`.
+_NON_DATA_TECH_IDS = frozenset(
+    {vendor.TECH_ID.LOOP, vendor.TECH_ID.TI, vendor.TECH_ID.TO, vendor.TECH_ID.TOS}
+)
+
+
+def _current_technique(channel: "_Channel", cfg: "SimConfig") -> int:
+    """Which loaded technique a poll at `channel.polls` reports as its data.
+
+    A real multi-technique plan runs its steps one after another, not all as
+    the first one -- `_get_data` used to always report `techniques[0]`, which
+    hid a driver bug (C1) that only fires when a *later* segment's id is
+    decoded. Splits the run evenly by poll count across the data-bearing
+    techniques (triggers/LOOP excluded, since they emit no rows of their own).
+    """
+    data_techs = [t for t in channel.techniques if t not in _NON_DATA_TECH_IDS]
+    if not data_techs:
+        return channel.techniques[0]
+    seg_len = max(1, (cfg.polls_until_stop + 1) // len(data_techs))
+    index = min(channel.polls // seg_len, len(data_techs) - 1)
+    return data_techs[index]
+
 
 #: (technique, board family, process index) -> column count. PDF §7, one row
 #: per data-format table. Process 0 is common to a technique's two families
@@ -153,6 +185,11 @@ class SimConfig:
     polls_until_stop: int = 3
     board_type: int = vendor.BOARD_TYPE.PREMIUM
     kernel_loaded: bool = True
+    #: Override the reported `FirmwareCode` outright, bypassing
+    #: `kernel_loaded`'s True/False mapping -- for a code that is neither
+    #: `NO_KERNEL_FIRMWARE_CODE` nor `_LOADED_FIRMWARE_CODE`, e.g. the
+    #: vendor's ECAL (10), which a calibration can leave a channel in.
+    firmware_code: int | None = None
     fail_on: dict[str, int] | None = None
     #: Number of `BL_GetData` polls after `BL_StartChannel` that report zero
     #: rows and `PROG_STATE.STOP` -- the real start race where a channel
@@ -242,6 +279,12 @@ _STATE: _Sim | None = None
 #: reconfigure doesn't zero a counter a test is about to assert on.
 _FIRMWARE_LOADS = 0
 
+#: (showgauge, forceload) from the most recent `BL_LoadFirmware` call, so a
+#: test can assert the flags the DLL actually received rather than just that
+#: a call happened -- a flag nothing observes is a flag that can silently
+#: rot back to the wrong value. Same reset rule as `_FIRMWARE_LOADS`.
+_LAST_FIRMWARE_FLAGS: tuple[bool, bool] | None = None
+
 #: Total rows handed back across every `BL_GetData` call. Same reset rule as
 #: `_FIRMWARE_LOADS`: `load_dll()` only.
 _ROWS_EMITTED = 0
@@ -255,6 +298,12 @@ def push_message(channel: int, text: str) -> None:
 def firmware_loads() -> int:
     """Number of `BL_LoadFirmware` calls since the last `load_dll()`."""
     return _FIRMWARE_LOADS
+
+
+def firmware_load_flags() -> tuple[bool, bool] | None:
+    """(showgauge, forceload) from the most recent `BL_LoadFirmware` call, or
+    `None` if it has never been called since the last `load_dll()`."""
+    return _LAST_FIRMWARE_FLAGS
 
 
 def rows_emitted() -> int:
@@ -369,13 +418,14 @@ class FakeDll:
     def _load_firmware(
         self, idn, channels, results, length, showgauge, forceload, binfile, xlxfile
     ) -> int:
-        global _FIRMWARE_LOADS
+        global _FIRMWARE_LOADS, _LAST_FIRMWARE_FLAGS
         err = self._state.check(idn)
         if err:
             return err
         for i in range(min(length, vendor.MAX_SLOT_NB)):
             results[i] = 0
         _FIRMWARE_LOADS += 1
+        _LAST_FIRMWARE_FLAGS = (bool(showgauge), bool(forceload))
         return 0
 
     # -- channel/board info -------------------------------------------
@@ -390,9 +440,12 @@ class FakeDll:
         info.Channel = ch
         info.BoardVersion = 0
         info.BoardSerialNumber = 0
-        info.FirmwareCode = (
-            _LOADED_FIRMWARE_CODE if cfg.kernel_loaded else NO_KERNEL_FIRMWARE_CODE
-        )
+        if cfg.firmware_code is not None:
+            info.FirmwareCode = cfg.firmware_code
+        else:
+            info.FirmwareCode = (
+                _LOADED_FIRMWARE_CODE if cfg.kernel_loaded else NO_KERNEL_FIRMWARE_CODE
+            )
         info.FirmwareVersion = 1090
         info.XilinxVersion = 0
         info.AmpCode = 0
@@ -560,7 +613,7 @@ class FakeDll:
             cv.State = channel.state
             return 0
 
-        tech_id = channel.techniques[0]
+        tech_id = _current_technique(channel, cfg)
         family = vendor.board_family(cfg.board_type)
         multi = tech_id in _MULTI_PROCESS
         process_index = channel.polls % 2 if multi else 0
@@ -619,8 +672,9 @@ class FakeDll:
 
 def load_dll(sdk_path: str | None = None) -> FakeDll:
     """Ignore `sdk_path` entirely -- there is no file to find."""
-    global _STATE, _FIRMWARE_LOADS, _ROWS_EMITTED
+    global _STATE, _FIRMWARE_LOADS, _ROWS_EMITTED, _LAST_FIRMWARE_FLAGS
     _STATE = _Sim()
     _FIRMWARE_LOADS = 0
     _ROWS_EMITTED = 0
+    _LAST_FIRMWARE_FLAGS = None
     return FakeDll(_STATE)

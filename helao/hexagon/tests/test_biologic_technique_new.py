@@ -157,6 +157,16 @@ def test_test3_without_test2_is_refused():
         )
 
 
+def test_a_malformed_limit_dict_is_refused_not_a_bare_keyerror():
+    """A TestN dict missing a required key used to surface to the operator as
+    `setup failed: 'logic'` -- everything else in this layer raises
+    TechniqueError with a sentence."""
+    with pytest.raises(TechniqueError, match="logic"):
+        built(
+            "CALIMIT", LIMIT_ARGS, Test1={"variable": "E", "above": True, "value": 1.0}
+        )
+
+
 def test_no_tests_at_all_is_allowed():
     got = built("CALIMIT", LIMIT_ARGS, Test1=None)
     assert got["Test1_Config"] == [0]

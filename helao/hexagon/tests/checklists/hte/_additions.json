@@ -18,7 +18,7 @@
     "path": "/BIOLOGIC/run_plan",
     "method": "post",
     "date": "2026-09-07",
-    "why": "run several techniques as one linked experiment, with LOOP_START/LOOP_END repeats; registered on both SDK-backed backends (eclib, eclib2), absent on olecom, whose multi-technique unit is a GUI-authored .mps covered by run_protocol; see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
+    "why": "run several techniques as one linked experiment, with a LOOP technique (loop_N_times/protocol_number) for repeats; registered on both SDK-backed backends (eclib, eclib2), absent on olecom, whose multi-technique unit is a GUI-authored .mps covered by run_protocol; see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
   },
   {
     "module": "biologic_server.py",
