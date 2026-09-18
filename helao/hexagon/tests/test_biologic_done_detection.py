@@ -34,10 +34,39 @@ def test_stop_before_any_run_reads_as_starting_not_done():
     assert t.seen_run is False
 
 
-def test_run_then_stop_reads_as_done():
-    t = RunTracker()
+def test_run_then_sustained_stop_reads_as_done():
+    t = RunTracker(stop_polls_to_finish=3)
     assert t.observe(V(RUN), I()) == "measuring"
+    assert t.observe(V(STOP), I()) == "measuring"
+    assert t.observe(V(STOP), I()) == "measuring"
     assert t.observe(V(STOP), I()) == "done"
+
+
+def test_a_stop_between_linked_techniques_is_not_the_end_of_the_run():
+    """Station failure, 2026-09-18, `run_CAOCV`: a linked experiment is one
+    protocol per technique and the channel passes through STOP between them
+    (`end protocol 0, ID = 101` to `start protocol 1, ID=100`, ~2 ms in the
+    firmware log). One STOP sample there ended the action a second into a
+    10 s OCV, which then ran to completion with nobody reading it."""
+    t = RunTracker(stop_polls_to_finish=3)
+    t.observe(V(RUN), I(index=0))
+    assert t.observe(V(STOP), I(index=0)) == "measuring"  # the gap
+    assert t.observe(V(RUN), I(index=1)) == "measuring"  # OCV running
+    assert t.observe(V(RUN), I(index=1)) == "measuring"
+    # ...and the real end, once STOP persists
+    assert t.observe(V(STOP), I(index=1)) == "measuring"
+    assert t.observe(V(STOP), I(index=1)) == "measuring"
+    assert t.observe(V(STOP), I(index=1)) == "done"
+
+
+def test_a_stop_run_of_less_than_the_bound_leaves_the_tracker_undone():
+    """The counter resets on any busy sample, so a channel that flickers
+    never accumulates its way to done."""
+    t = RunTracker(stop_polls_to_finish=3)
+    t.observe(V(RUN), I())
+    for _ in range(10):
+        assert t.observe(V(STOP), I()) == "measuring"
+        assert t.observe(V(RUN), I()) == "measuring"
 
 
 def test_pause_is_busy_not_done():
@@ -61,14 +90,16 @@ def test_an_unknown_state_is_treated_as_busy():
 
 def test_rows_arriving_count_as_having_run():
     """A short technique can complete between two polls; the rows are proof it
-    ran even though RUN was never observed."""
-    t = RunTracker()
-    assert t.observe(V(STOP), I(rows=4)) == "done"
+    ran even though RUN was never observed. It still has to hold STOP -- the
+    rows could equally be the first technique of a linked plan."""
+    t = RunTracker(stop_polls_to_finish=2)
+    assert t.observe(V(STOP), I(rows=4)) == "measuring"
     assert t.seen_run is True
+    assert t.observe(V(STOP), I(rows=0)) == "done"
 
 
 def test_done_is_sticky():
-    t = RunTracker()
+    t = RunTracker(stop_polls_to_finish=1)
     t.observe(V(RUN), I())
     assert t.observe(V(STOP), I()) == "done"
     assert t.observe(V(RUN), I()) == "done"
