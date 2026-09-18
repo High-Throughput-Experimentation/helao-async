@@ -213,12 +213,18 @@ async def async_action_dispatcher(
                     params=_query_safe(params),
                     json={"action": A.as_dict()},
                 ) as resp:
-                    response = await resp.json()
-                    error_code = ErrorCodes.none
                     if resp.status != 200:
+                        # Status BEFORE body, as in async_private_dispatcher:
+                        # an unhandled endpoint exception comes back as
+                        # text/plain and decoding it first raises
+                        # ContentTypeError, which loses the server's own error
+                        # message and misreports a 500 as a transport failure.
                         error_code = ErrorCodes.http
+                        response = None
+                        detail = (await resp.text())[:500]
                         LOGGER.error(
-                            f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
+                            f"{A.action_server.server_name}/{A.action_name} POST request "
+                            f"returned status {resp.status}: '{detail}', error={error_code}"
                         )
                         success = False
                         # Terminal, not retried. The server answered, so it
@@ -229,6 +235,8 @@ async def async_action_dispatcher(
                         # both.
                         break
                     else:
+                        response = await resp.json()
+                        error_code = ErrorCodes.none
                         success = True
         except (aiohttp.ClientConnectorError, aiohttp.ServerTimeoutError):
             # Connect-phase only: the request never reached the server, so
@@ -353,12 +361,20 @@ async def async_private_dispatcher(
                     params=_query_safe(params_dict),
                     json=json_dict,
                 ) as resp:
-                    response = await resp.json()
-                    error_code = ErrorCodes.none
                     if resp.status != 200:
+                        # Status BEFORE body. FastAPI returns an unhandled
+                        # endpoint exception as text/plain, so decoding first
+                        # raised ContentTypeError ("Attempt to decode JSON with
+                        # unexpected mimetype") and the 500 arrived at the
+                        # generic except arm as if it were transport noise --
+                        # logged as a traceback with a 30 s retry sleep, with
+                        # the server's actual error message thrown away.
                         error_code = ErrorCodes.http
+                        response = None
+                        detail = (await resp.text())[:500]
                         LOGGER.error(
-                            f"{server_key}/{private_action} POST request returned status {resp.status}: '{response}')"
+                            f"{server_key}/{private_action} POST request returned "
+                            f"status {resp.status}: '{detail}'"
                         )
                         success = False
                         # Counted, like the exception branch below. A non-200
@@ -369,6 +385,8 @@ async def async_private_dispatcher(
                         if retry_count < retries:
                             await asyncio.sleep(retry_count * timeout / 2)
                     else:
+                        response = await resp.json()
+                        error_code = ErrorCodes.none
                         success = True
         except Exception:
             retry_count += 1

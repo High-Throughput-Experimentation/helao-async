@@ -1128,7 +1128,21 @@ class ActionHost(HelaoFastAPI):
             if isinstance(self.poller, DriverPoller):
                 driver_status = DriverStatus.ok
             elif isinstance(self.driver, HelaoDriver):
-                driver_status = self.driver.get_status().status
+                try:
+                    driver_status = self.driver.get_status().status
+                except Exception:
+                    # A driver that is not connected is a *reportable state*,
+                    # not a server fault. It raises here during teardown --
+                    # shutdown() disconnects while the orchestrator's heartbeat
+                    # is still polling -- and the 500 that used to result came
+                    # back as text/plain, which the caller could not decode, so
+                    # a routine status poll ended in a stack trace on both
+                    # servers and a 30 s retry sleep on the orchestrator.
+                    LOGGER.info(
+                        "driver could not report status; reporting it as unknown",
+                        exc_info=True,
+                    )
+                    driver_status = "unknown"
             status_dict["_driver_status"] = driver_status
             return status_dict
 

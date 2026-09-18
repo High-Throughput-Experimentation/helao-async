@@ -1445,13 +1445,35 @@ class OrchHost(ActionHost):
         async def _orch_shutdown():
             await self.orch_shutdown()
 
+    async def shutdown(self) -> dict:
+        """Stop the orchestrator's own loops first, then the host's.
+
+        ``POST /shutdown`` reaches ``ActionHost.shutdown``, and the
+        orchestrator's monitors used to be cancelled only from the lifespan
+        shutdown *event* -- which uvicorn runs after its graceful wait. So
+        between the teardown sweep and process exit the heartbeat kept POSTing
+        /get_status at action servers that were already shutting down, each
+        failure costing a 30 s retry sleep. The launcher sends /shutdown to
+        orchestrators before action servers (``SHUTDOWN_POST_ORDER``) exactly
+        so this can stop cleanly; the orchestrator just was not using its turn.
+        """
+        await self.orch_shutdown()
+        return await super().shutdown()
+
     async def orch_shutdown(self) -> None:
         """Cancel the orchestrator's tasks and preserve unfinished queues.
 
         The queue export is the part that matters operationally: a stop
         with work still queued would otherwise lose it, and ``--restore``
         exists precisely to replay this file.
+
+        Idempotent: both ``shutdown`` and the lifespan shutdown event call it,
+        and a second export would write a second queue file from deques the
+        first one already exported.
         """
+        if getattr(self, "_orch_shutdown_done", False):
+            return
+        self._orch_shutdown_done = True
         for task in (
             self.status_subscriber,
             self.globstat_broadcaster,
