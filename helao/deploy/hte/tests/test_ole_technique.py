@@ -20,7 +20,14 @@ FIXTURES = Path("helao/deploy/hte/tests/fixtures/ole")
 
 
 def test_every_eclib_technique_has_an_ole_counterpart():
-    assert sorted(ot.OLE_TECHS) == sorted(BIOTECHS)
+    """Narrowed to the seven techniques both backends share, rather than full
+    equality. eclib also has CALIMIT/CPLIMIT/SPEIS/SGEIS, which OLE has never
+    had and is not expected to grow -- a station resolves a technique by
+    name, so eclib carrying extras cannot break the OLE path. Divergence
+    *within* the shared set is what would break a station, and that is what
+    the tests below (parametrized over TECHNIQUE_NAMES) actually check."""
+    assert set(TECHNIQUE_NAMES) <= set(BIOTECHS)
+    assert sorted(ot.OLE_TECHS) == sorted(TECHNIQUE_NAMES)
 
 
 @pytest.mark.parametrize("name", TECHNIQUE_NAMES)
@@ -38,19 +45,15 @@ def test_every_technique_names_a_template_file(name):
     assert ot.resolve(name).template.endswith(".mps")
 
 
-#: X_ohm and R_ohm are part of the frozen EIS contract but are NOT in the
-#: eclib registry's field_map -- that driver computes them in get_data from
-#: modulus and phase, after remapping. The OLE side declares them in its
-#: column plan instead, because it gets them straight off MeasureEisValue.
-#: Same emitted columns, declared in different places.
-ECLIB_DERIVED_IN_CODE = {"X_ohm", "R_ohm"}
-
-
 def eclib_columns(name: str) -> set:
-    columns = set(BIOTECHS[name].field_map.values())
-    if "modulus" in columns:
-        columns |= ECLIB_DERIVED_IN_CODE
-    return columns
+    """The eclib registry's declared column set for `name`.
+
+    `column_plan` (`data.COLUMNS[name]`) already includes X_ohm/R_ohm
+    directly -- unlike the old `field_map`-based registry, there is no
+    separate "derived in code" allowance to add back here, and keeping one
+    would let a column eclib actually dropped pass unnoticed.
+    """
+    return set(BIOTECHS[name].column_plan)
 
 
 @pytest.mark.parametrize("name", TECHNIQUE_NAMES)
@@ -113,6 +116,131 @@ def test_caocv_accepts_both_its_constituent_techniques():
     assert ot.resolve("CAOCV").technique_codes >= {24, 54, 11, 55}
 
 
+class _RecordingDict(dict):
+    """Records every key read via ``[]``, ``.get()``, or ``in``.
+
+    The eclib registry (`technique.py`) declares no static `parameter_map`
+    anymore -- a technique's action keys live only in what its `build`
+    callable (and the helpers it calls, e.g. `_steps`/`_ranges`) actually
+    reads off its `p` dict. Tracing real reads through those nested calls is
+    the dynamic equivalent of the deleted declaration, and it follows
+    indirection for free where a static/AST scan would have to special-case
+    every helper.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.accessed: set = set()
+
+    def __getitem__(self, key):
+        self.accessed.add(key)
+        return super().__getitem__(key)
+
+    def get(self, key, default=None):
+        self.accessed.add(key)
+        return super().get(key, default)
+
+    def __contains__(self, key):
+        self.accessed.add(key)
+        return super().__contains__(key)
+
+
+#: One value per action key any shared technique's `build` might read --
+#: enough for every `_build_*`/`_steps`/`_ranges` call in `technique.py` to
+#: run to completion without a KeyError. The *value* does not matter for
+#: introspection, only that `build` can read it.
+_FULL_PARAMS = dict(
+    Tval__s=10.0,
+    Vval__V=0.5,
+    Ival__A=1e-3,
+    Vinit__V=0.0,
+    Vapex1__V=1.0,
+    Vapex2__V=-1.0,
+    Vfinal__V=0.0,
+    ScanRate__V_s=1.0,
+    AcqInterval__s=0.1,
+    AcqInterval__V=0.01,
+    AcqInterval__A=1e-3,
+    N_Cycles=0,
+    Cycles=1,
+    vs_initial=False,
+    Average_over_dE=False,
+    Begin_measuring_I=0.5,
+    End_measuring_I=1.0,
+    Duration__s=1.0,
+    Iinit__A=1e-3,
+    Iamp__A=1e-4,
+    Vamp__V=0.01,
+    Ffinal__Hz=1.0,
+    Finit__Hz=1000.0,
+    SweepMode="lin",
+    FrequencyNumber=10,
+    Repeats=1,
+    Correction=False,
+    DelayFraction=0.1,
+    IRange="m10",
+    ERange="AUTO",
+    Bandwidth="BW4",
+)
+
+
+def _consumed_action_keys(technique) -> set:
+    """Which action-param keys `technique.build` actually reads."""
+    recording = _RecordingDict({**_FULL_PARAMS, **technique.defaults})
+    technique.build(recording)
+    return recording.accessed
+
+
+#: Reverse of `technique._CAOCV_RENAME` -- CAOCV's flat action keys rename
+#: `Vval__V`/`Tval__s` to `..._list` before the `CA_`/`OCV_` prefix, so
+#: reconstructing the real flat key from what CA's/OCV's own build reads
+#: needs the rename applied backwards.
+from helao.deploy.hte.drivers.pstat.biologic.technique import (  # noqa: E402
+    _CAOCV_RENAME,
+)
+
+_CAOCV_UNRENAME = {v: k for k, v in _CAOCV_RENAME.items()}
+
+
+def eclib_action_keys(name: str) -> set:
+    """The eclib registry's action-key surface for `name` (see
+    `_consumed_action_keys`). CAOCV has no `build` of its own -- it splits a
+    flat `CA_`/`OCV_`-prefixed dict at call time (`caocv_sub_params`) -- so
+    its keys are CA's and OCV's own consumed keys, re-prefixed.
+    """
+    if name == "CAOCV":
+        # The rename only applies to CA's own Vval__V/Tval__s (which
+        # `_steps()` also happens to read for CP) -- OCV's own `Tval__s`
+        # build-key has no `_list` counterpart and is never renamed by
+        # `caocv_sub_params`, so only the CA half is unrenamed here.
+        ca_keys = _consumed_action_keys(BIOTECHS["CA"])
+        ocv_keys = _consumed_action_keys(BIOTECHS["OCV"])
+        return {f"CA_{_CAOCV_UNRENAME.get(k, k)}" for k in ca_keys} | {
+            f"OCV_{k}" for k in ocv_keys
+        }
+    return _consumed_action_keys(BIOTECHS[name])
+
+
+#: Per-technique keys the eclib `build` reads only because `technique.build`
+#: is called against `{**defaults, **action_params}` -- no endpoint on either
+#: backend ever lets a caller override them (confirmed against
+#: `biologic_server.py`'s endpoint signatures: `vs_initial` is commented out
+#: of run_PEIS/run_GEIS outright, `N_Cycles`/`Correction`/`Average_over_dE`/
+#: `Begin_measuring_I`/`End_measuring_I` are not parameters of any endpoint,
+#: and PEIS's `AcqInterval__A`/GEIS's `AcqInterval__V` are pure defaults with
+#: no endpoint override). "A parameter eclib forwards but OLE drops" does not
+#: apply to a value no caller can ever change -- there is nothing for OLE to
+#: drop.
+_INTERNAL_ONLY: dict[str, set] = {
+    "CA": {"N_Cycles", "vs_initial"},
+    "CP": {"N_Cycles", "vs_initial"},
+    "CV": {"vs_initial", "Average_over_dE", "Begin_measuring_I", "End_measuring_I"},
+    "PEIS": {"vs_initial", "Correction", "AcqInterval__A"},
+    "GEIS": {"vs_initial", "Correction", "AcqInterval__V"},
+    "CAOCV": {"CA_N_Cycles", "CA_vs_initial"},
+}
+
+
 @pytest.mark.parametrize("name", TECHNIQUE_NAMES)
 def test_every_action_parameter_the_eclib_registry_maps_is_also_mapped(name):
     """A parameter eclib forwards but OLE drops would silently run a default.
@@ -122,9 +250,9 @@ def test_every_action_parameter_the_eclib_registry_maps_is_also_mapped(name):
     it through `erange_rows`. `test_erange_is_applied_as_a_min_max_pair`
     covers it.
     """
-    eclib_keys = set(BIOTECHS[name].parameter_map)
+    eclib_keys = eclib_action_keys(name)
     ole_keys = set(ot.resolve(name).parameter_map)
-    handled_elsewhere = {"ERange", "CA_ERange"}
+    handled_elsewhere = {"ERange", "CA_ERange"} | _INTERNAL_ONLY.get(name, set())
     if name == "CV":
         # EC-Lab's CV has no dE (mV) row at all -- see the registry comment.
         handled_elsewhere = handled_elsewhere | {"AcqInterval__V"}

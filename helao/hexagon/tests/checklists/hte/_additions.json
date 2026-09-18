@@ -18,7 +18,35 @@
     "path": "/BIOLOGIC/run_plan",
     "method": "post",
     "date": "2026-09-07",
-    "why": "run several techniques as one EC-Lib 2.0 experiment, with LOOP_START/LOOP_END repeats; eclib2 backend only, since neither sibling backend can load a multi-technique experiment in one call"
+    "why": "run several techniques as one linked experiment, with a LOOP technique (loop_N_times/protocol_number) for repeats; registered on both SDK-backed backends (eclib, eclib2), absent on olecom, whose multi-technique unit is a GUI-authored .mps covered by run_protocol; see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_CALIMIT",
+    "method": "post",
+    "date": "2026-09-17",
+    "why": "CALIMIT: chronoamperometry with per-step exit-on-limit tests (PDF section 7.36/7.37.2); see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_CPLIMIT",
+    "method": "post",
+    "date": "2026-09-17",
+    "why": "CPLIMIT: chronopotentiometry with per-step exit-on-limit tests (PDF section 7.36/7.37.2); see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_SPEIS",
+    "method": "post",
+    "date": "2026-09-17",
+    "why": "SPEIS: staircase potentiostatic EIS (PDF section 7.12); see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
+  },
+  {
+    "module": "biologic_server.py",
+    "path": "/BIOLOGIC/run_SGEIS",
+    "method": "post",
+    "date": "2026-09-17",
+    "why": "SGEIS: staircase galvanostatic EIS (PDF section 7.14); see docs/superpowers/specs/2026-09-17-biologic-eclib1-direct-driver-design.md"
   },
   {
     "module": "andor_server.py",
