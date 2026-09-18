@@ -143,11 +143,16 @@ def test_start_without_setup_fails(driver):
     assert driver.start_channel(0).response == DriverResponseType.failed
 
 
-def test_start_on_a_running_channel_fails(driver):
+def test_start_on_a_running_channel_reloads_it_and_proceeds(driver):
+    """No longer a refusal. `start_channel` reloads the whole plan with
+    `BL_LoadTechnique(first=True)` before starting, which halts whatever was
+    running, so a non-STOP state at that point is a state the driver itself
+    is about to replace. A channel EC-Lab holds is refused at `connect`
+    (`ERR_GEN_ECLAB_LOADED`), not here."""
     sim.set_sim_config(sim.SimConfig(polls_until_stop=99))
     setup(driver)
     driver.start_channel(0)
-    assert driver.start_channel(0).response == DriverResponseType.failed
+    assert driver.start_channel(0).response == DriverResponseType.success
 
 
 def test_a_failed_start_releases_the_claim_and_fails_get_data(driver):
@@ -371,3 +376,49 @@ _PEIS = dict(
     Repeats=10,
     DelayFraction=0.1,
 )
+
+
+def test_start_warns_but_proceeds_when_the_channel_is_not_yet_stopped(driver, caplog):
+    """Station failure, 2026-09-18: `run_OCV` raised "channel 0 is busy" here.
+
+    `setup`'s own `BL_LoadTechnique(first=True)` halts whatever the channel
+    was running -- the firmware logged "halt experiment"/"end protocol"
+    immediately before the refusal -- so the state this reads can be the tail
+    of the driver's own load. Refusing after the destructive step protects
+    nothing; `BL_StartChannel` is what gets to say no.
+    """
+    setup(driver)
+    unpatched = driver._client.channel_info
+
+    def still_running(channel):
+        info = unpatched(channel)
+        info.State = vendor.PROG_STATE.RUN
+        return info
+
+    driver._client.channel_info = still_running
+
+    with caplog.at_level("WARNING"):
+        response = driver.start_channel(0)
+
+    assert response.response == DriverResponseType.success
+    assert response.status == DriverStatus.busy
+    assert "state 1 (RUN)" in caplog.text
+    assert driver.channel == 0
+
+
+def test_start_still_fails_when_the_channel_state_cannot_be_read(driver):
+    """The other branch of that gate stays a refusal: an unreadable channel
+    means the instrument is not answering, not that it is mid-halt."""
+    from helao.deploy.hte.drivers.pstat.biologic.eclib_client import EclibError
+
+    setup(driver)
+
+    def unreadable(channel):
+        raise EclibError(-1, "BL_GetChannelInfos")
+
+    driver._client.channel_info = unreadable
+    response = driver.start_channel(0)
+
+    assert response.response == DriverResponseType.failed
+    assert "encountered an error" in (response.message or "")
+    assert driver.channel is None
