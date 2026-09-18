@@ -181,7 +181,13 @@ class BiologicExec(Executor):
                 if resp.response == "success"
                 else ErrorCodes.critical_error
             )
-            LOGGER.info("BiologicExec measurement started.")
+            if error == ErrorCodes.none:
+                LOGGER.info("BiologicExec measurement started.")
+            else:
+                # Logged unconditionally until 2026-09-18, so a station log
+                # read "measurement started" 2 ms after the driver had
+                # reported the start failing.
+                LOGGER.error(f"BiologicExec start failed: {resp.message}")
             return {"error": error}
         except Exception:
             LOGGER.error("BiologicExec exec error", exc_info=True)

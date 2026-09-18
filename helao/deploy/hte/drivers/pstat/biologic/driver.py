@@ -56,6 +56,16 @@ def _segment_name(info, technique: Any) -> str:
 #: and which then never gets a kernel reloaded.
 KERNEL_FIRMWARE_CODE = 5
 
+#: How long `_ensure_stopped` waits for a channel to reach `PROG_STATE.STOP`
+#: after `BL_StopChannel`, and how often it looks. The station's firmware log
+#: puts a halt at 1-2 ms ("halt experiment..." to "end protocol"), so this is
+#: three orders of magnitude of headroom rather than a tuned value. It is a
+#: ceiling, not a wait: a channel that is already stopped costs one
+#: `BL_GetChannelInfos`. Expiring is a warning and the load proceeds -- the
+#: firmware, not this timer, is what gets to refuse the load.
+STOP_BEFORE_LOAD_TIMEOUT_S = 2.0
+STOP_BEFORE_LOAD_POLL_S = 0.02
+
 
 def _firmware_path(sdk_path: str, name: str) -> str:
     """Join a firmware asset name with `sdk_path`, the same reason
@@ -316,16 +326,84 @@ class BiologicDriver(HelaoDriver):
         DLL-relative resolution.
         """
         assert self._client is not None
+        self._ensure_stopped(channel)
+        total = len(plan.steps)
         for i, step in enumerate(plan.steps):
             ecc = vendor.ecc_file(step.ecc_stem, board_type)
+            first, last = i == 0, i == total - 1
             params = self._client.define_params(step.params)
-            self._client.load_technique(
-                channel,
-                os.path.join(self.sdk_path, ecc),
-                params,
-                first=(i == 0),
-                last=(i == len(plan.steps) - 1),
-            )
+            try:
+                self._client.load_technique(
+                    channel,
+                    os.path.join(self.sdk_path, ecc),
+                    params,
+                    first=first,
+                    last=last,
+                )
+            except EclibError as exc:
+                raise EclibError(
+                    exc.code,
+                    f"loading step {i + 1}/{total} {step.ecc_stem} "
+                    f"(ecc {ecc}, tech_id {step.tech_id}, "
+                    f"{len(step.params)} params, first={first}, last={last})",
+                ) from exc
+            # Drained per step, not once at the end: the firmware answers a
+            # load asynchronously and `BL_LoadTechnique` can return 0 on a
+            # load the firmware went on to refuse ("cannot load experiment
+            # after make..."). Drained in a lump by the next `get_status`,
+            # those lines cannot be attributed to the call that caused them,
+            # which is how a two-step plan's failure read as a one-step
+            # plan's error code.
+            for message in self._client.drain_messages(channel):
+                LOGGER.warning(
+                    f"channel {channel} load message "
+                    f"(step {i + 1}/{total} {step.ecc_stem}): {message}"
+                )
+
+    def _ensure_stopped(self, channel: int) -> None:
+        """Stop `channel` and wait for it, before loading a technique list.
+
+        A list spanning more than one `BL_LoadTechnique` call leaves the
+        experiment un-made between calls, and the firmware will not begin one
+        on a channel that is still running. The station log for a TTL run
+        shows exactly that: the trigger's load (`first=True, last=False`)
+        drew `cannot load experiment after make...` while still returning 0,
+        and the technique's load then failed with `make experiment failed`
+        and `ERR_TECH_LOADTECHNIQUEFAILED` (-403), leaving the channel
+        holding the 8 bytes of the trigger alone. A single `first=True,
+        last=True` load is "made" by its own call and survives a running
+        channel, which is why plain `run_OCV` works and every linked plan --
+        a trigger, `CAOCV`, `run_plan` -- did not.
+
+        Stopping is safe here and nowhere near as blunt as it looks: every
+        caller of this is about to replace the channel's whole technique
+        list, and the load itself halts the channel anyway (`halt
+        experiment...`/`end protocol`). The only thing added is *waiting* for
+        that halt to land before the next call needs it.
+        """
+        assert self._client is not None
+        deadline = time.time() + STOP_BEFORE_LOAD_TIMEOUT_S
+        requested = False
+        while True:
+            state = self._client.channel_info(channel).State
+            if state == vendor.PROG_STATE.STOP:
+                return
+            if not requested:
+                LOGGER.info(
+                    f"channel {channel} is in state {state}; stopping it "
+                    "before loading"
+                )
+                self._client.stop_channel(channel)
+                requested = True
+                continue  # a halt lands in 1-2 ms; re-probe before sleeping
+            if time.time() >= deadline:
+                LOGGER.warning(
+                    f"channel {channel} still reports state {state} "
+                    f"{STOP_BEFORE_LOAD_TIMEOUT_S}s after BL_StopChannel; "
+                    "loading anyway"
+                )
+                return
+            time.sleep(STOP_BEFORE_LOAD_POLL_S)
 
     def setup(
         self,
