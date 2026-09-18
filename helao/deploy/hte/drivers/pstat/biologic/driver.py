@@ -49,13 +49,22 @@ def _segment_name(info, technique: Any) -> str:
     return name if name in data.COLUMNS else technique.technique_name
 
 
-def _kernel_loaded(ch: vendor.ChannelInfo) -> bool:
-    """A channel with no firmware kernel loaded reports ``FirmwareCode == 0``.
+#: The vendor's `FIRMWARE` enum member for a fully loaded kernel
+#: (`kbio_types.py`: NONE=0, INTERPR=1, UNKNOWN=4, KERNEL=5, INVALID=8,
+#: ECAL=10, ECAL4=11). `!= 0` was wrong -- it treated every other non-kernel
+#: code as "kernel loaded", including ECAL, which a calibration leaves behind
+#: and which then never gets a kernel reloaded.
+KERNEL_FIRMWARE_CODE = 5
 
-    Same check as the vendor example's ``is_kernel_loaded`` property; kept
-    here (not called from the example, which this repo does not vendor).
+
+def _kernel_loaded(ch: vendor.ChannelInfo) -> bool:
+    """A channel has a kernel loaded only at ``FirmwareCode == KERNEL_FIRMWARE_CODE``.
+
+    Same check as the vendor example's ``is_kernel_loaded`` property (`code ==
+    FIRMWARE.KERNEL`); kept here (not called from the example, which this
+    repo does not vendor).
     """
-    return ch.FirmwareCode != 0
+    return ch.FirmwareCode == KERNEL_FIRMWARE_CODE
 
 
 class BiologicDriver(HelaoDriver):
@@ -149,7 +158,16 @@ class BiologicDriver(HelaoDriver):
             ch = client.channel_info(0)
             if self.force_load_firmware or not _kernel_loaded(ch):
                 kernel, fpga = vendor.firmware_assets(self.board_type)
-                client.load_firmware(0, kernel, fpga, force=self.force_load_firmware)
+                # Joined with sdk_path for the same reason `_load_plan` joins
+                # a `.ecc` name: a bare name depends on undocumented
+                # DLL-relative resolution, which is not guaranteed for a
+                # station's own sdk_path layout.
+                client.load_firmware(
+                    0,
+                    os.path.join(self.sdk_path, kernel),
+                    os.path.join(self.sdk_path, fpga),
+                    force=self.force_load_firmware,
+                )
 
             for message in client.drain_messages(0):
                 LOGGER.warning(f"channel 0 firmware message: {message}")
@@ -207,19 +225,19 @@ class BiologicDriver(HelaoDriver):
             )
 
         try:
-            data = {}
+            states = {}
             for ch in channels:
                 info = self._client.channel_info(ch)
-                data[ch] = info.State
+                states[ch] = info.State
                 for message in self._client.drain_messages(ch):
                     LOGGER.warning(f"channel {ch} firmware message: {message}")
             status = (
                 DriverStatus.busy
-                if any(state != vendor.PROG_STATE.STOP for state in data.values())
+                if any(state != vendor.PROG_STATE.STOP for state in states.values())
                 else DriverStatus.ok
             )
             return DriverResponse(
-                response=DriverResponseType.success, status=status, data=data
+                response=DriverResponseType.success, status=status, data=states
             )
         except EclibError:
             LOGGER.error("get_status failed", exc_info=True)
@@ -435,6 +453,16 @@ class BiologicDriver(HelaoDriver):
             )
         except Exception as exc:
             LOGGER.error("start_channel failed", exc_info=True)
+            # Restores the old driver's cleanup-on-failed-start: without
+            # this, self.channel/_technique/_tracker stay set from setup()
+            # (plus the tracker pre-created above), so a subsequent get_data
+            # believes a never-started channel is running and reports
+            # "measuring" with no error -- a silent, empty success instead of
+            # a failed action.
+            self.channel = None
+            self._technique = None
+            self._params = {}
+            self._tracker = None
             return DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
@@ -502,6 +530,15 @@ class BiologicDriver(HelaoDriver):
                 return state, info
 
             state, info = await poll_once()
+            if state == "error":
+                # RunTracker gave up: the channel accepted BL_StartChannel
+                # but never reached RUN (or STOP-with-rows) within its
+                # bound -- report a fault rather than polling "measuring"
+                # forever.
+                raise RuntimeError(
+                    f"channel {channel} never reached RUN within "
+                    f"{tracker.max_starting_polls} polls"
+                )
             if state == "done":
                 while tracker.should_drain(info):
                     state, info = await poll_once()

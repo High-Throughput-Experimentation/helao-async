@@ -87,6 +87,20 @@ def test_firmware_is_loaded_when_the_channel_reports_none(driver):
     resp = driver.connect()
     assert resp.response == DriverResponseType.success
     assert sim.firmware_loads() == 1
+    # The flags the DLL actually received, not just that a call happened --
+    # BL_LoadFirmware's ABI is (..., ShowGauge, ForceReload, ...) and the two
+    # were swapped (I1), which no call-count assertion could ever catch.
+    assert sim.firmware_load_flags() == (False, False)
+
+
+def test_firmware_is_loaded_when_the_channel_reports_a_non_kernel_code(driver):
+    """FirmwareCode is a vendor enum, not a bool -- ECAL (10), which a
+    calibration can leave a channel in, is neither NONE (0) nor KERNEL (5), so
+    `_kernel_loaded` must read false and connect() must (re)load the kernel."""
+    sim.set_sim_config(sim.SimConfig(firmware_code=10))
+    resp = driver.connect()
+    assert resp.response == DriverResponseType.success
+    assert sim.firmware_loads() == 1
 
 
 def test_force_load_firmware_reloads_even_when_present():
@@ -95,6 +109,7 @@ def test_force_load_firmware_reloads_even_when_present():
     try:
         d.connect()
         assert sim.firmware_loads() == 1
+        assert sim.firmware_load_flags() == (False, True)
     finally:
         d.shutdown()
 

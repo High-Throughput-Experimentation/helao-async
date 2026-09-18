@@ -178,8 +178,12 @@ class EclibClient:
             channels,
             results,
             len(results),
-            force,
-            True,
+            # ABI is (..., Length, ShowGauge, ForceReload, BinFile, XlxFile)
+            # -- confirmed against the vendor's own kbio_api.py and
+            # easy-biologic's ec_lib.py. These two were swapped, which
+            # hardcoded a reflash on every connect regardless of `force`.
+            False,  # ShowGauge -- no progress bar, matching easy-biologic
+            force,  # ForceReload
             kernel.encode(),
             fpga.encode(),
         )

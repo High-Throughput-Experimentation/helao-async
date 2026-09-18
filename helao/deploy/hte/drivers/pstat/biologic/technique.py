@@ -234,25 +234,35 @@ TECH_OCV = BiologicTechnique(
     build=_build_ocv,
 )
 
-_DC_STEP_PARAMS = {
-    "vs_initial": Param("vs_initial", "bool", 20),
-    "Duration_step": Param("Duration_step", "float", 20),
-    "Step_number": Param("Step_number", "int", 1),
-    "N_Cycles": Param("N_Cycles", "int", 1),
-    "I_Range": Param("I_Range", "int", 1),
-    "E_Range": Param("E_Range", "int", 1),
-    "Bandwidth": Param("Bandwidth", "int", 1),
-}
+
+def _dc_step_params(n: int) -> dict[str, Param]:
+    """The per-step arrays shared by CA/CP/CALIMIT/CPLIMIT, at their real
+    width -- CA (PDF 7.6.2) and CP (7.5) are `Array of 100` (`Step_number`
+    0..98); CALIMIT (7.37) and CPLIMIT (7.36) stay at `Array of 20` (0..19).
+    A single shared width of 20 under-declared CA/CP and would silently
+    truncate a >20-step profile; over-declaring the limit variants to 100
+    would strip a real arity guard on techniques the PDF caps at 20.
+    """
+    return {
+        "vs_initial": Param("vs_initial", "bool", n),
+        "Duration_step": Param("Duration_step", "float", n),
+        "Step_number": Param("Step_number", "int", 1),
+        "N_Cycles": Param("N_Cycles", "int", 1),
+        "I_Range": Param("I_Range", "int", 1),
+        "E_Range": Param("E_Range", "int", 1),
+        "Bandwidth": Param("Bandwidth", "int", 1),
+    }
+
 
 TECH_CA = BiologicTechnique(
     technique_name="CA",
     ecc_stem="ca",
     tech_id=vendor.TECH_ID.CA,
     param_table={
-        "Voltage_step": Param("Voltage_step", "float", 20),
+        "Voltage_step": Param("Voltage_step", "float", 100),
         "Record_every_dT": Param("Record_every_dT", "float", 1),
         "Record_every_dI": Param("Record_every_dI", "float", 1),
-        **_DC_STEP_PARAMS,
+        **_dc_step_params(100),
     },
     # easy-biologic's CA.__init__ defaults: {"vs_initial": False,
     # "time_interval": 1.0, "current_interval": 1e-3}.
@@ -270,10 +280,10 @@ TECH_CP = BiologicTechnique(
     ecc_stem="cp",
     tech_id=vendor.TECH_ID.CP,
     param_table={
-        "Current_step": Param("Current_step", "float", 20),
+        "Current_step": Param("Current_step", "float", 100),
         "Record_every_dT": Param("Record_every_dT", "float", 1),
         "Record_every_dE": Param("Record_every_dE", "float", 1),
-        **_DC_STEP_PARAMS,
+        **_dc_step_params(100),
     },
     # easy-biologic's CP.__init__ defaults: {"vs_initial": False,
     # "time_interval": 1.0, "voltage_interval": 1e-3}.
@@ -347,13 +357,17 @@ def _encode_limit(test: dict | None) -> tuple[int, float]:
     """One TestN dict -> (config, value). Absent/None encodes as (0, 0.0)."""
     if not test:
         return 0, 0.0
-    limit = LimitTest(
-        variable=test["variable"],
-        above=test["above"],
-        logic=test["logic"],
-        active=test.get("active", True),
-    )
-    return encode_test(limit), float(test["value"])
+    try:
+        limit = LimitTest(
+            variable=test["variable"],
+            above=test["above"],
+            logic=test["logic"],
+            active=test.get("active", True),
+        )
+        value = test["value"]
+    except KeyError as exc:
+        raise TechniqueError(f"a TestN limit is missing required key {exc}")
+    return encode_test(limit), float(value)
 
 
 def _exit_cond(p: dict) -> int:
@@ -443,7 +457,7 @@ TECH_CALIMIT = BiologicTechnique(
         "Voltage_step": Param("Voltage_step", "float", 20),
         "Record_every_dT": Param("Record_every_dT", "float", 1),
         "Record_every_dI": Param("Record_every_dI", "float", 1),
-        **_DC_STEP_PARAMS,
+        **_dc_step_params(20),
         **_LIMIT_PARAMS,
     },
     defaults={
@@ -462,7 +476,7 @@ TECH_CPLIMIT = BiologicTechnique(
         "Current_step": Param("Current_step", "float", 20),
         "Record_every_dT": Param("Record_every_dT", "float", 1),
         "Record_every_dE": Param("Record_every_dE", "float", 1),
-        **_DC_STEP_PARAMS,
+        **_dc_step_params(20),
         **_LIMIT_PARAMS,
     },
     defaults={
@@ -946,10 +960,14 @@ class PlanTechnique:
         return LoadPlan(steps)
 
 
-def plan_technique(entries: list[PlanEntry], loops: list[PlanLoop]) -> PlanTechnique:
-    if not entries:
+def plan_technique(
+    plan_entries: list[PlanEntry], loops: list[PlanLoop]
+) -> PlanTechnique:
+    # Parameter named `plan_entries`, not `entries` -- the latter would shadow
+    # the module-level `entries()` function for the rest of this body.
+    if not plan_entries:
         raise TechniqueError("plan is empty")
-    return PlanTechnique("PLAN", entries, loops)
+    return PlanTechnique("PLAN", plan_entries, loops)
 
 
 #: `CA_`/`OCV_`-prefixed action key -> the sub-technique's own key.

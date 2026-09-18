@@ -282,9 +282,15 @@ def decode(
     to_seconds: Callable[[int, int, float, int], float],
     board_type: int,
 ) -> dict[str, list]:
-    """Decode one `BL_GetData` buffer into `COLUMNS[name]`-shaped lists."""
+    """Decode one `BL_GetData` buffer into `COLUMNS[name]`-shaped lists.
+
+    `name` can be a fallback like `"PLAN"` or `"NONE"` (see `_segment_name`)
+    on a zero-row terminal poll, which is not a key in `COLUMNS` -- `.get`
+    with an empty default means that poll decodes to no columns rather than
+    raising `KeyError` on every plan run's last poll.
+    """
     if info.TechniqueID == vendor.TECH_ID.NONE or info.NbRows == 0:
-        return {c: [] for c in COLUMNS[name]}
+        return {c: [] for c in COLUMNS.get(name, ())}
 
     fields = layout(
         info.TechniqueID, vendor.board_family(board_type), info.ProcessIndex
@@ -296,7 +302,7 @@ def decode(
         )
 
     start = 0.0 if math.isnan(info.StartTime) else info.StartTime
-    out: dict[str, list] = {c: [] for c in COLUMNS[name]}
+    out: dict[str, list] = {c: [] for c in COLUMNS.get(name, ())}
 
     for r in range(info.NbRows):
         row_words = records[r * info.NbCols : (r + 1) * info.NbCols]
@@ -334,6 +340,13 @@ _BUSY_STATES = frozenset(
     {vendor.PROG_STATE.RUN, vendor.PROG_STATE.PAUSE, vendor.PROG_STATE.SYNC}
 )
 
+#: How many `observe()` calls a channel may report "starting" before
+#: `RunTracker` gives up and reports "error" instead. Without this a channel
+#: that accepts `BL_StartChannel` and never reaches `RUN` (or `STOP` with
+#: rows) polls "starting" forever at `BiologicExec`'s 10 ms rate, with
+#: nothing anywhere reporting a fault.
+MAX_STARTING_POLLS = 500
+
 
 class RunTracker:
     """Decides when a technique has finished, and how far to drain after.
@@ -342,27 +355,41 @@ class RunTracker:
     `cleanup`.
     """
 
-    def __init__(self, max_drains: int = MAX_DRAINS_PER_CALL):
+    def __init__(
+        self,
+        max_drains: int = MAX_DRAINS_PER_CALL,
+        max_starting_polls: int = MAX_STARTING_POLLS,
+    ):
         self.max_drains = max_drains
+        self.max_starting_polls = max_starting_polls
         self.seen_run = False
         self.skipped = 0
         self.drains = 0
         self._done = False
+        self._errored = False
+        self._starting_polls = 0
         self._drain_index: Optional[int] = None
 
     def observe(self, values, info) -> str:
         self.skipped += int(getattr(info, "IRQskipped", 0) or 0)
+        if self._errored:
+            return "error"
         if self._done:
             return "done"
         state = int(values.State)
         if state in _BUSY_STATES or state not in {int(vendor.PROG_STATE.STOP)}:
             # Busy, or a state this build does not know -- either way not done.
             self.seen_run = True
+            self._starting_polls = 0
             return "measuring"
         if int(getattr(info, "NbRows", 0) or 0) > 0:
             # Rows are proof it ran, even if RUN was never sampled.
             self.seen_run = True
         if not self.seen_run:
+            self._starting_polls += 1
+            if self._starting_polls > self.max_starting_polls:
+                self._errored = True
+                return "error"
             return "starting"
         self._done = True
         return "done"

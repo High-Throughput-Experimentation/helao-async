@@ -74,6 +74,23 @@ def test_done_is_sticky():
     assert t.observe(V(RUN), I()) == "done"
 
 
+def test_starting_is_bounded_and_reports_error():
+    """A channel that accepts StartChannel and never reaches RUN (or STOP
+    with rows) must not poll "starting" forever -- see MAX_STARTING_POLLS."""
+    t = RunTracker(max_starting_polls=2)
+    assert t.observe(V(STOP), I(rows=0)) == "starting"
+    assert t.observe(V(STOP), I(rows=0)) == "starting"
+    assert t.observe(V(STOP), I(rows=0)) == "error"
+    assert t.seen_run is False
+
+
+def test_error_is_sticky():
+    t = RunTracker(max_starting_polls=1)
+    t.observe(V(STOP), I(rows=0))
+    assert t.observe(V(STOP), I(rows=0)) == "error"
+    assert t.observe(V(RUN), I()) == "error"
+
+
 def test_should_drain_while_rows_keep_arriving():
     t = RunTracker()
     assert t.should_drain(I(rows=3)) is True

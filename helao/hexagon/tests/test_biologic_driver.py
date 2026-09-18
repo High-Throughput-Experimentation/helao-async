@@ -150,6 +150,20 @@ def test_start_on_a_running_channel_fails(driver):
     assert driver.start_channel(0).response == DriverResponseType.failed
 
 
+def test_a_failed_start_releases_the_claim_and_fails_get_data(driver):
+    """The exception from BL_StartChannel must not leave the claim, technique
+    or tracker set (see start_channel's except clause) -- left set, a
+    subsequent get_data would believe a never-started channel is running and
+    report "measuring" with no error, an empty success instead of a fault."""
+    setup(driver)
+    sim.set_sim_config(sim.SimConfig(fail_on={"BL_StartChannel": -13}))
+    start_resp = driver.start_channel(0)
+    assert start_resp.response == DriverResponseType.failed
+    assert driver.channel is None
+    resp = asyncio.run(driver.get_data(0))
+    assert resp.response == DriverResponseType.failed
+
+
 # --- get_data ---------------------------------------------------------------
 
 
@@ -161,6 +175,16 @@ def test_the_first_poll_before_the_firmware_runs_is_not_done(driver):
     driver.start_channel(0)
     resp = asyncio.run(driver.get_data(0))
     assert resp.message == "measuring"
+
+
+def test_get_data_reports_a_bounded_tracker_as_a_failure(driver, monkeypatch):
+    """RunTracker's "error" (the never-reaches-RUN bound) must turn into a
+    failed DriverResponse, not "measuring" forever."""
+    setup(driver)
+    driver.start_channel(0)
+    monkeypatch.setattr(driver._tracker, "observe", lambda *a: "error")
+    resp = asyncio.run(driver.get_data(0))
+    assert resp.response == DriverResponseType.failed
 
 
 def test_a_ca_run_emits_exactly_the_frozen_columns(driver):
