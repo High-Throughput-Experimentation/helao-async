@@ -1,6 +1,7 @@
 """A fake EClib1 DLL, not a fake client.
 
-This fakes the ``ctypes.WinDLL`` surface that ``vendor.load_dll`` returns, so
+This fakes the name-indexed export surface that ``vendor.load_dll`` returns
+(`vendor.Exports`, a typed lookup over the real ``ctypes.WinDLL``), so
 `eclib_client` cannot tell it apart from the real thing. That is deliberate:
 the real structs, the real `EccParams` packing, and the real `BL_GetData`
 buffer decode all stay inside the code under test -- a simulator bolted on one
