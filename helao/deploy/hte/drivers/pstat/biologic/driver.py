@@ -425,10 +425,30 @@ class BiologicDriver(HelaoDriver):
                 raise ValueError(f"channel {channel} has not been set up")
 
             status = self.get_status(channel)
-            if status.status == DriverStatus.busy:
-                raise ValueError(f"channel {channel} is busy")
             if status.status == DriverStatus.error:
                 raise ValueError(f"channel {channel} encountered an error")
+            if status.status == DriverStatus.busy:
+                # Warned, never refused. `setup` has already called
+                # BL_LoadTechnique(first=True) on this channel, which
+                # replaces the whole loaded list and halts whatever was
+                # running -- the "halt experiment"/"end protocol" firmware
+                # messages this drains are that happening. A gate placed
+                # *after* the destructive step protects nothing, and it cost
+                # the first station run of this driver: `run_OCV` failed with
+                # "channel 0 is busy" on a state the driver's own load had
+                # just produced, one poll earlier. `BL_StartChannel` is the
+                # authority on whether a channel can start, and it answers
+                # with an error code `_checked` raises by name; easy-biologic
+                # asked no such question for years of production runs.
+                state = (status.data or {}).get(channel)
+                try:
+                    label = vendor.PROG_STATE(state).name
+                except ValueError:
+                    label = "unknown"
+                LOGGER.warning(
+                    f"channel {channel} reports state {state} ({label}), "
+                    "not STOP; starting anyway"
+                )
 
             plan = bt.plan_for(self._technique, self._params, ttl_params)
             # Deliberate second load, this time with the real ttl_params:
