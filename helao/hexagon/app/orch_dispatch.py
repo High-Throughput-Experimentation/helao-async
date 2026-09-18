@@ -41,12 +41,16 @@ Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
 - ``globstat_q`` -- written by ``StatusIngester``; drained by its own
   broadcast task.
 
-Concretely here: ``DispatchRunner`` acquires ``aiolock`` for the single
-dispatch critical section noted above (:944-1058 in the original inline
-loop); it reads ``interrupt_q`` via ``Orch.wait_for_interrupt`` (called from
-the dispatch loop, method body remains on ``Orch``, cluster B); it never
-touches ``globstat_q`` directly -- that queue is owned end-to-end by
-``StatusIngester`` in ``orch_status_sync.py``.
+Concretely here: ``DispatchRunner`` acquires ``aiolock`` for the dispatch
+critical section noted above (:944-1058 in the original inline loop) -- now
+as **two** sections with the dispatch call between them rather than one
+wrapped around it, because the POST is held for the whole action and holding
+the lock across it starves ``/update_status``; see
+``_dispatch_action_locked``. It reads ``interrupt_q`` via
+``Orch.wait_for_interrupt`` (called from the dispatch loop, method body
+remains on ``Orch``, cluster B); it never touches ``globstat_q`` directly --
+that queue is owned end-to-end by ``StatusIngester`` in
+``orch_status_sync.py``.
 
 CIRCULAR-IMPORT / MONKEYPATCH NOTE: this module must NOT import
 ``helao.core.servers.orch`` at module top (import-cycle rule). The two
@@ -876,33 +880,55 @@ class DispatchRunner:
     async def _dispatch_action_locked(
         self, A
     ) -> tuple[Optional[ErrorCodes], Optional[dict]]:
-        """Run the ``aiolock`` dispatch critical section intact (:944-1058), verbatim.
+        """Dispatch the head action and fold the response into global status.
 
-        The A12 in-lock estop recheck (:956-962) MUST stay a LIVE read inside
-        the ``aiolock`` critical section (never lifted into a pre-lock
-        snapshot): a concurrent estop can flip loop_intent/loop_state while the
-        runner blocks on the lock.
+        Two ``aiolock`` critical sections with the network call between them,
+        rather than one section wrapped around everything. The A12 estop
+        recheck MUST stay a LIVE read inside the first section (never lifted
+        into a pre-lock snapshot): a concurrent estop can flip
+        loop_intent/loop_state while the runner blocks on the lock.
+
+        What changed and why: an action's POST is held open for the whole
+        action, so holding the lock across it stopped ``/update_status`` --
+        same lock -- for that entire duration. Measured at eche10 on a 69 s
+        move: every status package from that server timed out at 60 s and
+        retried 30 s later. The consequence of the split is that ingestion can
+        now fold this action's status while the dispatch is still in flight,
+        which the self-registration below has to account for.
         """
         orch = self.orch
         from helao.core.servers.orch import async_action_dispatcher
 
         result_actiondict = None
+        error_code = ErrorCodes.none
+
+        # The estop re-check stays a LIVE read under the lock, immediately
+        # before the dispatch.
         async with orch.aiolock:
+            estopped = (
+                orch.globalstatusmodel.loop_intent == LoopIntent.estop
+                or orch.globalstatusmodel.loop_state == LoopStatus.estopped
+            )
+            if estopped:
+                LOGGER.info("orchestrator estopped, not dispatching action")
+                error_code = ErrorCodes.estop
+
+        # The dispatch itself runs WITHOUT the lock. It used to be inside it,
+        # and since the POST is held for the whole action, /update_status --
+        # which takes the same lock -- was starved for the action's duration:
+        # a 69 s move at eche10 made every status package from that server
+        # time out at 60 s and retry 30 s later. The lock protects the state
+        # mutation below, not the network wait.
+        if not estopped:
             try:
-                if (
-                    orch.globalstatusmodel.loop_intent == LoopIntent.estop
-                    or orch.globalstatusmodel.loop_state == LoopStatus.estopped
-                ):
-                    LOGGER.info("orchestrator estopped, not dispatching action")
-                    error_code = ErrorCodes.estop
-                else:
-                    result_actiondict, error_code = await async_action_dispatcher(
-                        orch.world_cfg, A
-                    )
+                result_actiondict, error_code = await async_action_dispatcher(
+                    orch.world_cfg, A
+                )
             except Exception as e:
                 LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
                 error_code = ErrorCodes.http
 
+        async with orch.aiolock:
             for cond, stop_message in [
                 (
                     error_code != ErrorCodes.none,
@@ -943,7 +969,24 @@ class DispatchRunner:
                 actstats = resmod.action_status
                 srvkeys = orch.globalstatusmodel.server_dict.keys()
                 srvkey = [k for k in srvkeys if k[0] == srvname][0]
-                if HloStatus.active in actstats:
+                # With the dispatch no longer holding the lock, status
+                # ingestion can fold this uuid while the POST is still open --
+                # and for a short action it can fold the FINISHED package
+                # before the dispatch even returns. Re-registering it as
+                # active from this stale response would strand it in
+                # active_dict forever, because the only packages that clear it
+                # have already been ingested. Ingestion's view is the fresher
+                # one; defer to it.
+                already_ingested = resuuid in orch.globalstatusmodel.active_dict or any(
+                    resuuid in stat_dict
+                    for stat_dict in orch.globalstatusmodel.nonactive_dict.values()
+                )
+                if already_ingested:
+                    LOGGER.info(
+                        f"status for {resuuid} already ingested; "
+                        "not self-registering the dispatch response"
+                    )
+                elif HloStatus.active in actstats:
                     orch.globalstatusmodel.active_dict[resuuid] = resmod
                     orch.globalstatusmodel.server_dict[srvkey].endpoints[
                         actname
