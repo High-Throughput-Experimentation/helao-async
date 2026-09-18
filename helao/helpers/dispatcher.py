@@ -142,9 +142,13 @@ async def async_action_dispatcher(
             select the destination endpoint.
         params: Extra query parameters merged into the RPC kwargs and the
             HTTP query string.
-        timeout: Per-request timeout in seconds; capped by the RPC probe
-            timeout when used for the fast path.
-        retries: Maximum HTTP retry attempts before giving up.
+        timeout: **Connect** budget in seconds, not a total. An action's POST
+            is held open for the whole action, which is unbounded by design,
+            so there is no wall clock on the response; an unreachable server
+            still fails inside this budget. Also caps the RPC fast path and
+            sets the retry backoff.
+        retries: Maximum connect retries. Only a failure that happened
+            *before* the request reached the server is retried.
 
     Returns:
         ``(response, error_code)`` where ``response`` is the decoded JSON
@@ -182,7 +186,17 @@ async def async_action_dispatcher(
     success = False
     retry_count = 0
 
-    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    # No total timeout. A blocking action holds its POST open for the whole
+    # action -- an eche10 xy traverse to the reference position is 688399
+    # counts at 10000 counts/s, 69 s, against what used to be a 60 s total --
+    # and when the clock won, the dispatcher re-POSTed a *running* action. The
+    # server queued the duplicate behind the original and ran it, both records
+    # landed in the same action directory, and the second overwrote the first.
+    # Nothing on disk showed it. The connect budget stays bounded so an
+    # unreachable server still fails fast.
+    client_timeout = aiohttp.ClientTimeout(
+        total=None, connect=timeout, sock_connect=timeout
+    )
     error_code = ErrorCodes.unspecified
     response = None
 
@@ -207,24 +221,38 @@ async def async_action_dispatcher(
                             f"{A.action_server.server_name}/{A.action_name} POST request returned status {resp.status}: '{response}', error={error_code}"
                         )
                         success = False
-                        # Counted, like the exception branch below. A non-200
-                        # is not transport noise that will pass on its own —
-                        # without this the loop condition never changes and
-                        # the call spins forever on a 404 or a 422.
-                        retry_count += 1
-                        if retry_count < retries:
-                            await asyncio.sleep(retry_count * timeout / 2)
+                        # Terminal, not retried. The server answered, so it
+                        # saw the request: a 404 or a 422 fails identically
+                        # five times, and a 500 may have raised *after* the
+                        # action session opened. The caller pauses the orch on
+                        # a non-none error code, which is the right response to
+                        # both.
+                        break
                     else:
                         success = True
-        except Exception:
+        except (aiohttp.ClientConnectorError, aiohttp.ServerTimeoutError):
+            # Connect-phase only: the request never reached the server, so
+            # re-sending it cannot duplicate an action.
             retry_count += 1
             retry_wait = retry_count * timeout / 2
             LOGGER.warning(
-                f"{A.action_server.server_name}/{A.action_name} encountered an error, sleeping for {retry_wait} seconds before retrying...",
+                f"{A.action_server.server_name}/{A.action_name} could not be reached, sleeping for {retry_wait} seconds before retrying...",
                 exc_info=True,
             )
             await asyncio.sleep(retry_wait)
             response = None
+        except Exception:
+            # Anything else happened with the request already in flight. An
+            # action POST is not idempotent -- the action may be running right
+            # now -- so this is reported, never re-sent.
+            error_code = ErrorCodes.http
+            LOGGER.error(
+                f"{A.action_server.server_name}/{A.action_name} failed after the request was sent; "
+                "not retrying, the action may be running",
+                exc_info=True,
+            )
+            response = None
+            break
         finally:
             await conn.close()
     if not success:
@@ -298,7 +326,17 @@ async def async_private_dispatcher(
     success = False
     retry_count = 0
 
-    client_timeout = aiohttp.ClientTimeout(total=timeout)
+    # No total timeout. A blocking action holds its POST open for the whole
+    # action -- an eche10 xy traverse to the reference position is 688399
+    # counts at 10000 counts/s, 69 s, against what used to be a 60 s total --
+    # and when the clock won, the dispatcher re-POSTed a *running* action. The
+    # server queued the duplicate behind the original and ran it, both records
+    # landed in the same action directory, and the second overwrote the first.
+    # Nothing on disk showed it. The connect budget stays bounded so an
+    # unreachable server still fails fast.
+    client_timeout = aiohttp.ClientTimeout(
+        total=None, connect=timeout, sock_connect=timeout
+    )
     error_code = ErrorCodes.unspecified
     response = None
 
