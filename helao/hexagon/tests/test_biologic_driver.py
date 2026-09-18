@@ -170,13 +170,22 @@ def test_an_untriggered_start_keeps_the_starting_cap(driver):
     assert driver._tracker.max_starting_polls == data.MAX_STARTING_POLLS
 
 
-def test_a_triggered_start_lifts_the_starting_cap(driver):
-    """A channel parked on a requested Trigger In/Out waits on an external
+def test_a_trigger_in_start_lifts_the_starting_cap(driver):
+    """A channel parked on a requested Trigger In waits on an external
     instrument, deliberately indefinitely -- MAX_STARTING_POLLS must not
     abort that wait."""
     setup(driver)
     driver.start_channel(0, {"ttl": "in", "ttl_logic": 1, "ttl_duration": 1.0})
     assert driver._tracker.max_starting_polls is None
+
+
+def test_a_trigger_out_start_keeps_the_starting_cap(driver):
+    """Trigger Out pulses for its own finite Trigger_Duration and returns --
+    it waits on nothing, so the firmware-start-failure detector must stay
+    armed for it, unlike Trigger In."""
+    setup(driver)
+    driver.start_channel(0, {"ttl": "out", "ttl_logic": 1, "ttl_duration": 1.0})
+    assert driver._tracker.max_starting_polls == data.MAX_STARTING_POLLS
 
 
 # --- get_data ---------------------------------------------------------------

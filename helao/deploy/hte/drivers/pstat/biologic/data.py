@@ -347,12 +347,13 @@ _BUSY_STATES = frozenset(
 #: `STOP` with rows) polls "starting" forever at `BiologicExec`'s 10 ms rate,
 #: with nothing anywhere reporting a fault.
 #:
-#: This bound must NOT apply to a channel parked on a requested trigger
-#: (Trigger In/Out loaded ahead of the real technique): that wait is on an
-#: external instrument and is deliberately unbounded, so `start_channel`
-#: passes `max_starting_polls=None` whenever a trigger was requested --
+#: This bound must NOT apply to a channel parked on a requested Trigger In:
+#: that wait is on an external instrument and is deliberately unbounded, so
+#: `start_channel` passes `max_starting_polls=None` whenever `ttl == "in"` --
 #: `None` disables the cap outright rather than raising it to a second
-#: guessed number. Conflating "firmware never started" (sub-second) with "a
+#: guessed number. Trigger *Out* is not the same case -- it pulses for its
+#: own finite `Trigger_Duration` and returns, waiting on nothing, so it keeps
+#: this cap armed. Conflating "firmware never started" (sub-second) with "a
 #: trigger the operator asked for" (indefinite) under one cap turns a correct
 #: wait into a premature abort.
 MAX_STARTING_POLLS = 500

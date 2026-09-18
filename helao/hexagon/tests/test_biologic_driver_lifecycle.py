@@ -103,6 +103,18 @@ def test_firmware_is_loaded_when_the_channel_reports_a_non_kernel_code(driver):
     assert sim.firmware_loads() == 1
 
 
+def test_firmware_path_joins_a_real_name_but_passes_an_empty_sentinel_through():
+    """DIGICORE's FPGA slot is `""` (`vendor.firmware_assets`'s own sentinel
+    for "no FPGA file"), not a bare filename -- `os.path.join(sdk_path, "")`
+    yields `f"{sdk_path}/"`, which is not empty and tells the DLL to look for
+    a file that does not exist. The simulator ignores `xlxfile` entirely, so
+    only a direct test of the join catches a regression here."""
+    from helao.deploy.hte.drivers.pstat.biologic.driver import _firmware_path
+
+    assert _firmware_path("/sdk", "kernel.bin") == "/sdk/kernel.bin"
+    assert _firmware_path("/sdk", "") == ""
+
+
 def test_force_load_firmware_reloads_even_when_present():
     sim.set_sim_config(sim.SimConfig(kernel_loaded=True))
     d = BiologicDriver({**CONFIG, "force_load_firmware": True})
