@@ -215,6 +215,7 @@ def ECHEUVIS_sub_CV_led(
             "trigger_name": "gamry_ttl0",
             "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
+            "out_name_gamry": "gamry_aux",
             "toggle_init_delay": [
                 toggle_dark_time_init,
                 toggle2_init_delay,
@@ -430,6 +431,7 @@ def ECHEUVIS_sub_CA_led(
             "trigger_name": "gamry_ttl0",
             "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
+            "out_name_gamry": "gamry_aux",
             "toggle_init_delay": [
                 toggle_dark_time_init,
                 toggle2_init_delay,
@@ -647,6 +649,7 @@ def ECHEUVIS_sub_CP_led(
             "trigger_name": "gamry_ttl0",
             "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
+            "out_name_gamry": "gamry_aux",
             "toggle_init_delay": [
                 toggle_dark_time_init,
                 toggle2_init_delay,
@@ -872,6 +875,7 @@ def ECHEUVIS_sub_OCV_led(
             "trigger_name": "gamry_ttl0",
             "triggertype": TOGGLE_TRIGGERTYPE,
             "out_name": [illumination_source, toggle2_source],
+            "out_name_gamry": "gamry_aux",
             "toggle_init_delay": [
                 toggle_dark_time_init,
                 toggle2_init_delay,
