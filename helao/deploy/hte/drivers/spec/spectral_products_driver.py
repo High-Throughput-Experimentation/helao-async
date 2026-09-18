@@ -32,6 +32,46 @@ from ...drivers.spec.enum import SpecTrigType
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+#: Ceiling on any single SM303 DLL call made off the event loop.
+#:
+#: The vendor DLL serializes on the device handle, so ``spSetTrgEx`` and
+#: ``spCloseGivenChannel`` block behind a ``spReadDataEx`` that is still
+#: waiting for an external trigger -- and if the trigger is never going to
+#: arrive (miswired lines, a source that did not fire) they block forever.
+#: The timeout frees the *caller* and leaves the worker thread parked, which
+#: is the same trade the OceanDirect and BioLogic drivers make: one stranded
+#: thread is recoverable, a dead event loop is not.
+#:
+#: Sized against what these calls actually cost: each setter is a USB
+#: round-trip followed by a 100 ms settle sleep, so the arming sequence is
+#: ~0.3 s and a close is faster. Ten seconds is two orders of magnitude of
+#: headroom and still bounded.
+DEVICE_CALL_TIMEOUT_S = 10.0
+
+
+async def device_call(what: str, fn, *args):
+    """Run a blocking SM303 DLL call off the event loop, under a timeout.
+
+    Every call into this DLL must go through here. Called inline, a blocked
+    DLL call freezes the whole server: SPEC_T stopped answering *every*
+    endpoint, including private ones like /list_executors, because
+    ``_post_exec`` ran ``unset_external_trigger`` and ``spCloseGivenChannel``
+    on the event loop while a read thread was still parked inside
+    ``spReadDataEx`` waiting for a trigger that never came.
+    """
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(fn, *args), timeout=DEVICE_CALL_TIMEOUT_S
+        )
+    except asyncio.TimeoutError:
+        LOGGER.error(
+            f"SM303 '{what}' did not return within {DEVICE_CALL_TIMEOUT_S}s; "
+            "the device is most likely still waiting on an external trigger "
+            "that never arrived. Continuing -- the worker thread stays parked "
+            "until the DLL releases it."
+        )
+        return None
+
 
 class SM303(HelaoDriver):
     """Driver for the Spectral Products SM303 USB spectrometer.
@@ -392,7 +432,11 @@ class SM303(HelaoDriver):
         """
         await asyncio.sleep(delay)
         if self.spec is not None:
-            self.unset_external_trigger()
+            # Off the event loop: the DLL serializes on the device handle, so
+            # this blocks behind a read that is still waiting for a trigger --
+            # and this is the very call an operator makes when that trigger is
+            # never coming. Inline it froze the whole server.
+            await device_call("unset_external_trigger", self.unset_external_trigger)
         return DriverResponse(
             response=DriverResponseType.success, status=DriverStatus.ok
         )
@@ -412,5 +456,7 @@ class SM303(HelaoDriver):
         """
         switch = bool(switch)
         if switch and self.spec is not None:
-            self.unset_external_trigger()
+            # The estop path is the last place that may block the event loop,
+            # and it is reached exactly when the device is already misbehaving.
+            await device_call("unset_external_trigger", self.unset_external_trigger)
         return switch
