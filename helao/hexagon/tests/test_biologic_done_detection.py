@@ -91,6 +91,15 @@ def test_error_is_sticky():
     assert t.observe(V(RUN), I()) == "error"
 
 
+def test_max_starting_polls_none_disables_the_cap():
+    """A channel parked on a requested trigger waits on an external
+    instrument, deliberately indefinitely -- `None` must never time out."""
+    t = RunTracker(max_starting_polls=None)
+    for _ in range(1000):
+        assert t.observe(V(STOP), I(rows=0)) == "starting"
+    assert t.seen_run is False
+
+
 def test_should_drain_while_rows_keep_arriving():
     t = RunTracker()
     assert t.should_drain(I(rows=3)) is True

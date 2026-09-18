@@ -441,7 +441,16 @@ class BiologicDriver(HelaoDriver):
             for message in self._client.drain_messages(channel):
                 LOGGER.warning(f"channel {channel} technique message: {message}")
 
-            self._tracker = data.RunTracker()
+            # A requested trigger (Trigger In/Out loaded ahead of the real
+            # technique) parks the channel waiting on an external instrument
+            # -- deliberately indefinite, unlike a firmware start failure
+            # (sub-second). MAX_STARTING_POLLS must not fire on that wait, so
+            # the cap is lifted outright rather than raised to a second
+            # guessed number.
+            triggered = (ttl_params or {}).get("ttl", "none") != "none"
+            self._tracker = data.RunTracker(
+                max_starting_polls=None if triggered else data.MAX_STARTING_POLLS
+            )
             self._logged_skipped = 0
             start_time = time.time()
             self._client.start_channel(channel)
