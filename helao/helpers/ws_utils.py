@@ -49,25 +49,42 @@ class WsPublisher:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        """Remove ``websocket`` from the active set."""
-        self.active_connections.remove(websocket)
+        """Remove ``websocket`` from the active set, if it is still in it.
+
+        Idempotent because ``broadcast`` also clears the connection on its way
+        out, and every caller then calls this from its own ``except`` arm: a
+        bare ``list.remove`` would raise ValueError out of the disconnect
+        handler, which is the same ASGI-traceback noise this whole path is
+        meant to stop producing.
+        """
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
 
     async def broadcast(self, websocket: WebSocket):
         """Subscribe to the source queue and forward messages to ``websocket``.
 
-        Runs until the client closes the connection; on close the subscriber
-        is removed from the source queue.
+        Returns when the client closes the connection, when the source queue is
+        closed (``MultisubscriberQueue.close`` sends the sentinel every
+        ``subscribe`` iterator breaks on), or when the task is cancelled.
+
+        The cancel case is a shutdown, and it is handled here rather than left
+        to propagate: this coroutine is the last frame of a WebSocket endpoint,
+        so an escaping ``CancelledError`` is what uvicorn reports as "Exception
+        in ASGI application" with a full traceback on every server at CTRL-x.
+        Nothing above this frame needs the cancellation to continue.
         """
-        src_sub = self.source_queue.subscribe()
         try:
             async for source_msg in self.source_queue.subscribe():
                 await websocket.send_bytes(
                     pyzstd.compress(pickle.dumps(self.xform_func(source_msg)))
                 )
         except websockets.ConnectionClosedError:
-            print("Client closed connection, but no close frame received or sent.")
-            if src_sub in self.source_queue.subscribers:
-                self.source_queue.remove(src_sub)
+            LOGGER.info("client closed the connection without a close frame")
+        except asyncio.CancelledError:
+            LOGGER.info("websocket broadcast cancelled, server is shutting down")
+        finally:
+            if websocket in self.active_connections:
+                self.active_connections.remove(websocket)
 
 
 class WsSyncClient:

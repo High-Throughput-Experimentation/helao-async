@@ -1344,6 +1344,19 @@ class ActionHost(HelaoFastAPI):
             if task is not None:
                 task.cancel()
 
+        # Close the fan-out queues so every /ws_* subscriber breaks out of its
+        # iterator and the endpoint returns. Without this the sockets stay open
+        # with nothing left to send, uvicorn waits the whole
+        # timeout_graceful_shutdown (5 s, fast_launcher.py) and then cancels
+        # them -- which is the "Cancel N running task(s), timeout graceful
+        # shutdown exceeded" line and the ASGI traceback under it. Only the
+        # POST /shutdown path can do this in time; uvicorn runs the lifespan
+        # shutdown event *after* it has already cancelled, so on the signal
+        # path WsPublisher.broadcast's own cancel handler is what keeps the
+        # log clean.
+        for queue in (self.status_q, self.data_q, self.live_q):
+            await queue.close()
+
         retvals: dict = {}
         shutdown = getattr(self.driver, "shutdown", None)
         async_shutdown = getattr(self.driver, "async_shutdown", None)
