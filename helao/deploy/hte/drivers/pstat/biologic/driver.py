@@ -57,6 +57,17 @@ def _segment_name(info, technique: Any) -> str:
 KERNEL_FIRMWARE_CODE = 5
 
 
+def _firmware_path(sdk_path: str, name: str) -> str:
+    """Join a firmware asset name with `sdk_path`, the same reason
+    `_load_plan` joins a `.ecc` name -- unless `name` is empty, which is a
+    sentinel (DIGICORE's FPGA slot: `vendor.firmware_assets` returns `""`
+    meaning "no FPGA file"), not a bare filename. `os.path.join(sdk_path,
+    "")` yields `f"{sdk_path}/"`, which is not empty and would tell the DLL
+    to look for a file that does not exist.
+    """
+    return os.path.join(sdk_path, name) if name else name
+
+
 def _kernel_loaded(ch: vendor.ChannelInfo) -> bool:
     """A channel has a kernel loaded only at ``FirmwareCode == KERNEL_FIRMWARE_CODE``.
 
@@ -158,14 +169,10 @@ class BiologicDriver(HelaoDriver):
             ch = client.channel_info(0)
             if self.force_load_firmware or not _kernel_loaded(ch):
                 kernel, fpga = vendor.firmware_assets(self.board_type)
-                # Joined with sdk_path for the same reason `_load_plan` joins
-                # a `.ecc` name: a bare name depends on undocumented
-                # DLL-relative resolution, which is not guaranteed for a
-                # station's own sdk_path layout.
                 client.load_firmware(
                     0,
-                    os.path.join(self.sdk_path, kernel),
-                    os.path.join(self.sdk_path, fpga),
+                    _firmware_path(self.sdk_path, kernel),
+                    _firmware_path(self.sdk_path, fpga),
                     force=self.force_load_firmware,
                 )
 
@@ -441,15 +448,17 @@ class BiologicDriver(HelaoDriver):
             for message in self._client.drain_messages(channel):
                 LOGGER.warning(f"channel {channel} technique message: {message}")
 
-            # A requested trigger (Trigger In/Out loaded ahead of the real
-            # technique) parks the channel waiting on an external instrument
+            # Only Trigger In parks the channel waiting on an external event
             # -- deliberately indefinite, unlike a firmware start failure
-            # (sub-second). MAX_STARTING_POLLS must not fire on that wait, so
-            # the cap is lifted outright rather than raised to a second
-            # guessed number.
-            triggered = (ttl_params or {}).get("ttl", "none") != "none"
+            # (sub-second) -- so only it lifts MAX_STARTING_POLLS. Trigger
+            # Out (TECH_TO) pulses for its own finite Trigger_Duration and
+            # returns; it waits on nothing, so the firmware-start-failure
+            # detector must stay armed for it.
+            waiting_on_trigger = (ttl_params or {}).get("ttl", "none") == "in"
             self._tracker = data.RunTracker(
-                max_starting_polls=None if triggered else data.MAX_STARTING_POLLS
+                max_starting_polls=(
+                    None if waiting_on_trigger else data.MAX_STARTING_POLLS
+                )
             )
             self._logged_skipped = 0
             start_time = time.time()

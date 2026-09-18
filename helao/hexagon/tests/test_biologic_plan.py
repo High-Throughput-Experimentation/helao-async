@@ -1,8 +1,12 @@
 """Plan expansion, and the entry-index to loaded-index mapping."""
 
+import asyncio
+
 import pytest
 
-from helao.deploy.hte.drivers.pstat.biologic import vendor
+from helao.deploy.hte.drivers.pstat.biologic import data as biodata
+from helao.deploy.hte.drivers.pstat.biologic import sim, vendor
+from helao.deploy.hte.drivers.pstat.biologic.driver import BiologicDriver
 from helao.deploy.hte.drivers.pstat.biologic.technique import (
     PlanEntry,
     PlanLoop,
@@ -281,3 +285,72 @@ _PEIS = dict(
 from helao.deploy.hte.drivers.pstat.biologic.data import (
     COLUMNS as _COLUMNS,
 )  # noqa: E402
+
+# --- driving a plan through the driver (the C1 regression) ------------------
+#
+# C1: `data.decode` raised `KeyError` on the terminal poll of every `run_plan`
+# run, because `_segment_name`'s fallback name ("PLAN"/"NONE" for a technique
+# id this build does not recognize, or a zero-row poll) is not a `COLUMNS`
+# key. Nothing above this line ever drives a plan through the driver's
+# `get_data` -- these tests exercise `expand()` only -- and
+# `test_biologic_caocv.py` does not cover it either, because `"CAOCV"` *is* a
+# `COLUMNS` key; only a plain multi-entry `PlanTechnique` (whose
+# `technique_name` really is `"PLAN"`) ever takes the fallback path. Before
+# this, the Critical was proofed only by a scratch reproduction script, with
+# no committed regression.
+
+
+def test_a_two_technique_plan_completes_with_every_poll_successful(monkeypatch):
+    """The full C1 regression: two techniques, polled to completion, with
+    every response asserted successful (not just the last) and more than one
+    distinct decoded segment name actually seen.
+
+    The second assertion is what makes the M8 fix (the simulator advancing
+    through loaded techniques instead of always reporting the first one)
+    load-bearing here rather than decorative -- without it, this test would
+    have passed against the pre-fix driver too, the same way nineteen other
+    green tests in this file missed C1: the bug only fires when `get_data`
+    decodes a *later* segment's id, and a simulator that always reports the
+    first technique never reaches that code path.
+    """
+    seen_names: list[str] = []
+    orig_decode = biodata.decode
+
+    def spy_decode(name, *args, **kwargs):
+        seen_names.append(name)
+        return orig_decode(name, *args, **kwargs)
+
+    monkeypatch.setattr(biodata, "decode", spy_decode)
+
+    sim.set_sim_config(sim.SimConfig())
+    driver = BiologicDriver(
+        {"address": "1.2.3.4", "num_channels": 1, "simulate": True, "sdk_path": "/x"}
+    )
+    try:
+        assert driver.connect().response == "success"
+        tech = plan_technique([PlanEntry("OCV", OCV), PlanEntry("CA", CA)], [])
+        assert driver.setup(tech, {"channel": 0}).response == "success"
+        assert driver.start_channel(0).response == "success"
+
+        for _ in range(50):
+            resp = asyncio.run(driver.get_data(0))
+            assert resp.response == "success", resp.message
+            if resp.message == "done":
+                break
+        else:
+            raise AssertionError("plan never finished")
+    finally:
+        driver.shutdown()
+        sim.set_sim_config(sim.SimConfig())
+
+    assert {"OCV", "CA"} <= set(seen_names), seen_names
+
+
+def test_current_technique_advances_across_the_run():
+    """M8 at the unit level: `sim._current_technique` must not always report
+    the first loaded technique -- that is what hid C1 from every test above
+    this section."""
+    channel = sim._Channel(techniques=[vendor.TECH_ID.OCV, vendor.TECH_ID.CA])
+    cfg = sim.SimConfig(polls_until_stop=3)
+    seen = {sim._current_technique(channel, cfg) for channel.polls in range(4)}
+    assert seen == {vendor.TECH_ID.OCV, vendor.TECH_ID.CA}
