@@ -507,6 +507,7 @@ class Galil(HelaoDriver):
             and isinstance(t_duration, int)
             and out_name in self.dev_do
             and out_name_gamry in self.dev_do
+            and self.dev_do[out_name_gamry] is not None
         ):
             out_port = self.dev_do[out_name]
             out_port_gamry = self.dev_do[out_name_gamry]
