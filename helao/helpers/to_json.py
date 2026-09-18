@@ -7,16 +7,38 @@ import json
 import orjson
 
 
+def _hlo_json_default(obj):
+    """Coerce the one shape orjson refuses that stdlib :mod:`json` accepted.
+
+    orjson serializes subclasses of ``str``, ``int``, ``dict`` and ``list``
+    natively but **not** subclasses of ``float``. ``ruamel`` loads every YAML
+    float as ``ScalarFloat``, so any value read out of a config and enqueued as
+    data hit ``TypeError: Type is not JSON serializable: ScalarFloat`` — which
+    the data logger catches and replaces with an error stub, writing
+    ``{"error": "data was not serializable"}`` into the ``.hlo`` in place of the
+    row. Silent, and only visible as one generic log line.
+
+    Anything else is left to raise. A blanket ``str(obj)`` here would write a
+    plausible-looking value for a genuinely wrong object, which is the failure
+    this function exists to stop being silent.
+    """
+    if isinstance(obj, float):
+        return float(obj)
+    raise TypeError(f"Type is not JSON serializable: {type(obj).__name__}")
+
+
 def hlo_json_dumps(obj) -> str:
     """Serialize ``obj`` to a strict-valid JSON string for a ``.hlo`` data line.
 
     Unlike stdlib :func:`json.dumps` (which emits bare ``NaN``/``Infinity``
     tokens that the orjson-based ``.hlo`` reader rejects), this maps non-finite
     floats to ``null`` so every data line is strict-valid JSON. Numpy scalars
-    and arrays are serialized natively; non-string dict keys are stringified.
+    and arrays are serialized natively; non-string dict keys are stringified;
+    ``float`` subclasses (``ruamel``'s ``ScalarFloat``, above all) are coerced.
     """
     return orjson.dumps(
         obj,
+        default=_hlo_json_default,
         option=orjson.OPT_SERIALIZE_NUMPY | orjson.OPT_NON_STR_KEYS,
     ).decode()
 
