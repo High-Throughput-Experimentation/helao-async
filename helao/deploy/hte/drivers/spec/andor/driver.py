@@ -807,11 +807,9 @@ class AndorDriver(HelaoDriver):
         """Configure continuous full-AOI acquisition and queue frame buffers.
 
         Sets vertical binning over the full AOI, Mono32 encoding, rolling
-        shutter, 280 MHz readout, continuous cycle mode, and the requested
-        exposure/framerate, then queues ``buffer_count`` buffers for the SDK
-        to fill. Overlap is left off here and enabled in
-        :meth:`set_trigger` after ``TriggerMode`` is written — the SDK
-        refuses a TriggerMode change while Overlap is already on.
+        shutter with overlap mode, 280 MHz readout, continuous cycle mode,
+        and the requested exposure/framerate, then queues ``buffer_count``
+        buffers for the SDK to fill.
 
         Args:
             exp_time: Exposure time in seconds.
@@ -833,10 +831,8 @@ class AndorDriver(HelaoDriver):
             # take care with rolling shutter as technically the image is not taken at the same time but line by line
             # meaning the last row of one image is taken after the first row of the next image.
             # see section 5.11.5 and figure 21 of the Zyla manual for more information.
-            # Overlap stays False until set_trigger writes TriggerMode; enabling
-            # it here leaves a sticky Software/External Start mode that the SDK
-            # will not let the next acquire overwrite. see section 5.11.5.
-            self.cam.Overlap = False
+            self.cam.Overlap = True  # overlap mode also carries a health warning but is needed to collect quickly for long aquisitions.
+            # see section 5.11.5 and figure 21 of the Zyla manual for more information.
             self.cam.PixelReadoutRate = "280 MHz"  # The fastest readout rate. This is 560 MHz in solis. I don't know why but these correspond to the same readout time
             self.cam.CycleMode = "Continuous"  # will go on forever until self.cam.AcquisitionStop() is called
             self.cam.ExposureTime = exp_time  # Default to fastest exposure time permissible in this AOI is the readout time of 9.8 ms
@@ -870,12 +866,7 @@ class AndorDriver(HelaoDriver):
         return response
 
     def set_trigger(self, external: bool = True) -> DriverResponse:
-        """Select trigger source, enable overlap, and start the acquisition.
-
-        Overlap is toggled off around the ``TriggerMode`` write because the
-        SDK will not accept a TriggerMode change while Overlap is already
-        enabled (the failure path when a software acquire is followed by an
-        External Start one, e.g. reference_scale then SpEC).
+        """Select trigger source and start the acquisition.
 
         Args:
             external: ``True`` for ``External Start``, ``False`` for
@@ -885,14 +876,11 @@ class AndorDriver(HelaoDriver):
             :class:`DriverResponse` with ``busy`` status when armed.
         """
         try:
-            # Overlap off → write mode → Overlap on. Matches the order in
-            # test_funcs.setup_SEC_aquisition; see Zyla manual §5.11.5.
-            self.cam.Overlap = False
+            # call function to activate External Trigger mode
             if external:
                 self.cam.TriggerMode = "External Start"
             else:
                 self.cam.TriggerMode = "Software"
-            self.cam.Overlap = True
             self.cam.AcquisitionStart()
             response = DriverResponse(
                 response=DriverResponseType.success,
@@ -900,15 +888,56 @@ class AndorDriver(HelaoDriver):
                 status=DriverStatus.busy,
             )
         except Exception:
-            LOGGER.error(
-                "set_trigger failed, overlap cannot be changed while TriggerMode is external. Turn overlap off before changing",
-                exc_info=True,
-            )
+            LOGGER.error("set_trigger failed", exc_info=True)
             response = DriverResponse(
                 response=DriverResponseType.failed,
                 status=DriverStatus.error,
             )
             self.cleanup()
+        return response
+
+    def reset_camera_state_for_triggered_aq(
+        self, exp_time: float = 0.0098, framerate: float = 98
+    ) -> DriverResponse:
+        """Leave External Start + Overlap configured without starting acquisition.
+
+        After a Software acquire, TriggerMode is sticky and cannot be changed
+        while Overlap is on (or while FrameRate is still at the SpEC rate).
+        This rewrites features in SDK-safe order so a following External Start
+        acquire (e.g. SpEC) does not hit AT_ERR_OUTOFRANGE. Does not
+        disconnect the camera.
+
+        Call only when acquisition is stopped (after :meth:`cleanup`).
+
+        Args:
+            exp_time: Exposure time in seconds to leave configured.
+            framerate: Frame rate in Hz to leave configured (needs Overlap on).
+
+        Returns:
+            Success :class:`DriverResponse` when features are written.
+        """
+        try:
+            # Drop rate while Overlap is still on (98 Hz is legal there), then
+            # Overlap off → TriggerMode → Overlap on → restore timing.
+            # ~1/(exp + readout); readout ≈ 9.8 ms for this full-AOI binning.
+            safe_fps = min(50.0, 1.0 / (exp_time + 0.01))
+            self.cam.FrameRate = safe_fps
+            self.cam.Overlap = False
+            self.cam.TriggerMode = "External Start"
+            self.cam.Overlap = True
+            self.cam.ExposureTime = exp_time
+            self.cam.FrameRate = framerate
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message="camera state reset for triggered acquisition",
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            LOGGER.error("reset_camera_state_for_triggered_aq failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+            )
         return response
 
     def get_data(

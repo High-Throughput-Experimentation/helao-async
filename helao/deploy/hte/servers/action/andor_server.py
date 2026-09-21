@@ -308,12 +308,13 @@ async def andor_dyn_endpoints(app: ActionHost):
     """Register Andor action endpoints on ``app`` after the driver is ready.
 
     Disables concurrent actions on this server and attaches the ``acquire``,
-    ``cancel_acquire``, ``cooling``, ``adjust_nd`` and ``calibrate_wl`` POST
-    routes. All are registered unconditionally: the frozen route checklist is
-    an AST extraction of source, so a decorator wrapped in a config test would
-    keep the source surface uniform while the live OpenAPI silently differed
-    per station -- a divergence no gate can observe. ``adjust_nd`` refuses at
-    runtime instead, on a station with no software-controlled ND wheel.
+    ``cancel_acquire``, ``reset_camera_state_for_triggered_aq``, ``cooling``,
+    ``adjust_nd`` and ``calibrate_wl`` POST routes. All are registered
+    unconditionally: the frozen route checklist is an AST extraction of
+    source, so a decorator wrapped in a config test would keep the source
+    surface uniform while the live OpenAPI silently differed per station -- a
+    divergence no gate can observe. ``adjust_nd`` refuses at runtime instead,
+    on a station with no software-controlled ND wheel.
 
     Args:
         app: The :class:`ActionHost` instance being constructed by ``makeApp``.
@@ -423,6 +424,28 @@ async def andor_dyn_endpoints(app: ActionHost):
         for exec_id, executor in app.executors.items():
             if exec_id.split()[0] == "acquire":
                 executor.stop_action_task()
+        finished_action = await active.finish()
+        return finished_action.as_dict()
+
+    @app.action()
+    async def reset_camera_state_for_triggered_aq(
+        ctx: ActionContext,
+        exp_time: float = 0.0098,
+        framerate: float = 98,
+    ):
+        """Rewrite Andor features for a following External Start acquire.
+
+        Does not acquire and does not disconnect. Intended after a Software
+        ``acquire`` (e.g. HISPEC2 reference scale) so SpEC can arm without
+        an Overlap/TriggerMode SDK error. Acquisition must already be stopped.
+        """
+        active = await ctx.begin()
+        resp = app.driver.reset_camera_state_for_triggered_aq(
+            exp_time=exp_time, framerate=framerate
+        )
+        active.action.error_code = (
+            ErrorCodes.none if resp.response == "success" else ErrorCodes.critical_error
+        )
         finished_action = await active.finish()
         return finished_action.as_dict()
 
