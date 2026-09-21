@@ -921,7 +921,9 @@ class AndorDriver(HelaoDriver):
             # Overlap off → TriggerMode → Overlap on → restore timing.
             # ~1/(exp + readout); readout ≈ 9.8 ms for this full-AOI binning.
             safe_fps = 1
+            safe_exp_time = 0.1
             self.cam.FrameRate = safe_fps
+            self.cam.ExposureTime = safe_exp_time
             self.cam.Overlap = False
             self.cam.TriggerMode = "External Start"
             self.cam.Overlap = True
