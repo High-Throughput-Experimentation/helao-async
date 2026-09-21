@@ -924,8 +924,9 @@ class AndorDriver(HelaoDriver):
             safe_exp_time = 0.1
             self.cam.FrameRate = safe_fps
             self.cam.ExposureTime = safe_exp_time
-            self.cam.Overlap = False
             self.cam.TriggerMode = "External Start"
+
+            self.cam.Overlap = False
             self.cam.Overlap = True
             self.cam.ExposureTime = exp_time
             self.cam.FrameRate = framerate
