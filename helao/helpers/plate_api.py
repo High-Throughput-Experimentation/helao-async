@@ -167,10 +167,10 @@ class HTEPlateAPI:
         Falls back to ``HTELegacyAPI`` for legacy plate ids and to ``None``
         when no ``screening_map_id`` is published for the plate.
         """
-        if plateid < self.legacy_plateid_threshold:
-            return self.legacy_api.get_info_plateid(plateid)
         infod = self.get_info(plateid)
         if infod is None:
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.get_info_plateid(plateid)
             return None
         if "screening_map_id" not in infod:
             return None
@@ -179,10 +179,12 @@ class HTEPlateAPI:
 
     def get_platemap_plateid(self, plateid: int):
         """Return the platemap for ``plateid``, using legacy paths when needed."""
-        if plateid < self.legacy_plateid_threshold:
-            return self.legacy_api.get_platemap_plateid(plateid)
+        infolist = self.get_info_plateid(plateid)
+        if infolist is None:
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.get_platemap_plateid(plateid)
         else:
-            return self.get_info_plateid(plateid)
+            return infolist
 
     def get_rcp_plateid(self, plateid: int):
         """Forward an RCP lookup to ``HTELegacyAPI`` (currently a no-op)."""
@@ -191,36 +193,40 @@ class HTEPlateAPI:
 
     def check_plateid(self, plateid: int) -> bool:
         """Return ``True`` when an info record exists for ``plateid``."""
-        if plateid < self.legacy_plateid_threshold:
-            return self.legacy_api.check_plateid(plateid)
         infod = self.get_info(plateid)
         # 1. checks that the plateid (info file) exists
         if infod is not None:
             return True
         else:
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.check_plateid(plateid)
             return False
 
     def check_printrecord_plateid(self, plateid: int):
         """Return ``True`` when the info record has a ``screening_print_id``."""
-        if plateid < self.legacy_plateid_threshold:
-            return self.legacy_api.check_printrecord_plateid(plateid)
         infod = self.get_info(plateid)
         if infod is not None:
             if "screening_print_id" not in infod:
                 return False
             else:
                 return True
+        else:
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.check_printrecord_plateid(plateid)
+            return False
 
     def check_annealrecord_plateid(self, plateid: int):
         """Return ``True`` when the info record contains an ``anneals`` block."""
-        if plateid < self.legacy_plateid_threshold:
-            return self.legacy_api.check_annealrecord_plateid(plateid)
         infod = self.get_info(plateid)
         if infod is not None:
             if "anneals" not in infod:
                 return False
             else:
                 return True
+        else:
+            if plateid < self.legacy_plateid_threshold:
+                return self.legacy_api.check_annealrecord_plateid(plateid)
+            return False
 
     def get_print(self, print_id: str) -> dict | None:
         """Fetch a print record by id from the live Plate API.
@@ -266,14 +272,14 @@ class HTEPlateAPI:
         if isinstance(plateid, dict):
             infofiled = plateid
         else:
-            if plateid < self.legacy_plateid_threshold:
-                return self.legacy_api.get_elements_plateid(
-                    plateid=plateid,
-                    exclude_elements_list=exclude_elements_list,
-                    **kwargs,
-                )
             infofiled: dict | None = self.get_info(plateid)
             if infofiled is None:
+                if plateid < self.legacy_plateid_threshold:
+                    return self.legacy_api.get_elements_plateid(
+                        plateid=plateid,
+                        exclude_elements_list=exclude_elements_list,
+                        **kwargs,
+                    )
                 return None
         print_id: str | None = infofiled.get("screening_print_id", None)
         if print_id is None:
