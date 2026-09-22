@@ -31,10 +31,12 @@ class HTELegacyAPI:
     def __init__(self):
         """Initialise the cache dicts and the platemap/plate search paths."""
         self.PLATEMAPFOLDERS = [
+            "/mnt/j/hte_jcap_app_proto/map",
             r"J:\hte_jcap_app_proto\map",
         ]
 
         self.PLATEFOLDERS = [
+            "/mnt/j/hte_jcap_app_proto/plate",
             r"J:\hte_jcap_app_proto\plate",
         ]
 
