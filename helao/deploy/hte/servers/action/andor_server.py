@@ -600,6 +600,19 @@ def makeApp(server_key) -> ActionHost:
         """Invoke :meth:`AndorDriver.stop` to halt the camera."""
         app.driver.stop()
 
+    @app.post("/get_wl", tags=["private"])
+    def get_wl():
+        """Return the live wavelength axis for action visualizers.
+
+        Same contract as the Ocean ``/get_wl``: the axis is in the action yml
+        header, not on the ``ws_data`` stream, so a live panel has to ask.
+        Empty when ``connect()`` never produced an axis.
+        """
+        wl = app.driver.wl_arr
+        if wl is None:
+            return []
+        return [float(v) for v in wl]
+
     @app.post("/set_wl_from_pairs", tags=["private"])
     def set_wl_from_pairs(pairs: list[tuple[float, float]], degree: int = 2):
         """Fit and install a wavelength axis from ``(channel, wavelength_nm)``.
