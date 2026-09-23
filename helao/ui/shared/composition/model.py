@@ -121,7 +121,8 @@ def record_from_process(
     sequence_uuid = str(entry.get("sequence_uuid") or "")
     sequence = ((sequences or {}).get(sequence_uuid)) or {}
     try:
-        plate_id = int(params.get("plate_id"))
+        raw = params.get("plate_id")
+        plate_id = 0 if raw is None else int(raw)
     except (TypeError, ValueError):
         plate_id = 0
     return CompositionRecord(
