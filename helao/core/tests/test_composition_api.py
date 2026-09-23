@@ -7,7 +7,19 @@ for plate 10244 on 2026-09-22.
 
 import asyncio
 
+import pytest
+
 from helao.ui.shared.composition import api
+
+
+@pytest.fixture(autouse=True)
+def _reset_quant_cache():
+    """Every test gets an empty quant cache: two tests below use the same
+    ``(action_uuid, file_name)`` key, and an entry surviving from an earlier
+    test would make a later one stop issuing the request it asserts on."""
+    api.reset_quant_cache()
+    yield
+    api.reset_quant_cache()
 
 
 class StubClient:
@@ -137,6 +149,27 @@ def test_fetch_quant_falls_back_to_the_metadata_endpoint(monkeypatch) -> None:
     monkeypatch.setattr(api, "_lookup_key", fake_lookup)
     out = run(api.fetch_quant(client, "act-1", "quant.hlo.json"))
     assert out["transition"] == ["Y.K"]
+
+
+def test_fetch_quant_caches_by_action_and_file_and_issues_no_second_request() -> None:
+    """A second Retrieve for the same plate must not re-issue ~499 requests --
+    the cost this cache removes. Re-grouping and re-selecting a unit are
+    already free without it, since `plot()` reads `_records` out of state and
+    does no I/O; only a repeat Retrieve regresses."""
+    client = StubClient(
+        raw={
+            "raw_data/act-1/quant.hlo.json": {
+                "data": {"data": {"transition": ["Co.K"]}}
+            }
+        }
+    )
+    first = run(api.fetch_quant(client, "act-1", "quant.hlo.json"))
+    assert first["transition"] == ["Co.K"]
+    assert len(client.calls) == 1
+
+    second = run(api.fetch_quant(client, "act-1", "quant.hlo.json"))
+    assert second["transition"] == ["Co.K"]
+    assert len(client.calls) == 1, "a cache hit must not issue another request"
 
 
 def test_fetch_spectrum_asks_the_action_for_its_name() -> None:

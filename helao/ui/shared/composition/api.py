@@ -17,6 +17,7 @@ import threading
 import httpx
 
 from helao.helpers import helao_logging as logging
+from helao.ui.shared.composition.model import SPECTRUM_FILE_TYPE
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -27,14 +28,18 @@ API_SPEC_URL = "https://helao-api.caltech-hte.modelyst.com/api/openapi.json"
 #: through the client; see that function.
 API_BASE = "https://helao-api.caltech-hte.modelyst.com/api"
 
-#: The spectrum HLO's file_type, required by /api/file/plottable-data.
-SPECTRUM_FILE_TYPE = "xrfspec_helao__json_file"
-
 #: Request timeout for the one call that bypasses the client, in seconds.
 _TIMEOUT_S = 30
 
 _CLIENT = None
 _CLIENT_LOCK = threading.Lock()
+
+#: Quantification results, keyed by ``(action_uuid, file_name)``. A record's
+#: quantification is immutable once its action has finished, so nothing here
+#: ever needs invalidating on its own -- only a test, or a plate reload that
+#: wants a clean slate, ever calls :func:`reset_quant_cache`.
+_QUANT_CACHE: dict = {}
+_QUANT_CACHE_LOCK = threading.Lock()
 
 
 def get_client():
@@ -58,6 +63,13 @@ def reset_client() -> None:
     global _CLIENT
     with _CLIENT_LOCK:
         _CLIENT = None
+
+
+def reset_quant_cache() -> None:
+    """Drop every cached quantification result. For tests, and for a plate
+    reload that must not carry a previous session's cached answers forever."""
+    with _QUANT_CACHE_LOCK:
+        _QUANT_CACHE.clear()
 
 
 async def search_processes(client, plate_id: int, *, size: int = 500) -> list:
@@ -146,14 +158,24 @@ async def _lookup_key(action_uuid: str, file_name: str) -> str:
 
 
 async def fetch_quant(client, action_uuid: str, file_name: str) -> dict:
-    """The quantification HLO's data columns for one action.
+    """The quantification HLO's data columns for one action, cached by
+    ``(action_uuid, file_name)``.
 
     The S3 key is derived rather than looked up -- ``/api/file/metadata``
     returns exactly ``raw_data/<action_uuid>/<file_name>``, verified against
     the production API -- which halves a plate load from two requests per
     process to one. The lookup is the fallback for a record stored under a
     different convention.
+
+    A plate's ~499 processes are the cost this removes on a *second*
+    Retrieve for the same plate -- re-grouping and re-selecting a unit are
+    already free, since ``plot()`` reads the already-loaded records out of
+    state and issues no request of its own.
     """
+    cache_key = (action_uuid, file_name)
+    with _QUANT_CACHE_LOCK:
+        if cache_key in _QUANT_CACHE:
+            return _QUANT_CACHE[cache_key]
     key = f"raw_data/{action_uuid}/{file_name}"
     try:
         response = await client.read_raw_data(request_body={"key": key})
@@ -162,7 +184,10 @@ async def fetch_quant(client, action_uuid: str, file_name: str) -> dict:
         if not key:
             return {}
         response = await client.read_raw_data(request_body={"key": key})
-    return ((response or {}).get("data") or {}).get("data") or {}
+    data = ((response or {}).get("data") or {}).get("data") or {}
+    with _QUANT_CACHE_LOCK:
+        _QUANT_CACHE[cache_key] = data
+    return data
 
 
 async def fetch_spectrum(client, action_uuid: str, file_name: str) -> dict:

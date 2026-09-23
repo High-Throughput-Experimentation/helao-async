@@ -342,6 +342,37 @@ def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
     assert state._plotted_ys == []
 
 
+def test_plot_clears_the_selected_sample_when_the_new_grouping_excludes_it() -> None:
+    """Regression: retrieve -> Plot -> select sample 42 -> narrow ``run_use``
+    to something matching nothing -> Plot left the details panel, its table
+    and its spectrum on screen for a sample the current view no longer
+    contains. Nothing errored.
+    """
+    state = _FakeCompositionState()
+    state._records = RECORDS
+    state._pm_rows = PM_ROWS
+    state.transition_choice = "Co.K"
+    state.unit_choice = "net_counts"
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.plot()
+
+    # Simulate a prior selection, as `_select` would have set it.
+    state.selected_label = "legacy__solid__10244_42   sample 42   post_anneal"
+    state.detail_rows = [["transition", "net_counts"], ["Co.K", "271.2"]]
+    state.spec_spec, state.spec_url, state.spec_layout = {"a": 1}, "u", "l"
+
+    state.run_use_choice = "no-such-run-use"
+    state.plot()
+
+    assert state.status == "nothing matches this grouping"
+    assert state.map_url == ""
+    assert state.selected_label == ""
+    assert state.detail_rows == []
+    assert state.spec_spec == {}
+    assert state.spec_url == ""
+    assert state.spec_layout == ""
+
+
 def test_draw_ternary_keeps_records_index_aligned_when_a_middle_point_is_dropped() -> (
     None
 ):

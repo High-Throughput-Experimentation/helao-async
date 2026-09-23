@@ -34,6 +34,7 @@ from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
 from helao.ui.shared.composition import ternary as _ternary
 from helao.ui.shared.palette import reflex_muted_text_class, reflex_table_class
+from helao.ui.shared.platemap import _as_number
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -396,6 +397,14 @@ class CompositionState(rx.State):
         self._tern_plotted_xs, self._tern_plotted_ys = [], []
         self.map_spec, self.map_url, self.map_layout = {}, "", ""
         self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
+        # A view that no longer contains the selected sample must not keep
+        # showing its details panel and spectrum: without this, changing the
+        # grouping to one that excludes the selected sample left its details
+        # table, label and spectrum chart on screen next to the new (empty or
+        # different) plot.
+        self.selected_label = ""
+        self.detail_rows = []
+        self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
         records = grouping.filter_records(
             self._records,
             run_use=self.run_use_choice,
@@ -486,8 +495,8 @@ class CompositionState(rx.State):
         panel names which, so an interpolated value is never shown as a
         measurement.
         """
-        x = _coord(payload, "x")
-        y = _coord(payload, "y")
+        x = _as_number((payload or {}).get("x"))
+        y = _as_number((payload or {}).get("y"))
         if x is None or y is None:
             return
         async with self:
@@ -504,8 +513,8 @@ class CompositionState(rx.State):
         `_draw_ternary` stored -- the plane the click reports, and the plane
         that plane's own triangle may be anisotropic in.
         """
-        x = _coord(payload, "x")
-        y = _coord(payload, "y")
+        x = _as_number((payload or {}).get("x"))
+        y = _as_number((payload or {}).get("y"))
         if x is None or y is None:
             return
         async with self:
@@ -519,6 +528,7 @@ class CompositionState(rx.State):
         if record is None:
             return
         async with self:
+            self.error = ""
             self.selected_label = (
                 f"{record.global_label}   sample {record.sample_no}   "
                 f"{record.run_use or '(no run_use)'}"
@@ -561,14 +571,6 @@ class CompositionState(rx.State):
             self.spec_spec = payload.spec
             self.spec_url = payload.buffer_url
             self.spec_layout = payload.layout
-
-
-def _coord(payload: Optional[dict], key: str) -> Optional[float]:
-    """One coordinate out of an ``on_select`` payload."""
-    try:
-        return float((payload or {}).get(key))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
 
 
 def _controls():
