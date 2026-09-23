@@ -51,6 +51,9 @@ MAX_CONCURRENT_FETCHES = 30
 #: How a missing value reads in the details table.
 MISSING = "-"
 
+#: Largest marker size, as a multiple of xy's default.
+MAX_POINT_SCALE = 8.0
+
 #: Units the ternary diagram can be coloured by, summed over every transition.
 TOTAL_UNITS = ("nanomoles", "nanomoles_per_cm2")
 
@@ -370,6 +373,8 @@ class CompositionState(rx.State):
     #: What the ternary slot shows; see `composition_mode`.
     tern_mode: str = "ternary"
     interpolate: bool = False
+    #: Marker size as a multiple of xy's default, from the slider.
+    point_scale: float = 1.0
     overlay_spectra: bool = False
 
     run_use_options: list[str] = []
@@ -484,6 +489,29 @@ class CompositionState(rx.State):
     @rx.event
     def set_vertex_c(self, value: str):
         self.vertex_c = value
+
+    def _point_size(self) -> float:
+        return plots.DEFAULT_POINT_SIZE * self.point_scale
+
+    @rx.event
+    def set_point_scale(self, value: list[float]):
+        """Resize markers on the charts already drawn, keeping the selection.
+
+        Not a re-`plot()`: that clears the selected sample and its spectra,
+        which a marker-size change has no reason to touch.
+        """
+        scale = float(value[0]) if value else 1.0
+        self.point_scale = min(max(scale, 1.0), MAX_POINT_SCALE)
+        if not (self.map_url or self.tern_url):
+            return
+        records = grouping.filter_records(
+            self._records,
+            run_use=self.run_use_choice,
+            sequence=self.sequence_choice,
+        )
+        self.version += 1
+        self._draw_map(records)
+        self._draw_composition(records)
 
     @rx.event
     def set_tern_color(self, value: str):
@@ -652,6 +680,7 @@ class CompositionState(rx.State):
             colorbar=True,
             panel_id=f"{self.panel_key()}-map",
             version=self.version,
+            size=self._point_size(),
         )
         self.map_spec = payload.spec
         self.map_url = payload.buffer_url
@@ -707,6 +736,7 @@ class CompositionState(rx.State):
             colorbar=True,
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
+            size=self._point_size(),
         )
         self.tern_spec = payload.spec
         self.tern_url = payload.buffer_url
@@ -778,6 +808,7 @@ class CompositionState(rx.State):
             colormap=TOTALS_COLORMAP,
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
+            size=self._point_size(),
         )
         self.tern_spec = payload.spec
         self.tern_url = payload.buffer_url
@@ -936,6 +967,17 @@ def _controls():
                 width="14em",
             ),
             rx.button("Plot", on_click=CompositionState.plot("")),
+            rx.text("point size", size="1", class_name=reflex_muted_text_class()),
+            # Commit, not change: each value redraws both charts, and a drag
+            # would otherwise redraw them on every step.
+            rx.slider(
+                default_value=[1.0],
+                min=1.0,
+                max=MAX_POINT_SCALE,
+                step=0.5,
+                on_value_commit=CompositionState.set_point_scale,
+                width="10em",
+            ),
             spacing="3",
             align="center",
         ),

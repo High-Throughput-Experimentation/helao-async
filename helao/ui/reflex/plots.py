@@ -259,6 +259,9 @@ def _chart(marks, axes, **kwargs) -> Any:
     return xy.chart(*marks, *axes, width="100%", height="100%", **kwargs)
 
 
+#: xy's own default scatter marker size, in pixels.
+DEFAULT_POINT_SIZE = 4.0
+
 #: Plot margins ``[top, right, bottom, left]`` for a square chart. Fixed, so the
 #: plot rectangle is the host size minus known gutters. Each must cover what xy
 #: would otherwise reserve (tick labels plus axis title), or xy grows it and
@@ -499,6 +502,7 @@ def scatter_map(
     x_label: str = "",
     y_label: str = "",
     value_label: str = "",
+    size: float = DEFAULT_POINT_SIZE,
     square: bool = False,
     colormap: str = "",
     colorbar: bool = False,
@@ -517,6 +521,7 @@ def scatter_map(
         y_label: Y axis label.
         value_label: Names ``values`` in the tooltip (instead of "color") and
             on the colorbar.
+        size: Marker size in pixels.
         square: Equal x/y data spans and fixed margins, for a 1.0 aspect when
             bound with :func:`square_width`.
         colormap: xy colormap name for ``values``; xy's default when empty.
@@ -552,7 +557,7 @@ def scatter_map(
     if vs is not None:
         keep &= np.isfinite(vs)
     xs, ys = xs[keep], ys[keep]
-    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
+    mark_kwargs: dict[str, Any] = {"x": xs, "y": ys, "size": float(size)}
     mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
     if value_label:
         mark_kwargs["name"] = value_label
@@ -565,22 +570,33 @@ def scatter_map(
     if show_bar:
         marks.append(xy.colorbar(title=value_label))
     return _publish_selectable(
-        marks, xs, ys, x_label, y_label, square, panel_id, version, show_bar
+        marks, xs, ys, x_label, y_label, square, panel_id, version, show_bar, size
     )
 
 
 def _publish_selectable(
-    marks, xs, ys, x_label, y_label, square, panel_id, version, colorbar=False
+    marks,
+    xs,
+    ys,
+    x_label,
+    y_label,
+    square,
+    panel_id,
+    version,
+    colorbar=False,
+    size=DEFAULT_POINT_SIZE,
 ):
     """Publish a click-selectable point chart, optionally square.
 
     xy emits clicks only when the spec opts in; without ``click=True`` the
     shim's ``on_select`` never fires. *colorbar* says whether *marks* carry an
     ``xy.colorbar``, which a square chart needs to know to size its margin.
+    *size* joins the layout token: a constant marker size is spec, not
+    column data, so the in-place update path would not apply a new one.
     """
     axes = _axes(x_label, y_label, False)
     kwargs: dict[str, Any] = {"click": True}
-    extra = ""
+    extra = f"size={float(size)}"
     if square:
         x_dom, y_dom = _square_domain(xs, ys)
         axes = [
@@ -590,7 +606,7 @@ def _publish_selectable(
         top, right, bottom, left = SQUARE_PADDING
         right += 0 if colorbar else _COLORBAR_ROOM
         kwargs["padding"] = [top, right, bottom, left]
-        extra = f"{x_dom}{y_dom}{colorbar}"
+        extra += f"{x_dom}{y_dom}{colorbar}"
     figure = _chart(marks, axes, **kwargs)
     return _publish(figure, panel_id, version, layout_extra=extra)
 
@@ -648,6 +664,7 @@ def ternary(
     labels,
     values=None,
     value_label: str = "",
+    size: float = DEFAULT_POINT_SIZE,
     colormap: str = "",
     panel_id: str = "ternary",
     version: int = 0,
@@ -673,6 +690,7 @@ def ternary(
         values: Optional per-point scalar driving colour.
         value_label: Names ``values`` in the tooltip and titles their
             colorbar, which is shown whenever ``values`` is.
+        size: Marker size in pixels.
         colormap: xy colormap name for ``values``; xy's default when empty.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
@@ -690,7 +708,12 @@ def ternary(
     xs, ys, keep = _ternary.barycentric_to_cartesian(a, b, c)
     marks = []
     if xs.size:
-        mark_kwargs: dict[str, Any] = {"x": xs, "y": ys, "name": "samples"}
+        mark_kwargs: dict[str, Any] = {
+            "x": xs,
+            "y": ys,
+            "name": "samples",
+            "size": float(size),
+        }
         if values is not None:
             # Masked with the same `keep` the coordinates were: colour is per
             # point, and filtering the two independently puts a colour on the
@@ -742,4 +765,5 @@ def ternary(
         panel_id,
         version,
         show_bar,
+        size,
     )

@@ -291,6 +291,7 @@ class _FakeCompositionState:
         self.tern_color_choice = composition.NO_COLOR
         self.tern_color_options: list = [composition.NO_COLOR]
         self.tern_mode = "ternary"
+        self.point_scale = 1.0
         self._tern_scale = (1.0, 1.0)
         self._spectra: list = []
         self.spec_spec: dict = {}
@@ -320,6 +321,8 @@ class _FakeCompositionState:
     _draw_binary = composition.CompositionState._draw_binary
     _draw_totals_histogram = composition.CompositionState._draw_totals_histogram
     _total_unit = composition.CompositionState._total_unit
+    _point_size = composition.CompositionState._point_size
+    set_point_scale = composition.CompositionState.set_point_scale.fn  # type: ignore[attr-defined]
     _select = composition.CompositionState._select
     _refresh_options = composition.CompositionState._refresh_options
     _draw_spectra = composition.CompositionState._draw_spectra
@@ -800,3 +803,26 @@ def test_platemap_and_ternary_carry_distinct_colorbars() -> None:
     state.tern_color_choice = composition.NO_COLOR
     state._draw_ternary([rec(1, 1.0), rec(2, 2.0)])
     assert "colorbar" not in state.tern_spec
+
+
+def test_point_size_slider_resizes_markers_and_keeps_the_selection() -> None:
+    state = _FakeCompositionState()
+    state._records = RECORDS
+    state._pm_rows = PM_ROWS
+    state.transition_choice, state.unit_choice = "Co.K", "net_counts"
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.plot()
+    assert state.map_spec["traces"][0]["size"]["size"] == 4.0
+    state.selected_label = "sample 1"
+
+    before = (state.map_layout, state.tern_layout)
+    state.set_point_scale([8.0])
+    # A new layout token makes the browser rebuild rather than update in place.
+    assert state.map_layout != before[0] and state.tern_layout != before[1]
+    assert state.map_spec["traces"][0]["size"]["size"] == 32.0
+    samples = next(t for t in state.tern_spec["traces"] if t["name"] == "samples")
+    assert samples["size"]["size"] == 32.0
+    assert state.selected_label == "sample 1"  # a resize is not a re-plot
+
+    state.set_point_scale([20.0])  # clamped to 8x
+    assert state.point_scale == composition.MAX_POINT_SCALE
