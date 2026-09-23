@@ -32,6 +32,7 @@ from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
+from helao.ui.shared.palette import reflex_muted_text_class, reflex_table_class
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -225,7 +226,6 @@ class CompositionState(rx.State):
     status: str = ""
     error: str = ""
     platemap_note: str = ""
-    progress: str = ""
 
     run_use_choice: str = grouping.ALL
     sequence_choice: str = grouping.ALL
@@ -325,7 +325,6 @@ class CompositionState(rx.State):
             plate_id = parse_plate_id(self.plate_id)
             self.error = ""
             self.status = ""
-            self.progress = ""
             # A new plate must not inherit the previous one's selection or
             # charts: without this, a plate with no platemap left the prior
             # plate's map on screen next to the new plate's ternary, and a
@@ -533,3 +532,181 @@ def _coord(payload: Optional[dict], key: str) -> Optional[float]:
         return float((payload or {}).get(key))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
+
+
+def _controls():
+    """The plate-id field, the four dropdowns and the two buttons."""
+    return rx.vstack(
+        rx.hstack(
+            rx.input(
+                placeholder="plate id",
+                value=CompositionState.plate_id,
+                on_change=CompositionState.set_plate_id,
+                width="10em",
+            ),
+            rx.button("Retrieve", on_click=CompositionState.retrieve("")),
+            rx.text(CompositionState.status, size="1"),
+            spacing="3",
+            align="center",
+        ),
+        rx.hstack(
+            rx.text("run_use", size="1", class_name=reflex_muted_text_class()),
+            rx.select(
+                CompositionState.run_use_options,
+                value=CompositionState.run_use_choice,
+                on_change=CompositionState.set_run_use,
+                width="12em",
+            ),
+            rx.text("sequence", size="1", class_name=reflex_muted_text_class()),
+            rx.select(
+                CompositionState.sequence_options,
+                value=CompositionState.sequence_choice,
+                on_change=CompositionState.set_sequence,
+                width="24em",
+            ),
+            spacing="3",
+            align="center",
+        ),
+        rx.hstack(
+            rx.text("transition", size="1", class_name=reflex_muted_text_class()),
+            rx.select(
+                CompositionState.transition_options,
+                value=CompositionState.transition_choice,
+                on_change=CompositionState.set_transition,
+                width="10em",
+            ),
+            rx.text("unit", size="1", class_name=reflex_muted_text_class()),
+            rx.select(
+                CompositionState.unit_options,
+                value=CompositionState.unit_choice,
+                on_change=CompositionState.set_unit,
+                width="14em",
+            ),
+            rx.button("Plot", on_click=CompositionState.plot("")),
+            spacing="3",
+            align="center",
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
+def _map_panel():
+    """The plate map, or the note saying why there is none."""
+    return rx.vstack(
+        rx.hstack(
+            rx.checkbox(
+                "RBF interpolate",
+                checked=CompositionState.interpolate,
+                on_change=CompositionState.set_interpolate,
+            ),
+            spacing="3",
+            align="center",
+        ),
+        rx.cond(
+            CompositionState.platemap_note != "",
+            rx.text(
+                CompositionState.platemap_note,
+                size="1",
+                class_name=reflex_muted_text_class(),
+            ),
+            plots.chart(
+                CompositionState.map_spec,
+                CompositionState.map_url,
+                CompositionState.map_layout,
+                height=420,
+                on_select=CompositionState.on_map_select,
+            ),
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
+def _ternary_panel():
+    """The ternary diagram and its three vertex selectors."""
+    return rx.vstack(
+        rx.hstack(
+            rx.select(
+                CompositionState.transition_options,
+                value=CompositionState.vertex_a,
+                on_change=CompositionState.set_vertex_a,
+                width="9em",
+            ),
+            rx.select(
+                CompositionState.transition_options,
+                value=CompositionState.vertex_b,
+                on_change=CompositionState.set_vertex_b,
+                width="9em",
+            ),
+            rx.select(
+                CompositionState.transition_options,
+                value=CompositionState.vertex_c,
+                on_change=CompositionState.set_vertex_c,
+                width="9em",
+            ),
+            spacing="3",
+            align="center",
+        ),
+        plots.chart(
+            CompositionState.tern_spec,
+            CompositionState.tern_url,
+            CompositionState.tern_layout,
+            height=420,
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
+def _details_panel():
+    """The selected sample's analysis output, and its spectrum."""
+    return rx.vstack(
+        rx.text(CompositionState.selected_label, size="2"),
+        rx.table.root(
+            rx.table.body(
+                rx.foreach(
+                    CompositionState.detail_rows,
+                    lambda row: rx.table.row(
+                        rx.foreach(row, lambda cell: rx.table.cell(cell))
+                    ),
+                )
+            ),
+            class_name=reflex_table_class("action"),
+            width="100%",
+        ),
+        plots.chart(
+            CompositionState.spec_spec,
+            CompositionState.spec_url,
+            CompositionState.spec_layout,
+            height=300,
+        ),
+        width="100%",
+        spacing="2",
+    )
+
+
+def build_page():
+    """Render the composition page.
+
+    Returns:
+        rx.Component: The page body.
+    """
+    return rx.vstack(
+        _controls(),
+        rx.cond(
+            CompositionState.error != "",
+            rx.text(CompositionState.error, class_name="text-red-600", size="1"),
+        ),
+        rx.hstack(
+            _map_panel(),
+            _ternary_panel(),
+            width="100%",
+            spacing="4",
+            align="start",
+        ),
+        _details_panel(),
+        width="100%",
+        spacing="4",
+        padding_x="1em",
+    )

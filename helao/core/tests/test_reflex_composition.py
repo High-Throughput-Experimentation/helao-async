@@ -329,6 +329,34 @@ def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
     assert state._plotted_ys == []
 
 
+def test_build_page_renders() -> None:
+    """Rendered, not merely imported. A handler bound to both a button and
+    something that supplies a value raises at render, not at import, so an
+    import-only test cannot see it."""
+    assert composition.build_page() is not None
+
+
+def test_every_foreach_var_carries_an_element_annotation() -> None:
+    """A bare `list` fails the frontend build with `ForeachVarError`, which
+    surfaces only at `reflex export`.
+
+    `CompositionState.__annotations__` is unusable here: the module carries
+    `from __future__ import annotations`, so every stored annotation is the
+    *string* `"list[list[str]]"` rather than the type object, and a string
+    never equals `list[list[str]]`. `get_fields()[name].annotated_type` is
+    Reflex's own resolved-type view and is what actually gates `rx.foreach`.
+    """
+    fields = composition.CompositionState.get_fields()
+    assert fields["detail_rows"].annotated_type == list[list[str]]
+    for name in (
+        "run_use_options",
+        "sequence_options",
+        "transition_options",
+        "unit_options",
+    ):
+        assert fields[name].annotated_type == list[str], name
+
+
 def test_platemap_note_when_the_plate_will_not_load(monkeypatch) -> None:
     class Raises:
         has_access = True

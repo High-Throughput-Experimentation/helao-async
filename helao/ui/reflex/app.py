@@ -34,6 +34,8 @@ from fastapi import FastAPI
 # class is what registers its event handlers, and `--backend-only` never
 # evaluates a page callable. No cycle -- app_reflex reaches back only as far as
 # `plots`, which knows nothing about this module.
+from helao.ui.reflex.composition import build_page as composition_page
+from helao.ui.reflex.composition import configure as configure_composition
 from helao.ui.reflex.data_browser import BrowserState
 from helao.ui.reflex.data_browser import build_page as browser_page
 from helao.ui.reflex.operator import (
@@ -72,7 +74,15 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 
 #: Routes always registered so the navigation shell is complete even when a
 #: page has no content yet.
-SHELL_ROUTES = ("/", "/live", "/action", "/operator", "/browser", "/control")
+SHELL_ROUTES = (
+    "/",
+    "/live",
+    "/action",
+    "/operator",
+    "/browser",
+    "/control",
+    "/composition",
+)
 
 #: Page name -> the config key whose panels belong on it.
 PAGE_TO_VIS_KEY = {"live": "live_vis", "action": "action_vis"}
@@ -289,6 +299,7 @@ def _nav():
         rx.link("Operator", href="/operator"),
         rx.link("Browser", href="/browser"),
         rx.link("Control", href="/control"),
+        rx.link("Composition", href="/composition"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -452,6 +463,8 @@ def build_app(world_cfg: dict, server_key: str):
     # And the control page's targets, which are enumerated from the config the
     # same way -- the export process has no orchestration group to read.
     configure_control(world_cfg, server_key)
+    # And the composition page's plate-metadata API target, same reasoning.
+    configure_composition(world_cfg, server_key)
 
     # The buffer route carries bulk column data out-of-band, so megabyte float
     # arrays never traverse Reflex's JSON state channel. `api_transformer` is
@@ -528,6 +541,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("Engineering controls", control_page(), "/control"),
         route="/control",
         title="HELAO control",
+    )
+    application.add_page(
+        lambda: _page("Composition", composition_page(), "/composition"),
+        route="/composition",
+        title="HELAO composition",
     )
 
     @contextlib.asynccontextmanager
