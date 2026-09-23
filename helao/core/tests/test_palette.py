@@ -87,6 +87,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "green-600": "#16a34a",
     "green-700": "#15803d",
     "green-800": "#166534",
+    "lime-50": "#f7fee7",
     "emerald-50": "#ecfdf5",
     "emerald-100": "#d1fae5",
     "emerald-500": "#10b981",
@@ -574,6 +575,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "emerald-50"): 7.19,
     ("slate-900", "rose-50"): 16.25,  # /control
     ("slate-600", "rose-50"): 6.90,
+    ("slate-900", "lime-50"): 17.25,  # /composition
+    ("slate-600", "lime-50"): 7.32,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -587,6 +590,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "violet-50"): 4.34,
     ("slate-500", "amber-50"): 4.59,
     ("slate-500", "emerald-50"): 4.52,
+    ("slate-500", "lime-50"): 4.60,
 }
 
 # Each table's header text on its own header background. Body-floor rows: a
@@ -876,14 +880,16 @@ def test_slate_500_is_measured_on_every_tint(pair: tuple[str, str]) -> None:
     assert measured == pytest.approx(SLATE_500_ON_TINT_ROWS[pair], abs=0.01)
 
 
-def test_slate_500_fails_the_body_floor_on_three_of_the_six_tints() -> None:
+def test_slate_500_fails_the_body_floor_on_three_of_the_seven_tints() -> None:
     """Exactly three, and named -- not "at least one".
 
     A count would pass if the failing set moved to three different tints, and
     the point of the row block above is that *which* surfaces fail is not
     guessable from the shade names. ``rose-50`` joined them when ``/control``
     was added, at 4.33: a sixth route was not going to make the case for
-    ``slate-500`` any better, and it did not.
+    ``slate-500`` any better, and it did not. ``lime-50`` arrived with
+    ``/composition`` at 4.60 and did not join them, which is the other half of
+    the same point -- the set is measured, not predicted.
     """
     failing = {
         bg

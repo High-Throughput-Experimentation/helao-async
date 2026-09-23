@@ -61,6 +61,7 @@ TW: Final[Mapping[str, str]] = {
     "green-500": "#22c55e",
     "green-600": "#16a34a",
     "green-700": "#15803d",
+    "lime-50": "#f7fee7",
     "emerald-50": "#ecfdf5",
     "emerald-100": "#d1fae5",
     "emerald-600": "#059669",
@@ -185,6 +186,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/operator": "amber-50",
     "/browser": "emerald-50",
     "/control": "rose-50",
+    "/composition": "lime-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
@@ -200,11 +202,18 @@ Distinct from :data:`PAGE_BG`, which is the **Bokeh** canvas. The ``"/"`` entry
 happens to name the same shade; that is a coincidence of both wanting the
 faintest neutral, not a shared constant. Changing one must not move the other.
 
-Every tint clears the 4.5 body floor against :data:`BODY_TEXT` (16.28–17.22)
-and against :data:`REFLEX_MUTED_TEXT` (6.91–7.31). ``slate-500`` does not: it
+Every tint clears the 4.5 body floor against :data:`BODY_TEXT` (16.25–17.25)
+and against :data:`REFLEX_MUTED_TEXT` (6.90–7.32). ``slate-500`` does not: it
 measures 4.34 on ``violet-50`` and 4.46 on ``sky-50``, and clears the floor on
 ``emerald-50`` by 0.02 — which is why muted text in the Reflex stack is a step
 darker than the ``slate-500`` that serves the same role on white.
+
+``lime-50`` was chosen by measurement, not by taste. Of the four unused
+50-level candidates it is the only one both further from its nearest existing
+tint (ΔE 5.30 to ``amber-50``) than the existing tints are from each other
+(their minimum pairwise ΔE is 3.21), and leaving every table border's weakest
+surface unchanged. ``indigo-50`` fails both: ΔE 2.25 to ``violet-50``, and it
+becomes the worst surface for all five borders.
 """
 
 REFLEX_TABLE_HUES: Final[Mapping[str, tuple[str, str, str]]] = {
