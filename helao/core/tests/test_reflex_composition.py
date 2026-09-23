@@ -286,7 +286,11 @@ class _FakeCompositionState:
         self.tern_url = ""
         self.tern_layout = ""
         self.selected_label = ""
+        self.ternary_label = ""
         self.detail_rows: list = []
+        self.sequence_options: list = []
+        self.transition_options: list = []
+        self.unit_options: list = []
 
     def panel_key(self) -> str:
         return "test-panel"
@@ -304,6 +308,7 @@ class _FakeCompositionState:
     _draw_map = composition.CompositionState._draw_map
     _draw_ternary = composition.CompositionState._draw_ternary
     _select = composition.CompositionState._select
+    _refresh_options = composition.CompositionState._refresh_options
     on_tern_select = composition.CompositionState.on_tern_select.fn  # type: ignore[attr-defined]
 
 
@@ -472,6 +477,7 @@ def test_on_tern_select_finds_the_nearest_plotted_record_and_fills_the_details_p
 
     assert state.selected_label.startswith("near-sample")
     assert state.detail_rows != []
+    assert state.ternary_label.endswith("Co.K 1.000   Y.K 0.000   Pt.L 0.000")
 
 
 def _chart_nodes(page) -> list:
@@ -551,3 +557,62 @@ def test_platemap_note_when_the_plate_will_not_load(monkeypatch) -> None:
     rows, note = composition.platemap_for(10244)
     assert rows == []
     assert "10244" in note
+
+
+def test_dropdowns_narrow_to_the_selected_run_use_and_sequence() -> None:
+    """run_use scopes sequences; run_use + sequence scope transitions/units."""
+    old = record(
+        run_use="pre_anneal",
+        sequence_uuid="11111111-0000-0000-0000-000000000000",
+        sequence_timestamp="2026-07-01T00:00:00.000000",
+        values={"Fe.K": {"net_counts": 1.0}},
+    )
+    state = _FakeCompositionState()
+    state._records = [record(), old]
+    state._refresh_options()
+    assert len(state.sequence_options) == 3  # All + both sequences
+    assert state.transition_options == ["Co.K", "Fe.K", "Pt.L", "Y.K"]
+
+    state.run_use_choice = "pre_anneal"
+    state._refresh_options()
+    assert state.sequence_options == [grouping.ALL, grouping.sequence_label(old)]
+    assert state.transition_options == ["Fe.K"]
+    assert state.unit_options == ["net_counts"]
+    assert state.transition_choice == "Fe.K"
+
+    # A sequence the new run_use does not contain falls back to All.
+    state.run_use_choice = grouping.ALL
+    state.sequence_choice = grouping.sequence_label(old)
+    state._refresh_options()
+    assert state.transition_options == ["Fe.K"]
+    state.run_use_choice = "post_anneal"
+    state._refresh_options()
+    assert state.sequence_choice == grouping.ALL
+    assert "Fe.K" not in state.transition_options
+
+
+def test_vertices_keep_offered_choices_and_refill_distinct_gaps() -> None:
+    options = ["Co.K", "Pt.L", "Y.K"]
+    assert composition._vertices(("Y.K", "Fe.K", ""), options) == (
+        "Y.K",
+        "Co.K",
+        "Pt.L",
+    )
+    assert composition._vertices(("", "", ""), ["Co.K"]) == ("Co.K", "", "")
+
+
+def test_ternary_fractions_normalize_the_three_vertices() -> None:
+    vertices = ("Co.K", "Y.K", "Pt.L")
+    line = composition.ternary_fractions(record(), vertices, "net_counts")
+    # 271.2, 792.1, 44.7 over their sum of 1108.0
+    assert line == (
+        "ternary fractions (net_counts):   Co.K 0.245   Y.K 0.715   Pt.L 0.040"
+    )
+
+
+def test_ternary_fractions_are_empty_when_the_point_is_not_on_the_diagram() -> None:
+    vertices = ("Co.K", "Y.K", "Fe.K")  # no Fe.K on the record
+    assert composition.ternary_fractions(record(), vertices, "net_counts") == ""
+    assert composition.ternary_fractions(record(), ("Co.K", "", "Y.K"), "x") == ""
+    zero = record(values={v: {"u": 0.0} for v in ("A", "B", "C")})
+    assert composition.ternary_fractions(zero, ("A", "B", "C"), "u") == ""

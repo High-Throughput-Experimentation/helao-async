@@ -22,6 +22,7 @@ different moment:
 from __future__ import annotations
 
 import asyncio
+import math
 import threading
 from dataclasses import dataclass
 from typing import Optional
@@ -44,6 +45,10 @@ MAX_CONCURRENT_FETCHES = 30
 
 #: How a missing value reads in the details table.
 MISSING = "-"
+
+#: Height of the plate map and ternary diagram, both square. 520 is about the
+#: least that keeps them out of xy's compact layout (see `plots.square_width`).
+CHART_HEIGHT = 520
 
 _SETTINGS: dict = {}
 _SETTINGS_LOCK = threading.Lock()
@@ -206,6 +211,48 @@ def detail_rows(record) -> list:
     return rows
 
 
+def ternary_fractions(record, vertices, unit: str) -> str:
+    """The sample's normalized ternary fractions, as one line of text.
+
+    The fractions are what the ternary diagram plots, so the click panel
+    stands in for a tooltip xy cannot show. Empty when a vertex is unset or
+    the sample lacks a finite, non-negative value for one, since such a point
+    is not on the diagram.
+    """
+    if record is None or not all(vertices):
+        return ""
+    values = [(record.values.get(vertex) or {}).get(unit) for vertex in vertices]
+    if any(
+        not isinstance(v, (int, float)) or not math.isfinite(v) or v < 0 for v in values
+    ):
+        return ""
+    total = sum(values)
+    if total <= 0:
+        return ""
+    parts = "   ".join(
+        f"{vertex} {value / total:.3f}" for vertex, value in zip(vertices, values)
+    )
+    return f"ternary fractions ({unit}):   {parts}"
+
+
+def _kept_or_first(choice: str, options: list) -> str:
+    """*choice* if *options* still offers it, else the first option."""
+    if choice in options:
+        return choice
+    return options[0] if options else ""
+
+
+def _vertices(current, options: list) -> tuple:
+    """Three ternary vertices: the current ones still offered, gaps refilled.
+
+    Refilled from *options* in order, skipping names already in use, so the
+    three stay distinct whenever there are three to choose from.
+    """
+    kept = [name if name in options else "" for name in current]
+    spare = [name for name in options if name not in kept]
+    return tuple(name or (spare.pop(0) if spare else "") for name in kept)
+
+
 def nearest_record(records, xs, ys, x: float, y: float):
     """The record nearest ``(x, y)`` in the plotted plane, or ``None``.
 
@@ -244,6 +291,7 @@ class CompositionState(rx.State):
     unit_options: list[str] = []
 
     selected_label: str = ""
+    ternary_label: str = ""
     detail_rows: list[list[str]] = []
 
     map_spec: dict = {}
@@ -286,10 +334,40 @@ class CompositionState(rx.State):
     @rx.event
     def set_run_use(self, value: str):
         self.run_use_choice = value
+        self._refresh_options()
 
     @rx.event
     def set_sequence(self, value: str):
         self.sequence_choice = value
+        self._refresh_options()
+
+    def _refresh_options(self) -> None:
+        """Narrow each dropdown to what the selections above it leave.
+
+        run_use scopes the sequences; run_use and sequence together scope the
+        transitions and units. A choice the new scope no longer offers falls
+        back to the first option (``All`` for sequence) rather than lingering
+        as a selection that matches nothing.
+        """
+        by_run_use = grouping.filter_records(
+            self._records, run_use=self.run_use_choice, sequence=grouping.ALL
+        )
+        self.sequence_options = grouping.sequence_options(by_run_use)
+        if self.sequence_choice not in self.sequence_options:
+            self.sequence_choice = grouping.ALL
+        scoped = grouping.filter_records(
+            by_run_use, run_use=grouping.ALL, sequence=self.sequence_choice
+        )
+        self.transition_options = model.transition_names(scoped)
+        self.unit_options = model.unit_names(scoped)
+        self.transition_choice = _kept_or_first(
+            self.transition_choice, self.transition_options
+        )
+        self.unit_choice = _kept_or_first(self.unit_choice, self.unit_options)
+        vertices = _vertices(
+            (self.vertex_a, self.vertex_b, self.vertex_c), self.transition_options
+        )
+        self.vertex_a, self.vertex_b, self.vertex_c = vertices
 
     @rx.event
     def set_transition(self, value: str):
@@ -343,6 +421,7 @@ class CompositionState(rx.State):
             self.map_spec, self.map_url, self.map_layout = {}, "", ""
             self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
             self.selected_label = ""
+            self.ternary_label = ""
             self.detail_rows = []
             self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
         if plate_id is None:
@@ -365,19 +444,11 @@ class CompositionState(rx.State):
             self._pm_rows = rows
             self.platemap_note = note
             self.run_use_options = grouping.run_use_options(loaded.records)
-            self.sequence_options = grouping.sequence_options(loaded.records)
-            self.transition_options = model.transition_names(loaded.records)
-            self.unit_options = model.unit_names(loaded.records)
             self.run_use_choice = grouping.ALL
             self.sequence_choice = grouping.ALL
-            self.transition_choice = (
-                self.transition_options[0] if self.transition_options else ""
-            )
-            self.unit_choice = self.unit_options[0] if self.unit_options else ""
-            vertices = self.transition_options[:3]
-            self.vertex_a = vertices[0] if len(vertices) > 0 else ""
-            self.vertex_b = vertices[1] if len(vertices) > 1 else ""
-            self.vertex_c = vertices[2] if len(vertices) > 2 else ""
+            self.transition_choice = self.unit_choice = ""
+            self.vertex_a = self.vertex_b = self.vertex_c = ""
+            self._refresh_options()
             failed = f", {loaded.failures} unreadable" if loaded.failures else ""
             self.status = (
                 f"plate {plate_id}: {len(loaded.records)} XRF processes{failed}"
@@ -403,6 +474,7 @@ class CompositionState(rx.State):
         # table, label and spectrum chart on screen next to the new (empty or
         # different) plot.
         self.selected_label = ""
+        self.ternary_label = ""
         self.detail_rows = []
         self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
         records = grouping.filter_records(
@@ -445,6 +517,8 @@ class CompositionState(rx.State):
             values=plot_values or None,
             x_label="x (mm)",
             y_label="y (mm)",
+            value_label=f"{self.transition_choice} {self.unit_choice}",
+            square=True,
             panel_id=f"{self.panel_key()}-map",
             version=self.version,
         )
@@ -534,6 +608,9 @@ class CompositionState(rx.State):
                 f"{record.run_use or '(no run_use)'}"
             )
             self.detail_rows = detail_rows(record)
+            self.ternary_label = ternary_fractions(
+                record, (self.vertex_a, self.vertex_b, self.vertex_c), self.unit_choice
+            )
         if not record.spectrum_action_uuid or not record.spectrum_file_name:
             async with self:
                 self.error = "this process recorded no spectrum file"
@@ -653,7 +730,8 @@ def _map_panel():
                 CompositionState.map_spec,
                 CompositionState.map_url,
                 CompositionState.map_layout,
-                height=420,
+                height=CHART_HEIGHT,
+                width=plots.square_width(CHART_HEIGHT),
                 on_select=CompositionState.on_map_select,
             ),
         ),
@@ -691,7 +769,8 @@ def _ternary_panel():
             CompositionState.tern_spec,
             CompositionState.tern_url,
             CompositionState.tern_layout,
-            height=420,
+            height=CHART_HEIGHT,
+            width=plots.square_width(CHART_HEIGHT),
             on_select=CompositionState.on_tern_select,
         ),
         width="100%",
@@ -703,6 +782,7 @@ def _details_panel():
     """The selected sample's analysis output, and its spectrum."""
     return rx.vstack(
         rx.text(CompositionState.selected_label, size="2"),
+        rx.text(CompositionState.ternary_label, size="2"),
         rx.table.root(
             rx.table.body(
                 rx.foreach(

@@ -259,7 +259,9 @@ const out = {};
   out.queuedBeforeAttach = calls.length === 0 && st.pendingUrl === "/xy/buffers/p?v=1";
   out.notMountedBeforeAttach = renders.length === 0;
 
-  st.attach(fakeModule, {});
+  const listeners = {};
+  const fakeEl = { addEventListener: (name, cb) => { listeners[name] = cb; } };
+  st.attach(fakeModule, fakeEl);
   await new Promise((r) => setTimeout(r, 0));
   out.flushedPendingUrl = calls[0];
 
@@ -290,6 +292,13 @@ const out = {};
   received = null;
   st.model.send({ type: "hover" });
   out.nonSelectIgnored = received === null;
+
+  // A click arrives as xy's `xy:click` DOM event on the host element.
+  listeners["xy:click"]({ detail: { x: 1.5, y: -2, trace: 0, index: 3, row: {} } });
+  out.clickPayload = received;
+  received = null;
+  listeners["xy:click"]({ detail: { x: null, y: 2 } });
+  out.clickWithoutCoordsIgnored = received === null;
 
   // A trace added or removed cannot be applied in place; the view is rebuilt.
   st.applyLayout("0:line:a");
@@ -339,7 +348,7 @@ const out = {};
     },
   };
   const st2 = createController({ spec: specAt(1), onSelect: null });
-  st2.attach(slowModule, {});
+  st2.attach(slowModule, { addEventListener: () => {} });
   st2.spec = specAt(1);
   const p1 = st2.refetch("/b?v=1");   // issued
   // Nine more ticks while it is outstanding; every one must coalesce.
@@ -526,6 +535,20 @@ def test_controller_dispatches_a_select_message_to_on_select():
     out = _run_controller_harness()
     assert out["selectPayload"] == {"type": "select", "rows": [1, 2]}
     assert out["nonSelectIgnored"] is True
+
+
+@pytest.mark.skipif(_JS_RUNTIME is None, reason="no node runtime available")
+def test_controller_forwards_a_chart_click_to_on_select():
+    """Clicks never reach model.send; only the DOM event carries them."""
+    out = _run_controller_harness()
+    assert out["clickPayload"] == {
+        "type": "click",
+        "x": 1.5,
+        "y": -2,
+        "trace": 0,
+        "index": 3,
+    }
+    assert out["clickWithoutCoordsIgnored"] is True
 
 
 def test_component_passes_the_current_url_into_refetch():

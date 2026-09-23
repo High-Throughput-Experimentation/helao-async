@@ -359,9 +359,20 @@ export function createController(options) {
     st.handlers = {};
   };
 
+  // A click reaches the page only as xy's bubbling `xy:click` DOM event, whose
+  // detail carries the data-space x/y. The comm `select` message above is a
+  // shift-drag box (x0..y1, no x/y), so a click used to go nowhere and the
+  // page's details panel never filled.
+  st.onClick = (event) => {
+    const d = (event && event.detail) || {};
+    if (!st.onSelect || !Number.isFinite(d.x) || !Number.isFinite(d.y)) return;
+    st.onSelect({ type: "click", x: d.x, y: d.y, trace: d.trace, index: d.index });
+  };
+
   st.attach = (mod, el) => {
     st.module = mod;
     st.el = el;
+    el.addEventListener("xy:click", st.onClick);
     const url = st.pendingUrl;
     st.pendingUrl = null;
     if (url) st.refetch(url);
@@ -478,7 +489,7 @@ export function createController(options) {
 #: The React wrapper. Deliberately thin — it wires props and lifecycle to the
 #: controller above and holds no logic of its own.
 _SHIM_COMPONENT_JS = """
-export function XYChart({ spec, bufferUrl, layout, height, onSelect }) {
+export function XYChart({ spec, bufferUrl, layout, height, width, onSelect }) {
   const hostRef = useRef(null);
   const ctrlRef = useRef(null);
   if (ctrlRef.current === null) {
@@ -520,7 +531,7 @@ export function XYChart({ spec, bufferUrl, layout, height, onSelect }) {
     <div
       ref={hostRef}
       style={{
-        width: "100%",
+        width: width || "100%",
         height: height,
         minHeight: height,
         flexShrink: 0,
@@ -561,6 +572,7 @@ class XYChart(rx.Component):
     buffer_url: rx.Var[str]
     layout: rx.Var[str]
     height: rx.Var[str]
+    width: rx.Var[str]
 
     on_select: rx.EventHandler[lambda payload: [payload]]
 
@@ -583,7 +595,7 @@ def xy_chart(**props) -> XYChart:
     """Create an :class:`XYChart`.
 
     Args:
-        **props: ``spec``, ``buffer_url``, ``height``, ``on_select``.
+        **props: ``spec``, ``buffer_url``, ``height``, ``width``, ``on_select``.
 
     Returns:
         XYChart: The component.

@@ -154,7 +154,9 @@ def layout_token(spec: dict) -> str:
     return "|".join(f"{t.get('id')}:{t.get('kind')}:{t.get('name')}" for t in traces)
 
 
-def _publish(figure, panel_id: str, version: int) -> ChartPayload:
+def _publish(
+    figure, panel_id: str, version: int, *, layout_extra: str = ""
+) -> ChartPayload:
     """Split a figure, park its buffers, and return the state payload.
 
     Args:
@@ -165,6 +167,9 @@ def _publish(figure, panel_id: str, version: int) -> ChartPayload:
             ``build_payload_split``, not the ``Chart`` itself.
         panel_id: Stable identity for this panel across re-renders.
         version: Monotonic token; the browser refetches when it changes.
+        layout_extra: Appended to the layout token. The in-place update path
+            swaps columns only, so anything else that must change the view --
+            a fixed axis domain -- has to force a rebuild through the token.
 
     Returns:
         ChartPayload: Assign this into the panel's state vars.
@@ -188,11 +193,19 @@ def _publish(figure, panel_id: str, version: int) -> ChartPayload:
     return ChartPayload(
         spec=spec,
         buffer_url=f"{BUFFER_ROUTE_PREFIX}/{panel_id}?v={version}",
-        layout=layout_token(spec),
+        layout=layout_token(spec) + (f"|{layout_extra}" if layout_extra else ""),
     )
 
 
-def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
+def chart(
+    spec_var,
+    url_var,
+    layout_var,
+    *,
+    height: int = 320,
+    width: int | None = None,
+    on_select=None,
+):
     """Bind a chart component to three Reflex state vars.
 
     Called once from a panel's ``build``. The panel's ``pull`` then assigns
@@ -205,7 +218,12 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
         layout_var: Reflex var holding :attr:`ChartPayload.layout`. When it
             changes the browser rebuilds the chart instead of updating it.
         height: Chart height in pixels.
-        on_select: Optional Reflex event handler for selection.
+        width: Chart width in pixels; ``None`` fills the container. A square
+            chart needs it fixed -- see :func:`square_width`.
+        on_select: Optional Reflex event handler for selection. Receives the
+            click's data-space ``x``/``y`` (and ``trace``/``index`` when a
+            point was hit); the figure must enable clicks, as
+            :func:`scatter_map` and :func:`ternary` do.
 
     Returns:
         An ``rx.Component``.
@@ -221,11 +239,12 @@ def chart(spec_var, url_var, layout_var, *, height: int = 320, on_select=None):
         buffer_url=url_var,
         layout=layout_var,
         height=f"{height}px",
+        width=f"{width}px" if width else "100%",
         on_select=on_select,
     )
 
 
-def _chart(marks, axes) -> Any:
+def _chart(marks, axes, **kwargs) -> Any:
     """Assemble a chart that sizes itself from its container.
 
     ``xy.chart`` defaults to a fixed 900x420 spec, and the renderer uses those
@@ -237,7 +256,54 @@ def _chart(marks, axes) -> Any:
     from :func:`chart`, which makes the host div the single place a chart's size
     is decided rather than a figure spec and a CSS rule that can disagree.
     """
-    return xy.chart(*marks, *axes, width="100%", height="100%")
+    return xy.chart(*marks, *axes, width="100%", height="100%", **kwargs)
+
+
+#: Plot margins ``[top, right, bottom, left]`` for a square chart. Fixed, so the
+#: plot rectangle is the host size minus known gutters. Each must cover what xy
+#: would otherwise reserve (tick labels plus axis title), or xy grows it and
+#: the square skews.
+SQUARE_PADDING = (12, 12, 48, 64)
+
+#: Below this host width xy switches to a compact layout that clamps the left
+#: and right padding (to 46 and 8), which skews the square.
+_COMPACT_BELOW = 520
+
+
+def square_width(height: int) -> int:
+    """Host width that makes a square chart's plot rectangle square.
+
+    xy has no aspect lock, so equal data spans (see :func:`_square_domain`)
+    only give a 1.0 aspect if the plot rectangle is itself square.
+
+    Args:
+        height: Host height in pixels, as passed to :func:`chart`.
+
+    Returns:
+        int: The width to pass to :func:`chart`.
+
+    Raises:
+        ValueError: If that width would put xy in its compact layout.
+    """
+    top, right, bottom, left = SQUARE_PADDING
+    width = height - top - bottom + left + right
+    if width < _COMPACT_BELOW:
+        raise ValueError(
+            f"a square chart {height}px tall is {width}px wide, under xy's "
+            f"{_COMPACT_BELOW}px compact-layout threshold; make it taller"
+        )
+    return width
+
+
+def _square_domain(xs: np.ndarray, ys: np.ndarray, margin: float = 0.05) -> tuple:
+    """Equal-span ``(x_domain, y_domain)`` centred on the data."""
+    if xs.size == 0:
+        return (0.0, 1.0), (0.0, 1.0)
+    x0, x1 = float(xs.min()), float(xs.max())
+    y0, y1 = float(ys.min()), float(ys.max())
+    half = max(x1 - x0, y1 - y0, 1e-9) * (0.5 + margin)
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    return (cx - half, cx + half), (cy - half, cy + half)
 
 
 def _axes(x_label: str, y_label: str, x_is_epoch: bool) -> list:
@@ -424,6 +490,8 @@ def scatter_map(
     values=None,
     x_label: str = "",
     y_label: str = "",
+    value_label: str = "",
+    square: bool = False,
     panel_id: str = "scatter",
     version: int = 0,
 ):
@@ -437,6 +505,10 @@ def scatter_map(
         values: Optional per-point scalar driving color.
         x_label: X axis label.
         y_label: Y axis label.
+        value_label: Names ``values`` in the tooltip (instead of "color") and
+            on the colorbar.
+        square: Equal x/y data spans and fixed margins, for a 1.0 aspect when
+            bound with :func:`square_width`.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
 
@@ -470,9 +542,35 @@ def scatter_map(
     xs, ys = xs[keep], ys[keep]
     mark_kwargs: dict[str, Any] = {"x": xs, "y": ys}
     mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
+    if value_label:
+        mark_kwargs["name"] = value_label
     marks = [xy.scatter(**mark_kwargs)] if xs.size else []
-    figure = _chart(marks, _axes(x_label, y_label, False))
-    return _publish(figure, panel_id, version)
+    if value_label:
+        marks.append(xy.tooltip(labels={"color": value_label}))
+    return _publish_selectable(
+        marks, xs, ys, x_label, y_label, square, panel_id, version
+    )
+
+
+def _publish_selectable(marks, xs, ys, x_label, y_label, square, panel_id, version):
+    """Publish a click-selectable point chart, optionally square.
+
+    xy emits clicks only when the spec opts in; without ``click=True`` the
+    shim's ``on_select`` never fires.
+    """
+    axes = _axes(x_label, y_label, False)
+    kwargs: dict[str, Any] = {"click": True}
+    extra = ""
+    if square:
+        x_dom, y_dom = _square_domain(xs, ys)
+        axes = [
+            xy.x_axis(label=x_label, domain=x_dom),
+            xy.y_axis(label=y_label, domain=y_dom),
+        ]
+        kwargs["padding"] = list(SQUARE_PADDING)
+        extra = f"{x_dom}{y_dom}"
+    figure = _chart(marks, axes, **kwargs)
+    return _publish(figure, panel_id, version, layout_extra=extra)
 
 
 def histogram(
@@ -598,5 +696,15 @@ def ternary(
         # not a Mark one. Passed as a chart child alongside the marks, it lands
         # in the spec's `annotations`.
         marks.append(xy.text(float(vx), float(vy), str(name), color=edge_color))
-    figure = _chart(marks, _axes("", "", False))
-    return _publish(figure, panel_id, version)
+    # The frame, not the points, fixes the domain: the triangle stays put
+    # whatever subset of samples is plotted.
+    return _publish_selectable(
+        marks,
+        np.asarray(edge_xs, dtype=np.float64),
+        np.asarray(edge_ys, dtype=np.float64),
+        "",
+        "",
+        True,
+        panel_id,
+        version,
+    )
