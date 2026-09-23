@@ -46,6 +46,16 @@ MAX_CONCURRENT_FETCHES = 30
 #: How a missing value reads in the details table.
 MISSING = "-"
 
+#: Units the ternary diagram can be coloured by, summed over every transition.
+TOTAL_UNITS = ("nanomoles", "nanomoles_per_cm2")
+
+#: The ternary colour option that leaves the points one colour.
+NO_COLOR = "none"
+
+#: Height of the spectrum chart. It has the full page width to itself since
+#: the info panel moved into the chart row.
+SPECTRUM_HEIGHT = 560
+
 #: Height of the plate map and ternary diagram, both square. 520 is about the
 #: least that keeps them out of xy's compact layout (see `plots.square_width`).
 CHART_HEIGHT = 520
@@ -235,6 +245,25 @@ def ternary_fractions(record, vertices, unit: str) -> str:
     return f"ternary fractions ({unit}):   {parts}"
 
 
+def total_label(unit: str) -> str:
+    """The ternary colour dropdown's entry for *unit*."""
+    return f"total {unit}"
+
+
+def total_for(record, unit: str) -> Optional[float]:
+    """*unit* summed over every transition of *record*, or ``None``.
+
+    ``None`` when no transition carries a finite value in *unit*: a sum over
+    nothing is not zero, and colouring it as zero would read as a measurement.
+    """
+    values = [
+        v
+        for per_unit in record.values.values()
+        if isinstance(v := per_unit.get(unit), (int, float)) and math.isfinite(v)
+    ]
+    return sum(values) if values else None
+
+
 def _kept_or_first(choice: str, options: list) -> str:
     """*choice* if *options* still offers it, else the first option."""
     if choice in options:
@@ -283,12 +312,15 @@ class CompositionState(rx.State):
     vertex_a: str = ""
     vertex_b: str = ""
     vertex_c: str = ""
+    tern_color_choice: str = NO_COLOR
     interpolate: bool = False
+    overlay_spectra: bool = False
 
     run_use_options: list[str] = []
     sequence_options: list[str] = []
     transition_options: list[str] = []
     unit_options: list[str] = []
+    tern_color_options: list[str] = [NO_COLOR]
 
     selected_label: str = ""
     ternary_label: str = ""
@@ -318,6 +350,9 @@ class CompositionState(rx.State):
     _tern_plotted: list = []
     _tern_plotted_xs: list = []
     _tern_plotted_ys: list = []
+    #: Spectra on the spectrum chart, oldest first: ``{"key": process_uuid,
+    #: "label", "x", "y"}``. One entry unless ``overlay_spectra`` is on.
+    _spectra: list = []
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key.
@@ -368,6 +403,10 @@ class CompositionState(rx.State):
             (self.vertex_a, self.vertex_b, self.vertex_c), self.transition_options
         )
         self.vertex_a, self.vertex_b, self.vertex_c = vertices
+        totals = [total_label(u) for u in TOTAL_UNITS if u in self.unit_options]
+        self.tern_color_options = [NO_COLOR] + totals
+        if self.tern_color_choice not in self.tern_color_options:
+            self.tern_color_choice = totals[0] if totals else NO_COLOR
 
     @rx.event
     def set_transition(self, value: str):
@@ -388,6 +427,35 @@ class CompositionState(rx.State):
     @rx.event
     def set_vertex_c(self, value: str):
         self.vertex_c = value
+
+    @rx.event
+    def set_tern_color(self, value: str):
+        self.tern_color_choice = value
+
+    @rx.event
+    def set_overlay_spectra(self, value: bool):
+        """Turning overlay off keeps only the most recent spectrum.
+
+        A bool, like ``set_interpolate``, for the same reason.
+        """
+        self.overlay_spectra = bool(value)
+        if not self.overlay_spectra and len(self._spectra) > 1:
+            self._spectra = self._spectra[-1:]
+            self._draw_spectra()
+
+    def _draw_spectra(self) -> None:
+        """Render every held spectrum, each on its own ev axis."""
+        self.version += 1
+        payload = plots.traces(
+            self._spectra,
+            x_label="ev",
+            y_label="intensity",
+            panel_id=f"{self.panel_key()}-spec",
+            version=self.version,
+        )
+        self.spec_spec = payload.spec
+        self.spec_url = payload.buffer_url
+        self.spec_layout = payload.layout
 
     @rx.event
     def set_interpolate(self, value: bool):
@@ -424,6 +492,7 @@ class CompositionState(rx.State):
             self.ternary_label = ""
             self.detail_rows = []
             self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
+            self._spectra = []
         if plate_id is None:
             async with self:
                 self.error = f"'{self.plate_id}' is not a plate id"
@@ -448,6 +517,7 @@ class CompositionState(rx.State):
             self.sequence_choice = grouping.ALL
             self.transition_choice = self.unit_choice = ""
             self.vertex_a = self.vertex_b = self.vertex_c = ""
+            self.tern_color_choice = ""
             self._refresh_options()
             failed = f", {loaded.failures} unreadable" if loaded.failures else ""
             self.status = (
@@ -477,6 +547,7 @@ class CompositionState(rx.State):
         self.ternary_label = ""
         self.detail_rows = []
         self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
+        self._spectra = []
         records = grouping.filter_records(
             self._records,
             run_use=self.run_use_choice,
@@ -540,6 +611,19 @@ class CompositionState(rx.State):
             ]
             for vertex in vertices
         ]
+        color_unit = next(
+            (u for u in TOTAL_UNITS if total_label(u) == self.tern_color_choice), None
+        )
+        totals = None
+        if color_unit is not None:
+            totals = [total_for(record, color_unit) for record in records]
+            # A sample with no total cannot be coloured, so it leaves the
+            # diagram -- through the components, so the `keep` mask below and
+            # the one `plots.ternary` computes agree on which points remain.
+            for index, total in enumerate(totals):
+                if total is None:
+                    for component in components:
+                        component[index] = float("nan")
         # Same projection `plots.ternary` computes internally -- recomputed
         # here (not read back from the payload, which carries none of this)
         # so a click can be matched against the plane it lands in. `keep` is
@@ -553,6 +637,12 @@ class CompositionState(rx.State):
             components[1],
             components[2],
             labels=vertices,
+            values=(
+                [t if t is not None else float("nan") for t in totals]
+                if totals is not None
+                else None
+            ),
+            value_label=self.tern_color_choice if totals is not None else "",
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
         )
@@ -635,19 +725,22 @@ class CompositionState(rx.State):
             async with self:
                 self.error = "the spectrum file carried no ev/intensity series"
             return
+        entry = {
+            "key": record.process_uuid,
+            "label": f"sample {record.sample_no} {record.run_use or ''}".strip(),
+            "x": ev,
+            "y": intensity,
+        }
         async with self:
-            self.version += 1
-            payload = plots.spectra(
-                ev,
-                {record.global_label: intensity},
-                x_label="ev",
-                y_label="intensity",
-                panel_id=f"{self.panel_key()}-spec",
-                version=self.version,
+            # Re-clicking a sample already overlaid moves it to the end rather
+            # than drawing it twice.
+            kept = (
+                [s for s in self._spectra if s["key"] != entry["key"]]
+                if self.overlay_spectra
+                else []
             )
-            self.spec_spec = payload.spec
-            self.spec_url = payload.buffer_url
-            self.spec_layout = payload.layout
+            self._spectra = kept + [entry]
+            self._draw_spectra()
 
 
 def _controls():
@@ -735,7 +828,6 @@ def _map_panel():
                 on_select=CompositionState.on_map_select,
             ),
         ),
-        width="100%",
         spacing="2",
     )
 
@@ -762,6 +854,13 @@ def _ternary_panel():
                 on_change=CompositionState.set_vertex_c,
                 width="9em",
             ),
+            rx.text("color", size="1", class_name=reflex_muted_text_class()),
+            rx.select(
+                CompositionState.tern_color_options,
+                value=CompositionState.tern_color_choice,
+                on_change=CompositionState.set_tern_color,
+                width="14em",
+            ),
             spacing="3",
             align="center",
         ),
@@ -773,13 +872,16 @@ def _ternary_panel():
             width=plots.square_width(CHART_HEIGHT),
             on_select=CompositionState.on_tern_select,
         ),
-        width="100%",
         spacing="2",
     )
 
 
-def _details_panel():
-    """The selected sample's analysis output, and its spectrum."""
+def _info_panel():
+    """The selected sample's label, ternary fractions and analysis table.
+
+    Sits in the chart row, capped at the charts' height and scrolling past
+    it, so a long transition list cannot push the row taller.
+    """
     return rx.vstack(
         rx.text(CompositionState.selected_label, size="2"),
         rx.text(CompositionState.ternary_label, size="2"),
@@ -795,11 +897,27 @@ def _details_panel():
             class_name=reflex_table_class("action"),
             width="100%",
         ),
+        flex="1",
+        min_width="22em",
+        max_height=f"{CHART_HEIGHT + 48}px",
+        overflow_y="auto",
+        spacing="2",
+    )
+
+
+def _spectrum_panel():
+    """The spectrum chart and its overlay toggle, full width."""
+    return rx.vstack(
+        rx.checkbox(
+            "Overlay spectra",
+            checked=CompositionState.overlay_spectra,
+            on_change=CompositionState.set_overlay_spectra,
+        ),
         plots.chart(
             CompositionState.spec_spec,
             CompositionState.spec_url,
             CompositionState.spec_layout,
-            height=300,
+            height=SPECTRUM_HEIGHT,
         ),
         width="100%",
         spacing="2",
@@ -818,14 +936,18 @@ def build_page():
             CompositionState.error != "",
             rx.text(CompositionState.error, class_name="text-red-600", size="1"),
         ),
+        # Wraps rather than overflowing: on a screen too narrow for all three,
+        # the info panel drops below the charts.
         rx.hstack(
             _map_panel(),
             _ternary_panel(),
+            _info_panel(),
             width="100%",
             spacing="4",
             align="start",
+            flex_wrap="wrap",
         ),
-        _details_panel(),
+        _spectrum_panel(),
         width="100%",
         spacing="4",
         padding_x="1em",

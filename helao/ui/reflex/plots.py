@@ -625,6 +625,7 @@ def ternary(
     *,
     labels,
     values=None,
+    value_label: str = "",
     panel_id: str = "ternary",
     version: int = 0,
 ):
@@ -647,6 +648,8 @@ def ternary(
         c: Third component.
         labels: Three vertex labels, in the order ``(a, b, c)``.
         values: Optional per-point scalar driving colour.
+        value_label: Names ``values`` in the tooltip, as in
+            :func:`scatter_map`.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
 
@@ -677,6 +680,8 @@ def ternary(
         else:
             mark_kwargs["color"] = PALETTE[0]
         marks.append(xy.scatter(**mark_kwargs))
+        if values is not None and value_label:
+            marks.append(xy.tooltip(labels={"color": value_label}))
     # The outline is drawn as three separate segments rather than one closed
     # polyline so each edge is its own trace, which keeps `layout_token` stable
     # when the point count changes but the frame does not.
