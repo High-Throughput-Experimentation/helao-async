@@ -904,6 +904,14 @@ def red_ramp(n: int) -> tuple[str, ...]:
 # ---------------------------------------------------------------------------
 # xy chart chrome
 # ---------------------------------------------------------------------------
+#: Continuous colour scales for the composition page, by xy colormap name.
+#: Two different scales on purpose: the plate map shows one transition's value
+#: and the ternary a total over all of them, and side by side the same ramp
+#: would read as the same quantity.
+PLATEMAP_COLORMAP: Final[str] = "plasma"
+TOTALS_COLORMAP: Final[str] = "viridis"
+
+
 def _rgba(hex_color: str, alpha: float) -> str:
     r, g, b = _to_rgb(hex_color)
     return f"rgba({r}, {g}, {b}, {alpha})"

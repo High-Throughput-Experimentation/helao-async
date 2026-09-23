@@ -270,11 +270,19 @@ SQUARE_PADDING = (12, 12, 48, 64)
 _COMPACT_BELOW = 520
 
 
+#: Width xy reserves right of the plot for a vertical colorbar with a title
+#: (62 + 24 pad + 18 title, from the bundle's ``_layout``).
+_COLORBAR_ROOM = 104
+
+
 def square_width(height: int) -> int:
     """Host width that makes a square chart's plot rectangle square.
 
     xy has no aspect lock, so equal data spans (see :func:`_square_domain`)
-    only give a 1.0 aspect if the plot rectangle is itself square.
+    only give a 1.0 aspect if the plot rectangle is itself square. Room for a
+    colorbar is always included; a square chart drawn without one pads its
+    right margin by the same amount instead, so the host width does not
+    depend on whether the data is coloured.
 
     Args:
         height: Host height in pixels, as passed to :func:`chart`.
@@ -286,7 +294,7 @@ def square_width(height: int) -> int:
         ValueError: If that width would put xy in its compact layout.
     """
     top, right, bottom, left = SQUARE_PADDING
-    width = height - top - bottom + left + right
+    width = height - top - bottom + left + right + _COLORBAR_ROOM
     if width < _COMPACT_BELOW:
         raise ValueError(
             f"a square chart {height}px tall is {width}px wide, under xy's "
@@ -492,6 +500,8 @@ def scatter_map(
     y_label: str = "",
     value_label: str = "",
     square: bool = False,
+    colormap: str = "",
+    colorbar: bool = False,
     panel_id: str = "scatter",
     version: int = 0,
 ):
@@ -509,6 +519,8 @@ def scatter_map(
             on the colorbar.
         square: Equal x/y data spans and fixed margins, for a 1.0 aspect when
             bound with :func:`square_width`.
+        colormap: xy colormap name for ``values``; xy's default when empty.
+        colorbar: Show a colour scale for ``values``, titled ``value_label``.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
 
@@ -544,19 +556,27 @@ def scatter_map(
     mark_kwargs["color"] = vs[keep] if vs is not None else PALETTE[0]
     if value_label:
         mark_kwargs["name"] = value_label
+    if colormap and vs is not None:
+        mark_kwargs["colormap"] = colormap
     marks = [xy.scatter(**mark_kwargs)] if xs.size else []
     if value_label:
         marks.append(xy.tooltip(labels={"color": value_label}))
+    show_bar = bool(colorbar and vs is not None and xs.size)
+    if show_bar:
+        marks.append(xy.colorbar(title=value_label))
     return _publish_selectable(
-        marks, xs, ys, x_label, y_label, square, panel_id, version
+        marks, xs, ys, x_label, y_label, square, panel_id, version, show_bar
     )
 
 
-def _publish_selectable(marks, xs, ys, x_label, y_label, square, panel_id, version):
+def _publish_selectable(
+    marks, xs, ys, x_label, y_label, square, panel_id, version, colorbar=False
+):
     """Publish a click-selectable point chart, optionally square.
 
     xy emits clicks only when the spec opts in; without ``click=True`` the
-    shim's ``on_select`` never fires.
+    shim's ``on_select`` never fires. *colorbar* says whether *marks* carry an
+    ``xy.colorbar``, which a square chart needs to know to size its margin.
     """
     axes = _axes(x_label, y_label, False)
     kwargs: dict[str, Any] = {"click": True}
@@ -567,8 +587,10 @@ def _publish_selectable(marks, xs, ys, x_label, y_label, square, panel_id, versi
             xy.x_axis(label=x_label, domain=x_dom),
             xy.y_axis(label=y_label, domain=y_dom),
         ]
-        kwargs["padding"] = list(SQUARE_PADDING)
-        extra = f"{x_dom}{y_dom}"
+        top, right, bottom, left = SQUARE_PADDING
+        right += 0 if colorbar else _COLORBAR_ROOM
+        kwargs["padding"] = [top, right, bottom, left]
+        extra = f"{x_dom}{y_dom}{colorbar}"
     figure = _chart(marks, axes, **kwargs)
     return _publish(figure, panel_id, version, layout_extra=extra)
 
@@ -626,6 +648,7 @@ def ternary(
     labels,
     values=None,
     value_label: str = "",
+    colormap: str = "",
     panel_id: str = "ternary",
     version: int = 0,
 ):
@@ -648,8 +671,9 @@ def ternary(
         c: Third component.
         labels: Three vertex labels, in the order ``(a, b, c)``.
         values: Optional per-point scalar driving colour.
-        value_label: Names ``values`` in the tooltip, as in
-            :func:`scatter_map`.
+        value_label: Names ``values`` in the tooltip and titles their
+            colorbar, which is shown whenever ``values`` is.
+        colormap: xy colormap name for ``values``; xy's default when empty.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
 
@@ -677,11 +701,16 @@ def ternary(
                     f"values has length {colors.size}, expected {int(keep.size)}"
                 )
             mark_kwargs["color"] = colors[keep]
+            if colormap:
+                mark_kwargs["colormap"] = colormap
         else:
             mark_kwargs["color"] = PALETTE[0]
         marks.append(xy.scatter(**mark_kwargs))
         if values is not None and value_label:
             marks.append(xy.tooltip(labels={"color": value_label}))
+    show_bar = values is not None and bool(xs.size)
+    if show_bar:
+        marks.append(xy.colorbar(title=value_label))
     # The outline is drawn as three separate segments rather than one closed
     # polyline so each edge is its own trace, which keeps `layout_token` stable
     # when the point count changes but the frame does not.
@@ -712,4 +741,5 @@ def ternary(
         True,
         panel_id,
         version,
+        show_bar,
     )

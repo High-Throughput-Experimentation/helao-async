@@ -738,6 +738,10 @@ def test_two_elements_plot_fraction_against_total_and_clicks_resolve() -> None:
     assert state._tern_plotted_ys == [20.0, 60.0]  # summed over every line
     labels = {axis.get("label") for axis in state.tern_spec["axes"].values()}
     assert {"Fe.K atomic_fraction", "total nanomoles"} <= labels
+    samples = state.tern_spec["traces"][0]
+    assert samples["color"]["mode"] == "continuous"
+    assert samples["color"]["colormap"] == composition.TOTALS_COLORMAP
+    assert state.tern_spec["colorbar"]["label"] == "total nanomoles"
     # Nearer sample 2 on the scaled plane, nearer sample 1 in raw distance.
     found = composition.nearest_record(
         state._tern_plotted,
@@ -773,3 +777,26 @@ def test_binary_and_histogram_need_a_total() -> None:
     state.tern_color_choice = composition.NO_COLOR
     state._draw_composition([_binary_record(1, 0.2, 1.0)])
     assert "total" in state.error and state.tern_spec == {}
+
+
+def test_platemap_and_ternary_carry_distinct_colorbars() -> None:
+    state = _FakeCompositionState()
+    state._pm_rows = PM_ROWS
+    state.transition_choice, state.unit_choice = "Co.K", "net_counts"
+    state._draw_map(RECORDS)
+    assert state.map_spec["colorbar"]["label"] == "Co.K net_counts"
+    assert state.map_spec["colorbar"]["colormap"] == composition.PLATEMAP_COLORMAP
+
+    def rec(n, total):
+        values = {v: {"net_counts": 1.0, "nanomoles": total} for v in ("A", "B", "C")}
+        return record(sample_no=n, process_uuid=f"p{n}", values=values)
+
+    state.vertex_a, state.vertex_b, state.vertex_c = "A", "B", "C"
+    state.tern_color_choice = "total nanomoles"
+    state._draw_ternary([rec(1, 1.0), rec(2, 2.0)])
+    assert state.tern_spec["colorbar"]["colormap"] == composition.TOTALS_COLORMAP
+    assert composition.PLATEMAP_COLORMAP != composition.TOTALS_COLORMAP
+
+    state.tern_color_choice = composition.NO_COLOR
+    state._draw_ternary([rec(1, 1.0), rec(2, 2.0)])
+    assert "colorbar" not in state.tern_spec
