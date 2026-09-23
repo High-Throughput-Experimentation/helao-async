@@ -32,6 +32,7 @@ from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
+from helao.ui.shared.composition import ternary as _ternary
 from helao.ui.shared.palette import reflex_muted_text_class, reflex_table_class
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -262,6 +263,12 @@ class CompositionState(rx.State):
     _plotted: list = []
     _plotted_xs: list = []
     _plotted_ys: list = []
+    #: Same as the three above, but for the ternary diagram -- kept separate
+    #: because `plot()` draws both charts, and one selection array would be
+    #: clobbered by the other's coordinates.
+    _tern_plotted: list = []
+    _tern_plotted_xs: list = []
+    _tern_plotted_ys: list = []
 
     def panel_key(self) -> str:
         """Session-scoped buffer-store key.
@@ -330,6 +337,8 @@ class CompositionState(rx.State):
             # plate's map on screen next to the new plate's ternary, and a
             # click on it resolved to the prior plate's record.
             self._plotted, self._plotted_xs, self._plotted_ys = [], [], []
+            self._tern_plotted = []
+            self._tern_plotted_xs, self._tern_plotted_ys = [], []
             self.map_spec, self.map_url, self.map_layout = {}, "", ""
             self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
             self.selected_label = ""
@@ -383,6 +392,8 @@ class CompositionState(rx.State):
         # selectable points on screen -- a click on a stale map used to
         # resolve to a stale record under the new plate's own header.
         self._plotted, self._plotted_xs, self._plotted_ys = [], [], []
+        self._tern_plotted = []
+        self._tern_plotted_xs, self._tern_plotted_ys = [], []
         self.map_spec, self.map_url, self.map_layout = {}, "", ""
         self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
         records = grouping.filter_records(
@@ -446,6 +457,14 @@ class CompositionState(rx.State):
             ]
             for vertex in vertices
         ]
+        # Same projection `plots.ternary` computes internally -- recomputed
+        # here (not read back from the payload, which carries none of this)
+        # so a click can be matched against the plane it lands in. `keep` is
+        # a mask over `records`, so the two stay index-aligned.
+        xs, ys, keep = _ternary.barycentric_to_cartesian(*components)
+        self._tern_plotted = [record for record, kept in zip(records, keep) if kept]
+        self._tern_plotted_xs = list(xs)
+        self._tern_plotted_ys = list(ys)
         payload = plots.ternary(
             components[0],
             components[1],
@@ -474,6 +493,24 @@ class CompositionState(rx.State):
         async with self:
             record = nearest_record(
                 self._plotted, self._plotted_xs, self._plotted_ys, x, y
+            )
+        await self._select(record)
+
+    @rx.event(background=True)
+    async def on_tern_select(self, payload: dict):
+        """Snap to the sample nearest a click on the ternary diagram.
+
+        Matched against `_tern_plotted_xs`/`_ys`, the transformed plane
+        `_draw_ternary` stored -- the plane the click reports, and the plane
+        that plane's own triangle may be anisotropic in.
+        """
+        x = _coord(payload, "x")
+        y = _coord(payload, "y")
+        if x is None or y is None:
+            return
+        async with self:
+            record = nearest_record(
+                self._tern_plotted, self._tern_plotted_xs, self._tern_plotted_ys, x, y
             )
         await self._select(record)
 
@@ -653,6 +690,7 @@ def _ternary_panel():
             CompositionState.tern_url,
             CompositionState.tern_layout,
             height=420,
+            on_select=CompositionState.on_tern_select,
         ),
         width="100%",
         spacing="2",
