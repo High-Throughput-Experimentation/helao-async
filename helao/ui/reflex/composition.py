@@ -34,7 +34,12 @@ from helao.ui.reflex import plots
 from helao.ui.shared import platemap
 from helao.ui.shared.composition import api, grouping, interp, model
 from helao.ui.shared.composition import ternary as _ternary
-from helao.ui.shared.palette import reflex_muted_text_class, reflex_table_class
+from helao.ui.shared.palette import (
+    PLATEMAP_COLORMAP,
+    TOTALS_COLORMAP,
+    reflex_muted_text_class,
+    reflex_table_class,
+)
 from helao.ui.shared.platemap import _as_number
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -643,6 +648,8 @@ class CompositionState(rx.State):
             y_label="y (mm)",
             value_label=f"{self.transition_choice} {self.unit_choice}",
             square=True,
+            colormap=PLATEMAP_COLORMAP,
+            colorbar=True,
             panel_id=f"{self.panel_key()}-map",
             version=self.version,
         )
@@ -687,11 +694,17 @@ class CompositionState(rx.State):
                 (max(xs) - min(xs)) or 1.0,
                 (max(ys) - min(ys)) or 1.0,
             )
+        # Coloured by the total as well as placed by it, on the ternary's own
+        # scale, so a switch between the two modes keeps one colour meaning.
         payload = plots.scatter_map(
             xs,
             ys,
+            values=ys,
             x_label=f"{self.vertex_a} atomic_fraction",
             y_label=self.tern_color_choice,
+            value_label=self.tern_color_choice,
+            colormap=TOTALS_COLORMAP,
+            colorbar=True,
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
         )
@@ -762,6 +775,7 @@ class CompositionState(rx.State):
                 else None
             ),
             value_label=self.tern_color_choice if totals is not None else "",
+            colormap=TOTALS_COLORMAP,
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
         )
