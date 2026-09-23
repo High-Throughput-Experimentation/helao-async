@@ -359,11 +359,21 @@ def test_ternary_drops_a_point_whose_components_are_all_none() -> None:
 
 def test_ternary_filters_values_with_the_same_mask() -> None:
     """Colour is per point. Filtering points and colours independently puts the
-    wrong colour on the wrong marker."""
+    wrong colour on the wrong marker.
+
+    The *first* input point (0, 0, 0) is the one dropped (sums to zero), and
+    the survivor is the second, with value 6.0. `colors[:xs.size]` would slice
+    off the *first* n values instead of masking with `keep`, which for this
+    fixture yields `[5.0]` -- the dropped point's value -- while still passing
+    a bare "some traces exist" check. Ordering the survivor second is what
+    makes that distinguishable: a mask/slice mixup that happens to agree when
+    the survivor is index 0 (as an earlier version of this fixture had it)
+    does not agree here.
+    """
     from helao.ui.reflex import plots
 
     payload = plots.ternary(
-        [1.0, 0.0],
+        [0.0, 1.0],
         [0.0, 0.0],
         [0.0, 0.0],
         labels=("a", "b", "c"),
@@ -371,12 +381,16 @@ def test_ternary_filters_values_with_the_same_mask() -> None:
         panel_id="tern-mask",
         version=1,
     )
-    # The second point (0, 0, 0) sums to zero and is dropped; the scatter
-    # trace for the one survivor still publishes alongside the 3 edges. If the
-    # mask were applied inconsistently this would raise inside `ternary`
-    # rather than land here quietly, since `values` would be indexed against
-    # the wrong length.
-    assert len(payload.spec.get("traces") or []) == 4
+    scatter = next(t for t in payload.spec["traces"] if t["name"] == "samples")
+    domain = scatter["color"]["domain"]
+    # A single-point colormap domain straddles that point's value; asserting
+    # containment (rather than the exact padded bounds, which is an
+    # implementation detail of the colour scale) is what ties this to the
+    # *value* the survivor carries.
+    assert domain[0] <= 6.0 <= domain[1], "the survivor's value must colour it"
+    assert not (
+        domain[0] <= 5.0 <= domain[1]
+    ), "the dropped point's value must not reach the published colour scale"
 
 
 def test_ternary_rejects_the_wrong_number_of_labels() -> None:
