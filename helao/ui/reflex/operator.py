@@ -2459,125 +2459,20 @@ class OperatorPlanState(rx.State):
 
 
 # -- plate map ---------------------------------------------------------------
-
-#: Composition fraction keys on a platemap entry, in display order.
-FRACTION_KEYS = ("A", "B", "C", "D", "E", "F", "G", "H")
-
-#: Plate APIs the operator knows how to build, by config value.
-PLATE_APIS = ("HTEPlateAPI",)
-
-_PLATE_API_CACHE: dict = {}
-
-
-def plate_api_for(server_cfg: dict):
-    """Build the configured plate API, or ``None`` when there is none.
-
-    Opt-in, as in the Bokeh operator: most stations have no plate API, and an
-    unknown name is ignored rather than imported, so a typo cannot pull in
-    something arbitrary.
-    """
-    params = (server_cfg or {}).get("params")
-    name = params.get("plate_api") if isinstance(params, dict) else None
-    if name not in PLATE_APIS:
-        if name:
-            LOGGER.warning(f"operator ignoring unknown plate_api '{name}'")
-        return None
-    cached = _PLATE_API_CACHE.get(name)
-    if cached is not None:
-        return cached
-    try:
-        from helao.helpers.plate_api import HTEPlateAPI
-
-        cached = HTEPlateAPI()
-    except Exception as exc:
-        LOGGER.warning(f"operator could not build plate API '{name}': {exc}")
-        return None
-    _PLATE_API_CACHE[name] = cached
-    return cached
-
-
-def _as_number(value):
-    """Read one coordinate, or ``None`` when it is not a number."""
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        return None
-
-
-def platemap_points(pmdata: Optional[list]) -> tuple:
-    """Split a platemap into plottable coordinates and sample numbers.
-
-    A row whose coordinates will not convert is dropped whole. Handing a
-    non-numeric value to ``plots`` raises from inside the render and takes the
-    entire chart down, and dropping only one of the pair would leave x and y
-    at different lengths, which ``scatter_map`` rejects.
-
-    Returns:
-        tuple: ``(xs, ys, sample_nos)``, all the same length. Sample numbers
-        are 1-based, matching the plate's own numbering.
-    """
-    xs, ys, samples = [], [], []
-    for index, entry in enumerate(pmdata or []):
-        x = _as_number((entry or {}).get("x"))
-        y = _as_number((entry or {}).get("y"))
-        if x is None or y is None:
-            continue
-        xs.append(x)
-        ys.append(y)
-        samples.append(index + 1)
-    return xs, ys, samples
-
-
-def nearest_sample(pmdata: Optional[list], x: float, y: float):
-    """Sample number nearest a clicked point, or ``None`` on an empty map.
-
-    Matched against the plottable rows only: a click lands on the rendered
-    map, which does not contain the rows that were dropped, so matching
-    against them could return a sample the operator cannot see.
-    """
-    xs, ys, samples = platemap_points(pmdata)
-    if not xs:
-        return None
-    best = min(range(len(xs)), key=lambda i: (xs[i] - x) ** 2 + (ys[i] - y) ** 2)
-    return samples[best]
-
-
-def composition_text(entry: Optional[dict]) -> str:
-    """Composition fractions of one platemap entry, as one line.
-
-    A dash when there are none: an empty readout reads as a failure to load
-    rather than a plate with no composition.
-    """
-    entry = entry or {}
-    parts = [
-        f"{key}_{entry[key]}" for key in FRACTION_KEYS if entry.get(key) is not None
-    ]
-    return " ".join(parts) if parts else "-"
-
-
-def sample_summary(pmdata: Optional[list], sample_no: int) -> dict:
-    """Code and composition for one sample number.
-
-    Args:
-        pmdata: The platemap.
-        sample_no: 1-based sample number. ``0`` is rejected rather than
-            treated as an index, which would silently return the last sample
-            on the plate.
-
-    Returns:
-        dict: ``sample_no``, ``code``, ``composition``, and ``error``.
-    """
-    blank = {"sample_no": str(sample_no), "code": "", "composition": ""}
-    entries = pmdata or []
-    if sample_no < 1 or sample_no > len(entries):
-        return {**blank, "error": f"sample {sample_no} is not on this plate"}
-    entry = entries[sample_no - 1] or {}
-    return {
-        "sample_no": str(sample_no),
-        "code": "" if entry.get("code") is None else str(entry["code"]),
-        "composition": composition_text(entry),
-        "error": "",
-    }
+#
+# Hoisted to `helao.ui.shared.platemap` so the composition page can use the
+# same helpers. Re-exported here under their existing names: every call site
+# below, and every test that reaches these through this module, is unchanged.
+from helao.ui.shared.platemap import (  # noqa: E402
+    FRACTION_KEYS,
+    PLATE_APIS,
+    composition_text,
+    nearest_sample,
+    plate_api_for,
+    platemap_points,
+    sample_summary,
+)
+from helao.ui.shared.platemap import _as_number  # noqa: E402
 
 
 class OperatorPlateState(rx.State):

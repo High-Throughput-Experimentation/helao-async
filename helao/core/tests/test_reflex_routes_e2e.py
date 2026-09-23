@@ -308,3 +308,37 @@ def test_operator_backend_is_configured_at_build(reflex_cfg):
     build_app(reflex_cfg, "UI")
     assert app_reflex.session_backend.__name__ == "session_backend"
     assert app_reflex._SETTINGS.get("server_key") == "UI"
+
+
+def test_composition_route_is_the_real_page_not_a_stub(reflex_cfg):
+    """A passing route test that renders a stub is worse than no test."""
+    from helao.ui.reflex import composition as app_reflex
+
+    from helao.ui.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    assert app_reflex.CompositionState.__name__ == "CompositionState"
+    assert callable(app_reflex.build_page)
+
+
+def test_composition_state_handlers_are_registered_without_compiling_pages(reflex_cfg):
+    """The same freeze the panels hit: a state class first touched inside
+    `add_page`'s lazy callable never exists in a `--backend-only` process, so
+    the browser calls handlers the backend has never heard of."""
+    from helao.ui.reflex import composition as app_reflex
+
+    from helao.ui.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    handlers = app_reflex.CompositionState.event_handlers
+    for name in ("retrieve", "plot", "on_map_select", "set_plate_id"):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_composition_page_is_configured_at_build(reflex_cfg):
+    from helao.ui.reflex import composition as app_reflex
+
+    from helao.ui.reflex.app import build_app
+
+    build_app(reflex_cfg, "UI")
+    assert app_reflex.world_config().get("servers")
