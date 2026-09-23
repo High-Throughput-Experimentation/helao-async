@@ -10,6 +10,8 @@ import pytest
 
 from helao.helpers import config_loader
 
+pytestmark = pytest.mark.usefixtures("reflex_registration")
+
 
 @pytest.fixture
 def reflex_cfg():

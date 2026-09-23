@@ -4,6 +4,8 @@ import pytest
 
 from helao.helpers.config_loader import ServerConfig
 
+pytestmark = pytest.mark.usefixtures("reflex_registration")
+
 
 def _pidd():
     """Return a stand-in carrying only the attributes validateConfig reads."""
