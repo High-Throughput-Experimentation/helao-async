@@ -290,6 +290,8 @@ class _FakeCompositionState:
         self.overlay_spectra = False
         self.tern_color_choice = composition.NO_COLOR
         self.tern_color_options: list = [composition.NO_COLOR]
+        self.tern_mode = "ternary"
+        self._tern_scale = (1.0, 1.0)
         self._spectra: list = []
         self.spec_spec: dict = {}
         self.spec_url = ""
@@ -314,6 +316,10 @@ class _FakeCompositionState:
     plot = composition.CompositionState.plot.fn  # type: ignore[attr-defined]
     _draw_map = composition.CompositionState._draw_map
     _draw_ternary = composition.CompositionState._draw_ternary
+    _draw_composition = composition.CompositionState._draw_composition
+    _draw_binary = composition.CompositionState._draw_binary
+    _draw_totals_histogram = composition.CompositionState._draw_totals_histogram
+    _total_unit = composition.CompositionState._total_unit
     _select = composition.CompositionState._select
     _refresh_options = composition.CompositionState._refresh_options
     _draw_spectra = composition.CompositionState._draw_spectra
@@ -698,3 +704,72 @@ def test_ternary_colours_by_total_and_drops_samples_without_one() -> None:
     state.tern_color_choice = composition.NO_COLOR
     state._draw_ternary(records)
     assert len(state._tern_plotted) == 3
+
+
+def _binary_record(n, fe, nanomoles):
+    return record(
+        sample_no=n,
+        process_uuid=f"p{n}",
+        values={
+            "Fe.K": {"atomic_fraction": fe, "nanomoles": nanomoles},
+            "Fe.L": {"atomic_fraction": None, "nanomoles": 0.0},
+            "Ni.K": {"atomic_fraction": 1 - fe, "nanomoles": nanomoles},
+        },
+    )
+
+
+def test_composition_mode_counts_elements_with_a_finite_fraction() -> None:
+    assert composition.composition_mode([record()]) == "ternary"  # Co, Y, Pt
+    assert composition.composition_mode([_binary_record(1, 0.3, 1.0)]) == "binary"
+    one = record(values={"Fe.K": {"atomic_fraction": 1.0}, "Ni.K": {"nanomoles": 2.0}})
+    assert composition.composition_mode([one]) == "histogram"
+    assert composition.composition_mode([record(values={})]) == "ternary"
+
+
+def test_two_elements_plot_fraction_against_total_and_clicks_resolve() -> None:
+    records = [_binary_record(1, 0.2, 10.0), _binary_record(2, 0.8, 30.0)]
+    state = _FakeCompositionState()
+    state.vertex_a = "Fe.K"
+    state.tern_color_choice = "total nanomoles"
+    state._draw_composition(records)
+
+    assert state.tern_mode == "binary"
+    assert state._tern_plotted_xs == [0.2, 0.8]
+    assert state._tern_plotted_ys == [20.0, 60.0]  # summed over every line
+    labels = {axis.get("label") for axis in state.tern_spec["axes"].values()}
+    assert {"Fe.K atomic_fraction", "total nanomoles"} <= labels
+    # Nearer sample 2 on the scaled plane, nearer sample 1 in raw distance.
+    found = composition.nearest_record(
+        state._tern_plotted,
+        state._tern_plotted_xs,
+        state._tern_plotted_ys,
+        0.75,
+        25.0,
+        state._tern_scale,
+    )
+    assert found.sample_no == 2
+
+
+def test_one_element_plots_a_histogram_of_totals() -> None:
+    one = [
+        record(
+            sample_no=n,
+            process_uuid=f"p{n}",
+            values={"Fe.K": {"atomic_fraction": 1.0, "nanomoles": float(n)}},
+        )
+        for n in (1, 2, 3)
+    ]
+    state = _FakeCompositionState()
+    state.tern_color_choice = "total nanomoles"
+    state._draw_composition(one)
+    assert state.tern_mode == "histogram"
+    assert [t["kind"] for t in state.tern_spec["traces"]] == ["histogram"]
+    assert state._tern_plotted == []  # nothing to click onto
+
+
+def test_binary_and_histogram_need_a_total() -> None:
+    state = _FakeCompositionState()
+    state.vertex_a = "Fe.K"
+    state.tern_color_choice = composition.NO_COLOR
+    state._draw_composition([_binary_record(1, 0.2, 1.0)])
+    assert "total" in state.error and state.tern_spec == {}

@@ -292,8 +292,43 @@ def _vertices(current, options: list) -> tuple:
     return tuple(name or (spare.pop(0) if spare else "") for name in kept)
 
 
-def nearest_record(records, xs, ys, x: float, y: float):
+def _finite(value) -> bool:
+    return isinstance(value, (int, float)) and math.isfinite(value)
+
+
+def elements_with_fractions(records) -> list:
+    """Distinct elements with a finite ``atomic_fraction`` in *records*.
+
+    The element is a transition's part before the ``.`` (``Co`` of ``Co.K``),
+    so two lines of one element count once.
+    """
+    return sorted(
+        {
+            transition.split(".")[0]
+            for record in records or []
+            for transition, per_unit in record.values.items()
+            if _finite(per_unit.get("atomic_fraction"))
+        }
+    )
+
+
+def composition_mode(records) -> str:
+    """Which chart stands in the ternary slot for *records*.
+
+    ``ternary`` needs three elements; two get a ``binary`` scatter, one a
+    ``histogram`` of totals. None at all keeps ``ternary``, whose own message
+    then says what is missing.
+    """
+    count = len(elements_with_fractions(records))
+    return {1: "histogram", 2: "binary"}.get(count, "ternary")
+
+
+def nearest_record(records, xs, ys, x: float, y: float, scale=(1.0, 1.0)):
     """The record nearest ``(x, y)`` in the plotted plane, or ``None``.
+
+    *scale* divides each axis before measuring. The binary scatter plots a
+    0-1 fraction against nanomoles, and unscaled distance there is decided by
+    the y axis alone.
 
     The chart reports a **coordinate**, never a row id: ``xy_component`` wires
     only ``on_select``, whose payload carries ``x`` and ``y``. Matching happens
@@ -303,7 +338,11 @@ def nearest_record(records, xs, ys, x: float, y: float):
     """
     if not records or not xs:
         return None
-    index = min(range(len(xs)), key=lambda i: (xs[i] - x) ** 2 + (ys[i] - y) ** 2)
+    sx, sy = scale
+    index = min(
+        range(len(xs)),
+        key=lambda i: ((xs[i] - x) / sx) ** 2 + ((ys[i] - y) / sy) ** 2,
+    )
     return records[index] if index < len(records) else None
 
 
@@ -323,6 +362,8 @@ class CompositionState(rx.State):
     vertex_b: str = ""
     vertex_c: str = ""
     tern_color_choice: str = NO_COLOR
+    #: What the ternary slot shows; see `composition_mode`.
+    tern_mode: str = "ternary"
     interpolate: bool = False
     overlay_spectra: bool = False
 
@@ -360,6 +401,7 @@ class CompositionState(rx.State):
     _tern_plotted: list = []
     _tern_plotted_xs: list = []
     _tern_plotted_ys: list = []
+    _tern_scale: tuple = (1.0, 1.0)
     #: Spectra on the spectrum chart, oldest first: ``{"key": process_uuid,
     #: "label", "x", "y"}``. One entry unless ``overlay_spectra`` is on.
     _spectra: list = []
@@ -528,6 +570,7 @@ class CompositionState(rx.State):
             self.transition_choice = self.unit_choice = ""
             self.vertex_a = self.vertex_b = self.vertex_c = ""
             self.tern_color_choice = ""
+            self.tern_mode = "ternary"
             self._refresh_options()
             failed = f", {loaded.failures} unreadable" if loaded.failures else ""
             self.status = (
@@ -568,7 +611,7 @@ class CompositionState(rx.State):
             return
         self.version += 1
         self._draw_map(records)
-        self._draw_ternary(records)
+        self._draw_composition(records)
 
     def _draw_map(self, records) -> None:
         """The plate-map scatter, measured or interpolated."""
@@ -607,6 +650,74 @@ class CompositionState(rx.State):
         self.map_url = payload.buffer_url
         self.map_layout = payload.layout
 
+    def _total_unit(self) -> Optional[str]:
+        """The unit the color/quantity dropdown selects, or ``None``."""
+        return next(
+            (u for u in TOTAL_UNITS if total_label(u) == self.tern_color_choice), None
+        )
+
+    def _draw_composition(self, records) -> None:
+        """The ternary slot: ternary, binary scatter or histogram."""
+        self._tern_scale = (1.0, 1.0)
+        self.tern_mode = composition_mode(records)
+        if self.tern_mode == "binary":
+            self._draw_binary(records)
+        elif self.tern_mode == "histogram":
+            self._draw_totals_histogram(records)
+        else:
+            self._draw_ternary(records)
+
+    def _draw_binary(self, records) -> None:
+        """Two elements: vertex A's atomic fraction against the chosen total."""
+        unit = self._total_unit()
+        if unit is None or not self.vertex_a:
+            self.error = "pick a transition and a total to plot two elements"
+            return
+        kept, xs, ys = [], [], []
+        for record in records:
+            fraction = (record.values.get(self.vertex_a) or {}).get("atomic_fraction")
+            total = total_for(record, unit)
+            if _finite(fraction) and total is not None:
+                kept.append(record)
+                xs.append(float(fraction))
+                ys.append(total)
+        self._tern_plotted, self._tern_plotted_xs, self._tern_plotted_ys = kept, xs, ys
+        if xs:
+            self._tern_scale = (
+                (max(xs) - min(xs)) or 1.0,
+                (max(ys) - min(ys)) or 1.0,
+            )
+        payload = plots.scatter_map(
+            xs,
+            ys,
+            x_label=f"{self.vertex_a} atomic_fraction",
+            y_label=self.tern_color_choice,
+            panel_id=f"{self.panel_key()}-tern",
+            version=self.version,
+        )
+        self.tern_spec = payload.spec
+        self.tern_url = payload.buffer_url
+        self.tern_layout = payload.layout
+
+    def _draw_totals_histogram(self, records) -> None:
+        """One element: the distribution of the chosen total. Not clickable."""
+        unit = self._total_unit()
+        if unit is None:
+            self.error = "pick a total to plot one element"
+            return
+        self._tern_plotted, self._tern_plotted_xs, self._tern_plotted_ys = [], [], []
+        totals = [t for r in records if (t := total_for(r, unit)) is not None]
+        payload = plots.histogram(
+            {self.tern_color_choice: totals},
+            bins=30,
+            x_label=self.tern_color_choice,
+            panel_id=f"{self.panel_key()}-tern",
+            version=self.version,
+        )
+        self.tern_spec = payload.spec
+        self.tern_url = payload.buffer_url
+        self.tern_layout = payload.layout
+
     def _draw_ternary(self, records) -> None:
         """The ternary diagram over the three chosen vertices."""
         vertices = (self.vertex_a, self.vertex_b, self.vertex_c)
@@ -621,9 +732,7 @@ class CompositionState(rx.State):
             ]
             for vertex in vertices
         ]
-        color_unit = next(
-            (u for u in TOTAL_UNITS if total_label(u) == self.tern_color_choice), None
-        )
+        color_unit = self._total_unit()
         totals = None
         if color_unit is not None:
             totals = [total_for(record, color_unit) for record in records]
@@ -693,7 +802,12 @@ class CompositionState(rx.State):
             return
         async with self:
             record = nearest_record(
-                self._tern_plotted, self._tern_plotted_xs, self._tern_plotted_ys, x, y
+                self._tern_plotted,
+                self._tern_plotted_xs,
+                self._tern_plotted_ys,
+                x,
+                y,
+                self._tern_scale,
             )
         await self._select(record)
 
@@ -708,8 +822,14 @@ class CompositionState(rx.State):
                 f"{record.run_use or '(no run_use)'}"
             )
             self.detail_rows = detail_rows(record)
-            self.ternary_label = ternary_fractions(
-                record, (self.vertex_a, self.vertex_b, self.vertex_c), self.unit_choice
+            self.ternary_label = (
+                ternary_fractions(
+                    record,
+                    (self.vertex_a, self.vertex_b, self.vertex_c),
+                    self.unit_choice,
+                )
+                if self.tern_mode == "ternary"
+                else ""
             )
         if not record.spectrum_action_uuid or not record.spectrum_file_name:
             async with self:
@@ -846,25 +966,38 @@ def _ternary_panel():
     """The ternary diagram and its three vertex selectors."""
     return rx.vstack(
         rx.hstack(
-            rx.select(
-                CompositionState.transition_options,
-                value=CompositionState.vertex_a,
-                on_change=CompositionState.set_vertex_a,
-                width="9em",
+            rx.cond(
+                CompositionState.tern_mode != "histogram",
+                rx.select(
+                    CompositionState.transition_options,
+                    value=CompositionState.vertex_a,
+                    on_change=CompositionState.set_vertex_a,
+                    width="9em",
+                ),
             ),
-            rx.select(
-                CompositionState.transition_options,
-                value=CompositionState.vertex_b,
-                on_change=CompositionState.set_vertex_b,
-                width="9em",
+            rx.cond(
+                CompositionState.tern_mode == "ternary",
+                rx.select(
+                    CompositionState.transition_options,
+                    value=CompositionState.vertex_b,
+                    on_change=CompositionState.set_vertex_b,
+                    width="9em",
+                ),
             ),
-            rx.select(
-                CompositionState.transition_options,
-                value=CompositionState.vertex_c,
-                on_change=CompositionState.set_vertex_c,
-                width="9em",
+            rx.cond(
+                CompositionState.tern_mode == "ternary",
+                rx.select(
+                    CompositionState.transition_options,
+                    value=CompositionState.vertex_c,
+                    on_change=CompositionState.set_vertex_c,
+                    width="9em",
+                ),
             ),
-            rx.text("color", size="1", class_name=reflex_muted_text_class()),
+            rx.text(
+                rx.cond(CompositionState.tern_mode == "ternary", "color", "plot"),
+                size="1",
+                class_name=reflex_muted_text_class(),
+            ),
             rx.select(
                 CompositionState.tern_color_options,
                 value=CompositionState.tern_color_choice,
