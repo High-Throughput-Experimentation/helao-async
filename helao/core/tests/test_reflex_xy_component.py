@@ -149,6 +149,21 @@ def test_copy_client_asset_places_the_esm(tmp_path):
     assert written.stat().st_size > 100_000
 
 
+def test_copy_client_asset_strips_bit_cast_nan(tmp_path):
+    # Firefox on Linux/NVIDIA cannot compile uintBitsToFloat (GLSL < 330), so
+    # every chart on that stack stayed blank.
+    xc.copy_client_asset(str(tmp_path))
+    written = (tmp_path / xc.CLIENT_ASSET_NAME).read_text(encoding="utf-8")
+    assert "uintBitsToFloat" not in written
+    assert written.count("uniform highp float xyNanZero;") == 1
+
+
+def test_patch_client_nan_refuses_a_moved_anchor():
+    assert xc.patch_client_nan("no nan here") == "no nan here"
+    with pytest.raises(RuntimeError):
+        xc.patch_client_nan("return uintBitsToFloat(0x7fc00000u);")
+
+
 def test_copy_client_asset_is_idempotent(tmp_path):
     first = xc.copy_client_asset(str(tmp_path))
     second = xc.copy_client_asset(str(tmp_path))

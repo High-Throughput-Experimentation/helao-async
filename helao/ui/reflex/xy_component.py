@@ -38,7 +38,6 @@ __all__ = [
 import collections
 import os
 import pathlib
-import shutil
 import threading
 
 import reflex as rx
@@ -97,8 +96,50 @@ def copy_client_asset(dest_dir: str) -> str:
         )
     os.makedirs(dest_dir, exist_ok=True)
     dest = os.path.join(dest_dir, CLIENT_ASSET_NAME)
-    shutil.copyfile(source, dest)
+    with open(dest, "w", encoding="utf-8") as f:
+        f.write(patch_client_nan(source.read_text(encoding="utf-8")))
     return dest
+
+
+#: xy's shaders build NaN as ``uintBitsToFloat(0x7fc00000u)``. Firefox on
+#: Linux/NVIDIA translates ESSL 3.00 to desktop GLSL below 330 without
+#: ``GL_ARB_shader_bit_encoding``, so every shader fails to compile ("error
+#: C7532: global function uintBitsToFloat requires #version 330"). Measured on
+#: that stack: ``0.0/0.0`` is folded back into the same call by ANGLE, and a
+#: local ``z/z`` survives compilation but NVIDIA's fast math makes it 1.0. Only
+#: a uniform divided by itself is opaque to both; uniforms default to 0.0 and
+#: xy never sets this one, so it evaluates 0/0 = NaN at runtime.
+_NAN_EXPR = "uintBitsToFloat(0x7fc00000u)"
+_NAN_ANCHOR = "float xyDecode(float encoded, vec2 meta)"
+_NAN_UNIFORM = "xyNanZero"
+
+
+def patch_client_nan(js: str) -> str:
+    """Rewrite xy's bit-cast NaN constant to a form every driver compiles.
+
+    The uniform is declared ahead of ``xyDecode``, the head of the GLSL
+    snippet every shader using the constant includes. ``highp`` is explicit
+    because a uniform shared by both stages must match precision.
+
+    Args:
+        js: Source of xy's bundled ESM client.
+
+    Returns:
+        str: The patched source; unchanged if xy stops using the constant.
+
+    Raises:
+        RuntimeError: If the constant is present but the anchor is not, i.e.
+            xy's shader layout changed under us.
+    """
+    if _NAN_EXPR not in js:
+        return js
+    if js.count(_NAN_ANCHOR) != 1:
+        raise RuntimeError(
+            f"xy client uses {_NAN_EXPR} but '{_NAN_ANCHOR}' no longer appears "
+            "exactly once; update patch_client_nan for this xy version."
+        )
+    js = js.replace(_NAN_ANCHOR, f"uniform highp float {_NAN_UNIFORM};\n{_NAN_ANCHOR}")
+    return js.replace(_NAN_EXPR, f"({_NAN_UNIFORM} / {_NAN_UNIFORM})")
 
 
 def encode_buffers(buffers) -> bytes:
