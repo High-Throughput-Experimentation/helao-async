@@ -267,6 +267,9 @@ class _FakeCompositionState:
         self._plotted: list = []
         self._plotted_xs: list = []
         self._plotted_ys: list = []
+        self._tern_plotted: list = []
+        self._tern_plotted_xs: list = []
+        self._tern_plotted_ys: list = []
         self.run_use_choice = grouping.ALL
         self.sequence_choice = grouping.ALL
         self.transition_choice = ""
@@ -282,16 +285,26 @@ class _FakeCompositionState:
         self.tern_spec: dict = {}
         self.tern_url = ""
         self.tern_layout = ""
+        self.selected_label = ""
+        self.detail_rows: list = []
 
     def panel_key(self) -> str:
         return "test-panel"
 
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
     # ``plot`` is wrapped in an ``EventHandler`` by ``@rx.event``; ``.fn`` is
-    # the underlying plain function. ``_draw_map``/``_draw_ternary`` carry no
-    # such decorator and bind directly.
+    # the underlying plain function. ``_draw_map``/``_draw_ternary``/``_select``
+    # carry no such decorator and bind directly.
     plot = composition.CompositionState.plot.fn  # type: ignore[attr-defined]
     _draw_map = composition.CompositionState._draw_map
     _draw_ternary = composition.CompositionState._draw_ternary
+    _select = composition.CompositionState._select
+    on_tern_select = composition.CompositionState.on_tern_select.fn  # type: ignore[attr-defined]
 
 
 def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
@@ -327,6 +340,142 @@ def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
     assert state._plotted == []
     assert state._plotted_xs == []
     assert state._plotted_ys == []
+
+
+def test_draw_ternary_keeps_records_index_aligned_when_a_middle_point_is_dropped() -> (
+    None
+):
+    """``barycentric_to_cartesian`` drops any point with a non-finite,
+    negative, or zero-sum component. A dropped *middle* record is the case
+    that catches an off-by-one in the surviving mask -- dropping the first or
+    last point can pass even when ``_tern_plotted`` and ``_tern_plotted_xs``/
+    ``_ys`` have drifted out of alignment with each other.
+    """
+    kept_a = record(
+        sample_no=1,
+        process_uuid="ka",
+        values={
+            "Co.K": {"net_counts": 1.0},
+            "Y.K": {"net_counts": 0.0},
+            "Pt.L": {"net_counts": 0.0},
+        },
+    )
+    # Missing Co.K and Pt.L entirely: series_for returns None for both, which
+    # _draw_ternary turns into NaN -- barycentric_to_cartesian drops it.
+    dropped = record(
+        sample_no=2,
+        process_uuid="dropped",
+        values={"Y.K": {"net_counts": 1.0}},
+    )
+    kept_b = record(
+        sample_no=3,
+        process_uuid="kb",
+        values={
+            "Co.K": {"net_counts": 0.0},
+            "Y.K": {"net_counts": 0.0},
+            "Pt.L": {"net_counts": 1.0},
+        },
+    )
+    records = [kept_a, dropped, kept_b]
+
+    state = _FakeCompositionState()
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.unit_choice = "net_counts"
+    state._draw_ternary(records)
+
+    assert [r.process_uuid for r in state._tern_plotted] == ["ka", "kb"]
+    assert len(state._tern_plotted_xs) == 2
+    assert len(state._tern_plotted_ys) == 2
+
+    # Clicking exactly where the second surviving point landed must resolve
+    # to kept_b -- an off-by-one against the dropped record's slot would
+    # instead land on kept_a (the only other candidate), which a "drop the
+    # first or last point" fixture could never catch.
+    x, y = state._tern_plotted_xs[1], state._tern_plotted_ys[1]
+    found = composition.nearest_record(
+        state._tern_plotted, state._tern_plotted_xs, state._tern_plotted_ys, x, y
+    )
+    assert found is kept_b
+
+
+def test_on_tern_select_finds_the_nearest_plotted_record_and_fills_the_details_panel() -> (
+    None
+):
+    """Clicking the ternary must resolve against the ternary's own stored
+    coordinates, not the plate map's -- ``plot()`` draws both charts, so a
+    shared selection array would have one click resolve against the other
+    chart's points.
+    """
+    near = record(
+        sample_no=7,
+        process_uuid="near",
+        global_label="near-sample",
+        spectrum_action_uuid="",
+        spectrum_file_name="",
+        values={
+            "Co.K": {"net_counts": 1.0},
+            "Y.K": {"net_counts": 0.0},
+            "Pt.L": {"net_counts": 0.0},
+        },
+    )
+    far = record(
+        sample_no=8,
+        process_uuid="far",
+        global_label="far-sample",
+        spectrum_action_uuid="",
+        spectrum_file_name="",
+        values={
+            "Co.K": {"net_counts": 0.0},
+            "Y.K": {"net_counts": 0.0},
+            "Pt.L": {"net_counts": 1.0},
+        },
+    )
+    state = _FakeCompositionState()
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.unit_choice = "net_counts"
+    state._draw_ternary([near, far])
+    assert state._tern_plotted_xs
+
+    x, y = state._tern_plotted_xs[0], state._tern_plotted_ys[0]
+    asyncio.run(state.on_tern_select({"x": x, "y": y}))
+
+    assert state.selected_label.startswith("near-sample")
+    assert state.detail_rows != []
+
+
+def _chart_nodes(page) -> list:
+    """Every ``XYChart`` node in the page tree, in document order."""
+    charts: list = []
+
+    def walk(node) -> None:
+        if type(node).__name__ == "XYChart":
+            charts.append(node)
+        for child in getattr(node, "children", []) or []:
+            walk(child)
+
+    walk(page)
+    return charts
+
+
+def _on_select_handler_name(chart_node) -> str:
+    """The bound handler's function name, out of the rendered event trigger."""
+    trigger = chart_node.event_triggers["on_select"]
+    return trigger.events[0].handler.fn.__name__
+
+
+def test_the_ternary_chart_is_bound_to_its_own_click_handler() -> None:
+    """The map and the ternary each resolve clicks against their own plotted
+    points -- binding both charts to the same handler, or leaving the
+    ternary's ``on_select`` unset, is exactly the bug this page shipped with
+    (the ternary click path did nothing on every host and config in this
+    repo, since no config here declares a plate map). The spectrum chart
+    carries no ``on_select`` at all -- there is nothing to click there."""
+    charts = _chart_nodes(composition.build_page())
+    assert len(charts) == 3
+    map_chart, tern_chart, spec_chart = charts
+    assert _on_select_handler_name(map_chart) == "on_map_select"
+    assert _on_select_handler_name(tern_chart) == "on_tern_select"
+    assert "on_select" not in spec_chart.event_triggers
 
 
 def test_build_page_renders() -> None:
