@@ -6,8 +6,7 @@ needs a platemap.
 """
 
 import asyncio
-
-import pytest
+from typing import Any
 
 from helao.ui.reflex import composition
 from helao.ui.shared.composition import grouping
@@ -15,7 +14,7 @@ from helao.ui.shared.composition.model import CompositionRecord
 
 
 def record(**kwargs) -> CompositionRecord:
-    base = dict(
+    base: dict[str, Any] = dict(
         plate_id=10244,
         sample_no=1,
         global_label="legacy__solid__10244_1",
@@ -128,38 +127,14 @@ def test_nearest_record_on_an_empty_plot_returns_none() -> None:
 
 
 def test_load_populates_records_and_options(monkeypatch) -> None:
-    """The whole retrieve path, with the API layer stubbed."""
+    """The whole retrieve path, with the API layer stubbed.
 
-    async def fake_search(client, plate_id, size=500):
-        return [{"process_uuid": "p1"}]
-
-    async def fake_sequences(client, uuids):
-        return {}
-
-    async def fake_quant(client, action_uuid, file_name):
-        return {
-            "transition": ["Co.K", "Y.K", "Pt.L"],
-            "net_counts": [271.2, 792.1, 44.7],
-        }
-
-    monkeypatch.setattr(composition.api, "search_processes", fake_search)
-    monkeypatch.setattr(composition.api, "fetch_sequences", fake_sequences)
-    monkeypatch.setattr(composition.api, "fetch_quant", fake_quant)
-    monkeypatch.setattr(composition.api, "get_client", lambda: object())
-    monkeypatch.setattr(
-        composition.model,
-        "record_from_process",
-        lambda item, seqs: record(),
-    )
-
-    loaded = asyncio.run(composition.load_records(10244))
-    assert len(loaded.records) == 1
-    assert loaded.failures == 0
-    assert grouping.ALL in grouping.run_use_options(loaded.records)
-
-
-def test_load_counts_a_failed_quant_fetch_rather_than_raising(monkeypatch) -> None:
-    """One unreadable HLO out of 497 must not cost the other 496."""
+    Two records, each carrying its own distinct payload keyed by its own
+    ``quant_action_uuid`` -- and the second's fetch finishes before the
+    first's, so a completion-order bug in the fan-out would swap them. Only a
+    correct ``zip(records, payloads)`` against ``asyncio.gather``'s
+    input-ordered results pairs each record with its own value.
+    """
 
     async def fake_search(client, plate_id, size=500):
         return [{"process_uuid": "p1"}, {"process_uuid": "p2"}]
@@ -167,25 +142,81 @@ def test_load_counts_a_failed_quant_fetch_rather_than_raising(monkeypatch) -> No
     async def fake_sequences(client, uuids):
         return {}
 
-    calls = {"n": 0}
-
     async def fake_quant(client, action_uuid, file_name):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            raise RuntimeError("500 from S3")
-        return {"transition": ["Co.K"], "net_counts": [1.0]}
+        # a1 (p1's fetch) is slower, so a2 (p2's fetch) resolves first even
+        # though p1 was listed -- and dispatched -- first.
+        delay = {"a1": 0.02, "a2": 0.0}[action_uuid]
+        await asyncio.sleep(delay)
+        value = {"a1": 271.2, "a2": 999.0}[action_uuid]
+        return {"transition": ["Co.K"], "net_counts": [value]}
+
+    def fake_record_from_process(item, seqs):
+        uuid = item["process_uuid"]
+        return record(
+            process_uuid=uuid,
+            quant_action_uuid={"p1": "a1", "p2": "a2"}[uuid],
+        )
 
     monkeypatch.setattr(composition.api, "search_processes", fake_search)
     monkeypatch.setattr(composition.api, "fetch_sequences", fake_sequences)
     monkeypatch.setattr(composition.api, "fetch_quant", fake_quant)
     monkeypatch.setattr(composition.api, "get_client", lambda: object())
     monkeypatch.setattr(
-        composition.model, "record_from_process", lambda item, seqs: record()
+        composition.model, "record_from_process", fake_record_from_process
+    )
+
+    loaded = asyncio.run(composition.load_records(10244))
+    assert len(loaded.records) == 2
+    assert loaded.failures == 0
+    by_uuid = {r.process_uuid: r for r in loaded.records}
+    assert by_uuid["p1"].values["Co.K"]["net_counts"] == 271.2
+    assert by_uuid["p2"].values["Co.K"]["net_counts"] == 999.0
+    # run_use_options always includes ALL regardless of input -- checking for
+    # its presence alone would pass even on a totally failed load. Pin the
+    # exact list, which only holds if both loaded records actually made it
+    # through the grouping call.
+    assert grouping.run_use_options(loaded.records) == [grouping.ALL, "post_anneal"]
+
+
+def test_load_counts_a_failed_quant_fetch_rather_than_raising(monkeypatch) -> None:
+    """One unreadable HLO out of 497 must not cost the other 496.
+
+    Two distinct records, the failure keyed to the *first* one's own
+    ``quant_action_uuid`` -- so this pins not just the count but which record
+    survived and that it carries its own (not the failed one's) value.
+    """
+
+    async def fake_search(client, plate_id, size=500):
+        return [{"process_uuid": "p1"}, {"process_uuid": "p2"}]
+
+    async def fake_sequences(client, uuids):
+        return {}
+
+    async def fake_quant(client, action_uuid, file_name):
+        if action_uuid == "a1":
+            raise RuntimeError("500 from S3")
+        return {"transition": ["Co.K"], "net_counts": [999.0]}
+
+    def fake_record_from_process(item, seqs):
+        uuid = item["process_uuid"]
+        return record(
+            process_uuid=uuid,
+            quant_action_uuid={"p1": "a1", "p2": "a2"}[uuid],
+        )
+
+    monkeypatch.setattr(composition.api, "search_processes", fake_search)
+    monkeypatch.setattr(composition.api, "fetch_sequences", fake_sequences)
+    monkeypatch.setattr(composition.api, "fetch_quant", fake_quant)
+    monkeypatch.setattr(composition.api, "get_client", lambda: object())
+    monkeypatch.setattr(
+        composition.model, "record_from_process", fake_record_from_process
     )
 
     loaded = asyncio.run(composition.load_records(10244))
     assert loaded.failures == 1
     assert len(loaded.records) == 1
+    assert loaded.records[0].process_uuid == "p2"
+    assert loaded.records[0].values["Co.K"]["net_counts"] == 999.0
 
 
 def test_configure_records_the_world_config() -> None:
@@ -214,6 +245,88 @@ def test_platemap_note_when_access_is_unavailable(monkeypatch) -> None:
     rows, note = composition.platemap_for(10244)
     assert rows == []
     assert "HELAO_CREDENTIALS" in note
+
+
+class _FakeCompositionState:
+    """A stand-in carrying the vars ``plot``/``_draw_map``/``_draw_ternary``
+    touch.
+
+    Deliberately not a ``CompositionState`` subclass, for the reason
+    ``test_reflex_motion_control.py``'s own ``_FakeState`` exists: Reflex
+    intercepts attribute assignment on a real ``rx.State`` and forwards it to
+    a session that does not exist outside a running app. The three methods
+    under test are bound straight off the real class, so this exercises the
+    actual clearing logic rather than a reimplementation of it.
+    """
+
+    def __init__(self):
+        self.error = ""
+        self.status = ""
+        self._records: list = []
+        self._pm_rows: list = []
+        self._plotted: list = []
+        self._plotted_xs: list = []
+        self._plotted_ys: list = []
+        self.run_use_choice = grouping.ALL
+        self.sequence_choice = grouping.ALL
+        self.transition_choice = ""
+        self.unit_choice = ""
+        self.vertex_a = ""
+        self.vertex_b = ""
+        self.vertex_c = ""
+        self.interpolate = False
+        self.version = 0
+        self.map_spec: dict = {}
+        self.map_url = ""
+        self.map_layout = ""
+        self.tern_spec: dict = {}
+        self.tern_url = ""
+        self.tern_layout = ""
+
+    def panel_key(self) -> str:
+        return "test-panel"
+
+    # ``plot`` is wrapped in an ``EventHandler`` by ``@rx.event``; ``.fn`` is
+    # the underlying plain function. ``_draw_map``/``_draw_ternary`` carry no
+    # such decorator and bind directly.
+    plot = composition.CompositionState.plot.fn  # type: ignore[attr-defined]
+    _draw_map = composition.CompositionState._draw_map
+    _draw_ternary = composition.CompositionState._draw_ternary
+
+
+def test_plot_clears_the_previous_charts_on_a_platemap_less_reload() -> None:
+    """A retrieve for a plate with no platemap must not leave the prior
+    plate's map, ternary and selectable points on screen.
+
+    Regression for a live bug: retrieve plate A (platemap loads) -> Plot ->
+    retrieve plate B (no platemap, so ``_pm_rows`` comes back empty) -> Plot.
+    ``_draw_map`` returns early on an empty ``_pm_rows``, and neither it nor
+    the old ``plot`` cleared what was already drawn, so plate A's map stayed
+    up next to plate B's fresh ternary -- and a click on it resolved to a
+    plate A record, filling the details table and fetching plate A's spectrum
+    under plate B's own header. Nothing errored.
+    """
+    state = _FakeCompositionState()
+    state._records = RECORDS
+    state._pm_rows = PM_ROWS
+    state.transition_choice = "Co.K"
+    state.unit_choice = "net_counts"
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+
+    state.plot()
+    assert state.map_url != ""
+    assert state._plotted != []
+    assert state._plotted_xs != []
+
+    # The next retrieve: a plate whose platemap did not load.
+    state._pm_rows = []
+    state.plot()
+    assert state.map_url == ""
+    assert state.map_spec == {}
+    assert state.map_layout == ""
+    assert state._plotted == []
+    assert state._plotted_xs == []
+    assert state._plotted_ys == []
 
 
 def test_platemap_note_when_the_plate_will_not_load(monkeypatch) -> None:
