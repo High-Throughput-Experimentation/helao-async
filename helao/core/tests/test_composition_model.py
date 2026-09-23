@@ -58,6 +58,7 @@ QUANT = {
     "analysis_name": ["XRFS_quantification_analysis"],
     "output_type": ["composition.xrfs_quantification"],
     "calibration_date": ["2026-06-03"],
+    "detector_gain": [1.0, 2.0],
 }
 
 
@@ -139,12 +140,14 @@ def test_with_values_drops_the_non_numeric_columns() -> None:
 
 
 def test_with_values_ignores_a_column_shorter_than_the_transitions() -> None:
-    """`global_sample_label` has one entry for five transitions. A zip would
-    silently truncate every other unit to one value."""
+    """`detector_gain` is numeric but has two entries for five transitions. A
+    zip would silently truncate every other unit to two values."""
     record = model.with_values(
         model.record_from_process(PROCESS_ITEM, SEQUENCES), QUANT
     )
     assert len(record.values) == 5
+    for per_unit in record.values.values():
+        assert "detector_gain" not in per_unit
 
 
 def test_unit_and_transition_names_are_the_union_sorted() -> None:
