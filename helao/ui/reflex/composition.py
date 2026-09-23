@@ -31,7 +31,7 @@ import reflex as rx
 from helao.helpers import helao_logging as logging
 from helao.ui.reflex import plots
 from helao.ui.shared import platemap
-from helao.ui.shared.composition import api, grouping, interp, model, ternary
+from helao.ui.shared.composition import api, grouping, interp, model
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -108,7 +108,7 @@ async def load_records(plate_id: int) -> Loaded:
     loaded = []
     failures = 0
     for record, payload in zip(records, payloads):
-        if isinstance(payload, Exception):
+        if isinstance(payload, BaseException):
             failures += 1
             LOGGER.warning(
                 f"composition could not read {record.quant_file_name} "
@@ -326,6 +326,16 @@ class CompositionState(rx.State):
             self.error = ""
             self.status = ""
             self.progress = ""
+            # A new plate must not inherit the previous one's selection or
+            # charts: without this, a plate with no platemap left the prior
+            # plate's map on screen next to the new plate's ternary, and a
+            # click on it resolved to the prior plate's record.
+            self._plotted, self._plotted_xs, self._plotted_ys = [], [], []
+            self.map_spec, self.map_url, self.map_layout = {}, "", ""
+            self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
+            self.selected_label = ""
+            self.detail_rows = []
+            self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
         if plate_id is None:
             async with self:
                 self.error = f"'{self.plate_id}' is not a plate id"
@@ -368,6 +378,14 @@ class CompositionState(rx.State):
     def plot(self, _tick: str = ""):
         """Render the plate map and the ternary diagram from the selections."""
         self.error = ""
+        # Cleared unconditionally, before either early return below: a plate
+        # with no platemap (``_draw_map`` returns early) or a grouping with no
+        # matching records must not leave the previous plot's chart and
+        # selectable points on screen -- a click on a stale map used to
+        # resolve to a stale record under the new plate's own header.
+        self._plotted, self._plotted_xs, self._plotted_ys = [], [], []
+        self.map_spec, self.map_url, self.map_layout = {}, "", ""
+        self.tern_spec, self.tern_url, self.tern_layout = {}, "", ""
         records = grouping.filter_records(
             self._records,
             run_use=self.run_use_choice,
