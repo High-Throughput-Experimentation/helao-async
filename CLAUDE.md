@@ -27,11 +27,7 @@ python launch.py <config_prefix> [extraopt] [--restore] [--hot-reload | --no-hot
 
 `extraopt` values understood by `launch.py`: `liveonly`/`gpvis` (only the live_visualizer Bokeh app), `nolive`/`actionvis` (suppress live_visualizer). Hotkeys after launch: `CTRL-r` restart a single server, `CTRL-x` terminate the group, `CTRL-t` toggle the hot-reload watcher on/off at runtime, `CTRL-d` disconnect monitor (leaves the group running; resume with `--reconnect`).
 
-**A server dies with its launcher unless the launcher says otherwise.** On Linux each launched server arms `prctl(PR_SET_PDEATHSIG)` at the top of its entry point (`helao.helpers.parent_death`, a no-op on Windows), so `kill -9` on `launch.py` no longer leaves the group orphaned and holding its ports. `SIGINT`/`SIGTERM` to the launcher run the same teardown `CTRL-x` does. The one case where children must *survive* the launcher is `CTRL-d`, which writes `STATES/detached_<prefix>_<extraopt>.marker` before exiting; a server that finds that marker stands down instead of shutting down. Cleared on the next launch, so the following crash is not mistaken for a detach. Two consequences worth knowing: the signal is scoped to the *spawning thread*, not the process (so the handler re-checks `getppid()` and re-arms rather than trusting the notification), and the arming must not move into a `preexec_fn` — `launch.py` is multi-threaded, where post-fork code is unsafe.
-
-**Windows gets the same guarantee by a different mechanism.** There is no `PDEATHSIG`, so `helao/helpers/win_job.py` puts *the launcher* in a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; a process spawned by a job member joins that job automatically, so containment is inherited and no child does anything. Three things follow. The job handle must stay referenced for the launcher's whole life — **closing it is what kills the group**, so a garbage-collected handle would terminate every running server. CTRL-d has to *clear* the kill-on-close limit before exiting (a process cannot be removed from a job), or detaching would kill the group it is meant to preserve. And servers are spawned `CREATE_NEW_PROCESS_GROUP` so `kill_server` can send a targeted `CTRL_BREAK_EVENT` before force-killing: `psutil.Process.terminate()` on Windows is `TerminateProcess`, which runs no shutdown handler at all, making the 7s `GRACEFUL_WAIT` there dead time. The trade is that children no longer receive console Ctrl+C — acceptable because `launch.py` catches `KeyboardInterrupt` and runs the teardown itself — and `HELAO_WIN_NEW_PROCESS_GROUP=0` disables just that part while keeping the job object. Raw `ctypes`, not `pywin32`, which is not in `helao_dev_win-64.yml`. **Confirmed at two stations** (2026-08-04) with `helao/hexagon/tests/smoke/launch_orphan_win.bat`: force-killing the monitor left no child process and released every port, on a 6-server simulated group and on a 13-server production group holding real hardware. Re-run that script after touching `win_job.py`, `launch.py`'s spawn path, or `CONSOLE.spawn_kwargs` — its judgement lives in `helao/core/tests/win_orphan_check.py`, which is Linux-tested, but the containment itself can only be observed on Windows.
-
-A caution earned the hard way: that smoke script was wrong four times before it first ran correctly (a `%~dp0` read after `shift`, `^|` escaping passed literally into PowerShell by `for /f`, `wmic` absent on current builds, and a usability guard that fired on the success case). Every one produced a confident, wrong verdict rather than an error, and three of the four reported FAIL while the mechanism was fine. Read its output sceptically: a FAIL should be corroborated by the surviving PIDs and held ports it lists, not taken on the word of the RESULT line.
+**A server dies with its launcher unless the launcher says otherwise** — `PR_SET_PDEATHSIG` on Linux, a Job Object on Windows, and `CTRL-d` the one case where children must *survive*. Before editing `launch.py`'s spawn path, `helao/helpers/win_job.py`, or `helao/helpers/parent_death.py`, read `helao/helpers/CLAUDE.md`; every mechanism there fails in a way that still reads as a clean launch.
 
 CLI flags (position-independent; parsed separately from `extraopt`):
 - `--restore` — launched orchestrators import their previously exported queues (`STATES/queues.pck`) on startup. Per-instrument persistent equivalent: `restore_queues_on_startup: true` on the orchestrator's server config. A restored `queues.pck` is archived (`queues_imported_<ts>.pck`) so it is not replayed again.
@@ -41,96 +37,19 @@ CLI flags (position-independent; parsed separately from `extraopt`):
 Other utilities:
 - `python run_unit_tests.py` — runs `helao.core.tests.unit_test_sample_models.sample_model_unit_test`. `launch.py` runs this automatically before launching anything and aborts on failure.
 - `python run_tests.py` — the full pytest sweep across this repo and every deployment (`--list` to preview, `--filter <substr>` to narrow, `--timeout` to raise the per-file cap). **Runs one file per pytest process**, because collecting the tree as a single session hangs indefinitely and ignores SIGINT while the same files pass individually — the tests start event loops, bind sockets, and spawn Bokeh servers, so cross-file interference is expected. Deliberately separate from `run_unit_tests.py`, which stays a fast pre-launch gate. Deployments opt in by having a `tests/` directory; the whole deployment is then swept for `test_*.py`, so a test filed beside its subject is not missed. Third-party import failures report as `ENV` rather than `FAIL` (a Windows-only vendor SDK cannot be collected on Linux), while a missing `helao*` module stays a failure.
-- `python -m helao.core.tests.check_queue_pcks <STATES dir>` — read-only report of which `queues*.pck` files the current build could actually restore (missing model classes, or a payload schema this build does not write). Never loads a pickle; walks the opcode stream instead. Exits 1 if any file is unrestorable, so it can gate a cleanup sweep.
-- `python -m helao.core.tests.check_long_paths <root> [--enable]` — reports whether the station still has the Windows 260-character `MAX_PATH` ceiling, and removes it with `--enable` (sets `HKLM\SYSTEM\CurrentControlSet\Control\FileSystem\LongPathsEnabled=1`; needs an elevated prompt and a reboot). **The registry value is evidence, the probe is proof** — it creates one directory level at a time under `<root>/STATES` and reports the *measured* ceiling, so "long paths are off" (stops near 260) reads differently from "the root is unwritable" (stops at 0), and it unwinds everything it created. `launch.py` runs the probe on Windows and warns, non-fatally, when the ceiling is still there.
-
-  **Why this is an OS setting and not `\\?\` in the writers.** Prefixing paths at HELAO's own call sites would cover about thirty writers and leave every read, every glob, and every third-party library that touches the run tree still capped — `boto3` streaming a file to S3, `zipfile` building a sequence archive, `ruamel` loading a yml, a vendor SDK appending to an `.mpr` inside the action directory. A `\\?\`-prefixed path that escapes into recorded metadata (`FileInfo.file_name`, an S3 key, a yml value) is also a worse defect than the one being fixed, because it outlives the run. `LongPathsEnabled` plus CPython's `longPathAware` manifest (present since 3.6) lifts the cap for the whole process, libraries included. The trade to know about: files past 260 characters become awkward for Explorer, `cmd`, and some backup tools.
-
-- `python -m helao.core.tests.scan_prg_ghosts <DATA dir>` — read-only report of `.prg` sidecars that recorded an atomic-write staging file (`.tmp` suffix or a leading dot), in loose sidecars and inside sequence zips. Exits 1 on any finding **or when any record went unexamined** — a directory that would not list, an archive that would not open, or a member that would not decode — so a partial sweep cannot read as a clean one. On the production archive that is 28 records (7 damaged zips plus 21 undecodable members), all pre-existing. **Run it on the host that owns the data, never across a network mount** — the first sweep of a production archive ran over sshfs, where `os.walk` silently swallowed transient `Operation not permitted` errors and pruned most of the tree, returning a confident clean verdict at ~2% coverage. Every listing is retried and any that still fails is reported. Cross-check its record count against a plain `find` on the same host before trusting a clean result.
-
-- `python -m helao.core.tests.set_run_use <RUNS_SYNCED/.../<sequence>.zip> [--run-use data] [--dry-run] [--no-reset]` — retag one already-synced record: the `-act.yml`/`-exp.yml` (and any `-prc.yml`) members inside the zip, plus the `-prc.yml` files in the parallel `PROCESSES` tree that older builds wrote outside it. The zip is rebuilt into a staging sibling and `os.replace`d; every member it does not retag is copied byte-for-byte with its own compression and timestamp. Three things it deliberately does *not* do: touch the literal string `run_use` in an action's `process_contrib` list (that names the field, it is not a value), add the key to a `-seq.yml` (`SequenceModel` has no such field — `ActionModel`/`ExperimentModel`/`ProcessModel` do, so those get it even where the writer omitted it), or rewrite a `files[]` entry that recorded no `run_use` at all. External process ymls are matched on `sequence_uuid`, not on the path convention alone, so a mirrored directory holding another sequence's processes is reported and skipped. **It then hands the record back to the syncer**: the retagged zip is extracted into the parallel `RUNS_FINISHED` directory without its `.prg`/`.progress`/`.lock` members and renamed `.orig`, so the next sync pass re-uploads it — dropping the `.prg` is the whole mechanism, since it records which files already reached S3 and a record restored with it reads as finished. `--no-reset` retags the archive and stops there, which changes nothing downstream. This does *not* call `SyncDriver.reset_sync`, which refuses any zip without a `-seq.prg` member: a batch-converted record has none (one measured: 506 members, 0 `.prg`), and those are exactly the records a retag is aimed at — the validity check here is a readable `-seq.yml`. An existing `.orig` is never overwritten; the zip is left in place instead.
+- Standalone report and repair utilities under `helao/core/tests/` — `check_queue_pcks`, `check_long_paths`, `scan_prg_ghosts`, `set_run_use`. Invocation and the reasoning behind each: `helao/core/tests/CLAUDE.md`.
 
 There is no project-wide build step for the Python side. Tests are a mix of pytest modules (most of `helao/hexagon/tests/`, `harness/tests/`, and each deployment's `tests/`) and standalone `__main__` scripts under `helao/core/tests/` that `run_tests.py` reports as `NOTESTS` and which must be invoked directly.
 
 ### Reflex UI stack (coexists with Bokeh)
 
-An optional second UI stack, opt-in per config via a `reflex:` server key alongside `fast:`/`bokeh:`. The Bokeh path is untouched; a station runs either, or both in the same group. Try it with `python launch.py goldenreflex`.
+An optional second UI stack, opt-in per config via a `reflex:` server key alongside `fast:`/`bokeh:`. The Bokeh path is untouched; a station runs either, or both in the same group. A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the backend. Try it with `python launch.py goldenreflex`.
 
-A Reflex server occupies **two consecutive ports**: `port` serves the prebuilt static frontend, `port + 1` is the Reflex backend. `validateConfig` reserves both, so nothing else may claim `port + 1`. The frontend server proxies `/xy/buffers/*` through to the backend, because the chart-buffer route is registered on the backend while the browser resolves the payload's relative URL against the page origin.
+Read `helao/ui/reflex/CLAUDE.md` before editing anything under `helao/ui/reflex/`. The bundle stamp, the mixin rule for panel state, the lazy-`add_page` trap, the WebGL context cap, and the paged-queue index rules live there, and each one fails silently.
 
-**The bundle is per `(config, reflex server)`, lives under the server root, and rebuilds itself.** See `docs/superpowers/specs/2026-08-05-reflex-bundle-states-autobuild-design.md`; `reflex_bundle.py` is the whole mechanism, shared by `reflex_launcher.py` and `build_reflex_bundle.py`.
+### Colours
 
-```
-<root>/STATES/reflex-bundles/<config_prefix>_<server_key>/
-    helao_ui/       # the export, 74 files / 3.0 MB
-    bundle.json     # the stamp it was built from
-```
-
-Every launch computes a stamp (baked `api_url`; HEAD **and** `git status --porcelain` digest for the parent repo and each nested `helao/deploy/*` repo; a content-hash map of every `helao/` module the app imported; `rxconfig.py` and xy's ESM client; the `reflex`/`reflex-components-radix`/`xy` versions) and compares it to the recorded one. **Never mtime** — `git checkout` rewrites it on unchanged files and `cp -p` preserves it on changed ones. A mismatch logs which field moved and rebuilds. The manual build step is no longer required where `node_modules` is warm.
-
-- **Auto-build has two branches, split by measured cost.** With `.web/node_modules` populated an export takes ~4.3 s, so it happens silently at launch. Cold, it fetches ~270 MB of npm packages, so the launcher **refuses**, prints the exact `python build_reflex_bundle.py <prefix> --server <key>`, and requires `REFLEX_ALLOW_LOCAL_BUILD=1` to proceed anyway. Both branches need `bun` or `node` on `PATH`, and **both `helao_dev_*.yml` now pin `nodejs>=22.12`** to supply it (added in `752a0e12`; `40870fb2` then dropped the `bun` entry and lets npm install it, so a stock env has `node` but not `bun`).
-- **A build failure never falls back to what is installed.** The launcher exits non-zero and leaves the old bundle untouched: a control UI that renders wrong or silently disconnected is worse than one that visibly does not come up, and the config's Bokeh UIs are unaffected either way. `launch.py` surfaces that refusal — its spawn loop registered a pid and never checked it, so a dead server used to leave a launch reading clean; `supervise_early_exits` now watches for 90 s and reports any child that exits on its own.
-- **The stamp's module map must be captured *after* the Reflex app is imported.** It is read from `sys.modules` (that is how it sees panel modules resolved from config strings, which no static scan could find). Captured earlier it is a stub that never changes — a bundle that is never rebuilt, with every signal reading healthy. `validate_stamp` refuses to write such a stamp. The map is scoped to `helao/`, not the repo root: measured, including root scripts made `build_reflex_bundle.py` and `reflex_launcher.py` differ by exactly their own filenames and rebuild each other's bundle forever.
-- **`<repo>/.reflex-bundle/helao_ui` survives as a one-release fallback**, used only when no per-config bundle exists — never in place of a stale one. It carries no stamp, so its baked URL is read back out of the emitted JavaScript; if that is not this server's backend URL the launcher refuses rather than serving a page that renders and then refuses every WebSocket.
-- **The build cannot run from a `noexec` filesystem.** `/mnt/STORAGE` is mounted `noexec`, so npm's binaries under `.web/node_modules/.bin/` fail with `Permission denied` (exit 126) no matter what their permission bits say. The build stages itself into `$XDG_CACHE_HOME/helao/reflex-build/<checkout digest>/_app` (override with `HELAO_REFLEX_BUILD_DIR`), which is **persistent** — staging into a fresh temp dir discarded `.web` with it, so every build on a `noexec` checkout was cold and the incremental branch was unreachable there. Only the *build* needs exec; the bundle is static files and `StaticFiles` serves them from anywhere.
-- **Concurrent builds share one `_app/.web` per checkout**, so the lock guards the build, not the bundle directory: `_app/.reflex-build.lock` (gitignored — a tracked lockfile would land in `git status --porcelain` and make every build invalidate its own stamp), with the holder's pid in a `.owner` sidecar so a timeout names it instead of hanging.
-- `--name helao_ui` is required when invoking `reflex init` by hand: it derives the app name from the current directory and rejects `_app`'s leading underscore, ignoring the valid `app_name` already in `rxconfig.py`.
-
-Layout and the two rules worth knowing before editing it:
-
-- `helao/ui/reflex/` — `app.py` (routes composed from config), `ingest.py`, `ringbuffer.py`, `state.py`, `plots.py`, `xy_component.py`. Panels live in `helao/deploy/<deployment>/servers/reflex/` and are discovered through the same `live_vis:` / `action_vis:` keys the Bokeh visualizers use.
-- **The plot facade is used at two call sites.** `plots.chart(spec_var, url_var, layout_var)` binds a component **once** in a panel's `build()`; `plots.time_series(...)` and friends return a `ChartPayload` **every tick** from `pull()`, which the panel assigns into its state vars. Calling a facade function from `build()` yields a chart that paints once and never updates.
-- **Panel state bases are Reflex mixins, and must stay that way.** A var declared on a concrete `rx.State` is owned by that class and *shared* by every substate under it; a subclass re-declaring it does not shadow it. Written as plain inheritance, `make_panel_state`'s `server_key` binding read back as `""` at runtime and every panel on a page shared one `chart_spec`. `make_panel_state` raises if handed a non-mixin base.
-- **`add_page` takes a lazy callable that `--backend-only` never runs.** Anything the serving process needs — above all the panel state classes, since Reflex registers event handlers at class creation — must be created *before* `add_page`, or the browser calls handlers the backend has never heard of and every panel sits at "connecting".
-- **`params.pages` does not decide which pages exist.** It is consulted in exactly one place (`PAGE_TO_VIS_KEY`) and picks which *panels* mount on `/live` and `/action`. Every route in `SHELL_ROUTES` is registered unconditionally, so `/operator`, `/browser` and `/control` appear whether or not they are listed — and `/live`/`/action` still render when omitted, just empty with a note saying so. A page is therefore made empty by config, never absent. What actually opts a station into the control page is a server declaring `control_vis`, without which `/control` renders only its "none declared" note.
-- **The data browser has two UIs over one logic layer.** `helao/ui/shared/data_browser/{readers,state,sources}.py` are backend-agnostic and shared; `helao/ui/bokeh/data_browser.py` is the Bokeh document and `helao/ui/reflex/data_browser.py` is the Reflex page on `/browser`. Never fork behaviour into one UI — add it to the shared layer so the other keeps working.
-- **The operator likewise has two UIs over one `OrchBackend`.** `helao/ui/shared/operator/orch_backend.py` is the async ABC both consume; `helao/ui/bokeh/operator.py` holds the `BokehOperator` document (still the production UI, reached by the 27 configs naming `bokeh: standalone_operator`, whose deployment module imports it) and `helao/ui/reflex/operator.py` is the Reflex page on `/operator`. Three shared layers sit under both — `param_forms.py` (library introspection, `Args:` parsing, version hints, `BUILTIN_TYPES`), `param_store.py` (`previous_params.json`, which one UI may write and the other read), and `spec_parser.py` (loading a deployment's `SpecParser` and parsing spec files). Add to those rather than to one UI. `helao/core/tests/test_standalone_operator.py`'s 59 tests are the gate on any change to them: they must pass with `helao/ui/bokeh/operator.py` unedited.
-- **A deployment's spec parser is code this repo never sees.** `spec_parser.load_parser` executes a file named by `seqspec_parser_path`, so every function in that module degrades to "nothing configured" instead of raising — a broken parser disables the Specs tab rather than taking down the page. The contract is `SpecParser` with `.lister`, `.PARAM_TYPES`, `.list_params`, and `.parser`.
-- **The Reflex process runs from `_app/`, not the repo root.** `import_autolibs` resolves every library path relative to the cwd, so a config's `helao/deploy/<dep>/experiments` silently yields an *empty* library plus one ERROR line — the operator then renders with nothing to select. `helao/ui/reflex/operator.py`'s `rooted_config` rewrites those paths against the repo root before handing the config to `RemoteBackend`. Anything else in a Reflex process that resolves a config path relative to the cwd has the same bug.
-- **A checkbox's value is not a string.** `str(False)` is `"False"` and `bool("False")` is `True`, so routing a checkbox through the same coercion as a text field inverts every unchecked box. The operator has a separate handler and reader for bool fields.
-- **Never drive a refresh from a server-side `while True`.** `on_unmount` fires on in-app navigation but *not* on tab close, so a `background=True` loop keeps running after the browser is gone — polling the orchestrator forever and logging `Attempting to send delta to disconnected client`. Both the operator and the visualizer panels tick from a `rx.moment(interval=..., on_change=...)` in the page instead: a component stops existing when its tab does. The panel tick is added by `app._render_panel`, not by panel modules, so panels in deployments outside this repo need no change; `VisPanelState.render_loop` is kept as the mount primer they already bind.
-- **Reflex vars that `rx.foreach` iterates need element annotations.** A bare `list` fails the *frontend build* with `ForeachVarError`, not at import, so it looks fine until `reflex export` runs. Use `list[list[str]]`, not `list`.
-- **The operator's queue and history tables are paged server-side, and a paged row index is not a queue index.** `orch_queues.list_sequences/list_experiments/list_actions` take `(limit=None, offset=0)` where **`limit=None` means the whole queue** — they used to default to `limit=10` while the three `/list_*` endpoints called them bare, so no operator UI could ever see an eleventh queued item, and the Reflex subtab counts (`len(rows)`) reported that truncation as the queue's depth. Depths now come from the `n_sequences`/`n_experiments`/`n_actions` that `_queue_counts` has always put in `get_orch_state`. Two traps follow. **The orchestrator indexes its deques absolutely** — `get_queue_object`, `move_*`, `remove_*` all do — while a rendered row index is page-local, so `OperatorQueueState` adds its own offset in the handler rather than in the template, and bounds the move/remove against the *total*, not the page length; dropping the offset deletes the wrong queued item with nothing on screen looking wrong. **History is the opposite**: `_hist_objs` caches only the rendered page, so `select_history_row`'s index stays page-local and adding an offset would index past the end. History paging is a separate `/get_history_page` (kind/limit/offset, newest-first, with a `total`) added *beside* `/get_histories`, which still returns all three containers whole because `helao/hexagon/tests/smoke/conc_items.py` calls it.
-- **A handler bound to both a button and `rx.moment` needs its tick argument passed explicitly.** `rx.moment` hands its value to every handler on `on_change`, but a button's `on_click` supplies a `PointerEventInfo`, so binding the same `(self, _tick: str = "")` handler to a button raises `EventHandlerArgTypeMismatchError` — **at render, not at import**. Write `on_click=State.handler("")`, as `on_mount` already does for `poll_once`. This is why `test_reflex_operator.py` renders `build_page()`: import-time tests cannot see any event-binding error.
-- **`rx.select` is a Radix select, not a `<select>`.** It renders a `combobox` button and portals its options into the body when opened, so Playwright's `locator("select").select_option` matches nothing and *silently* leaves the value alone — after which the thing you were actually testing gets blamed. Click the `combobox`, then the `option` by role.
-- **hte panels resolve by the same config key as the Bokeh visualizers.** `helao/deploy/hte/servers/reflex/co2_vis.py` answers to the same `live_vis: co2_vis` that `servers/visualizer/co2_vis.py` does — different subpackages, one name. A station gains the Reflex panels by adding a `reflex:` server and changing nothing else. `htereflex.yml` is a development config for verifying them without hardware and is not a station config.
-- **Every chart is a WebGL context, and the browser caps how many are live.** Chrome allows 16 and evicts the oldest past that, warning `Too many active WebGL contexts. Oldest context will be lost`. An evicted chart stops drawing *permanently* while every other signal still reads healthy — data arrives, the view is mounted, the append fires, and xy's `_applyAppend` returns at its `_glLost` guard before touching the GPU. Nothing is logged server-side. Budget charts per page accordingly: the hte action page was at 10 (16 with four BioLogic channels) until the per-action figures were merged into one chart carrying both segments as traces (`_action.segment_traces`). A panel that wants "this" beside "previous" should add a trace, not a chart.
-- **Not every HELAO data column is numeric.** Datasets carry an orchestrator host or a status message beside the traces; handing one to `plots` raises `could not convert string to float` from inside the render and takes down the whole chart. Filter columns before plotting.
-- **`ws_live` and `ws_data` carry different payloads.** `ws_live` relays a `{datalab: (value, epoch)}` dict; `ws_data` carries a pickled `DataPackageModel` object whose samples sit at `.datamodel.data[key][column]`. `ingest.NORMALIZERS` selects the right one by `ws_path` — a single normalizer silently drops the other endpoint's messages with no error.
-
-Only `plots.py` and `xy_component.py` may import `xy` (a test enforces this). `xy` is pre-1.0; `docs/superpowers/notes/2026-08-01-xy-api-probe.md` records its verified call signatures and should be re-checked after any version bump.
-
-### Colours: one palette, two theme seams
-
-**`helao/ui/shared/palette.py` is the single source of every colour in both UI stacks.** It is dependency-free (no bokeh, reflex, or matplotlib imports) and exports a Tailwind-derived `TW` shade table, the 10-entry qualitative `SERIES`, chrome roles, four Bokeh semantic-button constants, marker swatches, `CHART_CHROME`, and `red_ramp()`. **Never hardcode a colour anywhere else** — `helao/core/tests/test_palette.py` enforces this with an AST sweep and will fail.
-
-Things that will bite you when editing it:
-
-- **`palette.py` carries both `pink-400` and `pink-500`, deliberately.** `pink-500` is `SERIES[6]`; `pink-400` is the marker-swatch target. Neither supersedes the other; deleting either breaks something.
-- **The sweeper matches a bare CSS colour name, not a colour word inside a compound token.** `\b` treats `-` as a word boundary, so a naive pattern flags `red` inside `text-red-600` — i.e. it flags the Tailwind utilities the code is *supposed* to contain. The regex requires the match not be hyphen-flanked. It also walks the whole keyword value subtree (a `styles={...}` dict and an RGB tuple are not bare `Constant`s) and matches hex/`rgb(`/`color:` shapes anywhere, which is what catches f-strings and `CustomJS` code strings.
-- **`palette.py` and `bokeh_theme.py` are exempt from the sweep by exact path** (not basename) — they are the modules that are supposed to hold literals. A test pins that exemption list to exactly two entries.
-- **Contrast floors are per-role, not uniform**: body text 4.5:1, headings 3:1, controls 3:1, traces 2.0:1 plus CIE76 ΔE ≥ 15 between adjacent `SERIES` entries, surfaces 1.20:1. Identity swatches (the `label=""` marker chips) carry **no** floor — they exist to match a plotted hue. Accepted exceptions live in a registry keyed to their *measured* value, so a later change that degrades contrast still fails. Luminance/ΔE constants are pinned (linearization 0.04045, D65 0.95047/1.0/1.08883, f(t) 0.008856) because unpinned constants make two implementations disagree.
-- **The Reflex stack colours by function, and its constants are shade *names*, not hex.** `REFLEX_PAGE_TINTS` maps each route to one canvas tint (`/`→`slate-50`, `/live`→`sky-50`, `/action`→`violet-50`, `/operator`→`amber-50`, `/browser`→`emerald-50`) and `REFLEX_TABLE_HUES` maps each table *kind* to `(header bg, header text, border)` — keyed by kind, so a sequence looks the same in Queues and in History. Names because each one has to yield both `TW[name]` for the contrast matrix and `f"bg-{name}"` for the utility the component carries; hex would be unusable at the call site and a hand-written class string unmeasurable in the tests. **Table bodies stay white** — only the header row is saturated. `PAGE_BG` is the *Bokeh* canvas and is a separate constant even though it names the same shade as the `/` tint.
-- **Muted text in the Reflex stack is `slate-600`, and `text-slate-500` is a test failure there.** `slate-500` clears AA on white (4.76) but measures 4.34 on `violet-50` and 4.46 on `sky-50`, and clears `emerald-50` by only 0.02. `test_no_muted_slate_500_remains_in_the_reflex_stack` globs the whole Reflex stack for it. The Bokeh stack keeps its two surface-keyed muted roles; only the Reflex side collapsed to one.
-- **The sweeper is calibrated against frozen fixtures** under `helao/core/tests/fixtures/sweeper_calibration/` (`*.py.txt` snapshots + complete manifests). **Never `black` or refresh that directory** — reformatting invalidates the pinned line numbers. Calibrating against live files instead would self-destruct the moment a sweep edits them.
-
-**Bokeh** themes via `bokeh_theme.apply_theme(doc)`, called once from `HelaoVis.__init__` (`helao/ui/bokeh/vis.py`). That single hook reaches every Bokeh document, including the aligner served by `helao/hexagon/adapters/vis/galil_aligner_host.py`, which builds its own `Server` inside an action-server process and never passes through `bokeh_launcher.py` — no per-factory call could reach it.
-
-**Measured CSS reach — this is the part that surprises people.** In Bokeh 3 *every* `UIElement` renders into its own shadow root and layout containers nest, so a button in a row in a column is three boundaries deep. Consequences, all verified by `getComputedStyle` on a live page:
-
-- `GlobalInlineStyleSheet` lands in `<head>` and reaches **only** `html`/`body` chrome, the per-root shells that are direct children of `body`, and whatever CSS *inheritance* carries. Export the CSS as a `str` and build a fresh model per `apply_theme` call — a module-level `GlobalInlineStyleSheet` **instance** raises `RuntimeError: Models must be owned by only a single document` on the second browser connection, because the factory re-runs per client.
-- **`Div.text` is not light DOM.** It renders into the `Div`'s own shadow root, so a `<head>` selector cannot style `Div` innards. Those stay per-site Python values.
-- **There is no document-level shortcut for widget theming.** Bokeh's buttons are `var(--primary)`-driven and inherited custom properties *do* cross shadow boundaries, but Bokeh re-declares them on `:host` inside each widget's shadow root. Setting them on `html` changes nothing. Widget internals — ESTOP, param inputs, semantic buttons, marker chips — require a per-widget `InlineStyleSheet`.
-- **A `<style>` block inside `Div.text` targeting other widgets has been inert since the Bokeh 3 upgrade.** It is sealed in that `Div`'s shadow root. If you find that pattern, it is already dead, not working.
-- `semantic_button_stylesheet()` overrides `.bk-btn-{primary,success,warning,danger}` but must **never** emit a `.bk-btn-default` rule — the marker chips are `default` buttons with their own per-widget override, and a blanket rule collides with them. `button_type` is invisible to the AST sweep, so a `grep -rn 'button_type'` cross-check is the only guard against a site shipping stock-coloured.
-
-**Reflex** uses Tailwind utilities (`class_name="text-red-600"`), enabled by `plugins=[rx.plugins.TailwindV4Plugin()]` in `_app/rxconfig.py`. A bare plugin is right — every shade used is a stock Tailwind v4 colour. Gotchas:
-
-- **Set `--chart-*` (and any `:root` CSS) via `head_components=[rx.el.style(...)]`, not `rx.App(style={":root": ...})`.** Reflex matches `App.style` keys against component types; an unmatched string key falls through to Emotion's nested-selector serialization and emits a *descendant* rule (`.css-XXXX *:root{…}`), which can never match `<html>`. It fails silently — nothing errors, the properties just resolve nowhere.
-- **Tailwind v4's palette is OKLCH-native**, so `bg-red-900` renders `rgb(130,24,26)` while `palette.py`'s `#7f1d1d` is `rgb(127,29,29)`. Unsaturated 50/100-level shades round-trip within a unit or two, but **saturated 600/700 shades diverge much further** — v4's `violet-700` renders `rgb(112,8,231)` against the pinned `#6d28d9` = `rgb(109,40,217)`, 32 units off in green. Contrast is *better*, not worse (that header measures 6.15 in-browser vs the published 5.98), but a computed-style check needs a per-shade-class tolerance, and the real assertion should be the contrast achieved on the measured pixels rather than a hex match.
-- **The bundle must be rebuilt whenever `class_name=` usage changes**, not just when a config's port changes — the compiled CSS only contains the utilities present at build time. A stale bundle renders new utilities **completely unstyled with no error on either side**, which is why the checks assert computed styles rather than grepping source. The bundle stamp is what now catches this: an edited module changes its content hash, so the next launch rebuilds. Do not rely on remembering.
-- **`class_name` on a Radix table lands on the wrapper, not the `<table>`.** `rx.table.root(class_name=...)` renders the class onto `div.rt-TableRoot`; the inner `table.rt-TableRootTable` never sees it. A border utility does apply — just not to the element a `table` selector finds, which reads as "the utility silently did nothing".
-- **`rx.data_table` cannot be styled with utilities at all, for two independent reasons.** It drops `class_name` before the class reaches the grid it renders, *and* gridjs ships `th.gridjs-th` as unlayered CSS while Tailwind v4 emits utilities into `@layer utilities` — which every unlayered rule outranks regardless of specificity. Both halves fail silently, leaving a stock grey header. The data browser's Table tab gets its hue from `palette.reflex_gridjs_header_css()`, injected through the same `head_components` seam as `--chart-*`, with selectors prefixed `.gridjs-container` so they win on specificity rather than on a source order `head_components` does not control. Authoring that CSS **in `palette.py`** is what keeps it legal: a `color:` declaration anywhere else is a sweeper finding.
+**`helao/ui/shared/palette.py` is the single source of every colour in both UI stacks. Never hardcode a colour anywhere else** — `helao/core/tests/test_palette.py` enforces this with an AST sweep and will fail. Contrast floors, the two theme seams (Bokeh's shadow-DOM reach, Tailwind v4's OKLCH divergence) and the sweeper's frozen calibration fixtures: `helao/ui/shared/CLAUDE.md`.
 
 ### Formatting
 
@@ -163,15 +82,7 @@ There is no separate linter config; `ty` (Astral type checker) may be used as a 
 - **visualizer servers** (`group: visualizer`, `bokeh: ...`) — Bokeh apps that subscribe to action server status/data WebSockets and render plots.
 - **operator servers** (`group: operator`) — separately launched UIs (e.g. `gcld_operator.py`) or post-run processors.
 
-**`start_condition` is only honoured because the dispatch loop's history poll releases on *acknowledgement*, not on completion.** After every dispatch the loop waits for the dispatched uuid to appear in `orch.action_history` (`orch_effects.py`'s `DispatchHeadAction`, twinned in `orch_dispatch.py`) so the next action's condition reads current status. `action_history` is written by `update_status`, and from 2026-03-19 to 2026-09-11 that only registered a uuid found in an endpoint's `nonactive_dict` — a *terminal* status. The poll therefore waited for each action to **finish**: every action ran serially, `no_wait` could never overlap anything, and nothing anywhere reported a fault. Both ingestion twins (`orch_status_sync.py`, `ingestion.py`) now also register from `active_dict`. `helao/hexagon/domain/status_fold.py` is unwired but still encodes the terminal-only rule as deliberate — match the live path before wiring it. `helao/hexagon/tests/test_no_wait_overlap_live.py` is the gate: a blocking ORCH `wait` with a `no_wait` SIM acquisition under it must be simultaneously active on a real group.
-
-Two further traps in that area. **`orch.last_action_uuid` is a `str`** (the dispatch response is `as_dict`-serialised) while `globalstatusmodel.active_dict` is keyed by `UUID`, so `wait_for_previous`'s membership test silently never matched and that condition never waited; compare as strings. And **`loop_state == stopped` is not "parked"** — the reducer applies its state delta before running the exiting iterate's commands, so `stopped` is published while `finish_active_experiment` is still inside `orch_wait_for_all_actions` and the `clear_nonblocking` drain. A test (or a UI) that treats `stopped` as the end of a run is reading a loop that has merely stopped *dispatching*; the close-out finishing is `active_experiment is None`. Before the poll fix the loop could not get ahead of its own actions, so the two were a second apart and the distinction never showed.
-
-**A host is the FastAPI app, so `exception_handler` is a name it must not use.** Legacy `Base`/`Orch` were plain classes *held* by the app, and their `myinit` installed an asyncio loop exception handler with `aloop.set_exception_handler(self.exception_handler)`. `ActionHost` is the app, where Starlette already owns that name as the decorator that registers HTTP handlers — so the port is `ActionHost._loop_exception_handler`, installed where `self.aloop` is captured. It matters because HELAO fires a lot of work with `create_task` and never awaits it (`move_dir` on both finalize paths, the monitors, the dispatch loop): without it the traceback goes to asyncio's default handler, whose `asyncio` logger has no HELAO handler, since `make_logger` binds handlers to a *named* logger with `propagate = False` and never to the root. The failure was invisible in the server's own log and to alerting. `hasattr(host, "exception_handler")` is **not** a check for this — it is True on every host, because that is Starlette's method.
-
-**The head action is popped *before* its start condition is waited on, so a stop has to put it back.** `_launch_action` does `action_dq.popleft()` and only then calls `_wait_for_start_condition`, which parks on `wait_for_endpoint`/`wait_for_server`/`wait_for_orch`/`wait_for_previous`. For the whole of that wait the action exists only as a local, and `wait_for_interrupt(pending_action=A)` is what re-inserts it at the front and answers `False` so the caller bails. That parameter has existed since 2022 and **no production caller ever passed it** — only the dispatch golden master did, which is why the branch looked covered while being unreachable. A `/stop` arriving mid-wait therefore ran the action anyway once its condition came true: one more CV or pump move after the operator asked it to stop. E-stop was never affected — `_dispatch_action_locked` re-checks `loop_intent == estop or loop_state == estopped` inside the `aiolock` and refuses, and that in-lock guard covers estop *only*; plain `LoopIntent.stop` passes straight through it.
-
-Two things to know before touching this. **The window is narrow and easy to miss in a test**: stop too early and `pre_dispatch_intent_step` fires at the intent gate *before* `popleft()`, so the action is never popped and the re-queue is never exercised — a test written that way passes against the broken code. The real condition is "the blocking action is active *and* `action_dq` is empty" (`helao/hexagon/tests/test_stop_requeues_pending_action_live.py`). And **the bail-out returns without dispatching**, so the history poll after it must skip a `last_dispatched_action_uuid` of `None` or it spins forever on the very first action of a run.
+Four traps live in the dispatch loop — `start_condition` being honoured only because the history poll releases on *acknowledgement*, `orch.last_action_uuid` being a `str` against a `UUID`-keyed dict, `loop_state == stopped` not meaning parked, and the head action being popped *before* its start condition is waited on. All four are in `helao/core/servers/CLAUDE.md`; read it before editing `orch.py` or the dispatch path.
 
 Action servers, experiments, and sequences are written as importable Python; the `experiment_libraries:` / `sequence_libraries:` lists in the config name modules under `helao/deploy/<deployment>/{experiments,sequences}/` that the orchestrator dynamically imports.
 
@@ -181,12 +92,7 @@ Server output is rooted at the YAML's `root:` key (e.g. `C:\INST_hlo`):
 - `STATES/` — pickled PID files and other runtime state.
 - `RUNS_*` — per-run output trees consumed by `HelaoSyncer` (e.g. `RUNS_SYNCED` is the canonical "shipped" location; recent commits in `git log` show ongoing churn around this name).
 
-**What the syncer uploads to `raw_data/` is decided by a directory glob, not by `Action.files`.** `HelaoYml.misc_files` rglobs the action directory and takes everything that is not `.yml`/`.hlo`/`.lock`/`.tmp` and not a dotfile; `Action.files` is only consulted *after* a successful upload, to rewrite a name. Two consequences that have both bitten in production:
-
-- **Anything transiently present in the record directory gets shipped.** Every meta and data writer here writes atomically by staging a sibling temp file beside its target and renaming it into place (`posthoc_writer.py`, `meta_writer.py`, `base_meta_writer.py`, `micro_orch.py`). A batch conversion running while SYNC globs the same directory therefore hands the uploader a name the rename has already consumed. The `.tmp`/dotfile exclusion is what closes that, and any *new* staging convention must keep one of those two shapes or it will be uploaded.
-
-  The staging name comes from **one place, `helao.helpers.file_utils.staging_path`**, and is a fixed-length `.<8 hex>.tmp` rather than an echo of the target's own name. It used to be `.{basename}.{uuid1().hex}.tmp`, which added 38 characters to a path already close to Windows' 260-character `MAX_PATH`: on 2026-09-09 a SAMPLE-server `archive_custom_add_liquid` under a long ECMS experiment name had a 232-character `-act.yml` and a 270-character temp file, so `aiofiles.open` raised `FileNotFoundError: [Errno 2]` and — because `ActionSession.open` does not catch it, unlike the finalizer — the whole action failed at `ctx.begin`. **A staging name must never be longer than the file it stages**, or atomic writing turns a writable path into an unwritable one; `test_native_meta_writer.py` pins that. That removes the self-inflicted tax; the ceiling itself is lifted separately by `check_long_paths --enable` (above), and `launch.py` warns on Windows when it is still in place.
-- **An upload that can never succeed used to wedge the worker forever.** `to_s3` returns `False` rather than raising once its own five retries are spent, and the push loop only exited when `files_pending` emptied — 870 identical log lines over 80 minutes for one XAFS action, with the record never advancing and nothing else reporting a fault. The loop is now bounded: a pending path that is not on disk is dropped outright, and a pass that uploads nothing returns so the record is retried by the next scan instead of in place. `Progress.prune_missing_pending` heals sidecars that already recorded a ghost — the pending list is persisted as soon as any *sibling* file uploads, so a ghost beside a real artifact outlives the race that created it. It must run *after* `reanchor_recorded_paths`: a pre-relocation absolute entry resolves to a path that does not exist under the current root, and pruning first would delete exactly the entries the re-anchoring exists to save.
+**What the syncer uploads to `raw_data/` is decided by a directory glob, not by `Action.files`.** The consequences that have bitten in production — transient staging files getting shipped, the `staging_path` length rule, and the once-unbounded push loop — are in `helao/core/drivers/data/CLAUDE.md`.
 
 ### Two execution models: Orchestrator vs Runners
 The orchestrator is the long-lived queue-and-dispatch service used in production. `helao/core/runners/` provides an alternative "micro-orchestrator" pattern (`action_runner`, `experiment_runner`, `sequence_runner`, `micro_client`) for callers that want a short-lived runner with no backend service. See `helao/core/runners/runner.md`. Several of those files are currently stubs.
@@ -201,141 +107,10 @@ The orchestrator is the long-lived queue-and-dispatch service used in production
 
 ### BioLogic potentiostats: two backends
 
-`helao/deploy/hte/servers/action/biologic_server.py` serves the same seven
-technique endpoints from either of two drivers, chosen by the server's
-`pstat_backend` param — `eclib` (default, `drivers/pstat/biologic/`, via
-easy-biologic over TCP) or `olecom` (`drivers/pstat/biologic_ole/`, by
-piloting the EC-Lab application over OLE COM). An absent key yields `eclib`,
-so the four station configs that declare one (`hispec`, `odspechw`, `clad`,
-`adss3`) keep working unedited; an *unrecognized* value raises,
-because a typo must not hand an EC-Lab station the easy-biologic driver.
-Both satisfy the `BiologicBackend` Protocol in `drivers/pstat/biologic_backend.py`.
+`helao/deploy/hte/servers/action/biologic_server.py` serves the same seven technique endpoints from either of two drivers, chosen by the server's `pstat_backend` param — `eclib` (default) or `olecom` (piloting EC-Lab over OLE COM). An absent key yields `eclib`; an *unrecognized* value raises. Both satisfy the `BiologicBackend` Protocol.
 
-The OLE path is not a variation on the EClib one. What is worth knowing before
-editing it:
-
-- **There is no programmatic technique construction.** `LoadSettings` takes an
-  `.mps` file and nothing in the 32-function API builds a technique from
-  arguments, so `.mps` templating is the transport for *every* endpoint, not
-  an opt-in feature. `ModifyOnTheFly` exists but mutates a **running**
-  experiment, by GUI caption, needing a second call for the unit.
-- **The nine `.mps` templates cannot be produced from this repo.** They are
-  authored in the EC-Lab GUI at a station. `templates/README.md` says which.
-  A caption `technique.py` names but no template row matches raises
-  `MpsParameterNotFound` at setup — deliberately, because the alternative is
-  running the template's own default on a real cell with nothing to show it.
-- **Data is polled out of the growing MPR file, one value per call.** `P_W` is
-  derived as `|Ewe*I|`, which is EC-Lab's own definition of variable 70, and
-  `cycle` comes from status index 10 — fetching either would cost a call per
-  point to learn the same number. The manual's wording leaves open whether
-  `MeasureDcValue` returns one point or all remaining ones; `MprCursor`
-  advances by the length it receives, so a bulk return just makes it faster.
-- **`Stop_rec1`/`Stop_rec2` (status index 0 == 4 or 5) mean "the last points
-  are being recorded", not "stopped".** The driver finishes only at `Stop`,
-  and then drains once more. Finishing at `Stop_rec` truncates the tail of
-  every record, silently.
-- **`ConnectDevice`/`ConnectDeviceByIP` auto-answer "Yes" to EC-Lab's
-  firmware-upgrade prompt** and the API cannot suppress it, so a connect can
-  flash a production instrument. The driver warns before calling; nothing more
-  is possible from here.
-- **A modal Windows message box blocks the COM call that raised it, forever.**
-  `EnableMessagesWindows(0)` runs first at connect, and every call still goes
-  through a thread executor under a timeout — which frees the caller and
-  leaves the worker thread blocked, the same trade `OceanDirectExtrigExec`
-  makes.
-- **EC-Lab is a GUI a human can touch mid-run.** `SelectDevice`/`SelectChannel`
-  mutate a global selection, so every call passes an explicit device and
-  channel. The manual's own §6.1 example is internally inconsistent here (the
-  prose says device 6, the code says `OLE_ConnectDevice(1)`).
-- **TTL is not an API call.** Trigger In and Trigger Out are *techniques*
-  (appendix 7.1 codes 38/39, 88/89), so a non-default `TTLwait`/`TTLsend`
-  assembles a multi-technique `.mps` and renumbers both the `Technique : N`
-  lines and the `Number of linked techniques` header, which EC-Lab reads
-  positionally and does not repair.
-- **Technique codes are duplicated across two families** — CA is 24 and 54,
-  OCV 11 and 55, CV 6 and 57, PEIS 29 and 60, GEIS 30 and 61, CP 25 and 56.
-  Which one a template yields depends on the template; status index 5 reports
-  it back and the driver warns on a mismatch rather than refusing.
-- **The `.mps` and `.mpr` ship with the action, moved at cleanup.** EC-Lab
-  appends to the MPR for the whole run and `HelaoYml.misc_files` globs live
-  directories, so writing straight into the action directory would upload a
-  torn file.
-- **The range enums are coerced in each backend's `setup()`, not in the
-  endpoints.** Since 2026-09-07 the recorded action param is the string
-  (`"AUTO"`, `"m1"`, `"BW4"`) rather than the vendor enum's integer.
-- Only `biologic_ole/olecom_client.py` may import `comtypes`, and only inside
-  a function; a test parses imports to enforce it. `python launch.py
-  biologicole` is a hardware-free dev launch of the whole group, and
-  `helao/hexagon/tests/test_biologic_column_contract.py` is the gate that both
-  backends emit the same columns.
+The OLE path is not a variation on the EClib one. What to know before editing it: `helao/deploy/hte/drivers/pstat/CLAUDE.md`.
 
 ### Andor Zyla + spectrograph (two driver variants)
 
-`helao/deploy/hte/drivers/spec/andor/` holds one camera base and two variants,
-selected by the action server's `wl_source` param (`spectrograph` | `calibration`).
-
-- **The base is abstract on `_wavelengths()` alone.** Everything else — SDK handle,
-  camera, imaging, acquire loop, cooling, buffers — is shared. A subclass that
-  forgot the hook would acquire against a fabricated wavelength axis, which is
-  invisible in the recorded data, so it is `@abstractmethod` rather than a
-  defaulted hook.
-- **`spectrograph.py` is the only module that imports `pyAndorSpectrograph`**, pinned by
-  `test_andor_vendor_isolation.py`, which parses imports rather than grepping source —
-  a grep also matches the docstrings explaining the rule. What actually makes a spectrograph-free station
-  possible is that `_load_andor()` was split into `_load_camera()` and
-  `_load_spectrograph()`: the combined loader was called unconditionally from
-  `connect()`, so the class split alone would have changed nothing — a subclass
-  inherits that `connect()`. Two pre-existing standalone scripts in that package
-  (`test_funcs.py`, `test_read_loop.py`) do import the vendor package; they are
-  exempted by exact name because nothing imports *them* — each builds `AndorSDK3()`
-  at module scope, so they are in no station's import graph, and a test pins that.
-- **An absent `wl_source` yields the spectrograph driver**, so every existing station
-  config keeps working unedited. An *unrecognized* value raises: a typo would
-  otherwise hand a lamp-calibrated station the spectrograph driver and fail much
-  later at `connect()` with a vendor import error.
-- **`connect()` succeeds on an uncalibrated station; `acquire` is what refuses.** The
-  calibration action runs on the same server, so a refusing `connect()` would leave
-  the station uncalibratable forever. `acquire` cannot fall back to a pixel index —
-  both the channel names and `optional.wl` come from `wl_arr`.
-- **`run_wl_calibration()` is on the base, so a spectrograph station can measure a
-  lamp too** and compare the fit against `GetCalibration` without changing its live
-  axis. The response's `applied` field says which happened. On the lamp-calibrated
-  variant the fit becomes the live axis immediately, with no restart.
-- **`base_api` names the driver namedtuple field from the class name**, so
-  `app.drivers.AndorSpectrographDriver` and `app.drivers.AndorCalibratedDriver`
-  differ per station. Use `app.driver`.
-- Persisted calibration: `<STATES>/<host>_<server_key>_andor_wl_calib.json`,
-  coefficients not an array, with `model` refused on an unrecognized value rather
-  than mis-evaluated.
-- **Known pre-existing defect, deliberately not fixed here: `/ANDOR/adjust_nd` has
-  never worked.** `Executor.__init__` (`helao/helpers/executor.py`) sets no
-  `self.driver` and the class defines no `__getattr__`, while `AndorAdjustND` has no
-  `__init__` of its own — only a bare `driver: AndorSpectrographDriver` class
-  annotation, which binds nothing. Its `_exec` therefore raises `AttributeError`
-  before reaching the driver. The siblings `AndorCooling`, `AndorCalibrateWavelength`
-  and `AndorAcquire` each bind `self.driver = self.active.driver` in their own
-  `__init__`; the fix is one such `__init__`. It was left alone because the endpoint
-  is *inert* today: repairing it would make a station suddenly begin physically
-  driving the ND filter wheel through six exposures (`adjust_ND` sweeps positions
-  1..6), a hardware-affecting change outside this plan and the station owner's call.
-
-# Engineering Communication Style & Constraints
-
-## Core Directive
-Act as a blunt, hyper-efficient senior staff engineer. Prioritize raw information density, performance implications, and code correctness over conversational onboarding.
-
-## Tone & Vocabulary Restrictions
-- **Zero Fluff:** Ban all preambles, introductory filler ("Sure, I can help with that..."), and conversational postambles. Start with code or the direct answer.
-- **No Self-Praise or Flattery:** Do not validate code quality or call user ideas "excellent" or "clever". 
-- **Banned "AI-Prose" Words:** *Delve, seamlessly, robust, landscape, leveraging, paradigm, boilerplate, testament, modularity, meticulously*.
-
-## Code Presentation Rules
-- **Code-First Architecture:** Place the modified or newly generated code block at the absolute top of the response. Context, edge cases, and explanations go underneath the code block, never above it.
-- **Diffs & Scope:** When modifying existing code, provide only the affected functions or a clear, targeted code diff. Do not rewrite unchanged placeholder functions unless explicitly requested.
-- **Production-Ready Output:** Never use placeholders like `// TODO: add logic here` or `/* rest of your code */` inside code snippets unless specifically asked to mock it out. Write complete, functional code blocks.
-
-## Structural & Commentary Rules
-- **No Line-by-Line Playbacks:** Do not explain what standard syntax does (e.g., do not explain how a standard `Map` or `for` loop works). Comment only on non-obvious architecture, trade-offs, or optimization choices.
-- **Flat Visual Structure:** Avoid deeply nested bullet points. Use standard, flat markdown lists or short paragraphs for code analysis.
-- **Constraint Warnings:** Highlight performance footprints, memory leaks, or dependency issues in a single, punchy bullet point at the end.
-
+`helao/deploy/hte/drivers/spec/andor/` holds one camera base and two variants, selected by the action server's `wl_source` param (`spectrograph` | `calibration`). An absent value yields the spectrograph driver; an unrecognized one raises. Vendor-import isolation, the calibration lifecycle, and one known-inert endpoint: `helao/deploy/hte/drivers/spec/andor/CLAUDE.md`.
