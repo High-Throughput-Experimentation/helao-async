@@ -287,6 +287,13 @@ class _FakeCompositionState:
         self.tern_layout = ""
         self.selected_label = ""
         self.ternary_label = ""
+        self.overlay_spectra = False
+        self.tern_color_choice = composition.NO_COLOR
+        self.tern_color_options: list = [composition.NO_COLOR]
+        self._spectra: list = []
+        self.spec_spec: dict = {}
+        self.spec_url = ""
+        self.spec_layout = ""
         self.detail_rows: list = []
         self.sequence_options: list = []
         self.transition_options: list = []
@@ -309,6 +316,8 @@ class _FakeCompositionState:
     _draw_ternary = composition.CompositionState._draw_ternary
     _select = composition.CompositionState._select
     _refresh_options = composition.CompositionState._refresh_options
+    _draw_spectra = composition.CompositionState._draw_spectra
+    set_overlay_spectra = composition.CompositionState.set_overlay_spectra.fn  # type: ignore[attr-defined]
     on_tern_select = composition.CompositionState.on_tern_select.fn  # type: ignore[attr-defined]
 
 
@@ -616,3 +625,76 @@ def test_ternary_fractions_are_empty_when_the_point_is_not_on_the_diagram() -> N
     assert composition.ternary_fractions(record(), ("Co.K", "", "Y.K"), "x") == ""
     zero = record(values={v: {"u": 0.0} for v in ("A", "B", "C")})
     assert composition.ternary_fractions(zero, ("A", "B", "C"), "u") == ""
+
+
+def test_overlay_toggle_accumulates_spectra_and_off_keeps_the_last(
+    monkeypatch,
+) -> None:
+    async def fake_spectrum(client, action_uuid, file_name):
+        return {"ev": [1.0, 2.0, 3.0], "intensity": [5.0, 6.0, 7.0]}
+
+    monkeypatch.setattr(composition.api, "get_client", lambda: None)
+    monkeypatch.setattr(composition.api, "fetch_spectrum", fake_spectrum)
+    first, second = record(), record(sample_no=2, process_uuid="p2")
+    state = _FakeCompositionState()
+
+    def labels():
+        return [t["name"] for t in state.spec_spec["traces"]]
+
+    asyncio.run(state._select(first))
+    asyncio.run(state._select(second))
+    assert labels() == ["sample 2 post_anneal"]  # off: only the last
+
+    state.set_overlay_spectra(True)
+    asyncio.run(state._select(first))
+    asyncio.run(state._select(first))  # a repeat is not drawn twice
+    assert labels() == ["sample 2 post_anneal", "sample 1 post_anneal"]
+
+    state.set_overlay_spectra(False)
+    assert labels() == ["sample 1 post_anneal"]
+
+
+def test_total_for_sums_every_transition_and_is_none_when_absent() -> None:
+    assert composition.total_for(record(), "net_counts") == 271.2 + 792.1 + 44.7
+    assert composition.total_for(record(), "nanomoles") is None
+
+
+def test_ternary_color_options_follow_the_units_present() -> None:
+    state = _FakeCompositionState()
+    state.tern_color_choice = ""
+    state._records = [record(values={"Co.K": {"nanomoles": 1.0}})]
+    state._refresh_options()
+    assert state.tern_color_options == [composition.NO_COLOR, "total nanomoles"]
+    assert state.tern_color_choice == "total nanomoles"  # defaults to a total
+
+    state._records = [record()]  # no nanomoles unit at all
+    state._refresh_options()
+    assert state.tern_color_options == [composition.NO_COLOR]
+    assert state.tern_color_choice == composition.NO_COLOR
+
+
+def test_ternary_colours_by_total_and_drops_samples_without_one() -> None:
+    def rec(n, nanomoles):
+        values = {
+            v: {"atomic_fraction": 1 / 3, "nanomoles": nanomoles}
+            for v in ("A", "B", "C")
+        }
+        return record(sample_no=n, process_uuid=f"p{n}", values=values)
+
+    missing = rec(2, None)
+    records = [rec(1, 1.0), missing, rec(3, 2.0)]
+    state = _FakeCompositionState()
+    state.vertex_a, state.vertex_b, state.vertex_c = "A", "B", "C"
+    state.unit_choice = "atomic_fraction"
+    state.tern_color_choice = "total nanomoles"
+    state._draw_ternary(records)
+
+    # Clickable points and plotted points stay index-aligned.
+    assert [r.sample_no for r in state._tern_plotted] == [1, 3]
+    samples = next(t for t in state.tern_spec["traces"] if t["name"] == "samples")
+    assert samples["color"]["mode"] == "continuous"
+    assert state.tern_spec["tooltip"]["labels"] == {"color": "total nanomoles"}
+
+    state.tern_color_choice = composition.NO_COLOR
+    state._draw_ternary(records)
+    assert len(state._tern_plotted) == 3
