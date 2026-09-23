@@ -99,9 +99,30 @@ def test_record_from_process_survives_an_unknown_sequence() -> None:
     assert record.sequence_timestamp == ""
 
 
-def test_record_from_process_returns_none_without_a_sample_number() -> None:
+def test_a_label_less_process_takes_its_sample_from_the_quant_payload() -> None:
+    """Plate 6138's PROCESS items carry only ``{"plate_id"}``; dropping them
+    there retrieved 0 of 296 processes. The quant HLO names the sample."""
     item = {**PROCESS_ITEM, "process_params": {"plate_id": 10244}}
-    assert model.record_from_process(item, SEQUENCES) is None
+    record = model.record_from_process(item, SEQUENCES)
+    assert record is not None and record.sample_no is None
+    filled = model.with_values(record, QUANT)
+    assert filled.sample_no == 42
+    assert filled.global_label == "legacy__solid__10244_42"
+
+
+def test_a_sample_is_none_when_neither_source_names_one() -> None:
+    item = {**PROCESS_ITEM, "process_params": {"plate_id": 10244}}
+    quant = {k: v for k, v in QUANT.items() if k != "global_sample_label"}
+    record = model.with_values(model.record_from_process(item, SEQUENCES), quant)
+    assert record.sample_no is None
+
+
+def test_the_process_label_wins_over_the_quant_payload() -> None:
+    quant = {**QUANT, "global_sample_label": ["legacy__solid__10244_7"]}
+    record = model.with_values(
+        model.record_from_process(PROCESS_ITEM, SEQUENCES), quant
+    )
+    assert record.sample_no == 42
 
 
 def test_record_from_process_returns_none_without_a_quant_file() -> None:

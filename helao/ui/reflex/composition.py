@@ -133,7 +133,17 @@ async def load_records(plate_id: int) -> Loaded:
                 f"for action {record.quant_action_uuid}: {payload}"
             )
             continue
-        loaded.append(model.with_values(record, payload))
+        record = model.with_values(record, payload)
+        if record.sample_no is None:
+            # Neither the PROCESS item nor its quantification names a sample,
+            # so there is no platemap position to plot it at.
+            failures += 1
+            LOGGER.warning(
+                f"composition found no sample number for process "
+                f"{record.process_uuid}"
+            )
+            continue
+        loaded.append(record)
     return Loaded(records=loaded, failures=failures)
 
 

@@ -45,13 +45,17 @@ class CompositionRecord:
     """One XRF process on one sample.
 
     Attributes:
+        sample_no: ``None`` until known. Some plates' PROCESS records carry no
+            label at all (plate 6138: ``process_params`` is ``{"plate_id"}``
+            only), and the number then comes from the quantification payload
+            in :func:`with_values`.
         values: ``transition -> unit -> value``. A value is ``None`` where the
             API reported null -- an uncalibrated transition has no
             ``atomic_fraction``, and ``0.0`` there would plot as a measurement.
     """
 
     plate_id: int
-    sample_no: int
+    sample_no: Optional[int]
     global_label: str
     run_use: str
     sequence_uuid: str
@@ -107,13 +111,12 @@ def record_from_process(
 
     Returns:
         CompositionRecord with an empty ``values``, or ``None`` when the item
-        carries no sample number or no quantification file.
+        carries no quantification file. A missing sample number is not a
+        reason to drop the item here: :func:`with_values` may still find one.
     """
     entry = item or {}
     params = entry.get("process_params") or {}
     sample_no = sample_no_from(params)
-    if sample_no is None:
-        return None
     quant_uuid, quant_name = _file_named(entry.get("files"), QUANT_FILE_TYPE)
     if not quant_uuid or not quant_name:
         return None
@@ -145,6 +148,10 @@ def record_from_process(
 def with_values(record: CompositionRecord, quant: Optional[dict]) -> CompositionRecord:
     """Return *record* with the quantification payload folded into ``values``.
 
+    A record whose PROCESS item named no sample takes its sample number and
+    global label from the payload's ``global_sample_label``, and keeps
+    ``sample_no=None`` if that is missing too -- the caller drops it.
+
     A column shorter than the transition list is skipped rather than zipped:
     `global_sample_label` carries one entry for five transitions, and zipping
     would truncate every other unit to one value while nothing reported a
@@ -160,7 +167,16 @@ def with_values(record: CompositionRecord, quant: Optional[dict]) -> Composition
             continue
         for name, value in zip(transitions, series):
             values[name][column] = None if value is None else float(value)
-    return replace(record, values=values)
+    if record.sample_no is not None:
+        return replace(record, values=values)
+    labels = payload.get("global_sample_label") or []
+    label = str(labels[0]) if labels else ""
+    return replace(
+        record,
+        values=values,
+        sample_no=sample_no_from({"source_csv_label": label}),
+        global_label=record.global_label or label,
+    )
 
 
 def transition_names(records: Optional[list]) -> list:
