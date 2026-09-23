@@ -322,6 +322,8 @@ class _FakeCompositionState:
     _draw_totals_histogram = composition.CompositionState._draw_totals_histogram
     _total_unit = composition.CompositionState._total_unit
     _point_size = composition.CompositionState._point_size
+    _redraw_charts = composition.CompositionState._redraw_charts
+    _rings = composition.CompositionState._rings
     set_point_scale = composition.CompositionState.set_point_scale.fn  # type: ignore[attr-defined]
     _select = composition.CompositionState._select
     _refresh_options = composition.CompositionState._refresh_options
@@ -826,3 +828,45 @@ def test_point_size_slider_resizes_markers_and_keeps_the_selection() -> None:
 
     state.set_point_scale([20.0])  # clamped to 8x
     assert state.point_scale == composition.MAX_POINT_SCALE
+
+
+def test_clicked_samples_get_rings_in_their_spectrum_colours(monkeypatch) -> None:
+    async def fake_spectrum(client, action_uuid, file_name):
+        return {"ev": [1.0, 2.0], "intensity": [3.0, 4.0]}
+
+    monkeypatch.setattr(composition.api, "get_client", lambda: None)
+    monkeypatch.setattr(composition.api, "fetch_spectrum", fake_spectrum)
+    state = _FakeCompositionState()
+    state._records = RECORDS
+    state._pm_rows = PM_ROWS
+    state.transition_choice, state.unit_choice = "Co.K", "net_counts"
+    state.vertex_a, state.vertex_b, state.vertex_c = "Co.K", "Y.K", "Pt.L"
+    state.plot()
+
+    def rings(spec):
+        return [
+            (t["style"]["stroke"], t["n_points"])
+            for t in spec["traces"]
+            if t["name"].startswith("selected_")
+        ]
+
+    def spectrum_colours():
+        return [t["style"]["color"] for t in state.spec_spec["traces"]]
+
+    asyncio.run(state._select(RECORDS[0]))
+    assert rings(state.map_spec) == [(spectrum_colours()[0], 1)]
+    assert rings(state.tern_spec) == [(spectrum_colours()[0], 1)]
+
+    state.set_overlay_spectra(True)
+    asyncio.run(state._select(RECORDS[1]))
+    colours = spectrum_colours()
+    assert len(set(colours)) == 2
+    assert [c for c, _ in rings(state.map_spec)] == colours
+    assert [c for c, _ in rings(state.tern_spec)] == colours
+
+    state.set_overlay_spectra(False)  # back to the last one, and its ring only
+    assert [c for c, _ in rings(state.map_spec)] == spectrum_colours()
+    assert len(rings(state.map_spec)) == 1
+
+    state.plot()  # a new plot clears the selection and its rings
+    assert rings(state.map_spec) == []

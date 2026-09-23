@@ -502,6 +502,15 @@ class CompositionState(rx.State):
         """
         scale = float(value[0]) if value else 1.0
         self.point_scale = min(max(scale, 1.0), MAX_POINT_SCALE)
+        self.version += 1
+        self._redraw_charts()
+
+    def _redraw_charts(self) -> None:
+        """Redraw the charts already on screen from the current selections.
+
+        Used for changes that are not a new plot -- marker size, the set of
+        ringed samples -- so the selection and spectra are left alone.
+        """
         if not (self.map_url or self.tern_url):
             return
         records = grouping.filter_records(
@@ -509,9 +518,22 @@ class CompositionState(rx.State):
             run_use=self.run_use_choice,
             sequence=self.sequence_choice,
         )
-        self.version += 1
         self._draw_map(records)
         self._draw_composition(records)
+
+    def _rings(self, plotted, xs, ys) -> list:
+        """``(x, y, series_index)`` for each held spectrum's sample on a chart.
+
+        The index is the spectrum's position in `_spectra`, which is the
+        series index `plots.traces` colours it by, so a ring and its spectrum
+        share a colour. A sample the chart does not show gets no ring.
+        """
+        where = {record.process_uuid: i for i, record in enumerate(plotted)}
+        return [
+            (xs[where[spectrum["key"]]], ys[where[spectrum["key"]]], index)
+            for index, spectrum in enumerate(self._spectra)
+            if spectrum["key"] in where
+        ]
 
     @rx.event
     def set_tern_color(self, value: str):
@@ -541,6 +563,8 @@ class CompositionState(rx.State):
         self.spec_spec = payload.spec
         self.spec_url = payload.buffer_url
         self.spec_layout = payload.layout
+        # The rings on the scatter charts follow the spectra.
+        self._redraw_charts()
 
     @rx.event
     def set_interpolate(self, value: bool):
@@ -656,6 +680,7 @@ class CompositionState(rx.State):
         self._plotted = kept
         self._plotted_xs = list(xs)
         self._plotted_ys = list(ys)
+        rings = self._rings(kept, xs, ys)
         plot_xs, plot_ys, plot_values = xs, ys, values
         if self.interpolate:
             target_xs = [row["x"] for row in self._pm_rows]
@@ -681,6 +706,7 @@ class CompositionState(rx.State):
             panel_id=f"{self.panel_key()}-map",
             version=self.version,
             size=self._point_size(),
+            rings=rings,
         )
         self.map_spec = payload.spec
         self.map_url = payload.buffer_url
@@ -718,6 +744,7 @@ class CompositionState(rx.State):
                 xs.append(float(fraction))
                 ys.append(total)
         self._tern_plotted, self._tern_plotted_xs, self._tern_plotted_ys = kept, xs, ys
+        rings = self._rings(kept, xs, ys)
         if xs:
             self._tern_scale = (
                 (max(xs) - min(xs)) or 1.0,
@@ -737,6 +764,7 @@ class CompositionState(rx.State):
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
             size=self._point_size(),
+            rings=rings,
         )
         self.tern_spec = payload.spec
         self.tern_url = payload.buffer_url
@@ -794,6 +822,7 @@ class CompositionState(rx.State):
         self._tern_plotted = [record for record, kept in zip(records, keep) if kept]
         self._tern_plotted_xs = list(xs)
         self._tern_plotted_ys = list(ys)
+        rings = self._rings(self._tern_plotted, list(xs), list(ys))
         payload = plots.ternary(
             components[0],
             components[1],
@@ -809,6 +838,7 @@ class CompositionState(rx.State):
             panel_id=f"{self.panel_key()}-tern",
             version=self.version,
             size=self._point_size(),
+            rings=rings,
         )
         self.tern_spec = payload.spec
         self.tern_url = payload.buffer_url
