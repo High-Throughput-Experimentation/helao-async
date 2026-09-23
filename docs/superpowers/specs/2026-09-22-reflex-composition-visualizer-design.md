@@ -368,7 +368,10 @@ def ternary(a, b, c, *, labels, values=None, panel_id="ternary", version=0)
 xy 0.0.5 has no ternary mark; its `EXPORTS` list contains no such name, and
 `polar_chart`/`radar_chart` are a different projection. The implementation is
 `xy.scatter` over the transformed coordinates, three `xy.line` marks for the
-edges, and three `xy.text` marks for the vertex labels, assembled by the
+edges, and three `xy.text` vertex labels — which are *annotations*, not marks:
+`xy.text(x, y, value)` takes scalars and one string and lands under the spec's
+`annotations`, so a populated diagram carries 4 traces and 3 annotations rather
+than 7 traces. Assembled by the
 existing `_chart` and published by the existing `_publish`. Axes are rendered
 with empty labels: a ternary diagram has no meaningful x or y axis, and the
 vertex labels carry the identification instead.
