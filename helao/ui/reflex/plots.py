@@ -32,7 +32,7 @@ from typing import Any
 import numpy as np
 
 from helao.ui.shared.composition import ternary as _ternary
-from helao.ui.shared.palette import CHART_CHROME, SERIES
+from helao.ui.shared.palette import CHART_CHROME, SERIES, TRANSPARENT
 from helao.ui.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
     BufferStore,
@@ -450,7 +450,7 @@ def traces(
                 x=fx,
                 y=fy,
                 name=item["label"],
-                color=PALETTE[idx % len(PALETTE)],
+                color=series_color(idx),
             )
         )
     figure = _chart(marks, _axes(x_label, y_label, False))
@@ -503,6 +503,7 @@ def scatter_map(
     y_label: str = "",
     value_label: str = "",
     size: float = DEFAULT_POINT_SIZE,
+    rings=(),
     square: bool = False,
     colormap: str = "",
     colorbar: bool = False,
@@ -522,6 +523,8 @@ def scatter_map(
         value_label: Names ``values`` in the tooltip (instead of "color") and
             on the colorbar.
         size: Marker size in pixels.
+        rings: ``(x, y, series_index)`` per point to circle; see
+            :func:`_ring_marks`.
         square: Equal x/y data spans and fixed margins, for a 1.0 aspect when
             bound with :func:`square_width`.
         colormap: xy colormap name for ``values``; xy's default when empty.
@@ -569,9 +572,38 @@ def scatter_map(
     show_bar = bool(colorbar and vs is not None and xs.size)
     if show_bar:
         marks.append(xy.colorbar(title=value_label))
+    marks.extend(_ring_marks(rings, size))
     return _publish_selectable(
         marks, xs, ys, x_label, y_label, square, panel_id, version, show_bar, size
     )
+
+
+def series_color(index: int) -> str:
+    """The colour :func:`traces` and :func:`time_series` give series *index*."""
+    return PALETTE[index % len(PALETTE)]
+
+
+def _ring_marks(rings, size: float) -> list:
+    """Hollow circles around chosen points, one trace per ring.
+
+    Each ring is ``(x, y, series_index)`` and is stroked in
+    :func:`series_color` of that index, so a ring matches the line of the
+    series it stands for elsewhere on the page. Sized off the point size, so
+    it still clears a marker the slider has enlarged.
+    """
+    return [
+        xy.scatter(
+            x=np.array([float(x)]),
+            y=np.array([float(y)]),
+            color=TRANSPARENT,
+            stroke=series_color(index),
+            stroke_width=2.5,
+            size=float(size) + 12.0,
+            opacity=1.0,
+            name=f"selected_{n}",
+        )
+        for n, (x, y, index) in enumerate(rings)
+    ]
 
 
 def _publish_selectable(
@@ -596,6 +628,9 @@ def _publish_selectable(
     """
     axes = _axes(x_label, y_label, False)
     kwargs: dict[str, Any] = {"click": True}
+    # One series of data plus rings and (on the ternary) its edges: a legend
+    # would list only chrome.
+    marks = [*marks, xy.legend(show=False)]
     extra = f"size={float(size)}"
     if square:
         x_dom, y_dom = _square_domain(xs, ys)
@@ -665,6 +700,7 @@ def ternary(
     values=None,
     value_label: str = "",
     size: float = DEFAULT_POINT_SIZE,
+    rings=(),
     colormap: str = "",
     panel_id: str = "ternary",
     version: int = 0,
@@ -691,6 +727,8 @@ def ternary(
         value_label: Names ``values`` in the tooltip and titles their
             colorbar, which is shown whenever ``values`` is.
         size: Marker size in pixels.
+        rings: ``(x, y, series_index)`` per point to circle; see
+            :func:`_ring_marks`.
         colormap: xy colormap name for ``values``; xy's default when empty.
         panel_id: Stable panel identity for the buffer route.
         version: Monotonic data version.
@@ -734,6 +772,7 @@ def ternary(
     show_bar = values is not None and bool(xs.size)
     if show_bar:
         marks.append(xy.colorbar(title=value_label))
+    marks.extend(_ring_marks(rings, size))
     # The outline is drawn as three separate segments rather than one closed
     # polyline so each edge is its own trace, which keeps `layout_token` stable
     # when the point count changes but the frame does not.

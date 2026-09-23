@@ -911,6 +911,10 @@ def red_ramp(n: int) -> tuple[str, ...]:
 PLATEMAP_COLORMAP: Final[str] = "plasma"
 TOTALS_COLORMAP: Final[str] = "viridis"
 
+#: A fill that paints nothing. xy has no open marker symbol, so the rings
+#: around selected samples are circles with this fill and a coloured stroke.
+TRANSPARENT: Final[str] = "rgba(0, 0, 0, 0)"
+
 
 def _rgba(hex_color: str, alpha: float) -> str:
     r, g, b = _to_rgb(hex_color)
