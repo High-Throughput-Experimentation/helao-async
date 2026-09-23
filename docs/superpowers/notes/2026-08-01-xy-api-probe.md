@@ -162,3 +162,22 @@ first would have raised on first real use rather than at import.
 
 Re-run the Task 0 probe *and* re-check these kwargs after any xy version bump;
 the names surviving does not imply the signatures did, on a 0.0.x dependency.
+
+## Exact call signatures, verified during Task 7
+
+`xy.text` and `xy.line`, needed to assemble a ternary diagram (xy 0.0.5 ships
+no ternary mark; `polar_chart`/`radar_chart` are a different projection):
+
+```
+xy.text(x: CoordinateLike, y: CoordinateLike, value: str, *, dx=6.0, dy=-6.0,
+        color=None, anchor='start', class_name=None, style=None) -> Annotation
+xy.line(x=None, y=None, *, data=None, name=None, color=None, width=1.5, ...) -> Mark
+```
+
+**`xy.text` is an `Annotation` constructor, not a `Mark` one.** It takes
+scalar `x`/`y` and a single `value` string (no per-point arrays, no `name`),
+and `Figure.build_payload_split` places it under the spec's `annotations`
+key, not `traces`. A diagram with 3 vertex labels and a populated point cloud
+therefore publishes 4 `traces` (1 scatter + 3 edge lines) and 3
+`annotations` — not 7 traces, which is what you'd expect from treating
+`xy.text` as a mark.

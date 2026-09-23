@@ -22,6 +22,7 @@ __all__ = [
     "spectra",
     "scatter_map",
     "histogram",
+    "ternary",
 ]
 
 import time
@@ -30,7 +31,8 @@ from typing import Any
 
 import numpy as np
 
-from helao.ui.shared.palette import SERIES
+from helao.ui.shared.composition import ternary as _ternary
+from helao.ui.shared.palette import CHART_CHROME, SERIES
 from helao.ui.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
     BufferStore,
@@ -515,4 +517,86 @@ def histogram(
             kwargs["range"] = value_range
         marks.append(xy.hist(**kwargs))
     figure = _chart(marks, _axes(x_label, y_label, False))
+    return _publish(figure, panel_id, version)
+
+
+def ternary(
+    a,
+    b,
+    c,
+    *,
+    labels,
+    values=None,
+    panel_id: str = "ternary",
+    version: int = 0,
+):
+    """Render a ternary diagram: three components on the unit triangle.
+
+    xy 0.0.5 ships no ternary mark, so the diagram is assembled from
+    primitives: one scatter in the transformed plane, three line segments for
+    the edges, and three ``xy.text`` annotations for the vertex labels. Axis
+    labels are left empty deliberately -- a ternary diagram has no meaningful x
+    or y axis, and the vertex labels carry the identification instead.
+
+    **``xy.text`` is an annotation, not a mark.** It takes scalar ``x``/``y``
+    and one ``value`` string, has no ``name``, and lands under the spec's
+    ``annotations`` rather than its ``traces``. So a rendered diagram with
+    points carries 4 traces and 3 annotations, not 7 traces.
+
+    Args:
+        a: First component, one value per point.
+        b: Second component.
+        c: Third component.
+        labels: Three vertex labels, in the order ``(a, b, c)``.
+        values: Optional per-point scalar driving colour.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version.
+
+    Returns:
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
+
+    Raises:
+        ValueError: If ``labels`` does not hold exactly three entries, or if
+            the three component arrays differ in length.
+    """
+    names = tuple(labels or ())
+    if len(names) != 3:
+        raise ValueError(f"ternary needs exactly 3 vertex labels, got {len(names)}")
+    xs, ys, keep = _ternary.barycentric_to_cartesian(a, b, c)
+    marks = []
+    if xs.size:
+        mark_kwargs: dict[str, Any] = {"x": xs, "y": ys, "name": "samples"}
+        if values is not None:
+            # Masked with the same `keep` the coordinates were: colour is per
+            # point, and filtering the two independently puts a colour on the
+            # wrong marker.
+            colors = _as_float_array(values)
+            if colors.size != keep.size:
+                raise ValueError(
+                    f"values has length {colors.size}, expected {int(keep.size)}"
+                )
+            mark_kwargs["color"] = colors[keep]
+        else:
+            mark_kwargs["color"] = PALETTE[0]
+        marks.append(xy.scatter(**mark_kwargs))
+    # The outline is drawn as three separate segments rather than one closed
+    # polyline so each edge is its own trace, which keeps `layout_token` stable
+    # when the point count changes but the frame does not.
+    edge_xs, edge_ys = _ternary.triangle_edges()
+    edge_color = CHART_CHROME["--chart-axis"]
+    for index in range(3):
+        marks.append(
+            xy.line(
+                x=np.array([edge_xs[index], edge_xs[index + 1]]),
+                y=np.array([edge_ys[index], edge_ys[index + 1]]),
+                name=f"edge_{index}",
+                color=edge_color,
+            )
+        )
+    for (vx, vy), name in zip(_ternary.VERTICES, names):
+        # Scalars and a single string: `xy.text` is an Annotation constructor,
+        # not a Mark one. Passed as a chart child alongside the marks, it lands
+        # in the spec's `annotations`.
+        marks.append(xy.text(float(vx), float(vy), str(name), color=edge_color))
+    figure = _chart(marks, _axes("", "", False))
     return _publish(figure, panel_id, version)

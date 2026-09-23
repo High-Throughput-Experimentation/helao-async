@@ -310,3 +310,98 @@ def test_time_series_rebases_only_when_x_is_epoch():
     # The rebased axis sits in seconds-of-day; the untouched one is still epoch.
     assert epoch.spec["x_axis"]["range"][1] < 90000
     assert plain.spec["x_axis"]["range"][1] > 1e9
+
+
+# -- ternary -------------------------------------------------------------
+
+
+def test_ternary_publishes_points_edges_and_vertex_labels() -> None:
+    """Four traces and three annotations, not seven traces.
+
+    `xy.text` returns an `Annotation`, not a `Mark`: it takes scalar x/y and a
+    single `value` string, and `build_payload_split` puts it under `annotations`
+    rather than `traces`. Verified against xy 0.0.5.
+    """
+    from helao.ui.reflex import plots
+
+    payload = plots.ternary(
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        labels=("Co.K", "Y.K", "Pt.L"),
+        panel_id="tern-test",
+        version=1,
+    )
+    assert payload.buffer_url.endswith("tern-test?v=1")
+    assert len(payload.spec.get("traces") or []) == 4
+    labels = [a.get("text") for a in payload.spec.get("annotations") or []]
+    assert labels == ["Co.K", "Y.K", "Pt.L"]
+
+
+def test_ternary_drops_a_point_whose_components_are_all_none() -> None:
+    """An uncalibrated transition arrives as None. Plotted, it reaches the
+    renderer as a coordinate and blanks the chart."""
+    from helao.ui.reflex import plots
+
+    payload = plots.ternary(
+        [1.0, float("nan")],
+        [1.0, 1.0],
+        [1.0, 1.0],
+        labels=("a", "b", "c"),
+        panel_id="tern-nan",
+        version=1,
+    )
+    # One of the two points is dropped, not both: the scatter trace still
+    # publishes (4 traces total) rather than falling back to the
+    # triangle-only, no-data shape (3 traces).
+    assert len(payload.spec.get("traces") or []) == 4
+
+
+def test_ternary_filters_values_with_the_same_mask() -> None:
+    """Colour is per point. Filtering points and colours independently puts the
+    wrong colour on the wrong marker."""
+    from helao.ui.reflex import plots
+
+    payload = plots.ternary(
+        [1.0, 0.0],
+        [0.0, 0.0],
+        [0.0, 0.0],
+        labels=("a", "b", "c"),
+        values=[5.0, 6.0],
+        panel_id="tern-mask",
+        version=1,
+    )
+    # The second point (0, 0, 0) sums to zero and is dropped; the scatter
+    # trace for the one survivor still publishes alongside the 3 edges. If the
+    # mask were applied inconsistently this would raise inside `ternary`
+    # rather than land here quietly, since `values` would be indexed against
+    # the wrong length.
+    assert len(payload.spec.get("traces") or []) == 4
+
+
+def test_ternary_rejects_the_wrong_number_of_labels() -> None:
+    from helao.ui.reflex import plots
+
+    with pytest.raises(ValueError):
+        plots.ternary([1.0], [1.0], [1.0], labels=("only", "two"))
+
+
+def test_ternary_on_no_usable_points_still_draws_the_triangle() -> None:
+    """An empty diagram with a visible triangle reads as "no data"; a blank
+    canvas reads as a broken page."""
+    from helao.ui.reflex import plots
+
+    payload = plots.ternary(
+        [0.0], [0.0], [0.0], labels=("a", "b", "c"), panel_id="tern-empty", version=1
+    )
+    assert len(payload.spec.get("traces") or []) == 3
+    assert len(payload.spec.get("annotations") or []) == 3
+
+
+def test_ternary_rejects_a_values_array_of_the_wrong_length() -> None:
+    from helao.ui.reflex import plots
+
+    with pytest.raises(ValueError):
+        plots.ternary(
+            [1.0, 1.0], [1.0, 1.0], [1.0, 1.0], labels=("a", "b", "c"), values=[1.0]
+        )
