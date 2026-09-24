@@ -1,9 +1,14 @@
 # helao/ui/reflex/xafs.py
 """The `/xafs` page: XAFS scans across one plate.
 
-The shared plate-spectra page (``spectra_page``) over ``xafsscan__helao_file``
-scans: ROI count rate against energy, with the details table's statistics
-taken over the energy window. Grouping is the composition page's -- run_use,
+The shared plate-spectra page (``spectra_page``) over each scan's
+``XAFS_normalize_flatten`` analysis: any of its arrays against any other,
+chosen by x and y dropdowns (``flattened_energy`` and ``flattened_mu`` by
+default), with the details table's statistics taken over the x window.
+Arrays are read from the station's ANALYSES tree, or from S3 when the "read
+from S3" box is ticked or the local file is missing.
+
+Grouping is the composition page's -- run_use,
 then sequence -- plus an element, because one sequence scans several edges
 and averaging a Cu edge with a Co edge means nothing. Element has no ``All``.
 """
@@ -16,15 +21,30 @@ import reflex as rx
 
 from helao.helpers import helao_logging as logging
 from helao.ui.reflex import spectra_page
-from helao.ui.reflex.composition import _kept_or_first, parse_plate_id, platemap_for
+from helao.ui.reflex.composition import (
+    _kept_or_first,
+    parse_plate_id,
+    platemap_for,
+    world_config,
+)
 from helao.ui.reflex.spectra_page import SpectraPageState
-from helao.ui.shared import xafs
+from helao.ui.shared import spectra, xafs
 from helao.ui.shared.composition import api, grouping
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 #: The run_use a selection defaults to when the plate has one.
 DEFAULT_RUN_USE = "data"
+
+
+def unit_of(array_name: str) -> str:
+    """The unit an x array's readouts show: eV for energy, deg for angle."""
+    name = array_name.lower()
+    if "energy" in name:
+        return "eV"
+    if "angle" in name:
+        return "deg"
+    return ""
 
 
 def element_options(records) -> list:
@@ -47,9 +67,9 @@ class XafsState(SpectraPageState, rx.State):
     FILE_TYPE: ClassVar[str] = xafs.SPECTRUM_FILE_TYPE
     X_KEY: ClassVar[str] = xafs.X_KEY
     Y_KEY: ClassVar[str] = xafs.Y_KEY
-    X_LABEL: ClassVar[str] = xafs.X_KEY
-    Y_LABEL: ClassVar[str] = xafs.Y_KEY
-    Y_NAME: ClassVar[str] = "ROI count rate"
+    X_LABEL: ClassVar[str] = xafs.ANALYSIS_X
+    Y_LABEL: ClassVar[str] = xafs.ANALYSIS_Y
+    Y_NAME: ClassVar[str] = "mu"
     X_UNIT: ClassVar[str] = "eV"
     STATS_RANGE: ClassVar = None
     PANEL_PREFIX: ClassVar[str] = "xafs"
@@ -60,6 +80,59 @@ class XafsState(SpectraPageState, rx.State):
     run_use_options: list[str] = []
     sequence_options: list[str] = []
     element_options: list[str] = []
+    #: Read analysis arrays from S3 even where the station has a local copy.
+    read_s3: bool = False
+    #: The analysis arrays on each axis, and the unit of x for the readouts.
+    x_choice: str = xafs.ANALYSIS_X
+    y_choice: str = xafs.ANALYSIS_Y
+    x_options: list[str] = [xafs.ANALYSIS_X]
+    y_options: list[str] = [xafs.ANALYSIS_Y]
+    x_unit: str = "eV"
+
+    #: The loaded selection without a series, for re-pairing arrays.
+    _base: list = []
+
+    def _x_label(self) -> str:
+        return self.x_choice
+
+    def _y_label(self) -> str:
+        return self.y_choice
+
+    def _y_name(self) -> str:
+        return self.y_choice
+
+    def _x_unit(self) -> str:
+        return self.x_unit
+
+    @rx.event
+    def set_x(self, value: str):
+        self.x_choice = value
+        self._repair()
+
+    @rx.event
+    def set_y(self, value: str):
+        self.y_choice = value
+        self._repair()
+
+    def _repair(self) -> None:
+        """Re-pair the loaded arrays after an x or y change; no refetch."""
+        self.x_unit = unit_of(self.x_choice)
+        if not self._base:
+            return
+        self._loaded = xafs.with_series(self._base, self.x_choice, self.y_choice)
+        if not self._loaded:
+            self.error = (
+                f"no loaded analysis has both {self.x_choice} and {self.y_choice}"
+            )
+            return
+        self.error = ""
+        # Keep the clicked samples, now keyed by the new pair.
+        pair = f"{self.x_choice}|{self.y_choice}"
+        for s in self._selected:
+            s["key"] = f"{s['key'].split(':', 1)[0]}:{pair}"
+        grid, _stack, _kept = spectra.stack_for(self._loaded)
+        self._fit_window(grid)
+        self._redraw()
 
     @rx.event
     def set_run_use(self, value: str):
@@ -74,6 +147,11 @@ class XafsState(SpectraPageState, rx.State):
     @rx.event
     def set_element(self, value: str):
         self.element_choice = value
+
+    @rx.event
+    def set_read_s3(self, value: bool):
+        """A bool, as for every checkbox here: ``bool("False")`` is True."""
+        self.read_s3 = bool(value)
 
     def _refresh_options(self) -> None:
         """run_use scopes sequences; both scope elements (composition's rule)."""
@@ -147,8 +225,30 @@ class XafsState(SpectraPageState, rx.State):
             if not chosen:
                 self.status = "nothing matches this run_use, sequence and element"
                 return
-            self.status = f"loading {len(chosen)} scans..."
-        await self._load_and_draw(chosen, api.get_client())
+            self.status = f"loading {len(chosen)} analyses..."
+            use_s3 = self.read_s3
+            x, y = self.x_choice, self.y_choice
+            self._base = []
+        client = api.get_client()
+        local_root = "" if use_s3 else str(world_config().get("root") or "")
+
+        async def _fetch(records, progress):
+            failures = await xafs.load_analyses(
+                client,
+                records,
+                local_root=local_root,
+                use_s3=use_s3,
+                progress=progress,
+            )
+            return failures, xafs.with_series(records, x, y)
+
+        await self._load_and_draw(chosen, client, fetch=_fetch)
+        async with self:
+            # Offer every array the loaded analyses share.
+            self._base = chosen
+            names = xafs.array_names(chosen)
+            self.x_options = names or [x]
+            self.y_options = names or [y]
 
 
 def build_page():
@@ -183,10 +283,19 @@ def build_page():
                 width="6em",
             ),
             *spectra_page.plot_controls(S),
+            rx.checkbox("read from S3", checked=S.read_s3, on_change=S.set_read_s3),
             spacing="3",
             align="center",
         ),
-        *spectra_page.window_rows(S, "eV"),
+        rx.hstack(
+            spectra_page._muted("x"),
+            rx.select(S.x_options, value=S.x_choice, on_change=S.set_x, width="22em"),
+            spectra_page._muted("y"),
+            rx.select(S.y_options, value=S.y_choice, on_change=S.set_y, width="22em"),
+            spacing="3",
+            align="center",
+        ),
+        *spectra_page.window_rows(S, S.x_unit),
         *spectra_page.charts(S),
         width="100%",
         spacing="4",

@@ -79,6 +79,10 @@ class _FakeUvvisState:
     _draw_histogram = page.UvvisState._draw_histogram
     _draw_spectra = page.UvvisState._draw_spectra
     _window_label = page.UvvisState._window_label
+    _x_label = page.UvvisState._x_label
+    _y_label = page.UvvisState._y_label
+    _y_name = page.UvvisState._y_name
+    _x_unit = page.UvvisState._x_unit
     _set_window = page.UvvisState._set_window
     _redraw = page.UvvisState._redraw
     commit_wl_lo = page.UvvisState.commit_wl_lo.fn  # type: ignore[attr-defined]
