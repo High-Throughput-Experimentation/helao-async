@@ -10,24 +10,31 @@ then ``/api/sequence/{uuid}/processes`` (full records, ``samples_in``
 included), then one ``read_plottable_data`` per spectrum file. A sequence the
 backfill has not reached yet is simply not found.
 
-**Spectra live in a module cache, not in Reflex state.** A run is hundreds of
-1024-point spectra; Reflex state is synced and stored per session, and the
-spectra are immutable once recorded, so they are cached here by process uuid
-and the page keeps only the uuids.
+Spectra, the cache and the window arithmetic are shared with `/xafs` and live
+in :mod:`helao.ui.shared.spectra`; the names are re-exported here.
 """
 
 from __future__ import annotations
 
 import asyncio
-import threading
 import uuid
-from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
-import numpy as np
 from uuid_extensions import uuid_to_datetime
+
+from helao.ui.shared import spectra
+from helao.ui.shared.spectra import (  # noqa: F401  (re-exported)
+    MAX_CONCURRENT_FETCHES,
+    cached_spectrum,
+    range_stats,
+    reset_cache,
+    stack_for,
+    window_mean,
+    window_means,
+)
+from helao.ui.shared.spectra import store as _store  # noqa: F401
 
 #: The file role holding one reflectance spectrum.
 SPECTRUM_FILE_TYPE = "spec_r_parquet__file"
@@ -35,15 +42,12 @@ SPECTRUM_FILE_TYPE = "spec_r_parquet__file"
 #: The process name of a reflectance measurement.
 PROCESS_NAME = "R_UVVIS"
 
+#: The plottable series holding wavelength and intensity.
+X_KEY = "wl_nm"
+Y_KEY = "intensity"
+
 #: Wavelength range, in nm, the details table summarizes.
 STATS_RANGE = (350.0, 1000.0)
-
-#: Concurrent spectrum fetches, as for the composition page's quant fetches.
-MAX_CONCURRENT_FETCHES = 30
-
-#: Spectra kept in memory across sessions. ~4 KB each as float32, so the cap
-#: is ~80 MB. ponytail: LRU by count, not bytes; revisit if grids grow.
-_CACHE_LIMIT = 20000
 
 
 @dataclass(frozen=True)
@@ -124,83 +128,6 @@ def records_from_processes(processes, plate_id: int) -> list:
     return out
 
 
-def window_mean(wl, intensity, lo: float, hi: float) -> float:
-    """Mean intensity over ``[lo, hi]`` nm, either order.
-
-    A window holding no grid point -- both sliders on one wavelength, the
-    default -- takes the point nearest its centre instead of returning NaN.
-    """
-    wl = np.asarray(wl, dtype=float)
-    values = np.asarray(intensity, dtype=float)
-    lo, hi = min(lo, hi), max(lo, hi)
-    inside = (wl >= lo) & (wl <= hi)
-    if inside.any():
-        return float(np.mean(values[..., inside], axis=-1))
-    nearest = int(np.argmin(np.abs(wl - (lo + hi) / 2)))
-    return float(values[..., nearest])
-
-
-def window_means(wl, stack, lo: float, hi: float) -> np.ndarray:
-    """:func:`window_mean` for every row of *stack* at once."""
-    stack = np.asarray(stack, dtype=float)
-    if stack.size == 0:
-        return np.empty(0)
-    wl = np.asarray(wl, dtype=float)
-    lo, hi = min(lo, hi), max(lo, hi)
-    inside = (wl >= lo) & (wl <= hi)
-    if inside.any():
-        return stack[:, inside].mean(axis=1)
-    return stack[:, int(np.argmin(np.abs(wl - (lo + hi) / 2)))]
-
-
-def range_stats(wl, intensity, lo=STATS_RANGE[0], hi=STATS_RANGE[1]) -> dict:
-    """min/mean/max/stdev of *intensity* over ``[lo, hi]`` nm; empty if none."""
-    wl = np.asarray(wl, dtype=float)
-    values = np.asarray(intensity, dtype=float)
-    inside = values[(wl >= lo) & (wl <= hi)]
-    if inside.size == 0:
-        return {}
-    return {
-        "min": float(inside.min()),
-        "mean": float(inside.mean()),
-        "max": float(inside.max()),
-        "stdev": float(inside.std()),
-    }
-
-
-# ---------------------------------------------------------------------------
-# API and cache
-# ---------------------------------------------------------------------------
-_CACHE: "OrderedDict[str, tuple]" = OrderedDict()
-_CACHE_LOCK = threading.Lock()
-
-
-def cached_spectrum(process_uuid: str) -> Optional[tuple]:
-    """``(wl, intensity)`` float arrays for *process_uuid*, if loaded."""
-    with _CACHE_LOCK:
-        hit = _CACHE.get(process_uuid)
-        if hit is not None:
-            _CACHE.move_to_end(process_uuid)
-        return hit
-
-
-def _store(process_uuid: str, wl, intensity) -> None:
-    with _CACHE_LOCK:
-        _CACHE[process_uuid] = (
-            np.asarray(wl, dtype=np.float32),
-            np.asarray(intensity, dtype=np.float32),
-        )
-        _CACHE.move_to_end(process_uuid)
-        while len(_CACHE) > _CACHE_LIMIT:
-            _CACHE.popitem(last=False)
-
-
-def reset_cache() -> None:
-    """Drop every cached spectrum. For tests."""
-    with _CACHE_LOCK:
-        _CACHE.clear()
-
-
 async def sequences_for_plate(client, plate_id: int, *, size: int = 500) -> list:
     """SEQUENCE search items whose ``sequence_params.plate_id`` is *plate_id*."""
     items: list = []
@@ -244,85 +171,12 @@ async def records_for_plate(client, plate_id: int) -> list:
 
 
 async def load_spectra(client, records, progress=None) -> int:
-    """Fetch every uncached spectrum of *records*; returns how many failed.
-
-    ``read_plottable_data`` wants the action's name, which a process record
-    does not carry. Every spectrum action seen is ``acquire_spec_adv``, so the
-    name is read once from the first action and reused; a fetch that fails
-    with it re-reads its own action's name before giving up.
-
-    Args:
-        progress: Optional ``async (done, total)`` callback, called per batch.
-    """
-    todo = [r for r in records if cached_spectrum(r.process_uuid) is None]
-    if not todo:
-        return 0
-    names: dict = {}
-
-    async def _name(action_uuid: str) -> str:
-        if action_uuid not in names:
-            action = await client.read_action(action_uuid=action_uuid)
-            names[action_uuid] = str((action or {}).get("action_name") or "")
-        return names[action_uuid]
-
-    shared = await _name(todo[0].action_uuid)
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_FETCHES)
-
-    async def _fetch(record, action_name):
-        body = {
-            "file_name": record.file_name,
-            "file_type": SPECTRUM_FILE_TYPE,
-            "action_name": action_name,
-            "action_uuid": record.action_uuid,
-        }
-        response = await client.read_plottable_data(request_body=body)
-        series = ((response or {}).get("data") or {}).get("series") or {}
-        wl, intensity = series.get("wl_nm") or [], series.get("intensity") or []
-        if not wl or len(wl) != len(intensity):
-            raise ValueError(f"no wl_nm/intensity series in {record.file_name}")
-        _store(record.process_uuid, wl, intensity)
-
-    async def _one(record):
-        async with semaphore:
-            try:
-                await _fetch(record, shared)
-            except Exception:
-                await _fetch(record, await _name(record.action_uuid))
-
-    failures = 0
-    step = 60
-    for start in range(0, len(todo), step):
-        chunk = todo[start : start + step]
-        results = await asyncio.gather(
-            *(_one(r) for r in chunk), return_exceptions=True
-        )
-        failures += sum(isinstance(r, BaseException) for r in results)
-        if progress is not None:
-            await progress(min(start + step, len(todo)), len(todo))
-    return failures
-
-
-def stack_for(records) -> tuple:
-    """``(wl, stack, kept)``: one grid and a spectra matrix for *records*.
-
-    The grid is the first cached spectrum's. Spectra on another grid are
-    interpolated onto it (every run probed so far shares one grid, so this is
-    a guard, not a path). Records with no cached spectrum are left out;
-    ``kept`` lists the ones in ``stack``, row for row.
-    """
-    wl = None
-    rows, kept = [], []
-    for record in records:
-        hit = cached_spectrum(record.process_uuid)
-        if hit is None:
-            continue
-        x, y = hit
-        if wl is None:
-            wl = x
-        rows.append(
-            y if x.shape == wl.shape and np.allclose(x, wl) else np.interp(wl, x, y)
-        )
-        kept.append(record)
-    if wl is None:
-        return np.empty(0), np.empty((0, 0)), []
-    return np.asarray(wl, dtype=float), np.vstack(rows).astype(float), kept
+    """Fetch every uncached reflectance spectrum of *records*."""
+    return await spectra.load_spectra(
+        client,
+        records,
+        file_type=SPECTRUM_FILE_TYPE,
+        x_key=X_KEY,
+        y_key=Y_KEY,
+        progress=progress,
+    )
