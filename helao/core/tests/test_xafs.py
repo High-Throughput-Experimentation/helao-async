@@ -136,6 +136,7 @@ class _FakeXafsState:
     Y_NAME = page.XafsState.Y_NAME
     X_UNIT = page.XafsState.X_UNIT
     STATS_RANGE = page.XafsState.STATS_RANGE
+    DECIMALS = page.XafsState.DECIMALS
     _draw = page.XafsState._draw
     _draw_map = page.XafsState._draw_map
     _draw_histogram = page.XafsState._draw_histogram

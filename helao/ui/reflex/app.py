@@ -50,6 +50,8 @@ from helao.ui.reflex.uvvis import UvvisState
 from helao.ui.reflex.uvvis import build_page as uvvis_page
 from helao.ui.reflex.xafs import XafsState
 from helao.ui.reflex.xafs import build_page as xafs_page
+from helao.ui.reflex.xrds import XrdsState
+from helao.ui.reflex.xrds import build_page as xrds_page
 from helao.ui.reflex.operator import configure as configure_operator
 from helao.ui.shared.palette import (
     CHART_CHROME,
@@ -88,6 +90,7 @@ SHELL_ROUTES = (
     "/composition",
     "/uvvis",
     "/xafs",
+    "/xrds",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -308,6 +311,7 @@ def _nav():
         rx.link("Composition", href="/composition"),
         rx.link("UV-Vis", href="/uvvis"),
         rx.link("XAFS", href="/xafs"),
+        rx.link("XRD", href="/xrds"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -467,6 +471,7 @@ def build_app(world_cfg: dict, server_key: str):
     assert ControlState is not None
     assert UvvisState is not None
     assert XafsState is not None
+    assert XrdsState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -566,6 +571,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("XAFS", xafs_page(), "/xafs"),
         route="/xafs",
         title="HELAO XAFS",
+    )
+    application.add_page(
+        lambda: _page("XRD", xrds_page(), "/xrds"),
+        route="/xrds",
+        title="HELAO XRD",
     )
 
     @contextlib.asynccontextmanager

@@ -1,16 +1,18 @@
 # helao/ui/shared/spectra.py
-"""What the plate-spectra pages (`/uvvis`, `/xafs`) share: a spectrum cache,
+"""What the plate-spectra pages (`/uvvis`, `/xafs`, `/xrds`) share: a cache,
 the loader that fills it, and the window arithmetic.
 
 **Spectra live in a module cache, not in Reflex state.** A selection is
 hundreds of spectra; Reflex state is synced and stored per session, and a
-recorded spectrum never changes, so spectra are cached here by process uuid
-and a page keeps only the uuids. Process uuids are unique across techniques,
+recorded spectrum never changes, so spectra are cached here by record key
+and a page keeps only the keys. Process uuids are unique across techniques,
 so one cache serves every page.
 
 Records are duck-typed: the loader needs ``process_uuid``, ``action_uuid``
 and ``file_name``; the pages add ``sample_no``, ``global_label`` and
-``run_use``.
+``run_use``. A record whose process holds more than one spectrum (an XRD
+frame's original and background-subtracted patterns) sets ``spectrum_key``;
+everything that caches or selects goes through :func:`record_key`.
 """
 
 from __future__ import annotations
@@ -25,13 +27,19 @@ import numpy as np
 #: Concurrent spectrum fetches, as for the composition page's quant fetches.
 MAX_CONCURRENT_FETCHES = 30
 
-#: Spectra kept in memory across sessions. Up to ~8 KB each as float32
-#: (x and y, 1024 points), so the cap is ~160 MB.
-#: ponytail: LRU by count, not bytes; revisit if grids grow.
-_CACHE_LIMIT = 20000
+#: Bytes of spectra kept in memory across sessions, least recently used
+#: evicted first. By bytes, not count: a UV-Vis spectrum is ~8 KB as float32,
+#: an XRD pattern (10600 points) ~85 KB.
+_CACHE_BYTES = 512 * 1024 * 1024
 
 _CACHE: "OrderedDict[str, tuple]" = OrderedDict()
 _CACHE_LOCK = threading.Lock()
+_cache_size = 0
+
+
+def record_key(record) -> str:
+    """The cache and selection key of *record*'s spectrum."""
+    return getattr(record, "spectrum_key", None) or record.process_uuid
 
 
 def window_mean(x, y, lo: float, hi: float) -> float:
@@ -78,31 +86,36 @@ def range_stats(x, y, lo: float, hi: float) -> dict:
     }
 
 
-def cached_spectrum(process_uuid: str) -> Optional[tuple]:
-    """``(x, y)`` float arrays for *process_uuid*, if loaded."""
+def cached_spectrum(key: str) -> Optional[tuple]:
+    """``(x, y)`` float arrays for *key* (see :func:`record_key`), if loaded."""
     with _CACHE_LOCK:
-        hit = _CACHE.get(process_uuid)
+        hit = _CACHE.get(key)
         if hit is not None:
-            _CACHE.move_to_end(process_uuid)
+            _CACHE.move_to_end(key)
         return hit
 
 
-def store(process_uuid: str, x, y) -> None:
+def store(key: str, x, y) -> None:
     """Cache one spectrum, evicting the least recently used past the cap."""
+    global _cache_size
+    entry = (np.asarray(x, dtype=np.float32), np.asarray(y, dtype=np.float32))
     with _CACHE_LOCK:
-        _CACHE[process_uuid] = (
-            np.asarray(x, dtype=np.float32),
-            np.asarray(y, dtype=np.float32),
-        )
-        _CACHE.move_to_end(process_uuid)
-        while len(_CACHE) > _CACHE_LIMIT:
-            _CACHE.popitem(last=False)
+        old = _CACHE.pop(key, None)
+        if old is not None:
+            _cache_size -= old[0].nbytes + old[1].nbytes
+        _CACHE[key] = entry
+        _cache_size += entry[0].nbytes + entry[1].nbytes
+        while _cache_size > _CACHE_BYTES and len(_CACHE) > 1:
+            _, dropped = _CACHE.popitem(last=False)
+            _cache_size -= dropped[0].nbytes + dropped[1].nbytes
 
 
 def reset_cache() -> None:
     """Drop every cached spectrum. For tests."""
+    global _cache_size
     with _CACHE_LOCK:
         _CACHE.clear()
+        _cache_size = 0
 
 
 async def load_spectra(
@@ -121,7 +134,7 @@ async def load_spectra(
         y_key: The plottable series holding y.
         progress: Optional ``async (done, total)`` callback, called per batch.
     """
-    todo = [r for r in records if cached_spectrum(r.process_uuid) is None]
+    todo = [r for r in records if cached_spectrum(record_key(r)) is None]
     if not todo:
         return 0
     names: dict = {}
@@ -147,7 +160,7 @@ async def load_spectra(
         x, y = series.get(x_key) or [], series.get(y_key) or []
         if not x or len(x) != len(y):
             raise ValueError(f"no {x_key}/{y_key} series in {record.file_name}")
-        store(record.process_uuid, x, y)
+        store(record_key(record), x, y)
 
     async def _one(record):
         async with semaphore:
@@ -179,7 +192,7 @@ def stack_for(records) -> tuple:
     grid = None
     rows, kept = [], []
     for record in records:
-        hit = cached_spectrum(record.process_uuid)
+        hit = cached_spectrum(record_key(record))
         if hit is None:
             continue
         x, y = hit
