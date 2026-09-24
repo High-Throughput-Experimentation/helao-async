@@ -293,12 +293,12 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 | station | date | `unstable` rev captured | golden diff | smoke | e-stop | by |
 |---|---|---|---|---|---|---|
 | `ccsi2` | | | | | | |
-| `eche10` | | | | | | |
+| `eche10` | 2026-09-24 | ≥ `cfe9c69b` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `anec` | | | | | | |
 | `adss3` | | | | | | |
 | `clad` | | | | | | |
 | `ecms3` | 2026-09-17 | `e02a7ff6` | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `hispec` | | | | | | |
+| `hispec` | 2026-09-24 | `1cd49b17` (PR #213 branch) | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
 | `amts` | | | | | | |
 | `note1` | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
@@ -398,7 +398,67 @@ and outputs against the pre-migration reference, and does not exercise the abort
 path. A regression visible only as a *difference* from legacy, or only under
 e-stop, would not have surfaced here.
 
-`uvis4`, `note1` and `ecms3` are signed off. Three of eleven.
+### `eche10`, 2026-09-24 — signed off on a soak (‡)
+
+Signed off by the station owner on a soak of the ECHEUVIS sequences. The row
+records `≥ cfe9c69b` for the same reason `uvis4` records `≥ 118660ee`: the
+station was the one that found the defects, and the rev that passes is the one
+carrying their fixes. Seven were found and fixed here on 2026-09-18, which is
+the reason this row matters beyond its count — every one was a native-host or
+dispatch fault that no Linux gate had reached:
+
+- `95840e99` — KMOTOR read `self.base.app.driver`; `ActionHost` *is* the app, so
+  every `kmove` raised `AttributeError` at dispatch. KMOTOR runs only here and at
+  `hispec`, and neither had launched since the port. Two more sites were found in
+  private deployments by the static guard added with it.
+- `6488b59d` — orjson refuses `float` subclasses, and ruamel loads every YAML
+  float as `ScalarFloat`, so any config value enqueued as data was written to the
+  `.hlo` as an error stub. Live since `a63e264c` (2026-07-14), fleet-wide.
+- `12cd2d0d` — a 69 s move outran the dispatcher's 60 s total timeout, which
+  re-POSTed the running move; the duplicate overwrote the original's record. The
+  same fix split the orchestrator's `aiolock` so the dispatch no longer starves
+  `/update_status` for the action's duration.
+- `83e50cd1` — the WebSocket streams were never closed at shutdown, costing
+  every server a 5 s graceful-timeout wait and an ASGI traceback.
+- `b191b33f` — the orchestrator kept polling `/get_status` through teardown;
+  a disconnected driver made that route 500 with a `text/plain` body the caller
+  could not decode.
+- `e2bd3039` — SM303 DLL calls ran on the event loop, so a trigger that never
+  arrived froze SPEC_T entirely, private routes included.
+- `cfe9c69b` — `set_digital_cycle` could not validate on a station with no
+  `gamry_aux` line, whatever the caller passed.
+
+**This row does not cover `12cd2d0d`'s lock split under e-stop.** That change
+sits on the abort path and a soak does not exercise it. It is the one fix above
+whose remaining gate is a station e-stop drill, and `eche10` is the natural place
+to run it.
+
+### `hispec`, 2026-09-24 — signed off on a soak (‡), on the PR #213 branch
+
+Signed off by the station owner on a soak. **The rev is not on `unstable`:** it is
+`1cd49b17`, the head of `feat/biologic-eclib1-direct` (PR #213, unmerged at
+sign-off), which replaces easy-biologic with a direct EClib1 driver. That branch
+is `unstable` plus the BioLogic work, so the other B5-changed servers here —
+ANDOR, CALC, IO, KMOTOR, MOTOR, ORCH, SAMPLE, SYNC — ran the same native-host
+code the other rows are evidence for. `PSTAT (biologic)` did not: it ran the new
+driver, not the one B5 ported.
+
+So read this row two ways. As B5 evidence it covers ANDOR and KMOTOR, which no
+other signed station carries. As evidence for the B5 port of the *easy-biologic*
+PSTAT it covers nothing, and it will not need to once #213 merges, because that
+driver is then gone. If #213 does not merge, the biologic cell needs its own
+first launch on `unstable`.
+
+The hardware validation behind #213 — OCV, OCV with a `TTLsend` triggering
+ANDOR, CV and CAOCV, with five hardware-only fixes along the way — is recorded in
+the PR, not here.
+
+Same caveat as every soak row: no golden diff against the pre-migration
+reference, no e-stop drill.
+
+`uvis4`, `note1`, `ecms3`, `eche10` and `hispec` are signed off. Five of eleven.
+**No station has yet run the golden diff or the e-stop drill**; every signed row
+rests on a production run or a soak.
 
 ## Expected delta: `/ANDOR/calibrate_wl` (2026-09-04)
 
