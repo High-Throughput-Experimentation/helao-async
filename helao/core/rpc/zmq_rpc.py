@@ -128,35 +128,59 @@ _RESP_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 # ---------------------------------------------------------------------------
 
 
-def _model_class(ann: Any) -> Optional[type]:
-    """The pydantic model an annotation names, bare or as ``Optional[Model]``.
+def _rehydrate(ann: Any, val: Any) -> Any:
+    """Turn a msgpack-decoded value back into what ``ann`` declares.
 
-    Pass 1 of :func:`_coerce_args` used to accept only a bare model class, so
-    ``action: Optional[Action] = Body(None, embed=True)`` -- the shape FastAPI
-    endpoints use for an optional model -- was handed the raw msgpack ``dict``.
-    FastAPI's own request layer validates it into the model, so the HTTP path
-    worked and the RPC fast path raised ``'dict' object has no attribute
-    'action_uuid'`` inside the handler (SAMPLE's ``new_ref_samples``, reached
-    from PAL at anec), with the dispatcher then silently falling back to HTTP.
+    FastAPI validates request parameters into their declared types; the RPC
+    fast path receives plain msgpack values and has to do the same, or the
+    handler sees a ``dict`` where it expects a model and a ``str`` where it
+    expects an enum. Each gap below raised inside a handler on every RPC call,
+    and each was hidden because the dispatcher then fell back to HTTP, where
+    FastAPI did the conversion -- a fast path that always fails is a slow path
+    with a traceback:
 
-    Only a single model plus ``None`` is unwrapped. A union of several models
-    is ambiguous -- the sample unions are the live case, and their endpoints
-    coerce explicitly with ``object_to_sample`` -- so those stay raw.
+    * ``Optional[Model]`` -- SAMPLE's ``new_ref_samples(action: Optional[Action])``
+      raised ``'dict' object has no attribute 'action_uuid'`` on every PAL call.
+    * ``list[Model]`` -- the orchestrator's ``prepend_sequences(sequences:
+      list[Sequence])`` got a list of dicts. The legacy route coerced these
+      itself with ``model_validate``; the native port did not.
+    * ``Enum`` -- MOTOR's ``move_axis(units: Units)`` got ``"mm"`` and raised on
+      ``units.value`` on every panel move.
+
+    An enum value that is not a member raises ``ValueError``, deliberately. That
+    fails the RPC call, the dispatcher falls back to HTTP, and FastAPI answers
+    422 -- so the fast path stops being a way around validation. ``move_axis``'s
+    ``units`` is the case that matters: its docstring relies on a 422 to stop a
+    misspelt ``"count"`` running as millimetres.
+
+    Only unambiguous shapes are converted: one model or enum, optionally wrapped
+    in ``Optional`` and/or ``list``. A union of several models stays raw -- the
+    sample unions are the live case, and their endpoints coerce explicitly with
+    ``object_to_sample``; guessing here would pick a type for them.
     """
+    import enum
     import types
     import typing
 
-    if isinstance(ann, type) and issubclass(ann, BaseModel):
-        return ann
-    if typing.get_origin(ann) in (typing.Union, types.UnionType):
+    if val is None:
+        return None
+    origin = typing.get_origin(ann)
+    if origin in (typing.Union, types.UnionType):
         members = [a for a in typing.get_args(ann) if a is not type(None)]
-        if (
-            len(members) == 1
-            and isinstance(members[0], type)
-            and issubclass(members[0], BaseModel)
-        ):
-            return members[0]
-    return None
+        if len(members) != 1:
+            return val
+        return _rehydrate(members[0], val)
+    if origin is list:
+        (item,) = typing.get_args(ann) or (Any,)
+        if isinstance(val, list):
+            return [_rehydrate(item, v) for v in val]
+        return val
+    if isinstance(ann, type):
+        if issubclass(ann, BaseModel) and isinstance(val, dict):
+            return ann(**val)
+        if issubclass(ann, enum.Enum) and not isinstance(val, ann):
+            return ann(val)
+    return val
 
 
 def _coerce_args(fn: Callable, args: dict[str, Any]) -> dict[str, Any]:
@@ -188,34 +212,33 @@ def _coerce_args(fn: Callable, args: dict[str, Any]) -> dict[str, Any]:
     remaining = dict(args)
     out: dict[str, Any] = {}
 
+    # Resolve annotations once, for both passes. A module using
+    # ``from __future__ import annotations`` (PEP 563) stores them as
+    # *strings*, which no isinstance/issubclass check can match. Falls back to
+    # the raw annotations on any resolution error (keeps old behaviour intact).
+    try:
+        hints = inspect.get_annotations(fn, eval_str=True)
+    except Exception:
+        try:
+            import typing
+
+            hints = typing.get_type_hints(fn)
+        except Exception:
+            hints = {n: p.annotation for n, p in params.items()}
+
     # Pass 1: name-by-name pickup (covers Body(embed=True) and query params).
     for name, param in params.items():
         if name not in remaining:
             continue
         val = remaining.pop(name)
-        model = _model_class(param.annotation)
-        if model is not None and isinstance(val, dict):
-            val = model(**val)
-        out[name] = val
+        out[name] = _rehydrate(hints.get(name, param.annotation), val)
 
     # Pass 2: leftover args + an unfilled dict/BaseModel param -> wrap.
     # Handles the "body IS the dict" pattern (e.g. update_global_params).
     #
-    # NOTE: modules that use ``from __future__ import annotations`` (PEP 563)
-    # have their annotations stored as *strings*, not live types.  ``ann is
-    # dict`` will be False when ann == 'dict'.  We resolve annotations via
-    # ``get_type_hints`` so both forms work.  We fall back to the raw
-    # annotation on any resolution error (keeps old behaviour intact).
+    # ``hints`` (resolved above) makes ``ann is dict`` work for string
+    # annotations too.
     if remaining:
-        try:
-            hints = inspect.get_annotations(fn, eval_str=True)
-        except Exception:
-            try:
-                import typing
-
-                hints = typing.get_type_hints(fn)
-            except Exception:
-                hints = {n: p.annotation for n, p in params.items()}
         for name, param in params.items():
             if name in out:
                 continue
