@@ -46,6 +46,8 @@ from helao.ui.reflex.operator import (
     OperatorSpecState,
 )
 from helao.ui.reflex.operator import build_page as operator_page
+from helao.ui.reflex.uvvis import UvvisState
+from helao.ui.reflex.uvvis import build_page as uvvis_page
 from helao.ui.reflex.operator import configure as configure_operator
 from helao.ui.shared.palette import (
     CHART_CHROME,
@@ -82,6 +84,7 @@ SHELL_ROUTES = (
     "/browser",
     "/control",
     "/composition",
+    "/uvvis",
 )
 
 #: Page name -> the config key whose panels belong on it.
@@ -300,6 +303,7 @@ def _nav():
         rx.link("Browser", href="/browser"),
         rx.link("Control", href="/control"),
         rx.link("Composition", href="/composition"),
+        rx.link("UV-Vis", href="/uvvis"),
         width="100%",
         padding="0.75em 1em",
         align="center",
@@ -455,8 +459,9 @@ def build_app(world_cfg: dict, server_key: str):
         OperatorPlateState,
         OperatorSpecState,
     )
-    # Same for the control page's single state.
+    # Same for the control page's single state, and the UV-Vis page's.
     assert ControlState is not None
+    assert UvvisState is not None
     # The operator's backend is built per session from this config; without
     # this the page renders but can never reach an orchestrator.
     configure_operator(world_cfg, server_key)
@@ -546,6 +551,11 @@ def build_app(world_cfg: dict, server_key: str):
         lambda: _page("Composition", composition_page(), "/composition"),
         route="/composition",
         title="HELAO composition",
+    )
+    application.add_page(
+        lambda: _page("UV-Vis", uvvis_page(), "/uvvis"),
+        route="/uvvis",
+        title="HELAO UV-Vis",
     )
 
     @contextlib.asynccontextmanager

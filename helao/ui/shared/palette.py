@@ -67,6 +67,7 @@ TW: Final[Mapping[str, str]] = {
     "emerald-600": "#059669",
     "emerald-700": "#047857",
     "teal-600": "#0d9488",
+    "cyan-50": "#ecfeff",
     "cyan-100": "#cffafe",
     "cyan-400": "#22d3ee",
     "cyan-500": "#06b6d4",
@@ -187,6 +188,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/browser": "emerald-50",
     "/control": "rose-50",
     "/composition": "lime-50",
+    "/uvvis": "cyan-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 
@@ -914,6 +916,13 @@ TOTALS_COLORMAP: Final[str] = "viridis"
 #: A fill that paints nothing. xy has no open marker symbol, so the rings
 #: around selected samples are circles with this fill and a coloured stroke.
 TRANSPARENT: Final[str] = "rgba(0, 0, 0, 0)"
+
+#: The UV-Vis page: colour scale of the window-average plate map, the run's
+#: average spectrum drawn behind the selected ones, and the wavelength-window
+#: band over it.
+WINDOW_COLORMAP: Final[str] = "magma"
+AVERAGE_SPECTRUM: Final[str] = TW["slate-300"]
+WINDOW_BAND: Final[str] = TW["sky-600"]
 
 
 def _rgba(hex_color: str, alpha: float) -> str:
