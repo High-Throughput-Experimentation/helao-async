@@ -344,3 +344,24 @@ def test_composition_page_is_configured_at_build(reflex_cfg):
 
     build_app(reflex_cfg, "UI")
     assert app_reflex.world_config().get("servers")
+
+
+def test_uvvis_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
+    """Same freeze guard as the composition page's: a state first touched in
+    `add_page`'s lazy callable never exists in a `--backend-only` process."""
+    from helao.ui.reflex import uvvis as page
+
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
+
+    build_app(reflex_cfg, "UI")
+    assert "/uvvis" in SHELL_ROUTES
+    handlers = page.UvvisState.event_handlers
+    for name in (
+        "retrieve",
+        "plot",
+        "on_map_select",
+        "commit_wl_lo",
+        "commit_wl_hi",
+        "apply_wl_text",
+    ):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"

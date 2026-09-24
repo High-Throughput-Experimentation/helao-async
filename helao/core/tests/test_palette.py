@@ -96,6 +96,7 @@ CANONICAL_TAILWIND: Final[dict[str, str]] = {
     "teal-500": "#14b8a6",
     "teal-600": "#0d9488",
     "teal-700": "#0f766e",
+    "cyan-50": "#ecfeff",
     "cyan-100": "#cffafe",
     "cyan-400": "#22d3ee",
     "cyan-500": "#06b6d4",
@@ -577,6 +578,8 @@ PAGE_TINT_TEXT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-600", "rose-50"): 6.90,
     ("slate-900", "lime-50"): 17.25,  # /composition
     ("slate-600", "lime-50"): 7.32,
+    ("slate-900", "cyan-50"): 17.16,  # /uvvis
+    ("slate-600", "cyan-50"): 7.28,
 }
 
 # The shade slate-600 replaced, kept as a measurement rather than a comment.
@@ -591,6 +594,7 @@ SLATE_500_ON_TINT_ROWS: Final[dict[tuple[str, str], float]] = {
     ("slate-500", "amber-50"): 4.59,
     ("slate-500", "emerald-50"): 4.52,
     ("slate-500", "lime-50"): 4.60,
+    ("slate-500", "cyan-50"): 4.57,
 }
 
 # Each table's header text on its own header background. Body-floor rows: a

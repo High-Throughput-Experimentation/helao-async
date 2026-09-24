@@ -32,7 +32,13 @@ from typing import Any
 import numpy as np
 
 from helao.ui.shared.composition import ternary as _ternary
-from helao.ui.shared.palette import CHART_CHROME, SERIES, TRANSPARENT
+from helao.ui.shared.palette import (
+    AVERAGE_SPECTRUM,
+    CHART_CHROME,
+    SERIES,
+    TRANSPARENT,
+    WINDOW_BAND,
+)
 from helao.ui.reflex.xy_component import (
     BUFFER_ROUTE_PREFIX,
     BufferStore,
@@ -492,6 +498,55 @@ def spectra(
         panel_id=panel_id,
         version=version,
     )
+
+
+def spectra_over_background(
+    background,
+    series,
+    *,
+    window=None,
+    x_label: str = "",
+    y_label: str = "",
+    panel_id: str = "spectra",
+    version: int = 0,
+):
+    """Spectra drawn over a grey reference spectrum and a shaded x window.
+
+    The background line comes first so everything else draws over it; the
+    window is an ``xy.x_band`` annotation. The series take
+    :func:`series_color` of their position in *series* -- not of their trace
+    index -- so a series keeps the colour a page matches it by elsewhere.
+
+    Args:
+        background: ``(x, y)`` of the reference line, or ``None``.
+        series: Sequence of ``{"label": str, "x": array, "y": array}``.
+        window: ``(x0, x1)`` to shade, or ``None``.
+        x_label: X axis label.
+        y_label: Y axis label.
+        panel_id: Stable panel identity for the buffer route.
+        version: Monotonic data version.
+
+    Returns:
+        ChartPayload: Assign into the panel state vars bound by :func:`chart`.
+    """
+    marks = []
+    if background is not None:
+        bx, by = _finite_pairs(
+            _as_float_array(background[0]), _as_float_array(background[1])
+        )
+        marks.append(xy.line(x=bx, y=by, name="average", color=AVERAGE_SPECTRUM))
+    for idx, item in enumerate(series):
+        fx, fy = _finite_pairs(_as_float_array(item["x"]), _as_float_array(item["y"]))
+        marks.append(xy.line(x=fx, y=fy, name=item["label"], color=series_color(idx)))
+    extra = ""
+    if window is not None:
+        x0, x1 = sorted(float(v) for v in window)
+        marks.append(xy.x_band(x0, x1, color=WINDOW_BAND, opacity=0.18))
+        # An annotation, not a trace: the in-place update path would keep the
+        # old band, so a moved window has to rebuild.
+        extra = f"window={x0:g},{x1:g}"
+    figure = _chart(marks, _axes(x_label, y_label, False))
+    return _publish(figure, panel_id, version, layout_extra=extra)
 
 
 def scatter_map(
