@@ -65,6 +65,14 @@ class _FakeUvvisState:
     def panel_key(self):
         return "test-uvvis"
 
+    # The page's class-level settings, as the real state carries them.
+    FILE_TYPE = page.UvvisState.FILE_TYPE
+    X_LABEL = page.UvvisState.X_LABEL
+    Y_LABEL = page.UvvisState.Y_LABEL
+    Y_NAME = page.UvvisState.Y_NAME
+    X_UNIT = page.UvvisState.X_UNIT
+    STATS_RANGE = page.UvvisState.STATS_RANGE
+
     _draw = page.UvvisState._draw
     _draw_map = page.UvvisState._draw_map
     _draw_histogram = page.UvvisState._draw_histogram

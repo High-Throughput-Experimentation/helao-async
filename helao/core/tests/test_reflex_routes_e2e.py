@@ -365,3 +365,15 @@ def test_uvvis_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
         "apply_wl_text",
     ):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_xafs_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
+    from helao.ui.reflex import xafs as page
+
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
+
+    build_app(reflex_cfg, "UI")
+    assert "/xafs" in SHELL_ROUTES
+    handlers = page.XafsState.event_handlers
+    for name in ("retrieve", "plot", "on_map_select", "set_element", "commit_wl_lo"):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"

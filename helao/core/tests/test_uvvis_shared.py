@@ -71,12 +71,13 @@ def test_window_mean_averages_inside_and_falls_back_to_the_nearest_point() -> No
 
 
 def test_range_stats_cover_350_to_1000_nm_only() -> None:
-    stats = uvvis.range_stats(WL, WL.copy())
+    stats = uvvis.range_stats(WL, WL.copy(), *uvvis.STATS_RANGE)
     assert stats["min"] == pytest.approx(350.0)
     assert stats["max"] == pytest.approx(1000.0)
     assert stats["mean"] == pytest.approx(675.0)
     assert stats["stdev"] == pytest.approx(np.std(np.arange(350.0, 1001.0)))
-    assert uvvis.range_stats(WL, WL, 2000.0, 3000.0) == {}
+    # A range with no grid point takes the nearest one, like the window mean.
+    assert uvvis.range_stats(WL, WL, 2000.0, 3000.0)["mean"] == pytest.approx(1100.0)
 
 
 class _FakeClient:
