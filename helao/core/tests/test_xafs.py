@@ -1,6 +1,7 @@
 """Tests for the `/xafs` page: plate lookup, grouping, window statistics."""
 
 import asyncio
+import re
 
 import numpy as np
 import pytest
@@ -122,6 +123,10 @@ class _FakeXafsState:
         self.sequence_choice = grouping.ALL
         self.element_choice = ""
         self.sequence_options, self.element_options = [], []
+        self.x_choice, self.y_choice = xafs.ANALYSIS_X, xafs.ANALYSIS_Y
+        self.x_unit = "eV"
+        self.error = ""
+        self._base = []
         for name in ("map", "hist", "spec"):
             setattr(self, f"{name}_spec", {})
             setattr(self, f"{name}_url", "")
@@ -144,6 +149,15 @@ class _FakeXafsState:
     _window_label = page.XafsState._window_label
     _redraw = page.XafsState._redraw
     _refresh_options = page.XafsState._refresh_options
+    _x_label = page.XafsState._x_label
+    _y_label = page.XafsState._y_label
+    _y_name = page.XafsState._y_name
+    _x_unit = page.XafsState._x_unit
+    _fit_window = page.XafsState._fit_window
+    _set_window = page.XafsState._set_window
+    _repair = page.XafsState._repair
+    set_x = page.XafsState.set_x.fn  # type: ignore[attr-defined]
+    set_y = page.XafsState.set_y.fn  # type: ignore[attr-defined]
     on_map_select = page.XafsState.on_map_select.fn  # type: ignore[attr-defined]
 
 
@@ -157,12 +171,12 @@ def loaded():
     spectra.reset_cache()
 
 
-def test_axes_are_energy_and_roi_count_rate(loaded) -> None:
+def test_axes_default_to_flattened_energy_and_mu(loaded) -> None:
     state = _FakeXafsState(loaded)
     state._draw()
     axes = {a["id"]: a.get("label") for a in state.spec_spec["axes"].values()}
-    assert axes == {"x": "Energy(eV)", "y": "ROI_CountsPerLive(C/s)"}
-    assert state.map_spec["colorbar"]["label"] == "mean ROI count rate 9000.0-9100.0 eV"
+    assert axes == {"x": "flattened_energy", "y": "flattened_mu"}
+    assert state.map_spec["colorbar"]["label"] == "mean flattened_mu 9000.0-9100.0 eV"
 
 
 def test_details_take_statistics_over_the_energy_window(loaded) -> None:
@@ -194,3 +208,123 @@ def test_element_choice_falls_back_when_the_sequence_lacks_it() -> None:
     state.sequence_choice = grouping.sequence_label(records[1])  # the Co sequence
     state._refresh_options()
     assert state.element_options == ["Co"] and state.element_choice == "Co"
+
+
+# ---------------------------------------------------------------------------
+# XAFS_normalize_flatten arrays: local tree first, S3 on request or on a miss
+# ---------------------------------------------------------------------------
+def _arrays(n):
+    energy = ENERGY.tolist()
+    return {
+        "flattened_energy": energy,
+        "flattened_mu": (ENERGY * n).tolist(),
+        "flattened_norm": (ENERGY * 0 + n).tolist(),
+        "processed_Angle(deg)": (-ENERGY).tolist(),  # decreasing: must sort
+        "short": [1.0, 2.0],
+    }
+
+
+class _AnalysisClient:
+    """read_analysis_by_process plus S3 reads, counting the S3 ones."""
+
+    def __init__(self):
+        self.s3_reads = 0
+
+    async def read_analysis_by_process(self, process_uuid):
+        n = int(process_uuid.rsplit("-", 1)[1])
+        return [
+            {"analysis_name": "other"},
+            {
+                "analysis_name": "XAFS_normalize_flatten",
+                "analysis_uuid": f"an{n}",
+                "outputs": [
+                    {"output_name": "scalar", "analysis_output_path": {"key": "s"}},
+                    {
+                        "output_name": "array",
+                        "analysis_output_path": {
+                            "key": f"analysis/an{n}_output_array.json"
+                        },
+                    },
+                ],
+            },
+        ]
+
+    async def read_raw_data(self, request_body):
+        self.s3_reads += 1
+        n = int(re.search(r"/an(\d+)_output", request_body["key"]).group(1))
+        return {"data": _arrays(n)}
+
+
+def _local_tree(tmp_path, numbers):
+    folder = (
+        tmp_path / "ANALYSES" / "26.38" / "0924" / "105853__XAFS_normalize_flatten__L"
+    )
+    folder.mkdir(parents=True)
+    import json
+
+    for n in numbers:
+        (folder / f"an{n}_output_array.json").write_text(json.dumps(_arrays(n)))
+    return str(tmp_path)
+
+
+def test_arrays_come_from_the_local_tree_and_fall_back_to_s3(tmp_path) -> None:
+    xafs.reset_analyses()
+    spectra.reset_cache()
+    records = xafs.records_from_processes([_proc(1), _proc(2), _proc(3)], 10131)
+    root = _local_tree(tmp_path, numbers=(1, 2))  # 3 was never written locally
+    client = _AnalysisClient()
+    assert asyncio.run(xafs.load_analyses(client, records, local_root=root)) == 0
+    assert client.s3_reads == 1  # only the missing one
+    viewed = xafs.with_series(records)
+    assert [v.series for v in viewed] == ["flattened_energy|flattened_mu"] * 3
+    grid, stack, kept = spectra.stack_for(viewed)
+    assert stack[:, 0] == pytest.approx([8800.0, 17600.0, 26400.0])
+    xafs.reset_analyses()
+
+
+def test_read_from_s3_skips_the_local_tree(tmp_path) -> None:
+    xafs.reset_analyses()
+    records = xafs.records_from_processes([_proc(1), _proc(2)], 10131)
+    root = _local_tree(tmp_path, numbers=(1, 2))
+    client = _AnalysisClient()
+    asyncio.run(xafs.load_analyses(client, records, local_root=root, use_s3=True))
+    assert client.s3_reads == 2
+    xafs.reset_analyses()
+
+
+def test_any_two_arrays_pair_and_x_is_sorted() -> None:
+    xafs.reset_analyses()
+    spectra.reset_cache()
+    records = xafs.records_from_processes([_proc(1)], 10131)
+    asyncio.run(xafs.load_analyses(_AnalysisClient(), records))
+    names = xafs.array_names(records)
+    assert names[:3] == ["flattened_energy", "flattened_mu", "flattened_norm"]
+    assert "processed_Angle(deg)" in names
+    viewed = xafs.with_series(records, "processed_Angle(deg)", "flattened_mu")
+    x, y = spectra.cached_spectrum(viewed[0].spectrum_key)
+    assert np.all(np.diff(x) >= 0)  # decreasing angle, re-sorted
+    assert y[0] == pytest.approx(9600.0)  # mu at the most negative angle
+    assert xafs.with_series(records, "short", "flattened_mu") == []  # lengths differ
+    xafs.reset_analyses()
+
+
+def test_changing_x_or_y_redraws_from_memory_and_keeps_the_selection() -> None:
+    xafs.reset_analyses()
+    spectra.reset_cache()
+    records = xafs.records_from_processes([_proc(1), _proc(2)], 10131)
+    client = _AnalysisClient()
+    asyncio.run(xafs.load_analyses(client, records))
+    state = _FakeXafsState(xafs.with_series(records))
+    state._base = records
+    state._fit_window(np.asarray(ENERGY))
+    state._draw()
+    state.on_map_select({"x": 1.0, "y": 0.0})
+    state.set_y("flattened_norm")
+    axes = {a["id"]: a.get("label") for a in state.spec_spec["axes"].values()}
+    assert axes["y"] == "flattened_norm"
+    assert [t["name"] for t in state.spec_spec["traces"]][1:] == ["sample 2 data"]
+    state.set_x("processed_Angle(deg)")
+    assert state.x_unit == "deg"
+    assert state.wl_min == pytest.approx(-9600.0)  # the window refit to the new x
+    assert page.unit_of("flattened_norm") == ""
+    xafs.reset_analyses()

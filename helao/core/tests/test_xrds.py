@@ -84,6 +84,10 @@ class _FakeXrdsState:
     _draw_histogram = page.XrdsState._draw_histogram
     _draw_spectra = page.XrdsState._draw_spectra
     _window_label = page.XrdsState._window_label
+    _x_label = page.XrdsState._x_label
+    _y_label = page.XrdsState._y_label
+    _y_name = page.XrdsState._y_name
+    _x_unit = page.XrdsState._x_unit
     _redraw = page.XrdsState._redraw
     on_map_select = page.XrdsState.on_map_select.fn  # type: ignore[attr-defined]
 

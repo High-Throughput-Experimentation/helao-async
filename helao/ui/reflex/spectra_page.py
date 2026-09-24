@@ -62,7 +62,7 @@ def detail_rows(
         ["quantity", "value"],
         ["run_use", record.run_use or grouping.NO_RUN_USE],
         [
-            f"window mean ({lo:.{decimals}f}-{hi:.{decimals}f} {x_unit})",
+            f"window mean ({lo:.{decimals}f}-{hi:.{decimals}f} {x_unit}".rstrip() + ")",
             _fmt(spectra.window_mean(x, y, lo, hi)),
         ],
     ]
@@ -134,6 +134,20 @@ class SpectraPageState(rx.State, mixin=True):
     #: Clicked samples, oldest first: ``{"key": record_key, "label"}``.
     _selected: list = []
 
+    # Labels and units, as methods so a page whose series is a selection can
+    # answer from its state; the default is the page's class setting.
+    def _x_label(self) -> str:
+        return self.X_LABEL
+
+    def _y_label(self) -> str:
+        return self.Y_LABEL
+
+    def _y_name(self) -> str:
+        return self.Y_NAME
+
+    def _x_unit(self) -> str:
+        return self.X_UNIT
+
     def panel_key(self) -> str:
         """Session-scoped buffer-store key; see the composition page's."""
         return f"{self.PANEL_PREFIX}-{self.router.session.client_token}"
@@ -152,25 +166,34 @@ class SpectraPageState(rx.State, mixin=True):
         self.hist_spec, self.hist_url, self.hist_layout = {}, "", ""
         self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
 
-    async def _load_and_draw(self, chosen, client, file_type: str = "") -> None:
+    async def _load_and_draw(
+        self, chosen, client, file_type: str = "", fetch=None
+    ) -> None:
         """Load every spectrum of *chosen*, then draw. Call outside the lock.
 
-        *file_type* overrides the page's ``FILE_TYPE``, for a page whose
-        file type is itself a selection.
+        Args:
+            file_type: Overrides the page's ``FILE_TYPE``, for a page whose
+                file type is itself a selection.
+            fetch: A page's own loader, ``async (chosen, progress) ->
+                (failures, records)``, for spectra that are not one plottable
+                file per record. The returned records are what gets plotted.
         """
 
         async def _progress(done, total):
             async with self:
                 self.status = f"loading spectra: {done}/{total}"
 
-        failures = await spectra.load_spectra(
-            client,
-            chosen,
-            file_type=file_type or self.FILE_TYPE,
-            x_key=self.X_KEY,
-            y_key=self.Y_KEY,
-            progress=_progress,
-        )
+        if fetch is not None:
+            failures, chosen = await fetch(chosen, _progress)
+        else:
+            failures = await spectra.load_spectra(
+                client,
+                chosen,
+                file_type=file_type or self.FILE_TYPE,
+                x_key=self.X_KEY,
+                y_key=self.Y_KEY,
+                progress=_progress,
+            )
         grid, _stack, loaded = spectra.stack_for(chosen)
         async with self:
             self._loaded = loaded
@@ -178,15 +201,18 @@ class SpectraPageState(rx.State, mixin=True):
                 self.error = "none of these spectra could be read"
                 self.status = ""
                 return
-            low, high = float(grid.min()), float(grid.max())
-            if (low, high) != (self.wl_min, self.wl_max):
-                # A new grid: both window edges start at its midpoint.
-                self.wl_min, self.wl_max = low, high
-                self._set_window((low + high) / 2, (low + high) / 2)
+            self._fit_window(grid)
             failed = f", {failures} unreadable" if failures else ""
             self.status = f"{len(loaded)} spectra loaded{failed}"
             self.version += 1
             self._draw()
+
+    def _fit_window(self, grid) -> None:
+        """On a new x range, start both window edges at its midpoint."""
+        low, high = float(grid.min()), float(grid.max())
+        if (low, high) != (self.wl_min, self.wl_max):
+            self.wl_min, self.wl_max = low, high
+            self._set_window((low + high) / 2, (low + high) / 2)
 
     def _set_window(self, lo: float, hi: float) -> None:
         self.wl_lo = min(max(lo, self.wl_min), self.wl_max)
@@ -265,7 +291,7 @@ class SpectraPageState(rx.State, mixin=True):
     def _window_label(self) -> str:
         lo, hi = sorted((self.wl_lo, self.wl_hi))
         d = self.DECIMALS
-        return f"mean {self.Y_NAME} {lo:.{d}f}-{hi:.{d}f} {self.X_UNIT}"
+        return f"mean {self._y_name()} {lo:.{d}f}-{hi:.{d}f} {self._x_unit()}".rstrip()
 
     def _draw_map(self, loaded, means) -> None:
         if not self._pm_rows:
@@ -339,8 +365,8 @@ class SpectraPageState(rx.State, mixin=True):
             (grid, stack.mean(axis=0)),
             series,
             window=(lo, hi),
-            x_label=self.X_LABEL,
-            y_label=self.Y_LABEL,
+            x_label=self._x_label(),
+            y_label=self._y_label(),
             panel_id=f"{self.panel_key()}-spec",
             version=self.version,
         )
@@ -375,7 +401,7 @@ class SpectraPageState(rx.State, mixin=True):
             values,
             self.wl_lo,
             self.wl_hi,
-            x_unit=self.X_UNIT,
+            x_unit=self._x_unit(),
             stats_range=self.STATS_RANGE,
             decimals=self.DECIMALS,
         )
