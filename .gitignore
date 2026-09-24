@@ -45,10 +45,6 @@ C:*
 .understand-anything/
 .ua/
 
-# Exported Reflex frontend bundle; built per-machine, shipped as a release
-# artifact rather than tracked. See reflex_launcher.py.
-.reflex-bundle/
-
 # xy's ESM render client, copied out of the installed wheel at build time.
 # Generated artifact, ~411 KB — never tracked.
 helao/ui/reflex/_app/assets/xy-client.js
@@ -58,6 +54,13 @@ helao/ui/reflex/_app/assets/xy-client.js
 # project instructions, and a generated one would inject unrelated guidance.
 helao/ui/reflex/_app/.web/
 helao/ui/reflex/_app/.gitignore
+# `reflex export` writes its zip into the build directory, and on an exec-able
+# checkout that is _app itself. build_reflex_bundle.py deletes and recreates it
+# on every build, so a tracked copy made every in-tree build dirty the working
+# tree -- and a dirty tracked file is what makes a station's `git pull` refuse.
+# backend.zip is the same thing for an export without --frontend-only.
+helao/ui/reflex/_app/frontend.zip
+helao/ui/reflex/_app/backend.zip
 helao/ui/reflex/_app/AGENTS.md
 helao/ui/reflex/_app/CLAUDE.md
 helao/ui/reflex/_app/reflex.lock/
