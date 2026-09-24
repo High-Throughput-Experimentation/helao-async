@@ -128,6 +128,37 @@ _RESP_ENCODER = msgspec.msgpack.Encoder(enc_hook=_msgpack_enc_hook)
 # ---------------------------------------------------------------------------
 
 
+def _model_class(ann: Any) -> Optional[type]:
+    """The pydantic model an annotation names, bare or as ``Optional[Model]``.
+
+    Pass 1 of :func:`_coerce_args` used to accept only a bare model class, so
+    ``action: Optional[Action] = Body(None, embed=True)`` -- the shape FastAPI
+    endpoints use for an optional model -- was handed the raw msgpack ``dict``.
+    FastAPI's own request layer validates it into the model, so the HTTP path
+    worked and the RPC fast path raised ``'dict' object has no attribute
+    'action_uuid'`` inside the handler (SAMPLE's ``new_ref_samples``, reached
+    from PAL at anec), with the dispatcher then silently falling back to HTTP.
+
+    Only a single model plus ``None`` is unwrapped. A union of several models
+    is ambiguous -- the sample unions are the live case, and their endpoints
+    coerce explicitly with ``object_to_sample`` -- so those stay raw.
+    """
+    import types
+    import typing
+
+    if isinstance(ann, type) and issubclass(ann, BaseModel):
+        return ann
+    if typing.get_origin(ann) in (typing.Union, types.UnionType):
+        members = [a for a in typing.get_args(ann) if a is not type(None)]
+        if (
+            len(members) == 1
+            and isinstance(members[0], type)
+            and issubclass(members[0], BaseModel)
+        ):
+            return members[0]
+    return None
+
+
 def _coerce_args(fn: Callable, args: dict[str, Any]) -> dict[str, Any]:
     """Bind a flat caller-supplied args dict to ``fn``'s declared parameters.
 
@@ -162,13 +193,9 @@ def _coerce_args(fn: Callable, args: dict[str, Any]) -> dict[str, Any]:
         if name not in remaining:
             continue
         val = remaining.pop(name)
-        ann = param.annotation
-        if (
-            isinstance(ann, type)
-            and issubclass(ann, BaseModel)
-            and isinstance(val, dict)
-        ):
-            val = ann(**val)
+        model = _model_class(param.annotation)
+        if model is not None and isinstance(val, dict):
+            val = model(**val)
         out[name] = val
 
     # Pass 2: leftover args + an unfilled dict/BaseModel param -> wrap.
