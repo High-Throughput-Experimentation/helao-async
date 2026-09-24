@@ -377,3 +377,15 @@ def test_xafs_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
     handlers = page.XafsState.event_handlers
     for name in ("retrieve", "plot", "on_map_select", "set_element", "commit_wl_lo"):
         assert name in handlers, f"{name} not registered; have {sorted(handlers)}"
+
+
+def test_xrds_route_is_the_real_page_and_its_handlers_register(reflex_cfg):
+    from helao.ui.reflex import xrds as page
+
+    from helao.ui.reflex.app import SHELL_ROUTES, build_app
+
+    build_app(reflex_cfg, "UI")
+    assert "/xrds" in SHELL_ROUTES
+    handlers = page.XrdsState.event_handlers
+    for name in ("retrieve", "plot", "on_map_select", "set_file_type", "commit_wl_hi"):
+        assert name in handlers, f"{name} not registered; have {sorted(handlers)}"

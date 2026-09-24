@@ -72,6 +72,7 @@ class _FakeUvvisState:
     Y_NAME = page.UvvisState.Y_NAME
     X_UNIT = page.UvvisState.X_UNIT
     STATS_RANGE = page.UvvisState.STATS_RANGE
+    DECIMALS = page.UvvisState.DECIMALS
 
     _draw = page.UvvisState._draw
     _draw_map = page.UvvisState._draw_map

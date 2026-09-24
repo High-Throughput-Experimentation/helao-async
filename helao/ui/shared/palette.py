@@ -75,6 +75,7 @@ TW: Final[Mapping[str, str]] = {
     "cyan-600": "#0891b2",
     "cyan-700": "#0e7490",
     "sky-50": "#f0f9ff",
+    "yellow-50": "#fefce8",
     "sky-100": "#e0f2fe",
     "sky-200": "#bae6fd",
     "sky-600": "#0284c7",
@@ -191,6 +192,7 @@ REFLEX_PAGE_TINTS: Final[Mapping[str, str]] = {
     "/composition": "lime-50",
     "/uvvis": "cyan-50",
     "/xafs": "teal-50",
+    "/xrds": "yellow-50",
 }
 """One page canvas per Reflex route — the functional-section signal.
 

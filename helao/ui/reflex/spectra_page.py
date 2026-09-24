@@ -1,7 +1,7 @@
 # helao/ui/reflex/spectra_page.py
-"""What the plate-spectra pages (`/uvvis`, `/xafs`) share.
+"""What the plate-spectra pages (`/uvvis`, `/xafs`, `/xrds`) share.
 
-Both pages load a selection of one technique's spectra for a plate and show
+Each page loads a selection of one technique's spectra for a plate and show
 
 * a plate map coloured by each sample's mean y inside an x window set by two
   sliders (editable readouts, both starting at the grid midpoint),
@@ -49,7 +49,7 @@ def _fmt(value) -> str:
 
 
 def detail_rows(
-    record, x, y, lo: float, hi: float, *, x_unit: str, stats_range=None
+    record, x, y, lo: float, hi: float, *, x_unit: str, stats_range=None, decimals=1
 ) -> list:
     """The clicked sample's table: its window mean and range statistics.
 
@@ -62,7 +62,7 @@ def detail_rows(
         ["quantity", "value"],
         ["run_use", record.run_use or grouping.NO_RUN_USE],
         [
-            f"window mean ({lo:.1f}-{hi:.1f} {x_unit})",
+            f"window mean ({lo:.{decimals}f}-{hi:.{decimals}f} {x_unit})",
             _fmt(spectra.window_mean(x, y, lo, hi)),
         ],
     ]
@@ -88,6 +88,9 @@ class SpectraPageState(rx.State, mixin=True):
     X_UNIT: ClassVar[str] = ""
     STATS_RANGE: ClassVar[Optional[tuple]] = None
     PANEL_PREFIX: ClassVar[str] = "spectra"
+    #: Window slider step, and the decimals its readouts and labels show.
+    SLIDER_STEP: ClassVar[float] = 0.5
+    DECIMALS: ClassVar[int] = 1
 
     plate_id: str = ""
     status: str = ""
@@ -128,7 +131,7 @@ class SpectraPageState(rx.State, mixin=True):
     _plotted: list = []
     _plotted_xs: list = []
     _plotted_ys: list = []
-    #: Clicked samples, oldest first: ``{"key": process_uuid, "label"}``.
+    #: Clicked samples, oldest first: ``{"key": record_key, "label"}``.
     _selected: list = []
 
     def panel_key(self) -> str:
@@ -149,8 +152,12 @@ class SpectraPageState(rx.State, mixin=True):
         self.hist_spec, self.hist_url, self.hist_layout = {}, "", ""
         self.spec_spec, self.spec_url, self.spec_layout = {}, "", ""
 
-    async def _load_and_draw(self, chosen, client) -> None:
-        """Load every spectrum of *chosen*, then draw. Call outside the lock."""
+    async def _load_and_draw(self, chosen, client, file_type: str = "") -> None:
+        """Load every spectrum of *chosen*, then draw. Call outside the lock.
+
+        *file_type* overrides the page's ``FILE_TYPE``, for a page whose
+        file type is itself a selection.
+        """
 
         async def _progress(done, total):
             async with self:
@@ -159,7 +166,7 @@ class SpectraPageState(rx.State, mixin=True):
         failures = await spectra.load_spectra(
             client,
             chosen,
-            file_type=self.FILE_TYPE,
+            file_type=file_type or self.FILE_TYPE,
             x_key=self.X_KEY,
             y_key=self.Y_KEY,
             progress=_progress,
@@ -184,8 +191,8 @@ class SpectraPageState(rx.State, mixin=True):
     def _set_window(self, lo: float, hi: float) -> None:
         self.wl_lo = min(max(lo, self.wl_min), self.wl_max)
         self.wl_hi = min(max(hi, self.wl_min), self.wl_max)
-        self.wl_lo_text = f"{self.wl_lo:.1f}"
-        self.wl_hi_text = f"{self.wl_hi:.1f}"
+        self.wl_lo_text = f"{self.wl_lo:.{self.DECIMALS}f}"
+        self.wl_hi_text = f"{self.wl_hi:.{self.DECIMALS}f}"
 
     def _redraw(self) -> None:
         """Redraw after a window, size or selection change, keeping selection."""
@@ -257,7 +264,8 @@ class SpectraPageState(rx.State, mixin=True):
 
     def _window_label(self) -> str:
         lo, hi = sorted((self.wl_lo, self.wl_hi))
-        return f"mean {self.Y_NAME} {lo:.1f}-{hi:.1f} {self.X_UNIT}"
+        d = self.DECIMALS
+        return f"mean {self.Y_NAME} {lo:.{d}f}-{hi:.{d}f} {self.X_UNIT}"
 
     def _draw_map(self, loaded, means) -> None:
         if not self._pm_rows:
@@ -273,7 +281,7 @@ class SpectraPageState(rx.State, mixin=True):
             ys.append(row["y"])
             values.append(float(mean))
         self._plotted, self._plotted_xs, self._plotted_ys = kept, xs, ys
-        where = {r.process_uuid: i for i, r in enumerate(kept)}
+        where = {spectra.record_key(r): i for i, r in enumerate(kept)}
         rings = [
             (xs[where[s["key"]]], ys[where[s["key"]]], index)
             for index, s in enumerate(self._selected)
@@ -315,7 +323,7 @@ class SpectraPageState(rx.State, mixin=True):
         )
 
     def _draw_spectra(self, grid, stack, loaded) -> None:
-        rows = {r.process_uuid: i for i, r in enumerate(loaded)}
+        rows = {spectra.record_key(r): i for i, r in enumerate(loaded)}
         series = [
             {"label": s["label"], "x": grid, "y": stack[rows[s["key"]]]}
             for s in self._selected
@@ -353,7 +361,7 @@ class SpectraPageState(rx.State, mixin=True):
         record = nearest_record(self._plotted, self._plotted_xs, self._plotted_ys, x, y)
         if record is None:
             return
-        hit = spectra.cached_spectrum(record.process_uuid)
+        hit = spectra.cached_spectrum(spectra.record_key(record))
         if hit is None:
             return
         grid, values = hit
@@ -369,9 +377,10 @@ class SpectraPageState(rx.State, mixin=True):
             self.wl_hi,
             x_unit=self.X_UNIT,
             stats_range=self.STATS_RANGE,
+            decimals=self.DECIMALS,
         )
         entry = {
-            "key": record.process_uuid,
+            "key": spectra.record_key(record),
             "label": f"sample {record.sample_no} {record.run_use}".strip(),
         }
         kept = (
@@ -422,7 +431,7 @@ def plot_controls(S):
     ]
 
 
-def _slider_row(S, label, value, drag, commit, text, set_text, unit):
+def _slider_row(S, label, value, drag, commit, text, set_text, unit, step):
     """One window edge: label, slider, and an editable numeric readout."""
     return rx.hstack(
         rx.text(label, size="1", class_name=reflex_muted_text_class(), width="6em"),
@@ -430,7 +439,7 @@ def _slider_row(S, label, value, drag, commit, text, set_text, unit):
             value=[value],
             min=S.wl_min,
             max=S.wl_max,
-            step=0.5,
+            step=step,
             on_change=drag,
             on_value_commit=commit,
             width="24em",
@@ -448,7 +457,7 @@ def _slider_row(S, label, value, drag, commit, text, set_text, unit):
 
 
 def window_rows(S, unit: str):
-    """The two window-edge rows."""
+    """The two window-edge rows, stepping by the page's ``SLIDER_STEP``."""
     return [
         _slider_row(
             S,
@@ -459,6 +468,7 @@ def window_rows(S, unit: str):
             S.wl_lo_text,
             S.set_wl_lo_text,
             unit,
+            S.SLIDER_STEP,
         ),
         _slider_row(
             S,
@@ -469,6 +479,7 @@ def window_rows(S, unit: str):
             S.wl_hi_text,
             S.set_wl_hi_text,
             unit,
+            S.SLIDER_STEP,
         ),
     ]
 
