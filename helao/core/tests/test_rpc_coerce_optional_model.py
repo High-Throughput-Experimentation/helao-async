@@ -74,3 +74,79 @@ def test_a_union_of_several_models_is_left_raw():
     raw = _action_dict()
     out = _coerce_args(_union, {"x": raw})
     assert out["x"] is raw
+
+
+# ---------------------------------------------------------------------------
+# The same fast-path gap, in the two other shapes a sweep of every RPC-reachable
+# POST route found live: list[Model] (the orchestrator's /prepend_sequences) and
+# Enum (MOTOR's /move_axis).
+# ---------------------------------------------------------------------------
+
+import enum
+
+import pytest
+
+from helao.deploy.hte.drivers.motion.enum import MoveModes
+from helao.helpers.premodels import Sequence
+
+
+class _Units(str, enum.Enum):
+    mm = "mm"
+    counts = "counts"
+
+
+def _sequence_dict() -> dict:
+    return Sequence(sequence_name="ECHEUVIS_diagnostic_CV").model_dump()
+
+
+async def _prepend(sequences: list[Sequence] = Body([], embed=True)):
+    return sequences
+
+
+async def _move_axis(
+    axis: str,
+    value: float,
+    mode: MoveModes = MoveModes.relative,
+    units: _Units = _Units.mm,
+):
+    return units
+
+
+async def _optional_enum(units: Optional[_Units] = None):
+    return units
+
+
+def test_list_of_models_is_rehydrated():
+    # native OrchHost handed these straight to _prep_sequence_meta, which does
+    # attribute access on each; the legacy route had model_validate'd them.
+    out = _coerce_args(_prepend, {"sequences": [_sequence_dict(), _sequence_dict()]})
+    assert all(isinstance(s, Sequence) for s in out["sequences"])
+    assert out["sequences"][0].sequence_name == "ECHEUVIS_diagnostic_CV"
+
+
+def test_enum_is_rehydrated():
+    # The motion panel sends str(units.value); move_axis then calls units.value.
+    out = _coerce_args(
+        _move_axis, {"axis": "x", "value": 1.0, "mode": "absolute", "units": "counts"}
+    )
+    assert out["units"] is _Units.counts
+    assert out["mode"] is MoveModes.absolute
+    assert out["units"].value == "counts"
+
+
+def test_optional_enum_is_rehydrated_and_none_kept():
+    assert _coerce_args(_optional_enum, {"units": "mm"})["units"] is _Units.mm
+    assert _coerce_args(_optional_enum, {"units": None})["units"] is None
+
+
+def test_an_invalid_enum_value_is_refused_not_passed_through():
+    # FastAPI would answer 422. Raising here fails the RPC call, the dispatcher
+    # falls back to HTTP, and FastAPI answers 422 -- so the fast path is not a
+    # way around validation. A misspelt "count" must never reach move_axis.
+    with pytest.raises(ValueError):
+        _coerce_args(_move_axis, {"axis": "x", "value": 1.0, "units": "count"})
+
+
+def test_an_already_typed_enum_is_left_alone():
+    out = _coerce_args(_move_axis, {"axis": "x", "value": 1.0, "units": _Units.mm})
+    assert out["units"] is _Units.mm
