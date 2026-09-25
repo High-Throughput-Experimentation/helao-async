@@ -53,7 +53,7 @@ from helao.core.models.file import FileInfo
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.machine import MachineModel
 from helao.core.models.process import ProcessModel
-from helao.core.models.run_dir import SYNC_PROGRESSION, RunDir
+from helao.core.models.run_dir import SYNC_PROGRESSION, RunDir, is_same_location
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
@@ -127,6 +127,14 @@ def move_to_synced(file_path: Path) -> Union[Path, bool]:
     elif not file_path.exists():
         LOGGER.debug(f"File {file_path} does not exist. Skipping.")
         return target_path
+    elif is_same_location(file_path, target_path):
+        # The substitution missed: there is no RUNS_FINISHED segment to
+        # replace, so the "destination" is the source. Refuse rather than
+        # move a file onto itself (plan A24).
+        LOGGER.error(
+            f"Refusing to move {file_path}: computed destination is the source."
+        )
+        return False
     state_index = parts.index(RunDir.FINISHED)
     parts[state_index] = RunDir.SYNCED.value
     target_path = Path(*parts)
@@ -2512,9 +2520,16 @@ class SyncDriver:
             if fp.endswith(".lock") or fp.endswith(".progress") or fp.endswith(".prg"):
                 os.remove(fp)
             elif not os.path.isdir(fp):
-                tp = os.path.dirname(
-                    fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value)
-                )
+                dst = fp.replace(RunDir.SYNCED.value, RunDir.FINISHED.value)
+                if is_same_location(fp, dst):
+                    # No RUNS_SYNCED segment to replace; the destination is the
+                    # source directory. Refuse rather than move onto itself
+                    # (plan A24).
+                    LOGGER.error(
+                        f"Refusing to unsync {fp}: computed destination is the source."
+                    )
+                    continue
+                tp = os.path.dirname(dst)
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")

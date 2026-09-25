@@ -208,7 +208,7 @@ class ActionHost(HelaoFastAPI):
             else None
         )
         #: Legacy reads this from typed_cfg; an action with no run_type inherits
-        #: it and is marked MANUAL, which is what routes it to RUNS_DIAG.
+        #: it and is marked MANUAL, which is what routes it to <root>/DIAG.
         rt = self.world_cfg.get("run_type")
         self.run_type = rt.lower() if isinstance(rt, str) else None
 

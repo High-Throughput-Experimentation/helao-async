@@ -7,9 +7,9 @@ Sources of truth mirrored here:
   ``{abbr}-{orch_submit_order}.{action_order}.{action_retry}.{action_split}__{filenum}.{ext}``
 - file-conn keys: base_meta_writer.py:154-172 (md5 -> UUID; default key =
   md5(str(None)) — 34 call sites)
-- manual-run redirection RUNS_ACTIVE -> RUNS_DIAG: centralized here (legacy
-  copy-pastes the string replace at 8+ write sites, e.g. base_meta_writer.py:94
-  / active_data_file.py:257/308/415/441)
+- manual-run redirection: re-exported from helao.core.models.run_dir so the
+  legacy write sites (base_meta_writer.py, active_data_file.py, ...) and the
+  native ones share one implementation rather than importing hexagon from core
 - nosync flag: active_data_file.py:154
 
 Dir naming (sequence/experiment/action output dirs) is intentionally NOT
@@ -20,6 +20,8 @@ get_experiment_dir / get_action_dir, D8) and is pinned by tests/test_naming.py.
 import hashlib
 from datetime import datetime
 from uuid import UUID
+
+from helao.core.models.run_dir import redirect_manual_dir
 
 __all__ = [
     "META_YML_TS_FMT",
@@ -72,17 +74,6 @@ def new_file_conn_key(key: str) -> UUID:
 def dflt_file_conn_key() -> UUID:
     """The default file-connection key: ``md5(str(None))``."""
     return new_file_conn_key(str(None))
-
-
-def redirect_manual_dir(path: str) -> str:
-    """Manual-run redirection: substitute RUNS_ACTIVE -> RUNS_DIAG.
-
-    Mirrors ``save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)``
-    literal string substitution (spec §5.1); this is the single domain home
-    for the manual variant, centralizing what legacy copy-pastes at 8+ write
-    sites.
-    """
-    return path.replace("RUNS_ACTIVE", "RUNS_DIAG")
 
 
 def is_nosync_file(filename: str, sync_data: bool) -> bool:
