@@ -412,6 +412,51 @@ becomes reachable the moment anything registers a sub-directory name through
 the one-shot writer. One line: `os.makedirs(os.path.dirname(output_file),
 exist_ok=True)`.
 
+### A15 — Two frozen baselines are ALREADY RED on `unstable`
+
+Verified independently at the merge-base `658c94dc` (tip of `unstable` before
+this branch), in a clean worktree with `.omc/artifacts/` copied in — the
+artifacts directory is gitignored, so a bare worktree reports a missing
+baseline rather than a failure:
+
+```
+PASS   1_plain_two_experiment_sequence_no_wait
+DELTA  2_every_action_start_condition: byte diff vs .../baseline_S0/2_...jsonl
+PASS   3..6
+DELTA  7_returned_action_error_estop_loop: byte diff vs .../baseline_S0/7_...jsonl
+PASS   8, 9
+CHECK FAILED: trace diverged from frozen reference
+```
+
+Red before this branch existed:
+
+| Gate | State |
+|---|---|
+| `test_active_golden_master.py --check` | **green** — 13/13 |
+| `test_orch_dispatch_golden_master.py --check` | **RED** — scenarios 2 and 7 |
+| `.omc/artifacts/p3a/schema_baseline.json` (via `unit_test_status_transitions.py`) | **RED** |
+
+**Consequence for Task 13 Step 3.** That step says "re-baseline the golden
+masters deliberately" and treats a diff as this change's doing. For the orch
+harness that is false: two scenarios diverge already. Re-freezing it during
+Task 13 would silently adopt a pre-existing regression as the new truth and
+destroy the evidence of whatever caused it.
+
+**Rules for Task 13:**
+
+1. Before touching any baseline, run all three gates at the merge-base and
+   record the result. `test_active_golden_master` must be green there; if it is
+   not, stop — something changed under you.
+2. **Do not re-freeze `baseline_S0` or `schema_baseline.json` in this plan.**
+   They are red on arrival and their repair is separate work.
+3. Only re-baseline a gate that is **green at the merge-base and red at your
+   HEAD**, and then only after reading the diff field by field.
+4. For the two already-red gates, the bar is "fails in exactly the same way as
+   at the merge-base" — not "passes". Diff the diffs.
+
+Nobody has been told about the pre-existing failures; they are noted here
+because this plan trips over them, not because this plan owns them.
+
 ---
 
 ## Decision resolved (2026-09-25)
