@@ -6,6 +6,8 @@ outlets or all outlets on/off.
 
 __all__ = ["makeApp"]
 
+import asyncio
+
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -59,7 +61,8 @@ def makeApp(server_key) -> ActionHost:
             response is not ``DriverResponseType.success``.
         """
         active = await ctx.begin()
-        driver_resp = app.driver.switch_outlet(
+        driver_resp = await asyncio.to_thread(
+            app.driver.switch_outlet,
             outlet_number=active.action.action_params["outlet_number"],
             on=active.action.action_params["on"],
         )
@@ -86,7 +89,8 @@ def makeApp(server_key) -> ActionHost:
             response is not ``DriverResponseType.success``.
         """
         active = await ctx.begin()
-        driver_resp = app.driver.switch_all(
+        driver_resp = await asyncio.to_thread(
+            app.driver.switch_all,
             on=active.action.action_params["on"],
         )
         if driver_resp.response != DriverResponseType.success:
