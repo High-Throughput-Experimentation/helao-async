@@ -586,6 +586,59 @@ layout reasons; it also deletes this failure mode.
 `unstable` at `origin/unstable` `ac0cfa9b`, clean. The nested deployment repos
 are clean and identical to local. The cut-over lands on `unstable` + 3.
 
+### A19 — D9 (no sequence zip) is a CUT-OVER BLOCKER for the ECMS station
+
+Resolved from `/mnt/i/hte-ecms-03/DATA`, which is mounted here. This closes
+A18.2's open question and reverses its provisional answer.
+
+**The zip-based calibration discovery is live and succeeding, not inert.**
+
+```
+RUNS_SYNCED/26.37/0916/141548__ECMS_MS_calibration__MS_cali.zip
+RUNS_SYNCED/26.37/0917/102409__ECMS_MS_calibration__Cali_1_filament2.zip
+RUNS_SYNCED/26.37/0917/114018__ECMS_MS_calibration__Cali_1_filament2_repeat.zip
+RUNS_SYNCED/26.37/0917/125241__ECMS_MS_calibration__Cali_1_filament2_repeat_newMScond.zip
+RUNS_SYNCED/24.43/20241101/154140__ECMS_MS_calibration_recirculation__CO2RR_calibration.zip
+```
+
+Week `26.37` is days old. 551 sequence zips in a bounded 3-level scan; only 5
+loose `-act.yml` files in `RUNS_FINISHED`/`RUNS_ACTIVE`, so on this station the
+zip *is* the archive.
+
+The discovery is structurally zip-only, not incidentally so — it reads
+identity and timing from **zip members without extracting**
+(`calibration.py:150-156`), and `_is_calibration_zip_name` parses
+`<HHMMSS>__<sequence name>__<label>.zip` by stripping `".zip"` and splitting on
+`"__"`. Both the container and the name parsing break.
+
+Failure mode is silent: it logs `0 calibration window(s) found` and converts
+anyway. Indistinguishable from a quiet day.
+
+**Required before any station that feeds ECMS cuts over.** The directory form
+is a straightforward port — `HelaoData` already accepts a run directory, and
+the name parsing works on the directory name with the `.zip` strip removed —
+but it must be written, tested, and landed in that deployment's own repo
+first. Add it to Task 12's scope (A5 already widened Task 12 to "every
+consumer of the value") and to the cut-over checklist as a blocker.
+
+This station also carries **both** legacy date shapes (`24.43/20241101/` and
+`26.37/0916/`), independently confirming A18.1.
+
+### A20 — The OLE BioLogic finding is real but not live
+
+The survey's highest-severity item — `_ship_artifacts` moving EC-Lab's
+`.mps`/`.mpr`/`.mpt` into the action directory with no `FileInfo` registration
+— is on a backend **no production config currently selects**.
+`pstat_backend: olecom` appears in exactly one file tree-wide,
+`hte/configs/biologicole.yml`, which is a canary config. The key defaults to
+`eclib`, so every production BioLogic station is on a backend whose driver
+writes nothing into the action directory.
+
+So this is not a cut-over blocker, and A4's resolution stands. But it **must**
+be fixed before the OLE backend reaches a station, and the fix belongs with
+whoever promotes it. Note it in that config's comments so the next person to
+enable `olecom` finds it.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -3548,6 +3601,10 @@ the merge, in this order.
 - [ ] **Before cutting over a station that runs XRFS**, fix that deployment's
       `measurement_date_from_ymd` caller for the new layout (A18.2). It raises
       on the first post-cut-over analysis otherwise.
+- [ ] **Before cutting over the ECMS station**, port its calibration discovery
+      off sequence zips (A19). It is live, it is structurally zip-only, and it
+      fails silently — logging `0 calibration window(s) found` and converting
+      anyway.
 - [ ] Confirm `RUNS_ACTIVE` and `RUNS_FINISHED` are **empty**. A record left in
       either is a pre-cut-over record that the new syncer will never see: it has
       no journal entry and does not live under `RUNS`. Let the old build drain
