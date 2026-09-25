@@ -80,6 +80,12 @@ class RunStateJournal:
         server_key: The writing server's config key, e.g. ``ORCH`` or ``SYNC``.
     """
 
+    #: Directories :func:`rebuild_from_tree` could not read, 0 otherwise.
+    #: A non-zero value means this journal may be short, and a short journal
+    #: reads as "those records are done" -- a caller recovering from a
+    #: corrupt journal should say something louder than a log line.
+    unreadable_dirs: int = 0
+
     def __init__(self, states_root, server_key: str):
         self.states_root = Path(states_root)
         self.server_key = server_key
@@ -307,30 +313,54 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
         server_key: Journal owner, e.g. ``SYNC``.
 
     Returns:
-        The rebuilt, already-written journal.
+        The rebuilt, already-written journal. Its ``unreadable_dirs`` is the
+        number of directories the scan could not list; anything above zero
+        means the journal may be short.
     """
     runs_root = Path(runs_root)
     journal = RunStateJournal(states_root, server_key)
     root_name = runs_root.name
     entries = []
+    errors: list = []
 
-    for yml in sorted(runs_root.rglob("*.yml")):
-        kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])
-        if kind is None:
-            continue
-        if _prg_is_complete(yml.with_suffix(".prg")):
-            continue
-        uuid, parent = _identify(yml, kind)
-        rel = yml.parent.relative_to(runs_root).as_posix()
-        entries.append(
-            {
-                "ts": datetime.now().isoformat(),
-                "uuid": uuid,
-                "kind": kind,
-                "state": UNSYNCED,
-                "path": f"{root_name}/{rel}" if rel != "." else root_name,
-                "parent": parent,
-            }
+    # os.walk with onerror, not rglob: parts of the archive raise
+    # PermissionError for the account running this, and both rglob and a bare
+    # os.walk swallow that -- an unreadable subtree then looks exactly like an
+    # empty one. Directories are not pruned once a yml is found: the layout
+    # nests act inside exp inside seq, so a record directory is also the
+    # parent of the next level down.
+    for dirpath, dirnames, filenames in os.walk(runs_root, onerror=errors.append):
+        dirnames.sort()  # deterministic journal order across filesystems
+        for name in sorted(filenames):
+            if not name.endswith(".yml"):
+                continue
+            yml = Path(dirpath) / name
+            kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])
+            if kind is None:
+                continue
+            if _prg_is_complete(yml.with_suffix(".prg")):
+                continue
+            uuid, parent = _identify(yml, kind)
+            rel = yml.parent.relative_to(runs_root).as_posix()
+            entries.append(
+                {
+                    "ts": datetime.now().isoformat(),
+                    "uuid": uuid,
+                    "kind": kind,
+                    "state": UNSYNCED,
+                    "path": f"{root_name}/{rel}" if rel != "." else root_name,
+                    "parent": parent,
+                }
+            )
+
+    journal.unreadable_dirs = len(errors)
+    if errors:
+        shown = ", ".join(str(e.filename) for e in errors[:5])
+        LOGGER.warning(
+            f"{len(errors)} directory(ies) under {runs_root} could not be read "
+            f"({shown}{', ...' if len(errors) > 5 else ''}). The rebuilt journal "
+            "may be INCOMPLETE: a record under an unreadable directory is "
+            "absent, absence means done, and it will never sync."
         )
 
     journal.states_root.mkdir(parents=True, exist_ok=True)
