@@ -193,6 +193,25 @@ indistinguishable from an empty one — a short journal that looks complete.
 it could not read, and log it at WARNING. A rebuild that skipped 400
 directories must say so rather than quietly producing a short journal.
 
+**Shipped contract** (`a17b55b3`): `os.walk(runs_root, onerror=errors.append)`
+collects the `OSError` itself, so `e.filename` names the directory. The
+warning gives the count, the first five paths, and says the journal may be
+INCOMPLETE and that the missing records read as done and will never sync. It
+does not raise.
+
+The count is exposed as `RunStateJournal.unreadable_dirs` — a class attribute
+defaulting to `0`, set on the instance by `rebuild_from_tree`. Chosen over a
+tuple return so the signature and every call site stay unchanged. **Task 6
+must check it**: on a corrupt-journal startup, `if journal.unreadable_dirs:`
+should escalate louder than a log line, because a degraded rebuild means some
+records will never sync.
+
+Do **not** prune descent once a record's yml is found. Records nest — `act`
+inside `exp` inside `seq` — so every record directory is also the parent of
+the next level down, and pruning at a sequence yml would drop every experiment
+and action under it. An earlier draft of this amendment suggested otherwise
+and was wrong.
+
 ### A9 — Task 11: a path can carry *two* run-root segments
 
 Superseded records are archived as whole nested legacy trees:
