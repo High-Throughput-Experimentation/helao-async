@@ -119,10 +119,26 @@ Task 13 needs:
    pointed at a frozen archive. Neither fixture nor test; leave its literals
    alone.
 
-### A4 — Task 3: a *driver* that writes into an action directory has no way to register
+### A4 — Task 3: a *driver* that writes into an action directory has no way to register — RESOLVED
 
-See the separate decision note at the end of this section. Do not start Task 3
-until it is resolved.
+The premise behind the current design is false. The OLE driver defers moving
+EC-Lab's artifacts until `cleanup()` because, per its own docstring, "a file
+written straight into the action directory could be uploaded half-finished".
+
+**That cannot happen.** The syncer refuses any record whose status is not
+`finished` (`sync_driver.py:1408`), and a record only reaches the syncer at
+all through `yml_finisher`, after the action has finished. There is no window
+in which a live action's directory is uploaded.
+
+So the artifacts do not need to be shipped at `cleanup()` to be safe, and the
+registration does not need a post-hoc enumeration: whatever writes them can
+register them through the executor's `active` handle at the time it writes,
+like every other producer in the codebase already does.
+
+Task 3 is unblocked. The driver-side change belongs to that deployment's own
+repo and is tracked in A3's per-deployment commit step, not here. What this
+plan owes it is the guarantee in A11 — that `status` keeps meaning what it
+says once the path stops encoding it.
 
 ### A5 — Task 12: the alias covers the name, not the zip assumptions
 
@@ -207,39 +223,55 @@ Recorded here for completeness: `_is_syncable_misc_file` excludes neither
 on every record. Task 3's listing and its mutation list were corrected in
 commit `bc6607ce`.
 
+### A11 — Task 10: `HelaoYml.status` and `status_idx` raise on a new-layout path
+
+Found while verifying A4. This is the hardest item in this section: **the
+syncer cannot process a single new-layout record until it is fixed**, and it
+fails with an exception rather than silently.
+
+```python
+@property
+def status(self) -> str:                                    # sync_driver.py:328
+    path_parts = [x for x in self.targetdir.parts if x.startswith("RUNS_")]
+    status = path_parts[0].split("_")[-1].lower()           # IndexError
+```
+
+No segment of `RUNS/2026/0925/...` starts with `RUNS_`, so `path_parts` is
+empty and the subscript raises. `status_idx` (`:367-374`) has the same defect
+one layer down — `.index(True)` raises `ValueError` — and `rename`,
+`relative_path`, `active_path`, `finished_path` and `synced_path` all rest on
+it.
+
+`sync_yml` consults `status` twice, at `:1398` and `:1408`, to refuse a record
+that is already synced and to refuse one that is still active. Both are on the
+main path for every record.
+
+**Fix: derive the status from `meta_status`, not from the path.** The yml's own
+`<type>_status` list is the record's actual lifecycle; the path was only ever
+an inference from where the record happened to sit, and there is no longer a
+"where" to infer from. `meta_status` already exists (`:334-341`) and its
+docstring already draws the distinction.
+
+- `status` returns `"active"` / `"finished"` / `"synced"` from `meta_status`
+  for a new-layout path, and keeps the path derivation for a legacy one so
+  archives still classify.
+- `status_idx`, `rename` and `relative_path` are legacy-only. Guard each with
+  `is_legacy_path` and raise a clear error naming this amendment if a
+  new-layout path reaches them, rather than letting an `IndexError` surface
+  from three frames down.
+
+Tests: a new-layout record whose meta says `active` is refused by `sync_yml`;
+one whose meta says `finished` proceeds; a legacy record classifies from its
+path exactly as today. Mutate by restoring the path derivation and confirm the
+first two fail with `IndexError` rather than a clean refusal — that is the
+production symptom.
+
 ---
 
-## Decision required before Task 3
+## Decision resolved (2026-09-25)
 
-**A driver that writes into an action directory has no registration path, and
-this is the survey's highest-severity finding.**
-
-One deployment's OLE-backend potentiostat driver `shutil.move`s EC-Lab's
-`.mps` / `.mpr` / `.mpt` out of a scratch directory into the action output
-directory at `cleanup()`. Nothing appends a `FileInfo`. Those files are
-uploaded today **only** because `HelaoYml.misc_files` rglobs the record
-directory — the driver's own docstring says so.
-
-The moment the upload set comes from `files`, every action on that backend
-silently stops uploading its raw vendor artifacts. The action still succeeds,
-the record still syncs, the `.mpr` simply never reaches S3.
-
-The driver holds no `active` handle, so there is nothing for it to call
-`track_file` on. Three ways out, and this plan cannot choose for the project:
-
-1. **`_ship_artifacts` returns the moved names; the executor registers them
-   after `cleanup()`.** Smallest diff. Fixes the one instance, leaves the class
-   open — the next driver that writes a file by hand reintroduces it.
-2. **The executor enumerates the action directory after cleanup and registers
-   anything not already in `files`.** Closes the class. Staging files are gone
-   by then, so it does not reintroduce the `.tmp` defect — but it is a glob
-   again, and the `nosync` flag it assigns has to be derived from the action's
-   `sync_data` rather than from the file.
-3. **Keep a narrow glob fallback in the syncer for files absent from `files`.**
-   Rejected: it reinstates exactly what §3.5 removes and would re-open the
-   `nosync` hole, which is the whole reason for the change.
-
-Until this is decided, Task 3 has no owner for the case and must not land.
+The driver-registration question in A4 is closed: the syncer never sees a live
+action, so the race the current design guards against does not exist. See A4.
 
 # Phase 1 — The upload set becomes `files`-driven
 
