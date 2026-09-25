@@ -51,6 +51,196 @@ git checkout -b feat/runs-layout-unification
 
 ---
 
+# Amendments from the deployment impact survey (2026-09-25)
+
+A read-only survey of all six deployments ran against this plan. Full report
+(not committed — it names the private deployments, which tracked parent-repo
+files may not): `/home/dan/.claude/jobs/a98b8858/tmp/deploy-impact-report.md`.
+
+**Every task below is amended by this section. Read it before starting any
+task, and treat the item for your task as part of that task's requirements.**
+
+Verdicts: two deployments need real code changes, one is blocking, two are
+mechanical, one is unaffected. Their own repos are amended separately — see
+A3.
+
+---
+
+### A1 — Task 10: `list_pending` sweeps every record ever written
+
+`sync_driver.py:2260-2267, 2277-2284, 2294-2301` build the search root as
+
+```python
+finished_dir = str(self.helaodirs.save_root).replace(
+    RunDir.ACTIVE.value, RunDir.FINISHED.value
+)
+```
+
+Once `save_root` is `<root>/RUNS` that replace is the **identity**, and records
+never leave. So the startup sweep and `/finish_pending` would enqueue every
+record ever written under `RUNS`, growing without bound.
+
+Not destructive — `prog.s3_done` short-circuits the upload — but it floods
+`task_queue`, and `has_pending_work()` reads exactly that queue, so the
+hot-reload idle gate is wedged behind the sweep at every start.
+
+**Spec §5 lists `finish_pending` and `has_pending_work` as "unchanged". That is
+wrong and this amendment supersedes it.** Filter the three `list_pending*`
+globs on the absence of a complete sibling `.prg` — the same predicate spec
+§4.5 defines for the rebuild path. Share one helper with Task 5's
+`_prg_is_complete`; do not write a second copy.
+
+Add a test: a tree with one complete-`.prg` record and one without yields
+exactly one pending entry. Mutate by removing the filter and confirm it returns
+two.
+
+### A2 — Task 9: `helao/helpers/processors.py:45` is missing
+
+Every deployment's post-processors reach the action directory through it, and
+it carries an ACTIVE→DIAG string replace. Add it to Task 9's file list and
+convert it to `redirect_manual_dir()` with the others.
+
+Related, same task: the manual redirect is a bare-substring
+`save_root.replace("ACTIVE", "DIAG")` in several places that a `RunDir` grep
+does not find, including `active_data_file.py:411` in `track_file` itself.
+Grep for the bare string `"ACTIVE"` as well as `RunDir.ACTIVE`.
+
+### A3 — Task 13: the six deployments need their own commits
+
+Task 13 Step 1's sweep descends into `helao/deploy/*`, but four of those are
+separate git repositories with their own branches and remotes — the parent
+repo's `git status` cannot see changes there. One of them has ~50 files with
+hits and its **production** batch pipeline in scope, not only fixtures.
+
+Task 13 needs:
+1. An explicit per-deployment commit step: `cd` into each deployment directory
+   and commit within its own git repo.
+2. A **fourth triage bucket, `legacy-tooling-by-design`** — live repair tooling
+   pointed at a frozen archive. Neither fixture nor test; leave its literals
+   alone.
+
+### A4 — Task 3: a *driver* that writes into an action directory has no way to register
+
+See the separate decision note at the end of this section. Do not start Task 3
+until it is resolved.
+
+### A5 — Task 12: the alias covers the name, not the zip assumptions
+
+Two consumers are reached with the same value and open it with `ZipFile`
+unconditionally; they will skip silently or raise on a directory. Task 12
+extends to **every consumer of the value**, not just the keyword. Enumerate
+them in Step 1 alongside the `sequence_zip_path` grep by also grepping for
+`ZipFile`, `zipfile`, and `.zip` in any file that mentions a sequence path.
+
+### A6 — Task 11: the operator's spec-lister goes silently empty
+
+`week_window.py:47-59` globs `<folderpath>/<%y.%W>/**/*.zip` for each of the
+last N weeks. It depends on **both** the week-numbered top level **and** on
+synced sequences being zips — this plan removes both. The operator's "re-run a
+previous sequence with overridden params" list goes permanently empty for new
+runs at six live stations, and an empty list is indistinguishable from a quiet
+station.
+
+Glob `<folderpath>/%Y/%m%d/*/` for directories and keep the zip glob for the
+legacy window. `HelaoData` already accepts a directory, so the downstream
+`list_params` and `parser` need no change. **This needs a test**, precisely
+because the failure is invisible.
+
+Note while you are in that function: it uses `%y.%W` (Monday-start) while
+`premodels.get_sequence_dir` writes `%y.%U` (Sunday-start). That is a
+**pre-existing off-by-one-week bug**, not something this change introduces.
+Fix it while the file is open, and say so in the commit message so it is not
+mistaken for a regression.
+
+Thirteen configs point `seqspec_folder_path` at the legacy tree. Repointing
+them is a per-station decision at cut-over, not a code change — add it to the
+cut-over checklist.
+
+### A7 — Task 8: the label has consumers outside the record
+
+Spec §10.3's table covers the *rule*. Nothing covers a consumer that compares
+the label against something outside the record: one matches the recorded label
+as a substring of a source folder name, another hashes it into a `uuid5`.
+
+A `uuid5` over a changed label yields a **different identity for the same
+sequence**, which is the duplicate-record failure mode this codebase has
+already fought. Task 8 must enumerate label consumers and state, for each,
+whether the D6 suffix changes its result.
+
+### A8 — Task 5: the rebuild scan must not silently under-report
+
+Some archive subdirectories raise `PermissionError: [Errno 1] Operation not
+permitted`. `os.walk` swallows errors by default, so an unreadable subtree is
+indistinguishable from an empty one — a short journal that looks complete.
+
+`rebuild_from_tree` must pass `onerror=` (or catch per-directory), count what
+it could not read, and log it at WARNING. A rebuild that skipped 400
+directories must say so rather than quietly producing a short journal.
+
+### A9 — Task 11: a path can carry *two* run-root segments
+
+Superseded records are archived as whole nested legacy trees:
+
+```
+RUNS_SUPERSEDED/260818.091656/RUNS_FINISHED/26.25/0624/160156__.../...
+```
+
+Spec §7's rule ("legacy iff **any** segment is in `LEGACY_RUN_DIRS`") is
+correct and unaffected. But:
+
+- `file_mapper.py:56-59` takes the **first** matching segment.
+- `helao_data.py:145-146` takes the first and then uses `str.replace`, which
+  rewrites **all** occurrences.
+
+The single-candidate fast path must take the **last** run-root segment, or
+refuse to fast-path a multi-root path at all. Add a test with a two-root path.
+
+Also: `FileMapper.__init__` special-cases the literal `PROCESSES`
+(`file_mapper.py:56-59`) and will `IndexError` on a `PROCESSES_SUPERSEDED`
+path. That directory mirrors `PROCESSES`, not `RUNS_*`, so spec §3.1 leaves it
+alone — but the reader still has to survive meeting one.
+
+### A10 — Task 3: the reconciliation warning (already fixed)
+
+Recorded here for completeness: `_is_syncable_misc_file` excludes neither
+`.prg` nor `.lock`, so once the sidecar sits beside its yml the warning fires
+on every record. Task 3's listing and its mutation list were corrected in
+commit `bc6607ce`.
+
+---
+
+## Decision required before Task 3
+
+**A driver that writes into an action directory has no registration path, and
+this is the survey's highest-severity finding.**
+
+One deployment's OLE-backend potentiostat driver `shutil.move`s EC-Lab's
+`.mps` / `.mpr` / `.mpt` out of a scratch directory into the action output
+directory at `cleanup()`. Nothing appends a `FileInfo`. Those files are
+uploaded today **only** because `HelaoYml.misc_files` rglobs the record
+directory — the driver's own docstring says so.
+
+The moment the upload set comes from `files`, every action on that backend
+silently stops uploading its raw vendor artifacts. The action still succeeds,
+the record still syncs, the `.mpr` simply never reaches S3.
+
+The driver holds no `active` handle, so there is nothing for it to call
+`track_file` on. Three ways out, and this plan cannot choose for the project:
+
+1. **`_ship_artifacts` returns the moved names; the executor registers them
+   after `cleanup()`.** Smallest diff. Fixes the one instance, leaves the class
+   open — the next driver that writes a file by hand reintroduces it.
+2. **The executor enumerates the action directory after cleanup and registers
+   anything not already in `files`.** Closes the class. Staging files are gone
+   by then, so it does not reintroduce the `.tmp` defect — but it is a glob
+   again, and the `nosync` flag it assigns has to be derived from the action's
+   `sync_data` rather than from the file.
+3. **Keep a narrow glob fallback in the syncer for files absent from `files`.**
+   Rejected: it reinstates exactly what §3.5 removes and would re-open the
+   `nosync` hole, which is the whole reason for the change.
+
+Until this is decided, Task 3 has no owner for the case and must not land.
+
 # Phase 1 — The upload set becomes `files`-driven
 
 Ships alone. Fixes `sync-uploads-glob-not-action-files` at its source and is the
