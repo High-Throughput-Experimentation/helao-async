@@ -639,6 +639,43 @@ be fixed before the OLE backend reaches a station, and the fix belongs with
 whoever promotes it. Note it in that config's comments so the next person to
 enable `olecom` finds it.
 
+### A21 — Baseline a delta list against the MERGE-BASE, not HEAD
+
+Task 7 produced a green→red delta list, which is the right instrument, but it
+baselined against `HEAD` — and `HEAD` already contained Tasks 2 through 6. Two
+suites were therefore red "before" its change and got classified
+**"pre-existing, unowned"**. Both were green at the merge-base `658c94dc`:
+
+| Suite | merge-base | HEAD | Actually introduced by |
+|---|---|---|---|
+| `core/tests/test_prc_colocation.py` | 14 passed | 1 failed | **Task 6** |
+| `hexagon/tests/test_boundaries.py` | 14 passed | 2 failed | **Task 2** |
+
+`test_prc_colocation` fails with `AttributeError: '_StubSyncer' object has no
+attribute '_journal'` at `sync_driver.py:1504` — Task 6's journal call.
+`test_boundaries` fails with `native-adapter boundary violations: [(40,
+'helao.core.servers.active_data_file', 'adapters-native')]` — Task 2's import
+of the shared helper across a boundary the repo enforces with a test. That
+import was prescribed by the plan, which is why the executing task did not
+question it.
+
+**This is the exact failure mode a phased migration invites**: each task
+reports "these were already red," everyone believes it, and a regression rides
+to the merge under a label that means nobody looks at it.
+
+**Rule for Tasks 8-13:** the baseline for any before/after comparison is
+`git merge-base unstable HEAD`, established in a detached worktree, **not** the
+branch tip. A suite red at the branch tip and green at the merge-base is a
+regression this branch owns, no matter which task introduced it. Only
+`test_orch_dispatch_golden_master.py` and `.omc/artifacts/p3a/schema_baseline.json`
+are genuinely red at the merge-base (A15), and that is established, not
+assumed.
+
+Note also what the delta list got right: it caught both suites at all. Neither
+is in the plan's named verification list for any task, and Task 7 found them
+only by sweeping the 43 test files that mention `RUNS_ACTIVE` / `RunDir` /
+`save_root` / `helao_dirs` rather than trusting the list it was given.
+
 ---
 
 ## Decision resolved (2026-09-25)
