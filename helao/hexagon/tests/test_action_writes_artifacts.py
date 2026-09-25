@@ -73,7 +73,14 @@ async def _started_app(root: str, postprocess_libs: list[str] | None = None):
 def _run_files(root: str) -> list[Path]:
     """Every file under the run trees, whatever stage they reached."""
     found: list[Path] = []
-    for top in ("RUNS_ACTIVE", "RUNS_FINISHED", "RUNS_SYNCED", "RUNS_DIAG"):
+    for top in (
+        "RUNS",
+        "DIAG",
+        "RUNS_ACTIVE",
+        "RUNS_FINISHED",
+        "RUNS_SYNCED",
+        "RUNS_DIAG",
+    ):
         base = Path(root) / top
         if base.exists():
             found.extend(p for p in base.rglob("*") if p.is_file())

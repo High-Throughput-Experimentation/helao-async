@@ -1190,11 +1190,10 @@ class SyncDriver:
             return
         except ValueError as exc:
             LOGGER.warning(f"SYNC journal is corrupt ({exc}); rebuilding from the run tree.")
-        # Phase 2 still runs the folder-state machinery, so the records waiting
-        # to sync are the ones under RUNS_FINISHED, not under save_root
-        # (RUNS_ACTIVE). Task 7 collapses both onto RUNS.
+        # Records never move, so save_root (<root>/RUNS) is the whole tree a
+        # rebuild has to scan.
         self.run_journal = rebuild_from_tree(
-            Path(str(self.helaodirs.root)) / RunDir.FINISHED.value,
+            Path(str(self.helaodirs.save_root)),
             self.helaodirs.states_root,
             "SYNC",
         )

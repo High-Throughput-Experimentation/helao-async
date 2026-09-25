@@ -48,7 +48,7 @@ def _fake_syncer(tmp_path: Path) -> SyncDriver:
     driver = SyncDriver.__new__(SyncDriver)
     driver.helaodirs = SimpleNamespace(  # type: ignore[assignment]
         root=str(tmp_path),
-        save_root=str(tmp_path / "RUNS_ACTIVE"),
+        save_root=str(tmp_path / "RUNS"),
         states_root=str(tmp_path / "STATES"),
     )
     driver.run_journal = RunStateJournal(driver.helaodirs.states_root, "SYNC")
@@ -197,7 +197,7 @@ def test_a_path_that_is_not_a_record_is_not_journalled(tmp_path: Path):
 
 def test_a_corrupt_journal_is_rebuilt_from_the_run_tree(tmp_path: Path):
     driver = _fake_syncer(tmp_path)
-    _act_yml(tmp_path / "RUNS_FINISHED" / "26.39" / "0925" / "seq" / "exp" / "act")
+    _act_yml(tmp_path / "RUNS" / "2026" / "0925" / "seq" / "exp" / "act")
     journal_of(driver).states_root.mkdir(parents=True, exist_ok=True)
     journal_of(driver).path.write_text("{ not json\n{ nor this\n", encoding="utf-8")
     with pytest.raises(ValueError):
@@ -208,7 +208,7 @@ def test_a_corrupt_journal_is_rebuilt_from_the_run_tree(tmp_path: Path):
     entries = journal_of(driver).working_set()
     assert set(entries) == {ACT_UUID}
     assert entries[ACT_UUID]["state"] == UNSYNCED
-    assert entries[ACT_UUID]["path"].startswith("RUNS_FINISHED/")
+    assert entries[ACT_UUID]["path"].startswith("RUNS/")
 
 
 def test_a_degraded_rebuild_is_escalated(tmp_path: Path, monkeypatch):
