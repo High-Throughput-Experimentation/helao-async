@@ -38,6 +38,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from uuid import UUID
 
 from helao.helpers import helao_logging as logging
 
@@ -190,6 +191,23 @@ class RunStateJournal:
 
 
 _KIND_BY_SUFFIX = {"-seq": "sequence", "-exp": "experiment", "-act": "action"}
+_UUID_KEY = {
+    "sequence": "sequence_uuid",
+    "experiment": "experiment_uuid",
+    "action": "action_uuid",
+}
+_PARENT_KIND = {"action": "experiment", "experiment": "sequence"}
+
+#: A record yml is read only at its two ends, and both ends are needed. An
+#: action carries its own uuid on line 3 and its parent's on line 19, but a
+#: sequence's own uuid sits seven lines from the *end* of a file measured in
+#: hundreds of thousands of lines -- ``sequence_params`` and
+#: ``planned_experiments`` are serialized before it -- and an experiment's
+#: parent ``sequence_uuid`` lands ~20 lines from its end for the same reason.
+#: Measured across the 26.03-26.05 production archive, where seq ymls run
+#: 427k-560k lines: a head-only read would recover no sequence uuid at all.
+_HEAD_BYTES = 4096
+_TAIL_BYTES = 8192
 
 
 def _prg_is_complete(prg_path: Path) -> bool:
@@ -209,12 +227,74 @@ def _prg_is_complete(prg_path: Path) -> bool:
     return "s3: true" in lines and "api: true" in lines
 
 
+def _scan_top_level(path: Path, keys: set) -> dict:
+    """``key: value`` pairs for ``keys``, from a bounded window of ``path``.
+
+    Reads only the first :data:`_HEAD_BYTES` and last :data:`_TAIL_BYTES`, so
+    the cost is flat whether the yml is 20 lines or half a million. Each
+    chunk's boundary line is discarded: a fragment is a prefix of a real line
+    and could otherwise yield a truncated value.
+    """
+    try:
+        with path.open("rb") as f:
+            head = f.read(_HEAD_BYTES)
+            size = f.seek(0, os.SEEK_END)
+            f.seek(max(0, size - _TAIL_BYTES))
+            tail = f.read(_TAIL_BYTES)
+    except OSError:
+        return {}
+    lines = head.decode("utf-8", "replace").splitlines()
+    if size > _HEAD_BYTES:
+        lines = lines[:-1]
+    tail_lines = tail.decode("utf-8", "replace").splitlines()
+    lines += tail_lines[1:] if size > _TAIL_BYTES else tail_lines
+    found: dict = {}
+    for line in lines:
+        key, sep, value = line.partition(": ")
+        if sep and key in keys:
+            found.setdefault(key, value.strip())
+    return found
+
+
+def _identify(yml: Path, kind: str) -> tuple:
+    """``(uuid, parent)`` for a record, from a bounded read of its yml.
+
+    The journal is keyed by uuid and eviction is a ``pop`` by that key, so
+    keying a rebuilt record by anything else is not a cosmetic shortcut: the
+    ``done`` tombstone the syncer later appends carries the record's real
+    uuid, would pop nothing, and the phantom would survive every subsequent
+    compaction (spec §3 D3, §4.2).
+
+    A yml too damaged to yield one falls back to the stem and warns rather
+    than raising -- one bad record must not cost the whole rebuild -- and the
+    warning says what the leftover entry will be.
+    """
+    self_key = _UUID_KEY[kind]
+    parent_key = _UUID_KEY.get(_PARENT_KIND.get(kind, ""))
+    found = _scan_top_level(yml, {self_key, parent_key} - {None})
+    try:
+        own = str(UUID(found[self_key]))
+    except (KeyError, TypeError, ValueError):
+        LOGGER.warning(
+            f"No parseable {self_key} in {yml}; keying its journal record by "
+            "the file stem instead. A done tombstone carries the real uuid, "
+            "so this entry will linger until the yml is repaired."
+        )
+        return yml.stem, None
+    try:
+        parent = str(UUID(found[parent_key]))
+    except (KeyError, TypeError, ValueError):
+        parent = None
+    return own, parent
+
+
 def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJournal":
     """Reconstruct a journal by scanning the run tree (spec §4.5).
 
     The journal is an index; the ``.prg`` sidecar beside each record's yml is
     the authoritative receipt. A record whose ``.prg`` is present and complete
-    is done and is not emitted. Everything else is emitted as ``unsynced``.
+    is done and is not emitted. Everything else is emitted as ``unsynced``,
+    keyed by the uuid read out of its yml.
 
     This is a full walk of ``runs_root``, which is affordable because the new
     tree accumulates only from cut-over forward -- years of history stay in the
@@ -240,21 +320,16 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
             continue
         if _prg_is_complete(yml.with_suffix(".prg")):
             continue
+        uuid, parent = _identify(yml, kind)
         rel = yml.parent.relative_to(runs_root).as_posix()
         entries.append(
             {
                 "ts": datetime.now().isoformat(),
-                # The yml stem, not a real uuid: a rebuild recovers *which*
-                # records still need work from the filesystem, and the
-                # filesystem does not carry the uuid in the path. Sufficient
-                # because the only consumer is the syncer's pending queue,
-                # which is addressed by path. A caller must not assume a
-                # rebuilt record's uuid parses as one.
-                "uuid": yml.stem,
+                "uuid": uuid,
                 "kind": kind,
                 "state": UNSYNCED,
                 "path": f"{root_name}/{rel}" if rel != "." else root_name,
-                "parent": None,
+                "parent": parent,
             }
         )
 
