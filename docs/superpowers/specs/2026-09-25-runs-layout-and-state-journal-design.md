@@ -216,6 +216,53 @@ Both directions must be pinned, and both must fail when their guard is removed:
 - A `.<hex>.tmp` staging file present in the directory at scan time is absent
   from the upload set — the original defect, now prevented structurally.
 
+#### 3.5.3 Audit result (partial, measured 2026-09-25)
+
+Run with `helao/core/tests/audit_upload_sets.py`. The archive §3.5.1 names
+(note1's `/mnt/wd4/DATA/RUNS_SYNCED`) is **not reachable from the development
+host** — `/mnt/wd4` is a mounted but empty mount point. The audit was run
+instead against the only real run archive present locally,
+`/mnt/STORAGE/INST_hlo` (an ADSS campaign from week 23.08 plus an
+active-learning simulator campaign from week 23.34).
+
+| Tree | Actions scanned | Actions with a gap | Suffixes |
+|---|---:|---:|---|
+| `RUNS_FINISHED` | 9864 | 0 | — |
+| `RUNS_DIAG` | 16 | 0 | — |
+| `RUNS_ACTIVE` | 81 | 10 | `.hlo` |
+
+The ten `RUNS_ACTIVE` rows are not gaps. Each is an `action_status: [active]`
+record whose yml was written at action start and does not yet carry a `files`
+key; its `.hlo` is still open. Finished records are what the syncer ships, and
+every one of those 9880 named every file in its own directory.
+
+**This result does not close the §3.5.1 gate.** It is a real measurement, but
+of the wrong population. The writers the gate exists to find are vendor drivers
+that copy instrument output in by hand, and none of them appear here: the
+9864 finished actions are 9346 `GPSIM`/`CPSIM` simulator actions and 518
+real-hardware actions from `NI` (320), `PAL` (87), `ORCH` (77), `SYRINGE0`/
+`SYRINGE1` (13), `PSTAT` (12) and `MOTOR` (9). The Andor, Bruker GADDS, Gamry,
+BioLogic and OceanDirect families are absent entirely. Directly on point:
+**zero of the 9864 action directories contain a subdirectory at all**, so the
+specific defect §3.5.1 describes — a driver writing into a subdirectory of the
+action directory, uploaded by the `rglob` and unnameable by `files` — is
+simply not exercised by this sample.
+
+What this does establish is a floor: the *framework's* own writers
+(`active_data_file`, the native data-file adapter, `NI`, `PAL`, `PSTAT`,
+`MOTOR`, `SYRINGE`) already register everything they produce, so making `files`
+authoritative costs nothing for those paths.
+
+Outstanding, and still a prerequisite for the Phase 1 upload-set switch:
+
+```bash
+python helao/core/tests/audit_upload_sets.py /mnt/wd4/DATA/RUNS_SYNCED --limit 2000
+```
+
+on `hte-note-01.caltech.edu`. Until that runs, the per-suffix decision table
+this subsection is supposed to carry — one line per offending writer, fixed or
+consciously accepted — cannot be written.
+
 ## 4. State journals
 
 ### 4.1 Files and ownership (D7)
