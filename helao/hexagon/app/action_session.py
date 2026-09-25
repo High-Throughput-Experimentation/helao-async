@@ -42,6 +42,7 @@ from helao.core.models.sample import (
 )
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Action
+from helao.helpers.run_state import record_active
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -218,6 +219,13 @@ class ActionSession:
                     "DIAG",
                 )
             os.makedirs(full_action_output_path, exist_ok=True)
+            record_active(
+                self.base,
+                "action",
+                self.action.action_uuid,
+                full_action_output_path,
+                parent=self.action.experiment_uuid,
+            )
             await self.update_act_file()
 
             if self.action.manual_action:

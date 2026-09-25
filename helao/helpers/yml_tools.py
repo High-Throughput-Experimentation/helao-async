@@ -21,6 +21,7 @@ import ruamel.yaml
 from ruamel.yaml.representer import RepresenterError
 
 from helao.core.models.run_dir import RunDir
+from helao.helpers.run_state import DONE as RUN_STATE_DONE
 from helao.helpers.server_keys import get_sync_server_cfg
 
 #: Per-thread dumper cache. ``ruamel.yaml.YAML`` instances hold emitter state
@@ -369,6 +370,19 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
                         )
                 if not os.path.exists(yml_dir):
                     rm_success = True
+                    # The producing server evicts here, before the handoff:
+                    # whether or not a syncer exists, this server is done with
+                    # the record (spec §4.3). A manual record has no handoff at
+                    # all, so the eviction must not sit under `not is_manual`
+                    # below or its journal entry would never be dropped.
+                    journal = getattr(base, "run_journal", None)
+                    if journal is not None:
+                        journal.append(
+                            str(getattr(hobj, f"{obj_type}_uuid")),
+                            obj_type,
+                            RUN_STATE_DONE,
+                            "",
+                        )
                     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
                         "%y%m%d.%H%M%S%f"
                     )
