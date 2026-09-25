@@ -29,7 +29,9 @@ __all__ = [
     "DONE",
     "UNSYNCED",
     "RunStateJournal",
+    "identify_record",
     "rebuild_from_tree",
+    "record_active",
     "root_relative",
 ]
 
@@ -70,6 +72,34 @@ def root_relative(path, root) -> str:
         return Path(path).resolve().relative_to(Path(str(root)).resolve()).as_posix()
     except ValueError:
         return Path(path).as_posix()
+
+
+def record_active(base, kind: str, uuid, record_dir, parent=None) -> None:
+    """Append an ``active`` line for a record the server has just created.
+
+    Args:
+        base: Any server object carrying ``run_journal`` and ``helaodirs``.
+            A server without a journal (no ``root`` in its config) is a no-op,
+            which is why the attribute is read with ``getattr``.
+        kind: ``action`` | ``experiment`` | ``sequence``.
+        uuid: The record's uuid.
+        record_dir: The record's directory as an **absolute** path. The three
+            ``*_output_dir`` fields are run-relative, so a caller must join
+            ``save_root`` itself before getting here; resolving one of them
+            directly anchors on the process cwd and silently yields a
+            basename (plan A13).
+        parent: Parent record uuid, or ``None`` for a sequence.
+    """
+    journal = getattr(base, "run_journal", None)
+    if journal is None:
+        return
+    journal.append(
+        str(uuid),
+        kind,
+        ACTIVE,
+        root_relative(record_dir, base.helaodirs.root),
+        parent=str(parent) if parent else None,
+    )
 
 
 class RunStateJournal:
@@ -292,6 +322,25 @@ def _identify(yml: Path, kind: str) -> tuple:
     except (KeyError, TypeError, ValueError):
         parent = None
     return own, parent
+
+
+def identify_record(yml_path) -> tuple:
+    """``(uuid, kind, parent)`` for a record yml, or ``(None, None, None)``.
+
+    The bounded head+tail read behind :func:`rebuild_from_tree`, exposed for
+    the syncer, which is handed a yml path by ``/finish_yml`` and needs the
+    record's uuid to journal it. A sequence yml runs to half a million lines
+    (plan A12), so loading it just to read a uuid is not an option.
+
+    Returns ``(None, None, None)`` for a path whose name carries no
+    ``-seq``/``-exp``/``-act`` suffix, i.e. not a record at all.
+    """
+    yml = Path(yml_path)
+    kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])
+    if kind is None:
+        return None, None, None
+    uuid, parent = _identify(yml, kind)
+    return uuid, kind, parent
 
 
 def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJournal":

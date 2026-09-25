@@ -83,6 +83,7 @@ from helao.helpers.helao_logging import print_message
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.processors import HloPostProcessor
+from helao.helpers.run_state import RunStateJournal, record_active
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.time_utils import (
     read_saved_offset,
@@ -177,6 +178,15 @@ class Base:
             raise ValueError(
                 "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
             )
+
+        #: This server's append-only run-state journal (spec §4.1). Exactly one
+        #: process writes it, so there is no locking. Additive in this phase --
+        #: the folder-state machinery is still authoritative.
+        self.run_journal = (
+            RunStateJournal(self.helaodirs.states_root, str(self.server.server_name))
+            if self.helaodirs.states_root
+            else None
+        )
 
         LOGGER.info(f"Found run_type in config: {self.typed_cfg.run_type}")
         self.run_type = self.typed_cfg.run_type.lower()
@@ -1028,6 +1038,13 @@ class Active:
                     "DIAG",
                 )
             os.makedirs(full_action_output_path, exist_ok=True)
+            record_active(
+                self.base,
+                "action",
+                self.action.action_uuid,
+                full_action_output_path,
+                parent=self.action.experiment_uuid,
+            )
             await self.update_act_file()
 
             if self.action.manual_action:

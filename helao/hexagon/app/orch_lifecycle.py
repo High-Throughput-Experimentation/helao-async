@@ -42,6 +42,7 @@ from copy import deepcopy
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
+from helao.helpers.run_state import record_active
 from helao.helpers.time_utils import set_time
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -219,6 +220,7 @@ class RunLifecycle:
             k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
         }
         await orch.write_exp(orch.active_experiment)
+        self._record_active(orch.active_experiment, "experiment")
 
     async def write_active_sequence_seq(self):
         """Persist the active sequence to disk after snapshotting initial global params."""
@@ -227,6 +229,34 @@ class RunLifecycle:
             k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
         }
         await orch.write_seq(orch.active_sequence)
+        self._record_active(orch.active_sequence, "sequence")
+
+    def _record_active(self, hobj, kind: str) -> None:
+        """Journal ``hobj`` as ``active`` (spec §4.3).
+
+        Both writers above are re-entered for a record that is already in the
+        journal -- ``write_active_sequence_seq`` runs again on every experiment
+        finish. A repeated ``active`` line is harmless: replay keys on uuid and
+        keeps the last line, and compaction collapses them.
+
+        ``get_*_dir()`` is run-relative, so ``save_root`` is joined here
+        (plan A13). Orchestrator-driven records are never manual, so the
+        ACTIVE -> DIAG rewrite the meta writers apply does not arise.
+        """
+        orch = self.orch
+        if getattr(orch, "run_journal", None) is None:
+            return  # no root configured, or a stub orch in a unit test
+        record_active(
+            orch,
+            kind,
+            getattr(hobj, f"{kind}_uuid"),
+            os.path.join(
+                str(orch.helaodirs.save_root), getattr(hobj, f"get_{kind}_dir")()
+            ),
+            parent=(
+                getattr(hobj, "sequence_uuid", None) if kind == "experiment" else None
+            ),
+        )
 
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
