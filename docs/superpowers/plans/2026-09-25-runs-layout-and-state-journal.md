@@ -741,6 +741,64 @@ deployment's own suite passes at HEAD because its fixtures carry no
 `plate_id`, so the degradation is **uncovered, not absent** — a fixture gap
 worth fixing at the same time.
 
+### A24 — DANGER: Task 7 without Task 9 DESTROYS every finished record
+
+**Do not launch this branch at a station between Task 7 and Task 9.** Not a
+test failure — actual data loss, reproduced.
+
+`move_dir` (`yml_tools.py:291`) computes its destination by string
+substitution:
+
+```python
+new_dir = os.path.join(yml_dir.replace(RunDir.ACTIVE.value, dest_dir))
+```
+
+Task 7 flipped `save_root` to `<root>/RUNS`. There is no `RUNS_ACTIVE`
+substring in that path, so the replace is the identity and **`new_dir ==
+yml_dir`**. What follows:
+
+1. `aioshutil.copy(src, dst)` with `dst == src` raises `SameFileError`,
+   swallowed by `return_exceptions=True`.
+2. `exists_list` finds every destination on disk — they are the originals — so
+   `len(exists_list) == len(src_list)` and `copy_success = True`.
+3. The success branch then removes every file in `rm_list` and `rmtree`s
+   `yml_dir`.
+
+The record is deleted. Every guard in that function reads as satisfied at each
+step; nothing logs an error.
+
+**Reproduced**, not deduced: a live two-experiment run under the branch leaves
+one `-exp.yml` on disk. The first experiment's directory is gone.
+
+```
+RUNS/2026/0925/150208__SIM_websocket_data_seq__p1b2b/
+    260925.150208919214-seq.yml
+    260925.150216__SIM_websocket_data/260925.150216917542-exp.yml   <- only one
+```
+
+`helao/hexagon/tests/test_concurrency_live.py::test_item1_status_burst_no_double_drain`
+is the suite that caught it (`assert exp_yml_count == 2` → `0` before the
+counter was pointed at `RUNS`, `1` after). It was initially filed as
+environment noise by a concurrent baseline sweep, then as a stale assertion.
+It was neither.
+
+**This is a defect in the plan's task ordering, not in any task's execution.**
+Task 7 flips the write root; Task 9 guts `move_dir`. Between them the tree is
+not merely inconsistent, it is destructive — and nothing in Phase 3's framing
+said so. The same string-substitution pattern is the reason A2 exists
+(`processors.py`) and A18.3 (`save_root.replace("ACTIVE", "DIAG")`); this is
+the third instance and the only lethal one.
+
+**Required:** Task 9 lands immediately after Task 7, before anything else, and
+its first step is to make `move_dir` safe. Any future plan that flips a path
+root must gut the movers in the **same** task, or gut them first.
+
+**Also required — a guard that outlives this branch.** A `move_dir` whose
+computed destination equals its source must refuse and log, never proceed to
+the removal branch. The identity-substitution bug is latent in the legacy path
+too: a record already under `RUNS_FINISHED` reaching `move_dir` has the same
+shape. Task 9 must add that guard and a test for it.
+
 ---
 
 ## Decision resolved (2026-09-25)
