@@ -366,7 +366,7 @@ and the six `*_postseq` sequences keep working with no edit.
 levels, so the ANA endpoints need no logic change — only the parameter rename and
 the alias.
 
-Existing zips stay readable: `FileMapper._zip_lookup` (`file_mapper.py:119-160`)
+Existing zips stay readable: `FileMapper._locate_in_zip` (`file_mapper.py:118-165`)
 is legacy-only from here, reached only for paths that carry a `RUNS_SYNCED`
 segment.
 
