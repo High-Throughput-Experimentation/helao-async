@@ -26,8 +26,7 @@ methods, with ``self.`` rewritten to ``self.active.``):
 - ``log_data_set_output_file`` -- open the streamed HLO file and write header.
 - ``_resolve_output_path`` -- resolve write params for a one-shot file.
 - ``write_file`` / ``write_file_nowait`` -- write one complete file (async/sync).
-- ``track_file`` -- record an aux file and queue it for relocation.
-- ``relocate_files`` -- copy tracked aux files into the action's output dir.
+- ``track_file`` -- record an existing file on the action.
 
 State stays on ``Active`` (rule 3, same as the ``Base`` collaborators):
 ``file_conn_dict``, ``action``, ``action_list``, ``base``, and all file-path
@@ -58,7 +57,6 @@ from helao.core.models.sample import (
     NoneSample,
     SolidSample,
 )
-from helao.helpers import async_copy
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Action
 from helao.helpers.yml_tools import yml_dumps
@@ -336,7 +334,10 @@ class DataFileWriter:
             ).strip("\\")
         else:
             LOGGER.info("could not detect OS, path seps may be mixed")
-        os.makedirs(output_path, exist_ok=True)
+        # The file's own directory, not just the record root: a record-relative
+        # file_name may name a subdirectory, and opening into one that does
+        # not exist fails with FileNotFoundError.
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         return header, file_info, output_path, output_file
 
     async def write_file(
@@ -420,7 +421,7 @@ class DataFileWriter:
         ],
         action: Optional[Action] = None,
     ) -> None:
-        """Record an auxiliary file on the action and queue it for relocation if needed.
+        """Record an auxiliary file on the action.
 
         Args:
             file_type: HELAO file-type label stored on the ``FileInfo``.
@@ -434,8 +435,6 @@ class DataFileWriter:
         if action.manual_action:
             save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
         record_dir = os.path.join(save_root, action.action_output_dir)
-        if os.path.dirname(file_path) != record_dir:
-            action.aux_file_paths.append(file_path)
 
         file_info = FileInfo(
             file_type=file_type,
@@ -453,16 +452,3 @@ class DataFileWriter:
         action.files.append(file_info)
         LOGGER.info(f"{file_info.file_name} added to files_technique / aux_files list.")
 
-    async def relocate_files(self):
-        """Copy any tracked auxiliary file paths into the action's output directory."""
-        save_root = str(self.active.base.helaodirs.save_root)
-        if self.active.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        for x in self.active.action.aux_file_paths:
-            new_path = os.path.join(
-                save_root,
-                self.active.action.action_output_dir,
-                os.path.basename(x),
-            )
-            if x != new_path:
-                await async_copy(x, new_path)

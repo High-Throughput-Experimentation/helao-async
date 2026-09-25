@@ -502,8 +502,7 @@ def test_repeat_write_error_is_still_exported():
 
 def test_track_file_copies_immediately_and_returns_the_fileinfo(run, tmp_path):
     """Divergence 7: post-hoc composition has no finalizer to relocate a
-    queued path later, so the copy happens at call time and
-    ``aux_file_paths`` is left empty."""
+    queued path later, so the copy happens at call time."""
     act, writer, save_root = run["act"], run["writer"], run["save_root"]
     src = tmp_path / "instrument_export.raw"
     src.write_bytes(b"\x00\x01raw-payload\x02")
@@ -524,7 +523,6 @@ def test_track_file_copies_immediately_and_returns_the_fileinfo(run, tmp_path):
     assert info.file_type == "demo_raw__file"
     assert info.sample == [_sample().get_global_label()]
     assert act.files[-1] is info
-    assert act.aux_file_paths == []
 
 
 def test_track_file_skips_the_copy_when_the_source_is_already_in_place(run):
@@ -540,7 +538,37 @@ def test_track_file_skips_the_copy_when_the_source_is_already_in_place(run):
     with open(src, "rb") as f:
         assert f.read() == b"in-place"
     assert act.files[-1].file_name == "already_here.raw"
-    assert act.aux_file_paths == []
+
+
+def test_track_file_honours_a_recorded_subdirectory(run):
+    """Amendment A14.3: the written location must match the recorded name.
+
+    ``track_file`` records a record-relative name, so a source already sitting
+    in a subdirectory of the record directory is named ``"sub/x.raw"``.
+    Copying it to ``dest_dir/x.raw`` instead would leave the recorded entry
+    resolving to nothing -- and the syncer's upload set is built by resolving
+    ``file_name`` against the record directory, so the file would be silently
+    dropped.
+    """
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    target_dir = os.path.join(save_root, str(act.action_output_dir))
+    sub = os.path.join(target_dir, "subdir")
+    os.makedirs(sub, exist_ok=True)
+    src = os.path.join(sub, "instrument.raw")
+    with open(src, "wb") as f:
+        f.write(b"sub-payload")
+
+    info = writer.track_file(
+        act, src_path=src, file_type="demo_raw__file", samples=[_sample()]
+    )
+
+    assert info.file_name == "subdir/instrument.raw"
+    resolved = os.path.join(target_dir, *info.file_name.split("/"))
+    assert os.path.isfile(resolved)
+    with open(resolved, "rb") as f:
+        assert f.read() == b"sub-payload"
+    # and no flattened second copy at the record root
+    assert not os.path.exists(os.path.join(target_dir, "instrument.raw"))
 
 
 # --------------------------------------------------------------------------
