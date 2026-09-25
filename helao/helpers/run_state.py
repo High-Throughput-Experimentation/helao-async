@@ -29,6 +29,7 @@ __all__ = [
     "DONE",
     "UNSYNCED",
     "RunStateJournal",
+    "rebuild_from_tree",
     "root_relative",
 ]
 
@@ -186,3 +187,87 @@ class RunStateJournal:
             f"{len(survivors)} live records."
         )
         self.compact()
+
+
+_KIND_BY_SUFFIX = {"-seq": "sequence", "-exp": "experiment", "-act": "action"}
+
+
+def _prg_is_complete(prg_path: Path) -> bool:
+    """Whether a ``.prg`` sidecar reports its record fully shipped.
+
+    Matched as whole top-level lines against what ``Progress`` actually
+    writes (``yml_dumps`` renders a python bool as a bare lowercase
+    ``true``/``false``), so a path inside ``files_s3`` cannot be mistaken for
+    the flag. Read as flat text rather than through ``yml_load`` so that this
+    module stays free of helao imports and a malformed sidecar degrades to
+    "not complete" instead of raising mid-rebuild.
+    """
+    try:
+        lines = prg_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    return "s3: true" in lines and "api: true" in lines
+
+
+def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJournal":
+    """Reconstruct a journal by scanning the run tree (spec §4.5).
+
+    The journal is an index; the ``.prg`` sidecar beside each record's yml is
+    the authoritative receipt. A record whose ``.prg`` is present and complete
+    is done and is not emitted. Everything else is emitted as ``unsynced``.
+
+    This is a full walk of ``runs_root``, which is affordable because the new
+    tree accumulates only from cut-over forward -- years of history stay in the
+    legacy ``RUNS_*`` trees and are never scanned. It runs on cold start after
+    a lost or corrupt journal, never on a hot path.
+
+    Args:
+        runs_root: The station's ``<root>/RUNS`` directory.
+        states_root: The station's ``<root>/STATES`` directory.
+        server_key: Journal owner, e.g. ``SYNC``.
+
+    Returns:
+        The rebuilt, already-written journal.
+    """
+    runs_root = Path(runs_root)
+    journal = RunStateJournal(states_root, server_key)
+    root_name = runs_root.name
+    entries = []
+
+    for yml in sorted(runs_root.rglob("*.yml")):
+        kind = _KIND_BY_SUFFIX.get(yml.stem[-4:])
+        if kind is None:
+            continue
+        if _prg_is_complete(yml.with_suffix(".prg")):
+            continue
+        rel = yml.parent.relative_to(runs_root).as_posix()
+        entries.append(
+            {
+                "ts": datetime.now().isoformat(),
+                # The yml stem, not a real uuid: a rebuild recovers *which*
+                # records still need work from the filesystem, and the
+                # filesystem does not carry the uuid in the path. Sufficient
+                # because the only consumer is the syncer's pending queue,
+                # which is addressed by path. A caller must not assume a
+                # rebuilt record's uuid parses as one.
+                "uuid": yml.stem,
+                "kind": kind,
+                "state": UNSYNCED,
+                "path": f"{root_name}/{rel}" if rel != "." else root_name,
+                "parent": None,
+            }
+        )
+
+    journal.states_root.mkdir(parents=True, exist_ok=True)
+    tmp = journal.path.with_suffix(journal.path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        for record in entries:
+            f.write(json.dumps(record, separators=(",", ":")) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, journal.path)
+    LOGGER.info(
+        f"Rebuilt {journal.path.name} from {runs_root}: "
+        f"{len(entries)} unsynced record(s)."
+    )
+    return journal
