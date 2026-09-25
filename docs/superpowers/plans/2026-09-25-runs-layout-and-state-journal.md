@@ -117,6 +117,12 @@ def glob_set(action_dir: Path) -> set[str]:
     Returns forward-slash paths relative to ``action_dir``. Action ymls recurse
     (``sync_driver.HelaoYml.misc_files`` uses ``rglob`` for actions), so a file
     in a subdirectory is included.
+
+    ``.hlo`` files are included here even though ``_is_syncable_misc_file``
+    excludes them: the syncer's real upload set is ``misc_files + hlo_files``,
+    and this function models that whole set, not just the misc half. Only
+    ``.yml`` is dropped, because a record's own metadata is handled separately
+    at every level.
     """
     out = set()
     for p in action_dir.rglob("*"):
@@ -229,22 +235,68 @@ audit is untrustworthy.
 
 - [ ] **Step 3: Run it against the real station archive**
 
+Two archives matter, and they answer different questions.
+
+**Local, available now** — `/mnt/STORAGE/INST_hlo` is a real station archive on
+this host (~9.9k action ymls under `RUNS_FINISHED`, weeks 23.08 and 23.34):
+
 ```bash
 /home/dan/miniforge3/envs/helao/bin/python helao/core/tests/audit_upload_sets.py \
-    /mnt/wd4/DATA/RUNS_SYNCED --limit 2000 | tee $CLAUDE_JOB_DIR/tmp/upload_audit.txt
+    /mnt/STORAGE/INST_hlo/RUNS_FINISHED | tee $CLAUDE_JOB_DIR/tmp/upload_audit_local.txt
 ```
 
-If `/mnt/wd4/DATA` is not mounted on this machine, the archive lives on the note1
-station; say so and stop rather than guessing at the result. **This measurement
-is the gate for Task 3** — do not proceed on an assumed answer.
+This establishes a **floor**, not the answer: its actions are overwhelmingly
+simulator (`GPSIM`/`CPSIM`) plus `NI`/`PAL`/`PSTAT`/`MOTOR`/`SYRINGE`. None of
+the vendor drivers §3.5.1 exists to find — Andor, Bruker GADDS, Gamry, BioLogic,
+OceanDirect — appear in it, and not one of its action directories contains a
+subdirectory, so the specific defect is never exercised. A clean result here
+means only that the framework's own writers register what they produce.
+
+**Station, gating** — the vendor-driver population lives on the instrument
+stations:
+
+```bash
+/home/dan/miniforge3/envs/helao/bin/python helao/core/tests/audit_upload_sets.py \
+    <station_root>/RUNS_SYNCED --limit 2000 | tee $CLAUDE_JOB_DIR/tmp/upload_audit.txt
+```
+
+Check the mount before believing it:
+
+```bash
+[ -n "$(ls -A /mnt/wd4/DATA 2>/dev/null)" ] && echo MOUNTED || echo "empty or absent"
+```
+
+`/mnt/wd4` is an **empty mount point** on this host, not a missing path — a bare
+`test -d /mnt/wd4/DATA` reports success and is wrong. If it is empty, say so and
+stop rather than guessing. **The station measurement is the gate for Task 3** —
+do not proceed on an assumed answer.
+
+Note which station you measure. A data-processing station (SYNC/BATCH/ANA, no
+hardware) cannot answer this question either; the audit must run somewhere the
+vendor drivers actually wrote.
 
 - [ ] **Step 4: Record the finding in the spec**
 
-Append a short subsection `#### 3.5.3 Audit result (measured YYYY-MM-DD)` to the
-spec with: actions scanned, actions with a gap, the suffix table, and one line
-per suffix saying whether that writer will be fixed to register its output or
-whether the file is consciously accepted as no-longer-uploaded. This is the
-record that the decision was measured, not assumed.
+Append a `#### 3.5.3 Audit result` subsection to the spec. Which form depends on
+what Step 3 actually produced — do not write the first form unless you ran the
+audit against a population that contains vendor-driver actions.
+
+**If the gating measurement succeeded**, head it `(measured YYYY-MM-DD)` and
+give: which archive and host, actions scanned, actions with a gap, the suffix
+table, and one line per suffix saying whether that writer will be fixed to
+register its output or whether the file is consciously accepted as
+no-longer-uploaded.
+
+**If only the local floor was measured**, head it `(partial, measured
+YYYY-MM-DD)`, give the same numbers, and state explicitly which populations were
+absent and that the gate is still open.
+
+**If nothing was measured**, head it `(NOT YET MEASURED)` and state the exact
+command, the host and path it must run on, and that Tasks 2 and 3 are gated on
+it.
+
+In every case this is the record that the decision was measured rather than
+assumed — including the record that it was not.
 
 - [ ] **Step 5: Commit**
 
