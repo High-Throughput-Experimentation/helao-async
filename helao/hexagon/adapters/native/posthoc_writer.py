@@ -32,8 +32,8 @@ What this face changes relative to the fork it replaces:
   two payloads as one body; this face replaces the target instead.
 * Meta ymls are written atomically (temp file + ``os.replace``) with the
   default YAML dumper, matching the core writers.
-* ``track_file`` copies at call time -- post-hoc composition has no finalizer to
-  relocate a queued path later -- and leaves ``aux_file_paths`` empty.
+* ``track_file`` copies at call time, to the record-relative name the
+  ``FileInfo`` carries -- nothing relocates a file later on any path.
 * ``write_act`` accepts ``manual=`` like the other two writers, and returns
   ``None`` instead of raising when the action has ``save_act`` disabled.
 
@@ -140,9 +140,7 @@ def _atomic_copy(src_path: "str | os.PathLike[str]", dest_path: str) -> None:
     destination is either the previous file or the complete new one.
 
     Args:
-        src_path: File to copy. Accepts ``PathLike`` because
-            ``action.aux_file_paths`` carries ``Path`` entries as well as
-            strings.
+        src_path: File to copy. Accepts ``PathLike`` as well as ``str``.
         dest_path: Destination path, created or replaced.
     """
     dest_dir = os.path.dirname(dest_path)
@@ -400,10 +398,15 @@ class PostHocRunWriter:
     ) -> FileInfo:
         """Record an existing file on ``action`` and copy it in immediately.
 
-        Unlike the live path, which queues the source for the finalizer to
-        relocate at action end, this copies at call time: a post-hoc caller has
-        no finalizer, so a queued path would simply never be moved.
-        ``action.aux_file_paths`` is left as it was found.
+        The live path records the file and leaves it where it is; nothing ever
+        relocates it. A post-hoc caller's source is typically outside the
+        record directory, so this copies it in at call time.
+
+        The destination is the name the ``FileInfo`` records, resolved against
+        the record directory -- not the source's basename. The two have to
+        agree: the syncer's upload set resolves ``file_name`` against the
+        record directory, so a file written under a different name than the
+        one recorded resolves to nothing and is silently dropped.
 
         The copy is atomic and replaces any existing destination, for the same
         reason the data-file write is: a conversion killed mid-copy would
@@ -412,7 +415,9 @@ class PostHocRunWriter:
 
         Args:
             action: Action to attach the file to.
-            src_path: Path to the existing file; only its basename is recorded.
+            src_path: Path to the existing file. A source inside the record
+                directory is recorded (and left) at its record-relative path;
+                one outside it is recorded and copied in under its basename.
             file_type: HELAO file-type tag recorded on the ``FileInfo``.
             samples: Samples whose global labels are recorded on the
                 ``FileInfo``. Samples with no label are skipped.
@@ -421,7 +426,6 @@ class PostHocRunWriter:
             The ``FileInfo`` appended to ``action.files``.
         """
         active = self._active_for(action)
-        queued_before = list(action.aux_file_paths)
         _run_sync(
             active.data_file_writer.track_file(
                 file_type=file_type,
@@ -430,18 +434,19 @@ class PostHocRunWriter:
                 action=action,
             )
         )
-        queued = [p for p in action.aux_file_paths if p not in queued_before]
-        action.aux_file_paths = queued_before
+        file_info = action.files[-1]
 
+        # ``_root_for`` honours ``action.manual_action`` exactly as the writer
+        # does, so this is the same record directory the name was computed
+        # against.
         dest_dir = os.path.join(
             self._root_for(action, False), str(action.action_output_dir)
         )
-        for path in queued:
-            new_path = os.path.join(dest_dir, os.path.basename(path))
-            if path != new_path:
-                _atomic_copy(path, new_path)
+        new_path = os.path.join(dest_dir, *str(file_info.file_name).split("/"))
+        if os.path.abspath(src_path) != os.path.abspath(new_path):
+            _atomic_copy(src_path, new_path)
 
-        return action.files[-1]
+        return file_info
 
     # -- meta files --------------------------------------------------------
 

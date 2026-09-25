@@ -1452,10 +1452,6 @@ class Active:
             file_type, file_path, samples, action=action
         )
 
-    async def relocate_files(self):
-        """Copy any tracked auxiliary file paths into the action's output directory."""
-        return await self.data_file_writer.relocate_files()
-
     async def finish_manual_action(self):
         """Finalize a manual action by writing its synthesized experiment and sequence meta files."""
         return await self.action_finalizer.finish_manual_action()

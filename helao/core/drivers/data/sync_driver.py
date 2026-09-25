@@ -512,6 +512,99 @@ class HelaoYml:
             ]
 
     @property
+    def upload_files(self) -> list[Path]:
+        """Files this record ships, named by the record itself.
+
+        The record's own ``files`` list is the authority, not a directory
+        glob. A glob cannot see ``FileInfo.nosync``, which is the only thing
+        keeping withheld data off S3 now that ``RUNS_NOSYNC`` no longer
+        exists (spec §3.5); and a glob sweeps up whatever is transiently
+        present, which is how ``.<hex>.tmp`` staging objects reached
+        ``raw_data/``.
+
+        Names are resolved relative to this record's directory and may name a
+        subdirectory (spec §3.5.1). A named file that is not on disk is
+        skipped here and surfaced by :meth:`warn_unregistered_files`, not
+        raised: a post-hoc converter can write the yml before its payloads.
+
+        Experiments and sequences carry no ``files`` list; their payload is
+        the yml plus the colocated ``*-prc.yml``, which :attr:`process_ymls`
+        already handles.
+        """
+        out = []
+        for name in self._registered_names():
+            candidate = self.targetdir / name
+            if candidate.is_file():
+                out.append(candidate)
+        return out
+
+    def _registered_names(self, include_nosync: bool = False) -> list[str]:
+        """Record-relative, forward-slash names from the yml's ``files`` list.
+
+        Args:
+            include_nosync: Keep entries flagged ``nosync``. The upload set
+                excludes them; the reconciliation warning must not report a
+                withheld file as unregistered.
+        """
+        if self.type != "action":
+            return []
+        names = []
+        for entry in (self.meta or {}).get("files") or []:
+            entry = entry or {}
+            if entry.get("nosync") and not include_nosync:
+                continue
+            name = entry.get("file_name")
+            if name:
+                names.append(str(name).replace("\\", "/"))
+        return names
+
+    def warn_unregistered_files(self) -> list[Path]:
+        """Log files the upload set will not ship, in both directions.
+
+        Migration aid for spec §3.5.1. A writer that produces output without
+        registering it used to be carried by the glob and is now dropped; and
+        a ``files`` entry naming a path that is not on disk -- what
+        ``track_file`` records for a source outside the record directory --
+        was never uploaded and cannot be seen by a glob at all. Both are
+        reported; neither is uploaded. This is not a fallback.
+        """
+        if self.type != "action":
+            return []
+        named = self._registered_names(include_nosync=True)
+        missing = [
+            self.targetdir / n for n in named if not (self.targetdir / n).is_file()
+        ]
+        unregistered = []
+        for p in self.targetdir.rglob("*"):
+            if not p.is_file() or not self._is_syncable_misc_file(p):
+                continue
+            # _is_syncable_misc_file excludes neither .prg nor .lock. They
+            # escape it today only because the sidecar is written under
+            # RUNS_SYNCED while the record being globbed is under
+            # RUNS_FINISHED -- two different trees. Spec §4.5 moves the
+            # sidecar beside its own yml, so without this both would be
+            # reported on every single record and the warning would be noise
+            # from the first run.
+            if p.suffix in (".prg", ".lock"):
+                continue
+            if p.relative_to(self.targetdir).as_posix() in named:
+                continue
+            unregistered.append(p)
+        for p in unregistered:
+            LOGGER.warning(
+                f"{p} is present in {self.targetdir.name} but not named in its "
+                "action's files list; it will not be uploaded. Register it in "
+                "the producing driver or accept the loss (spec §3.5.1)."
+            )
+        for p in missing:
+            LOGGER.warning(
+                f"{p} is named in the files list of {self.targetdir.name} but "
+                "is not on disk; it will not be uploaded. Register the file "
+                "where it is actually written (spec §3.5.1)."
+            )
+        return unregistered + missing
+
+    @property
     def lock_files(self) -> list[Path]:
         """``.lock`` files in the immediate target directory."""
         return [
