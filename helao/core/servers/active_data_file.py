@@ -66,6 +66,26 @@ from helao.helpers.yml_tools import yml_dumps
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+def _relative_file_name(file_path, record_dir) -> str:
+    """The name recorded in ``FileInfo.file_name`` for a produced file.
+
+    Relative to the record's own directory and forward-slash separated
+    (spec 9), so a file a driver writes into a subdirectory of the action
+    directory is addressable by name -- the syncer's upload set is built from
+    ``files`` and cannot see anything the list does not name.
+
+    A path outside ``record_dir`` degrades to its basename rather than
+    emitting a ``../`` traversal, which would be meaningless to a reader
+    resolving the name against the record.
+    """
+    fp = pathlib.Path(file_path)
+    rd = pathlib.Path(record_dir)
+    try:
+        return fp.resolve().relative_to(rd.resolve()).as_posix()
+    except ValueError:
+        return fp.name
+
+
 class DataFileWriter:
     """Data-file init + file-I/O methods for an ``Active``.
 
@@ -413,14 +433,13 @@ class DataFileWriter:
         save_root = str(self.active.base.helaodirs.save_root)
         if action.manual_action:
             save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        if os.path.dirname(file_path) != os.path.join(
-            save_root, action.action_output_dir
-        ):
+        record_dir = os.path.join(save_root, action.action_output_dir)
+        if os.path.dirname(file_path) != record_dir:
             action.aux_file_paths.append(file_path)
 
         file_info = FileInfo(
             file_type=file_type,
-            file_name=os.path.basename(file_path),
+            file_name=_relative_file_name(file_path, record_dir),
             # data_keys = json_data_keys,
             sample=[
                 label
