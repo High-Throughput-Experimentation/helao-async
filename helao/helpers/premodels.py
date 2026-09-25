@@ -54,6 +54,16 @@ EXPERIMENT_CTX: "ContextVar[Optional[Experiment]]" = ContextVar(
     "helao_active_experiment", default=None
 )
 
+#: Sequence-param keys consulted, in order, for a single sample number
+#: (spec §3.3). Module-level rather than a class attribute because a bare
+#: assignment inside a pydantic model is rejected as an unannotated field.
+SAMPLE_NO_KEYS = (
+    "sample_no",
+    "solid_sample_no",
+    "plate_sample_no",
+    "plate_sample_no_list",
+)
+
 
 class Sequence(SequenceModel):
     """Runtime sequence object held by the orchestrator.
@@ -112,36 +122,67 @@ class Sequence(SequenceModel):
             self.sequence_uuid = gen_uuid()
         if force or not self.sequence_status:
             self.reset_sequence_status(HloStatus.active)
+        self.apply_label_suffix()
         if force or self.sequence_output_dir is None:
             self.sequence_output_dir = self.get_sequence_dir()
+
+    def _single_sample_no(self):
+        """The one sample number this sequence is about, or ``None``.
+
+        Sources are consulted in :data:`SAMPLE_NO_KEYS` order and the first
+        that yields exactly one value wins; a scalar counts as one, a list
+        only when it holds exactly one element.
+        """
+        for key in SAMPLE_NO_KEYS:
+            value = self.sequence_params.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple)):
+                if len(value) == 1:
+                    return value[0]
+                continue
+            return value
+        return None
+
+    def apply_label_suffix(self) -> None:
+        """Fold the plate (and single sample) into ``sequence_label`` itself.
+
+        The suffix used to be computed into the directory name only, so the
+        plate a sequence ran on could not be recovered from its metadata --
+        the reason a plate lookup needs the API at all. Putting it in the
+        label means the record carries it.
+
+        Idempotent: ``init_seq`` can run more than once and the suffix must
+        not stack. A sample number without a plate appends nothing, because
+        a sample number is only meaningful as a position on a plate.
+        """
+        if self.sequence_label is None:
+            self.sequence_label = "noLabel"
+        plate = self.sequence_params.get("plate_id", "")
+        if not plate:
+            return
+        serial = f"{plate}{sum(int(x) for x in str(plate)) % 10}"
+        if serial in self.sequence_label:
+            return
+        self.sequence_label = f"{self.sequence_label}-{serial}"
+        sample_no = self._single_sample_no()
+        if sample_no is not None:
+            self.sequence_label = f"{self.sequence_label}-{sample_no}"
 
     def get_sequence_dir(self) -> str:
         """Build the relative output directory for this sequence.
 
-        Layout is ``YY.WW/MMDD/HHMMSS__name__label[-plate-serial[-sampleno]]``
-        and is always returned with forward slashes.
+        Layout is ``%Y/%m%d/%H%M%S__name__label``, always forward-slash
+        (spec §9). The plate/sample suffix is already part of
+        ``sequence_label`` (:meth:`apply_label_suffix`) and is not computed
+        here.
         """
-        HMS = self.sequence_timestamp.strftime("%H%M%S")
-        year_week = self.sequence_timestamp.strftime("%y.%U")
-        sequence_day = self.sequence_timestamp.strftime("%m%d")
-        plate = self.sequence_params.get("plate_id", "")
-        smpno = self.sequence_params.get("plate_sample_no_list", [])
-        append_plate = ""
-        if self.sequence_label is None:
-            self.sequence_label = "noLabel"
-        if plate:
-            serial = f"{plate}{str(sum([int(x) for x in str(plate)]) % 10)}"
-            if f"-{serial}" not in self.sequence_label:
-                if len(smpno) == 1:
-                    append_plate = f"-{serial}-{smpno[0]}"
-                else:
-                    append_plate = f"-{serial}"
-
         return os.path.join(
-            year_week,
-            sequence_day,
-            f"{HMS}__{self.sequence_name}__{self.sequence_label}{append_plate}",
-        ).replace(r"\\", "/")
+            self.sequence_timestamp.strftime("%Y"),
+            self.sequence_timestamp.strftime("%m%d"),
+            f"{self.sequence_timestamp.strftime('%H%M%S')}__"
+            f"{self.sequence_name}__{self.sequence_label}",
+        ).replace("\\", "/")
 
 
 class Experiment(Sequence, ExperimentModel):
@@ -193,7 +234,7 @@ class Experiment(Sequence, ExperimentModel):
         return os.path.join(
             str(sequence_dir),
             f"{experiment_time}__{self.experiment_name}",
-        ).replace(r"\\", "/")
+        ).replace("\\", "/")
 
     def get_exp(self) -> ExperimentModel:
         """Return a plain ``ExperimentModel`` snapshot with aggregated actions.
