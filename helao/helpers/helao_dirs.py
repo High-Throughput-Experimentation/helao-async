@@ -1,8 +1,8 @@
 """Resolve and prepare the on-disk directory layout used by a HELAO server.
 
-Given a loaded config, ``helao_dirs`` ensures the standard ``RUNS_ACTIVE``,
-``LOGS``, ``STATES``, ``DATABASE``, ``USER_CONFIG``, ``ANALYSES`` and
-``PROCESSES`` subdirectories exist under the configured ``root``, archives
+Given a loaded config, ``helao_dirs`` ensures the standard ``RUNS``,
+``DIAG``, ``LOGS``, ``STATES``, ``DATABASE``, ``USER_CONFIG``, ``ANALYSES``
+and ``PROCESSES`` subdirectories exist under the configured ``root``, archives
 any leftover ``*.txt`` log files from a previous run, and returns a
 populated ``HelaoDirs`` model.
 """
@@ -16,7 +16,7 @@ from glob import glob
 from typing import Optional
 
 from helao.core.models.helaodirs import HelaoDirs
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import diag_root, run_root
 
 #: Process-level cache keyed on ``(root, server_name)``. Bokeh re-runs each
 #: ``makeBokehApp`` per client connection, and ``Vis.__init__`` calls
@@ -59,7 +59,8 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
 
     if "root" in world_cfg:
         root = world_cfg["root"]
-        save_root = os.path.join(root, RunDir.ACTIVE.value)
+        save_root = str(run_root(root))
+        diag_dir = str(diag_root(root))
         log_root = os.path.join(root, "LOGS")
         states_root = os.path.join(root, "STATES")
         db_root = os.path.join(root, "DATABASE")
@@ -70,6 +71,7 @@ def helao_dirs(world_cfg: dict, server_name: Optional[str] = None) -> HelaoDirs:
         print(f"Found root directory in config: {world_cfg['root']}")
         check_dir(root)
         check_dir(save_root)
+        check_dir(diag_dir)
         check_dir(log_root)
         check_dir(states_root)
         check_dir(db_root)
