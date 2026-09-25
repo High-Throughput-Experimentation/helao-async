@@ -847,13 +847,68 @@ That is the right technique for any future drift.
 | `native/finalizer.py` | `core/servers/active_finalizer.py` | both sides | green |
 | `native/meta_writer.py` | `core/servers/base_meta_writer.py` | **legacy only** | green |
 
-`base_meta_writer.py` was edited on the legacy side alone and its pin still
-passes, so that edit fell outside the pinned members — it is riding on that
-rather than on a matching native edit. Worth knowing before Task 10 touches
-the meta writers.
+**Corrected by Task 10:** `base_meta_writer.py` did *not* ride on a blind pin.
+`git diff 658c94dc` shows **both** sides received the identical 8-line
+`RunDir.ACTIVE`→`DIAG` → `redirect_manual_dir(...)` change in Task 9
+(`2e4866a6`). The pin is green because the copies genuinely match. A16
+otherwise clears for the meta writers: neither `meta_writer.py` nor
+`posthoc_writer.py` needs a syncer-driven edit.
 
 `native/posthoc_writer.py` was also edited and has **no** parity pin: it is a
 hand-written adapter, not a mirror, so that is expected rather than a gap.
+
+### A26 — The batch pipeline still writes into `RUNS_FINISHED` — cut-over gap
+
+`posthoc_writer.default_save_root()`
+(`helao/hexagon/adapters/native/posthoc_writer.py:525-549`) still returns
+`<root>/RUNS_FINISHED`. Every standalone batch converter writes there.
+
+Now that `save_root` is `<root>/RUNS`, the `list_pending*` sweep root no longer
+covers that tree. **A batch-converted record is invisible to the startup sweep**
+unless something enqueues it explicitly via `/finish_yml`. It would sit in a
+legacy tree, unsynced, with nothing scanning for it — and because the legacy
+readers still resolve that path, nothing would look broken.
+
+This matters most at a data-processing station, where the batch pipeline is the
+primary producer rather than an accessory.
+
+**Not a syncer change.** Where the batch pipeline writes is a decision about
+that pipeline, and moving it mid-plan would surprise the private deployments'
+converters. **Task 13 owns it**, as part of A3's per-deployment step, and it
+must be settled before any batch station cuts over. Two options, and the
+deployment's owner picks:
+
+1. Point `default_save_root()` at `run_root(root)` so converted records land in
+   `RUNS` like everything else and the sweep finds them.
+2. Leave it writing to the legacy tree and rely on the explicit `/finish_yml`
+   enqueue, accepting that the startup sweep is no longer a safety net for
+   batch output.
+
+Option 1 is this plan's default — "a record is written once, in one place" is
+the whole invariant, and a converter writing somewhere else re-creates the
+two-locations problem the plan exists to remove.
+
+### A27 — A11 was bigger than its own description
+
+Task 10 found two more defects in A11's class, either of which alone stops the
+syncer processing a new-layout record:
+
+- **`HelaoYml.check_paths` rejected every new-layout path outright**, before
+  `status` was ever reached:
+  `if not any(x.startswith("RUNS_") for x in self.targetdir.parts): raise ValueError(...)`.
+  Nothing under `RUNS/2026/0925/...` satisfies that, so **construction** raised.
+  Broadened to accept `RUNS*` and `DIAG`.
+- **`active_children` / `finished_children` / `synced_children` were filtered
+  only by which tree the glob ran over.** Once nothing moves, all three globs
+  see the same tree and the tree-based distinction is meaningless; a shipped
+  child stays visible as unshipped. Now filtered by status rather than by
+  location.
+
+Both are the same root cause as A11 itself: **the directory name was carrying
+information, and removing it leaves the information nowhere.** Every predicate
+that inferred lifecycle from location has to be re-sourced from the record's
+own metadata. When reviewing Tasks 11-13, treat any `startswith("RUNS_")`,
+`"RUNS_" in path`, or per-tree glob as a candidate for the same defect.
 
 ---
 
@@ -3817,6 +3872,13 @@ the merge, in this order.
 - [ ] **Before cutting over a station that runs XRFS**, fix that deployment's
       `measurement_date_from_ymd` caller for the new layout (A18.2). It raises
       on the first post-cut-over analysis otherwise.
+- [ ] **Before cutting over a batch station**, settle where the batch pipeline
+      writes (A26). `posthoc_writer.default_save_root()` still returns
+      `<root>/RUNS_FINISHED`, which the startup sweep no longer covers, so
+      converted records would sit unsynced with nothing scanning for them.
+- [ ] **Run a `warn_unregistered_files` log sweep** after the first real
+      post-cut-over run. Any producer that was relying on glob upload rather
+      than registering its output shows up there and nowhere else.
 - [ ] **Before cutting over the ECMS station**, port its calibration discovery
       off sequence zips (A19). It is live, it is structurally zip-only, and it
       fails silently — logging `0 calibration window(s) found` and converting
