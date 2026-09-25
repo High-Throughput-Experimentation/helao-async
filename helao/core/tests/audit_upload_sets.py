@@ -28,8 +28,15 @@ def _is_bookkeeping(path: Path) -> bool:
     Mirrors ``HelaoYml._is_syncable_misc_file``'s exclusions: every meta and
     data writer here stages ``.<hex>.tmp`` beside its target and renames into
     place, so a scan landing mid-write sees a name that is not a run artifact.
+
+    ``.prg`` is excluded here but *not* by ``_is_syncable_misc_file``. The
+    sidecar escapes upload today only because it is written under
+    ``RUNS_SYNCED`` while the record being globbed is still under
+    ``RUNS_FINISHED`` -- two different trees. Once it sits beside its own yml
+    (spec §4.5) that accident disappears, which is a further reason the upload
+    set must come from ``files`` rather than from a glob.
     """
-    return path.suffix in (".lock", ".tmp") or path.name.startswith(".")
+    return path.suffix in (".lock", ".tmp", ".prg") or path.name.startswith(".")
 
 
 def glob_set(action_dir: Path) -> set[str]:

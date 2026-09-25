@@ -799,12 +799,33 @@ def test_corruption_before_the_last_line_raises(tmp_path: Path):
         j.working_set()
 
 
+def _raw_append(journal: RunStateJournal, uuid: str, state: str, path: str) -> None:
+    """Append a line without going through ``append``'s compaction check.
+
+    Building a >1000-line file with ``append`` is impossible: the automatic
+    compaction under test here fires partway through the setup and empties
+    the file. This is the only place that matters, so the test writes the
+    same record shape by hand rather than the module growing a seam for it.
+    """
+    journal.states_root.mkdir(parents=True, exist_ok=True)
+    with journal.path.open("a", encoding="utf-8") as f:
+        record = {
+            "ts": "2026-09-25T09:41:02",
+            "uuid": uuid,
+            "kind": "action",
+            "state": state,
+            "path": path,
+            "parent": None,
+        }
+        f.write(json.dumps(record, separators=(",", ":")) + "\n")
+
+
 def test_compaction_drops_tombstones_and_preserves_survivors(tmp_path: Path):
     j = RunStateJournal(tmp_path, "SIM")
     for _ in range(600):
-        j.append(UUID_A, "action", ACTIVE, "RUNS/a")
-        j.append(UUID_A, "action", DONE, "RUNS/a")
-    j.append(UUID_B, "action", ACTIVE, "RUNS/b")
+        _raw_append(j, UUID_A, ACTIVE, "RUNS/a")
+        _raw_append(j, UUID_A, DONE, "RUNS/a")
+    _raw_append(j, UUID_B, ACTIVE, "RUNS/b")
     before = len(j.path.read_text().splitlines())
     assert before > 1000
 
@@ -830,7 +851,8 @@ def test_compaction_fires_automatically_once_both_thresholds_are_met(tmp_path):
     for _ in range(600):
         j.append(UUID_A, "action", ACTIVE, "RUNS/a")
         j.append(UUID_A, "action", DONE, "RUNS/a")
-    # 1201 lines written, working set is 1 -> 1201 > 1000 and 1201 > 10*1
+    # Compaction fires at line 1001 -- both thresholds are met (1001 > 1000,
+    # and 1001 > 10 * 1 live record) -- so the file never reaches 1201.
     assert len(j.path.read_text().splitlines()) < 1000
     assert set(j.working_set()) == {UUID_B}
 
@@ -869,7 +891,7 @@ here. A crash during an append can only truncate the final line; every
 earlier record is intact, which is the reason for an append-only journal
 rather than a rewritten document.
 
-The journal is an index, not the source of truth. ``run_state_rebuild``
+The journal is an index, not the source of truth. ``rebuild_from_tree``
 reconstructs it from the run tree (spec §4.5).
 
 Spec: docs/superpowers/specs/2026-09-25-runs-layout-and-state-journal-design.md §4
@@ -1048,7 +1070,8 @@ timeout 300 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
     helao/core/tests/test_run_state.py -v
 ```
 
-Expected: 10 passed.
+Expected: 10 passed. (`_raw_append` is a helper, not a test, so the count is
+10 rather than 11.)
 
 - [ ] **Step 5: Prove the guards are falsifiable**
 
