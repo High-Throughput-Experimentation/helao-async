@@ -218,6 +218,9 @@ def _finished_action(root: Path):
     exp_yml = make_exp_tree(root, "RUNS_FINISHED", mk_uuid(1))
     act_yml = make_action(exp_yml, 0)
     (act_yml.parent / "artifact.npz").write_text("payload")
+    # Registered, not merely present: since Task 3 the upload set is the
+    # record's own ``files`` list, never a directory glob (spec §3.5).
+    act_yml.write_text(act_yml.read_text() + "files:\n- file_name: artifact.npz\n")
     return act_yml
 
 
