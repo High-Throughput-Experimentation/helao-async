@@ -61,6 +61,14 @@ from helao.helpers.dispatcher import async_action_dispatcher
 from helao.helpers.file_utils import zip_dir
 from helao.helpers.hlo_data import hlo_to_parquet, read_hlo
 from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.helpers.run_state import (
+    DONE,
+    UNSYNCED,
+    RunStateJournal,
+    identify_record,
+    rebuild_from_tree,
+    root_relative,
+)
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.yml_tools import yml_dumps, yml_load
 
@@ -522,6 +530,99 @@ class HelaoYml:
             return [
                 x for x in self.targetdir.glob("*") if self._is_syncable_misc_file(x)
             ]
+
+    @property
+    def upload_files(self) -> list[Path]:
+        """Files this record ships, named by the record itself.
+
+        The record's own ``files`` list is the authority, not a directory
+        glob. A glob cannot see ``FileInfo.nosync``, which is the only thing
+        keeping withheld data off S3 now that ``RUNS_NOSYNC`` no longer
+        exists (spec §3.5); and a glob sweeps up whatever is transiently
+        present, which is how ``.<hex>.tmp`` staging objects reached
+        ``raw_data/``.
+
+        Names are resolved relative to this record's directory and may name a
+        subdirectory (spec §3.5.1). A named file that is not on disk is
+        skipped here and surfaced by :meth:`warn_unregistered_files`, not
+        raised: a post-hoc converter can write the yml before its payloads.
+
+        Experiments and sequences carry no ``files`` list; their payload is
+        the yml plus the colocated ``*-prc.yml``, which :attr:`process_ymls`
+        already handles.
+        """
+        out = []
+        for name in self._registered_names():
+            candidate = self.targetdir / name
+            if candidate.is_file():
+                out.append(candidate)
+        return out
+
+    def _registered_names(self, include_nosync: bool = False) -> list[str]:
+        """Record-relative, forward-slash names from the yml's ``files`` list.
+
+        Args:
+            include_nosync: Keep entries flagged ``nosync``. The upload set
+                excludes them; the reconciliation warning must not report a
+                withheld file as unregistered.
+        """
+        if self.type != "action":
+            return []
+        names = []
+        for entry in (self.meta or {}).get("files") or []:
+            entry = entry or {}
+            if entry.get("nosync") and not include_nosync:
+                continue
+            name = entry.get("file_name")
+            if name:
+                names.append(str(name).replace("\\", "/"))
+        return names
+
+    def warn_unregistered_files(self) -> list[Path]:
+        """Log files the upload set will not ship, in both directions.
+
+        Migration aid for spec §3.5.1. A writer that produces output without
+        registering it used to be carried by the glob and is now dropped; and
+        a ``files`` entry naming a path that is not on disk -- what
+        ``track_file`` records for a source outside the record directory --
+        was never uploaded and cannot be seen by a glob at all. Both are
+        reported; neither is uploaded. This is not a fallback.
+        """
+        if self.type != "action":
+            return []
+        named = self._registered_names(include_nosync=True)
+        missing = [
+            self.targetdir / n for n in named if not (self.targetdir / n).is_file()
+        ]
+        unregistered = []
+        for p in self.targetdir.rglob("*"):
+            if not p.is_file() or not self._is_syncable_misc_file(p):
+                continue
+            # _is_syncable_misc_file excludes neither .prg nor .lock. They
+            # escape it today only because the sidecar is written under
+            # RUNS_SYNCED while the record being globbed is under
+            # RUNS_FINISHED -- two different trees. Spec §4.5 moves the
+            # sidecar beside its own yml, so without this both would be
+            # reported on every single record and the warning would be noise
+            # from the first run.
+            if p.suffix in (".prg", ".lock"):
+                continue
+            if p.relative_to(self.targetdir).as_posix() in named:
+                continue
+            unregistered.append(p)
+        for p in unregistered:
+            LOGGER.warning(
+                f"{p} is present in {self.targetdir.name} but not named in its "
+                "action's files list; it will not be uploaded. Register it in "
+                "the producing driver or accept the loss (spec §3.5.1)."
+            )
+        for p in missing:
+            LOGGER.warning(
+                f"{p} is named in the files list of {self.targetdir.name} but "
+                "is not on disk; it will not be uploaded. Register the file "
+                "where it is actually written (spec §3.5.1)."
+            )
+        return unregistered + missing
 
     @property
     def lock_files(self) -> list[Path]:
@@ -1047,6 +1148,15 @@ class SyncDriver:
             self.s3r = None
         self.bucket = self.config_dict["aws_bucket"]
 
+        #: The unsynced working set (spec §4.1). SYNC is the only writer of
+        #: this file; producing servers own their own.
+        self.run_journal = (
+            RunStateJournal(self.helaodirs.states_root, "SYNC")
+            if self.helaodirs.states_root
+            else None
+        )
+        self._recover_run_journal()
+
         # self.progress = {}
         self.sequence_objs = {}
         self.task_queue = asyncio.PriorityQueue()
@@ -1075,6 +1185,62 @@ class SyncDriver:
             i: asyncio.create_task(self.syncer(), name=f"syncer_loop__{i}")
             for i in range(self.max_tasks)
         }
+
+    def _recover_run_journal(self) -> None:
+        """Replay the SYNC journal, rebuilding from the run tree if it is corrupt.
+
+        A journal that fails to replay is unusable, and its absence reads as
+        "every record is done" -- so the rebuild is not optional (spec §4.5).
+        A rebuild that could not read some directories is *degraded*: the
+        records under them are absent, absence means done, and they will never
+        sync. That is louder than a debug line (plan A8).
+        """
+        if self.run_journal is None:
+            return
+        try:
+            self.run_journal.working_set()
+            return
+        except ValueError as exc:
+            LOGGER.warning(f"SYNC journal is corrupt ({exc}); rebuilding from the run tree.")
+        # Records never move, so save_root (<root>/RUNS) is the whole tree a
+        # rebuild has to scan.
+        self.run_journal = rebuild_from_tree(
+            Path(str(self.helaodirs.save_root)),
+            self.helaodirs.states_root,
+            "SYNC",
+        )
+        if self.run_journal.unreadable_dirs:
+            LOGGER.error(
+                f"SYNC journal was rebuilt from a run tree with "
+                f"{self.run_journal.unreadable_dirs} unreadable directory(ies). "
+                "Records under them are MISSING from the journal, which reads "
+                "as done: they will never sync. Fix the permissions and POST "
+                "/finish_pending, or delete the journal to force another rebuild."
+            )
+
+    def _journal(self, yml_path: Path, state: str) -> None:
+        """Append ``state`` for the record at ``yml_path`` to the SYNC journal.
+
+        The uuid comes from a bounded head+tail read, never a full load: a
+        sequence yml runs to half a million lines (plan A12). No normalization
+        happens here: ``identify_record`` already returns ``str(UUID(...))``,
+        which is what makes both appends below agree on a key -- eviction is a
+        ``pop`` by this exact string, so a differently-cased or braced uuid
+        reaching the journal would pop nothing and leave the record in the
+        working set forever.
+        """
+        if self.run_journal is None:
+            return
+        uuid, kind, parent = identify_record(yml_path)
+        if uuid is None:
+            return
+        self.run_journal.append(
+            uuid,
+            str(kind),
+            state,
+            root_relative(yml_path.parent, self.helaodirs.root),
+            parent=parent,
+        )
 
     def has_pending_work(self) -> bool:
         """True while any yml is queued for or actively being synced.
@@ -1345,6 +1511,9 @@ class SyncDriver:
             )
         else:
             # async with self.aiolock:
+            # The handoff (spec §4.3): the producing server has already
+            # evicted this record; SYNC owns it from here until it ships.
+            self._journal(yml_path, UNSYNCED)
             self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")
@@ -1712,6 +1881,12 @@ class SyncDriver:
 
         # move to synced
         if prog.s3_done and prog.api_done:
+
+            # Both legs are in, which is exactly what the .prg sidecar records
+            # and what rebuild_from_tree reads back as "done" (spec §4.5), so
+            # the journal is evicted here rather than after the moves below --
+            # the moves are folder-state bookkeeping this phase does not own.
+            self._journal(yml_path, DONE)
 
             LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
@@ -2533,4 +2708,3 @@ class SyncDriver:
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")
-
