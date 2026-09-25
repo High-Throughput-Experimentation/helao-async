@@ -201,15 +201,15 @@ def test_sync_process_writes_beside_the_exp_yml(tmp_path):
     ), "nothing may be written under process_root"
 
 
-def test_the_prc_moves_with_the_record_and_the_directory_cleans_up(tmp_path):
-    """Drive the real move and assert the outcome, not the set composition.
+def test_the_prc_stays_beside_its_experiment_through_a_sync(tmp_path):
+    """Drive the real sync and assert the outcome, not the set composition.
 
-    A stranded prc is worse than an orphan: cleanup() walks up from the moved
-    record and reports any non-empty directory as "failed", so the leftover
-    would keep the experiment directory alive forever. Asserting
-    ``prc in misc_files + hlo_files + process_ymls`` would only restate the
-    production expression in the test and would pass before the fix -- so this
-    drives move_to_synced and looks at where the file actually ends up.
+    A stranded prc used to be worse than an orphan: the record moved to
+    RUNS_SYNCED and the artifact did not, so cleanup() reported the
+    experiment directory as non-empty forever. Task 10 deleted the promotion
+    outright, so the invariant is now the stronger one -- the prc is still
+    beside its own exp yml once the sync has run, and no RUNS_SYNCED tree is
+    created at all.
     """
     from helao.core.drivers.data.sync_driver import SyncDriver
     from helao.core.models.run_dir import RunDir
@@ -248,14 +248,11 @@ def test_the_prc_moves_with_the_record_and_the_directory_cleans_up(tmp_path):
 
     assert len(written) == 1
 
-    finished_leftovers = [
-        p for p in (tmp_path / RunDir.FINISHED.value).rglob("*-prc.yml")
-    ]
-    assert (
-        not finished_leftovers
-    ), f"the prc was stranded in RUNS_FINISHED: {finished_leftovers}"
-    synced = list((tmp_path / RunDir.SYNCED.value).rglob("*-prc.yml"))
-    assert len(synced) == 1, f"the prc must travel to RUNS_SYNCED, found {synced}"
+    in_place = list(exp_yml.parent.glob("*-prc.yml"))
+    assert in_place == written, f"the prc did not stay beside its exp yml: {in_place}"
+    assert not (
+        tmp_path / RunDir.SYNCED.value
+    ).exists(), "nothing may be promoted to RUNS_SYNCED any more"
 
 
 def test_the_zip_carries_the_prc_and_reset_sync_restores_it(tmp_path):

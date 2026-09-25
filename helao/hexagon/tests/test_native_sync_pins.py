@@ -17,7 +17,7 @@ from helao.hexagon.tests.sync_fixtures import (
     assert_verbatim_region,
 )
 
-MODULE_FUNCS = ["dict2json", "move_to_synced", "revert_to_finished"]
+MODULE_FUNCS = ["dict2json", "_pending_only"]
 
 ASYNC_RW_LOCK = ["__init__", "read_locked", "write_locked"]
 
@@ -35,18 +35,25 @@ HELAO_YML = [
     "rename",
     "status_idx",
     "relative_path",
+    "_require_legacy",
     "active_path",
     "finished_path",
     "synced_path",
     "cleanup",
     "list_children",
+    "_children_in",
     "active_children",
     "finished_children",
     "synced_children",
     "children",
+    "_is_syncable_misc_file",
     "misc_files",
+    "upload_files",
+    "_registered_names",
+    "warn_unregistered_files",
     "lock_files",
     "hlo_files",
+    "process_ymls",
     "parent_yml",
     "parent_path",
     "write_meta",
@@ -94,6 +101,9 @@ def test_progress_parity():
 
 SYNC_DRIVER_CORE = [
     "__init__",
+    "_recover_run_journal",
+    "_journal",
+    "has_pending_work",
     "try_remove_empty",
     "cleanup_root",
     "sync_exit_callback",

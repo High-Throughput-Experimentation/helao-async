@@ -1,18 +1,19 @@
 """Ship completed HELAO run trees to S3 and an upstream API.
 
-Walks ``RUNS_FINISHED`` YAML trees (sequences, experiments, actions, and the
-processes they contribute to), pushes raw HLO/parquet/misc files plus the
-patched YAML metadata to S3, optionally registers each record with the API,
-moves the on-disk tree to ``RUNS_SYNCED``, and finally zips the synced
-sequence directory.
+Walks the ``RUNS`` tree (sequences, experiments, actions, and the processes
+they contribute to) and pushes the files each record registers, plus the
+patched YAML metadata, to S3. **Nothing moves and nothing is zipped**: a
+record is written once and stays where it was written, and the ``.prg``
+sidecar beside its yml is the receipt that it shipped (spec §4.5, D9).
 
 Public surface:
-    HelaoYml: Wraps a single ``*-{seq,exp,act}.yml`` file and its directory,
-        with helpers to locate active/finished/synced siblings.
+    HelaoYml: Wraps a single ``*-{seq,exp,act}.yml`` file and its directory.
+        Its ``status`` comes from the record's own meta for a new-layout
+        path, and from the ``RUNS_*`` segment only for a legacy one.
     Progress: Tracks per-yml sync state in a sidecar ``.prg`` file.
-    SyncDriver / HelaoSyncer: Worker that consumes a queue of yml paths,
-        uploads to S3 / API, and rewrites the on-disk state.
-    dict2json / move_to_synced / revert_to_finished: Module-level helpers.
+    SyncDriver / HelaoSyncer: Worker that consumes a queue of yml paths and
+        uploads to S3 / API.
+    dict2json: Module-level helper.
 """
 
 __all__ = ["HelaoYml", "Progress", "HelaoSyncer"]
@@ -42,7 +43,12 @@ from helao.core.models.file import FileInfo
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.machine import MachineModel
 from helao.core.models.process import ProcessModel
-from helao.core.models.run_dir import SYNC_PROGRESSION, RunDir, is_same_location
+from helao.core.models.run_dir import (
+    SYNC_PROGRESSION,
+    RunDir,
+    is_legacy_path,
+    is_same_location,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     # B5: the host that constructs this driver. Annotation-only, so it costs
@@ -53,13 +59,13 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
 from helao.helpers.dispatcher import async_action_dispatcher
-from helao.helpers.file_utils import zip_dir
 from helao.helpers.hlo_data import hlo_to_parquet, read_hlo
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.run_state import (
     DONE,
     UNSYNCED,
     RunStateJournal,
+    _prg_is_complete,
     identify_record,
     rebuild_from_tree,
     root_relative,
@@ -109,71 +115,20 @@ def dict2json(input_dict: dict) -> io.BytesIO:
     return bio
 
 
-def move_to_synced(file_path: Path) -> Union[Path, bool]:
-    """Move a file from ``RUNS_FINISHED`` to the parallel ``RUNS_SYNCED`` path.
+def _pending_only(paths: list) -> list:
+    """Drop records whose sibling ``.prg`` already reports them shipped.
 
-    No-op (returns the target path) when the file is already under
-    ``RUNS_SYNCED`` or does not exist on disk.
+    ``list_pending*`` used to get this for free: a synced record had been
+    moved out of ``RUNS_FINISHED``, so the glob could not see it any more.
+    Records never move now and the glob root is the whole tree, so without
+    this every record ever written is re-enqueued on every startup sweep --
+    unbounded, and ``has_pending_work()`` reads exactly that queue, so the
+    hot-reload idle gate would sit behind the sweep at every start (plan A1).
 
-    Args:
-        file_path: Source file inside a ``RUNS_FINISHED`` tree.
-
-    Returns:
-        The new ``Path`` on success, or ``False`` on ``PermissionError``.
+    The predicate is the one spec 4.5 defines for the rebuild path, shared
+    with ``run_state`` rather than written twice.
     """
-    parts = list(file_path.parts)
-    target_path = Path(
-        str(file_path).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
-    )
-    if RunDir.SYNCED in parts:
-        LOGGER.debug(f"File {file_path} is already synced. Skipping.")
-        return target_path
-    elif not file_path.exists():
-        LOGGER.debug(f"File {file_path} does not exist. Skipping.")
-        return target_path
-    elif is_same_location(file_path, target_path):
-        # The substitution missed: there is no RUNS_FINISHED segment to
-        # replace, so the "destination" is the source. Refuse rather than
-        # move a file onto itself (plan A24).
-        LOGGER.error(
-            f"Refusing to move {file_path}: computed destination is the source."
-        )
-        return False
-    state_index = parts.index(RunDir.FINISHED)
-    parts[state_index] = RunDir.SYNCED.value
-    target_path = Path(*parts)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.move(str(file_path), str(target_path))
-        return Path(target_path)
-    except PermissionError:
-        LOGGER.info(f"Permission error when moving {file_path} to {target_path}")
-        return False
-
-
-def revert_to_finished(file_path: Path) -> Union[Path, bool]:
-    """Move a file from ``RUNS_SYNCED`` back to the parallel ``RUNS_FINISHED`` path.
-
-    Args:
-        file_path: Source file inside a ``RUNS_SYNCED`` tree.
-
-    Returns:
-        The new ``Path`` on success, or ``False`` on ``PermissionError``.
-
-    Raises:
-        ValueError: If ``RUNS_SYNCED`` is not present in the path.
-    """
-    parts = list(file_path.parts)
-    state_index = parts.index(RunDir.SYNCED)
-    parts[state_index] = RunDir.FINISHED.value
-    target_path = Path(*parts)
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        new_path = file_path.replace(target_path)
-        return new_path
-    except PermissionError:
-        LOGGER.info(f"Permission error when moving {file_path} to {target_path}")
-        return False
+    return [p for p in paths if not _prg_is_complete(Path(p).with_suffix(".prg"))]
 
 
 class AsyncRWLock:
@@ -310,9 +265,11 @@ class HelaoYml:
         else:
             self.targetdir = self.target.parent
         # self.parts = list(self.target.parts)
-        if not any([x.startswith("RUNS_") for x in self.targetdir.parts]):
+        if not any(
+            x.startswith("RUNS") or x == "DIAG" for x in self.targetdir.parts
+        ):
             raise ValueError(
-                f"{self.target} is not located with a Helao RUNS_* directory"
+                f"{self.target} is not located within a Helao run directory"
             )
         # self.filelockpath = str(self.target) + ".lock"
         # self.filelock = FileLock(self.filelockpath)
@@ -342,10 +299,30 @@ class HelaoYml:
 
     @property
     def status(self) -> str:
-        """Lowercase status (``active``/``finished``/``synced``) from the ``RUNS_*`` parent."""
-        path_parts = [x for x in self.targetdir.parts if x.startswith("RUNS_")]
-        status = path_parts[0].split("_")[-1].lower()
-        return status
+        """Lowercase lifecycle status: ``active``, ``finished`` or ``synced``.
+
+        The ``.prg`` sidecar beside the yml is consulted first, whatever the
+        layout: since Task 10 nothing is promoted, so a shipped record stays
+        in the tree it was written in and the path can no longer distinguish
+        it from one still waiting. A legacy record without a receipt is
+        classified from its ``RUNS_*`` segment exactly as before.
+
+        A record under the single ``RUNS`` tree has no such segment -- the old
+        derivation raised ``IndexError`` on the empty list, three frames below
+        ``sync_yml``, for every new-layout record (plan A11). The state comes
+        from the record itself instead: the ``.prg`` receipt (spec §4.5 D8),
+        and failing that the record's own ``<type>_status`` list, which says
+        whether it is still running.
+        ``HloStatus`` has no ``synced`` member and never will; shipping is the
+        syncer's business, not the record's.
+        """
+        if _prg_is_complete(self.target.with_suffix(".prg")):
+            return "synced"
+        if is_legacy_path(self.targetdir):
+            path_parts = [x for x in self.targetdir.parts if x.startswith("RUNS_")]
+            return path_parts[0].split("_")[-1].lower()
+        statuses = {str(x).split(".")[-1] for x in self.meta_status}
+        return "active" if "active" in statuses else "finished"
 
     @property
     def meta_status(self) -> list:
@@ -374,7 +351,13 @@ class HelaoYml:
 
         Returns:
             The rewritten path as a string.
+
+        Raises:
+            ValueError: If this is not a legacy path. Nothing under the single
+                ``RUNS`` tree encodes its state in a directory name, so there
+                is no segment to rewrite (plan A11).
         """
+        self._require_legacy("rename")
         tempparts = list(self.parts)
         tempparts[self.status_idx] = status
         return os.path.join(*tempparts)
@@ -384,29 +367,68 @@ class HelaoYml:
         """Index in ``self.parts`` of the ``RUNS_{ACTIVE,FINISHED,SYNCED}`` segment.
 
         Raises:
-            ValueError: If no valid status segment is present.
+            ValueError: If this is not a legacy path, or no valid status
+                segment is present (plan A11).
         """
+        self._require_legacy("status_idx")
         valid_statuses = SYNC_PROGRESSION
         return [any([x in valid_statuses]) for x in self.parts].index(True)
 
     @property
     def relative_path(self) -> str:
-        """Path under the ``RUNS_*`` root, joined with forward slashes."""
+        """Path under the ``RUNS_*`` root, joined with forward slashes.
+
+        Legacy-only; see :meth:`_require_legacy`.
+        """
+        self._require_legacy("relative_path")
         return "/".join(list(self.parts)[self.status_idx + 1 :])
+
+    def _require_legacy(self, what: str) -> None:
+        """Refuse a new-layout path, naming why (plan A11).
+
+        ``rename``, ``status_idx`` and ``relative_path`` all locate a
+        ``RUNS_{ACTIVE,FINISHED,SYNCED}`` segment. Under the single ``RUNS``
+        tree there is none, and the unguarded versions failed with a bare
+        ``IndexError``/``ValueError`` raised from a list subscript several
+        frames below the caller.
+        """
+        if not is_legacy_path(self.target):
+            raise ValueError(
+                f"{self.target} is not a legacy RUNS_* path, so {what} has no "
+                "state segment to work with. Records under RUNS never move "
+                "and hold their state in the per-server journals (plan A11)."
+            )
 
     @property
     def active_path(self) -> Path:
-        """``self.target`` rewritten under ``RUNS_ACTIVE``."""
+        """Where this record would be while running.
+
+        A record written under ``RUNS`` never moves, so this is the record
+        itself. Only a legacy path is rewritten, so archives predating the
+        cut-over keep resolving.
+        """
+        if not is_legacy_path(self.target):
+            return self.target
         return Path(self.rename(RunDir.ACTIVE.value))
 
     @property
     def finished_path(self) -> Path:
-        """``self.target`` rewritten under ``RUNS_FINISHED``."""
+        """Where this record sits once finished. See :attr:`active_path`."""
+        if not is_legacy_path(self.target):
+            return self.target
         return Path(self.rename(RunDir.FINISHED.value))
 
     @property
     def synced_path(self) -> Path:
-        """``self.target`` rewritten under ``RUNS_SYNCED``."""
+        """Where this record ends up once shipped.
+
+        A record written under ``RUNS`` never moves, so this is the record
+        itself. Only a legacy path -- one still carrying a ``RUNS_*``
+        segment -- is rewritten, and only so that archives predating the
+        cut-over keep resolving.
+        """
+        if not is_legacy_path(self.target):
+            return self.target
         return Path(self.rename(RunDir.SYNCED.value))
 
     def cleanup(self) -> str:
@@ -461,28 +483,47 @@ class HelaoYml:
         hpaths = [HelaoYml(x) for x in paths]
         return sorted(hpaths, key=lambda x: x.timestamp)
 
+    def _children_in(self, tree_path: Path, status: str) -> list:
+        """Children of this record whose state is ``status``.
+
+        The glob used to be the filter by itself: a child moved out of the
+        tree it was in as it advanced. Nothing moves now, so a shipped child
+        is still in the directory its parent globs, and an unfiltered result
+        makes it read as unfinished -- which parks its parent in ``sync_yml``
+        forever. The child's own status is the filter. For a legacy tree the
+        two agree except on the one case that matters: a record synced in
+        place, still under ``RUNS_FINISHED``, with a complete ``.prg``.
+        """
+        return [x for x in self.list_children(tree_path) if x.status == status]
+
     @property
     def active_children(self) -> list:
-        """Children located under the ``RUNS_ACTIVE`` tree."""
-        return self.list_children(self.active_path)
+        """Children that are still running."""
+        return self._children_in(self.active_path, "active")
 
     @property
     def finished_children(self) -> list:
-        """Children located under the ``RUNS_FINISHED`` tree."""
-        return self.list_children(self.finished_path)
+        """Children that are finished but not yet shipped."""
+        return self._children_in(self.finished_path, "finished")
 
     @property
     def synced_children(self) -> list:
-        """Children located under the ``RUNS_SYNCED`` tree."""
-        return self.list_children(self.synced_path)
+        """Children that have shipped."""
+        return self._children_in(self.synced_path, "synced")
 
     @property
     def children(self) -> list:
-        """Union of active/finished/synced children, sorted by timestamp."""
-        all_children = (
-            self.active_children + self.finished_children + self.synced_children
-        )
-        return sorted(all_children, key=lambda x: x.timestamp)
+        """Every child of this record, whatever its state, sorted by timestamp.
+
+        Deduplicated by path rather than status-filtered: for a new-layout
+        record the three state paths are the same directory, so the union
+        would otherwise list every child three times.
+        """
+        seen = {}
+        for tree_path in (self.active_path, self.finished_path, self.synced_path):
+            for child in self.list_children(tree_path):
+                seen[str(child.target)] = child
+        return sorted(seen.values(), key=lambda x: x.timestamp)
 
     @staticmethod
     def _is_syncable_misc_file(path: Path) -> bool:
@@ -726,7 +767,7 @@ class Progress:
 
     Attributes:
         ymlpath: Path of the parent yml.
-        prg: Path of the ``.prg`` file (under ``RUNS_SYNCED``).
+        prg: Path of the ``.prg`` file, beside its own yml.
         dict: In-memory copy of the progress dict.
     """
 
@@ -746,8 +787,8 @@ class Progress:
         """Resolve the yml/prg pair and load (or initialize) the progress dict.
 
         Args:
-            path: Either the yml file under any ``RUNS_*`` tree or its
-                companion ``.prg`` file under ``RUNS_SYNCED``.
+            path: Either a record yml or its companion ``.prg`` sidecar,
+                which sits beside it.
 
         Raises:
             ValueError: If ``path`` is not a ``.yml`` or ``.prg`` file.
@@ -771,7 +812,11 @@ class Progress:
         #     self.yml = HelaoYml(self.dict["yml"])
 
         if not hasattr(self, "prg"):
-            self.prg = self.yml.synced_path.with_suffix(".prg")
+            # The receipt belongs with the record it describes. It used to be
+            # written under RUNS_SYNCED -- a different tree from the record --
+            # which is why moving a station root stranded .prg files forever,
+            # and why rebuild_from_tree could not find them (spec 4.5).
+            self.prg = self.yml.target.with_suffix(".prg")
 
         # self.prglockpath = str(self.prg) + ".lock"
         # self.prglock = FileLock(self.prglockpath)
@@ -1674,7 +1719,7 @@ class SyncDriver:
                 rel
                 for rel in (
                     prog.relpath(p)
-                    for p in prog.yml.hlo_files + prog.yml.misc_files
+                    for p in prog.yml.upload_files
                 )
                 if rel not in prog.dict["files_pending"]
                 and rel not in prog.dict["files_s3"]
@@ -1866,82 +1911,29 @@ class SyncDriver:
 
         # The API leg is retired: the SQL database is offline and to_api() was a
         # no-op stub. The flag is still set so the "s3_done and api_done" gate
-        # below advances the run to RUNS_SYNCED.
+        # below can still close the record out.
         if not prog.api_done or force_api:
             prog.dict["api"] = True
             prog.write_dict()
 
-        # get yml target name for popping later (after seq zip removes yml)
         yml_target_name = prog.yml.target.name
         yml_type = prog.yml.type
 
-        # move to synced
+        # Both legs are in. Nothing moves and nothing is zipped: the record
+        # stays where it was written, and the .prg sidecar beside its yml --
+        # already holding "s3: true" and "api: true" -- is the receipt that it
+        # shipped, which is exactly what rebuild_from_tree reads back (spec
+        # 4.5 D8, D9).
         if prog.s3_done and prog.api_done:
-
-            # Both legs are in, which is exactly what the .prg sidecar records
-            # and what rebuild_from_tree reads back as "done" (spec §4.5), so
-            # the journal is evicted here rather than after the moves below --
-            # the moves are folder-state bookkeeping this phase does not own.
             self._journal(yml_path, DONE)
-
-            LOGGER.debug(f"Moving files to RUNS_SYNCED for {yml_target_name}")
             for lock_path in prog.yml.lock_files:
                 lock_path.unlink()
-            for file_path in (
-                prog.yml.misc_files + prog.yml.hlo_files + prog.yml.process_ymls
-            ):
-                LOGGER.debug(f"Moving {str(file_path)}")
-                move_success = await asyncio.to_thread(move_to_synced, file_path)
-                while not move_success:
-                    LOGGER.debug(f"{file_path} is in use, retrying.")
-                    await asyncio.sleep(1)
-                    move_success = await asyncio.to_thread(move_to_synced, file_path)
-
-            # finally move yaml and update target
-            LOGGER.debug(f"Moving {yml_target_name} to RUNS_SYNCED")
-            # with prog.yml.filelock:
-            yml_success = move_to_synced(yml_path)
-            if yml_success:
-                result = prog.yml.cleanup()
-                LOGGER.debug(f"Cleanup {yml_target_name} {result}.")
-                if result == "success":
-                    LOGGER.debug("yml_success")
-                    prog = self.get_progress(Path(yml_success))
-                    LOGGER.debug("reassigning prog")
-                    prog.dict["yml"] = str(yml_success)
-                    LOGGER.debug("updating progress")
-                    prog.write_dict()
-
-            # pop children from progress dict
-            if yml_type in ["experiment", "sequence"]:
-                children = prog.yml.children
-                LOGGER.debug(f"Removing children from progress: {children}.")
-                for childyml in children:
-                    LOGGER.debug(f"Clearing {childyml.target.name}")
-                    finished_child_path = childyml.finished_path.parent
-                    if finished_child_path.exists():
-                        self.try_remove_empty(str(finished_child_path))
-                self.try_remove_empty(str(prog.yml.finished_path.parent))
+            prog.yml.warn_unregistered_files()
+            LOGGER.debug(f"{yml_target_name} synced in place.")
 
             if yml_type == "sequence":
                 sequence_name = prog.yml.meta.get("sequence_name", "NA")
-                LOGGER.debug(f"Zipping {prog.yml.target.parent.name}.")
-                zip_target = prog.yml.target.parent.parent.joinpath(
-                    f"{prog.yml.target.parent.name}.zip"
-                )
-                LOGGER.info(
-                    f"Full sequence has synced, creating zip: {str(zip_target)}"
-                )
-                path_parts = prog.yml.target.parts
-                await asyncio.to_thread(zip_dir, prog.yml.target.parent, zip_target)
-                root_path = Path(
-                    *path_parts[: path_parts.index(RunDir.SYNCED)]
-                ).as_posix()
-                self.cleanup_root(root_path)
-                LOGGER.debug("Removing sequence from progress.")
-                # self.progress.pop(prog.yml.target.name)
-
-                if zip_target.exists() and sequence_name in self.auto_analyses:
+                if sequence_name in self.auto_analyses:
                     ana_config = self.auto_analyses[sequence_name]
                     LOGGER.info(
                         f"dispatching auto-analysis {ana_config['endpoint']} for {sequence_name}"
@@ -1956,7 +1948,9 @@ class SyncDriver:
                                 server_name=ana_config["server_key"],
                             ),
                             action_params={
-                                "sequence_zip_path": str(zip_target),
+                                # A directory now, not a zip. Task 12 renames
+                                # the key; HelaoData already accepts either.
+                                "sequence_zip_path": str(prog.yml.target.parent),
                                 "params": ana_config.get("analysis_params", {}),
                             },
                         ),
@@ -2432,7 +2426,7 @@ class SyncDriver:
             return False
 
     def list_pending(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-seq.yml`` paths waiting under ``RUNS_FINISHED``.
+        """Return ``*-seq.yml`` paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2446,11 +2440,12 @@ class SyncDriver:
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*-seq.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
-        LOGGER.info(f"Found {len(pending)} pending sequences in RUNS_FINISHED.")
+        pending = _pending_only(pending)
+        LOGGER.info(f"Found {len(pending)} pending sequences.")
         return pending
 
     def list_pending_acts(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-act.yml`` paths waiting under ``RUNS_FINISHED``.
+        """Return ``*-act.yml`` paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2464,11 +2459,12 @@ class SyncDriver:
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*", "*-act.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
-        LOGGER.info(f"Found {len(pending)} pending actions in RUNS_FINISHED.")
+        pending = _pending_only(pending)
+        LOGGER.info(f"Found {len(pending)} pending actions.")
         return pending
 
     def list_pending_exps(self, omit_manual_exps: bool = True) -> list:
-        """Return ``*-exp.yml`` paths waiting under ``RUNS_FINISHED``.
+        """Return ``*-exp.yml`` paths that have not shipped yet.
 
         Args:
             omit_manual_exps: Skip files containing ``manual_orch_seq``.
@@ -2482,7 +2478,8 @@ class SyncDriver:
         pending = glob(os.path.join(finished_dir, "*", "*", "*", "*", "*-exp.yml"))
         if omit_manual_exps:
             pending = [x for x in pending if "manual_orch_seq" not in x]
-        LOGGER.info(f"Found {len(pending)} pending experiments in RUNS_FINISHED.")
+        pending = _pending_only(pending)
+        LOGGER.info(f"Found {len(pending)} pending experiments.")
         return pending
 
     async def finish_pending(
@@ -2537,19 +2534,17 @@ class SyncDriver:
 
         if actions_first:
             pending_acts = self.list_pending_acts(omit_manual_exps)
-            LOGGER.info(f"Enqueueing {len(pending_acts)} actions from RUNS_FINISHED.")
+            LOGGER.info(f"Enqueueing {len(pending_acts)} pending actions.")
             for pp in pending_acts:
                 await reset_and_queue(pp, rank=0)
 
             pending_exps = self.list_pending_exps(omit_manual_exps)
-            LOGGER.info(
-                f"Enqueueing {len(pending_exps)} experiments from RUNS_FINISHED."
-            )
+            LOGGER.info(f"Enqueueing {len(pending_exps)} pending experiments.")
             for pp in pending_exps:
                 await reset_and_queue(pp, rank=1)
 
         pending_seqs = self.list_pending(omit_manual_exps)
-        LOGGER.info(f"Enqueueing {len(pending_seqs)} sequences from RUNS_FINISHED.")
+        LOGGER.info(f"Enqueueing {len(pending_seqs)} pending sequences.")
 
         for pp in pending_seqs:
             await reset_and_queue(pp, rank=2)
