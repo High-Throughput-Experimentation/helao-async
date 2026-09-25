@@ -799,6 +799,62 @@ the removal branch. The identity-substitution bug is latent in the legacy path
 too: a record already under `RUNS_FINISHED` reaching `move_dir` has the same
 shape. Task 9 must add that guard and a test for it.
 
+### A25 — The nosync guard was missing from the native syncer entirely
+
+Restoring `test_native_sync_pins.py` (commit `549b0c1b`) found **six** missing
+blocks in `helao/hexagon/adapters/native/sync_driver.py`, not the three the
+failing test names suggested. Three of them are the substance of Task 3:
+
+| Missing from native | What it is |
+|---|---|
+| `HelaoYml.upload_files` | the entire files-list-over-glob authority |
+| `HelaoYml._registered_names` | its helper |
+| `HelaoYml.warn_unregistered_files` | the reconciliation warning |
+| `SyncDriver.__init__` | `run_journal` construction + `_recover_run_journal` |
+| `SyncDriver.enqueue_yml` | the `UNSYNCED` handoff |
+| `SyncDriver.sync_yml` | the `DONE` eviction |
+
+**So the `nosync` guard existed only in the legacy syncer.** The single check
+standing between a `sync_data: False` acquisition and S3 — the one whose
+mutation Task 3 was told was the most important in the plan — was absent from
+an entire code path. Any hexagon-composed syncer would have kept uploading by
+glob and shipped data the station deliberately withholds, which is exactly the
+regression §3.5 exists to prevent.
+
+**The per-member parity lists would never have caught it.** `upload_files`,
+`_registered_names` and `warn_unregistered_files` are new members inside
+`HelaoYml`; a list that enumerates known members cannot notice one that was
+never added to it. Only `assert_verbatim_region`, which compares a whole
+sentinel-delimited byte range, saw them.
+
+Lesson for the rest of this plan and for the `A16` class generally: **when a
+task adds a new member to a mirrored class, the per-member pin is silent by
+construction.** Every task from here that adds a member to `HelaoYml`,
+`SyncDriver`, `Active`, `Base` or their hexagon twins must check the native
+copy explicitly rather than relying on a pin to report it.
+
+The restoration was done by rebuilding the native region from the *live*
+legacy region using the same sentinel-derived bounds the test uses, rather than
+hand-patching — so the bytes match by construction rather than by inspection.
+That is the right technique for any future drift.
+
+**Survey of the other mirrored pairs** (no fourth instance):
+
+| Native | Legacy twin | Edited on this branch | Pin |
+|---|---|---|---|
+| `native/data_file.py` | `core/servers/active_data_file.py` | both sides | green |
+| `native/data_stream.py` | `core/servers/active_data_stream.py` | neither | green |
+| `native/finalizer.py` | `core/servers/active_finalizer.py` | both sides | green |
+| `native/meta_writer.py` | `core/servers/base_meta_writer.py` | **legacy only** | green |
+
+`base_meta_writer.py` was edited on the legacy side alone and its pin still
+passes, so that edit fell outside the pinned members — it is riding on that
+rather than on a matching native edit. Worth knowing before Task 10 touches
+the meta writers.
+
+`native/posthoc_writer.py` was also edited and has **no** parity pin: it is a
+hand-written adapter, not a mirror, so that is expected rather than a gap.
+
 ---
 
 ## Decision resolved (2026-09-25)
