@@ -514,6 +514,78 @@ whatever `save_root` happens to be, so Task 7 flipping `save_root` to
 fix that one literal** — grep `run_state.py` and the Task 6 call sites for
 `RUNS_` before declaring Task 7 done.
 
+### A18 — Station findings (hte-note-01, 2026-09-25)
+
+Full report: `/home/dan/.claude/jobs/a98b8858/tmp/station-check-report.md`.
+
+**1. The legacy archive has TWO day-directory shapes — Task 11.**
+
+| Era | Shape | Example |
+|---|---|---|
+| 24.41–24.42 | `YY.WW/YYYYMMDD` | `24.42/20241022/` |
+| 25.39 onward | `YY.WW/MMDD` | `26.17/0428/` |
+
+The week level is `%y.%U` in both eras. Spec §3.2 and §7 assume legacy is
+uniformly `YY.WW/MMDD`. **A legacy reader built to one shape silently fails to
+resolve the other** — a miss returns `None`, not an error. Task 11's legacy
+branch and its test must cover both, and Task 13's triage must not "correct"
+an 8-char fixture into a 4-char one.
+
+**2. The new layout breaks the XRFS calibration date, loudly — needs an owner.**
+
+`xrfs_local.py:295-303`'s `measurement_date_from_ymd` is
+`pd.to_datetime(ymd_dir, format="%y%m%d")` with default `errors="raise"`. Its
+caller builds `ymd_dir` as `yw_dir.split(".")[0] + md_dir`. Under
+`RUNS/%Y/%m%d/` that yields `"20260624"` — 8 chars against a 6-char format, so
+it **raises**. Loud, not silent: the survey's worst finding is downgraded, but
+this still breaks XRFS analysis on the first post-cut-over run.
+
+It lives in a private deployment, so it belongs to that repo's commit in Task
+13's A3 step — but it must be fixed *before* the cut-over reaches a station
+that runs XRFS, not after. Add it to the cut-over checklist as a blocker.
+
+**3. `CTRL-x` does NOT quiesce the batch watchdog — cut-over checklist.**
+
+The checklist says "stop the running group cleanly (`CTRL-x`, not a kill)".
+That is insufficient at a batch station. Because of the graft seam,
+`POST /shutdown` runs the hexagon host's own shutdown rather than the legacy
+lifespan handler that stops the watchdog, so the scan loop keeps claiming
+folders until SIGTERM — and then has only `GRACEFUL_WAIT = 7.0 s` before
+SIGKILL. A conversion interrupted there writes into a tree the new build no
+longer sweeps.
+
+Correct sequence: `/pause_watchdog`, wait for `service.busy()` to clear,
+confirm every `processing/` directory is empty, *then* stop the group.
+
+**4. `FAULTS` — the survey's "referenced by nothing" was wrong.**
+
+It has three writers in tracked code (`base_api.py:674`,
+`action_host.py:1289`, `base.py:266`) and zero readers anywhere. Contents are
+`faulthandler` dumps. Not a run tree, unaffected by this change — but it is
+not orphaned either, and nothing should delete it.
+
+**5. The `PermissionError` is sshfs, not permissions — revises A8's rationale.**
+
+`/mnt/wd4` is an **sshfs** mount. A full walk of the same 33,754 directories
+gives 0 errors natively (~2 s) and 0 errors over sshfs when it is the sole
+walker (1061 s); `Errno 1` appears only under **concurrent** access.
+
+A8's requirement stands and is if anything more important — the errors are
+transient and load-dependent, so a walk that swallows them produces a
+*different* short journal on each run. It also means the pruning tool's
+degraded orphan detection is a property of the mount, not of the data.
+
+**6. Removing the sequence zip removes a crash class — supports D9.**
+
+SYNC has segfaulted twice inside `zip_file.write` (`file_utils.py:109`), most
+recently 2026-09-15 18:19, killing the whole syncer process and leaving
+exactly the empty `RUNS_FINISHED` husk the station still has. D9 was chosen for
+layout reasons; it also deletes this failure mode.
+
+**7. The station is 3 commits behind local `unstable`.** Parent repo on
+`unstable` at `origin/unstable` `ac0cfa9b`, clean. The nested deployment repos
+are clean and identical to local. The cut-over lands on `unstable` + 3.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -3466,7 +3538,16 @@ Do not merge without a station check: note1 is the station with eight live
 Not a code task — the operational steps that must happen at each station after
 the merge, in this order.
 
+- [ ] **At a batch station, quiesce the watchdog FIRST** — `CTRL-x` alone is
+      not enough (A18.3). `POST /pause_watchdog`, wait for `service.busy()` to
+      clear, and confirm every `processing/` directory is empty. The graft seam
+      means `/shutdown` does not run the legacy lifespan handler that stops the
+      scan loop, so it keeps claiming folders until SIGTERM and then has 7 s
+      before SIGKILL.
 - [ ] Stop the running group cleanly (`CTRL-x`, not a kill).
+- [ ] **Before cutting over a station that runs XRFS**, fix that deployment's
+      `measurement_date_from_ymd` caller for the new layout (A18.2). It raises
+      on the first post-cut-over analysis otherwise.
 - [ ] Confirm `RUNS_ACTIVE` and `RUNS_FINISHED` are **empty**. A record left in
       either is a pre-cut-over record that the new syncer will never see: it has
       no journal entry and does not live under `RUNS`. Let the old build drain
