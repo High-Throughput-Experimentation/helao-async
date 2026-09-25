@@ -266,6 +266,49 @@ path exactly as today. Mutate by restoring the path derivation and confirm the
 first two fail with `IndexError` rather than a clean refusal — that is the
 production symptom.
 
+### A12 — Task 5: read the real uuid, from both ends of the yml
+
+Two corrections to this task, both found by measuring rather than reading. The
+shipped implementation is `helao/helpers/run_state.py` (commits `da70cbae`,
+`218aebe2`); it is the reference, not the listing in Task 5.
+
+**1. A rebuilt record must be keyed by its real uuid.** The plan's stem
+shortcut is a phantom-record generator: `working_set()` is keyed by uuid,
+eviction is `records.pop(uuid, None)`, and the `done` tombstone the syncer
+appends later carries the real `action_uuid` out of `prog.yml.meta`. The pop
+misses, the stem record is never evicted, and the working set grows
+monotonically across every rebuild — the precise failure spec §3 D3 exists to
+prevent.
+
+**2. A head-only read recovers no sequence uuid at all.** Measured across the
+production archive:
+
+| yml | own uuid | parent uuid | file size |
+|---|---|---|---|
+| `-act` | line 3 | line 19 | 1,134 lines |
+| `-exp` | line 2 | line 1050 of 1071 | 1,071 lines |
+| `-seq` | line 427442 of 427448 | n/a | 427k–560k lines |
+
+`sequence_params` and `planned_experiments` serialize *before* the uuid, so a
+sequence's own uuid sits seven lines from the end of a half-million-line file
+and an experiment's parent ~21 lines from its end. So the read is **head +
+tail** — 4 KB and 8 KB windows via `open("rb")` and `seek`, each chunk's
+boundary line discarded because a fragment is a prefix of a real line. Flat
+cost whether the yml is 20 lines or 560k.
+
+`parent` falls out of the same windows: an action's `experiment_uuid` from the
+head, an experiment's `sequence_uuid` from the tail, `None` for a sequence.
+
+Values are validated with stdlib `uuid.UUID(...)` and stored as
+`str(UUID(value))`. A yml with no uuid key, or an unparseable one, falls back
+to the stem and logs at WARNING naming the file — a rebuild survives one bad
+record.
+
+**Consequence for Task 6:** normalize the tombstone uuid the same way, with
+`str(UUID(value))`. An uppercase or braced uuid arriving from elsewhere would
+not pop. The ymls on disk are already lowercase canonical, so this is a guard
+rather than a live bug — but it is the same `pop` that item 1 is about.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -1526,11 +1569,13 @@ def rebuild_from_tree(runs_root, states_root, server_key: str) -> "RunStateJourn
     return journal
 ```
 
-Note the `uuid` field holds the yml stem, not a real uuid: a rebuild recovers
-*which records still need work* from the filesystem, and the filesystem does not
-carry the uuid in the path. That is sufficient, because the only consumer is the
-syncer's pending queue, which is addressed by path. Task 6 must not assume a
-rebuilt record's `uuid` is parseable as one.
+**Superseded — see A12.** An earlier draft of this task keyed a rebuilt record
+by the yml stem, on the grounds that the filesystem does not carry the uuid in
+the path and the only consumer is addressed by path. That was wrong: the
+*journal* is keyed by uuid and eviction is `pop(uuid)`, so a stem-keyed record
+is never evicted by the syncer's real-uuid tombstone and survives every
+compaction. Read the uuid out of the yml. A12 has the details, including why a
+head-only read is not enough.
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
