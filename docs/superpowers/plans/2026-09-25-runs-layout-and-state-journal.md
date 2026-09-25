@@ -357,6 +357,61 @@ and `action_output_dir` are all run-relative. Any task that calls `.resolve()`,
 `.relative_to()` or `os.path.abspath()` on one of them without joining
 `save_root` first has this bug, and a `tmp_path`-based test will not find it.
 
+### A14 — Task 3: four findings from the Task 2 investigation
+
+**1. `relocate_files` and `aux_file_paths` are dead.** Six occurrences
+tree-wide across all six deployment repos, **no call site**; the `Active`
+delegator at `base.py:1455` is itself never invoked. So `track_file`'s
+`dirname != record_dir` branch writes into a queue nobody drains.
+
+This matters mainly because it corrects a scarier reading: there is no
+relocation, therefore no second copy at the record root, therefore no
+duplicate for §3.5.1's reconciliation to false-positive on. Note also that
+`relocate_files` is `async_copy` (`shutil.copy`), a copy and not a move, so
+the source would survive even if it ran.
+
+`posthoc_writer.py:402` documents the live path as "queues the source for the
+finalizer to relocate at action end" — **that finalizer step does not exist.**
+The post-hoc writer works only because it does the copy itself at `:424-440`.
+That stale docstring is what made the first analysis wrong.
+
+*Decision for Task 3:* either delete both as dead, or wire the finalizer to
+call `relocate_files`. Leaving a queue that one adapter hand-works-around and
+another never drains is how this got mis-analysed. Deleting is the smaller
+change and this plan's default; say which you did.
+
+**2. A `files` entry that does not resolve is silently dropped.** `track_file`
+on a path *outside* the record directory records a bare basename and the file
+is never copied in, so `record_dir / file_name` does not exist. Task 3's
+`is_file()` check drops it — **and §3.5.1's reconciliation cannot flag it**,
+because that compares against a glob of the record directory and the file is
+not there. Silent in, silent out.
+
+Task 3 does not regress this (the glob never uploaded it either — it is not in
+the record directory). But the warning needs **a second arm** to make it
+visible: a `files` entry that does not resolve to an existing file under the
+record directory. Add it, and test it.
+
+**3. The post-hoc writer has a live sub-directory mismatch.**
+`posthoc_writer.py:440` copies to `os.path.join(dest_dir, basename(path))`
+while the `FileInfo` it just built now says `"sub/x.spc"` for a source inside a
+sub-directory. Under a files-driven upload set that entry resolves to nothing
+and the file is dropped — a **real regression** for post-hoc-written records,
+unlike item 2. Its docstring's "only its basename is recorded" contract
+(`:416`) is no longer true. Not covered by any test:
+`test_posthoc_writer.py` is 40 passed either way. Task 3 must fix the copy to
+preserve the sub-path, or the writer to record the basename it actually used.
+
+**4. Latent: `_resolve_output_path` makedirs only the record root.**
+`active_data_file.py:332-336` builds `output_file = join(output_path,
+file_info.file_name)` then `os.makedirs(output_path, exist_ok=True)` — the root
+only. A multi-segment `file_name` reaching there fails with
+`FileNotFoundError`. Not reachable today (that name comes from
+`init_datafile`, which Task 2 deliberately left as a record-root name), but it
+becomes reachable the moment anything registers a sub-directory name through
+the one-shot writer. One line: `os.makedirs(os.path.dirname(output_file),
+exist_ok=True)`.
+
 ---
 
 ## Decision resolved (2026-09-25)
