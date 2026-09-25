@@ -490,8 +490,12 @@ its hexagon counterpart checked.** Specifically:
 - **Task 10** (syncer): `helao/hexagon/adapters/native/sync_driver.py` is
   already listed; confirm it does not also need `posthoc_writer.py` and
   `meta_writer.py`, which the survey named.
-- **Task 11** (readers): the hexagon browser source port is a separate
-  implementation from `ui/shared/data_browser/sources.py`.
+- **Task 11** (readers): ~~the hexagon browser source port is a separate
+  implementation~~ — **wrong, corrected by Task 11.**
+  `helao/hexagon/adapters/vis/browser_source.py` is a 75-line pure delegator:
+  one class, six methods, each a one-line forward into the shared
+  `ui/shared/data_browser` modules. Fixing the shared readers fixes it. Not
+  every hexagon file is a second implementation; check before assuming.
 
 Two corrections in the other direction — the plan over-listed:
 
@@ -921,6 +925,44 @@ information, and removing it leaves the information nowhere.** Every predicate
 that inferred lifecycle from location has to be re-sourced from the record's
 own metadata. When reviewing Tasks 11-13, treat any `startswith("RUNS_")`,
 `"RUNS_" in path`, or per-tree glob as a candidate for the same defect.
+
+### A28 — Three `RUN_TREES` constants disagree; two are blind to the new layout
+
+The bug class this whole plan is about, one level up: instead of a directory
+name carrying state, a **list of directory names** carries it — copied, and
+drifted.
+
+| File | Contents | Sees `RUNS`/`DIAG`? |
+|---|---|---|
+| `ui/shared/data_browser/sources.py:230` | `RUNS`, `DIAG`, `RUNS_FINISHED`, `RUNS_DIAG` | yes (new, Task 11) |
+| `core/tests/scan_prg_ghosts.py:93` | all 8 `RUNS_*` | **no** |
+| a private deployment's prune script | 7 `RUNS_*`, omits `RUNS_SYNCED` | **no** |
+
+Three constants, one name, three memberships, none importing another. Plus two
+more enumerations under different names: a local `states` tuple in
+`loaders/localfs.py:213` (legacy branch only now) and `FileMapper.states` /
+`.roots`.
+
+**Cut-over blocker.** `scan_prg_ghosts` and the private prune script will
+**silently skip every post-cut-over record**, because neither enumerates `RUNS`
+or `DIAG`. Both are repair/report tools that exit non-zero on findings, so the
+failure mode is a **confident clean verdict over a tree they never entered** —
+the same shape as A18.5's sshfs coverage problem, and the same shape as A15's
+golden master that collected zero tests and exited green.
+
+**Required before any station cuts over:** both tool copies gain `RUNS` and
+`DIAG`. The private one goes in Task 13's A3 per-deployment step.
+
+**Worth doing properly:** collapse all of them onto the shared vocabulary in
+`core/models/run_dir.py` — `run_root(...)` / `diag_root(...)` /
+`LEGACY_RUN_DIRS` — so there is one list. Task 11 already collapsed three
+inline `for state in ("SYNCED", "FINISHED")` loops inside `sources.py` into
+one constant; the same move across files is what stops this recurring.
+
+Note the recurring shape across A15, A18.5, A24, A26 and now A28: **a tool that
+looks in the wrong place reports success, not failure.** Every one of them
+fails safe-looking and loud-never. Any verification step this plan adds should
+be asked the question "what does this print if it is pointed at nothing?"
 
 ---
 
@@ -3888,6 +3930,10 @@ the merge, in this order.
       writes (A26). `posthoc_writer.default_save_root()` still returns
       `<root>/RUNS_FINISHED`, which the startup sweep no longer covers, so
       converted records would sit unsynced with nothing scanning for them.
+- [ ] **Teach the repair tools about `RUNS` and `DIAG`** (A28).
+      `scan_prg_ghosts` and the private deployment's prune script enumerate
+      only `RUNS_*`, so post-cut-over they report a clean archive they never
+      entered.
 - [ ] **Run a `warn_unregistered_files` log sweep** after the first real
       post-cut-over run. Any producer that was relying on glob upload rather
       than registering its output shows up there and nowhere else.
