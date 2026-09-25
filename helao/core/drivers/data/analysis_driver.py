@@ -90,6 +90,7 @@ from helao.core.error import ErrorCodes
 from helao.helpers import config_loader
 from helao.helpers import helao_logging as logging
 from helao.helpers.executor import Executor
+from helao.helpers.param_alias import resolve_sequence_path
 from helao.hexagon.app.action_context import ActionContext
 from helao.hexagon.app.action_host import ActionHost
 
@@ -1326,27 +1327,27 @@ class AnalysisSyncer(HelaoSyncer):
     async def batch_calc(
         self,
         analysis_class: BaseAnalysis,
-        sequence_zip_path: str = "",
+        sequence_path: str = "",
         params: Optional[dict] = None,
         analysis_action_uuid: Optional[UUID] = None,
     ):
-        """Enqueue ``analysis_class`` for each selected process in a local zip.
+        """Enqueue ``analysis_class`` for each selected process in a local record.
 
-        Builds a :class:`LocalLoader` for ``sequence_zip_path``, asks the analysis
+        Builds a :class:`LocalLoader` for ``sequence_path``, asks the analysis
         class which process UUIDs it should run on (via
         :meth:`BaseAnalysis.select_process_uuids`), and enqueues one analysis
         tuple per process.
 
         Args:
             analysis_class: :class:`BaseAnalysis` subclass to instantiate.
-            sequence_zip_path: Path to a sequence zip parseable by
-                :class:`LocalLoader`.
+            sequence_path: Path to a sequence directory or zip parseable
+                by :class:`LocalLoader`.
             params: Per-analysis parameter overrides.
             analysis_action_uuid: UUID of the requesting action.
         """
         if params is None:
             params = {}
-        local_loader = LocalLoader(sequence_zip_path)
+        local_loader = LocalLoader(sequence_path)
         for puuid in analysis_class.select_process_uuids(local_loader):
             await self.enqueue_calc(
                 (
@@ -1390,9 +1391,10 @@ class AnalysisSyncer(HelaoSyncer):
 
 
 class AnalysisExecutor(Executor):
-    """Executor that enqueues a local analysis from a sequence zip.
+    """Executor that enqueues a local analysis from a synced sequence.
 
-    Reads the ``sequence_zip_path`` and ``params`` action parameters and calls
+    Reads the ``sequence_path`` (or the deprecated ``sequence_zip_path``) and
+    ``params`` action parameters and calls
     :meth:`AnalysisSyncer.batch_calc` for the bound ``analysis_class``, which
     enqueues one task per selected process.
     """
@@ -1419,11 +1421,11 @@ class AnalysisExecutor(Executor):
             LOGGER.error("Failed to initialize AnalysisExecutor.", exc_info=True)
 
     async def _exec(self):
-        """Enqueue analyses for all selected processes in the loaded zip."""
+        """Enqueue analyses for all selected processes in the loaded record."""
         try:
             await self.driver.batch_calc(
                 self.analysis_class,
-                sequence_zip_path=self.action_params["sequence_zip_path"],
+                sequence_path=resolve_sequence_path(self.action_params) or "",
                 params=self.action_params.get("params", {}),
                 analysis_action_uuid=self.active.action.action_uuid,
             )
@@ -1490,10 +1492,10 @@ def make_analysis_app(server_key) -> ActionHost:
         @app.action(path=f"/{server_key}/{endpoint_name}", name=endpoint_name)
         async def _analyze(
             ctx: ActionContext,
-            sequence_zip_path: str = "",
+            sequence_path: str = "",
             params: dict = {},
         ):
-            f"""Action endpoint: run {ana_cls.__name__} on a sequence zip."""
+            f"""Action endpoint: run {ana_cls.__name__} on a synced sequence."""
             active = await ctx.begin()
             executor = AnalysisExecutor(
                 analysis_class=ana_cls,

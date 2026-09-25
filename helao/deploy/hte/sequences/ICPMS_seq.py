@@ -8,12 +8,12 @@ from helao.helpers.premodels import ExperimentPlanMaker
 
 @sequence(version=1)
 def ICPMS_postseq(
-    sequence_zip_path: str = "",
+    sequence_path: str = "",
 ) -> list:
     """Build a post-sequence that runs the ICPMS concentration analysis.
 
     Args:
-        sequence_zip_path: Path to the zipped sequence archive to analyze.
+        sequence_path: Path to the synced sequence directory to analyze.
 
     Returns:
         list: Ordered list of planned ``Experiment`` objects.
@@ -22,7 +22,7 @@ def ICPMS_postseq(
     epm.add(
         "ICPMS_analysis_concentration",
         {
-            "sequence_zip_path": sequence_zip_path,
+            "sequence_path": sequence_path,
         },
     )
 
