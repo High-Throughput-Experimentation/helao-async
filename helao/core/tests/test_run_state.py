@@ -1,6 +1,7 @@
 """The per-server run-state journal (spec §4)."""
 
 import json
+import os
 from pathlib import Path
 from uuid import NAMESPACE_URL, uuid5
 
@@ -305,3 +306,33 @@ def test_unreadable_uuid_falls_back_to_the_stem_and_warns(tmp_path: Path, caplog
         ws = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC").working_set()
     assert set(ws) == {missing, garbage}
     assert caplog.text.count("No parseable sequence_uuid") == 2
+
+
+def test_unreadable_directory_is_counted_and_warned(tmp_path: Path, caplog):
+    """A scan that could not read a subtree must not pass as a complete one.
+
+    Parts of the production archive raise ``PermissionError`` for the account
+    running the rebuild. Both ``rglob`` and a bare ``os.walk`` swallow that,
+    so an unreadable subtree looks exactly like an empty one -- and a short
+    journal means "those records are done", which is silent data loss
+    arrived at through the path that exists to prevent it (plan A8).
+    """
+    runs = tmp_path / "RUNS"
+    readable, hidden = "260925.120000000000-seq", "260925.130000000000-seq"
+    _record(runs, "2026/0925/readable", readable, prg=False, complete=False)
+    blocked = _record(runs, "2026/0925/blocked", hidden, prg=False, complete=False)
+
+    os.chmod(blocked, 0o000)
+    try:
+        if os.access(blocked, os.R_OK):  # running as root: the test is vacuous
+            pytest.skip("cannot make a directory unreadable as this user")
+        with caplog.at_level("WARNING"):
+            j = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC")
+            ws = j.working_set()
+    finally:
+        os.chmod(blocked, 0o700)
+
+    assert set(ws) == {_uuid_for(readable)}  # what it could read, it kept
+    assert j.unreadable_dirs == 1
+    assert "may be INCOMPLETE" in caplog.text
+    assert str(blocked) in caplog.text
