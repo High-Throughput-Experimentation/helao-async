@@ -77,10 +77,10 @@ across ~40 call sites for no behaviour change.
 RUNS/%Y/%m%d/%H%M%S__{sequence_name}__{sequence_label}
 ```
 
-Built with `os.path.join`, returned with **OS-native separators**. This is a
-change from today: `get_sequence_dir()` currently ends
-`.replace(r"\\", "/")` and every downstream consumer receives forward slashes on
-Windows. See §9 for why that replace exists and what has to move with it.
+Built with `os.path.join`, then normalized to **forward slashes**, exactly as
+today. Every written and consumed run-relative path uses `/` on every platform;
+the OS-native form exists only transiently, at the filesystem call itself. See
+§9.
 
 Experiment and action directories are unchanged:
 
@@ -143,26 +143,78 @@ right place.
 `base.py:1019`'s existing `save_root.replace(ACTIVE, DIAG)` becomes a call to
 `redirect_manual_dir(save_root)` returning `<root>/DIAG`.
 
-### 3.5 nosync files (D4)
+### 3.5 nosync files, and the end of glob-driven upload (D4)
 
 `.hlo` files for a record with `sync_data: False` stay where they are written.
-They are not diverted to a parallel tree.
+They are not diverted to a parallel tree. `is_nosync_file()`
+(`naming.py:87-89`) keeps its job of *setting* `FileInfo.nosync` at write time.
 
-**This needs explicit work, and it is the one place where the design meets a
-known trap.** `sync-uploads-glob-not-action-files` records that the syncer
-decides what to upload with a *directory glob*, not from `Action.files`. A glob
-cannot see a per-file flag. So folding nosync in without further change would
-start uploading data that the station deliberately withholds — a silent,
-non-reversible data leak.
+Folding `RUNS_NOSYNC` away removes the mechanism that currently enforces the
+flag. The syncer decides what to upload by **globbing the record directory**
+(`HelaoYml.misc_files` / `hlo_files`, `sync_driver.py:497-527`) — a glob cannot
+see a per-file flag, so without a replacement the first run after cut-over would
+silently ship data the station deliberately withholds.
 
-Required: before collecting uploadable files for an action, the syncer loads that
-action's yml (which it already parses) and builds the set of filenames whose
-`FileInfo.nosync` is true, then subtracts that set from the glob result. The
-existing `is_nosync_file()` helper (`naming.py:87-89`) stays as the predicate
-that *sets* the flag at write time.
+**Resolution: the record's `files` list becomes the authority for what uploads.**
+The glob stops deciding. This is the same defect recorded in
+`sync-uploads-glob-not-action-files` (transient `.<hex>.tmp` staging files
+reaching `raw_data/`, and one unuploadable name wedging the push loop) — fixing
+it at the source rather than adding a second filter on top.
 
-A test must exist that fails if the subtraction is removed. This is the single
-highest-risk item in the design.
+New rule for an action:
+
+- Upload set = the `files` entries in the action's yml whose `nosync` is false.
+- `_is_syncable_misc_file()` (`sync_driver.py:472-495`) is no longer the filter;
+  its dotfile/`.tmp` exclusions become unnecessary, because a staging file was
+  never registered in `files` in the first place. Keep the function until the
+  audit below is clean, then delete it.
+- `*-prc.yml` and `*.lock` keep their existing dedicated handling
+  (`process_ymls`, `lock_files`); they are artifacts of the sync machinery
+  itself, not action output, and are not in `files`.
+
+Experiments and sequences have no `files` list; their upload set is the yml
+itself plus the colocated `*-prc.yml`, which is what the non-action branch of
+`misc_files` already approximates.
+
+#### 3.5.1 The gap this opens, and how it is closed
+
+`FileInfo.file_name` is written with `os.path.basename()`
+(`active_data_file.py:423`, `hexagon/adapters/native/data_file.py:422`) — a bare
+name. But `misc_files` **rglobs** for actions (`sync_driver.py:505-508`), so a
+file a driver writes into a *subdirectory* of the action directory is uploaded
+today and cannot be named by `files` at all.
+
+Switching to `files` without addressing this would stop uploading those files,
+silently. Two changes close it:
+
+1. **`file_name` becomes record-relative, not a basename.** Forward-slash (§9),
+   relative to the action directory, so a subdirectory file is addressable.
+   A bare name is the degenerate case and existing ymls keep parsing.
+2. **Runtime reconciliation warning.** After building the upload set, the syncer
+   compares it against what a glob of the record directory would have found.
+   Anything present on disk, not excluded as staging/bookkeeping, and absent
+   from `files` is logged at WARNING with its path. The gap becomes visible at
+   the station instead of becoming a silent data loss. This log is the migration
+   aid; it is not a fallback and does not upload the file.
+
+**The plan must run an audit before implementing this**, against real station
+trees: for a representative sample of synced actions under note1's archive,
+compute the glob-derived set and the `files`-derived set and diff them. That diff
+is the list of writers that produce files without registering them. Each is then
+either fixed to register, or consciously accepted as no-longer-uploaded. The
+number is not guessable from the repo — vendor drivers copy instrument output in
+by hand — so it must be measured, not assumed.
+
+#### 3.5.2 Tests
+
+Both directions must be pinned, and both must fail when their guard is removed:
+
+- An action with `sync_data: False` produces `.hlo` files present on disk and
+  **absent** from the upload set.
+- An action with a registered file in a subdirectory has that file **in** the
+  upload set.
+- A `.<hex>.tmp` staging file present in the directory at scan time is absent
+  from the upload set — the original defect, now prevented structurally.
 
 ## 4. State journals
 
@@ -202,7 +254,7 @@ One JSON object per line, newline-terminated, no pretty-printing:
 | `uuid` | the record's `action_uuid` / `experiment_uuid` / `sequence_uuid` |
 | `kind` | `action` \| `experiment` \| `sequence` |
 | `state` | `active` \| `unsynced` \| `done` |
-| `path` | **relative to `root`**, OS-native separators |
+| `path` | **relative to `root`**, forward-slash separators (§9) |
 | `parent` | parent record uuid, or `null` for a sequence |
 
 `path` is relative to `root` deliberately. Absolute paths recorded into sidecars
@@ -378,12 +430,14 @@ Grep for `RUNS_` across `*.py`: **99 files**. They are not equal.
 | `helao/helpers/yml_tools.py` | `move_dir` body deleted; nosync divert removed |
 | `helao/helpers/file_mapper.py` | legacy flag; single-candidate fast path |
 | `helao/helpers/helao_data.py` | legacy flag |
-| `helao/core/drivers/data/sync_driver.py` | promotion + zip deleted; `.prg` relocated; nosync subtraction added |
+| `helao/core/drivers/data/sync_driver.py` | promotion + zip deleted; `.prg` relocated; upload set driven by `files`, not globs (§3.5) |
 | `helao/core/drivers/data/process_locator.py`, `loaders/localfs.py` | legacy fallback |
 | `helao/core/servers/base.py`, `base_api.py`, `orch.py` | journal appends; manual redirect via `diag_root()` |
 | `helao/hexagon/domain/naming.py` | `redirect_manual_dir` ⇒ `DIAG` |
 | `helao/hexagon/adapters/native/sync_driver.py`, `meta_writer.py`, `posthoc_writer.py` | mirror the above |
 | `helao/ui/shared/data_browser/sources.py` | legacy fallback |
+| `helao/core/models/file.py` | `FileInfo.file_name` becomes record-relative (§3.5.1) |
+| `helao/core/servers/active_data_file.py`, `hexagon/adapters/native/data_file.py` | stop calling `os.path.basename` on `file_name` |
 | **new** `helao/helpers/run_state.py` | the journal: append, replay, compact, rebuild |
 
 **Mechanical (~85 files):** tests and fixtures that construct literal
@@ -392,31 +446,27 @@ under `helao/core/tests/`. Each needs its literal updated or, where the test is
 *about* legacy handling, deliberately left alone. `harness/` (capture, mutate,
 parity, treepass) reads real station trees and must keep understanding both.
 
-## 9. The Windows separator hazard
+## 9. Path separators
 
-`get_sequence_dir()`, `get_experiment_dir()` and `get_action_dir()` all end with
-`.replace(r"\\", "/")` or build with `"/".join(...)`. That is not decoration:
-`windows-rundir-separator-normalization` records a fix where run-dir methods
-returning OS-native separators broke consumers that assumed forward slashes, and
-`check_long_paths` exists because Windows `MAX_PATH` has bitten this tree before.
+**Decided: `/` everywhere.** The existing normalization at the end of
+`get_sequence_dir()` / `get_experiment_dir()` / `get_action_dir()` stays. Every
+run-relative path that is written to a yml, recorded in a journal, compared,
+split, or handed to another server is forward-slash. The OS-native form is
+produced only at the point of a filesystem call and never stored.
 
-D6's shorter top-level (`RUNS` vs `RUNS_FINISHED`) buys back 5 characters and the
-label suffix spends some; net path length is roughly unchanged, so `MAX_PATH`
-risk does not increase.
+This keeps `windows-rundir-separator-normalization` fixed rather than
+re-litigated: run-dir methods returning native separators is precisely the
+regression that memory records.
 
-The separator question is **decided: native, stored native.** The three
-`get_*_dir()` methods return OS-native separators and the normalization at the
-end of each is deleted. That is the requirement as stated, and a path that is
-native everywhere is simpler to reason about than one that is posix in metadata
-and native on disk.
+Two consequences for this design:
 
-The cost is that it reverses a normalization added for a reason. The plan's
-**first task** is therefore an enumeration, not a design decision: find every
-consumer of `sequence_output_dir` / `experiment_output_dir` / `action_output_dir`
-and every place a run-relative path is compared, split, or joined as a string,
-and fix each one that assumes forward slashes. `windows-rundir-separator-normalization`
-names the failure mode to look for. The enumeration is mechanical; skipping it is
-what would break Windows stations, and it breaks them quietly.
+- The journal's `path` field (§4.2) is forward-slash, root-relative. A journal
+  written on a Windows station is byte-identical to one written on Linux for the
+  same run, so the repair and reporting tools are platform-free.
+- `RUNS` is 5 characters shorter than `RUNS_FINISHED` while the §3.3 label suffix
+  spends some of that back; net path length is roughly unchanged, so the
+  `MAX_PATH` exposure that `check_long_paths` exists to monitor neither improves
+  nor worsens. No new mitigation needed.
 
 ## 10. Testing
 
@@ -438,10 +488,10 @@ Each of these must be shown to fail when its guard is removed
 6. **Rebuild.** Delete a journal, run the rebuild, assert the working set matches
    what the journal held. Then delete a `.prg` and assert its record reappears as
    unsynced.
-7. **nosync subtraction (§3.5).** An action with `sync_data: False` produces
-   `.hlo` files present on disk and **absent** from the syncer's upload set.
-   Remove the subtraction ⇒ this test must fail. Highest-priority test in the
-   suite.
+7. **Upload set (§3.5).** The three cases in §3.5.2: nosync excluded, a
+   registered subdirectory file included, a `.<hex>.tmp` staging file excluded.
+   Highest-priority tests in the suite — the first one failing means a station
+   ships data it withholds today.
 8. **Legacy readers.** A synthetic legacy tree (`RUNS_SYNCED/26.35/0828/...`,
    including a sequence `.zip`) resolves through `FileMapper` and `HelaoData`
    unchanged.
