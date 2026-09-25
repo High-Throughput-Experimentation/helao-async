@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 
@@ -133,7 +134,47 @@ def test_missing_file_is_an_empty_working_set(tmp_path: Path):
     assert RunStateJournal(tmp_path, "NEVERWRITTEN").working_set() == {}
 
 
-def _record(runs_root: Path, rel: str, stem: str, prg: bool, complete: bool):
+def _uuid_for(stem: str) -> str:
+    """The uuid ``_record`` writes into a record's yml, derived from its stem."""
+    return str(uuid5(NAMESPACE_URL, stem))
+
+
+def _yml_text(stem: str, parent_stem) -> str:
+    """A record yml shaped the way a real one is.
+
+    The shape is the point, not decoration. On the production archive an
+    action carries both uuids in its header, but a sequence's own
+    ``sequence_uuid`` and an experiment's parent ``sequence_uuid`` sit at the
+    *end*, behind a params block hundreds of thousands of lines long. The
+    filler here is only ~30 KB, but that is already past both ends of the
+    bounded window, so a head-only read fails these tests the way it would
+    fail a station.
+    """
+    filler = "".join(f"  - sample_{i}\n" for i in range(2000))
+    own = _uuid_for(stem)
+    parent = _uuid_for(parent_stem) if parent_stem else None
+    if stem.endswith("-act"):
+        head = f"file_type: action\naction_uuid: {own}\n"
+        if parent:
+            head += f"experiment_uuid: {parent}\n"
+        return f"{head}action_params:\n{filler}"
+    if stem.endswith("-exp"):
+        tail = f"sequence_uuid: {parent}\n" if parent else ""
+        return (
+            f"file_type: experiment\nexperiment_uuid: {own}\n"
+            f"experiment_params:\n{filler}{tail}"
+        )
+    return f"file_type: sequence\nsequence_params:\n{filler}sequence_uuid: {own}\n"
+
+
+def _record(
+    runs_root: Path,
+    rel: str,
+    stem: str,
+    prg: bool,
+    complete: bool,
+    parent_stem=None,
+):
     """A record directory with a yml and optionally a ``.prg`` beside it.
 
     The sidecar is written the way ``Progress`` actually writes it -- the
@@ -144,7 +185,7 @@ def _record(runs_root: Path, rel: str, stem: str, prg: bool, complete: bool):
     d = runs_root / rel
     d.mkdir(parents=True, exist_ok=True)
     yml = d / f"{stem}.yml"
-    yml.write_text("action_name: x\n")
+    yml.write_text(_yml_text(stem, parent_stem))
     if prg:
         state = "true" if complete else "false"
         (d / f"{stem}.prg").write_text(
@@ -208,3 +249,59 @@ def test_rebuild_overwrites_a_corrupt_journal(tmp_path: Path):
     (states / "runstate_SYNC.jsonl").write_text("garbage\ngarbage\n")
     _record(runs, "2026/0925/seq", "260925.120000000000-seq", prg=False, complete=False)
     assert len(rebuild_from_tree(runs, states, "SYNC").working_set()) == 1
+
+
+def test_rebuilt_record_is_keyed_by_the_real_uuid_so_done_evicts_it(tmp_path: Path):
+    """The regression that makes reading the yml worth it.
+
+    ``working_set`` is keyed by uuid and eviction is ``pop(uuid)``. The done
+    tombstone the syncer appends carries the record's *real* uuid, so a
+    rebuilt record keyed by its file stem is never evicted and every rebuild
+    leaves a permanent phantom -- exactly what spec §3 D3 ("absence means
+    done") exists to prevent.
+    """
+    runs = tmp_path / "RUNS"
+    stem = "260925.120002000000-act"
+    rel = "2026/0925/seq/exp/act"
+    _record(runs, rel, stem, prg=False, complete=False)
+    j = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC")
+    assert set(j.working_set()) == {_uuid_for(stem)}
+
+    j.append(_uuid_for(stem), "action", DONE, f"RUNS/{rel}")
+    assert j.working_set() == {}
+
+
+def test_rebuilt_parent_is_the_enclosing_record(tmp_path: Path):
+    """Read from the same bounded window, at the far end for an experiment."""
+    runs = tmp_path / "RUNS"
+    seq, exp, act = (
+        "260925.120000000000-seq",
+        "260925.120001000000-exp",
+        "260925.120002000000-act",
+    )
+    base = "2026/0925/seq"
+    _record(runs, base, seq, prg=False, complete=False)
+    _record(runs, f"{base}/exp", exp, prg=False, complete=False, parent_stem=seq)
+    _record(runs, f"{base}/exp/act", act, prg=False, complete=False, parent_stem=exp)
+    ws = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC").working_set()
+    assert ws[_uuid_for(seq)]["parent"] is None
+    assert ws[_uuid_for(exp)]["parent"] == _uuid_for(seq)
+    assert ws[_uuid_for(act)]["parent"] == _uuid_for(exp)
+
+
+def test_unreadable_uuid_falls_back_to_the_stem_and_warns(tmp_path: Path, caplog):
+    """One damaged yml costs a phantom entry, never the whole rebuild."""
+    runs = tmp_path / "RUNS"
+    missing, garbage = "260925.120000000000-seq", "260925.130000000000-seq"
+    for stem, body in (
+        (missing, "file_type: sequence\n"),
+        (garbage, "file_type: sequence\nsequence_uuid: not-a-uuid\n"),
+    ):
+        d = runs / stem
+        d.mkdir(parents=True)
+        (d / f"{stem}.yml").write_text(body)
+
+    with caplog.at_level("WARNING"):
+        ws = rebuild_from_tree(runs, tmp_path / "STATES", "SYNC").working_set()
+    assert set(ws) == {missing, garbage}
+    assert caplog.text.count("No parseable sequence_uuid") == 2
