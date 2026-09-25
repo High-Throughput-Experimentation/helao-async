@@ -125,13 +125,21 @@ class SourceIndex:
 
 
 class RunsSourceIndex(SourceIndex):
-    """Index RUNS_FINISHED/RUNS_DIAG (unzipped trees) or RUNS_SYNCED (sequence zips)."""
+    """Index an unzipped run tree, or RUNS_SYNCED's sequence zips.
+
+    ``RUNS`` and ``DIAG`` are the two trees records are written to now;
+    ``RUNS_FINISHED``, ``RUNS_DIAG`` and ``RUNS_SYNCED`` are pre-cut-over
+    archives, which are never migrated (spec §7) and so stay separate sources
+    rather than being folded in -- folding would list a record twice.
+    """
 
     def __init__(self, root, state):
-        # state is "FINISHED", "DIAG", or "SYNCED"
+        # state is "RUNS", "DIAG" (the current trees) or the legacy
+        # "FINISHED"/"DIAG"/"SYNCED" -- "DIAG" names the current tree; the
+        # legacy one is reached as the RunDir.DIAG source value.
         self.root = Path(root)
         self.state = state
-        self.source = f"RUNS_{state}"
+        self.source = state if state in ("RUNS", "DIAG") else f"RUNS_{state}"
         self.base = self.root / self.source
 
     def list_dates(self):
@@ -217,14 +225,21 @@ class RunsSourceIndex(SourceIndex):
         return rows
 
 
+#: Unzipped run trees a derived record's data file may sit in, current first.
+#: The legacy names stay because archives are never migrated (spec §7).
+RUN_TREES = ("RUNS", "DIAG", RunDir.FINISHED.value, RunDir.DIAG.value)
+
+
 def _resolve_run_file(root, date_str, seq_dirname, exp_dirname, file_name):
-    """Locate a data file by basename under RUNS_FINISHED tree or RUNS_SYNCED zip.
+    """Locate a data file by basename in an unzipped run tree or a RUNS_SYNCED zip.
 
     Returns (locator, available).
     """
     root = Path(root)
-    exp_path = root / RunDir.FINISHED.value / date_str / seq_dirname / exp_dirname
-    if exp_path.is_dir():
+    for tree in RUN_TREES:
+        exp_path = root / tree / date_str / seq_dirname / exp_dirname
+        if not exp_path.is_dir():
+            continue
         # direct action-dir children first (the normal layout)
         for act_dir in sorted(p for p in exp_path.iterdir() if p.is_dir()):
             cand = act_dir / file_name
@@ -287,8 +302,8 @@ class DerivedSourceIndex(SourceIndex):
         over it silently drops them.
         """
         dates = {d for d, _ in _list_day_dirs(self.base)}
-        for state in ("SYNCED", "FINISHED"):
-            dates.update(d for d, _ in _list_day_dirs(self.root / f"RUNS_{state}"))
+        for tree in (RunDir.SYNCED.value,) + RUN_TREES:
+            dates.update(d for d, _ in _list_day_dirs(self.root / tree))
         return sorted(dates)
 
     def _index_processes(self, date_str):
@@ -323,11 +338,12 @@ class DerivedSourceIndex(SourceIndex):
         return rows
 
     def _colocated_loose_process_rows(self, date_str, seen):
-        """Loose (unzipped) colocated prc ymls: a sequence mid-sync, or one
-        restored by ``reset_sync``, under RUNS_SYNCED or RUNS_FINISHED."""
+        """Loose (unzipped) colocated prc ymls: a record in the current RUNS or
+        DIAG tree, or a legacy sequence mid-sync or restored by ``reset_sync``
+        under RUNS_SYNCED or RUNS_FINISHED."""
         rows = []
-        for state in ("SYNCED", "FINISHED"):
-            day = self.root / f"RUNS_{state}" / date_str
+        for tree in (RunDir.SYNCED.value,) + RUN_TREES:
+            day = self.root / tree / date_str
             if not day.is_dir():
                 continue
             for prc_yml in sorted(day.glob("*/*/*-prc.yml")):
@@ -468,6 +484,8 @@ class DerivedSourceIndex(SourceIndex):
 
 
 SOURCES = [
+    "RUNS",
+    "DIAG",
     RunDir.FINISHED.value,
     RunDir.DIAG.value,
     RunDir.SYNCED.value,
@@ -475,13 +493,21 @@ SOURCES = [
     "ANALYSES",
 ]
 GROUPS = {
-    "RUNS": [RunDir.FINISHED.value, RunDir.DIAG.value, RunDir.SYNCED.value],
+    "RUNS": [
+        "RUNS",
+        "DIAG",
+        RunDir.FINISHED.value,
+        RunDir.DIAG.value,
+        RunDir.SYNCED.value,
+    ],
     "DERIVED": ["PROCESSES", "ANALYSES"],
 }
 
 
 def build_source_index(root, source):
     """Return the SourceIndex for a source name."""
+    if source in ("RUNS", "DIAG"):
+        return RunsSourceIndex(root, source)
     if source == RunDir.FINISHED:
         return RunsSourceIndex(root, "FINISHED")
     if source == RunDir.DIAG:

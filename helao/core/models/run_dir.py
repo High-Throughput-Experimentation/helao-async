@@ -17,6 +17,7 @@ __all__ = [
     "SYNC_PROGRESSION",
     "diag_root",
     "is_legacy_path",
+    "is_run_root",
     "is_same_location",
     "redirect_manual_dir",
     "run_root",
@@ -74,6 +75,21 @@ def is_legacy_path(path) -> bool:
     week-directory shape is needed.
     """
     return any(part in LEGACY_RUN_DIRS for part in Path(path).parts)
+
+
+def is_run_root(segment: str) -> bool:
+    """Whether one path segment names a run tree root.
+
+    Covers the single ``RUNS`` tree, every legacy ``RUNS_*`` name, and the
+    ``PROCESSES`` mirror -- including ``PROCESSES_SUPERSEDED``, which is a real
+    directory on station archives and which readers that matched only the
+    literal ``PROCESSES`` used to blow up on.
+    """
+    return (
+        segment == "RUNS"
+        or segment.startswith("RUNS_")
+        or segment.startswith("PROCESSES")
+    )
 
 
 def redirect_manual_dir(path: str) -> str:

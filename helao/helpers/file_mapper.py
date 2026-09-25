@@ -1,25 +1,33 @@
-"""Helper for resolving HELAO output files across RUNS_* state directories."""
+"""Helper for resolving HELAO output files in the RUNS tree or a legacy archive."""
 
 import os
 from pathlib import Path
 from typing import Union
 from zipfile import ZipFile
 
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
 
 from .hlo_data import read_hlo_bytes
 from .yml_tools import yml_load
 
 
 class FileMapper:
-    """Locate and read files within a run tree across its lifecycle states.
+    """Locate and read files within a run tree, new layout or legacy archive.
 
-    HELAO writes output beneath ``<root>/RUNS_<state>/...`` where ``<state>``
-    cycles through ``ACTIVE``, ``FINISHED``, ``SYNCED``, ``DIAG``, and
-    ``NOSYNC`` as a run progresses, plus a parallel ``PROCESSES`` tree.
-    A :class:`FileMapper` is constructed from any path inside one of those
-    trees and exposes ``read_*`` methods that resolve a path relative to
-    the ``RUNS_*`` root and try each state directory in turn.
+    HELAO now writes every record once, beneath ``<root>/RUNS/...``, and never
+    moves it, so a new-layout path has exactly **one** candidate and no search
+    is needed. Archives written before the cut-over are never migrated
+    (spec §7): they live under ``<root>/RUNS_<state>/`` with ``<state>``
+    cycling through ``ACTIVE``, ``FINISHED``, ``SYNCED``, ``DIAG`` and
+    ``NOSYNC``, optionally with the sequence directory zipped away, and are
+    resolved by trying each state root in turn exactly as before. Both eras
+    also have a parallel ``PROCESSES`` mirror.
+
+    The legacy day directory is *not* one shape: the week level is ``%y.%U``
+    throughout, but the day level is ``YYYYMMDD`` in the early era and ``MMDD``
+    later, and both sit side by side in one archive. Nothing here parses it --
+    the run-root segment alone distinguishes the layouts, which is why no
+    heuristic on the week/day shape is needed.
 
     Attributes:
         inputfile: Absolute path of the input file, or ``None`` if a
@@ -27,13 +35,18 @@ class FileMapper:
         inputdir: Absolute directory containing ``inputfile`` (or the
             input directory itself).
         inputparts: ``inputdir.parts`` as a mutable list, used to splice
-            in different ``RUNS_<state>`` names.
-        runpos: Index in ``inputparts`` of the ``RUNS_<state>`` or
-            ``PROCESSES`` segment.
+            in different run-root names.
+        is_legacy: Whether the input sits under a pre-cut-over run tree.
+        runpos: Index in ``inputparts`` of the run-root segment. The **last**
+            such segment, because a superseded record is archived as a whole
+            nested legacy tree (``RUNS_SUPERSEDED/<ts>/RUNS_FINISHED/...``)
+            and only the inner root anchors its contents.
         prestr: Joined parent path up to (but not including) ``runpos``.
-        states: Run-state names tried by :meth:`locate`.
-        relstrs: Relative paths (under the ``RUNS_*``/``PROCESSES`` root)
-            of all files discovered at or below the input location.
+        states: Legacy run-state names, retained for the archive read path.
+        roots: Run-root directory names :meth:`locate` tries, in order. One
+            entry for a new-layout path; every legacy state for an archive.
+        relstrs: Relative paths (under the run root) of all files discovered
+            at or below the input location.
     """
 
     def __init__(self, save_path: Union[str, Path]):
@@ -52,37 +65,42 @@ class FileMapper:
             self.inputfile = None
             self.inputdir = save_path.absolute()
         self.inputparts = list(self.inputdir.parts)
-        self.runpos = [
-            i
-            for i, v in enumerate(self.inputparts)
-            if v.startswith("RUNS_") or v == "PROCESSES"
-        ][0]
+        self.is_legacy = is_legacy_path(self.inputdir)
+        # The LAST run root, not the first: a superseded record is archived as
+        # a whole nested legacy tree, so an outer RUNS_SUPERSEDED segment is
+        # part of the prefix and only the inner root anchors the contents.
+        self.runpos = [i for i, v in enumerate(self.inputparts) if is_run_root(v)][-1]
         self.prestr = os.path.join(*self.inputparts[: self.runpos])
 
-        # list all files at save_path level and deeper, relative to RUNS_*
         self.states = ["ACTIVE", "FINISHED", "SYNCED", "DIAG", "NOSYNC"]
+        if self.is_legacy:
+            self.roots = [f"RUNS_{state}" for state in self.states]
+        else:
+            # One record, one place. The input's own root is the only
+            # candidate -- and it is what survives a PROCESSES_SUPERSEDED
+            # path, which matches none of the names spliced in below.
+            self.roots = [self.inputparts[self.runpos]]
+        if "PROCESSES" not in self.roots:
+            self.roots.append("PROCESSES")  # the parallel process mirror
+
+        # list all files at save_path level and deeper, relative to the run root
         self.relstrs = []
-        for state in self.states:
-            stateparts = list(self.inputparts)
-            stateparts[self.runpos] = f"RUNS_{state}"
-            stateglob = Path(os.path.join(*stateparts)).rglob("*")
-            for p in stateglob:
+        for root in self.roots:
+            rootparts = list(self.inputparts)
+            rootparts[self.runpos] = root
+            for p in Path(os.path.join(*rootparts)).rglob("*"):
                 if p.is_file():
                     self.relstrs.append(os.path.join(*p.parts[self.runpos + 1 :]))
-        prcparts = list(self.inputparts)
-        prcparts[self.runpos] = "PROCESSES"
-        prcglob = Path(os.path.join(*prcparts)).rglob("*")
-        for p in prcglob:
-            if p.is_file():
-                self.relstrs.append(os.path.join(*p.parts[self.runpos + 1 :]))
 
     def locate(self, p: str):
         """Resolve a run-tree-relative path against each known run state.
 
         If ``p`` already contains ``"PROCESSES"`` it is returned unchanged.
-        Otherwise the method tries ``<prestr>/RUNS_<state>/<p>`` for each
-        state in :attr:`states` and returns the first existing path. When no
-        loose file is found, it falls back to the synced sequence zip:
+        Otherwise the method tries ``<prestr>/<root>/<p>`` for each root in
+        :attr:`roots` and returns the first existing path -- a single
+        candidate for a new-layout record, every legacy state for an archive.
+        For an archive, when no loose file is found it falls back to the
+        synced sequence zip:
         a fully-synced sequence directory is archived to
         ``<prestr>/RUNS_SYNCED/<seq_dir>.zip`` (members stored relative to the
         sequence dir), so ``p``'s first segment names the zip and the
@@ -106,13 +124,15 @@ class FileMapper:
         if p.endswith(".hlo.json"):
             candidates.append(p[: -len(".json")])
         for cand in candidates:
-            for state in self.states:
-                testp = Path(os.path.join(self.prestr, f"RUNS_{state}", cand))
+            for root in self.roots:
+                testp = Path(os.path.join(self.prestr, root, cand))
                 if testp.exists():
                     return testp
-            zip_hit = self._locate_in_zip(cand)
-            if zip_hit is not None:
-                return zip_hit
+            # Only archives were ever zipped, and only they need the search.
+            if self.is_legacy:
+                zip_hit = self._locate_in_zip(cand)
+                if zip_hit is not None:
+                    return zip_hit
         return None
 
     def _locate_in_zip(self, p: str):
