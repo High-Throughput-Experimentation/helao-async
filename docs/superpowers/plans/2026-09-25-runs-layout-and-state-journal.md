@@ -556,6 +556,23 @@ def test_unregistered_file_is_reported_but_not_uploaded(tmp_path: Path, caplog):
     with caplog.at_level("WARNING"):
         yml.warn_unregistered_files()
     assert "orphan.spc" in caplog.text
+
+
+def test_sidecars_are_not_reported_as_unregistered(tmp_path: Path):
+    """Spec §4.5 puts .prg beside the yml; it must not look like a gap.
+
+    _is_syncable_misc_file excludes .yml, .hlo, .lock and .tmp -- but NOT
+    .prg. The sidecar escapes it today purely because it is written into
+    RUNS_SYNCED while the record being globbed is still in RUNS_FINISHED.
+    Once the two are colocated, an unguarded reconciliation warning fires on
+    every record ever synced.
+    """
+    act_yml = _action_tree(tmp_path, "  - {file_name: real.hlo, nosync: false}")
+    (act_yml.parent / "real.hlo").write_text("x")
+    (act_yml.parent / "260925.120000000000-act.prg").write_text("s3: true\napi: true\n")
+    (act_yml.parent / "260925.120000000000-act.lock").write_text("")
+
+    assert HelaoYml(act_yml).warn_unregistered_files() == []
 ```
 
 - [ ] **Step 2: Run them to see them fail**
@@ -628,6 +645,15 @@ existing `misc_files` / `hlo_files` properties:
         for p in self.targetdir.rglob("*"):
             if not p.is_file() or not self._is_syncable_misc_file(p):
                 continue
+            # _is_syncable_misc_file excludes neither .prg nor .lock. They
+            # escape it today only because the sidecar is written under
+            # RUNS_SYNCED while the record being globbed is under
+            # RUNS_FINISHED -- two different trees. Spec §4.5 moves the
+            # sidecar beside its own yml, so without this both would be
+            # reported on every single record and the warning would be noise
+            # from the first run.
+            if p.suffix in (".prg", ".lock"):
+                continue
             if p.relative_to(self.targetdir).as_posix() in named:
                 continue
             unregistered.append(p)
@@ -651,7 +677,7 @@ timeout 300 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
     helao/core/tests/test_upload_set.py -v
 ```
 
-Expected: 8 passed (4 from Task 2, 4 from this task).
+Expected: 9 passed (4 from Task 2, 5 from this task).
 
 - [ ] **Step 5: Prove each guard is falsifiable**
 
@@ -665,6 +691,11 @@ Three separate mutations, each run and then restored:
    Expected: `test_registered_subdirectory_file_is_in_the_upload_set` FAILS.
 3. Delete the `LOGGER.warning(...)` loop body.
    Expected: `test_unregistered_file_is_reported_but_not_uploaded` FAILS.
+4. Delete the `if p.suffix in (".prg", ".lock"): continue` guard.
+   Expected: `test_sidecars_are_not_reported_as_unregistered` FAILS. Without
+   it the station gets two spurious WARNINGs per record from the first run
+   after cut-over, which trains everyone to ignore the one warning that
+   matters.
 
 - [ ] **Step 6: Confirm the existing syncer suite is unaffected**
 
