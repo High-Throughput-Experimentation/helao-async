@@ -37,7 +37,7 @@ from uuid import UUID
 import aiofiles
 
 from helao.core.models.file import FileInfo, HloFileGroup
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -253,7 +253,7 @@ class NativeDataFileWriter:
         filename = file_info.file_name
         save_root = str(self.active.base.helaodirs.save_root)
         if self.active.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         output_path = os.path.join(save_root, output_action.action_output_dir)
         output_file = os.path.join(output_path, filename)
 
@@ -304,7 +304,7 @@ class NativeDataFileWriter:
         )
         save_root = str(self.active.base.helaodirs.save_root)
         if action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         output_path = os.path.join(save_root, action.action_output_dir)
         output_file = os.path.join(output_path, file_info.file_name)
         if os.name == "nt":
@@ -414,7 +414,7 @@ class NativeDataFileWriter:
             action = self.active.action
         save_root = str(self.active.base.helaodirs.save_root)
         if action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         record_dir = os.path.join(save_root, action.action_output_dir)
 
         file_info = FileInfo(

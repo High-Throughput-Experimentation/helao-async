@@ -197,7 +197,7 @@ class ActionSession:
         import os
         from copy import deepcopy
 
-        from helao.core.models.run_dir import RunDir
+        from helao.core.models.run_dir import redirect_manual_dir
 
         # The host captures aloop at startup; fall back to the loop we are
         # already running on when it has not. Legacy could assume Base.myinit
@@ -207,17 +207,15 @@ class ActionSession:
         self.data_logger = aloop.create_task(self.log_data_task())
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         if self.action.save_act:
+            # The root is already DIAG for a manual run; the second, string-level
+            # .replace("ACTIVE", "DIAG") that used to sit here is deleted -- it
+            # corrupted any action whose own name contained "ACTIVE".
             full_action_output_path = os.path.join(
                 save_root,
                 self.action.action_output_dir,
             )
-            if self.action.manual_action:
-                full_action_output_path = full_action_output_path.replace(
-                    "ACTIVE",
-                    "DIAG",
-                )
             os.makedirs(full_action_output_path, exist_ok=True)
             record_active(
                 self.base,

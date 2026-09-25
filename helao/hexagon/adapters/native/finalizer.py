@@ -38,7 +38,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConn, FileConnParams
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.premodels import Action
@@ -388,7 +388,7 @@ class NativeActionFinalizer:
 
             save_root = str(self.active.base.helaodirs.save_root)
             if self.active.action.manual_action:
-                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+                save_root = redirect_manual_dir(save_root)
             try:
                 # call custom hlo post-processor if it exists
                 if self.active.base.hlo_postprocessors:

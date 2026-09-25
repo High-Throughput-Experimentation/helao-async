@@ -17,9 +17,12 @@ __all__ = [
     "SYNC_PROGRESSION",
     "diag_root",
     "is_legacy_path",
+    "is_same_location",
+    "redirect_manual_dir",
     "run_root",
 ]
 
+import os
 from enum import Enum
 from pathlib import Path
 
@@ -71,3 +74,41 @@ def is_legacy_path(path) -> bool:
     week-directory shape is needed.
     """
     return any(part in LEGACY_RUN_DIRS for part in Path(path).parts)
+
+
+def redirect_manual_dir(path: str) -> str:
+    """Point a save root at the station's DIAG tree instead of RUNS.
+
+    Manual and diagnostic runs are written straight into ``<root>/DIAG`` and
+    are never written under ``RUNS`` (spec 3.4). This replaces the old
+    ``RUNS_ACTIVE`` -> ``RUNS_DIAG`` string substitution, which ran *after*
+    the tree had already been written to the wrong place and then had to
+    delete the parent experiment and sequence directories behind itself.
+
+    Idempotent: a path already under DIAG is returned unchanged. A
+    pre-cut-over ``RUNS_ACTIVE`` path still gets the legacy substitution, so a
+    caller handed an archive path does something sane instead of silently
+    returning it unchanged.
+    """
+    p = Path(path)
+    if p.name == "DIAG":
+        return str(p)
+    if p.name == "RUNS":
+        return str(p.parent / "DIAG")
+    return str(path).replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+
+
+def is_same_location(src, dst) -> bool:
+    """Whether a computed move destination is really the source itself.
+
+    Every mover in this codebase builds its destination by substituting one
+    ``RUNS_*`` segment for another. When the substitution misses -- which it
+    does for every path under the single ``RUNS`` tree -- the "destination" is
+    the source. A mover that trusts it copies a tree onto itself, finds every
+    destination present on disk, concludes the copy succeeded, and deletes the
+    original (plan A24: reproduced, records destroyed).
+
+    A mover must refuse and log when this is True, and must never reach a
+    removal branch.
+    """
+    return os.path.normpath(str(src)) == os.path.normpath(str(dst))

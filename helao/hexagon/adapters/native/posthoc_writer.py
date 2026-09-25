@@ -52,7 +52,7 @@ import shutil
 from typing import Any, Optional, Union
 
 from helao.core.models.file import FileInfo, HloFileGroup
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, redirect_manual_dir
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -268,7 +268,7 @@ class PostHocRunWriter:
     def _root_for(self, model, manual: bool) -> str:
         """Return the save root, redirected to the diagnostic tree if manual."""
         if manual or getattr(model, "manual_action", False):
-            return self.save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            return redirect_manual_dir(self.save_root)
         return self.save_root
 
     def _active_for(self, action: Action, manual: bool = False) -> _PostHocActive:
