@@ -328,6 +328,35 @@ record.
 not pop. The ymls on disk are already lowercase canonical, so this is a guard
 rather than a live bug — but it is the same `pop` that item 1 is about.
 
+### A13 — Task 2: `action_output_dir` is run-relative (already fixed)
+
+Recorded because the same mistake is easy to repeat in Tasks 3, 9 and 10.
+
+The plan's Task 2 call-site snippet read:
+
+```python
+file_name=_relative_file_name(file_path, self.action.action_output_dir),
+```
+
+Two defects. The class has no `self.action` (it is `self.active.action`, and
+inside `track_file` the local is `action`). Worse, **`action_output_dir` is
+run-relative** — `premodels.py:373` sets it from `get_action_dir()` — so
+`Path(<relative>).resolve()` anchors on the process cwd, `relative_to` raises
+`ValueError` for every real file, and the helper falls back to basename.
+
+The change would have looked applied and done nothing, **with every test still
+green**, because the tests pass an absolute `tmp_path` while the real call site
+passes a relative one. The prescribed mutation would not have caught it either.
+
+The record directory is `os.path.join(save_root, action.action_output_dir)`,
+which the surrounding lines already compute; hoist it into a local and reuse
+it. Shipped that way in `04e16759`.
+
+**Rule for the remaining tasks:** `sequence_output_dir`, `experiment_output_dir`
+and `action_output_dir` are all run-relative. Any task that calls `.resolve()`,
+`.relative_to()` or `os.path.abspath()` on one of them without joining
+`save_root` first has this bug, and a `tmp_path`-based test will not find it.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -720,9 +749,15 @@ Expected: `test_file_in_subdirectory_keeps_its_subdirectory` FAILS. Restore.
 ```bash
 timeout 600 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
     helao/hexagon/tests/test_native_data_file.py -v
-timeout 600 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
-    helao/core/tests/test_active_golden_master.py -v
+timeout 900 /home/dan/miniforge3/envs/helao/bin/python \
+    helao/core/tests/test_active_golden_master.py --check
 ```
+
+Note the second is **not** run under pytest. Despite the `test_` prefix it is a
+standalone `argparse` harness whose gate is `--check`; `pytest` collects zero
+tests from it and exits **green vacuously**, which looks exactly like a pass.
+`run_tests.py` reports it as `NOTESTS` for the same reason. Expect
+`CHECK PASSED: all 13 scenarios match .../baseline_S0a`.
 
 Both must pass unchanged. If the golden master fails, read the diff before
 re-baselining — a `file_name` that gained a subdirectory is expected; anything
@@ -3196,11 +3231,18 @@ timeout 600 /home/dan/miniforge3/envs/helao/bin/python -m pytest <one_file> -v
 - [ ] **Step 3: Re-baseline the golden masters deliberately**
 
 ```bash
-for f in helao/core/tests/test_active_golden_master.py \
-         helao/core/tests/test_orch_dispatch_golden_master.py; do
-  timeout 900 /home/dan/miniforge3/envs/helao/bin/python -m pytest "$f" -v
-done
+timeout 900 /home/dan/miniforge3/envs/helao/bin/python \
+    helao/core/tests/test_active_golden_master.py --check
+timeout 900 /home/dan/miniforge3/envs/helao/bin/python \
+    helao/core/tests/test_orch_dispatch_golden_master.py --check
 ```
+
+**Neither is a pytest module.** Both carry a `test_` prefix but are standalone
+`argparse` harnesses; `--check` is the gate. Run under `pytest` they collect
+zero tests and exit green, so the whole layout change would appear to clear its
+hardest gate without the gate ever running. Expect
+`CHECK PASSED: all 13 scenarios match .../baseline_S0a` from the first and an
+equivalent line from the second.
 
 **Read every diff before accepting it.** Expected differences: the run root, the
 `%Y/%m%d` date segment, `sequence_label` carrying a plate suffix, and
