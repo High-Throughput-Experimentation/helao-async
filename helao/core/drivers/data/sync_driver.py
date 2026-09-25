@@ -1948,9 +1948,11 @@ class SyncDriver:
                                 server_name=ana_config["server_key"],
                             ),
                             action_params={
-                                # A directory now, not a zip. Task 12 renames
-                                # the key; HelaoData already accepts either.
-                                "sequence_zip_path": str(prog.yml.target.parent),
+                                # A directory now, not a zip (spec D9). The
+                                # analysis endpoints declare `sequence_path`;
+                                # `sequence_zip_path` is still accepted there
+                                # as a deprecated alias for live configs.
+                                "sequence_path": str(prog.yml.target.parent),
                                 "params": ana_config.get("analysis_params", {}),
                             },
                         ),

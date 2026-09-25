@@ -15,13 +15,13 @@ ANA_server = MM(server_name="ANA", machine_name=gethostname().lower()).as_dict()
 
 @experiment(version=1)
 def ICPMS_analysis_concentration(
-    sequence_zip_path: str = "",
+    sequence_path: str = "",
     params: dict = {},
 ) -> list:
     """Run the ANA server's local ICP-MS concentration analysis.
 
     Args:
-        sequence_zip_path: Path to a zipped sequence archive on disk.
+        sequence_path: Path to a synced sequence directory on disk.
         params: Free-form parameter dict forwarded to the analyzer.
 
     Returns:
@@ -32,7 +32,7 @@ def ICPMS_analysis_concentration(
         ANA_server,
         "analyze_icpms_local",
         {
-            "sequence_zip_path": sequence_zip_path,
+            "sequence_path": sequence_path,
             "params": params,
         },
     )
