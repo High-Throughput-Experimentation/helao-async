@@ -58,30 +58,11 @@ from helao.core.models.sample import (
     SolidSample,
 )
 from helao.helpers import helao_logging as logging
+from helao.helpers.file_utils import _relative_file_name
 from helao.helpers.premodels import Action
 from helao.helpers.yml_tools import yml_dumps
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
-def _relative_file_name(file_path, record_dir) -> str:
-    """The name recorded in ``FileInfo.file_name`` for a produced file.
-
-    Relative to the record's own directory and forward-slash separated
-    (spec 9), so a file a driver writes into a subdirectory of the action
-    directory is addressable by name -- the syncer's upload set is built from
-    ``files`` and cannot see anything the list does not name.
-
-    A path outside ``record_dir`` degrades to its basename rather than
-    emitting a ``../`` traversal, which would be meaningless to a reader
-    resolving the name against the record.
-    """
-    fp = pathlib.Path(file_path)
-    rd = pathlib.Path(record_dir)
-    try:
-        return fp.resolve().relative_to(rd.resolve()).as_posix()
-    except ValueError:
-        return fp.name
 
 
 class DataFileWriter:

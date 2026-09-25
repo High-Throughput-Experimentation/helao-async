@@ -40,16 +40,25 @@ class _FakeQueue:
 
 
 class _StubSyncer:
-    """Just enough of SyncDriver to exercise enqueue_yml's guard."""
+    """Just enough of SyncDriver to exercise enqueue_yml's guard.
+
+    ``run_journal is None`` is a real SyncDriver state, not a stub shortcut:
+    a config without ``root`` gives ``helaodirs.states_root = None``
+    (helao_dirs.py:138), and SyncDriver.__init__ leaves ``run_journal`` None
+    in that case. So the real ``_journal`` is borrowed alongside
+    ``enqueue_yml`` and exercises its own None-guard here.
+    """
 
     def __init__(self):
         self.task_queue = _FakeQueue()
         self.task_set = set()
         self.running_tasks = {}
+        self.run_journal = None
 
     from helao.core.drivers.data.sync_driver import SyncDriver
 
     enqueue_yml = SyncDriver.enqueue_yml
+    _journal = SyncDriver._journal
 
 
 def test_enqueue_yml_refuses_a_process_yml(tmp_path):

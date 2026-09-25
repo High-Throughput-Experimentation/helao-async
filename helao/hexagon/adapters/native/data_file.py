@@ -37,7 +37,6 @@ from uuid import UUID
 import aiofiles
 
 from helao.core.models.file import FileInfo, HloFileGroup
-from helao.core.servers.active_data_file import _relative_file_name
 from helao.core.models.run_dir import RunDir
 from helao.core.models.sample import (
     AssemblySample,
@@ -47,6 +46,7 @@ from helao.core.models.sample import (
     SolidSample,
 )
 from helao.helpers import helao_logging as logging
+from helao.helpers.file_utils import _relative_file_name
 from helao.helpers.premodels import Action
 from helao.helpers.yml_tools import yml_dumps
 from helao.hexagon.ports.action_session import ActionSessionPort
