@@ -37,6 +37,7 @@ from uuid import UUID
 import aiofiles
 
 from helao.core.models.file import FileInfo, HloFileGroup
+from helao.core.servers.active_data_file import _relative_file_name
 from helao.core.models.run_dir import RunDir
 from helao.core.models.sample import (
     AssemblySample,
@@ -412,14 +413,13 @@ class NativeDataFileWriter:
         save_root = str(self.active.base.helaodirs.save_root)
         if action.manual_action:
             save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
-        if os.path.dirname(file_path) != os.path.join(
-            save_root, action.action_output_dir
-        ):
+        record_dir = os.path.join(save_root, action.action_output_dir)
+        if os.path.dirname(file_path) != record_dir:
             action.aux_file_paths.append(file_path)
 
         file_info = FileInfo(
             file_type=file_type,
-            file_name=os.path.basename(file_path),
+            file_name=_relative_file_name(file_path, record_dir),
             # data_keys = json_data_keys,
             sample=[
                 label
