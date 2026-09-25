@@ -522,10 +522,22 @@ Full report: `/home/dan/.claude/jobs/a98b8858/tmp/station-check-report.md`.
 
 | Era | Shape | Example |
 |---|---|---|
-| 24.41–24.42 | `YY.WW/YYYYMMDD` | `24.42/20241022/` |
-| 25.39 onward | `YY.WW/MMDD` | `26.17/0428/` |
+| earlier | `YY.WW/YYYYMMDD` | `24.42/20241022/` |
+| later | `YY.WW/MMDD` | `26.17/0428/` |
 
-The week level is `%y.%U` in both eras. Spec §3.2 and §7 assume legacy is
+The week level is `%y.%U` in both eras. **The crossover is per-station, not
+global** — it tracks when each station was upgraded, not a software version.
+Measured (Task 11):
+
+| Archive | last 8-char | first 4-char |
+|---|---|---|
+| `/mnt/wd4/DATA` | `24.42/20241022` | `25.39/1003` |
+| `/mnt/i/hte-ecms-03/DATA` | `25.27/20250709` | `26.03/0120` |
+
+Both shapes coexist in the same `RUNS_SYNCED` on both archives. **Resolved
+smaller than written**: no reader parses the day segment at all — the run-root
+segment alone distinguishes the layouts — so there was never a shape to get
+wrong. Both are pinned by tests regardless. Spec §3.2 and §7 assume legacy is
 uniformly `YY.WW/MMDD`. **A legacy reader built to one shape silently fails to
 resolve the other** — a miss returns `None`, not an error. Task 11's legacy
 branch and its test must cover both, and Task 13's triage must not "correct"
