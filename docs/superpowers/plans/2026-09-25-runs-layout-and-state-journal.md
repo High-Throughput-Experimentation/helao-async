@@ -676,6 +676,71 @@ is in the plan's named verification list for any task, and Task 7 found them
 only by sweeping the 43 test files that mention `RUNS_ACTIVE` / `RunDir` /
 `save_root` / `helao_dirs` rather than trusting the list it was given.
 
+### A22 — Do NOT re-freeze `baseline_S0a` until Phase 3 is complete
+
+Task 8 turned `test_active_golden_master.py --check` red, correctly and by
+design, and did **not** re-freeze it. That is now the rule for Tasks 9-12.
+
+Its delta:
+
+```
+DELTA 6_manual_action
+  only-in-baseline: RUNS_DIAG/26.00/0102/...
+  only-in-current:  RUNS_DIAG/2026/0102/...
+```
+
+Four manifest paths in one scenario, differing only in the date segment; 12 of
+13 scenarios still pass. That is the `%y.%U` → `%Y` change doing exactly what
+it was designed to do and nothing else — and it is legible *only* because the
+baseline was left alone.
+
+**Why not re-freeze after each task.** Re-freezing would restore the gate for
+the next task, but the frozen reference would then encode each intermediate
+state, and a regression introduced in Task 9 would be measured against a
+baseline Task 8 had already moved. Phase 3 changes this scenario at least
+twice more — Task 9 moves manual runs from `RUNS_DIAG` to `DIAG`, Task 10
+stops the promotion — so a per-task re-freeze is three chances to quietly
+adopt something unintended.
+
+**The rule for Tasks 9-12:** run `--check`, read the DELTAs, and assert that
+every differing field is one your task intended to change. Report the delta in
+full. Accumulate; do not re-freeze. The original `baseline_S0a` stays ground
+truth for the whole phase.
+
+**Task 13 freezes once**, at the end, and its commit message must enumerate
+every field that moved and which task moved it. A field nobody can attribute
+is a regression, not a re-baseline.
+
+This supersedes Task 13 Step 3's instruction to re-baseline both harnesses:
+`test_orch_dispatch_golden_master` is red at the merge-base (A15) and is
+**not** re-frozen by this plan at all.
+
+### A23 — The `uuid5` sequence identity is protected by call ordering alone
+
+From Task 8's A7 enumeration (27 consumers, tree-wide; full file:
+`/home/dan/.claude/jobs/a98b8858/tmp/task8-label-consumers.md`).
+
+A private deployment hashes `campaign|name|label|stamp` into a `uuid5` to mint
+a sequence identity. D6 does **not** break it — but only because both call
+sites hash the *local* label **before** `init_seq()` runs, so the suffix never
+reaches the hash. That is call ordering, not a design guarantee, and it is now
+load-bearing: any future caller passing `seq.sequence_label` after `init_seq`
+mints a **different identity for the same sequence**, which is the
+duplicate-record failure mode this codebase has already fought once.
+
+The module must say so explicitly. Carried into that repo's commit in Task 13
+(A3).
+
+**One consumer genuinely breaks**, also in that deployment: a recovery path
+matches the recorded label as a *substring of a source folder name*. Its own
+docstring example — source `20260226-HfFe-101125_interp`, label `HfFe-101125`
+— stops matching post-D6, because the record now reads `HfFe-101125-1011250`.
+It fails **safe** (unidentifiable ⇒ no delete), so the cost is a lost recovery
+path for the five plate-carrying pipelines rather than data loss. That
+deployment's own suite passes at HEAD because its fixtures carry no
+`plate_id`, so the degradation is **uncovered, not absent** — a fixture gap
+worth fixing at the same time.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -2650,7 +2715,7 @@ timeout 300 /home/dan/miniforge3/envs/helao/bin/python -m pytest \
     helao/core/tests/test_sequence_label.py -v
 ```
 
-Expected: 15 passed.
+Expected: 14 passed (10 parametrize cases + 4 named tests).
 
 - [ ] **Step 5: Prove the guards are falsifiable**
 
