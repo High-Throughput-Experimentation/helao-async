@@ -457,6 +457,63 @@ destroy the evidence of whatever caused it.
 Nobody has been told about the pre-existing failures; they are noted here
 because this plan trips over them, not because this plan owns them.
 
+### A16 — There are TWO server stacks; the plan's file lists assume one
+
+Task 6 could not be completed from its declared file list, and the reason
+generalizes to **Tasks 9, 10 and 11**.
+
+The plan writes as if `Base` / `Active` / `Orch` are the only implementations.
+They are not. `helao/hexagon/app/` carries a native host/session pair that is
+**not** a subclass of either:
+
+| Legacy | Hexagon-native |
+|---|---|
+| `Base` (`core/servers/base.py`) | `ActionHost` (`hexagon/app/action_host.py`) |
+| `Active` (`core/servers/base.py`) | `ActionSession` (`hexagon/app/action_session.py`) |
+| `Orch` write_active_* (`core/servers/orch.py`) | `RunLifecycle` (`hexagon/app/orch_lifecycle.py`) |
+
+The `golden` test config runs the hexagon stack — `ws_simulator` and
+`sim_db_server` both build an `ActionHost` — and several production servers are
+hexagon-composed via `fast: graft`. Task 6 had to add `run_journal`
+construction to `ActionHost.__init__` and a `record_active(...)` call to
+`ActionSession.myinit` mirroring `Active.myinit`, or the producer journal would
+never have been written at all and Step 8 would have shown a SYNC journal with
+no producer behind it.
+
+**Rule for the remaining tasks: every edit to `Base`, `Active` or `Orch` needs
+its hexagon counterpart checked.** Specifically:
+
+- **Task 9** (manual → DIAG, `move_dir` gutted): `base.py:1017-1029` has a
+  mirror in the hexagon session, and `helao/hexagon/domain/naming.py` is
+  already in scope. Check `action_host.py` and `action_session.py` for their
+  own save-root resolution.
+- **Task 10** (syncer): `helao/hexagon/adapters/native/sync_driver.py` is
+  already listed; confirm it does not also need `posthoc_writer.py` and
+  `meta_writer.py`, which the survey named.
+- **Task 11** (readers): the hexagon browser source port is a separate
+  implementation from `ui/shared/data_browser/sources.py`.
+
+Two corrections in the other direction — the plan over-listed:
+
+- **`hte/servers/action/sync_server.py` needed no edit.** `/finish_yml`
+  forwards to `SyncDriver.enqueue_yml`, so wiring the `unsynced` append in the
+  driver covers hte and the sim syncer with one change.
+- **`helao/core/servers/orch.py` needed no edit.** Its `write_active_*` methods
+  are delegators to `RunLifecycle`; wiring the collaborator covers both
+  orchestrator hosts.
+
+Prefer the collaborator over the delegator wherever that choice exists — one
+edit instead of two, and no risk of the two drifting.
+
+### A17 — The only `RUNS_*` literal left in production code
+
+`rebuild_from_tree`'s scan root is the one place Phase 2 hardcodes a legacy
+name. Everything else derives its path from `root_relative(...)` against
+whatever `save_root` happens to be, so Task 7 flipping `save_root` to
+`<root>/RUNS` needs no edit anywhere else in the journal wiring. **Task 7 must
+fix that one literal** — grep `run_state.py` and the Task 6 call sites for
+`RUNS_` before declaring Task 7 done.
+
 ---
 
 ## Decision resolved (2026-09-25)
