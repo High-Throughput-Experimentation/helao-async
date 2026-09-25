@@ -88,11 +88,18 @@ def _mirror_dir(exp_dir: Path, process_root: Path) -> "Path | None":
 
     The mirror reproduces the record's path below the ``RUNS_*`` segment, so
     that segment is where the two trees are rejoined. Returns ``None`` when
-    ``exp_dir`` is not inside a ``RUNS_*`` tree, which is the only case where no
-    correspondence exists.
+    ``exp_dir`` is not inside a ``RUNS_*`` tree -- which now includes every
+    record written under the single ``RUNS`` tree, correctly: those colocate
+    their prc and have no mirror to find.
+
+    The **last** ``RUNS_*`` segment is the anchor, not the first. A superseded
+    record is archived as a whole nested legacy tree
+    (``RUNS_SUPERSEDED/<ts>/RUNS_FINISHED/...``); rejoining at the outer one
+    puts the timestamp and the inner root into the mirror path, where no
+    directory has ever existed.
     """
     parts = exp_dir.parts
     runs = [i for i, p in enumerate(parts) if p.startswith("RUNS_")]
     if not runs:
         return None
-    return process_root.joinpath(*parts[runs[0] + 1 :])
+    return process_root.joinpath(*parts[runs[-1] + 1 :])
