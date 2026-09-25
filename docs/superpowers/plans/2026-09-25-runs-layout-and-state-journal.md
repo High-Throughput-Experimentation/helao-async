@@ -964,6 +964,72 @@ looks in the wrong place reports success, not failure.** Every one of them
 fails safe-looking and loud-never. Any verification step this plan adds should
 be asked the question "what does this print if it is pointed at nothing?"
 
+### A29 — `grep` here honours `.gitignore`; the blast radius is 152 files, not 99
+
+**`grep` in this environment is a shell function backed by ripgrep**, which
+skips `.gitignore`d paths by default. The four private deployment directories
+are gitignored. So a sweep from the repo root **does not see them at all**:
+
+```
+grep -rn "sequence_zip_path" --include='*.py' .                 ->  16 hits
+grep -rn "sequence_zip_path" --include='*.py' helao/deploy/priv/ ->  23 hits
+```
+
+A root sweep returns fewer hits than one subdirectory contains.
+
+**Corrected blast radius** for `RUNS_` across `*.py`:
+
+| Scope | Files |
+|---|---|
+| root sweep (what spec §8 reported) | 97 |
+| private deployments, swept explicitly | 55 (41 + 9 + 4 + 1) |
+| **true total** | **152** |
+
+Spec §8's "99 files" is a **56% undercount**. Every earlier statement in this
+plan that sized the work from a root sweep is low by roughly that much.
+
+**Task 13 Step 1's command is wrong as written** and would report the
+deployments clean. It must sweep each deployment explicitly:
+
+```bash
+grep -rln "RUNS_" --include='*.py' . > /tmp/sites.txt
+for d in helao/deploy/*/; do
+    grep -rln "RUNS_" --include='*.py' "$d" >> /tmp/sites.txt
+done
+sort -u /tmp/sites.txt
+```
+
+An earlier survey asserted the opposite — "grep does not honour `.gitignore`,
+so they were swept". Its *findings* stand, because it used explicit per-
+deployment paths; its claim about the method was wrong and nobody checked it.
+
+Same shape as A28 and A15 once more: **the tool reported a clean sweep of
+directories it never entered.**
+
+### A30 — Two more ECMS consumers A19 missed
+
+Found by Task 12's enumeration. Both in a private deployment, both for Task
+13's A3 step, both silent:
+
+1. **`scripts/ecms_ms/batch_process.py:145-176` `_archive_root`** derives the
+   archive as `dirname(save_root) + RUNS_SYNCED`. Once `save_root` is
+   `<root>/RUNS`, that sibling does not exist — same silent zero as the
+   calibration discovery, from a different direction. A19 does not mention it.
+
+2. **`scripts/common/session.py:469-511` `get_action_data_local`** opens the
+   value with `ZipFile` unconditionally at `:488` and `:496`. No in-tree call
+   site, but **not dead**: it is in `__all__`, exposed through the nbio shim,
+   and pinned by two shim tests. **Notebook callers.** It raises uncaught on a
+   directory — the one consumer in this family that fails loudly rather than
+   silently, and the one whose users are people rather than pipelines.
+
+The confirmed detail on A19's calibration discovery, for whoever ports it:
+`find_calibration_zips:223` has only an `is_file() and endswith(".zip")` arm,
+so a sequence *directory* fails both arms and is dropped; `_scan_calibration_zip:156`
+raises `IsADirectoryError`, which is an `OSError` and is **caught** at `:182`
+into `refusals`; `_is_calibration_zip_name:200` strips `[:-4]` unconditionally.
+Three independent reasons it returns empty, each individually silent.
+
 ---
 
 ## Decision resolved (2026-09-25)
@@ -3811,8 +3877,14 @@ tracked parent-repo file.
 
 ```bash
 cd /mnt/STORAGE/repos/helao/helao-async
-grep -rln "RUNS_" --include='*.py' . | sort > $CLAUDE_JOB_DIR/tmp/runs_sites.txt
-wc -l $CLAUDE_JOB_DIR/tmp/runs_sites.txt
+# grep here is ripgrep-backed and honours .gitignore, so the deployment
+# directories are INVISIBLE to a root sweep -- see A29. Sweep each one.
+grep -rln "RUNS_" --include='*.py' . > $CLAUDE_JOB_DIR/tmp/runs_sites.txt
+for d in helao/deploy/*/; do
+    grep -rln "RUNS_" --include='*.py' "$d" >> $CLAUDE_JOB_DIR/tmp/runs_sites.txt
+done
+sort -u -o $CLAUDE_JOB_DIR/tmp/runs_sites.txt $CLAUDE_JOB_DIR/tmp/runs_sites.txt
+wc -l $CLAUDE_JOB_DIR/tmp/runs_sites.txt   # expect ~152, NOT ~97
 ```
 
 Classify every file into exactly one of three buckets and record the
