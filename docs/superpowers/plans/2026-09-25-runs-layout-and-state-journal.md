@@ -1095,6 +1095,61 @@ cleanup, holding those ports. Any task that launches a group must verify
 teardown with `pgrep`, not assume `CTRL-x` or process exit did it — which is
 the same lesson A18.3 records for the batch watchdog at a station.
 
+### A33 — `test_concurrency_live` verifies the ORCH write, not the syncer handoff
+
+The suite I twice called "the end-to-end proof that finished records are not
+destroyed" **passes 6/6 at `2e4866a6` while swallowing 68 `AttributeError`s**
+from A31's dict literal. It counts `-exp.yml` files on disk, which the
+orchestrator writes; the exception fired later, in the hand-off to the syncer.
+
+So its guarantee is narrower than I claimed: **the record is written**, not
+**the record is shipped**. Both statements were true of the tree it inspected,
+and only the first is what it checks.
+
+That matters because it is the suite three tasks leaned on. It did catch A24's
+destruction — a deleted directory is missing files, which it does see — but it
+would not have caught A31, A26 or D-B, all of which leave the tree correct and
+the pipeline severed.
+
+**What actually distinguishes the two:** a `.prg` sidecar beside the yml, and an
+empty journal working set at rest. Both are byproducts of the syncer having
+run. Any future end-to-end check of this pipeline should assert those, not file
+counts.
+
+### A34 — Two more defects from the same launch, and one has no pytest at all
+
+**D-B — `enqueue_yml` wrote `UNSYNCED` after `DONE`.** Introduced by Task 6.
+It journalled `UNSYNCED` unconditionally on every enqueue, but an experiment's
+finish re-walks its children and re-enqueues the last one *after* that child's
+`sync_yml` has already appended its `DONE`. The later `UNSYNCED` re-opens a
+record that has already shipped, and nothing appends `DONE` again because
+`sync_yml` short-circuits on a complete `.prg`. **The entry is in the working
+set permanently**, and `has_pending_work()` reads exactly that set — so the
+hot-reload idle gate never clears. Observed at rest on a real launch: the last
+action of *every* experiment sat `unsynced` beside a `.prg` reading
+`api: true` / `s3: true`.
+
+**D-C — the finalizer skipped `move_dir` for manual actions.** *Not introduced
+by this branch* — the branch predates the merge-base and was **correct** while
+`move_dir` copied a tree, because a manual run is already written where it
+belongs. Task 9 emptied `move_dir` and made it the eviction point; the skip then
+silently became a skip of the eviction. A latent defect **activated by a change
+elsewhere**, which is why no diff shows it. Same consequence as D-B: one
+diagnostic action wedges the idle gate for the life of the station.
+
+**D-C has no pytest coverage.** It is pinned by the frozen golden master —
+which `run_tests.py` reports as `NOTESTS`, and which exits green vacuously
+under pytest — and by a real launch. So the full suite can go green with it
+reintroduced. A test is being added.
+
+**The pattern worth keeping:** D-C is the second defect on this branch that
+existed harmlessly until something else moved (the first being every predicate
+that inferred lifecycle from location, A27). When a function's *meaning*
+changes — `move_dir` from "copy a tree" to "evict a journal entry" — every
+caller that conditionally skips it must be re-read, because the condition was
+written against the old meaning. A grep for callers is not enough; the callers
+did not change.
+
 ---
 
 ## Decision resolved (2026-09-25)
