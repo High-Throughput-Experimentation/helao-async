@@ -137,6 +137,45 @@ def _mk_active(base: Base) -> Active:
     return Active(base, ap)
 
 
+def _make_active_for_journal(tmp_path, manual_action: bool = False):
+    """A real ``Active`` on a real ``RunStateJournal``, rooted at ``tmp_path``.
+
+    ``_make_base`` gives the finish path every attribute it touches but no
+    station root, so it has no journal. Exported (not ``_``-private to this
+    module's own checks) because ``test_run_state_wiring.py`` drives the real
+    ``move_dir`` through ``finish`` to assert the journal drains.
+    """
+    from helao.helpers.run_state import RunStateJournal
+
+    save_root = Path(tmp_path) / "RUNS"
+    save_root.mkdir(parents=True, exist_ok=True)
+    base = _make_base(str(save_root))
+    base.helaodirs = SimpleNamespace(
+        root=str(tmp_path),
+        save_root=str(save_root),
+        states_root=str(Path(tmp_path) / "STATES"),
+    )
+    base.run_journal = RunStateJournal(base.helaodirs.states_root, "SIM")
+
+    action = _mk_action()
+    action.manual_action = manual_action
+    action.save_act = True
+    dflt = base.dflt_file_conn_key()
+    ap = ActiveParams(
+        action=action,
+        file_conn_params_dict={
+            dflt: FileConnParams(
+                file_conn_key=dflt,
+                json_data_keys=["t", "v"],
+                file_type="fin__test_file",
+                file_group=HloFileGroup.helao_files,
+            )
+        },
+        aux_listen_uuids=[],
+    )
+    return base, Active(base, ap)
+
+
 async def _drain(active: Active, timeout_s: float = 5.0):
     """Block until the data logger has consumed every enqueued packet."""
     waited = 0.0

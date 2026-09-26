@@ -292,3 +292,65 @@ async def test_an_unshipped_record_is_still_journalled_on_enqueue(tmp_path: Path
 
     (entry,) = journal_of(driver).working_set().values()
     assert entry["state"] == UNSYNCED
+
+
+# --- the producing server's own eviction (plan D-C) --------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_manual_action_is_evicted_from_the_journal_when_it_finishes(
+    tmp_path: Path,
+):
+    """A manual run's entry must not be left ``active`` for the life of the station.
+
+    ``ActionFinalizer._finish`` used to skip ``move_dir`` for a manual action,
+    which was correct while ``move_dir`` copied a tree: a manual run is
+    already written where it belongs. ``move_dir`` moves nothing now -- it is
+    where the producing server evicts its own journal entry -- so the skip
+    became a skip of the eviction. ``has_pending_work()`` reads that set, so
+    one diagnostic action wedges the hot-reload idle gate forever (plan A1).
+    A latent defect activated by a change elsewhere, so no diff shows it.
+
+    The assertion is the working set at rest, not that ``move_dir`` was
+    called: a call that does nothing would satisfy the latter.
+    """
+    import asyncio
+
+    import helao.core.servers.active_finalizer as finalizer_module
+    import helao.core.servers.base as base_module
+    from helao.core.error import ErrorCodes
+    from helao.core.tests.unit_test_active_finalizer import _make_active_for_journal
+
+    base, active = _make_active_for_journal(tmp_path, manual_action=True)
+
+    async def _noop_dispatch(*args, **kwargs):
+        return {}, ErrorCodes.none
+
+    orig = (
+        base_module.async_private_dispatcher,
+        finalizer_module.async_private_dispatcher,
+    )
+    base_module.async_private_dispatcher = _noop_dispatch
+    finalizer_module.async_private_dispatcher = _noop_dispatch
+    try:
+        await active.myinit()
+        await asyncio.sleep(0.02)
+        assert set(base.run_journal.working_set()) == {
+            str(active.action.action_uuid)
+        }, "the action was never journalled active; the test proves nothing"
+
+        await active.finish()
+        # move_dir is scheduled fire-and-forget by _finish
+        for _ in range(100):
+            await asyncio.sleep(0.01)
+            if base.run_journal.working_set() == {}:
+                break
+    finally:
+        (
+            base_module.async_private_dispatcher,
+            finalizer_module.async_private_dispatcher,
+        ) = orig
+
+    assert (
+        base.run_journal.working_set() == {}
+    ), "a manual action stayed active in the journal after it finished"
