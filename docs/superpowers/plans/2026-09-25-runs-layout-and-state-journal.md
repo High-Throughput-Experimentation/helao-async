@@ -1255,6 +1255,61 @@ Running count of this bug class on this branch: three disagreeing `RUN_TREES`
 constants (A28), a fourth in `capture.py`, and `PARITY_TOPS`. **Every one fails
 by reporting success.**
 
+### A38 — Deployment work complete; three of my amendments were wrong
+
+All four deployment repos now carry a `feat/runs-layout-unification` branch.
+Full report: `/home/dan/.claude/jobs/a98b8858/tmp/d2-priv-report.md`.
+
+**A26 was wrong about where the decision bites.** I wrote it on the premise
+that `default_save_root()` was the chokepoint — flip it and every converter
+follows. The **live batch pipeline never calls it**: `batch_converter.py:904`
+names `<root>/RUNS_FINISHED` itself. So the parent flip (`679b5119`) covered
+only the standalone converters, and the user's option 1 would have been
+half-applied, with production records still landing outside the sweep.
+`roots.default_save_root`'s own docstring already said the batch pipeline does
+not reach it; I did not read it closely enough.
+
+**A24's identity-substitution shape, third independent instance.** The same
+constructor derives `synced_root = save_root.replace("RUNS_FINISHED",
+"RUNS_SYNCED")`. Under a `RUNS` save root that substitution is a **silent
+no-op**, so the recovery scan searches one tree twice and never sees the
+archive. Read-side rather than a mover, so no deletion risk — but the same
+mechanism that destroyed records earlier on this branch.
+
+**A36 undercounted**: five `os.path.join(data_root, "RUNS_FINISHED", rel)`
+sites, not three. All five deliberately unchanged, and the argument is the
+right one: each derives `rel` by splitting a target on `"RUNS_SYNCED/"` and
+stripping `".zip"`, so it is **structurally incapable** of receiving a
+new-layout record. Better than changing them defensively.
+
+**A28 was wrong to demand `RUNS_SYNCED`.** I said the private prune script's
+`RUN_TREES` "omits `RUNS_SYNCED`" as though that were part of the defect.
+Adding it breaks `set_is_orphaned`: a second loop finds the surviving sequence
+zip and answers "a run tree survives" for every set that has one, so the
+function **could never return `True` again** — inert in the opposite
+direction. The exclusion is deliberate, is now stated at the constant with the
+failing test named, and is pinned. `RUNS` and `DIAG` were the real gap.
+
+**Two fixes better than what I specified:**
+
+- **Part 4 (XRFS date).** I asked for the path-derived date to handle both
+  legacy day-dir shapes. Instead the path derivation was **deleted** and the
+  date taken from `process_timestamp` — which makes A18.1's two shapes, and
+  the whole 4-char/8-char question, moot. The right move: stop parsing a path
+  for something the record already carries.
+- **Part 5 (label matcher).** Rather than copying the plate-suffix rule, it
+  indexes the stripped label alongside the recorded one and removes the suffix
+  using the **recorded `plate_id`** — no second copy of the checksum rule, which
+  is the bug class from A28.
+
+**Asking "evidence or construction?" changed an answer.** The ECMS directory
+reader was pinned **by construction only** — there is no station record in the
+new shape yet, so nothing real to compare against. Prompted, the agent unpacked
+a live archive record and compared: identical members and bytes, but
+**`os.walk` order ≠ `namelist()` order**, leaving `refusals` nondeterministic.
+Fixed and pinned (`6cb05e9`). A test written against the shape the code
+produces cannot detect an ordering assumption; only a real artifact can.
+
 ---
 
 ## Decision resolved (2026-09-25)
