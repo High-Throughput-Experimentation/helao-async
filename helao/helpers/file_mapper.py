@@ -46,7 +46,13 @@ class FileMapper:
         roots: Run-root directory names :meth:`locate` tries, in order. One
             entry for a new-layout path; every legacy state for an archive.
         relstrs: Relative paths (under the run root) of all files discovered
-            at or below the input location.
+            at or below the input location. **OS-native separators**, not
+            forward-slash: they are built with :func:`os.path.join` below.
+            Spec §9's forward-slash rule covers paths that are *stored* --
+            ymls, journal records, RPC payloads, S3 keys -- and these are
+            purely in-memory, never written or transmitted. A consumer that
+            splits one must therefore not assume ``"/"``; normalize, or use
+            :func:`os.path.dirname` and friends, which accept both.
     """
 
     def __init__(self, save_path: Union[str, Path]):
