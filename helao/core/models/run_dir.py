@@ -80,13 +80,21 @@ def is_legacy_path(path) -> bool:
 def is_run_root(segment: str) -> bool:
     """Whether one path segment names a run tree root.
 
-    Covers the single ``RUNS`` tree, every legacy ``RUNS_*`` name, and the
-    ``PROCESSES`` mirror -- including ``PROCESSES_SUPERSEDED``, which is a real
-    directory on station archives and which readers that matched only the
-    literal ``PROCESSES`` used to blow up on.
+    Covers the single ``RUNS`` tree, its ``DIAG`` sibling, every legacy
+    ``RUNS_*`` name, and the ``PROCESSES`` mirror -- including
+    ``PROCESSES_SUPERSEDED``, which is a real directory on station archives and
+    which readers that matched only the literal ``PROCESSES`` used to blow up
+    on.
+
+    ``DIAG`` is not optional here. Manual and diagnostic runs are written there
+    and nowhere else (spec §3.4), and callers locate the run root by taking the
+    last matching segment -- so omitting it does not degrade a lookup, it
+    raises ``IndexError`` from an empty comprehension. Any tree a record can be
+    written to belongs in this predicate.
     """
     return (
         segment == "RUNS"
+        or segment == "DIAG"
         or segment.startswith("RUNS_")
         or segment.startswith("PROCESSES")
     )

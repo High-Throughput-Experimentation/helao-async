@@ -382,3 +382,40 @@ def test_list_pending_skips_records_whose_prg_says_they_shipped(tmp_path: Path):
     drv.helaodirs = SimpleNamespace(save_root=tmp_path / "RUNS")  # type: ignore[assignment]
     pending = drv.list_pending()
     assert [Path(p).parent.name for p in pending] == ["todo_seq"]
+
+
+def test_is_run_root_covers_every_tree_a_record_can_be_written_to():
+    """DIAG is a write target, not a legacy name (spec §3.4).
+
+    Callers locate the run root by taking the LAST matching segment, so a
+    missing entry here does not degrade a lookup -- it raises IndexError from
+    an empty comprehension. Omitting DIAG crashed FileMapper on every manual
+    and diagnostic record.
+    """
+    from helao.core.models.run_dir import LEGACY_RUN_DIRS, is_run_root
+
+    assert is_run_root("RUNS")
+    assert is_run_root("DIAG")
+    for name in LEGACY_RUN_DIRS:
+        assert is_run_root(name), name
+    assert is_run_root("PROCESSES")
+    assert is_run_root("PROCESSES_SUPERSEDED")
+    assert not is_run_root("LOGS")
+    assert not is_run_root("STATES")
+
+
+def test_file_mapper_resolves_a_manual_record_under_diag(tmp_path: Path):
+    """The crash this guards: an empty [-1] over the run-root comprehension."""
+    from helao.helpers.file_mapper import FileMapper
+
+    d = tmp_path / "DIAG" / "2026" / "0925" / "094102__s__l" / "exp"
+    d = d / "0__0__SIM__do_thing"
+    d.mkdir(parents=True)
+    (d / "data-0.0.0.0__0.hlo").write_text("x")
+
+    fm = FileMapper(str(d))
+    assert fm.is_legacy is False
+    # DIAG is the record's own root, so it is the only candidate.
+    assert fm.roots[0] == "DIAG"
+    assert fm.relstrs, "the DIAG tree was not indexed at all"
+    assert Path(str(fm.locate(fm.relstrs[0]))).is_file()
