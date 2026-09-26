@@ -1150,6 +1150,48 @@ caller that conditionally skips it must be re-read, because the condition was
 written against the old meaning. A grep for callers is not enough; the callers
 did not change.
 
+### A35 — The estop path strands a record in the producer's journal forever
+
+Third instance of the latent-activation shape (after A27 and D-C), and the only
+one still live when found.
+
+`helao/hexagon/app/orch_estop.py:233` `_estop_promote` waits up to 30 s for
+child directories to clear and, failing that, returns `False` **without calling
+`move_dir`**. Its docstring gives the original reason verbatim: *"`move_dir`
+promotes only an exp/seq's top-level files and then `rmtree`s the whole
+directory, so moving while a co-located child action is still finalizing in
+`RUNS_ACTIVE` would delete that action's data."*
+
+True before Task 9. **`move_dir` deletes nothing now.**
+
+Established, not assumed:
+
+- **The 30-second wait is fully pointless.** The syncer already gates on
+  children, with a carve-out for estop. Nothing else depends on the child
+  directories having cleared.
+- **No other eviction exists on that path.** `finish_pending` drains the
+  **SYNC** journal only; the producer's journal is never touched. So an
+  estopped experiment or sequence stays `active` in the ORCH journal
+  **permanently**.
+
+`has_pending_work()` reads that set, so one estop wedges the hot-reload idle
+gate for the life of the station — and an estop is exactly when a station most
+needs a clean restart.
+
+**Also found: a hexagon test that contradicts its own production code.**
+`helao/hexagon/tests/test_native_finalizer.py:180` stays green only because of
+a missing `yield`; the production code it claims to pin has already been fixed.
+A test that passes by timing rather than by assertion is indistinguishable from
+a passing guard — the same family as the inert mutations (A22-era) and the
+literal-based fixtures (A31).
+
+**The rule, now firm at three instances:** when a function's *meaning* changes,
+every caller that **conditionally skips** it is suspect, and `grep` will not
+find them, because the callers did not change. The condition was written
+against the old meaning and still reads as reasonable. Tasks touching
+`move_dir`, `yml_finisher`, `enqueue_yml` or `sync_yml` must re-read every
+guarded call site, not just every call site.
+
 ---
 
 ## Decision resolved (2026-09-25)
