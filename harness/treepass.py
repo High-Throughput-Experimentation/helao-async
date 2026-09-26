@@ -30,7 +30,22 @@ from harness.classify import (
 from harness.uuidmap import RE_UUID, UuidMapper
 from harness.yaml_pass import load_yml_plain
 
+#: Top-level directories a capture snapshots and a parity run compares.
+#:
+#: ``RUNS`` and ``DIAG`` first: a record is written once under one of those and
+#: never moves. The five legacy ``RUNS_*`` names stay because archives are
+#: never migrated (spec §7) and a golden captured before the cut-over must keep
+#: comparing.
+#:
+#: This list is load-bearing in a way that fails silently. ``snapshot()`` copies
+#: only these tops, while its anti-vacuous guard counts ``*-act.yml`` anywhere
+#: under the root -- so a list missing the tree a capture actually wrote gives a
+#: guard that passes, a snapshot that copies nothing, and an **empty golden set
+#: that then compares clean with zero diffs**. Any new run-tree name must be
+#: added here at the same time it starts being written.
 PARITY_TOPS = (
+    "RUNS",
+    "DIAG",
     "RUNS_ACTIVE",
     "RUNS_FINISHED",
     "RUNS_SYNCED",
