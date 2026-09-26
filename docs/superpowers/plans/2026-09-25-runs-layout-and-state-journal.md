@@ -1166,9 +1166,17 @@ True before Task 9. **`move_dir` deletes nothing now.**
 
 Established, not assumed:
 
-- **The 30-second wait is fully pointless.** The syncer already gates on
-  children, with a carve-out for estop. Nothing else depends on the child
-  directories having cleared.
+- **The 30-second wait is fully pointless — and under `RUNS` it can never
+  succeed.** `get_action_dir()` nests the action directory inside the
+  experiment directory, inside the sequence directory, and nothing moves any
+  more, so `_child_dirs()` is non-empty **forever** for any exp/seq that ran an
+  action. Every estop burned the full 30 s and then took the `return False`
+  path. Not occasional — unconditional. Measured: the mutation run takes
+  31.08 s and fails; the fixed module runs in 0.82 s.
+- The child-still-running concern is already handled one layer down: `sync_yml`
+  gates on a child's **sync status**, requeues unsynced children below the
+  parent, and treats an estopped `active` child as terminal rather than
+  blocking on it.
 - **No other eviction exists on that path.** `finish_pending` drains the
   **SYNC** journal only; the producer's journal is never touched. So an
   estopped experiment or sequence stays `active` in the ORCH journal
@@ -1177,6 +1185,11 @@ Established, not assumed:
 `has_pending_work()` reads that set, so one estop wedges the hot-reload idle
 gate for the life of the station — and an estop is exactly when a station most
 needs a clean restart.
+
+**Second consequence, worse than the first:** the skipped call also skipped
+`yml_finisher`, so **the estopped run was never handed to the syncer at all.**
+Every estopped experiment and sequence since the cut-over would have gone
+unsynced, silently.
 
 **Also found: a hexagon test that contradicts its own production code.**
 `helao/hexagon/tests/test_native_finalizer.py:180` stays green only because of
