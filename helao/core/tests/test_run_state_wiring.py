@@ -354,3 +354,62 @@ async def test_a_manual_action_is_evicted_from_the_journal_when_it_finishes(
     assert (
         base.run_journal.working_set() == {}
     ), "a manual action stayed active in the journal after it finished"
+
+
+# --- the orchestrator's estop handoff (plan A34) -----------------------------
+
+
+@pytest.mark.asyncio
+async def test_an_estopped_experiment_is_evicted_from_the_journal(tmp_path: Path):
+    """An estopped experiment must not be left ``active`` for the life of the station.
+
+    ``EstopController._estop_promote`` used to wait up to 30s for the record's
+    child directories to clear and, if they did not, return without calling
+    ``move_dir`` at all. That was correct while ``move_dir`` ``rmtree``d the
+    directory it promoted. ``move_dir`` deletes nothing now -- it is where the
+    producing server evicts its own journal entry and hands the yml to the
+    syncer -- and under the unified ``RUNS`` tree the child directory never
+    goes away, so the wait could only time out and the eviction could only be
+    skipped. ``has_pending_work()`` reads that set, so one estop wedges the
+    hot-reload idle gate forever (plan A34, same shape as D-B/D-C).
+
+    The child directory below is what made the old guard give up, and the
+    assertion is the working set at rest -- not that ``move_dir`` was called,
+    which a call that does nothing would satisfy.
+    """
+    from datetime import datetime
+
+    from helao.helpers.premodels import Experiment
+    from helao.hexagon.app.orch_estop import EstopController
+
+    save_root = tmp_path / "RUNS"
+    orch = SimpleNamespace(
+        helaodirs=SimpleNamespace(
+            root=str(tmp_path),
+            save_root=str(save_root),
+            states_root=str(tmp_path / "STATES"),
+        ),
+        run_journal=RunStateJournal(tmp_path / "STATES", "ORCH"),
+        world_cfg={},  # no syncer configured -> yml_finisher is a no-op
+    )
+
+    exp = Experiment(
+        experiment_name="estopped_exp",
+        experiment_uuid=EXP_UUID,
+        experiment_timestamp=datetime(2026, 9, 25, 12, 0, 0),
+        sequence_output_dir="2026/0925/seq",
+    )
+    exp_dir = save_root / exp.get_experiment_dir()
+    # a co-located child action dir, which nothing ever removes
+    (exp_dir / "1__0__SIM__noop").mkdir(parents=True)
+
+    record_active(orch, "experiment", exp.experiment_uuid, str(exp_dir))
+    assert set(orch.run_journal.working_set()) == {
+        EXP_UUID
+    }, "the experiment was never journalled active; the test proves nothing"
+
+    await EstopController(orch)._estop_promote(exp, "experiment")
+
+    assert (
+        orch.run_journal.working_set() == {}
+    ), "an estopped experiment stayed active in the journal"
