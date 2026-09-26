@@ -33,9 +33,10 @@ import yaml
 from helao.core.models.file import FileInfo, HloFileGroup
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, run_root
 from helao.core.models.run_use import RunUse
 from helao.core.models.sample import SolidSample
+from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps
 
@@ -903,18 +904,24 @@ def test_an_actions_own_manual_flag_also_redirects(run):
 
 def test_default_save_root_derives_from_the_config_root():
     root = os.path.join("demo_root", "INST_hlo")
-    assert default_save_root({"root": root}) == os.path.join(
-        root, RunDir.FINISHED.value
-    )
+    assert default_save_root({"root": root}) == str(run_root(root))
 
 
 def test_default_save_root_uses_the_fallback_when_the_config_has_no_root():
-    assert default_save_root({}, fallback_root="fb") == os.path.join(
-        "fb", RunDir.FINISHED.value
-    )
-    assert default_save_root(None, fallback_root="fb") == os.path.join(
-        "fb", RunDir.FINISHED.value
-    )
+    assert default_save_root({}, fallback_root="fb") == str(run_root("fb"))
+    assert default_save_root(None, fallback_root="fb") == str(run_root("fb"))
+
+
+def test_default_save_root_is_the_same_tree_a_server_writes_to(tmp_path):
+    """Batch output must land in the tree the live runtime writes to.
+
+    Asserted as an equality against what ``helao_dirs`` resolves ``save_root``
+    to for the same root, not against a directory literal: the two are one
+    decision, and pinning literals on both sides is exactly how they drifted
+    into separate trees (plan A26).
+    """
+    resolved = helao_dirs({"root": str(tmp_path)}, server_name=None).save_root
+    assert default_save_root({"root": str(tmp_path)}) == str(resolved)
 
 
 def test_default_save_root_refuses_to_invent_a_root():

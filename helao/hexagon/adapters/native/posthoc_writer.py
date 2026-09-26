@@ -52,7 +52,7 @@ import shutil
 from typing import Any, Optional, Union
 
 from helao.core.models.file import FileInfo, HloFileGroup
-from helao.core.models.run_dir import RunDir, redirect_manual_dir
+from helao.core.models.run_dir import redirect_manual_dir, run_root
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -82,7 +82,7 @@ class RepeatWriteError(RuntimeError):
     no ``%%`` separator (which makes a reader parse two payloads as one body).
 
     Refusing turned out to be the wrong remedy. A batch conversion that dies
-    partway leaves half-written artifacts under ``RUNS_FINISHED``, and on the
+    partway leaves half-written artifacts under the run tree, and on the
     next attempt every one of them made the converter raise here -- so a single
     interrupted run poisoned the source folder until someone cleaned it by
     hand. The corruption the guard existed to prevent came from *appending*;
@@ -250,7 +250,7 @@ class PostHocRunWriter:
 
     Args:
         save_root: Root the run tree is written under, e.g.
-            ``<config root>/RUNS_FINISHED``. Model-relative output directories
+            ``<config root>/RUNS``. Model-relative output directories
             (``action_output_dir`` and friends) are joined onto it.
     """
 
@@ -522,7 +522,18 @@ class PostHocRunWriter:
 
 
 def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) -> str:
-    """Resolve the default run-output root (``<root>/RUNS_FINISHED``).
+    """Resolve the default run-output root (``<root>/RUNS``).
+
+    This is the same tree :func:`~helao.helpers.helao_dirs.helao_dirs`
+    resolves ``save_root`` to, so batch-converted records land beside live
+    ones and the syncer's ``list_pending*`` sweep root covers them. It used to
+    return ``<root>/RUNS_FINISHED``, which after the single-run-tree cut-over
+    would have left converted records permanently outside that sweep.
+
+    The sweep is a safety net here rather than the primary path: the
+    converters enqueue each record explicitly once it is written, and an
+    interrupted conversion is recovered from its ``processing/`` checkpoint
+    sidecar. What this restores is the net, plus a uniform layout.
 
     Args:
         cfg: Loaded instrument config, or ``None``. Only its ``root`` key is
@@ -532,7 +543,7 @@ def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) 
             data-root path of its own.
 
     Returns:
-        ``<root>/RUNS_FINISHED``.
+        ``<root>/RUNS``.
 
     Raises:
         ValueError: Neither a config root nor a fallback was supplied.
@@ -544,4 +555,4 @@ def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) 
             "no save root: the config carries no 'root' key and no "
             "fallback_root was supplied."
         )
-    return os.path.join(str(root), RunDir.FINISHED.value)
+    return str(run_root(root))
