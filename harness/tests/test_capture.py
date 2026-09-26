@@ -107,3 +107,49 @@ def test_assert_fresh_accepts_a_root_with_empty_run_trees(tmp_path):
         (tmp_path / tree / "26.32").mkdir(parents=True)
 
     assert_fresh(tmp_path)  # must not raise
+
+
+def _act(dir_, status: str) -> None:
+    dir_.mkdir(parents=True, exist_ok=True)
+    (dir_ / "260925.120000000000-act.yml").write_text(
+        f"file_type: action\naction_status:\n- {status}\n"
+    )
+
+
+def test_assert_fresh_refuses_a_root_dirty_under_the_new_trees(tmp_path):
+    """A29/A28: the guard was blind to RUNS and DIAG, so a root holding a
+    whole previous run read as fresh and every uuid index in the capture
+    shifted -- the 365-phantom-diff failure, one layout later."""
+    from harness.capture import assert_fresh
+
+    import pytest
+
+    _act(tmp_path / "RUNS" / "2026" / "0925" / "seq" / "exp" / "act", "finished")
+
+    with pytest.raises(RuntimeError, match="RUNS"):
+        assert_fresh(tmp_path)
+
+
+def test_runs_active_empty_is_not_vacuous_under_the_single_tree(tmp_path):
+    """The legacy check returned True over a RUNS_ACTIVE that is never
+    created, so quiesce settled instantly and snapshotted a mid-flight tree."""
+    from harness.capture import runs_active_empty
+
+    assert not runs_active_empty(tmp_path), "an empty root is not a settled run"
+
+    act_dir = tmp_path / "RUNS" / "2026" / "0925" / "seq" / "exp" / "act"
+    _act(act_dir, "active")
+    assert not runs_active_empty(tmp_path), "an active -act.yml means in flight"
+
+    _act(act_dir, "finished")
+    assert runs_active_empty(tmp_path)
+
+
+def test_runs_active_empty_keeps_the_legacy_arm(tmp_path):
+    """A pre-cut-over station still answers from RUNS_ACTIVE."""
+    from harness.capture import runs_active_empty
+
+    (tmp_path / "RUNS_ACTIVE" / "26.39").mkdir(parents=True)
+    assert runs_active_empty(tmp_path)
+    (tmp_path / "RUNS_ACTIVE" / "26.39" / "x-act.yml").write_text("file_type: action\n")
+    assert not runs_active_empty(tmp_path)

@@ -56,7 +56,7 @@ PROTECTED_DIRS: set[str] = {"CODE"}
 #: PROTECTED_DIRS is subtracted so a protected name can never leak into the
 #: deletable set even if _NON_RUN_GENERATED is later edited.
 GENERATED_DIRS: set[str] = (
-    {d.value for d in ALL_RUN_DIRS} | set(_NON_RUN_GENERATED)
+    {"RUNS", "DIAG"} | {d.value for d in ALL_RUN_DIRS} | set(_NON_RUN_GENERATED)
 ) - PROTECTED_DIRS
 
 #: The only subdirs safe to delete without special intent: transient launch
@@ -64,6 +64,13 @@ GENERATED_DIRS: set[str] = (
 #: (USER_CONFIG calibration, DATABASE, RUNS_FINISHED/SYNCED, ANALYSES,
 #: PROCESSES, LOGS) holds data that is expensive or impossible to regenerate.
 #: RunDir.ACTIVE.value is used (not a literal) so an enum rename is caught here.
+#:
+#: ``RUNS`` is deliberately NOT here. ``RUNS_ACTIVE`` was safe to wipe because a
+#: record left it the moment it finished, so the tree only ever held in-flight
+#: work. Under the single tree a finished, synced record sits in ``RUNS`` next
+#: to an in-flight one and never moves, so wiping it by default would delete
+#: exactly the data the rest of this list exists to protect. A smoke reset that
+#: wants the new trees gone must name ``RUNS``/``DIAG`` explicitly.
 EPHEMERAL_DIRS: set[str] = {"STATES", RunDir.ACTIVE.value}  # RUNS_ACTIVE
 
 

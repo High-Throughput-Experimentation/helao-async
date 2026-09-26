@@ -40,8 +40,9 @@ Usage::
     python -m helao.core.tests.scan_prg_ghosts <DATA dir> [more dirs...]
     python -m helao.core.tests.scan_prg_ghosts /mnt/wd4/DATA
 
-Given a run-tree root the ``RUNS_*`` subtrees are scanned; given anything else
-the directory itself is walked, so a single week or sequence can be checked.
+Given a run-tree root the ``RUNS``, ``DIAG`` and legacy ``RUNS_*`` subtrees are
+scanned; given anything else the directory itself is walked, so a single week
+or sequence can be checked.
 
 Exit status is 0 only when every record encountered was actually examined and
 none carried a staging name. It is 1 when a ghost is found, and also when any
@@ -89,8 +90,17 @@ except ImportError:  # pragma: no cover - the path taken on a bare data host
 RETRIES = 4
 RETRY_BACKOFF_S = 0.2
 
-# Subtrees walked when the given directory looks like a run-tree root.
+# Subtrees walked when the given directory looks like a run-tree root. ``RUNS``
+# and ``DIAG`` are where a current build writes; the rest is pre-cut-over
+# vocabulary that station archives still hold. Spelled out rather than imported
+# from ``helao.core.models.run_dir`` so this file keeps running on a bare data
+# host with no PYTHONPATH (see the ``yml_load`` fallback above);
+# ``test_scan_prg_ghosts`` pins it to ``LEGACY_RUN_DIRS`` so the two cannot
+# drift. Omitting the live trees here would walk nothing on a cut-over station
+# and still exit 0 -- a clean verdict over a tree never entered.
 RUN_TREES = (
+    "RUNS",
+    "DIAG",
     "RUNS_ACTIVE",
     "RUNS_FINISHED",
     "RUNS_SYNCED",
@@ -315,7 +325,7 @@ def main(argv=None) -> int:
         "data_dirs",
         nargs="+",
         metavar="DATA_DIR",
-        help="a run-tree root (its RUNS_* subtrees are scanned), or any directory",
+        help="a run-tree root (its RUNS/DIAG and RUNS_* subtrees are scanned), or any directory",
     )
     parser.add_argument(
         "--progress",

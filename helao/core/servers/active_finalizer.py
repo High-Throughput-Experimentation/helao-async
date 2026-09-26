@@ -462,18 +462,23 @@ class ActionFinalizer:
                         f"Failed to send last status for action {action.action_uuid}",
                         exc_info=True,
                     )
-                if not self.active.action.manual_action:
-                    try:
-                        self.active.base.aloop.create_task(move_dir(action, base=self.active.base))
-                        # pop from local action task queue
-                    except Exception:
-                        LOGGER.error(
-                            f"Failed to move directory for action {action.action_uuid}",
-                            exc_info=True,
-                        )
-                else:
-                    LOGGER.info(
-                        f"Action {action.action_uuid} is a manual action, skipping directory move."
+                # A manual action used to be excluded here because move_dir
+                # copied its tree, and a manual run is already written where it
+                # belongs. move_dir moves nothing now -- it evicts this server's
+                # journal entry and, for a non-manual record, hands the yml to
+                # the syncer. Skipping it for a manual run therefore leaves that
+                # entry `active` forever, and `has_pending_work()` reads exactly
+                # that set, so one diagnostic action wedges the hot-reload idle
+                # gate for the life of the station. move_dir itself skips the
+                # syncer handoff for a manual record; the branch belongs there,
+                # not here.
+                try:
+                    self.active.base.aloop.create_task(move_dir(action, base=self.active.base))
+                    # pop from local action task queue
+                except Exception:
+                    LOGGER.error(
+                        f"Failed to finish action {action.action_uuid}",
+                        exc_info=True,
                     )
                 if action.action_uuid in self.active.base.local_action_task_queue:
                     self.active.base.local_action_task_queue.remove(action.action_uuid)

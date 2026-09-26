@@ -293,20 +293,21 @@ def settle(
     name "the action" generically, not any one scenario's endpoint.
 
     NO orch/DB in this topology, AND a manual direct-POST action writes to
-    RUNS_DIAG (base.py:1016) and never touches RUNS_ACTIVE -- so polling
-    ``runs_active_empty`` alone returns before any file is written,
-    snapshotting an empty tree that then passes parity vacuously (the original
-    at-station false PASS). Instead require the action's ``-act.yml`` to be
-    present (the action ran to completion), ``RUNS_ACTIVE`` empty (nothing in
-    flight), and the artifact count stable across ``settle_polls`` consecutive
-    polls. If no ``-act.yml`` ever appears the action errored -> TimeoutError
-    (loud failure, never a silent empty capture).
+    the DIAG tree (``RUNS_DIAG`` before the cut-over) and never touches the
+    in-flight tree -- so polling ``runs_active_empty`` alone returns before
+    any file is written, snapshotting an empty tree that then passes parity
+    vacuously (the original at-station false PASS). Instead require the
+    action's ``-act.yml`` to be present (the action ran to completion),
+    ``runs_active_empty`` (nothing in flight), and the artifact count stable
+    across ``settle_polls`` consecutive polls. If no ``-act.yml`` ever appears
+    the action errored -> TimeoutError (loud failure, never a silent empty
+    capture).
 
     Completion is gated on the -act.yml's action_status reaching a TERMINAL
     state (finished/errored), NOT on the file merely existing -- the file is
     written at init with status "active" (base.py:1029), so existence-based
     settling snapshots + kills the server MID-MEASUREMENT (observed: a captured
-    -act.yml frozen at "active"). Also require RUNS_ACTIVE empty and the
+    -act.yml frozen at "active"). Also require ``runs_active_empty`` and the
     artifact count stable across ``settle_polls`` consecutive polls.
 
     NOTE: ``.hlo`` presence is intentionally NOT required here (a run that

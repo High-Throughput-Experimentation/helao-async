@@ -49,3 +49,31 @@ def finished_action(tmp_path: Path):
         run_journal=None,
     )
     return act, base
+
+
+def finished_experiment(tmp_path: Path):
+    """Return ``(experiment, base)`` with the experiment's tree written."""
+    from helao.helpers.premodels import Experiment
+
+    _, base = finished_action(tmp_path)
+    exp = Experiment(experiment_name="exp")
+    exp.sequence_timestamp = TS
+    exp.experiment_timestamp = TS
+    exp.sequence_name = "seq"
+    exp.sequence_label = "noLabel"
+    exp.manual_action = False
+    exp.init_seq()
+    exp.init_exp()
+    return exp, base
+
+
+def finished_sequence(tmp_path: Path):
+    """Return ``(sequence, base)`` with the sequence's tree written."""
+    from helao.helpers.premodels import Sequence
+
+    _, base = finished_action(tmp_path)
+    seq = Sequence(sequence_name="seq")
+    seq.sequence_timestamp = TS
+    seq.sequence_label = "noLabel"
+    seq.init_seq()
+    return seq, base

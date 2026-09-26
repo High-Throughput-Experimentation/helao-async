@@ -114,6 +114,32 @@ async def test_move_dir_creates_no_legacy_directory(tmp_path: Path):
     assert created.isdisjoint(LEGACY_RUN_DIRS)
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["action", "experiment", "sequence"])
+async def test_move_dir_finishes_every_record_kind(tmp_path: Path, kind: str):
+    """All three kinds reach the handoff, not just an Action.
+
+    ``move_dir`` selected its directory getter out of a dict literal, and a
+    dict literal evaluates every value before a key is chosen -- so building
+    it looked up ``get_action_dir`` on an Experiment and raised. The raise was
+    swallowed by the event loop's exception handler, so an experiment and a
+    sequence were simply never handed to the syncer: observed on a real
+    launch as a completed run with no ``-seq.prg`` and an ORCH journal that
+    never evicted.
+    """
+    from helao.core.tests import run_layout_fixtures as fx
+    from helao.helpers.yml_tools import move_dir
+
+    hobj, base = getattr(fx, f"finished_{kind}")(tmp_path)
+    finished = []
+    base.run_journal = SimpleNamespace(append=lambda *a, **kw: finished.append(a))
+
+    await move_dir(hobj, base=base)
+
+    assert finished, f"{kind} was never evicted from the producing journal"
+    assert finished[0][1] == kind
+
+
 def test_is_same_location_sees_through_normalization(tmp_path: Path):
     from helao.core.models.run_dir import is_same_location
 

@@ -120,6 +120,32 @@ class TestPrefilter:
         assert not _might_hold_ghost("progress: 0.5\nitems:\n  - 1.25\n")
 
 
+class TestRunTrees:
+    """``RUN_TREES`` is a copy of the shared vocabulary; pin it to the original.
+
+    The module spells the list out rather than importing it so it still runs on
+    a bare data host with no PYTHONPATH. That copy is only safe if it cannot
+    drift: a list missing the live trees walks nothing on a cut-over station and
+    still exits 0.
+    """
+
+    def test_covers_the_live_trees_and_every_legacy_one(self):
+        from helao.core.models.run_dir import LEGACY_RUN_DIRS
+        from helao.core.tests.scan_prg_ghosts import RUN_TREES
+
+        assert set(RUN_TREES) == {"RUNS", "DIAG"} | set(LEGACY_RUN_DIRS)
+
+    def test_a_new_layout_root_is_entered(self, tmp_path):
+        from helao.core.tests.scan_prg_ghosts import _roots_under
+
+        (tmp_path / "RUNS").mkdir()
+        (tmp_path / "DIAG").mkdir()
+        assert sorted(os.path.basename(r) for r in _roots_under(str(tmp_path))) == [
+            "DIAG",
+            "RUNS",
+        ]
+
+
 class TestLoaderEquivalence:
     """The PyYAML fallback must read a .prg identically to the project loader.
 
