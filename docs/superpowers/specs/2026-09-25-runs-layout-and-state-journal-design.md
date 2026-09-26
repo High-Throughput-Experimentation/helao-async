@@ -495,15 +495,41 @@ parity, treepass) reads real station trees and must keep understanding both.
 
 ## 9. Path separators
 
-**Decided: `/` everywhere.** The existing normalization at the end of
-`get_sequence_dir()` / `get_experiment_dir()` / `get_action_dir()` stays. Every
-run-relative path that is written to a yml, recorded in a journal, compared,
-split, or handed to another server is forward-slash. The OS-native form is
-produced only at the point of a filesystem call and never stored.
+**Decided: `/` at the storage boundary, native in-process.** Corrected
+2026-09-26 — an earlier draft of this section said the native form "is produced
+only at the point of a filesystem call and never stored", which over-specified
+the rule and caused a real regression.
 
-This keeps `windows-rundir-separator-normalization` fixed rather than
-re-litigated: run-dir methods returning native separators is precisely the
-regression that memory records.
+The repository's actual contract, set deliberately by `d563cb67`:
+
+> The in-process dir methods must return **OS-native** paths so
+> `get_experiment_dir()` matches `str(sequence_output_dir)`; the forward-slash
+> contract is honoured **at serialization time** (`Path` → posix in yml/RPC),
+> not in the method return.
+
+`sequence_output_dir` / `experiment_output_dir` / `action_output_dir` are
+`Path` fields, so `str()` of them is native on Windows. `get_experiment_dir()`
+joins onto that string — normalize separators there and the result no longer
+nests under `str(sequence_output_dir)`, and every "nests under" assertion
+fails on Windows only.
+
+The `.replace(r"\\", "/")` at the end of those methods **looks like a broken
+escape and is not**: `r"\\"` is two characters, matches no single Windows
+separator, and is deliberately inert. `d563cb67` restored it after exactly this
+"fix" broke Windows once; this plan reintroduced the same change and it was
+reverted again in `ee3b283a`. Anyone tempted to tidy it a third time should
+read both commits first.
+
+So the binding rule is narrower than "forward-slash everywhere":
+
+| Where | Separator |
+|---|---|
+| a yml, a journal record, an RPC payload, S3 keys | **forward-slash** |
+| a `*_output_dir` field and the methods that build it | **OS-native** |
+| `FileMapper.relstrs` and other in-memory path lists | native; never stored (verified: no consumer writes, transmits or compares one against a stored path) |
+
+`windows-rundir-separator-normalization` records the first instance of getting
+this wrong. There have now been three.
 
 Two consequences for this design:
 
