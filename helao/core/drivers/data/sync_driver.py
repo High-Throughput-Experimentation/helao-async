@@ -1554,7 +1554,18 @@ class SyncDriver:
             # async with self.aiolock:
             # The handoff (spec §4.3): the producing server has already
             # evicted this record; SYNC owns it from here until it ships.
-            self._journal(yml_path, UNSYNCED)
+            #
+            # Not for a record that already shipped. An experiment's finish
+            # re-walks its children and re-enqueues the last one after its own
+            # sync has closed it out, so an unconditional append writes
+            # UNSYNCED *after* the DONE tombstone and the record re-enters the
+            # working set for good -- observed on a real launch as the last
+            # action of every experiment stuck unsynced with a complete .prg.
+            # `has_pending_work()` reads that set, so the hot-reload idle gate
+            # would never open again (plan A1). Same predicate as
+            # `_pending_only`, not a second copy.
+            if not _prg_is_complete(yml_path.with_suffix(".prg")):
+                self._journal(yml_path, UNSYNCED)
             self.task_set.add(yml_path.name)
             await self.task_queue.put((rank, yml_path))
             LOGGER.info(f"Added {str(yml_path)} to syncer queue with priority {rank}.")

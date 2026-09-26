@@ -241,3 +241,54 @@ def test_a_degraded_rebuild_is_escalated(tmp_path: Path, monkeypatch):
 
     assert len(errors) == 1
     assert "400" in errors[0] and "never sync" in errors[0]
+
+
+@pytest.mark.asyncio
+async def test_a_shipped_record_is_not_re_journalled_when_it_is_re_enqueued(
+    tmp_path: Path,
+):
+    """An already-complete record must not go back into the working set.
+
+    An experiment's finish re-walks its children and re-enqueues the last one
+    *after* that child's own sync closed it out. An unconditional
+    ``_journal(..., UNSYNCED)`` in ``enqueue_yml`` therefore writes UNSYNCED
+    after the DONE tombstone and the record re-enters the working set for
+    good -- observed on a real launch as the last action of every experiment
+    stuck unsynced beside a complete ``.prg``. ``has_pending_work()`` reads
+    exactly that set, so the hot-reload idle gate never reopens (plan A1).
+    """
+    import asyncio
+
+    driver = _fake_syncer(tmp_path)
+    driver.task_set = set()
+    driver.running_tasks = {}
+    driver.task_queue = asyncio.PriorityQueue()
+
+    record_dir = tmp_path / "RUNS" / "2026" / "0925" / "seq" / "exp" / "act"
+    yml = _act_yml(record_dir)
+    driver._journal(yml, UNSYNCED)
+    driver._journal(yml, DONE)
+    assert journal_of(driver).working_set() == {}
+
+    yml.with_suffix(".prg").write_text("s3: true\napi: true\n", encoding="utf-8")
+    await driver.enqueue_yml(yml)
+
+    assert journal_of(driver).working_set() == {}, "a shipped record was re-opened"
+    assert driver.task_set == {yml.name}, "it must still be queued, just not re-opened"
+
+
+@pytest.mark.asyncio
+async def test_an_unshipped_record_is_still_journalled_on_enqueue(tmp_path: Path):
+    """The guard above must not swallow the normal handoff."""
+    import asyncio
+
+    driver = _fake_syncer(tmp_path)
+    driver.task_set = set()
+    driver.running_tasks = {}
+    driver.task_queue = asyncio.PriorityQueue()
+
+    yml = _act_yml(tmp_path / "RUNS" / "2026" / "0925" / "seq" / "exp" / "act")
+    await driver.enqueue_yml(yml)
+
+    (entry,) = journal_of(driver).working_set().values()
+    assert entry["state"] == UNSYNCED

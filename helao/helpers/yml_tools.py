@@ -281,11 +281,13 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     if is_manual:
         save_dir = redirect_manual_dir(save_dir)
 
-    target_subdir = {
-        "action": hobj.get_action_dir,
-        "experiment": hobj.get_experiment_dir,
-        "sequence": hobj.get_sequence_dir,
-    }[obj_type]()
+    # getattr, not a dict of the three bound methods: a dict literal evaluates
+    # every value before the key is selected, so building one looks up
+    # `get_action_dir` on an Experiment and raises AttributeError. The raise
+    # lands in the event loop's exception handler, so the experiment and
+    # sequence are simply never handed to the syncer and the run silently
+    # never ships.
+    target_subdir = getattr(hobj, f"get_{obj_type}_dir")()
     yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
     timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime("%y%m%d.%H%M%S%f")
