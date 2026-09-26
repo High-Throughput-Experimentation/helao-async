@@ -182,7 +182,16 @@ class Sequence(SequenceModel):
             self.sequence_timestamp.strftime("%m%d"),
             f"{self.sequence_timestamp.strftime('%H%M%S')}__"
             f"{self.sequence_name}__{self.sequence_label}",
-        ).replace("\\", "/")
+            # NOT a broken escape. ``r"\\\\"`` is two characters and matches no
+            # single Windows separator, so this is deliberately a no-op and the
+            # method returns an OS-native path. That is required: the
+            # ``*_output_dir`` fields are ``Path``, so ``str()`` of them is native
+            # on Windows, and ``get_experiment_dir()`` must match
+            # ``str(sequence_output_dir)`` or the "nests under" assertions fail.
+            # The forward-slash contract is honoured at SERIALIZATION time
+            # (Path -> posix in yml/RPC), not in the method return -- see
+            # d563cb67, which reverted exactly this change once already.
+        ).replace(r"\\", "/")
 
 
 class Experiment(Sequence, ExperimentModel):
@@ -234,7 +243,16 @@ class Experiment(Sequence, ExperimentModel):
         return os.path.join(
             str(sequence_dir),
             f"{experiment_time}__{self.experiment_name}",
-        ).replace("\\", "/")
+            # NOT a broken escape. ``r"\\\\"`` is two characters and matches no
+            # single Windows separator, so this is deliberately a no-op and the
+            # method returns an OS-native path. That is required: the
+            # ``*_output_dir`` fields are ``Path``, so ``str()`` of them is native
+            # on Windows, and ``get_experiment_dir()`` must match
+            # ``str(sequence_output_dir)`` or the "nests under" assertions fail.
+            # The forward-slash contract is honoured at SERIALIZATION time
+            # (Path -> posix in yml/RPC), not in the method return -- see
+            # d563cb67, which reverted exactly this change once already.
+        ).replace(r"\\", "/")
 
     def get_exp(self) -> ExperimentModel:
         """Return a plain ``ExperimentModel`` snapshot with aggregated actions.
