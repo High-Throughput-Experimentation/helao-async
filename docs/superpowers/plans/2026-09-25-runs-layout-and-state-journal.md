@@ -1205,6 +1205,56 @@ against the old meaning and still reads as reasonable. Tasks touching
 `move_dir`, `yml_finisher`, `enqueue_yml` or `sync_yml` must re-read every
 guarded call site, not just every call site.
 
+### A36 — Option 1 chosen; the literals that will NOT follow it
+
+The user chose option 1. `default_save_root()` now returns `run_root(root)`
+(parent commit `679b5119`), so every standalone converter writes into `RUNS`.
+
+The one-line change propagates automatically to the 13 modules that go
+**through** the wrapper. It does **not** propagate to code that derives a
+sibling path by joining or string-matching the literal `"RUNS_FINISHED"`, and
+that code now points at a tree nothing writes:
+
+| Shape | Effect after the flip |
+|---|---|
+| an archive root derived by **splitting `save_root` on `"RUNS_FINISHED"`** (plus a test pinning that literal) | split fails; archive root wrong or empty |
+| `os.path.join(data_root, "RUNS_FINISHED", rel)` in three repair/reconvert scripts | reads a tree new records never enter |
+| an S3 staging installer joining the same literal | same |
+| the wrapper's own docstring, still stating `<config root>/RUNS_FINISHED` | now false |
+
+**This is the same failure as A28 and the `PARITY_TOPS` one**: a second place
+that names the tree, drifting from the first. Flipping the function without
+these makes the deployment *internally* inconsistent — worse than leaving it —
+so they land together or not at all.
+
+Note what did not need changing: no parent-repo code assumes batch output lives
+in `RUNS_FINISHED`. The surviving parent-repo mentions are all legacy-read-path
+or syncer-internal, none reachable from `default_save_root`. `posthoc_writer.py`
+has **no** parity twin (established: no `core/servers/posthoc_writer.py`
+exists, and no parity suite names it), so the usual A25 mirroring duty does not
+apply here.
+
+### A37 — `PARITY_TOPS` was a fifth copy of the tree list, and a false PASS
+
+`harness/treepass.py:33` still held only the eight legacy names after
+`capture.py`'s two lists had been taught both layouts. Fixed in `a0e824eb`.
+
+The failure is the sharpest instance of the pattern so far, because a guard and
+the thing it guards read **different** lists:
+
+- `snapshot()` copies **only** `PARITY_TOPS`.
+- Its anti-vacuous guard `_run_artifacts()` counts `*-act.yml` **anywhere**
+  under the root.
+
+So post-cut-over: the capture writes to `RUNS`/`DIAG`; the guard sees the
+`-act.yml` and passes; `snapshot()` copies zero tops; **the empty golden set
+then compares clean with zero diffs.** The captures exist to prevent exactly
+that PASS.
+
+Running count of this bug class on this branch: three disagreeing `RUN_TREES`
+constants (A28), a fourth in `capture.py`, and `PARITY_TOPS`. **Every one fails
+by reporting success.**
+
 ---
 
 ## Decision resolved (2026-09-25)
