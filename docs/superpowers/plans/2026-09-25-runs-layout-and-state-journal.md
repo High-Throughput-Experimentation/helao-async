@@ -1030,6 +1030,71 @@ raises `IsADirectoryError`, which is an `OSError` and is **caught** at `:182`
 into `refusals`; `_is_calibration_zip_name:200` strips `[:-4]` unconditionally.
 Three independent reasons it returns empty, each individually silent.
 
+### A31 — The plan itself authored a silent, launch-only defect
+
+Task 13's real launch found three defects no file sweep could reach. The first
+is **the plan's own code, copied verbatim into `move_dir` by Task 9**:
+
+```python
+    target_subdir = {
+        "action": hobj.get_action_dir,
+        "experiment": hobj.get_experiment_dir,
+        "sequence": hobj.get_sequence_dir,
+    }[obj_type]()
+```
+
+A dict literal evaluates **every value** before subscripting, so
+`hobj.get_action_dir` is resolved on an `Experiment` and raises
+`AttributeError`. The raise went to the event loop's exception handler, so
+**every experiment and sequence was silently never handed to the syncer.**
+
+Fixed to `getattr(hobj, f"get_{obj_type}_dir")()`.
+
+Three things about this are worth carrying forward:
+
+1. **It was in the plan, not in the execution.** Task 9 implemented what was
+   written. Reviewers read it as a dispatch table, which is what it looks like.
+2. **No unit test could catch it** — the tests exercise actions, and the action
+   branch is the one that works. It needed a real two-experiment run.
+3. **It failed by omission.** Nothing errored visibly; records simply stopped
+   arriving. Same family as A15 (a gate that collected zero tests and exited
+   green), A24 (a copy that found every destination present and concluded
+   success), A26 (a sweep root that covered nothing and found nothing pending)
+   and A28 (a repair tool that scanned no trees and reported clean).
+
+**The `run_tests.py` sweep cannot substitute for a launch.** Every remaining
+verification step in this plan that says "run the suite" should be read as
+necessary and not sufficient.
+
+### A32 — Live suites must be run one at a time, across ALL trees
+
+A21's companion, and it has now bitten three times:
+
+- Task 7's delta list ran a live suite concurrently with its baseline and filed
+  real data destruction as port contention.
+- Task 8 re-checked, also concurrently, and reached the same wrong conclusion
+  by a different route.
+- **I did it myself** while verifying Task 13: ran
+  `test_concurrency_live.py` while Task 13 was running the same file in its own
+  worktree. Both bind the same fixed ports (`8101/8102/8110` and the `18xxx`
+  ZMQ twins), so both fail with `SystemExit: 3` /
+  `ZMQError: Address already in use`, which reads exactly like a product
+  failure. A `ss -ltn` check between the other run's tests showed the ports
+  free, which made it look like a real defect rather than a collision.
+
+**Rule:** anything matching `*_live.py`, `tests/smoke/*`, or a golden-master
+harness binds fixed ports and must be run **solo across the whole machine** —
+not merely one-file-per-pytest-process, and not merely serially within one
+tree. Check `pgrep -af "fast_launcher|bokeh_launcher|launch.py"` and
+`ss -ltnp | grep -E ':(8101|8102|8110|18101|18102|18110)'` first; a hit means
+wait, not diagnose.
+
+Also: **a launched group can outlive the task that started it.** Task 13's
+group (7 processes, a copied config) was still running after it reported
+cleanup, holding those ports. Any task that launches a group must verify
+teardown with `pgrep`, not assume `CTRL-x` or process exit did it — which is
+the same lesson A18.3 records for the batch watchdog at a station.
+
 ---
 
 ## Decision resolved (2026-09-25)
