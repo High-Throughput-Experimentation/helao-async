@@ -35,7 +35,7 @@ import aiofiles
 
 from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
-from helao.helpers.file_utils import staging_path
+from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps
 
@@ -75,7 +75,7 @@ class NativeMetaFileWriter:
         tmp_file = staging_path(output_file)
         async with aiofiles.open(tmp_file, mode="w") as f:
             await f.write(output_str)
-        os.replace(tmp_file, output_file)
+        await replace_when_free(tmp_file, output_file)
 
     async def write_act(self, action: Action):
         """Write the action's metadata to ``<output_dir>/<timestamp>-act.yml`` if ``save_act``.
