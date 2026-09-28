@@ -191,7 +191,7 @@ def assert_s3_meta_rules(disk_act: dict, s3_act: dict) -> list[dict]:
     return diffs
 
 
-#: `ANALYSES/<yy.ww>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/` -- spec §5 row 13.
+#: `ANALYSES/<yyyy>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/` (legacy `<yy.ww>`) -- spec §5 row 13.
 ANALYSIS_DIR_RE = re.compile(r"^\d{6}__[^/]+$")
 
 #: `analysis/<uuid>_output_<group>.json`; the two groups `export_analysis`

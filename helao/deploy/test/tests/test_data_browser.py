@@ -401,8 +401,8 @@ def test_processes_index_corrupt_zip_skipped():
     print("test_processes_index_corrupt_zip_skipped PASS")
 
 
-def _make_analysis(root, with_local_output=True):
-    ana_dir = os.path.join(root, "ANALYSES", "26.25", "0618", "150305__icpms__plate1")
+def _make_analysis(root, with_local_output=True, year_dir="26.25"):
+    ana_dir = os.path.join(root, "ANALYSES", year_dir, "0618", "150305__icpms__plate1")
     os.makedirs(ana_dir)
     with open(os.path.join(ana_dir, "uuid1234.yml"), "w") as f:
         yaml.safe_dump(
@@ -427,6 +427,17 @@ def _make_analysis(root, with_local_output=True):
     if with_local_output:
         with open(os.path.join(ana_dir, "conc.json"), "w") as f:
             json.dump({"element": ["Ni", "Fe"], "ppm": [12.0, 3.4]}, f)
+
+
+def test_analyses_index_reads_both_layouts():
+    """``analysis_dir`` now writes ``%Y/%m%d`` like the RUNS tree; records
+    written under the old ``%y.%U/%m%d`` stay where they are. One ANALYSES
+    base holds both, and the index must see both."""
+    with tempfile.TemporaryDirectory() as d:
+        _make_analysis(d, year_dir="26.25")
+        _make_analysis(d, year_dir="2026")
+        df = sources.DerivedSourceIndex(d, "ANALYSES").index()
+        assert sorted(df["date"]) == ["2026/0618", "26.25/0618"], df
 
 
 def test_analyses_index_local():
@@ -709,6 +720,7 @@ def run_all():
     test_processes_index_zip_member_only()
     test_processes_index_both_present_no_duplicate()
     test_processes_index_corrupt_zip_skipped()
+    test_analyses_index_reads_both_layouts()
     test_analyses_index_local()
     test_analyses_index_s3_only_unavailable()
     test_get_index_dispatch()
