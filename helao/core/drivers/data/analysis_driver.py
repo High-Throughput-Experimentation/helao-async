@@ -1288,7 +1288,7 @@ class AnalysisSyncer(HelaoSyncer):
         Instantiates the analysis class, calls ``calc_output`` then
         ``export_analysis``, attaches sequence/campaign metadata pulled from the
         corresponding process, writes the YAML model and JSON outputs under
-        ``local_ana_root/<yy.ww>/<mmdd>/<HHMMSS>__<name>``, and uploads them to S3
+        ``local_ana_root/<yyyy>/<mmdd>/<HHMMSS>__<name>``, and uploads them to S3
         unless ``local_only`` is set.
 
         The blocking portion runs in a worker thread (see

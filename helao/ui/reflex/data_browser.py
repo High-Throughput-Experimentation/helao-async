@@ -118,7 +118,8 @@ def scan_index(root: str, source: str, date_start, date_end):
     Args:
         root: HELAO output root.
         source: Source name.
-        date_start: ``YY.WW/MMDD`` lower bound, or ``None``.
+        date_start: Lower bound (``YYYY/MMDD``, ``YY.WW/MMDD``, ``YYYYMMDD`` or
+            ``YYYY-MM-DD``), or ``None``.
         date_end: Upper bound, or ``None``.
 
     Returns:
@@ -521,13 +522,13 @@ def build_page():
             width="12em",
         ),
         rx.input(
-            placeholder="From (YY.WW/MMDD)",
+            placeholder="From (YYYY/MMDD)",
             value=BrowserState.date_start,
             on_change=BrowserState.on_date_start,
             width="11em",
         ),
         rx.input(
-            placeholder="To (YY.WW/MMDD)",
+            placeholder="To (YYYY/MMDD)",
             value=BrowserState.date_end,
             on_change=BrowserState.on_date_end,
             width="11em",
