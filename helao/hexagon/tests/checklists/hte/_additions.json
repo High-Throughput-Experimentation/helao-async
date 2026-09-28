@@ -26,5 +26,19 @@
     "method": "post",
     "date": "2026-09-07",
     "why": "private direct wavelength fit from (channel, wavelength) pairs, for when the line identities are already known; see 2026-09-04-andor-driver-split-design.md"
+  },
+  {
+    "module": "nidaqmx_server.py",
+    "path": "/NI/toggle_ttl",
+    "method": "post",
+    "date": "2026-09-28",
+    "why": "hold a dev_ttl digital output high for an optional duration as a TTLExec executor, since the hold can outlast an HTTP request; negative duration holds until cancelled"
+  },
+  {
+    "module": "nidaqmx_server.py",
+    "path": "/NI/cancel_toggle_ttl",
+    "method": "post",
+    "date": "2026-09-28",
+    "why": "stop running toggle_ttl holds (one dev_ttl line, or all); each drives its line low in the executor's cleanup"
   }
 ]

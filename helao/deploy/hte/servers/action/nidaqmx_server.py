@@ -1,10 +1,11 @@
 """FastAPI action server for an NI DAQmx instrument.
 
-Wraps :class:`cNIMAX` and its :class:`CellIVExec` (multi-cell IV) and
-:class:`DevMonExec` (monitor acquisition) executors, and dynamically exposes
+Wraps :class:`cNIMAX` and its :class:`CellIVExec` (multi-cell IV),
+:class:`DevMonExec` (monitor acquisition) and :class:`TTLExec` (timed TTL
+hold) executors, and dynamically exposes
 digital-output endpoints for each populated device group declared in
 ``server_params`` (mastercell, activecell, pump, gasvalve, liquidvalve,
-multivalve, led, fswbcd, heater) plus digital-input endpoints for foot
+multivalve, led, fswbcd, heater, ttl) plus digital-input endpoints for foot
 switches, multi-cell IV measurement, monitor acquisition, and a
 temperature-controlled heat loop. Thermocouple monitor channels are
 always-on, polled by :class:`cNIMAXPoller`.
@@ -52,15 +53,21 @@ from helao.helpers import helao_logging as logging
 from helao.helpers.make_str_enum import make_str_enum
 from helao.helpers.sample_api import UnifiedSampleDataAPI
 
-from ...drivers.io.nidaqmx_driver import CellIVExec, DevMonExec, cNIMAX, cNIMAXPoller
+from ...drivers.io.nidaqmx_driver import (
+    CellIVExec,
+    DevMonExec,
+    TTLExec,
+    cNIMAX,
+    cNIMAXPoller,
+)
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 #: Config groups whose entries are digital outputs, i.e. every group that gets
-#: an endpoint taking ``on: bool``. Order fixes which group's port wins if two
-#: ever claim a name, but a collision is refused rather than resolved — see
-#: :func:`build_do_port_map`.
+#: an endpoint taking ``on: bool`` (or, for ``dev_ttl``, ``duration``). Order
+#: fixes which group's port wins if two ever claim a name, but a collision is
+#: refused rather than resolved — see :func:`build_do_port_map`.
 DO_GROUPS = (
     "dev_mastercell",
     "dev_activecell",
@@ -71,6 +78,7 @@ DO_GROUPS = (
     "dev_led",
     "dev_fswbcd",
     "dev_heat",
+    "dev_ttl",
 )
 
 
@@ -229,6 +237,8 @@ def makeApp(server_key) -> ActionHost:
     dev_mastercellitems = make_str_enum(
         "dev_mastercell", {key: key for key in dev_mastercell}
     )
+    dev_ttl = app.server_params.get("dev_ttl", {})
+    dev_ttlitems = make_str_enum("dev_ttl", {key: key for key in dev_ttl})
     dev_fsw = app.server_params.get("dev_fsw", {})
     dev_fswitems = make_str_enum("dev_fsw", {key: key for key in dev_fsw})
     # dev_RSHTTLhandshake = app.server_params.get("dev_RSHTTLhandshake",dict())
@@ -735,6 +745,69 @@ def makeApp(server_key) -> ActionHost:
             await active.enqueue_data_dflt(datadict=datadict)
             finished_act = await active.finish()
             return finished_act.as_dict()
+
+    if dev_ttl:
+
+        def _ttl_sessions(ttl=None):
+            """Running ``toggle_ttl`` sessions, optionally only for one line."""
+            return [
+                session
+                for exec_id, session in list(app.executors.items())
+                if exec_id.split()[0] == "toggle_ttl"
+                and (
+                    ttl is None
+                    or str(session.action.action_params.get("ttl")) == str(ttl)
+                )
+            ]
+
+        @app.action()
+        async def toggle_ttl(
+            ctx: ActionContext,
+            ttl: Optional[dev_ttlitems] = None,
+            duration: float = -1,
+        ):
+            """Hold a ``dev_ttl`` line high, then drive it low.
+
+            Runs as a :class:`TTLExec` so a hold longer than the HTTP timeout
+            returns immediately with the action active. The line goes low when
+            ``duration`` elapses, on ``cancel_toggle_ttl``, or on stop/estop.
+
+            Args:
+                ttl: TTL line name from ``dev_ttl``.
+                duration: Seconds to hold the line high; negative holds until
+                    cancelled.
+
+            Returns:
+                The active action dictionary from ``start_executor``, or an
+                ``in_progress`` error if a hold on this line is already running
+                (the first to finish would drop the line under the second).
+            """
+            A = ctx.action
+            if _ttl_sessions(A.action_params["ttl"]):
+                A.error_code = ErrorCodes.in_progress
+                return A.as_dict()
+            active = await ctx.begin(action_abbr="ttl")
+            executor = TTLExec(active=active, oneoff=False, poll_rate=0.1)
+            return active.start_executor(executor)
+
+        @app.action()
+        async def cancel_toggle_ttl(
+            ctx: ActionContext,
+            ttl: Optional[dev_ttlitems] = None,
+        ):
+            """Stop running ``toggle_ttl`` holds; each drives its line low.
+
+            Args:
+                ttl: TTL line name from ``dev_ttl``; ``None`` cancels every hold.
+
+            Returns:
+                The finished action dictionary.
+            """
+            active = await ctx.begin()
+            for session in _ttl_sessions(active.action.action_params.get("ttl")):
+                session.stop_action_task()
+            finished_action = await active.finish()
+            return finished_action.as_dict()
 
     if dev_monitor:
 
