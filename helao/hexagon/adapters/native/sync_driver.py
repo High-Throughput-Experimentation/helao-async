@@ -1987,6 +1987,19 @@ class SyncDriver:
                 exp_prog = self.update_process(prog.yml, meta)
                 await self.sync_process(exp_prog)
 
+            # Re-queue the parent at its entry rank (finish_yml's ranks). A
+            # parent with unsynced children re-queues itself one rank lower per
+            # pass, and enqueue_yml drops it below rank_limit -- silently, at
+            # DEBUG. A sequence whose actions were still uploading spent that
+            # budget and never synced (so never dispatched its auto-analysis)
+            # until a restart swept it up. Shipping a child is the event the
+            # parent was waiting on, so hand it a fresh budget here.
+            if yml_type != "sequence":
+                parent_yml = prog.yml.parent_yml
+                if parent_yml is not None:
+                    parent_rank = 1 if yml_type == "action" else 2
+                    await self.enqueue_yml(parent_yml, parent_rank)
+
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
 
