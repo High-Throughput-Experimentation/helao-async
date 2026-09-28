@@ -851,6 +851,7 @@ class AnalysisSyncer(HelaoSyncer):
         # Building one is a full index of the archive, so this is not a
         # micro-optimisation on a plate with dozens of processes.
         loaders: dict = {}
+        prepared: set = set()
         for index, name in enumerate(names):
             if limit and summary["recovered"] >= limit:
                 # Counted, not swept. Only re-enqueues are capped: dropping an
@@ -922,6 +923,14 @@ class AnalysisSyncer(HelaoSyncer):
                     # server's event loop -- this sweep runs while the server is
                     # already answering requests.
                     loaders[target] = await asyncio.to_thread(LocalLoader, target)
+                # The live path (batch_calc) runs select_process_uuids on its
+                # loader before enqueueing, and a class may annotate the loader
+                # there: the UVIS analysis adds the ``run_use`` column its inputs
+                # query. Skipping it failed every recovered UVIS analysis.
+                select = getattr(ana_cls, "select_process_uuids", None)
+                if select is not None and (target, ana_cls) not in prepared:
+                    await asyncio.to_thread(select, loaders[target])
+                    prepared.add((target, ana_cls))
             except Exception:
                 _alert(
                     f"Could not rebuild the analysis in journal entry {name} from "
