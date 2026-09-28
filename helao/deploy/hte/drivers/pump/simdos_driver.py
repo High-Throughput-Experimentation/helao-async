@@ -134,8 +134,8 @@ def str2bin(val: str) -> list:
 class SIMDOS(HelaoDriver):
     """``HelaoDriver`` wrapper for the KNF SIMDOS RC-P diaphragm pump over RS-485.
 
-    The serial port specified in ``config['port']`` is opened by :meth:`connect`,
-    not by construction. Always-on status polling (operation/system/run/
+    The serial port specified in ``config['port']`` is opened at construction,
+    through :meth:`connect`. Always-on status polling (operation/system/run/
     dispense/fault registers) is handled by the paired :class:`SIMDOSPoller`,
     wired in as the server's ``poller_class``.
 
@@ -145,7 +145,7 @@ class SIMDOS(HelaoDriver):
     """
 
     def __init__(self, config: dict = {}):
-        """Store config; the serial connection is opened in :meth:`connect`.
+        """Store config and open the serial connection via :meth:`connect`.
 
         Args:
             config: Driver configuration (the server's ``params`` dict).
@@ -156,6 +156,10 @@ class SIMDOS(HelaoDriver):
         self.com = None
         self.polling = True
         self.last_state = "unknown"
+        # Open the port here, not lazily: ActionHost never calls connect(), and
+        # SIMDOSPoller starts polling as soon as it is built. Deferring the open
+        # (6d42909c) left self.com None for the life of the server.
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the serial connection to the pump.
@@ -248,6 +252,11 @@ class SIMDOS(HelaoDriver):
             The decoded response string, or ``None`` if no acknowledgement
             was returned.
         """
+        if self.com is None:
+            raise RuntimeError(
+                "SIMDOS serial port is not open; see the 'connect failed' error "
+                "logged at server startup."
+            )
         addr = self.config_dict["address"]
         command_str = f"{addr:02}{cmd}"
         self.com.write(b"\x02" + command_str.encode() + b"\x03U")
@@ -466,7 +475,7 @@ class SIMDOSPoller(DriverPoller):
             to the pre-migration ``status_dict`` passed to ``put_lbuf``), or
             an empty ``DriverResponse`` when polling is paused.
         """
-        if not self.driver.polling:
+        if not self.driver.polling or self.driver.com is None:
             return DriverResponse()
         status_dict = {}
         waittime = 0.1  # 10 Hz, mirrors pre-migration `frequency=10` default
