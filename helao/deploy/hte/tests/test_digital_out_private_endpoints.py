@@ -290,7 +290,9 @@ def test_nidaqmx_do_groups_match_the_endpoints_that_take_on_bool():
         # off the line after the paren. Both are tolerated here.
         r"async def \w+\(\n"
         r"(?:\s+ctx: ActionContext,\n)?"
-        r"\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n\s+on: bool",
+        r"\s+\w+: (?:Optional\[)?(dev_\w+)items\]? = None,\n"
+        # toggle_ttl holds its line for a duration instead of taking `on`.
+        r"\s+(?:on: bool|duration: float)",
         src,
     ):
         togglable.add(m.group(1))

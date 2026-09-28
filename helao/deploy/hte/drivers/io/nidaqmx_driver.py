@@ -17,7 +17,7 @@ reference to ``Active``/``Base`` themselves. Thermocouple monitor channels are
 always-on and are handled by the paired :class:`cNIMAXPoller`.
 """
 
-__all__ = ["cNIMAX", "cNIMAXPoller", "CellIVExec", "DevMonExec"]
+__all__ = ["cNIMAX", "cNIMAXPoller", "CellIVExec", "DevMonExec", "TTLExec"]
 
 import asyncio
 import time
@@ -71,7 +71,7 @@ class cNIMAX(HelaoDriver):
     """NI DAQmx wrapper used by the HTE action server.
 
     Reads device maps (`dev_pump`, `dev_gasvalve`, `dev_liquidvalve`,
-    `dev_heat`, `dev_led`, `dev_monitor`, `dev_cellcurrent`,
+    `dev_heat`, `dev_led`, `dev_ttl`, `dev_monitor`, `dev_cellcurrent`,
     `dev_cellvoltage`) from `config`. NI resources (the custom current scale
     and the thermocouple monitor task) are opened in :meth:`connect`, not at
     construction. Always-on thermocouple polling is handled by the paired
@@ -81,7 +81,8 @@ class cNIMAX(HelaoDriver):
 
     Server config parameters:
         ``dev_pump``/``dev_gasvalve``/``dev_liquidvalve``/``dev_heat``/
-        ``dev_led``: digital-out port maps.
+        ``dev_led``/``dev_ttl``: digital-out port maps (``dev_ttl`` lines
+            are held high for a duration by :class:`TTLExec`).
         ``dev_monitor``: thermocouple channel map (K-type by default,
             T-type when the name contains ``"Ttc_"``).
         ``dev_cellcurrent``/``dev_cellvoltage``: analog-in port maps for the
@@ -129,6 +130,8 @@ class cNIMAX(HelaoDriver):
 
         self.dev_led = self.config_dict.get("dev_led", {})
         self.dev_leditems = make_str_enum("dev_led", {key: key for key in self.dev_led})
+
+        self.dev_ttl = self.config_dict.get("dev_ttl", {})
 
         self.allow_no_sample = self.config_dict.get("allow_no_sample", False)
 
@@ -821,8 +824,8 @@ class cNIMAX(HelaoDriver):
     async def estop(self, switch: bool, *args, **kwargs) -> bool:
         """Engage or release the IO emergency stop.
 
-        Drives every configured LED, pump, gas valve, liquid valve, and
-        heater output low (matching the pre-migration behavior, this runs
+        Drives every configured LED, pump, gas valve, liquid valve, heater,
+        and TTL output low (matching the pre-migration behavior, this runs
         whether `switch` asserts or releases estop). If a cell-IV
         measurement is in progress and `switch` is True, it is also
         signalled to stop.
@@ -853,6 +856,9 @@ class cNIMAX(HelaoDriver):
             await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
 
         for do_name, do_port in self.dev_heat.items():
+            await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
+
+        for do_name, do_port in self.dev_ttl.items():
             await self.set_digital_out(do_port=do_port, do_name=do_name, on=False)
 
         if switch and self.IO_measuring:
@@ -1047,4 +1053,64 @@ class DevMonExec(Executor):
             "error": ErrorCodes.none,
             "status": status,
             "data": data_dict,
+        }
+
+
+class TTLExec(Executor):
+    """Executor that holds one ``dev_ttl`` output high for ``duration`` seconds.
+
+    The hold can outlast an HTTP request, so it runs under the executor
+    lifecycle instead of inline in the endpoint. The line goes high in
+    ``_pre_exec`` and low in ``_post_exec``, which the runner calls on every
+    exit path -- duration elapsed, ``cancel_toggle_ttl``, or stop -- so an
+    ended action never leaves the line energised. ``duration < 0`` holds until
+    stopped. Timing is software (``poll_rate`` resolution); a hardware-timed
+    pulse would need a counter-output channel, not a DO line.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Resolve the TTL name in ``action_params['ttl']`` to its NI port."""
+        super().__init__(*args, **kwargs)
+        p = self.active.action.action_params
+        self.ttl_name = str(p["ttl"])
+        self.ttl_port = self.active.driver.dev_ttl[self.ttl_name]
+        self.duration = p.get("duration", -1)
+
+    async def _set(self, on: bool) -> dict:
+        return await self.active.driver.set_digital_out(
+            do_port=self.ttl_port, do_name=self.ttl_name, on=on
+        )
+
+    async def _pre_exec(self) -> dict:
+        """Drive the TTL line high and start the hold timer."""
+        try:
+            datadict = await self._set(True)
+        except Exception:
+            # An exception here would kill the action task with the action
+            # never finished; report it so the runner finishes with an error.
+            LOGGER.error(f"TTL '{self.ttl_name}' set high failed", exc_info=True)
+            return {"error": ErrorCodes.cmd_error}
+        self.start_time = time.time()
+        self.on_datadict = datadict
+        return {"error": datadict.get("error_code", ErrorCodes.unspecified)}
+
+    async def _exec(self) -> dict:
+        """Record the high write; ``_post_exec`` records the low one."""
+        return {"error": ErrorCodes.none, "data": self.on_datadict}
+
+    async def _poll(self) -> dict:
+        """Report active until ``duration`` elapses (never, if negative)."""
+        elapsed = time.time() - self.start_time
+        if self.duration < 0 or elapsed < self.duration:
+            status = HloStatus.active
+        else:
+            status = HloStatus.finished
+        return {"error": ErrorCodes.none, "status": status, "data": {}}
+
+    async def _post_exec(self) -> dict:
+        """Drive the TTL line low and record the write."""
+        datadict = await self._set(False)
+        return {
+            "error": datadict.get("error_code", ErrorCodes.unspecified),
+            "data": datadict,
         }
