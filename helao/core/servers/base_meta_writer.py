@@ -37,7 +37,7 @@ from uuid import UUID
 
 import aiofiles
 
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers import helao_logging as logging
 from helao.helpers.file_utils import staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
@@ -89,7 +89,7 @@ class MetaFileWriter:
             act_dict = action.get_act().clean_dict()
             save_root = str(self.base.helaodirs.save_root)
             if action.manual_action:
-                save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+                save_root = redirect_manual_dir(save_root)
             output_path = os.path.join(save_root, action.action_output_dir)
             output_file = os.path.join(
                 output_path,
@@ -115,7 +115,7 @@ class MetaFileWriter:
         exp_dict = experiment.get_exp().clean_dict()
         save_root = str(self.base.helaodirs.save_root)
         if experiment.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         output_path = os.path.join(save_root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
@@ -137,7 +137,7 @@ class MetaFileWriter:
         sequence_dir = sequence.get_sequence_dir()
         save_root = str(self.base.helaodirs.save_root)
         if sequence.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         output_path = os.path.join(save_root, sequence_dir)
         output_file = os.path.join(
             output_path,

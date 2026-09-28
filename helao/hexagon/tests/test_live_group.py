@@ -1,5 +1,5 @@
 """Live in-process group smoke: a real 1-experiment run drains to
-RUNS_FINISHED through the hexagon graft over real transport. This is the
+RUNS through the hexagon graft over real transport. This is the
 foundation every §10.3 in-process item builds on — if this hangs or fails,
 fix the harness FIRST (systematic-debugging), never weaken it to a stub."""
 
@@ -27,9 +27,11 @@ async def test_live_group_runs_one_experiment_to_finished(tmp_path):
         # move_dir() as a fire-and-forget aloop.create_task (not awaited by
         # the code that flips loop_state), so the on-disk sync can lag the
         # parked signal by several seconds. Poll for the real artifacts.
-        finished_dir = tmp_path / "RUNS_FINISHED"
+        # Records are written once under RUNS and never move (spec §2), so
+        # this is the same directory they were created in.
+        finished_dir = tmp_path / "RUNS"
         finished = await wait_for_glob(str(finished_dir), "*-seq.yml", timeout_s=60.0)
-        assert finished, "sequence yml missing from RUNS_FINISHED"
+        assert finished, "sequence yml missing from RUNS"
         exp_ymls = await wait_for_glob(str(finished_dir), "*-exp.yml", timeout_s=60.0)
         assert len(exp_ymls) == 1
         # B3b: the HOST is the drainer, so its own runtime is the one the

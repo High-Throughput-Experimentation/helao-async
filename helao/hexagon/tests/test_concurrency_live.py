@@ -58,7 +58,13 @@ def _count_exp_ymls(root: Path) -> int:
     "Full sequence has synced, creating zip" step). Summing both locations
     makes the count robust to exactly where in that pipeline the run happens
     to sit when the assertion runs."""
-    total = len(list((root / "RUNS_FINISHED").rglob("*-exp.yml")))
+    # A record is written once under RUNS and never moves, so that is where
+    # the loose ymls are. The RUNS_FINISHED / RUNS_SYNCED arms below are kept
+    # for a legacy tree -- this counter is also pointed at pre-cut-over
+    # archives -- and the zip arm becomes legacy-only once the syncer stops
+    # zipping a synced sequence.
+    total = len(list((root / "RUNS").rglob("*-exp.yml")))
+    total += len(list((root / "RUNS_FINISHED").rglob("*-exp.yml")))
     for zip_path in (root / "RUNS_SYNCED").rglob("*.zip"):
         try:
             with zipfile.ZipFile(zip_path) as zf:

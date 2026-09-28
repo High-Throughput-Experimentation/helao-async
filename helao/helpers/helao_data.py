@@ -22,7 +22,7 @@ from tempfile import TemporaryDirectory
 import orjson
 import pandas as pd
 
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, is_legacy_path
 
 from .file_mapper import FileMapper
 from .hlo_data import read_hlo_bytes
@@ -142,8 +142,22 @@ class HelaoData:
                     self.ymlpath = target
                 self.type = self.ymlpath.split("-")[-1].replace(".yml", "")
                 # self.yml = yml_load("".join(builtins.open(self.ymlpath, "r").readlines()))
-                runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[0]
-                yml_reldir = self.ymldir.replace(runstate, "RUNS_*")
+                # A record under the single RUNS tree has exactly one home, so
+                # there is nothing to glob across. Only archives need the
+                # state wildcard -- and there the LAST RUNS_* segment is the
+                # one to widen: a superseded record is stored as a nested
+                # legacy tree (RUNS_SUPERSEDED/<ts>/RUNS_FINISHED/...), where
+                # str.replace would rewrite both segments and resolve nothing.
+                if is_legacy_path(self.ymldir):
+                    runstate = re.findall("RUNS_[A-Z]+", self.ymldir)[-1]
+                    cut = self.ymldir.rfind(runstate)
+                    yml_reldir = (
+                        self.ymldir[:cut]
+                        + "RUNS_*"
+                        + self.ymldir[cut + len(runstate) :]
+                    )
+                else:
+                    yml_reldir = self.ymldir
                 self.seq = [
                     HelaoData(x)
                     for x in sorted(

@@ -23,6 +23,7 @@ from fastapi import Body
 
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -150,7 +151,7 @@ class BiologicExec(Executor):
         except AttributeError:
             return None
         if action.manual_action:
-            save_root = save_root.replace("ACTIVE", "DIAG")
+            save_root = redirect_manual_dir(save_root)
         return os.path.join(save_root, str(action.action_output_dir))
 
     async def _pre_exec(self) -> dict:

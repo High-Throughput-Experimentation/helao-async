@@ -66,8 +66,12 @@ def test_sequence_dir_grammar_reused_from_premodels():
         sequence_params={"plate_id": 1234, "plate_sample_no_list": [7]},
     )
     seq.sequence_timestamp = datetime(2026, 7, 17, 13, 5, 9)
-    # checksum: digit-sum of 1234 = 10, mod 10 = 0 -> serial "12340"
-    assert seq.get_sequence_dir() == "26.28/0717/130509__test_seq__lab-12340-7"
+    # checksum: digit-sum of 1234 = 10, mod 10 = 0 -> serial "12340". The
+    # suffix now lands in sequence_label itself (spec §3.3) rather than in
+    # the directory name, and the date segment is %Y/%m%d (spec §3.2).
+    seq.apply_label_suffix()
+    assert seq.sequence_label == "lab-12340-7"
+    assert seq.get_sequence_dir() == "2026/0717/130509__test_seq__lab-12340-7"
 
 
 def test_experiment_dir_grammar_reused_from_premodels():

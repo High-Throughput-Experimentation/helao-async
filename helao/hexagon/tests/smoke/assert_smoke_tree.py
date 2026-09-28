@@ -5,6 +5,8 @@ import sys
 import zipfile
 from pathlib import Path
 
+from helao.helpers.run_state import RunStateJournal, _prg_is_complete
+
 
 def main(root: str) -> int:
     root_p = Path(root)
@@ -13,9 +15,16 @@ def main(root: str) -> int:
     def check(cond: bool, msg: str):
         (print(f"  OK  {msg}") if cond else failures.append(msg))
 
-    # 1. sequence shipped end-to-end: RUNS_SYNCED holds the destructive zip
-    zips = list((root_p / "RUNS_SYNCED").rglob("*.zip"))
-    check(len(zips) >= 1, f"RUNS_SYNCED sequence zip present ({zips})")
+    # 1. sequence shipped end-to-end. A record no longer moves or archives, so
+    # "shipped" is a complete .prg sidecar beside a -seq.yml that is still in
+    # the one place it was ever written. Asserting the absence of a zip is half
+    # the check: the promotion and the zip were the same deleted step, and a zip
+    # reappearing means a legacy mover is still live.
+    seqs = list((root_p / "RUNS").rglob("*-seq.yml"))
+    check(len(seqs) >= 1, f"RUNS holds a -seq.yml ({seqs})")
+    unshipped = [str(s) for s in seqs if not _prg_is_complete(s.with_suffix(".prg"))]
+    check(not unshipped, f"every -seq.yml has a complete .prg beside it ({unshipped})")
+    check(not list(root_p.rglob("*.zip")), "no sequence zip anywhere under root")
 
     # 2. process leg ran: GM-1 = 2 experiments x 2 process groups -> 4 prc ymls
     # Processes are written beside their -exp.yml, so a fully synced sequence
@@ -26,7 +35,7 @@ def main(root: str) -> int:
     for z in sorted(root_p.rglob("*.zip")):
         with zipfile.ZipFile(z) as zf:
             prcs += [f"{z.name}:{n}" for n in zf.namelist() if n.endswith("-prc.yml")]
-    check(len(prcs) == 4, f"RUNS_* tree and zips hold 4 -prc.yml (got {len(prcs)})")
+    check(len(prcs) == 4, f"run tree and any zips hold 4 -prc.yml (got {len(prcs)})")
     stale = list((root_p / "PROCESSES").rglob("*-prc.yml"))
     check(not stale, f"PROCESSES must gain nothing (got {len(stale)})")
 
@@ -34,9 +43,16 @@ def main(root: str) -> int:
     s3 = list((root_p / "S3_SIM").rglob("*")) if (root_p / "S3_SIM").is_dir() else []
     check(len(s3) > 0, "S3_SIM recorded uploads present")
 
-    # 4. quiesced: nothing stranded in RUNS_ACTIVE
-    active = list((root_p / "RUNS_ACTIVE").rglob("*.yml"))
-    check(len(active) == 0, f"RUNS_ACTIVE empty (got {active})")
+    # 4. quiesced. There is no longer an in-flight tree to be empty, and
+    # "RUNS_ACTIVE is empty" would now pass over a directory that was never
+    # created -- a clean verdict from a tree never entered. State lives in the
+    # per-server journals, so quiesced means every journal replays to nothing.
+    journals = sorted((root_p / "STATES").glob("runstate_*.jsonl"))
+    check(bool(journals), f"per-server run-state journals exist ({journals})")
+    for j in journals:
+        left = RunStateJournal(root_p / "STATES", j.stem[len("runstate_") :])
+        ws = left.working_set()
+        check(not ws, f"{j.name} replays empty (got {sorted(ws)})")
 
     # 5. logging contract (F3): flat per-server logs under <root>/LOGS
     for key in ("ORCH", "SIM", "SYNC"):

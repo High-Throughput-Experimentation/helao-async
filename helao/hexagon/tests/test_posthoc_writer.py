@@ -33,9 +33,10 @@ import yaml
 from helao.core.models.file import FileInfo, HloFileGroup
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, run_root
 from helao.core.models.run_use import RunUse
 from helao.core.models.sample import SolidSample
+from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.yml_tools import yml_dumps
 
@@ -502,8 +503,7 @@ def test_repeat_write_error_is_still_exported():
 
 def test_track_file_copies_immediately_and_returns_the_fileinfo(run, tmp_path):
     """Divergence 7: post-hoc composition has no finalizer to relocate a
-    queued path later, so the copy happens at call time and
-    ``aux_file_paths`` is left empty."""
+    queued path later, so the copy happens at call time."""
     act, writer, save_root = run["act"], run["writer"], run["save_root"]
     src = tmp_path / "instrument_export.raw"
     src.write_bytes(b"\x00\x01raw-payload\x02")
@@ -524,7 +524,6 @@ def test_track_file_copies_immediately_and_returns_the_fileinfo(run, tmp_path):
     assert info.file_type == "demo_raw__file"
     assert info.sample == [_sample().get_global_label()]
     assert act.files[-1] is info
-    assert act.aux_file_paths == []
 
 
 def test_track_file_skips_the_copy_when_the_source_is_already_in_place(run):
@@ -540,7 +539,37 @@ def test_track_file_skips_the_copy_when_the_source_is_already_in_place(run):
     with open(src, "rb") as f:
         assert f.read() == b"in-place"
     assert act.files[-1].file_name == "already_here.raw"
-    assert act.aux_file_paths == []
+
+
+def test_track_file_honours_a_recorded_subdirectory(run):
+    """Amendment A14.3: the written location must match the recorded name.
+
+    ``track_file`` records a record-relative name, so a source already sitting
+    in a subdirectory of the record directory is named ``"sub/x.raw"``.
+    Copying it to ``dest_dir/x.raw`` instead would leave the recorded entry
+    resolving to nothing -- and the syncer's upload set is built by resolving
+    ``file_name`` against the record directory, so the file would be silently
+    dropped.
+    """
+    act, writer, save_root = run["act"], run["writer"], run["save_root"]
+    target_dir = os.path.join(save_root, str(act.action_output_dir))
+    sub = os.path.join(target_dir, "subdir")
+    os.makedirs(sub, exist_ok=True)
+    src = os.path.join(sub, "instrument.raw")
+    with open(src, "wb") as f:
+        f.write(b"sub-payload")
+
+    info = writer.track_file(
+        act, src_path=src, file_type="demo_raw__file", samples=[_sample()]
+    )
+
+    assert info.file_name == "subdir/instrument.raw"
+    resolved = os.path.join(target_dir, *info.file_name.split("/"))
+    assert os.path.isfile(resolved)
+    with open(resolved, "rb") as f:
+        assert f.read() == b"sub-payload"
+    # and no flattened second copy at the record root
+    assert not os.path.exists(os.path.join(target_dir, "instrument.raw"))
 
 
 # --------------------------------------------------------------------------
@@ -875,18 +904,24 @@ def test_an_actions_own_manual_flag_also_redirects(run):
 
 def test_default_save_root_derives_from_the_config_root():
     root = os.path.join("demo_root", "INST_hlo")
-    assert default_save_root({"root": root}) == os.path.join(
-        root, RunDir.FINISHED.value
-    )
+    assert default_save_root({"root": root}) == str(run_root(root))
 
 
 def test_default_save_root_uses_the_fallback_when_the_config_has_no_root():
-    assert default_save_root({}, fallback_root="fb") == os.path.join(
-        "fb", RunDir.FINISHED.value
-    )
-    assert default_save_root(None, fallback_root="fb") == os.path.join(
-        "fb", RunDir.FINISHED.value
-    )
+    assert default_save_root({}, fallback_root="fb") == str(run_root("fb"))
+    assert default_save_root(None, fallback_root="fb") == str(run_root("fb"))
+
+
+def test_default_save_root_is_the_same_tree_a_server_writes_to(tmp_path):
+    """Batch output must land in the tree the live runtime writes to.
+
+    Asserted as an equality against what ``helao_dirs`` resolves ``save_root``
+    to for the same root, not against a directory literal: the two are one
+    decision, and pinning literals on both sides is exactly how they drifted
+    into separate trees (plan A26).
+    """
+    resolved = helao_dirs({"root": str(tmp_path)}, server_name=None).save_root
+    assert default_save_root({"root": str(tmp_path)}) == str(resolved)
 
 
 def test_default_save_root_refuses_to_invent_a_root():

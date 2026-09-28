@@ -53,6 +53,7 @@ from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.loaded_modules import loaded_repo_modules
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+from helao.helpers.run_state import RunStateJournal
 from helao.helpers.time_utils import read_saved_offset
 from helao.helpers.premodels import Action
 from helao.helpers.server_api import HelaoFastAPI
@@ -198,8 +199,16 @@ class ActionHost(HelaoFastAPI):
         # HelaoSyncer.__init__ (sync_driver.py:2203) among others -- its absence
         # is a startup crash for any driver that writes, not a lazy failure.
         self.helaodirs = helao_dirs(self.world_cfg, self.server.server_name)
+        #: This server's append-only run-state journal (spec §4.1). Exactly one
+        #: process writes it, so there is no locking. Additive in this phase --
+        #: the folder-state machinery is still authoritative.
+        self.run_journal = (
+            RunStateJournal(self.helaodirs.states_root, str(self.server.server_name))
+            if self.helaodirs.states_root
+            else None
+        )
         #: Legacy reads this from typed_cfg; an action with no run_type inherits
-        #: it and is marked MANUAL, which is what routes it to RUNS_DIAG.
+        #: it and is marked MANUAL, which is what routes it to <root>/DIAG.
         rt = self.world_cfg.get("run_type")
         self.run_type = rt.lower() if isinstance(rt, str) else None
 

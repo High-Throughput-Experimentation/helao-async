@@ -2,19 +2,22 @@
 
 ``HelaoSyncer``/``SyncDriver`` run their ``syncer`` worker coroutines on the
 hosting FastAPI server's event loop. The heavy steps in ``sync_yml`` --
-boto3 S3 uploads, ``read_hlo``/``hlo_to_parquet`` parsing, ``zip_dir``, and
-file moves -- are blocking; if they run inline they freeze the loop and the
-whole server (every endpoint) times out until they finish. Those call sites
-are wrapped in ``asyncio.to_thread`` so the loop stays responsive.
+boto3 S3 uploads and ``read_hlo``/``hlo_to_parquet`` parsing -- are blocking;
+if they run inline they freeze the loop and the whole server (every endpoint)
+times out until they finish. Those call sites are wrapped in
+``asyncio.to_thread`` so the loop stays responsive.
+
+The third case this file used to cover -- ``move_to_synced`` + ``zip_dir``
+offloaded the same way -- went with Task 10: records never move and a synced
+sequence is never zipped, so there is no blocking filesystem step left on the
+sync path to offload.
 
 This test guards that contract. It drives the real changed code paths and
 runs a heartbeat coroutine concurrently to measure the worst loop-stall:
 
   * ``to_s3`` with a deliberately blocking boto3-style client must offload
     the upload (heartbeat keeps ticking while the upload sleeps),
-  * ``to_s3`` with S3 disabled (``s3 is None``) is a no-op returning ``True``,
-  * the real ``move_to_synced`` + ``zip_dir`` helpers invoked via
-    ``asyncio.to_thread`` complete and keep the loop responsive.
+  * ``to_s3`` with S3 disabled (``s3 is None``) is a no-op returning ``True``.
 
 The test is hermetic: ``AWS_CONFIG_PATH`` is unset for the duration so the
 driver never reads host credentials or contacts S3, regardless of where the
@@ -30,11 +33,10 @@ import time
 import traceback
 from pathlib import Path
 
-from helao.core.drivers.data.sync_driver import SyncDriver, move_to_synced
+from helao.core.drivers.data.sync_driver import SyncDriver
 from helao.core.models.helaodirs import HelaoDirs
 from helao.core.models.run_dir import RunDir
 from helao.core.tests._test_utils import TestReporter
-from helao.helpers.file_utils import zip_dir
 
 # Blocking duration injected into the fake uploader. The "responsive" check
 # asserts the loop stall stayed well under this; a regression that drops the
@@ -120,41 +122,6 @@ async def _run_checks() -> dict:
             out["upload_took_block_time"] = elapsed >= BLOCK_S * 0.9
             out["loop_responsive_upload"] = hb.max_gap < MAX_GAP_S
 
-            # real move_to_synced + zip_dir via to_thread
-            fin = (
-                Path(tmp_root)
-                / RunDir.FINISHED.value
-                / "26.23"
-                / "0610"
-                / "120000__seq__lab"
-            )
-            fin.mkdir(parents=True)
-            seq_yml = fin / "260610.120000000000-seq.yml"
-            seq_yml.write_text("sequence_name: seq\n", encoding="utf-8")
-            data = fin / "data.hlo"
-            data.write_bytes(b"x" * (5 * 1024 * 1024))  # 5 MB, real move/zip work
-
-            hb = _HeartBeat()
-            hb_task = asyncio.create_task(hb.run())
-            moved = await asyncio.to_thread(move_to_synced, data)
-            out["move_returned_path"] = isinstance(moved, Path)
-            out["moved_into_synced"] = (
-                isinstance(moved, Path)
-                and RunDir.SYNCED in str(moved)
-                and moved.exists()
-            )
-            out["moved_out_of_finished"] = not data.exists()
-
-            synced_dir = Path(
-                str(fin).replace(RunDir.FINISHED.value, RunDir.SYNCED.value)
-            )
-            await asyncio.to_thread(move_to_synced, seq_yml)
-            zip_target = synced_dir.parent / f"{synced_dir.name}.zip"
-            await asyncio.to_thread(zip_dir, synced_dir, zip_target)
-            hb.stop()
-            await hb_task
-            out["zip_created"] = zip_target.exists() and zip_target.stat().st_size > 0
-            out["loop_responsive_move_zip"] = hb.max_gap < MAX_GAP_S
         finally:
             # tear down the background syncer worker(s) created in __init__
             for task in drv.syncer_loops.values():
@@ -198,18 +165,6 @@ def sync_to_thread_unit_test() -> bool:
     reporter.check(
         "event loop stayed responsive during upload (offloaded)",
         lambda: res["loop_responsive_upload"],
-    )
-
-    reporter.section("move_to_synced + zip_dir via to_thread")
-    reporter.check("move_to_synced returned a Path", lambda: res["move_returned_path"])
-    reporter.check("file moved into RUNS_SYNCED", lambda: res["moved_into_synced"])
-    reporter.check(
-        "file removed from RUNS_FINISHED", lambda: res["moved_out_of_finished"]
-    )
-    reporter.check("sequence zip created", lambda: res["zip_created"])
-    reporter.check(
-        "event loop stayed responsive during move+zip",
-        lambda: res["loop_responsive_move_zip"],
     )
 
     return reporter.success()

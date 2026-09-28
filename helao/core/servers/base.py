@@ -40,7 +40,7 @@ from helao.core.models.file import (
 )
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -83,6 +83,7 @@ from helao.helpers.helao_logging import print_message
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.processors import HloPostProcessor
+from helao.helpers.run_state import RunStateJournal, record_active
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.time_utils import (
     read_saved_offset,
@@ -177,6 +178,15 @@ class Base:
             raise ValueError(
                 "Warning: root directory was not defined. Logs, PRCs, PRGs, and data will not be written.",
             )
+
+        #: This server's append-only run-state journal (spec §4.1). Exactly one
+        #: process writes it, so there is no locking. Additive in this phase --
+        #: the folder-state machinery is still authoritative.
+        self.run_journal = (
+            RunStateJournal(self.helaodirs.states_root, str(self.server.server_name))
+            if self.helaodirs.states_root
+            else None
+        )
 
         LOGGER.info(f"Found run_type in config: {self.typed_cfg.run_type}")
         self.run_type = self.typed_cfg.run_type.lower()
@@ -1016,18 +1026,23 @@ class Active:
         self.data_logger = self.base.aloop.create_task(self.log_data_task())
         save_root = str(self.base.helaodirs.save_root)
         if self.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         if self.action.save_act:
+            # The root is already DIAG for a manual run; the second, string-level
+            # .replace("ACTIVE", "DIAG") that used to sit here is deleted -- it
+            # corrupted any action whose own name contained "ACTIVE".
             full_action_output_path = os.path.join(
                 save_root,
                 self.action.action_output_dir,
             )
-            if self.action.manual_action:
-                full_action_output_path = full_action_output_path.replace(
-                    "ACTIVE",
-                    "DIAG",
-                )
             os.makedirs(full_action_output_path, exist_ok=True)
+            record_active(
+                self.base,
+                "action",
+                self.action.action_uuid,
+                full_action_output_path,
+                parent=self.action.experiment_uuid,
+            )
             await self.update_act_file()
 
             if self.action.manual_action:
@@ -1451,10 +1466,6 @@ class Active:
         return await self.data_file_writer.track_file(
             file_type, file_path, samples, action=action
         )
-
-    async def relocate_files(self):
-        """Copy any tracked auxiliary file paths into the action's output directory."""
-        return await self.data_file_writer.relocate_files()
 
     async def finish_manual_action(self):
         """Finalize a manual action by writing its synthesized experiment and sequence meta files."""

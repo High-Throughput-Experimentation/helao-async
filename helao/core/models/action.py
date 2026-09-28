@@ -111,7 +111,6 @@ class ActionModel(ShortActionModel):
         start_condition (ActionStartCondition): Gate that must clear before dispatch.
         save_act (bool): True to persist the action YAML record.
         save_data (bool): True to persist data files.
-        aux_file_paths (list[Path]): Auxiliary files to ship with the action.
         from_global_act_params (dict): Parameters injected from the global context.
         to_global_params (Union[list, dict]): Parameters to publish to the global context.
     """
@@ -162,7 +161,6 @@ class ActionModel(ShortActionModel):
     start_condition: ActionStartCondition = ActionStartCondition.wait_for_all
     save_act: bool = True  # default should be true
     save_data: bool = True  # default should be true
-    aux_file_paths: list[Path] = Field(default=[])
     from_global_act_params: dict = {}
     to_global_params: Union[list, dict] = []
 

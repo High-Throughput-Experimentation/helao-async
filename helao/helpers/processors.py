@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from glob import glob
 
 from helao.core.models.file import FileInfo
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 
 from .premodels import Action
 
@@ -42,7 +42,7 @@ class HloPostProcessor(ABC):
         """
         self.action = action
         if action.manual_action:
-            save_root = str(save_root).replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(str(save_root))
         self.output_dir = os.path.join(save_root, action.action_output_dir)
         exp_dir = os.path.dirname(self.output_dir)
         # Record suffixes only. exp_dir is where a -prc.yml now lands, and its

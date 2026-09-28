@@ -25,7 +25,7 @@ from helao.core.drivers.helao_driver import (
 )
 from helao.core.error import ErrorCodes
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
 from helao.helpers.executor import Executor
 
 
@@ -111,7 +111,7 @@ class AxisCamExec(Executor):
         self.counter = 0
         save_root = str(self.active.base.helaodirs.save_root)
         if self.active.action.manual_action:
-            save_root = save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            save_root = redirect_manual_dir(save_root)
         self.output_dir = os.path.join(save_root, self.active.action.action_output_dir)
 
     async def _pre_exec(self) -> dict:
