@@ -292,9 +292,9 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 
 | station | date | `unstable` rev captured | golden diff | smoke | e-stop | by |
 |---|---|---|---|---|---|---|
-| `ccsi2` | | | | | | |
+| `ccsi2` | 2026-09-28 | not recorded | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `eche10` | 2026-09-24 | ≥ `cfe9c69b` | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `anec` | | | | | | |
+| `anec` | 2026-09-28 | ≥ `164e4dfd` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `adss3` | | | | | | |
 | `clad` | | | | | | |
 | `ecms3` | 2026-09-17 | `e02a7ff6` | soak ‡ | soak ‡ | soak ‡ | dang828 |
@@ -456,7 +456,47 @@ the PR, not here.
 Same caveat as every soak row: no golden diff against the pre-migration
 reference, no e-stop drill.
 
-`uvis4`, `note1`, `ecms3`, `eche10` and `hispec` are signed off. Five of eleven.
+### `ccsi2`, 2026-09-28 — signed off on a soak (‡)
+
+Signed off by the station owner on a soak. **The rev was not recorded at
+sign-off**; fill it in if it is known, because it is what a later reader needs to
+tell which fixes this row is evidence for.
+
+This is the row with the most coverage in the table. `ccsi2` runs twelve
+B5-changed servers, and six of their families run nowhere else in the fleet:
+CLEANSYRINGE, CO2SENSOR, DOSEPUMP, N2MFC, WATERSYRINGE and WORKSYRINGE. Until
+this row, none of those had any hardware confirmation on the native host.
+
+### `anec`, 2026-09-28 — signed off on a soak (‡)
+
+Signed off by the station owner on a soak. The row records `≥ 164e4dfd` on the
+same convention as `uvis4` and `eche10`: `anec` is where the RPC fast path was
+found handing SAMPLE's `new_ref_samples` a raw `dict` for its `Optional[Action]`
+parameter, on every PAL call. The call still succeeded, because the dispatcher
+fell back to HTTP and FastAPI did the conversion, so the cost was one traceback
+and one extra round trip per call. The fix (`b108cdc3`) led to a sweep of every
+RPC-reachable POST route, which found the same fault in two more shapes — ORCH's
+`/prepend_sequences` (`list[Sequence]`) and MOTOR's `/move_axis` (enum
+parameters) — and fixed all three at the root (`164e4dfd`). That commit also
+made an invalid enum over RPC fail through to FastAPI's 422, where before the
+fast path had skipped validation entirely.
+
+`anec` carries nothing unique — IO, MOTOR, NI, PAL, PSTAT (gamry), SAMPLE, SYNC
+and ORCH are all covered elsewhere — so its value is as a second station on PAL,
+which only `uvis4` confirmed before it.
+
+Same caveat as every soak row: no golden diff against the pre-migration
+reference, no e-stop drill.
+
+`uvis4`, `note1`, `ecms3`, `eche10`, `hispec`, `ccsi2` and `anec` are signed off.
+Seven of eleven. **Every B5-changed action-server family now has at least one
+signed station**, with one caveat: `PSTAT (biologic)` counts only through
+`hispec`, which ran the PR #213 replacement driver rather than the
+easy-biologic one B5 ported (see that row). The four left — `adss3`, `clad`, `amts`, `electrode-demo` —
+add confirmation rather than coverage, with one exception: `electrode-demo` is
+the only station that exercises the B5 orchestrator, operator and visualizers
+with no hte action server underneath them.
+
 **No station has yet run the golden diff or the e-stop drill**; every signed row
 rests on a production run or a soak.
 
