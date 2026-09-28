@@ -292,17 +292,17 @@ is. Record what failed, on which server, with the log excerpt — not a summary.
 
 | station | date | `unstable` rev captured | golden diff | smoke | e-stop | by |
 |---|---|---|---|---|---|---|
-| `ccsi2` | 2026-09-28 | not recorded | soak ‡ | soak ‡ | soak ‡ | dang828 |
+| `ccsi2` | 2026-09-28 | `daf798bc` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `eche10` | 2026-09-24 | ≥ `cfe9c69b` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `anec` | 2026-09-28 | ≥ `164e4dfd` | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `adss3` | | | | | | |
-| `clad` | | | | | | |
+| `adss3` | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
+| `clad` | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
 | `ecms3` | 2026-09-17 | `e02a7ff6` | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `hispec` | 2026-09-24 | `1cd49b17` (PR #213 branch) | soak ‡ | soak ‡ | soak ‡ | dang828 |
 | `uvis4` | 2026-08-17 | ≥ `118660ee` | prod run † | prod run † | prod run † | dang828 |
-| `amts` | | | | | | |
+| `amts` | 2026-09-28 | — | waived § | waived § | waived § | dang828 |
 | `note1` | 2026-08-17 | ≥ `762cd9f0` | soak ‡ | soak ‡ | soak ‡ | dang828 |
-| `electrode-demo` | | | n/a — no hte action server | | | |
+| `electrode-demo` | 2026-09-28 | — | n/a — no hte action server | waived ¶ | waived ¶ | dang828 |
 
 B5 is already on `unstable`; this table is the record of hardware confirmation
 accumulating behind it. **B7 (the deletion) should not start until it is
@@ -458,9 +458,11 @@ reference, no e-stop drill.
 
 ### `ccsi2`, 2026-09-28 — signed off on a soak (‡)
 
-Signed off by the station owner on a soak. **The rev was not recorded at
-sign-off**; fill it in if it is known, because it is what a later reader needs to
-tell which fixes this row is evidence for.
+Signed off by the station owner on a soak. The rev tested at
+sign-off was not recorded; the row carries `daf798bc`, the latest code revision
+on 2026-09-28, which the station owner confirmed the station was then running
+cleanly. (`ebea6468`, the tip that day, only edits this document.) So the row is
+evidence for `daf798bc`, not for whatever rev the original soak ran.
 
 This is the row with the most coverage in the table. `ccsi2` runs twelve
 B5-changed servers, and six of their families run nowhere else in the fleet:
@@ -488,17 +490,62 @@ which only `uvis4` confirmed before it.
 Same caveat as every soak row: no golden diff against the pre-migration
 reference, no e-stop drill.
 
-`uvis4`, `note1`, `ecms3`, `eche10`, `hispec`, `ccsi2` and `anec` are signed off.
-Seven of eleven. **Every B5-changed action-server family now has at least one
-signed station**, with one caveat: `PSTAT (biologic)` counts only through
-`hispec`, which ran the PR #213 replacement driver rather than the
-easy-biologic one B5 ported (see that row). The four left — `adss3`, `clad`, `amts`, `electrode-demo` —
-add confirmation rather than coverage, with one exception: `electrode-demo` is
-the only station that exercises the B5 orchestrator, operator and visualizers
-with no hte action server underneath them.
+`uvis4`, `note1`, `ecms3`, `eche10`, `hispec`, `ccsi2` and `anec` are signed off on
+evidence. **Every B5-changed action-server family has at least one of them**,
+with one caveat: `PSTAT (biologic)` counts only through `hispec`, which ran the
+PR #213 replacement driver rather than the easy-biologic one B5 ported (see that
+row).
 
-**No station has yet run the golden diff or the e-stop drill**; every signed row
-rests on a production run or a soak.
+### `adss3`, `clad`, `amts` — waived, 2026-09-28 (§)
+
+**§ Not tested. Signed off by the station owner on a coverage argument, not on a
+run.** None of the three carries a B5-changed family that a signed station does
+not already cover:
+
+| station | its B5-changed servers | covered by |
+|---|---|---|
+| `adss3` | CLEANSYRINGE, MOTOR, NI, ORCH, PAL, PSTAT (gamry), SAMPLE, SYNC, WORKSYRINGE | `ccsi2` (syringes), `uvis4`/`anec` (PAL), `eche10`/`ecms3` (gamry) |
+| `clad` | as `adss3`, plus WATERSYRINGE | the same, plus `ccsi2` |
+| `amts` | PSTAT (gamry), SYNC, ORCH | `ecms3`, `eche10` |
+
+What the argument does not cover is anything station-specific: a config value, a
+wiring difference, or a hardware revision that only that station has. The
+KMOTOR and `gamry_aux` defects were both of that kind, and both were caught only
+by a station's own first launch. So if one of these three misbehaves on first
+use, treat it as a B5 first-launch finding and not as an unrelated fault.
+
+### `electrode-demo` — waived, 2026-09-28 (¶)
+
+**¶ Not tested. Signed off by the station owner because the station is blocked,
+not because it ran.** `electrode-demo` is waiting on its private deployment's
+repository migration and cannot launch until that lands.
+
+This is the one waiver that gives up coverage. `electrode-demo` is the only
+station that runs the B5 orchestrator, operator and visualizers with **no** hte
+action server underneath. Every other station validates those servers only
+incidentally, next to the action modules that the smoke sequence is actually
+driving. So the gap is specific: the orchestrator surface has never run at a
+station without an hte action server, and so far only the Linux suite has
+exercised that composition. The station's first launch after the migration
+should be treated as that station's B5 gate.
+
+### Where the table stands
+
+Eleven of eleven rows are filled: **seven on evidence, four waived.** The runbook
+says B7 should not start until the table is full, and it now is. What anyone
+starting B7 should know from this table:
+
+- **No station has run the golden diff or the e-stop drill.** Every row that
+  rests on evidence rests on a production run or a soak. A regression that
+  appears only as a *difference* from legacy, or only under abort, has never been
+  looked for on hardware. B7 deletes the legacy engine the golden diff compares
+  against, so after B7 that comparison can no longer be made.
+- **`12cd2d0d`'s aiolock split sits on the abort path** and has had no station
+  drill. It is the one change in this table whose remaining gate is an e-stop.
+- **The biologic PSTAT** is covered only by the #213 replacement driver.
+- **The four waived rows** — three on coverage, one on a blocked station — are
+  decisions and not results. They are recorded that way so no later reader
+  mistakes them for evidence.
 
 ## Expected delta: `/ANDOR/calibrate_wl` (2026-09-04)
 
