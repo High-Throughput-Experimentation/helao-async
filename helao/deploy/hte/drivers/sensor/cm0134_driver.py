@@ -31,8 +31,8 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 class CM0134(HelaoDriver):
     """Modbus-RTU HelaoDriver for the CM-0134 oxygen sensor.
 
-    The Modbus serial connection is opened by :meth:`connect`, not by
-    construction; always-on O2 ppm polling is handled by the paired
+    The Modbus serial connection is opened at construction, through
+    :meth:`connect`; always-on O2 ppm polling is handled by the paired
     :class:`CM0134Poller`, wired in as the server's ``poller_class``.
 
     Server config parameters:
@@ -45,7 +45,7 @@ class CM0134(HelaoDriver):
     """
 
     def __init__(self, config: dict = {}):
-        """Store config; the Modbus connection is opened in :meth:`connect`.
+        """Store config and open the Modbus connection via :meth:`connect`.
 
         Args:
             config: Driver configuration (the server's ``params`` dict).
@@ -59,6 +59,9 @@ class CM0134(HelaoDriver):
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
         self.allow_no_sample = self.config_dict.get("allow_no_sample", True)
+        # Open the port here, not lazily: ActionHost never calls connect(),
+        # and the poller starts polling as soon as it is built.
+        self.connect()
 
     def connect(self) -> DriverResponse:
         """Open the Modbus serial connection to the sensor.
@@ -66,9 +69,9 @@ class CM0134(HelaoDriver):
         Returns:
             ``DriverResponse`` reporting connection success or failure.
         """
-        import minimalmodbus
-
         try:
+            import minimalmodbus
+
             self.inst = minimalmodbus.Instrument(
                 self.config_dict.get("device", "COM7"),
                 self.config_dict.get("address", 254),
@@ -133,6 +136,8 @@ class CM0134(HelaoDriver):
 
     def read_o2_ppm(self):
         """Read one O2 ppm value from the sensor, or ``None`` on a transient error."""
+        if self.inst is None:
+            return None
         import minimalmodbus
 
         try:
