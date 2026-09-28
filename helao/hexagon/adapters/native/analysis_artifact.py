@@ -11,7 +11,7 @@ upload, and the two had diverged in eleven measurable ways.
 
 Two things this face decides that the server does not:
 
-**The directory stamp is per-conversion.** ``ANALYSES/<yy.ww>/<mmdd>/<HHMMSS>__
+**The directory stamp is per-conversion.** ``ANALYSES/<yyyy>/<mmdd>/<HHMMSS>__
 <name>[__<suffix>]/`` takes its time components from one timestamp, and with
 ``group_dir=True`` (the post-hoc default) that timestamp is the FIRST record
 published through this adapter. A conversion emitting several analyses used to
