@@ -1469,3 +1469,34 @@ def test_the_drain_is_armed_by_default_and_has_its_own_off_switch(
         False,
     )
     assert asyncio.run(_run({"analysis_recovery_on_startup": False})) == (False, False)
+
+
+@pytest.mark.asyncio
+async def test_recovery_prepares_the_loader_like_the_live_path(
+    tmp_path, logger, monkeypatch
+):
+    """The live path runs ``select_process_uuids`` on its loader before
+    enqueueing, and some classes annotate the loader there -- the UVIS analysis
+    adds the ``run_use`` column its inputs query. Recovery built a bare loader,
+    so every recovered UVIS analysis died on ``name 'run_use' is not defined``
+    (uvis4, 2026-09-28) and was quarantined."""
+    journal = tmp_path / "ana_pending"
+    zip_path = _zip(tmp_path)
+    writer = _syncer(journal)
+    await writer.enqueue_calc(_tup(zip_path, process_uuid=PROC_A, ana_cls=_AnaPrep))
+    await writer.enqueue_calc(_tup(zip_path, process_uuid=PROC_B, ana_cls=_AnaPrep))
+
+    monkeypatch.setattr(m, "LocalLoader", _FakeLoader)
+    syncer = _syncer(journal)
+    summary = await syncer.recover_journal(_classes(_AnaPrep))
+
+    assert summary["recovered"] == 2
+    loader = syncer.task_queue.get_nowait()[1]
+    assert loader.prepared == 1  # once per loader, not once per entry
+
+
+class _AnaPrep:
+    @classmethod
+    def select_process_uuids(cls, local_loader) -> list:
+        local_loader.prepared = getattr(local_loader, "prepared", 0) + 1
+        return []
