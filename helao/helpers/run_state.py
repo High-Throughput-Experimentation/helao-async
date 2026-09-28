@@ -269,7 +269,8 @@ def _scan_top_level(path: Path, keys: set) -> dict:
     Reads only the first :data:`_HEAD_BYTES` and last :data:`_TAIL_BYTES`, so
     the cost is flat whether the yml is 20 lines or half a million. Each
     chunk's boundary line is discarded: a fragment is a prefix of a real line
-    and could otherwise yield a truncated value.
+    and could otherwise yield a truncated value. A key outside both windows
+    falls back to a line stream that stops as soon as every key is found.
     """
     try:
         with path.open("rb") as f:
@@ -289,6 +290,19 @@ def _scan_top_level(path: Path, keys: set) -> dict:
         key, sep, value = line.partition(": ")
         if sep and key in keys:
             found.setdefault(key, value.strip())
+    if found.keys() < keys and size > _HEAD_BYTES + _TAIL_BYTES:
+        # A large sequence_params (a plate preset) pushes sequence_uuid past
+        # the head window. Stream the middle, stopping once every key is found.
+        try:
+            with path.open("r", encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    key, sep, value = line.rstrip("\n").partition(": ")
+                    if sep and key in keys:
+                        found.setdefault(key, value.strip())
+                        if found.keys() >= keys:
+                            break
+        except OSError:
+            pass
     return found
 
 

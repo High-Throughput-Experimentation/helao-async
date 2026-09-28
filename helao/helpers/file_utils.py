@@ -6,6 +6,7 @@ Consolidates the former file_in_use, zip_dir, and zstd_io modules.
 __all__ = [
     "file_in_use",
     "staging_path",
+    "replace_when_free",
     "rm_tree",
     "rm_tree_async",
     "zip_dir",
@@ -14,6 +15,7 @@ __all__ = [
 ]
 
 import _pickle as cPickle
+import asyncio
 import os
 import zipfile
 from pathlib import Path
@@ -73,6 +75,34 @@ def staging_path(output_file: Union[Path, str]) -> str:
         rename over it.
     """
     return str(Path(output_file).parent / f".{uuid1().hex[:8]}.tmp")
+
+
+async def replace_when_free(src, dst, timeout: float = 30.0) -> None:
+    """``os.replace(src, dst)``, retried while Windows reports ``dst`` in use.
+
+    On Windows a rename onto a file that another process holds open fails with
+    ``PermissionError: [WinError 5] Access is denied``, because Python opens
+    files without ``FILE_SHARE_DELETE``. The syncer reads a sequence yml while
+    the orchestrator rewrites it at sequence finish (uvis4, 2026-09-28), and the
+    unretried rename estopped the orchestrator. Readers hold the handle only
+    for the length of a read, so the rename is retried with backoff until
+    ``timeout``; the staged ``src`` is removed if it never goes through.
+    """
+    delay, waited = 0.05, 0.0
+    while True:
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if waited >= timeout:
+                try:
+                    os.remove(src)
+                except OSError:
+                    pass
+                raise
+            await asyncio.sleep(delay)
+            waited += delay
+            delay = min(delay * 2, 1.0)
 
 
 def file_in_use(file_path) -> bool:

@@ -336,3 +336,49 @@ def test_unreadable_directory_is_counted_and_warned(tmp_path: Path, caplog):
     assert j.unreadable_dirs == 1
     assert "may be INCOMPLETE" in caplog.text
     assert str(blocked) in caplog.text
+
+
+def test_uuid_past_the_head_window_is_still_found(tmp_path: Path, caplog):
+    """uvis4, 2026-09-28: a plate preset's sequence_params pushed
+    sequence_uuid past the 4 KiB head window, so every sequence was journaled
+    by its stem and its done tombstone never evicted it."""
+    from helao.helpers.run_state import identify_record
+
+    params = "".join(f"  p{i}: {'x' * 60}\n" for i in range(200))
+    tail = "".join(f"- {'y' * 60}\n" for i in range(300))
+    yml = tmp_path / "260928.134349843994-seq.yml"
+    yml.write_text(
+        f"file_type: sequence\nsequence_params:\n{params}"
+        f"sequence_uuid: {UUID_A}\nexperiment_list:\n{tail}"
+    )
+    assert identify_record(yml)[0] == UUID_A
+    assert "No parseable" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_replace_retries_while_the_target_is_held(tmp_path: Path, monkeypatch):
+    """uvis4, 2026-09-28: os.replace onto a seq.yml the syncer had open raised
+    WinError 5 and estopped the orchestrator."""
+    import helao.helpers.file_utils as fu
+
+    src, dst = tmp_path / "s.tmp", tmp_path / "d.yml"
+    src.write_text("new")
+    real, calls = os.replace, []
+
+    def busy_twice(a, b):
+        calls.append(a)
+        if len(calls) < 3:
+            raise PermissionError(13, "Access is denied")
+        real(a, b)
+
+    monkeypatch.setattr(fu.os, "replace", busy_twice)
+    await fu.replace_when_free(src, dst)
+    assert dst.read_text() == "new" and len(calls) == 3
+
+    src.write_text("never")
+    monkeypatch.setattr(
+        fu.os, "replace", lambda a, b: (_ for _ in ()).throw(PermissionError())
+    )
+    with pytest.raises(PermissionError):
+        await fu.replace_when_free(src, dst, timeout=0.1)
+    assert not src.exists()
