@@ -1630,6 +1630,11 @@ class SyncDriver:
             return True
 
         meta = copy(prog.yml.meta)
+        # Own the files list: the upload loop renames entries to their S3 names
+        # (.hlo -> .hlo.json), and a shared list would leak that into
+        # prog.yml.meta, where warn_unregistered_files reads it as missing.
+        if "files" in meta:
+            meta["files"] = list(meta["files"] or [])
 
         if prog.yml.status == "synced":
             LOGGER.debug(
