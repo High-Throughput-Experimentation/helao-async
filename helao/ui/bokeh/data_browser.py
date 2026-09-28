@@ -92,8 +92,8 @@ class _UI:
             value=sources.GROUPS["RUNS"][0],
             width=160,
         )
-        self.date_start = TextInput(title="From (YY.WW/MMDD)", width=140)
-        self.date_end = TextInput(title="To (YY.WW/MMDD)", width=140)
+        self.date_start = TextInput(title="From (YYYY/MMDD)", width=140)
+        self.date_end = TextInput(title="To (YYYY/MMDD)", width=140)
         # The scan button flips primary -> warning -> primary across a scan, so it
         # carries the four-type sheet rather than a single-type override.
         self.scan_btn = Button(

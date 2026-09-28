@@ -1,12 +1,15 @@
 """Date-scoped indexers that emit a uniform candidate-dataset index.
 
-Each source indexer walks the cheap ``YY.WW/MMDD`` directory layout, scoped to a
+Each source indexer walks the cheap two-level day layout -- ``YYYY/MMDD`` now,
+``YY.WW/MMDD`` for records written before the RUNS unification -- scoped to a
 date range, and returns a pandas DataFrame with :data:`INDEX_COLUMNS`. Reading a
 row's data is done separately via ``readers.read_dataset(row.locator, row.file_type)``.
 """
 
 import posixpath
+import re
 import zipfile
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -35,7 +38,7 @@ DATA_EXTS = (".hlo", ".json", ".parquet")
 
 
 def _list_day_dirs(base):
-    """Yield (date_str, day_path) for each YY.WW/MMDD under base, sorted."""
+    """Yield (date_str, day_path) for each two-level day dir under base."""
     base = Path(base)
     if not base.is_dir():
         return
@@ -45,13 +48,97 @@ def _list_day_dirs(base):
             yield f"{ww}/{mmdd}", wwp / mmdd
 
 
+_DAY_FORMS = (
+    re.compile(r"^(?P<y>\d{4})/(?P<md>\d{4})$"),  # YYYY/MMDD (RUNS, ANALYSES)
+    re.compile(r"^(?P<yy>\d{2})\.\d{2}/(?P<md>\d{4})$"),  # YY.WW/MMDD (legacy)
+    re.compile(r"^\d{2}\.\d{2}/(?P<ymd>\d{8})$"),  # YY.WW/YYYYMMDD (early legacy)
+    re.compile(r"^(?P<ymd>\d{8})$"),  # YYYYMMDD (typed bound)
+    re.compile(r"^(?P<y>\d{4})-(?P<m>\d{2})-(?P<d>\d{2})$"),  # ISO (typed bound)
+)
+
+
+def _date_key(date_str):
+    """Calendar ``YYYYMMDD`` for a day-dir date string or a typed bound.
+
+    The two layouts do not sort together as strings: ``2026/0618`` is less
+    than ``26.25/0617``. A ``%U`` week dir always lies inside its own year, so
+    the legacy form's year is ``20<YY>``. Returns ``None`` when unparseable.
+    """
+    for form in _DAY_FORMS:
+        m = form.match(date_str or "")
+        if not m:
+            continue
+        g = m.groupdict()
+        if g.get("ymd"):
+            return g["ymd"]
+        if g.get("m"):
+            return f"{g['y']}{g['m']}{g['d']}"
+        year = g.get("y") or f"20{g['yy']}"
+        return f"{year}{g['md']}"
+    return None
+
+
+_WEEK_BOUND = re.compile(r"^(?P<yy>\d{2})\.(?P<ww>\d{2})$")  # YY.WW
+_YEAR_BOUND = re.compile(r"^(?P<y>\d{4})$")  # YYYY
+
+
+def _bound_key(bound, end=False):
+    """``_date_key`` for a user-typed bound; an unreadable one is an error.
+
+    A whole period is also accepted -- a ``YY.WW`` week, as the old string
+    comparison allowed by prefix, or a ``YYYY`` year -- and stands for its
+    first day as a start bound and its last day as an end bound. Silently
+    treating an unreadable bound as open, or comparing it as a string, returns
+    a plausible-looking but wrong index.
+    """
+    if not bound:
+        return None
+    bound = bound.strip()
+    key = _date_key(bound)
+    if key is not None:
+        return key
+    m = _WEEK_BOUND.match(bound)
+    if m:
+        year = 2000 + int(m["yy"])
+        # %U week 00 starts on the Sunday before 1 January; clamp to the year,
+        # since a week dir only ever holds days of its own year.
+        first = max(
+            datetime.strptime(f"{year} {m['ww']} 0", "%Y %U %w"),
+            datetime(year, 1, 1),
+        )
+        last = min(
+            first + timedelta(days=6 - int(first.strftime("%w"))),
+            datetime(year, 12, 31),
+        )
+        return (last if end else first).strftime("%Y%m%d")
+    m = _YEAR_BOUND.match(bound)
+    if m:
+        return f"{m['y']}1231" if end else f"{m['y']}0101"
+    raise ValueError(
+        f"unreadable date bound {bound!r}; use YYYY/MMDD, YY.WW/MMDD, "
+        "YYYYMMDD, YYYY-MM-DD, a YY.WW week or a YYYY year"
+    )
+
+
 def _in_range(date_str, start, end):
-    """Lexicographic YY.WW/MMDD range test; None bounds are open."""
-    if start and date_str < start:
+    """Calendar-day range test across both layouts; None bounds are open.
+
+    A day dir whose name is not a date is outside every bounded range.
+    """
+    lo, hi = _bound_key(start), _bound_key(end, end=True)
+    if lo is None and hi is None:
+        return True
+    key = _date_key(date_str)
+    if key is None:
         return False
-    if end and date_str > end:
-        return False
-    return True
+    return (lo is None or key >= lo) and (hi is None or key <= hi)
+
+
+def _by_date(date_strs):
+    """Sort date strings chronologically; unparseable names go last."""
+    return sorted(
+        date_strs, key=lambda d: (_date_key(d) is None, _date_key(d) or "", d)
+    )
 
 
 def _seq_name(dirname):
@@ -143,7 +230,7 @@ class RunsSourceIndex(SourceIndex):
         self.base = self.root / self.source
 
     def list_dates(self):
-        return [d for d, _ in _list_day_dirs(self.base)]
+        return _by_date(d for d, _ in _list_day_dirs(self.base))
 
     def index(self, date_start=None, date_end=None):
         rows = []
@@ -275,7 +362,7 @@ class DerivedSourceIndex(SourceIndex):
     def list_dates(self):
         if self.source == "PROCESSES":
             return self._process_dates()
-        return [d for d, _ in _list_day_dirs(self.base)]
+        return _by_date(d for d, _ in _list_day_dirs(self.base))
 
     def index(self, date_start=None, date_end=None):
         rows = []
@@ -304,7 +391,7 @@ class DerivedSourceIndex(SourceIndex):
         dates = {d for d, _ in _list_day_dirs(self.base)}
         for tree in (RunDir.SYNCED.value,) + RUN_TREES:
             dates.update(d for d, _ in _list_day_dirs(self.root / tree))
-        return sorted(dates)
+        return _by_date(dates)
 
     def _index_processes(self, date_str):
         """Combine legacy-mirror, colocated-loose, and colocated-zip prc rows.
