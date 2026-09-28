@@ -124,6 +124,13 @@ def test_dir_walk_and_range():
         assert sources._in_range("26.25/0618", "26.22", "26.30") is True
         assert sources._in_range("26.20/0515", "26.22", "26.30") is False
         assert sources._in_range("26.25/0618", None, None) is True
+        # A whole week or year as a bound covers every day of it, in both
+        # layouts (week 25 of 2026 is Sun 06-21 .. Sat 06-27).
+        assert sources._in_range("2026/0621", "26.25", "26.25") is True
+        assert sources._in_range("2026/0627", "26.25", "26.25") is True
+        assert sources._in_range("2026/0628", "26.25", "26.25") is False
+        assert sources._in_range("26.00/0101", "26.00", "2026") is True
+        assert sources._in_range("2025/1231", "2026", None) is False
     print("test_dir_walk_and_range PASS")
 
 
@@ -440,6 +447,44 @@ def test_analyses_index_reads_both_layouts():
         assert sorted(df["date"]) == ["2026/0618", "26.25/0618"], df
 
 
+def test_date_range_compares_calendar_days_across_layouts():
+    """``2026/0618`` sorts before ``26.25/0618`` as a string, so a range typed
+    in either form used to drop the other layout's days. Bounds and day dirs
+    are compared as calendar dates now, and a bound may use any of the forms
+    the tree does."""
+    with tempfile.TemporaryDirectory() as d:
+        _make_analysis(d, year_dir="26.25")  # 2026-06-18, legacy
+        os.rename(
+            os.path.join(d, "ANALYSES", "26.25", "0618"),
+            os.path.join(d, "ANALYSES", "26.25", "0617"),
+        )
+        _make_analysis(d, year_dir="2026")  # 2026-06-18, new
+        idx = sources.DerivedSourceIndex(d, "ANALYSES")
+        for start, end in (
+            ("26.24/0617", "26.25/0618"),
+            ("2026/0617", "2026/0618"),
+            ("2026-06-17", "20260618"),
+        ):
+            assert sorted(idx.index(start, end)["date"]) == [
+                "2026/0618",
+                "26.25/0617",
+            ], (start, end)
+        assert list(idx.index("2026/0618")["date"]) == ["2026/0618"]
+        assert list(idx.index(None, "26.25/0617")["date"]) == ["26.25/0617"]
+        assert idx.list_dates() == ["26.25/0617", "2026/0618"]
+
+
+def test_an_unparseable_date_bound_is_an_error_not_an_empty_result():
+    with tempfile.TemporaryDirectory() as d:
+        _make_analysis(d, year_dir="2026")
+        try:
+            sources.DerivedSourceIndex(d, "ANALYSES").index("june")
+        except ValueError as exc:
+            assert "june" in str(exc)
+        else:
+            raise AssertionError("an unreadable bound silently filtered")
+
+
 def test_analyses_index_local():
     with tempfile.TemporaryDirectory() as d:
         _make_analysis(d, with_local_output=True)
@@ -721,6 +766,8 @@ def run_all():
     test_processes_index_both_present_no_duplicate()
     test_processes_index_corrupt_zip_skipped()
     test_analyses_index_reads_both_layouts()
+    test_date_range_compares_calendar_days_across_layouts()
+    test_an_unparseable_date_bound_is_an_error_not_an_empty_result()
     test_analyses_index_local()
     test_analyses_index_s3_only_unavailable()
     test_get_index_dispatch()
