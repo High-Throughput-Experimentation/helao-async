@@ -606,6 +606,25 @@ class LocalLoader:
                     break
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()
+        elif yml_path == "":
+            # The directory twin of the zip branch: ``fn`` is run-relative
+            # (``<action_output_dir>/<file_name>``), so anchor it on the
+            # sequence directory it names. FileMapper("") has no run root to
+            # find and raised IndexError here (spec D9).
+            rel = fn.replace("\\", "/")
+            for seq_dir, seq_yml in sorted(
+                zip(self.sequences.sequence_dir, self.sequences.sequence_localpath),
+                key=lambda x: len(x[0]),
+                reverse=True,
+            ):
+                if seq_dir and f"{seq_dir}/" in f"{rel}/":
+                    tail = rel.split(seq_dir, 1)[-1].strip("/")
+                    fpath = os.path.join(os.path.dirname(seq_yml), *tail.split("/"))
+                    break
+            else:
+                raise FileNotFoundError(f"{fn} names no sequence under {self.target}")
+            with open(fpath, "rb") as fh:
+                fbytes = fh.read()
         else:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)

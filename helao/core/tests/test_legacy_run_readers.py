@@ -224,3 +224,23 @@ def test_derived_processes_index_the_new_tree(tmp_path: Path):
     assert len(df) == 1, df
     assert df.iloc[0]["available"] is True, df.iloc[0]["locator"]
     assert Path(df.iloc[0]["locator"]).is_file()
+
+
+def test_a_process_file_resolves_against_a_sequence_directory(tmp_path: Path):
+    """``get_bytes("", fn)`` names a file by its run-relative path.
+
+    A process lists its files as ``<action_output_dir>/<file_name>``. For a
+    sequence zip, the zip branch strips everything up to the sequence dir. The
+    syncer now hands analyses a directory instead (spec D9), and that branch
+    fell through to ``FileMapper("")`` -- an IndexError on uvis4 for every
+    reference spectrum parquet.
+    """
+    from helao.core.drivers.data.loaders.localfs import LocalLoader
+
+    day = tmp_path / "RUNS" / "2026" / "0925"
+    act_dir = _sequence(day, "seqA")
+    (act_dir / "spec.parquet").write_bytes(b"PAR1")
+    seq_dir = act_dir.parent.parent
+    fn = act_dir.relative_to(tmp_path / "RUNS").as_posix() + "/spec.parquet"
+
+    assert LocalLoader(str(seq_dir)).get_bytes("", fn) == b"PAR1"
