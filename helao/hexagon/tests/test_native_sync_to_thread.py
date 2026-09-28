@@ -2,10 +2,15 @@
 
 ``HelaoSyncer``/``SyncDriver`` run their ``syncer`` worker coroutines on the
 hosting FastAPI server's event loop. The heavy steps in ``sync_yml`` --
-boto3 S3 uploads, ``read_hlo``/``hlo_to_parquet`` parsing, ``zip_dir``, and
-file moves -- are blocking; if they run inline they freeze the loop and the
-whole server (every endpoint) times out until they finish. Those call sites
-are wrapped in ``asyncio.to_thread`` so the loop stays responsive.
+boto3 S3 uploads and ``read_hlo``/``hlo_to_parquet`` parsing -- are blocking;
+if they run inline they freeze the loop and the whole server (every endpoint)
+times out until they finish. Those call sites are wrapped in
+``asyncio.to_thread`` so the loop stays responsive.
+
+The third case this file used to cover -- ``move_to_synced`` + ``zip_dir``
+offloaded the same way -- went with Task 10: records never move and a synced
+sequence is never zipped, so there is no blocking filesystem step left on the
+sync path to offload.
 
 This test guards that contract against the NATIVE driver. It drives the real
 changed code paths and runs a heartbeat coroutine concurrently to measure the
@@ -13,9 +18,7 @@ worst loop-stall:
 
   * ``to_s3`` with a deliberately blocking boto3-style client must offload
     the upload (heartbeat keeps ticking while the upload sleeps),
-  * ``to_s3`` with S3 disabled (``s3 is None``) is a no-op returning ``True``,
-  * the real ``move_to_synced`` + ``zip_dir`` helpers invoked via
-    ``asyncio.to_thread`` complete and keep the loop responsive.
+  * ``to_s3`` with S3 disabled (``s3 is None``) is a no-op returning ``True``.
 
 The legacy test file is NOT modified and NOT imported for logic (mirrored
 only). Mechanical translation: legacy `_make_driver` -> `make_sync_driver(...,
@@ -24,17 +27,11 @@ NativeSyncDriver)`, legacy `tempfile.TemporaryDirectory()` -> pytest
 
 import asyncio
 import time
-from pathlib import Path
 
 import pytest
 
-from helao.core.models.run_dir import RunDir
-from helao.helpers.file_utils import zip_dir
 from helao.hexagon.adapters.native.sync_driver import (
     SyncDriver as NativeSyncDriver,
-)
-from helao.hexagon.adapters.native.sync_driver import (
-    move_to_synced,
 )
 from helao.hexagon.tests.sync_fixtures import make_sync_driver, teardown_driver
 
@@ -124,47 +121,5 @@ async def test_to_s3_offloads_blocking_upload(tmp_path):
         assert drv.s3.calls == 1, "uploader_ran"
         assert elapsed >= BLOCK_S * 0.9, "upload_took_block_time"
         assert hb.max_gap < MAX_GAP_S, "loop_responsive_upload"
-    finally:
-        await teardown_driver(drv)
-
-
-# --- 3. real move_to_synced + zip_dir via to_thread -------------------------
-
-
-@pytest.mark.asyncio
-async def test_move_and_zip_offload_keep_loop_responsive(tmp_path):
-    drv = make_sync_driver(str(tmp_path), NativeSyncDriver)
-    try:
-        fin = (
-            Path(tmp_path)
-            / RunDir.FINISHED.value
-            / "26.23"
-            / "0610"
-            / "120000__seq__lab"
-        )
-        fin.mkdir(parents=True)
-        seq_yml = fin / "260610.120000000000-seq.yml"
-        seq_yml.write_text("sequence_name: seq\n", encoding="utf-8")
-        data = fin / "data.hlo"
-        data.write_bytes(b"x" * (5 * 1024 * 1024))  # 5 MB, real move/zip work
-
-        hb = _HeartBeat()
-        hb_task = asyncio.create_task(hb.run())
-        moved = await asyncio.to_thread(move_to_synced, data)
-        assert isinstance(moved, Path), "move_returned_path"
-        assert (
-            isinstance(moved, Path) and RunDir.SYNCED in str(moved) and moved.exists()
-        ), "moved_into_synced"
-        assert not data.exists(), "moved_out_of_finished"
-
-        synced_dir = Path(str(fin).replace(RunDir.FINISHED.value, RunDir.SYNCED.value))
-        await asyncio.to_thread(move_to_synced, seq_yml)
-        zip_target = synced_dir.parent / f"{synced_dir.name}.zip"
-        await asyncio.to_thread(zip_dir, synced_dir, zip_target)
-        hb.stop()
-        await hb_task
-
-        assert zip_target.exists() and zip_target.stat().st_size > 0, "zip_created"
-        assert hb.max_gap < MAX_GAP_S, "loop_responsive_move_zip"
     finally:
         await teardown_driver(drv)

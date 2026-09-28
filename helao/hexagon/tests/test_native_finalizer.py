@@ -3,7 +3,8 @@
 chain. Source-parity pin + behavior on real tmp trees with a full native
 collaborator set (mini-graft): finish drains queued data BEFORE closing
 handles, closes every file, cancels data_logger, writes the final -act.yml,
-schedules move_dir only for non-manual, pops base.actives into history;
+schedules move_dir (manual included -- it is the journal eviction
+point), pops base.actives into history;
 substitute closes streams; split forks file conns + resets counters;
 finish_manual_action writes synthesized exp/seq metas. Module globals
 (move_dir/set_time/async_private_dispatcher) are patched on THIS module,
@@ -177,7 +178,15 @@ async def test_split_forks_conns_and_resets_counters(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_manual_action_skips_move_dir_and_writes_exp_seq(tmp_path, monkeypatch):
+async def test_manual_action_calls_move_dir_and_writes_exp_seq(tmp_path, monkeypatch):
+    """A manual action must still reach ``move_dir`` -- that is where the
+    producing server evicts its own journal entry (plan A34, D-C). The
+    finalizer used to skip it, which was correct only while ``move_dir``
+    copied a tree. This test asserted ``moved == []`` and kept passing after
+    the fix purely because ``move_dir`` is scheduled fire-and-forget and it
+    never yielded to the loop; the drain below is what makes it falsifiable.
+    The eviction itself is asserted at rest in
+    ``helao/core/tests/test_run_state_wiring.py``."""
     moved = []
 
     async def fake_move_dir(action, base=None):
@@ -189,7 +198,8 @@ async def test_manual_action_skips_move_dir_and_writes_exp_seq(tmp_path, monkeyp
     )
     await _start_logger(base, active)
     await active.finish()
-    assert moved == []  # manual: no promotion
+    await asyncio.sleep(0.1)  # let the fire-and-forget move_dir task run
+    assert moved == [active.action.action_uuid]
     from helao.core.models.run_dir import RunDir
 
     diag_root = str(base.helaodirs.save_root).replace(

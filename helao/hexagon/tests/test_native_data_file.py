@@ -28,7 +28,6 @@ METHODS = [
     "write_file",
     "write_file_nowait",
     "track_file",
-    "relocate_files",
 ]
 
 
@@ -160,3 +159,21 @@ async def test_finish_hlo_header_stamps_only_unset(tmp_path):
     assert active.file_conn_dict[dflt].params.hloheader.epoch_ns == 42
     active.finish_hlo_header(realtime=99)
     assert active.file_conn_dict[dflt].params.hloheader.epoch_ns == 42  # not re-stamped
+
+
+@pytest.mark.asyncio
+async def test_write_file_creates_a_subdirectory_named_by_the_filename(tmp_path):
+    """Amendment A14.4: makedirs covered the record root, not the file's dir.
+
+    ``file_name`` is record-relative since the upload set is built from it, so
+    a one-shot write under a subdirectory name is legitimate. It used to fail
+    with FileNotFoundError because only the record root was created.
+    """
+    _, active, _ = _native_active(tmp_path)
+    path = await active.write_file(
+        output_str="payload",
+        file_type="aux__csv",
+        filename="subdir/nested.csv",
+    )
+    assert path is not None and os.path.isfile(path)
+    assert os.path.basename(os.path.dirname(path)) == "subdir"

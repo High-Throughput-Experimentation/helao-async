@@ -123,7 +123,11 @@ class FileInfo(BaseModel, HelaoDict):
 
     Attributes:
         file_type (Optional[str]): File type tag.
-        file_name (Optional[str]): File name on disk.
+        file_name (Optional[str]): Path to the file relative to the record's own
+            directory, forward-slash separated on every platform. A bare file
+            name is the common case; a file written into a subdirectory of the
+            action directory keeps its subdirectory segments, so that the
+            syncer's ``files``-driven upload set can address it.
         data_keys (list[str]): Data keys present in the file.
         sample (list[str]): Sample labels associated with the file.
         action_uuid (Optional[UUID]): UUID of the producing action.

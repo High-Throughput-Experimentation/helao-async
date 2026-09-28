@@ -2,7 +2,7 @@
 (CARDS P6, Stage S5): the data-file init + file-I/O helpers
 (``init_datafile``/``finish_hlo_header``/``log_data_set_output_file``/
 ``_resolve_output_path``/``write_file``/``write_file_nowait``/``track_file``/
-``relocate_files``/``update_act_file``).
+``update_act_file``).
 
 ``test_active_golden_master.py --check`` already exercises the streamed-file
 path (``log_data_set_output_file``/``init_datafile``/``finish_hlo_header``) and
@@ -228,14 +228,12 @@ async def _check_track_file() -> bool:
     save_root = tempfile.mkdtemp()
     base = _make_base(save_root)
     active, _ = _mk_active(base)
-    # a file outside the action output dir -> queued for relocation
+    # a file outside the action output dir -> recorded under its basename
     outside = os.path.join(tempfile.mkdtemp(), "aux_data.dat")
     with open(outside, "w") as f:
         f.write("payload")
     await active.track_file("df__aux", outside, [])
-    return outside in active.action.aux_file_paths and any(
-        fi.file_name == "aux_data.dat" for fi in active.action.files
-    )
+    return any(fi.file_name == "aux_data.dat" for fi in active.action.files)
 
 
 async def _run_checks() -> dict:
@@ -298,7 +296,7 @@ def active_data_file_unit_test() -> bool:
         lambda: res["resolve_output_path_save_data_false"],
     )
     reporter.check(
-        "track_file records a FileInfo and queues an out-of-dir path for relocation",
+        "track_file records a FileInfo naming an out-of-dir path by its basename",
         lambda: res["track_file"],
     )
 

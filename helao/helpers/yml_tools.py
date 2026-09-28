@@ -1,26 +1,24 @@
-"""YAML serialization helpers and post-run directory promotion logic.
+"""YAML serialization helpers and post-run record finishing.
 
 Wraps :mod:`ruamel.yaml` with HELAO conventions (2/4/2 indent, ``null`` for
 None, duplicate keys allowed) and provides the asynchronous :func:`move_dir`
-that promotes ``RUNS_ACTIVE`` directories to ``RUNS_FINISHED`` (or
-``RUNS_DIAG`` for manual actions) and notifies the syncer server.
+that marks a record finished in place and notifies the syncer server.
 """
 
 import asyncio
 import os
 import threading
-from glob import glob
 from io import StringIO
 from pathlib import Path
 from typing import Optional, Union
 
-import aiofiles
 import aiohttp
-import aioshutil
 import ruamel.yaml
 from ruamel.yaml.representer import RepresenterError
 
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir
+from helao.helpers.run_state import DONE as RUN_STATE_DONE
+from helao.helpers.run_state import root_relative
 from helao.helpers.server_keys import get_sync_server_cfg
 
 #: Per-thread dumper cache. ``ruamel.yaml.YAML`` instances hold emitter state
@@ -238,19 +236,28 @@ async def yml_finisher(yml_path: str, sync_config: dict = {}, retry: int = 3) ->
 
 
 async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
-    """Promote an Action/Experiment/Sequence's directory out of ``RUNS_ACTIVE``.
+    """Mark an Action/Experiment/Sequence finished. Nothing moves.
 
-    The destination is ``RUNS_DIAG`` for manual actions or ``RUNS_FINISHED``
-    otherwise; ``.hlo`` data files for objects with ``sync_data=False`` are
-    diverted to ``RUNS_NOSYNC``. Copy and removal are retried up to 60 and 30
-    times respectively, sleeping ``retry_delay`` seconds between attempts. On
-    success of a non-manual move, :func:`yml_finisher` is invoked.
+    Records are written once, under ``RUNS`` (or ``DIAG`` for a manual run),
+    and stay there for life; lifecycle state lives in the per-server journals
+    (spec §2). What used to be ~160 lines of copy-with-60-retries followed by
+    remove-with-30-retries is now an eviction from this server's journal and
+    the same ``yml_finisher`` call as before.
+
+    The old body computed its destination as
+    ``yml_dir.replace("RUNS_ACTIVE", dest_dir)``. Under the single
+    ``RUNS`` tree that substitution is the identity, so every record was
+    copied onto itself and then deleted (plan A24). Nothing here computes a
+    destination any more; :func:`helao.core.models.run_dir.is_same_location`
+    is the guard any future mover must call before it removes anything.
+
+    ``retry_delay`` is accepted and ignored: there is no longer anything to
+    retry. It is kept so the ~30 call sites need no edit.
 
     Args:
-        hobj: An ``Action``, ``Experiment``, or ``Sequence`` instance whose
-            on-disk directory should be promoted.
-        base: Server object providing ``helaodirs.save_root`` and config.
-        retry_delay: Sleep between copy/remove retry rounds, in seconds.
+        hobj: An ``Action``, ``Experiment``, or ``Sequence``.
+        base: Server object providing ``helaodirs`` and ``world_cfg``.
+        retry_delay: Unused. Retained for signature compatibility.
 
     Returns:
         Empty dict when ``hobj`` is not a supported type; otherwise None.
@@ -262,136 +269,46 @@ async def move_dir(hobj, base: Optional[object] = None, retry_delay: int = 5):
     )
 
     obj_type = hobj.__class__.__name__.lower()
-    dest_dir = RunDir.FINISHED.value
+    if obj_type not in ("action", "experiment", "sequence"):
+        LOGGER.info(
+            f"Invalid object {obj_type} was provided. Can only move Action, "
+            "Experiment, or Sequence."
+        )
+        return {}
+
+    is_manual = bool(getattr(hobj, "manual_action", False))
     save_dir = str(base.helaodirs.save_root)
+    if is_manual:
+        save_dir = redirect_manual_dir(save_dir)
 
-    is_manual = False
-
-    yml_dir = None
-
-    if hobj.manual_action:
-        dest_dir = RunDir.DIAG.value
-        is_manual = True
-    match obj_type:
-        case "action":
-            target_subdir = hobj.get_action_dir()
-        case "experiment":
-            target_subdir = hobj.get_experiment_dir()
-        case "sequence":
-            target_subdir = hobj.get_sequence_dir()
-        case _:
-            LOGGER.info(
-                f"Invalid object {obj_type} was provided. Can only move Action, Experiment, or Sequence."
-            )
-            return {}
-
+    # getattr, not a dict of the three bound methods: a dict literal evaluates
+    # every value before the key is selected, so building one looks up
+    # `get_action_dir` on an Experiment and raises AttributeError. The raise
+    # lands in the event loop's exception handler, so the experiment and
+    # sequence are simply never handed to the syncer and the run silently
+    # never ships.
+    target_subdir = getattr(hobj, f"get_{obj_type}_dir")()
     yml_dir = os.path.normpath(os.path.join(save_dir, target_subdir))
 
-    new_dir = os.path.join(yml_dir.replace(RunDir.ACTIVE.value, dest_dir))
-    nosync_dir = os.path.join(yml_dir.replace(RunDir.ACTIVE.value, RunDir.NOSYNC.value))
-    await aiofiles.os.makedirs(new_dir, exist_ok=True)
-    await aiofiles.os.makedirs(nosync_dir, exist_ok=True)
+    timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime("%y%m%d.%H%M%S%f")
+    yml_path = os.path.join(yml_dir, f"{timestamp}-{obj_type[:3]}.yml")
 
-    copy_success = False
-    copy_retries = 0
-    if obj_type == "action":
-        src_list = glob(os.path.join(yml_dir, "**", "*"), recursive=True)
-    else:
-        src_list = glob(os.path.join(yml_dir, "*"))
-    src_list = [x for x in src_list if os.path.isfile(x)]
-
-    while (not copy_success) and copy_retries <= 60:
-        dst_list = [
-            p.replace(
-                RunDir.ACTIVE.value,
-                (
-                    RunDir.NOSYNC.value
-                    if p.endswith(".hlo") and not hobj.sync_data
-                    else dest_dir
-                ),
-            )
-            for p in src_list
-        ]
-        for p in dst_list:
-            os.makedirs(os.path.dirname(p), exist_ok=True)
-
-        mvtups = []
-        cptups = []
-        for src, dst in zip(src_list, dst_list):
-            if RunDir.NOSYNC.value in dst:
-                mvtups.append((src, dst))
-            else:
-                cptups.append((src, dst))
-
-        move_results = await asyncio.gather(
-            *[aioshutil.move(src, dst) for src, dst in mvtups],
-            return_exceptions=True,
+    # The producing server evicts here, before the handoff: whether or not a
+    # syncer exists, this server is done with the record (spec §4.3). A manual
+    # record has no handoff at all, so the eviction must not sit under the
+    # `not is_manual` branch below or its journal entry would never be dropped.
+    journal = getattr(base, "run_journal", None)
+    if journal is not None:
+        journal.append(
+            str(getattr(hobj, f"{obj_type}_uuid")),
+            obj_type,
+            RUN_STATE_DONE,
+            root_relative(yml_dir, base.helaodirs.root),
         )
 
-        copy_results = await asyncio.gather(
-            *[aioshutil.copy(src, dst) for src, dst in cptups],
-            return_exceptions=True,
+    if not is_manual:
+        await yml_finisher(
+            yml_path,
+            sync_config=get_sync_server_cfg(base.world_cfg),
         )
-
-        exists_list = [f for f in dst_list if os.path.exists(f)]
-        if len(exists_list) == len(src_list):
-            copy_success = True
-            LOGGER.info(f"Successfully copied {yml_dir} to FINISHED.")
-        else:
-            src_list = [f for f in src_list if f not in exists_list]
-            LOGGER.info(
-                f"Could not copy {len(src_list)} files to FINISHED, retrying after {retry_delay} seconds"
-            )
-            LOGGER.info(src_list)
-            LOGGER.info(move_results)
-            LOGGER.info(copy_results)
-            copy_retries += 1
-        await asyncio.sleep(retry_delay)
-
-    if copy_success:
-        rm_success = False
-        rm_retries = 0
-        rm_list = src_list
-        while (not rm_success) and rm_retries <= 30:
-            rm_files = [x for x in rm_list if os.path.isfile(x)]
-            await asyncio.gather(
-                *[aiofiles.os.remove(f) for f in rm_files], return_exceptions=True
-            )
-            rm_files_done = [f for f in rm_files if not os.path.exists(f)]
-            if len(rm_files_done) == len(rm_files):
-                if os.path.exists(yml_dir):
-                    try:
-                        await aioshutil.rmtree(yml_dir)
-                    except FileNotFoundError:
-                        LOGGER.warning(
-                            f"Error removing {yml_dir}, perhaps removed by another operation.",
-                            exc_info=False,
-                        )
-                if not os.path.exists(yml_dir):
-                    rm_success = True
-                    timestamp = getattr(hobj, f"{obj_type}_timestamp").strftime(
-                        "%y%m%d.%H%M%S%f"
-                    )
-                    yml_path = os.path.join(new_dir, f"{timestamp}-{obj_type[:3]}.yml")
-                    if not is_manual:
-                        await yml_finisher(
-                            yml_path,
-                            sync_config=get_sync_server_cfg(base.world_cfg),
-                        )
-                    LOGGER.info(f"Successfully removed {yml_dir}")
-                if rm_success and obj_type == "action" and is_manual:
-                    # remove active sequence and experiment dirs
-                    exp_dir = os.path.dirname(yml_dir)
-                    if os.path.exists(exp_dir):
-                        await aioshutil.rmtree(exp_dir)
-                    seq_dir = os.path.dirname(exp_dir)
-                    if os.path.exists(seq_dir):
-                        await aioshutil.rmtree(seq_dir)
-            else:
-                rm_list = [f for f in rm_list if f not in rm_files_done]
-                LOGGER.info(
-                    f"Could not remove directory from ACTIVE, retrying after {retry_delay} seconds"
-                )
-                LOGGER.info(rm_list)
-                rm_retries += 1
-            await asyncio.sleep(retry_delay)
+    LOGGER.info(f"Finished {yml_dir}")

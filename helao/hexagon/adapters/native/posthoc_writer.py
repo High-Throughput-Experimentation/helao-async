@@ -32,8 +32,8 @@ What this face changes relative to the fork it replaces:
   two payloads as one body; this face replaces the target instead.
 * Meta ymls are written atomically (temp file + ``os.replace``) with the
   default YAML dumper, matching the core writers.
-* ``track_file`` copies at call time -- post-hoc composition has no finalizer to
-  relocate a queued path later -- and leaves ``aux_file_paths`` empty.
+* ``track_file`` copies at call time, to the record-relative name the
+  ``FileInfo`` carries -- nothing relocates a file later on any path.
 * ``write_act`` accepts ``manual=`` like the other two writers, and returns
   ``None`` instead of raising when the action has ``save_act`` disabled.
 
@@ -52,7 +52,7 @@ import shutil
 from typing import Any, Optional, Union
 
 from helao.core.models.file import FileInfo, HloFileGroup
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import redirect_manual_dir, run_root
 from helao.core.models.sample import (
     AssemblySample,
     GasSample,
@@ -82,7 +82,7 @@ class RepeatWriteError(RuntimeError):
     no ``%%`` separator (which makes a reader parse two payloads as one body).
 
     Refusing turned out to be the wrong remedy. A batch conversion that dies
-    partway leaves half-written artifacts under ``RUNS_FINISHED``, and on the
+    partway leaves half-written artifacts under the run tree, and on the
     next attempt every one of them made the converter raise here -- so a single
     interrupted run poisoned the source folder until someone cleaned it by
     hand. The corruption the guard existed to prevent came from *appending*;
@@ -140,9 +140,7 @@ def _atomic_copy(src_path: "str | os.PathLike[str]", dest_path: str) -> None:
     destination is either the previous file or the complete new one.
 
     Args:
-        src_path: File to copy. Accepts ``PathLike`` because
-            ``action.aux_file_paths`` carries ``Path`` entries as well as
-            strings.
+        src_path: File to copy. Accepts ``PathLike`` as well as ``str``.
         dest_path: Destination path, created or replaced.
     """
     dest_dir = os.path.dirname(dest_path)
@@ -252,7 +250,7 @@ class PostHocRunWriter:
 
     Args:
         save_root: Root the run tree is written under, e.g.
-            ``<config root>/RUNS_FINISHED``. Model-relative output directories
+            ``<config root>/RUNS``. Model-relative output directories
             (``action_output_dir`` and friends) are joined onto it.
     """
 
@@ -270,7 +268,7 @@ class PostHocRunWriter:
     def _root_for(self, model, manual: bool) -> str:
         """Return the save root, redirected to the diagnostic tree if manual."""
         if manual or getattr(model, "manual_action", False):
-            return self.save_root.replace(RunDir.ACTIVE.value, RunDir.DIAG.value)
+            return redirect_manual_dir(self.save_root)
         return self.save_root
 
     def _active_for(self, action: Action, manual: bool = False) -> _PostHocActive:
@@ -400,10 +398,15 @@ class PostHocRunWriter:
     ) -> FileInfo:
         """Record an existing file on ``action`` and copy it in immediately.
 
-        Unlike the live path, which queues the source for the finalizer to
-        relocate at action end, this copies at call time: a post-hoc caller has
-        no finalizer, so a queued path would simply never be moved.
-        ``action.aux_file_paths`` is left as it was found.
+        The live path records the file and leaves it where it is; nothing ever
+        relocates it. A post-hoc caller's source is typically outside the
+        record directory, so this copies it in at call time.
+
+        The destination is the name the ``FileInfo`` records, resolved against
+        the record directory -- not the source's basename. The two have to
+        agree: the syncer's upload set resolves ``file_name`` against the
+        record directory, so a file written under a different name than the
+        one recorded resolves to nothing and is silently dropped.
 
         The copy is atomic and replaces any existing destination, for the same
         reason the data-file write is: a conversion killed mid-copy would
@@ -412,7 +415,9 @@ class PostHocRunWriter:
 
         Args:
             action: Action to attach the file to.
-            src_path: Path to the existing file; only its basename is recorded.
+            src_path: Path to the existing file. A source inside the record
+                directory is recorded (and left) at its record-relative path;
+                one outside it is recorded and copied in under its basename.
             file_type: HELAO file-type tag recorded on the ``FileInfo``.
             samples: Samples whose global labels are recorded on the
                 ``FileInfo``. Samples with no label are skipped.
@@ -421,7 +426,6 @@ class PostHocRunWriter:
             The ``FileInfo`` appended to ``action.files``.
         """
         active = self._active_for(action)
-        queued_before = list(action.aux_file_paths)
         _run_sync(
             active.data_file_writer.track_file(
                 file_type=file_type,
@@ -430,18 +434,19 @@ class PostHocRunWriter:
                 action=action,
             )
         )
-        queued = [p for p in action.aux_file_paths if p not in queued_before]
-        action.aux_file_paths = queued_before
+        file_info = action.files[-1]
 
+        # ``_root_for`` honours ``action.manual_action`` exactly as the writer
+        # does, so this is the same record directory the name was computed
+        # against.
         dest_dir = os.path.join(
             self._root_for(action, False), str(action.action_output_dir)
         )
-        for path in queued:
-            new_path = os.path.join(dest_dir, os.path.basename(path))
-            if path != new_path:
-                _atomic_copy(path, new_path)
+        new_path = os.path.join(dest_dir, *str(file_info.file_name).split("/"))
+        if os.path.abspath(src_path) != os.path.abspath(new_path):
+            _atomic_copy(src_path, new_path)
 
-        return action.files[-1]
+        return file_info
 
     # -- meta files --------------------------------------------------------
 
@@ -517,7 +522,18 @@ class PostHocRunWriter:
 
 
 def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) -> str:
-    """Resolve the default run-output root (``<root>/RUNS_FINISHED``).
+    """Resolve the default run-output root (``<root>/RUNS``).
+
+    This is the same tree :func:`~helao.helpers.helao_dirs.helao_dirs`
+    resolves ``save_root`` to, so batch-converted records land beside live
+    ones and the syncer's ``list_pending*`` sweep root covers them. It used to
+    return ``<root>/RUNS_FINISHED``, which after the single-run-tree cut-over
+    would have left converted records permanently outside that sweep.
+
+    The sweep is a safety net here rather than the primary path: the
+    converters enqueue each record explicitly once it is written, and an
+    interrupted conversion is recovered from its ``processing/`` checkpoint
+    sidecar. What this restores is the net, plus a uniform layout.
 
     Args:
         cfg: Loaded instrument config, or ``None``. Only its ``root`` key is
@@ -527,7 +543,7 @@ def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) 
             data-root path of its own.
 
     Returns:
-        ``<root>/RUNS_FINISHED``.
+        ``<root>/RUNS``.
 
     Raises:
         ValueError: Neither a config root nor a fallback was supplied.
@@ -539,4 +555,4 @@ def default_save_root(cfg: Optional[dict], fallback_root: Optional[str] = None) 
             "no save root: the config carries no 'root' key and no "
             "fallback_root was supplied."
         )
-    return os.path.join(str(root), RunDir.FINISHED.value)
+    return str(run_root(root))

@@ -15,6 +15,7 @@ __all__ = [
     "is_ui_only_server",
     "install_global_config",
     "load_global_config",
+    "sync_finished_enabled",
     "CONFIG",
 ]
 
@@ -245,6 +246,24 @@ class ServerConfig(BaseModel):
     verbose: Optional[bool] = False
 
 
+def sync_finished_enabled(world_cfg: Optional[dict]) -> bool:
+    """Whether a finished record should enter the unsynced set (spec §6).
+
+    Defaults to ``True``. A group with no syncer server is always ``False``
+    regardless of the key: there is nothing to hand a record to, so the
+    record is done the moment it finishes.
+
+    Distinct from the per-record ``sync_data`` field, which has never meant
+    "skip sync" -- it means "do not upload this record's .hlo payloads".
+    """
+    from helao.helpers.server_keys import resolve_sync_server_key
+
+    cfg = world_cfg or {}
+    if resolve_sync_server_key(cfg) is None:
+        return False
+    return bool(cfg.get("sync_finished", True))
+
+
 class HelaoConfig(BaseModel):
     """Top-level schema for a HELAO orchestration-group config file.
 
@@ -261,6 +280,8 @@ class HelaoConfig(BaseModel):
             ``helao/deploy/<deployment>/sequences`` to import for the orchestrator.
         sequence_params: Default parameters merged into sequences at runtime.
         servers: Mapping of server key to :class:`ServerConfig`.
+        sync_finished: Whether a finished record is handed to the syncer's
+            unsynced set. See :func:`sync_finished_enabled`.
         alert_config_path: Path to the email-alert configuration, if any.
         builtin_ref_motorxy: Built-in reference XY motor coordinates.
     """
@@ -274,5 +295,6 @@ class HelaoConfig(BaseModel):
     sequence_libraries: Optional[list[str]] = None
     sequence_params: Optional[dict] = None
     servers: Optional[dict[str, ServerConfig]] = None
+    sync_finished: Optional[bool] = True
     alert_config_path: Optional[str] = None
     builtin_ref_motorxy: Optional[list[float]] = None

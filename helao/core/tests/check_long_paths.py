@@ -1,7 +1,7 @@
 """Report -- and optionally remove -- the Windows 260-character path ceiling.
 
 A station's run tree is deep by construction:
-``<root>/RUNS_ACTIVE/<week>/<day>/<sequence>/<experiment>/<action>/<file>``,
+``<root>/RUNS/<year>/<mmdd>/<sequence>/<experiment>/<action>/<file>``,
 where the sequence and experiment components carry the library function's own
 name. On 2026-09-09 an ECMS action reached 232 characters for its ``-act.yml``
 and the write failed anyway, because the atomic-write staging name was longer

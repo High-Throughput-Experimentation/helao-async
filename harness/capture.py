@@ -249,11 +249,57 @@ def db_drained() -> bool:
     return n == 0 and not tasks.get("running")
 
 
+#: An ``action_status`` a record will not leave. Same pair as
+#: ``golden_capture.TERMINAL_STATUSES``; kept here because that module imports
+#: from this one and not the other way round.
+TERMINAL_STATUSES = ("finished", "errored")
+
+
 def runs_active_empty(root: Path) -> bool:
-    active = Path(root) / "RUNS_ACTIVE"
-    if not active.is_dir():
-        return True
-    return next(active.rglob("*.yml"), None) is None
+    """Whether nothing is still in flight under *root*.
+
+    A root holding any pre-cut-over tree is answered the pre-cut-over way --
+    ``RUNS_ACTIVE`` empty, and vacuously true when it was never created,
+    because a manual run wrote only to ``RUNS_DIAG``. That arm is unchanged.
+
+    Under the single ``RUNS`` tree there is no in-flight directory to be
+    empty, so the legacy answer would have gone on returning True over a
+    directory that is never created -- quiescing instantly and snapshotting a
+    mid-flight tree. That is exactly the at-station false PASS
+    ``golden_capture.settle`` was written to close, so the new-layout arm uses
+    the same signal it does: every ``-act.yml`` has reached a terminal
+    ``action_status``.
+
+    A record mid-write, unreadable, or missing its status reads as NOT
+    terminal, so an unparseable tree stalls quiesce rather than clearing it.
+    """
+    from helao.core.models.run_dir import LEGACY_RUN_DIRS
+
+    root = Path(root)
+    if any((root / tree).is_dir() for tree in LEGACY_RUN_DIRS):
+        active = root / "RUNS_ACTIVE"
+        if not active.is_dir():
+            return True
+        return next(active.rglob("*.yml"), None) is None
+    acts = [p for tree in ("RUNS", "DIAG") for p in (root / tree).rglob("*-act.yml")]
+    if not acts:
+        # Nothing has been written yet: a run that has not started is not a
+        # run that has settled.
+        return False
+    return all(_act_is_terminal(p) for p in acts)
+
+
+def _act_is_terminal(act_yml: Path) -> bool:
+    """Whether one ``-act.yml`` records a terminal ``action_status``."""
+    try:
+        from helao.helpers.yml_tools import yml_load
+
+        status = yml_load(act_yml.read_text(encoding="utf-8")).get("action_status")
+    except Exception:
+        return False
+    if isinstance(status, str):
+        status = [status]
+    return any(s in TERMINAL_STATUSES for s in (status or []))
 
 
 def wait_until(pred: Callable[[], bool], timeout_s: float = 600.0, poll_s: float = 2.0):
@@ -640,7 +686,13 @@ SCENARIO_MASKS: dict[str, tuple] = {
 #: UUIDs before GM-4's own first sequence, every downstream uuid index shifted
 #: by one to three. The result was 365 diffs, none of them real, against a
 #: candidate that was byte-identical everywhere the scenario actually wrote.
+#: ``RUNS`` and ``DIAG`` are where a current build writes, and omitting them
+#: would reproduce exactly the failure above one layout later: every artifact
+#: lands somewhere this list does not name, so a contaminated root reads as
+#: fresh and the capture comes back as hundreds of phantom diffs.
 _RUN_TREES: tuple[str, ...] = (
+    "RUNS",
+    "DIAG",
     "RUNS_ACTIVE",
     "RUNS_FINISHED",
     "RUNS_SYNCED",

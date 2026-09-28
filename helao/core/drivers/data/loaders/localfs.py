@@ -21,7 +21,7 @@ from helao.core.drivers.data.loaders.model_base import (
     HelaoDataModelMixin,
 )
 from helao.core.drivers.data.process_locator import process_uuid_of
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
 from helao.helpers.file_mapper import FileMapper
 from helao.helpers.hlo_data import read_hlo_bytes
 from helao.helpers.yml_tools import yml_load
@@ -223,9 +223,17 @@ class LocalLoader:
             )
         else:
             process_dir = os.path.dirname(self.target).replace(state_dir, "PROCESSES")
-        check_dirs = [f"{self.target.replace(state_dir, x)}" for x in states] + [
-            process_dir
-        ]
+        if is_legacy_path(self.target):
+            check_dirs = [f"{self.target.replace(state_dir, x)}" for x in states] + [
+                process_dir
+            ]
+        else:
+            # A record under the single RUNS tree never moves and colocates its
+            # prc, so the target IS the only place to look. Keeping the legacy
+            # fan-out here would be worse than useless: every RUNS_* -> state
+            # substitution is a no-op, and `process_dir` then collapses to the
+            # target's PARENT, pulling in every sibling sequence.
+            check_dirs = [self.target]
         if not os.path.exists(self.target):
             raise FileNotFoundError(
                 "data_path argument is not a valid file or folder path"
@@ -598,6 +606,25 @@ class LocalLoader:
                     break
             with ZipFile(self.target, "r") as zf:
                 fbytes = zf.open(rel_seqzip_path).read()
+        elif yml_path == "":
+            # The directory twin of the zip branch: ``fn`` is run-relative
+            # (``<action_output_dir>/<file_name>``), so anchor it on the
+            # sequence directory it names. FileMapper("") has no run root to
+            # find and raised IndexError here (spec D9).
+            rel = fn.replace("\\", "/")
+            for seq_dir, seq_yml in sorted(
+                zip(self.sequences.sequence_dir, self.sequences.sequence_localpath),
+                key=lambda x: len(x[0]),
+                reverse=True,
+            ):
+                if seq_dir and f"{seq_dir}/" in f"{rel}/":
+                    tail = rel.split(seq_dir, 1)[-1].strip("/")
+                    fpath = os.path.join(os.path.dirname(seq_yml), *tail.split("/"))
+                    break
+            else:
+                raise FileNotFoundError(f"{fn} names no sequence under {self.target}")
+            with open(fpath, "rb") as fh:
+                fbytes = fh.read()
         else:
             FM = FileMapper(yml_path)
             fpath = os.path.join(os.path.dirname(yml_path), fn)
@@ -925,7 +952,7 @@ class HelaoProcess(HelaoModel):
                 zip-member path from a fully-synced record.
         """
         parts = os.path.normpath(self.yml_path).split(os.sep)
-        if not any(p.startswith("RUNS_") or p == "PROCESSES" for p in parts):
+        if not any(is_run_root(p) for p in parts):
             raise ValueError(
                 f"read_action_file: yml_path {self.yml_path!r} has no "
                 "RUNS_*/PROCESSES segment (likely a zip-member path from a "
