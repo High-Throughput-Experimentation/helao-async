@@ -55,8 +55,8 @@ COMMAND_TABLE = {
 class MeerstetterTEC(HelaoDriver):
     """``HelaoDriver`` wrapper for a Meerstetter TEC device controlled over serial.
 
-    The ``MeCom`` serial session is opened by :meth:`connect`, not by
-    construction; always-on telemetry polling is handled by the paired
+    The ``MeCom`` serial session is opened at construction, through
+    :meth:`connect`; always-on telemetry polling is handled by the paired
     :class:`MeerstetterTECPoller`, wired in as the server's ``poller_class``.
     Exposes helpers to enable/disable the control loop and set the target
     object temperature.
@@ -71,7 +71,7 @@ class MeerstetterTEC(HelaoDriver):
     """
 
     def __init__(self, config: dict = {}):
-        """Store config; the MeCom session is opened in :meth:`connect`.
+        """Store config and open the MeCom session via :meth:`connect`.
 
         Args:
             config: Driver configuration (the server's ``params`` dict).
@@ -92,6 +92,9 @@ class MeerstetterTEC(HelaoDriver):
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
         self.allow_no_sample = self.config_dict.get("allow_no_sample", True)
+        # Open the session here, not lazily: ActionHost never calls connect(),
+        # and the poller starts polling as soon as it is built.
+        self.connect()
 
     def _connect(self):
         """Open a ``MeCom`` session on ``self.port`` and identify the address."""
@@ -116,6 +119,11 @@ class MeerstetterTEC(HelaoDriver):
                 )
             except ResponseTimeout:
                 LOGGER.info(f"connection timeout, retrying attempt {i+1}")
+            except Exception:
+                # A missing or busy port is not a handshake timeout; retrying
+                # cannot fix it, and raising here would kill server startup.
+                LOGGER.error("connect failed", exc_info=True)
+                break
         LOGGER.error("connect failed: exhausted retries")
         return DriverResponse(
             response=DriverResponseType.failed, status=DriverStatus.error
