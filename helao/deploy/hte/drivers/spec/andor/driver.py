@@ -896,6 +896,53 @@ class AndorDriver(HelaoDriver):
             self.cleanup()
         return response
 
+    def reset_camera_state_for_triggered_aq(
+        self, exp_time: float = 0.0098, framerate: float = 98
+    ) -> DriverResponse:
+        """Leave External Start + Overlap configured without starting acquisition.
+
+        After a Software acquire, TriggerMode is sticky and cannot be changed
+        while Overlap is on (or while FrameRate is still at the SpEC rate).
+        This rewrites features in SDK-safe order so a following External Start
+        acquire (e.g. SpEC) does not hit AT_ERR_OUTOFRANGE. Does not
+        disconnect the camera.
+
+        Call only when acquisition is stopped (after :meth:`cleanup`).
+
+        Args:
+            exp_time: Exposure time in seconds to leave configured.
+            framerate: Frame rate in Hz to leave configured (needs Overlap on).
+
+        Returns:
+            Success :class:`DriverResponse` when features are written.
+        """
+        try:
+            # Drop rate while Overlap is still on (98 Hz is legal there), then
+            # Overlap off → TriggerMode → Overlap on → restore timing.
+            # ~1/(exp + readout); readout ≈ 9.8 ms for this full-AOI binning.
+            safe_fps = 1
+            safe_exp_time = 0.1
+            self.cam.FrameRate = safe_fps
+            self.cam.ExposureTime = safe_exp_time
+            self.cam.TriggerMode = "External Start"
+
+            self.cam.Overlap = False
+            self.cam.Overlap = True
+            self.cam.ExposureTime = exp_time
+            self.cam.FrameRate = framerate
+            response = DriverResponse(
+                response=DriverResponseType.success,
+                message="camera state reset for triggered acquisition",
+                status=DriverStatus.ok,
+            )
+        except Exception:
+            LOGGER.error("reset_camera_state_for_triggered_aq failed", exc_info=True)
+            response = DriverResponse(
+                response=DriverResponseType.failed,
+                status=DriverStatus.error,
+            )
+        return response
+
     def get_data(
         self,
         frames: int,
