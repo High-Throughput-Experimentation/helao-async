@@ -14,6 +14,24 @@ from helao.core.models.run_dir import (
 )
 
 
+import helao.core.drivers.data.sync_driver as _legacy_sync_driver
+import helao.hexagon.adapters.native.sync_driver as _native_sync_driver
+
+
+@pytest.fixture(
+    params=[_legacy_sync_driver, _native_sync_driver], ids=["legacy", "native"]
+)
+def sd(request):
+    """Both syncer implementations, so every new-layout assertion runs twice.
+
+    The hexagon-native syncer is a byte-pinned mirror of the legacy one, and
+    no config in this repository routes a SYNC server to it -- so without
+    this, its behaviour on a RUNS tree would be established only by the
+    parity argument, never by a test that runs it.
+    """
+    return request.param
+
+
 def test_run_root_is_a_single_runs_directory():
     assert run_root("/data").name == "RUNS"
 
@@ -149,14 +167,14 @@ def test_is_same_location_sees_through_normalization(tmp_path: Path):
     assert not is_same_location(src, tmp_path / "DIAG" / "2026" / "0925")
 
 
-def test_a_mover_refuses_when_its_substitution_missed(tmp_path: Path):
+def test_a_mover_refuses_when_its_substitution_missed(tmp_path: Path, sd):
     """Plan A24: the identity rewrite must never reach a move or a removal.
 
     ``move_to_synced`` carried this guard until Task 10 deleted it along with
     the promotion. ``unsync_dir`` is the only mover left in the syncer, and it
     computes its destination the same way.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    SyncDriver = sd.SyncDriver
 
     # No RUNS_SYNCED segment, so .replace(SYNCED, FINISHED) is the identity.
     d = tmp_path / "RUNS" / "2026" / "0925"
@@ -190,7 +208,7 @@ def _legacy_seq(tmp_path: Path, tree: str = "RUNS_FINISHED") -> Path:
 
 
 @pytest.mark.parametrize("builder", [_new_layout_seq, _legacy_seq])
-def test_prg_sits_beside_its_own_yml(tmp_path: Path, builder):
+def test_prg_sits_beside_its_own_yml(tmp_path: Path, builder, sd):
     """Spec §4.5: the receipt lives with the record, not in another tree.
 
     Both layouts, because only the legacy one can tell the two derivations
@@ -200,7 +218,7 @@ def test_prg_sits_beside_its_own_yml(tmp_path: Path, builder):
     the record is not in, which is how moving a station root stranded every
     ``.prg`` ever written.
     """
-    from helao.core.drivers.data.sync_driver import Progress
+    Progress = sd.Progress
 
     yml = builder(tmp_path)
     prog = Progress(yml)
@@ -208,23 +226,22 @@ def test_prg_sits_beside_its_own_yml(tmp_path: Path, builder):
     assert prog.prg.name == "260925.094102000000-seq.prg"
 
 
-def test_synced_path_is_identity_for_a_new_layout_record(tmp_path: Path):
-    from helao.core.drivers.data.sync_driver import HelaoYml
+def test_synced_path_is_identity_for_a_new_layout_record(tmp_path: Path, sd):
+    HelaoYml = sd.HelaoYml
 
     yml = _new_layout_seq(tmp_path)
     assert HelaoYml(yml).synced_path == yml
 
 
-def test_synced_path_still_rewrites_a_legacy_record(tmp_path: Path):
-    from helao.core.drivers.data.sync_driver import HelaoYml
+def test_synced_path_still_rewrites_a_legacy_record(tmp_path: Path, sd):
+    HelaoYml = sd.HelaoYml
 
     yml = _legacy_seq(tmp_path)
     assert "RUNS_SYNCED" in str(HelaoYml(yml).synced_path)
 
 
-def test_no_zip_is_produced_for_a_synced_sequence(tmp_path: Path):
+def test_no_zip_is_produced_for_a_synced_sequence(tmp_path: Path, sd):
     """Spec D9. Paired with the sequence_path alias in Task 12."""
-    import helao.core.drivers.data.sync_driver as sd
 
     assert not hasattr(sd, "move_to_synced")
     assert not hasattr(sd, "revert_to_finished")
@@ -263,23 +280,23 @@ def test_pending_globs_find_records_in_the_new_layout(tmp_path: Path):
 # --- A11: status comes from the record, not from the path -------------------
 
 
-def test_status_of_a_new_layout_record_comes_from_its_meta(tmp_path: Path):
+def test_status_of_a_new_layout_record_comes_from_its_meta(tmp_path: Path, sd):
     """Plan A11: no segment of RUNS/2026/0925 starts with 'RUNS_'.
 
     The path derivation subscripted an empty list, so every new-layout record
     raised IndexError three frames below sync_yml instead of classifying.
     """
-    from helao.core.drivers.data.sync_driver import HelaoYml
+    HelaoYml = sd.HelaoYml
 
     assert HelaoYml(_new_layout_seq(tmp_path / "a", "active")).status == "active"
     assert HelaoYml(_new_layout_seq(tmp_path / "b", "finished")).status == "finished"
 
 
 def test_status_of_a_new_layout_record_is_synced_once_its_prg_is_complete(
-    tmp_path: Path,
+    tmp_path: Path, sd
 ):
     """HloStatus has no 'synced' member; the .prg sidecar is the receipt."""
-    from helao.core.drivers.data.sync_driver import HelaoYml
+    HelaoYml = sd.HelaoYml
 
     yml = _new_layout_seq(tmp_path)
     assert HelaoYml(yml).status == "finished"
@@ -296,16 +313,16 @@ def test_status_of_a_new_layout_record_is_synced_once_its_prg_is_complete(
     ],
 )
 def test_a_legacy_record_still_classifies_from_its_path(
-    tmp_path: Path, tree: str, expected: str
+    tmp_path: Path, tree: str, expected: str, sd
 ):
-    from helao.core.drivers.data.sync_driver import HelaoYml
+    HelaoYml = sd.HelaoYml
 
     assert HelaoYml(_legacy_seq(tmp_path, tree)).status == expected
 
 
-def test_legacy_only_helpers_refuse_a_new_layout_path(tmp_path: Path):
+def test_legacy_only_helpers_refuse_a_new_layout_path(tmp_path: Path, sd):
     """Plan A11: a clear error naming the amendment, not an IndexError."""
-    from helao.core.drivers.data.sync_driver import HelaoYml
+    HelaoYml = sd.HelaoYml
 
     yml = HelaoYml(_new_layout_seq(tmp_path))
     for call in (
@@ -318,19 +335,19 @@ def test_legacy_only_helpers_refuse_a_new_layout_path(tmp_path: Path):
 
 
 def test_sync_yml_refuses_an_active_new_layout_record_and_accepts_a_finished_one(
-    tmp_path: Path,
+    tmp_path: Path, sd
 ):
     """Both `status` reads on sync_yml's main path (plan A11)."""
     import asyncio
 
-    from helao.core.drivers.data.sync_driver import HelaoYml
+    HelaoYml = sd.HelaoYml
 
     for state, expected in (("active", "active"), ("finished", "finished")):
         yml = _new_layout_seq(tmp_path / state, state)
         assert HelaoYml(yml).status == expected
 
     async def drive():
-        from helao.core.drivers.data.sync_driver import SyncDriver
+        SyncDriver = sd.SyncDriver
         from helao.core.models.helaodirs import HelaoDirs
 
         hd = HelaoDirs(
@@ -361,14 +378,14 @@ def test_sync_yml_refuses_an_active_new_layout_record_and_accepts_a_finished_one
 # --- A1: the startup sweep must not re-enqueue everything ever written ------
 
 
-def test_list_pending_skips_records_whose_prg_says_they_shipped(tmp_path: Path):
+def test_list_pending_skips_records_whose_prg_says_they_shipped(tmp_path: Path, sd):
     """Plan A1: save_root IS the search root now, and records never leave it.
 
     Without the .prg filter the startup sweep enqueues every record ever
     written, unbounded -- and has_pending_work() reads that queue, so the
     hot-reload idle gate sits behind the sweep at every start.
     """
-    from helao.core.drivers.data.sync_driver import SyncDriver
+    SyncDriver = sd.SyncDriver
 
     for name, shipped in (("done_seq", True), ("todo_seq", False)):
         d = tmp_path / "RUNS" / "2026" / "0925" / name
