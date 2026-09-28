@@ -8,6 +8,7 @@ of them has to change a test that says what the old value was.
 
 import asyncio
 import json
+import os
 from datetime import datetime
 
 import pytest
@@ -122,9 +123,20 @@ def test_suffix_is_empty_when_neither_rule_applies():
 
 def test_analysis_dir_takes_every_time_component_from_one_stamp():
     ts = datetime(2026, 8, 8, 18, 13, 40)
-    assert analysis_dir("/r/ANALYSES", ts, "AN", "__lbl") == (
-        "/r/ANALYSES/26.31/0808/181340__AN__lbl"
+    assert analysis_dir("/r/ANALYSES", ts, "AN", "__lbl") == os.path.join(
+        "/r/ANALYSES", "2026", "0808", "181340__AN__lbl"
     )
+
+
+def test_analysis_dir_follows_the_runs_tree_not_the_week_number():
+    """``%Y/%m%d``, as ``RUNS`` is. The old ``%y.%U`` week level split one
+    calendar year across two top-level names at a year boundary and could
+    not be read without a week-number table."""
+    ts = datetime(2026, 1, 2, 0, 0, 1)  # %U week 00 of 2026
+    assert analysis_dir("/r/ANALYSES", ts, "AN").split(os.sep)[-3:-1] == [
+        "2026",
+        "0102",
+    ]
 
 
 def test_analysis_timestamp_parses_the_serialized_form():
@@ -214,7 +226,7 @@ def test_publish_writes_the_golden_layout(tmp_path):
     d = (
         tmp_path
         / "ANALYSES"
-        / "26.31"
+        / "2026"
         / "0808"
         / "181340__XAFS_normalize_flatten__Zn-100348"
     )
@@ -291,7 +303,7 @@ def test_a_conversion_straddling_a_second_lands_in_one_directory(tmp_path):
     art = NativeAnalysisArtifact(str(tmp_path / "ANALYSES"), group_dir=True)
     for ts, uid in STRADDLE:
         asyncio.run(art.publish(make_record(analysis_uuid=uid, timestamp=ts)))
-    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "26.31" / "0808").iterdir())
+    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
     assert dirs == ["202332__XAFS_normalize_flatten__Zn-100348"]
 
 
@@ -300,7 +312,7 @@ def test_the_server_shaped_ungrouped_adapter_still_splits(tmp_path):
     art = NativeAnalysisArtifact(str(tmp_path / "ANALYSES"), group_dir=False)
     for ts, uid in STRADDLE:
         asyncio.run(art.publish(make_record(analysis_uuid=uid, timestamp=ts)))
-    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "26.31" / "0808").iterdir())
+    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
     assert dirs == [
         "202332__XAFS_normalize_flatten__Zn-100348",
         "202333__XAFS_normalize_flatten__Zn-100348",
@@ -319,7 +331,7 @@ def test_enqueue_defers_publication_and_flush_performs_it(tmp_path):
 
     asyncio.run(run())
     assert art.pending == []
-    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "26.31" / "0808").iterdir())
+    dirs = sorted(p.name for p in (tmp_path / "ANALYSES" / "2026" / "0808").iterdir())
     assert dirs == ["202332__XAFS_normalize_flatten__Zn-100348"]
 
 

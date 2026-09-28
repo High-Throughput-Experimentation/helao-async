@@ -6,7 +6,7 @@ bucket* lives here and nowhere else:
 * the scalar/array output split and the ``analysis/<uuid>_output_<group>.json``
   key template (:func:`analysis_output_models`),
 * the content-hash analysis uuid (:func:`analysis_uuid_for`),
-* the ``ANALYSES/<yy.ww>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/`` directory
+* the ``ANALYSES/<yyyy>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/`` directory
   grammar and its two suffix rules (:func:`analysis_suffix`,
   :func:`analysis_dir`),
 * the local write and the S3 upload of the model plus one JSON per output group
@@ -247,14 +247,17 @@ def analysis_dir(
 ) -> str:
     """Return the local directory one analysis record is written into.
 
-    The grammar is ``<ana_root>/<yy.ww>/<mmdd>/<HHMMSS>__<name><suffix>``; every
+    The grammar is ``<ana_root>/<yyyy>/<mmdd>/<HHMMSS>__<name><suffix>``, the
+    same ``%Y/%m%d`` date levels as the ``RUNS`` tree. It used to be
+    ``%y.%U/%m%d``; records written that way stay where they are, and every
+    reader globs two date levels deep, so both shapes are found. Every
     time-derived element comes from the single ``timestamp`` argument, so a
     caller that passes one stamp for a batch cannot have that batch split across
-    two directories -- or, at a midnight or week boundary, across two days.
+    two directories -- or, at a midnight or year boundary, across two days.
 
     Args:
         ana_root: The ``ANALYSES`` root.
-        timestamp: Stamp naming the week, day and second components.
+        timestamp: Stamp naming the year, day and second components.
         analysis_name: Name of the analysis routine.
         suffix: Suffix from :func:`analysis_suffix`.
 
@@ -263,7 +266,7 @@ def analysis_dir(
     """
     return os.path.join(
         ana_root,
-        timestamp.strftime("%y.%U"),
+        timestamp.strftime("%Y"),
         timestamp.strftime("%m%d"),
         f"{timestamp.strftime('%H%M%S')}__{analysis_name}{suffix}",
     )

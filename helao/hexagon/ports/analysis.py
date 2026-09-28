@@ -2,7 +2,7 @@
 
 Unifies a private analysis deployment's divergent analysis writers behind a
 single "publish" seam producing the §5 row-13 layout
-(``ANALYSES/<yy.ww>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/`` + per-output JSONs +
+(``ANALYSES/<yyyy>/<mmdd>/<HHMMSS>__<name>[__<suffix>]/`` + per-output JSONs +
 ``analysis/<uuid>.json`` S3 keys, content-hash UUIDs). Converters ENQUEUE
 analyses; they never write the layout themselves.
 

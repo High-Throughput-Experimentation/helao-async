@@ -126,10 +126,14 @@ def test_the_walk_finds_the_run_and_names_it(run_tree, port):
 
 
 def test_a_date_range_scopes_the_walk_on_both_faces(run_tree, port):
-    """Lexicographic ``YY.WW/MMDD``; ``None`` bounds open."""
+    """Calendar days, whichever layout names them; ``None`` bounds open.
+
+    The start bound used to be ``26.31/0101``, which excluded 2026-08-01 only
+    because ``26.31`` sorts after ``26.30`` as a string -- as a date it is
+    1 January. Bounds are compared as calendar dates now."""
     assert len(port.get_index(run_tree, RunDir.FINISHED, "26.30/0801", None)) == 1
-    assert len(port.get_index(run_tree, RunDir.FINISHED, "26.31/0101", None)) == 0
-    assert len(sources.get_index(run_tree, RunDir.FINISHED, "26.31/0101", None)) == 0
+    assert len(port.get_index(run_tree, RunDir.FINISHED, "26.31/0802", None)) == 0
+    assert len(sources.get_index(run_tree, RunDir.FINISHED, "2026/0802", None)) == 0
 
 
 def test_build_source_index_returns_the_same_indexer_the_module_builds(run_tree, port):
