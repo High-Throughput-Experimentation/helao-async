@@ -36,6 +36,7 @@ EXPERIMENTS = [
     "ECMS_sub_pulsecali",
     "ECMS_sub_threegascali",
     "ECMS_sub_unload_cell",
+    "ECMS_sub_cali_second",
 ]
 
 ###
@@ -1237,7 +1238,7 @@ def ECMS_sub_final_clean_cell(
     )
     return apm.planned_actions
 
-
+#used for when calibration gas is connected to first MFC_caligas"
 @experiment(version=1)
 def ECMS_sub_cali(
     CO2flowrate_sccm: float = 20.0,
@@ -1298,6 +1299,67 @@ def ECMS_sub_cali(
 
     return apm.planned_actions
 
+
+#used for when calibration gas is connected to second MFC_Caligassecond"
+@experiment(version=1)
+def ECMS_sub_cali_second(
+    CO2flowrate_sccm: float = 20.0,
+    Califlowrate_sccm: float = 0.0,
+    flow_ramp_sccm: float = 0,
+    MSsignal_quilibrium_time: float = 300,
+) -> list:
+    """Set CO2 and calibration-gas MFC flow rates and wait for the MS to equilibrate.
+
+    Args:
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration-gas flow rate (sccm).
+        flow_ramp_sccm: MFC ramp rate (sccm/s).
+        MSsignal_quilibrium_time: Equilibration wait (s).
+
+    Returns:
+        List of planned actions for the orchestrator.
+    """
+
+    apm = ActionPlanMaker()
+
+    # set CO2 flow rate
+    apm.add(
+        MFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": CO2flowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "CO2",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        MFC_server,
+        "cancel_hold_valve_action",
+        {"device_name": "CO2"},
+        asc.no_wait,
+    )
+    # set Calibration gas flow rate
+    apm.add(NI_server, "gasvalve", {"gasvalve": "7", "on": 1})
+    apm.add(
+        CALIBRATIONMFC_server,
+        "set_flowrate",
+        {
+            "flowrate_sccm": Califlowrate_sccm,
+            "ramp_sccm_sec": flow_ramp_sccm,
+            "device_name": "Caligassecond",
+        },
+        asc.no_wait,
+    )
+    apm.add(
+        CALIBRATIONMFC_server,
+        "cancel_hold_valve_action",
+        {"device_name": "Caligassecond"},
+        asc.no_wait,
+    )
+    apm.add(ORCH_server, "wait", {"waittime": MSsignal_quilibrium_time})
+
+    return apm.planned_actions
 
 @experiment(version=1)
 def ECMS_sub_threegascali(

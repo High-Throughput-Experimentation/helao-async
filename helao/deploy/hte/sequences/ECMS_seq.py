@@ -23,6 +23,7 @@ SEQUENCES = [
     "ECMS_series_CA_recirculation_mixedreactant",
     "ECMS_series_CA_recirculation_mixedthreereactant",
     "ECMS_series_pulseCA",
+    "ECMS_MS_calibration_second",
 ]
 
 from helao.helpers.lib_decorators import sequence
@@ -2173,7 +2174,7 @@ def ECMS_MS_calibration_recirculation(
 #     return epm.planned_experiments
 # =============================================================================
 
-
+#used for when calibration gas is connected to first MFC_Caligas"
 @sequence(version=1)
 def ECMS_MS_calibration(
     reservoir_liquid_sample_no: int = 2,
@@ -2258,6 +2259,89 @@ def ECMS_MS_calibration(
     return epm.planned_experiments
 
 
+#used for when calibration gas is connected to second MFC_Caligassecond"
+@sequence(version=1)
+def ECMS_MS_calibration_second(
+    reservoir_liquid_sample_no: int = 2,
+    volume_ul_cell_liquid: float = 600,
+    # liquid_forward_time: float = 20,
+    liquid_backward_time: float = 80,
+    CO2equilibrium_duration: float = 30,
+    flowrate_sccm: float = 20.0,
+    flow_ramp_sccm: float = 0,
+    MS_baseline_duration_1: float = 120,
+    CO2flowrate_sccm: list[float] = [19, 18, 17, 16, 15],
+    Califlowrate_sccm: list[float] = [1, 2, 3, 4, 5],
+    MSsignal_quilibrium_time_initial: float = 480,
+    MSsignal_quilibrium_time: float = 300,
+    liquid_drain_time: float = 60.0,
+) -> list:
+    """Calibrate the mass spec in the non-recirculating configuration.
+
+    Single-pass variant of the MS calibration sequence.
+
+    Args:
+        reservoir_liquid_sample_no: Liquid-sample number of the reservoir electrolyte.
+        volume_ul_cell_liquid: Cell liquid fill volume (µL).
+        liquid_backward_time: Duration of backward liquid pumping (s).
+        CO2equilibrium_duration: CO2 equilibration duration.
+        flowrate_sccm: Flow rate (sccm).
+        flow_ramp_sccm: Flow ramp (sccm).
+        MS_baseline_duration_1: Mass-spec baseline acquisition duration, segment 1 (s).
+        CO2flowrate_sccm: CO2 flow rate (sccm).
+        Califlowrate_sccm: Calibration flow rate (sccm).
+        MSsignal_quilibrium_time_initial: Initial mass-spec signal equilibration time (s).
+        MSsignal_quilibrium_time: Mass-spec signal equilibration time (s).
+        liquid_drain_time: Duration of the liquid drain (s).
+
+    Returns:
+        List of planned experiments to dispatch.
+    """
+
+    epm = ExperimentPlanMaker()
+
+    epm.add(
+        "ECMS_sub_electrolyte_fill_cell",
+        {
+            # "liquid_forward_time": liquid_forward_time,
+            "liquid_backward_time": liquid_backward_time,
+            "reservoir_liquid_sample_no": reservoir_liquid_sample_no,
+            "volume_ul_cell_liquid": volume_ul_cell_liquid,
+        },
+    )
+    # achiving faster equilibrium time with faster CO2 flow rate
+    epm.add(
+        "ECMS_sub_headspace_purge_and_CO2baseline",
+        {
+            "CO2equilibrium_duration": CO2equilibrium_duration,
+            "flowrate_sccm": flowrate_sccm,
+            "flow_ramp_sccm": flow_ramp_sccm,
+            "MS_baseline_duration": MS_baseline_duration_1,
+        },
+    )
+    for run, (co2gas, caligas) in enumerate(zip(CO2flowrate_sccm, Califlowrate_sccm)):
+        if run == 0:
+            epm.add(
+                "ECMS_sub_cali_second",
+                {
+                    "CO2flowrate_sccm": co2gas,
+                    "Califlowrate_sccm": caligas,
+                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time_initial,
+                },
+            )
+        else:
+            epm.add(
+                "ECMS_sub_cali_second",
+                {
+                    "CO2flowrate_sccm": co2gas,
+                    "Califlowrate_sccm": caligas,
+                    "MSsignal_quilibrium_time": MSsignal_quilibrium_time,
+                },
+            )
+    epm.add("ECMS_sub_normal_state", {})
+    epm.add("ECMS_sub_drain", {"liquid_drain_time": liquid_drain_time})
+
+    return epm.planned_experiments
 @sequence(version=1)
 def ECMS_MS_pulsecalibration(
     reservoir_liquid_sample_no: int = 2,
