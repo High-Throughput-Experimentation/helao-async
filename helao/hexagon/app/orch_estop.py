@@ -75,8 +75,9 @@ class EstopController:
         # reset loop intend
         await orch.intend_none()
 
-        # finalize + move the active experiment/sequence with estopped status so
-        # the partial run is not stranded in RUNS_ACTIVE and can be synced
+        # finalize the active experiment/sequence with estopped status so the
+        # partial run is evicted from the journal and handed to the syncer.
+        # Nothing moves: the record stays where it was written.
         try:
             await orch.estop_finish_active()
         except Exception:
@@ -90,8 +91,8 @@ class EstopController:
         """Signal every registered action server to emergency-stop (or release).
 
         Each server's ``/estop`` endpoint stops its executors and finalizes any
-        in-flight actions with ``estopped`` status (moving them to
-        ``RUNS_FINISHED`` via their normal lifecycle). No placeholder ``estop``
+        in-flight actions with ``estopped`` status (finished in place via their
+        normal lifecycle -- nothing moves). No placeholder ``estop``
         action artifact is generated -- an idle server writes nothing, and estop
         is recorded purely through the ``*_status`` fields of the actions (and,
         orch-side, the experiment/sequence) that were actually running.

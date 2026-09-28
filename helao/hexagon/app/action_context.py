@@ -145,7 +145,8 @@ def _apply_host_context(action: Action, endpoint_func, host) -> None:
 
     Ported after a golden-master run showed its absence: without the
     ``run_type is None`` branch below, a manually dispatched action never gets
-    ``orchestrator = MANUAL`` and therefore never lands in ``RUNS_DIAG`` -- GM-3
+    ``orchestrator = MANUAL`` and therefore never lands in the manual/diagnostic
+    tree (``RUNS_DIAG`` then, ``DIAG`` since the single-run-tree cut-over) -- GM-3
     diffed as an entire missing tree. ``build_action`` originally ported only
     ``_build_action_from_kwargs`` plus the code-identity tail, and
     ``ActionSession.__init__`` happened to cover ``action_server``, so the gap

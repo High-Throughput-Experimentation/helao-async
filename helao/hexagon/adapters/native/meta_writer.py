@@ -4,7 +4,7 @@ Verbatim re-body of the CARDS-P6 ``MetaFileWriter`` collaborator
 (``helao/core/servers/base_meta_writer.py``): the atomic
 temp-file-then-``os.replace`` write, the three ``write_act``/``write_exp``/
 ``write_seq`` writers (``file_type`` first key, trailing newline,
-RUNS_ACTIVE->RUNS_DIAG swap for manual), and the file-connection-key
+manual runs resolved to the ``DIAG`` tree), and the file-connection-key
 helpers. Method bodies are byte-identical to legacy (source-parity-pinned by
 ``test_native_meta_writer.py``); only this docstring, the class name, and
 ``__all__`` differ.
