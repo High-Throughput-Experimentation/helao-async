@@ -245,9 +245,23 @@ def test_every_technique_this_backend_advertises_resolves(server_module):
         assert resolve(name).technique_name == name
 
 
+#: Techniques every backend that has them must spell identically. eclib has
+#: grown four PDF-only techniques (CALIMIT, CPLIMIT, SPEIS, SGEIS) eclib2 does
+#: not carry, by design -- see test_biologic_column_contract.py's
+#: ECLIB_ONLY_TECHNIQUES. That is not a divergence this test should catch.
+SHARED_TECHNIQUE_NAMES = {"OCV", "CA", "CP", "CV", "PEIS", "GEIS", "CAOCV"}
+
+
 def test_the_endpoint_technique_names_are_the_same_across_backends(server_module):
     # The server's run_* endpoints are generated per technique name, so a
-    # backend that spelled them differently would change the route table.
+    # backend that spelled a *shared* technique differently would change the
+    # route table for a station picking either backend. The invariant that
+    # actually matters is narrower than "every backend has every name": a
+    # technique name must mean the same technique on every backend that has
+    # it. eclib carrying extra, eclib-only techniques cannot break a station
+    # -- an eclib2 station never resolves a name eclib2 does not advertise --
+    # so that is not part of what this test checks.
     from helao.deploy.hte.drivers.pstat.biologic.technique import BIOTECHS
 
-    assert set(ec2tech.TECHNIQUE_NAMES) == set(BIOTECHS)
+    assert SHARED_TECHNIQUE_NAMES <= set(ec2tech.TECHNIQUE_NAMES)
+    assert SHARED_TECHNIQUE_NAMES <= set(BIOTECHS)
