@@ -193,13 +193,19 @@ externally managed server is declared.
 | `log_level` | int | Bokeh and Reflex launchers. Falls back to the top-level `log_level`, then `20`. |
 | `regular_update` | bool | `Base` / `Orch`: start a periodic status broadcast. |
 | `regular_update_delay` | float | Seconds between those broadcasts. Default `10`. |
-| `hlo_postprocess_libs` | list[str] | `Base`: `HloPostProcessor` modules run over each `.hlo` file. |
+| `prefinish_hooks` | dict[str, list[str] \| dict] | Action servers: pre-finish hooks by name → action names (`"*"` = all). `hlo_postprocess_libs: [a, b]` is a deprecated alias for `{a: ["*"], b: ["*"]}`. |
 | `action_vis` / `live_vis` | str | Names the visualizer/panel module for this server. See below. |
 | `verbose` | bool | **Nothing.** See the warning below. |
 
 Two more are orchestrator-only but sit at the server level rather than under
-`params:` — `exp_postprocess_libs` and `seq_postprocess_libs`, `MetaProcessor`
-modules run when an experiment or sequence finishes.
+`params:` — `prefinish_experiment_hooks` and `prefinish_sequence_hooks`, hook
+name → experiment/sequence names (`"*"` = all); `exp_postprocess_libs` /
+`seq_postprocess_libs` are their deprecated list aliases. The SYNC server takes
+`postfinish_hooks` with `action`/`experiment`/`sequence` sub-dicts of the same
+shape; when absent the chain is `s3_upload: ["*"]` at every level plus, for
+sequences, `dispatch_analysis` translated from `params.auto_analyze_sequences`.
+An entry that sets an old key and its replacement is refused at startup. Full
+surface: `docs/superpowers/specs/2026-09-28-finish-hooks-design.md`.
 
 > **`verbose:` is declared but never read.** It appears in `ServerConfig` with
 > the docstring "Enables debug-level logging on the server" and is set on 45
