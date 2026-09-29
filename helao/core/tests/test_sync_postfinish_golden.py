@@ -9,14 +9,24 @@ literal below is what the pre-refactor code produced; the refactor may ADD
 may not change anything else asserted here.
 
 Wire-level strengthening over the brief: uploads are recorded as an ORDERED
-list per ``_drive`` step (asserted by exact key-list per step, not just the
-overall set), and the ``action/``, ``experiment/``, ``sequence/`` and
-``process/`` JSON bodies are asserted by FULL dict equality rather than
-containment. Two values are genuinely nondeterministic-by-policy and are
-normalized before that equality check:
+log (every ``to_s3`` call, including a repeat upload to the same key) so a
+per-``_drive``-step ordered key list can be asserted exactly, not just the
+overall key set; and the ``action/``, ``experiment/``, ``sequence/`` and
+``process/`` JSON bodies -- plus the experiment's ``.prg`` (legacy view) --
+are asserted by FULL equality, recursively checking dict KEY ORDER at every
+level in addition to `==` (``_assert_ordered_equal``), since `dict.__eq__`
+ignores key order but the actual S3 upload bytes (``json.dumps`` of the same
+dict) follow it. Two values are genuinely nondeterministic-by-policy and are
+normalized (value replaced by a placeholder, key/position left alone) before
+that equality check:
 
-- ``hlo_version`` (every uploaded meta dict) is the running code's git short
-  SHA -- it changes on every commit, so it is popped recursively.
+- ``hlo_version`` (every uploaded meta dict, and each entry of a nested
+  ``dispatched_actions_abbr`` list) is the running code's git short SHA -- it
+  changes on every commit (confirmed: it changed from ``580b254a`` to
+  ``90ef5cee`` between two runs of this exploration, one commit apart) -- so
+  its *value* is replaced with ``"<HLO_VERSION>"``, recursively, while the key
+  itself stays at its observed position so presence + position are still
+  pinned.
 - ``process_uuid`` is generated (uuid5 over process-defining fields) rather
   than supplied by the test tree; it is replaced everywhere it appears
   (including nested under ``dispatched_actions_abbr`` and in
@@ -30,6 +40,12 @@ what the unchanged code does when it parses the fixture's
 ``action_timestamp`` string as a bare float and treats it as epoch seconds.
 It is fully deterministic for this fixture and is pinned as observed, not
 "fixed".
+
+The experiment's `.prg` (``process_actions_done``, ``process_groups``,
+``process_metas``) uses **int** keys (confirmed by ``repr()``, not
+``json.dumps()``, which would have silently coerced them to strings) -- the
+expected literal must use int keys too, or the ordered-key-list check would
+spuriously fail on a type mismatch that isn't really there.
 """
 
 import asyncio
@@ -63,6 +79,7 @@ EXP_UUID = mk_uuid(1)
 ACT0_UUID = mk_uuid(0)
 ACT1_UUID = mk_uuid(1)  # act_meta(order) uses mk_uuid(order)
 PUUID_PLACEHOLDER = "<PUUID>"
+HLO_VERSION_PLACEHOLDER = "<HLO_VERSION>"
 ANA = {
     "server_key": "ANA",
     "host": "127.0.0.1",
@@ -86,10 +103,14 @@ LEGACY_PRG_KEYS = (
     "legacy_experiment",
 )
 
-#: Golden bodies (post-normalization: no ``hlo_version``, ``process_uuid``
-#: replaced by PUUID_PLACEHOLDER everywhere) for the four record-level S3
-#: uploads. Captured from the unchanged code (see module docstring).
+#: Golden bodies (post-normalization: ``hlo_version`` value replaced by
+#: HLO_VERSION_PLACEHOLDER at its observed key position, ``process_uuid``
+#: value replaced by PUUID_PLACEHOLDER everywhere) for the five record-level
+#: S3 uploads. Key order below is the ACTUAL observed order (verified via
+#: exploration against the unchanged code, not assumed) -- it is asserted by
+#: ``_assert_ordered_equal``, not just ``==``.
 ACT0_EXPECTED = {
+    "hlo_version": HLO_VERSION_PLACEHOLDER,
     "action_uuid": ACT0_UUID,
     "action_actual_order": 0,
     "orch_submit_order": 0,
@@ -120,6 +141,7 @@ ACT0_EXPECTED = {
     "sequence_label": "noLabel",
 }
 ACT1_EXPECTED = {
+    "hlo_version": HLO_VERSION_PLACEHOLDER,
     "action_uuid": ACT1_UUID,
     "action_actual_order": 1,
     "orch_submit_order": 1,
@@ -146,6 +168,7 @@ ACT1_EXPECTED = {
     "sequence_label": "noLabel",
 }
 PROCESS_EXPECTED = {
+    "hlo_version": HLO_VERSION_PLACEHOLDER,
     "process_uuid": PUUID_PLACEHOLDER,
     "sequence_uuid": SEQ_UUID,
     "experiment_uuid": EXP_UUID,
@@ -159,14 +182,25 @@ PROCESS_EXPECTED = {
     "process_params": {"foo": "bar", "p0": 0, "p1": 1},
     "process_group_index": 0,
     "dispatched_actions_abbr": [
-        {"action_uuid": ACT0_UUID, "action_actual_order": 0, "orch_submit_order": 0},
-        {"action_uuid": ACT1_UUID, "action_actual_order": 1, "orch_submit_order": 1},
+        {
+            "hlo_version": HLO_VERSION_PLACEHOLDER,
+            "action_uuid": ACT0_UUID,
+            "action_actual_order": 0,
+            "orch_submit_order": 0,
+        },
+        {
+            "hlo_version": HLO_VERSION_PLACEHOLDER,
+            "action_uuid": ACT1_UUID,
+            "action_actual_order": 1,
+            "orch_submit_order": 1,
+        },
     ],
 }
 EXP_EXPECTED = {
     "experiment_uuid": EXP_UUID,
     "experiment_name": "test_exp",
     "experiment_params": {"foo": "bar"},
+    "hlo_version": HLO_VERSION_PLACEHOLDER,
     "access": "hte",
     "dummy": False,
     "simulation": False,
@@ -182,6 +216,7 @@ SEQ_EXPECTED = {
     "sequence_name": "test_seq",
     "sequence_params": {"p": 1},
     "sequence_label": "golden",
+    "hlo_version": HLO_VERSION_PLACEHOLDER,
     "access": "hte",
     "dummy": False,
     "simulation": False,
@@ -191,17 +226,68 @@ SEQ_EXPECTED = {
 }
 
 
+def _exp_prg_expected(exp_yml_str: str) -> dict:
+    """Full expected legacy-view ``.prg`` for the experiment (see module
+    docstring re: int keys). Already in normalized form (placeholders, not
+    real values) -- the caller compares this against
+    ``_golden_body(_legacy_view(exp_prg), puuid)``, never the raw dict, so
+    both sides carry the same placeholders."""
+    return {
+        "yml": exp_yml_str,
+        "api": True,
+        "s3": True,
+        "process_actions_done": {0: f"{ts(1)}-act.yml", 1: f"{ts(2)}-act.yml"},
+        "process_groups": {0: [0, 1]},
+        "process_metas": {
+            0: {
+                "experiment_uuid": EXP_UUID,
+                "sequence_uuid": SEQ_UUID,
+                "run_type": "test",
+                "process_params": {"foo": "bar", "p0": 0, "p1": 1},
+                "technique_name": "tech_b",
+                "process_uuid": PUUID_PLACEHOLDER,
+                "process_group_index": 0,
+                "dispatched_actions_abbr": [
+                    {
+                        "hlo_version": HLO_VERSION_PLACEHOLDER,
+                        "action_uuid": ACT0_UUID,
+                        "action_actual_order": 0,
+                        "orch_submit_order": 0,
+                    },
+                    {
+                        "hlo_version": HLO_VERSION_PLACEHOLDER,
+                        "action_uuid": ACT1_UUID,
+                        "action_actual_order": 1,
+                        "orch_submit_order": 1,
+                    },
+                ],
+                "process_timestamp": "1970-01-04 00:23:30.120001",
+            }
+        },
+        "process_s3": [0],
+        "process_api": [0],
+        "legacy_finisher_idxs": [1],
+        "legacy_experiment": True,
+    }
+
+
 def _legacy_view(prg_dict: dict) -> dict:
     return {k: v for k, v in prg_dict.items() if k in LEGACY_PRG_KEYS}
 
 
 def _golden_body(payload, puuid: str):
-    """Strip the run-generated ``hlo_version`` and replace the run-generated
-    process uuid with a placeholder, recursively, so the rest of the body can
-    be asserted by full dict equality (see module docstring)."""
+    """Replace the run-generated ``hlo_version`` VALUE (the key stays, at its
+    observed position -- see module docstring) and the run-generated process
+    uuid with placeholders, recursively, so the rest of the body can be
+    asserted by full equality including key order (``_assert_ordered_equal``)."""
     if isinstance(payload, dict):
         return {
-            k: _golden_body(v, puuid) for k, v in payload.items() if k != "hlo_version"
+            k: (
+                HLO_VERSION_PLACEHOLDER
+                if k == "hlo_version"
+                else _golden_body(v, puuid)
+            )
+            for k, v in payload.items()
         }
     if isinstance(payload, list):
         return [_golden_body(v, puuid) for v in payload]
@@ -210,15 +296,45 @@ def _golden_body(payload, puuid: str):
     return payload
 
 
+def _assert_ordered_equal(actual, expected, path: str = "$") -> None:
+    """``==`` plus, recursively at every dict level, ``list(keys) ==
+    list(keys)``: plain dict equality ignores key order, but the actual S3
+    upload bytes (``json.dumps`` of the same dict) follow it, so this is what
+    really pins the wire format rather than just its contents."""
+    assert actual == expected, f"{path}: {actual!r} != {expected!r}"
+    if isinstance(expected, dict):
+        assert list(actual.keys()) == list(
+            expected.keys()
+        ), f"{path} key order: {list(actual.keys())} != {list(expected.keys())}"
+        for k in expected:
+            _assert_ordered_equal(actual[k], expected[k], f"{path}.{k}")
+    elif isinstance(expected, list):
+        for i, (a, e) in enumerate(zip(actual, expected)):
+            _assert_ordered_equal(a, e, f"{path}[{i}]")
+
+
+class _UploadLog(dict):
+    """``{target: latest payload}`` (unchanged interface: still a plain dict
+    for Task 9's reuse -- ``in``, ``[...]``, ``set(...)`` all work as before)
+    PLUS an ordered ``.log`` of EVERY upload, including a repeat upload to the
+    same key. The dict view alone can't show a duplicate (the second write
+    just overwrites the first at the same key), so ``_drive`` slices
+    ``.log`` -- not the dict -- to build each step's ordered key list."""
+
+    def __init__(self):
+        super().__init__()
+        self.log: list[tuple] = []
+
+
 def _record_uploads(drv) -> dict:
-    """Stub ``to_s3`` to record ``{key: payload}``; a dict payload is
-    deep-copied. Plain dict insertion order == upload order (no key in this
-    golden's tree is ever uploaded twice), which is what ``_drive`` below
-    relies on to slice out each step's ordered key list."""
-    uploads: dict = {}
+    """Stub ``to_s3`` to record ``{key: payload}`` plus an ordered upload
+    log (see ``_UploadLog``); a dict payload is deep-copied."""
+    uploads = _UploadLog()
 
     async def accept(msg=None, target=None, compress=False, retries=5):
-        uploads[target] = copy.deepcopy(msg) if isinstance(msg, dict) else str(msg)
+        payload = copy.deepcopy(msg) if isinstance(msg, dict) else str(msg)
+        uploads[target] = payload
+        uploads.log.append((target, payload))
         return True
 
     drv.to_s3 = accept
@@ -263,9 +379,10 @@ def _build_tree(root):
 
 async def _drive(drv, ymls, uploads):
     """Drive ``sync_yml`` for each (yml, rank) pair; return the enqueue_yml
-    calls plus, per step, the ordered list of upload keys added during that
-    step (relies on ``uploads`` being a plain dict populated in insertion
-    order by ``_record_uploads``)."""
+    calls plus, per step, the ordered list of upload keys made during that
+    step -- sliced from ``uploads.log`` (every call, duplicates included),
+    NOT from the dict's keys (which would collapse a duplicate upload to the
+    same key and hide it)."""
     calls = []
 
     async def record(upath, rank=0, rank_limit=-5):
@@ -274,9 +391,9 @@ async def _drive(drv, ymls, uploads):
     drv.enqueue_yml = record
     steps = []
     for yml, rank in ymls:
-        keys_before = set(uploads)
+        log_before = len(uploads.log)
         await asyncio.wait_for(drv.sync_yml(yml_path=yml, rank=rank), timeout=30)
-        steps.append([k for k in uploads if k not in keys_before])
+        steps.append([target for target, _ in uploads.log[log_before:]])
     return calls, steps
 
 
@@ -312,7 +429,7 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
         # --- process uuid (generated; needed to build expected keys) ----
         exp_prg = mod.Progress(exp_yml).dict
         assert len(exp_prg["process_metas"]) == 1, exp_prg
-        ((pidx, pmeta),) = exp_prg["process_metas"].items()
+        ((_pidx, pmeta),) = exp_prg["process_metas"].items()
         puuid = pmeta["process_uuid"]
 
         # --- S3 key set --------------------------------------------------
@@ -345,14 +462,33 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
         }
         assert uploads[f"raw_data/{ACT0_UUID}/{MISC}"] == str(act0.parent / MISC)
 
-        # --- bodies: action/experiment/sequence/process (FULL equality) --
-        assert _golden_body(uploads[f"action/{ACT0_UUID}.json"], puuid) == ACT0_EXPECTED
-        assert _golden_body(uploads[f"action/{ACT1_UUID}.json"], puuid) == ACT1_EXPECTED
-        assert _golden_body(uploads[f"process/{puuid}.json"], puuid) == PROCESS_EXPECTED
-        assert (
-            _golden_body(uploads[f"experiment/{EXP_UUID}.json"], puuid) == EXP_EXPECTED
+        # --- bodies: action/experiment/sequence/process (FULL equality, ---
+        # --- key order included -- see _assert_ordered_equal) ------------
+        _assert_ordered_equal(
+            _golden_body(uploads[f"action/{ACT0_UUID}.json"], puuid),
+            ACT0_EXPECTED,
+            path=f"action/{ACT0_UUID}.json",
         )
-        assert _golden_body(uploads[f"sequence/{SEQ_UUID}.json"], puuid) == SEQ_EXPECTED
+        _assert_ordered_equal(
+            _golden_body(uploads[f"action/{ACT1_UUID}.json"], puuid),
+            ACT1_EXPECTED,
+            path=f"action/{ACT1_UUID}.json",
+        )
+        _assert_ordered_equal(
+            _golden_body(uploads[f"process/{puuid}.json"], puuid),
+            PROCESS_EXPECTED,
+            path=f"process/{puuid}.json",
+        )
+        _assert_ordered_equal(
+            _golden_body(uploads[f"experiment/{EXP_UUID}.json"], puuid),
+            EXP_EXPECTED,
+            path=f"experiment/{EXP_UUID}.json",
+        )
+        _assert_ordered_equal(
+            _golden_body(uploads[f"sequence/{SEQ_UUID}.json"], puuid),
+            SEQ_EXPECTED,
+            path=f"sequence/{SEQ_UUID}.json",
+        )
 
         # --- .prg sidecars (legacy keys only) ----------------------------
         act0_prg = _legacy_view(mod.Progress(act0).dict)
@@ -373,11 +509,14 @@ async def test_default_chain_golden(tmp_path, mod, monkeypatch):
             "files_pending": [],
             "files_s3": {},
         }
+        # Experiment .prg: FULL equality (not spot checks), same
+        # placeholder-normalization + key-order pinning as the S3 bodies.
         exp_view = _legacy_view(exp_prg)
-        assert exp_view["api"] is True and exp_view["s3"] is True
-        assert exp_view["process_s3"] == [pidx] and exp_view["process_api"] == [pidx]
-        assert exp_view["legacy_experiment"] is True
-        assert sorted(exp_view["process_actions_done"]) == [0, 1]
+        _assert_ordered_equal(
+            _golden_body(exp_view, puuid),
+            _exp_prg_expected(str(exp_yml)),
+            path="exp.prg",
+        )
         assert list(exp_yml.parent.glob("*-prc.yml")), "no local -prc.yml written"
         seq_view = _legacy_view(mod.Progress(seq_yml).dict)
         assert seq_view == {"yml": str(seq_yml), "api": True, "s3": True}
