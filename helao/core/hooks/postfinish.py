@@ -1,8 +1,11 @@
 """Post-finish chain runner (spec §6.2). State lives in the ``.prg`` sidecar.
 
 Per record, per ``sync_yml`` pass, for each matching hook in config order:
-``done`` -> skip; non-blocking ``failed`` -> skip (clearing the entry re-arms
-it); otherwise run it. Success -> ``done``; blocking failure -> ``failed`` and
+``done`` -> skip; non-blocking ``failed`` -> skip (clearing the hook's entry
+from ``hooks:`` *and* setting ``synced: false`` re-arms it -- a ``.prg``
+already carrying ``synced: true`` is gated out of ``sync_yml`` before the
+chain is ever reached, so clearing the entry alone is not enough); otherwise
+run it. Success -> ``done``; blocking failure -> ``failed`` and
 stop (the record stays unsynced and the next pass re-runs this hook);
 non-blocking failure -> ``failed`` + alert, continue. The chain reports synced
 when every blocking hook in it is ``done``.
@@ -17,7 +20,7 @@ __all__ = ["run_postfinish_chain"]
 
 from datetime import datetime
 
-from helao.core.hooks import HookSet, PostfinishContext
+from helao.core.hooks import PostfinishContext
 from helao.helpers import helao_logging as logging
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
@@ -31,10 +34,11 @@ async def run_postfinish_chain(syncer, prog, opts: dict) -> bool:
     """Run the record's post-finish chain; return whether it is now synced."""
     level = prog.yml.type
     name = prog.yml.meta.get(f"{level}_name", "NA")
-    hook_set = (getattr(syncer, "postfinish", None) or {}).get(level) or HookSet.empty()
+    hook_set = syncer.postfinish[level]
     chain = hook_set.select(name)
 
-    states = prog.dict.setdefault("hooks", {})
+    states = prog.dict.get("hooks") or {}
+    prog.dict["hooks"] = states
     if "synced" not in prog.dict:
         prog.dict["synced"] = False
     prog.write_dict()
@@ -75,7 +79,8 @@ async def run_postfinish_chain(syncer, prog, opts: dict) -> bool:
             LOGGER.alert(  # type: ignore[attr-defined]
                 f"non-blocking post-finish hook {hook_name!r} failed for {level} "
                 f"{name} ({prog.yml.target.name}): {type(exc).__name__}: {exc}; "
-                "clear its entry in the .prg to re-arm it"
+                "clear its entry from the .prg's hooks: and set synced: false "
+                "to re-arm it"
             )
             continue
         states[hook_name] = {"state": "done", "ts": _ts()}

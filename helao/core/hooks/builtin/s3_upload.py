@@ -13,7 +13,7 @@ process bookkeeping and push the process (settled decision A2).
 
 Failure = raise: a pass that uploads nothing, processes that will not finish,
 an unreadable ``.hlo``, or a failed meta upload all leave the record unsynced
-for the next pass, exactly as ``return False`` did.
+for the next pass.
 """
 
 import asyncio
@@ -30,8 +30,9 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-# Same tables as the sync drivers'; duplicated rather than imported so this
-# module depends on neither twin (they import the hooks package at module top).
+# This hook is the single home of these tables now: neither sync_driver twin
+# defines its own MOD_MAP/MOD_PATCH any more (they import the hooks package at
+# module top, so keeping a copy there would be a cycle, not a duplication).
 MOD_MAP = {
     "action": Action,
     "experiment": Experiment,
@@ -64,14 +65,30 @@ class Hook(FinishHook):
         # next push files to S3 (actions only)
         if prog.yml.type == "action":
             LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
+            # Recorded RELATIVE to the record directory: an absolute entry is
+            # only true for the root it was written under, and a later
+            # relocation of the run trees strands every one of them.
             prog.dict["files_pending"] += [
                 rel
                 for rel in (prog.relpath(p) for p in prog.yml.upload_files)
                 if rel not in prog.dict["files_pending"]
                 and rel not in prog.dict["files_s3"]
             ]
+            # Bounded, because ``to_s3`` returns False rather than raising once
+            # its own five retries are spent: an entry that can never upload
+            # kept this loop spinning in place forever, and the record never
+            # advanced -- one wedged worker per such file, visible only as the
+            # same failure repeating in the log. Two escapes now. A pending path
+            # that is not on disk is dropped outright: it is not data, it is a
+            # glob that landed on an atomic-write staging name (see
+            # ``_is_syncable_misc_file``) and was then persisted into the
+            # sidecar. And a pass that uploads nothing at all raises, leaving
+            # the rest pending for the next scan instead of retrying in place.
             while prog.dict.get("files_pending", []):
                 pending_before = len(prog.dict["files_pending"])
+                # Iterate a copy: the body removes from the live list, which
+                # used to skip the entry after every successful upload and left
+                # the outer ``while`` to pick them up on a later pass.
                 for sp in list(prog.dict["files_pending"]):
                     fp = prog.abspath(sp)
                     if not fp.exists():
@@ -92,10 +109,20 @@ class Hook(FinishHook):
                                 file_s3_key += ".gz"
                             LOGGER.debug("Parsing hlo dicts.")
                             try:
+                                # ``fp``, not ``sp``: the pending list holds the
+                                # record-RELATIVE form, which is what the S3 key
+                                # wants and what survives a relocated run tree,
+                                # but opening a file needs the absolute path.
                                 file_meta, file_data = await asyncio.to_thread(
                                     read_hlo, fp
                                 )
                             except Exception:
+                                # Do NOT fall through to an empty payload. An
+                                # unreadable hlo used to upload {"meta": {},
+                                # "data": {}} and be recorded in files_s3 as a
+                                # success, so the raw data never reached S3 and
+                                # nothing ever retried it -- silent data loss
+                                # that reads as a clean sync.
                                 LOGGER.error(
                                     f"Failed to read hlo file {fp}; leaving it "
                                     "pending rather than uploading an empty "
@@ -124,6 +151,11 @@ class Hook(FinishHook):
                                 )
                                 msg = None
                     else:
+                        # ``sp`` is already the record-relative POSIX form, which
+                        # is exactly what the S3 key wants. This used to recompute
+                        # it with ``fp.relative_to(prog.yml.targetdir)`` -- the
+                        # call that raised ValueError for every sidecar written
+                        # before the run trees were relocated.
                         file_s3_key = f"raw_data/{meta['action_uuid']}/{sp}"
                         msg = fp
                     LOGGER.debug(f"Destination: {file_s3_key}")

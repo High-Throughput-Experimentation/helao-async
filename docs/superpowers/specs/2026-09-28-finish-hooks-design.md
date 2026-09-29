@@ -26,6 +26,11 @@ full list); recorded here because they narrow this spec's open questions.
   clearing the entry alone is not enough, because a `.prg` already carrying
   `synced: true` is gated out of `sync_yml` before the hook chain is ever
   reached.
+- **Ordering correction.** `dispatch_analysis` (a post-finish hook) now runs
+  *before* the `DONE` journal entry and lock removal, while the `.prg` still
+  says `synced: false` at that point -- previously the auto-analysis dispatch
+  ran after both. No reader depends on the relative order of the dispatch, the
+  journal entry, and the lock removal.
 
 ## 1. Problem
 
