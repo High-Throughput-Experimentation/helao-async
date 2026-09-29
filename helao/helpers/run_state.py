@@ -249,16 +249,27 @@ _TAIL_BYTES = 8192
 def _prg_is_complete(prg_path: Path) -> bool:
     """Whether a ``.prg`` sidecar reports its record fully shipped.
 
-    Matched as whole top-level lines against what ``Progress`` actually
-    writes (``yml_dumps`` renders a python bool as a bare lowercase
-    ``true``/``false``), so a path inside ``files_s3`` cannot be mistaken for
-    the flag. Read as flat text rather than through ``yml_load`` so that this
-    module stays free of helao imports and a malformed sidecar degrades to
-    "not complete" instead of raising mid-rebuild.
+    ``synced: true`` (finish-hooks) or, for a sidecar without a ``synced`` key,
+    the legacy ``s3: true`` + ``api: true`` pair. Matched as whole top-level
+    lines against what ``Progress`` actually writes (``yml_dumps`` renders a
+    python bool as a bare lowercase ``true``/``false``), so a path inside
+    ``files_s3`` cannot be mistaken for the flag. Read as flat text rather
+    than through ``yml_load`` so that this module stays free of helao imports
+    and a malformed sidecar degrades to "not complete" instead of raising
+    mid-rebuild.
     """
     try:
         lines = prg_path.read_text(encoding="utf-8").splitlines()
     except OSError:
+        return False
+    # A record that entered the post-finish chain carries `synced` (the chain
+    # runner writes `synced: false` before its first hook), and only that flag
+    # decides: `s3`/`api` are set by the s3_upload hook while later hooks may
+    # still be pending. A sidecar without the key predates the chain and is
+    # judged by the legacy pair (finish-hooks spec 6.3).
+    if "synced: true" in lines:
+        return True
+    if any(line.startswith("synced:") for line in lines):
         return False
     return "s3: true" in lines and "api: true" in lines
 
