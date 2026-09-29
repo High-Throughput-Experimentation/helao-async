@@ -130,6 +130,10 @@ class ExperimentModel(ShortExperimentModel):
     run_id: Optional[UUID] = None
     initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})
+    # Pre-finish hook failures, {"hook", "error", "ts"} each (finish-hooks spec
+    # §5.2). clean_dict drops the empty default, so ymls without failures are
+    # byte-identical to before the field existed.
+    prefinish_errors: list[dict] = Field(default=[])
 
     def append_experiment_status(self, s: HloStatus) -> None:
         """Guarded append onto ``experiment_status`` (see status_transitions.guarded_append)."""
