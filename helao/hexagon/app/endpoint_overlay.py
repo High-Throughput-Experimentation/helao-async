@@ -34,9 +34,10 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Awaitable, Callable
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from helao.core.servers.base_api import BaseAPI
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from helao.hexagon.app.action_host import ActionHost
 
 DynEndpointsRegistrar = Callable[..., Optional[Awaitable[None]]]
 # What `overlay_dyn_endpoints` itself returns: unlike an arbitrary caller-
@@ -53,7 +54,7 @@ class EndpointOverlayError(RuntimeError):
     end of the route table (the legacy delete-then-re-register position)."""
 
 
-async def _run(registrar: DynEndpointsRegistrar, app: BaseAPI) -> None:
+async def _run(registrar: DynEndpointsRegistrar, app: ActionHost) -> None:
     """Invoke a ``dyn_endpoints``-shaped registrar, awaiting it if async.
 
     Mirrors ``helao.core.servers.base_endpoints.init_endpoint_status``'s own
@@ -66,7 +67,7 @@ async def _run(registrar: DynEndpointsRegistrar, app: BaseAPI) -> None:
         await result
 
 
-def _target_path(app: BaseAPI, name: str) -> str:
+def _target_path(app: ActionHost, name: str) -> str:
     """The path a same-named ``@app.post(f"/{server_key}/{name}")`` route
     registers at. Every ``dyn_endpoints`` registrar in this codebase keys its
     routes off ``app.base.server.server_name``; the overlay looks the target
@@ -99,7 +100,7 @@ def overlay_dyn_endpoints(
 
     Returns:
         An ``async def dyn_endpoints(app)`` suitable for passing as
-        ``BaseAPI(..., dyn_endpoints=...)``.
+        ``ActionHost(..., dyn_endpoints=...)``.
 
     Raises:
         EndpointOverlayError: at call time, if an override's target route
@@ -107,7 +108,7 @@ def overlay_dyn_endpoints(
             route at the end of the route table.
     """
 
-    async def dyn_endpoints(app: BaseAPI) -> None:
+    async def dyn_endpoints(app: ActionHost) -> None:
         await _run(base_registrar, app)
 
         for name, override_registrar in overrides.items():

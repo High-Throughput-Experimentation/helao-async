@@ -36,14 +36,17 @@ import asyncio
 import os
 import time
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
 from helao.helpers import yml_tools
 from helao.helpers.run_state import record_active
 from helao.helpers.time_utils import set_time
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from helao.hexagon.app.action_session import ActionSession
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -260,12 +263,14 @@ class RunLifecycle:
             ),
         )
 
-    def start_wait(self, active: Active):
+    def start_wait(self, active: "ActionSession"):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
         orch = self.orch
         orch.wait_task = asyncio.create_task(orch.dispatch_wait_task(active))
 
-    async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
+    async def dispatch_wait_task(
+        self, active: "ActionSession", print_every_secs: int = 5
+    ):
         """Run a long wait action off the HTTP handler so the client doesn't time out.
 
         Args:

@@ -41,7 +41,7 @@ from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.zdeque import zdeque
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from helao.core.servers.base import Active
+    from helao.hexagon.app.action_session import ActionSession
 from helao.hexagon.app import orch_unpack
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring
@@ -403,7 +403,7 @@ class OrchHost(ActionHost):
         return await self.run_lifecycle.write_active_sequence_seq()
 
     async def dispatch_wait_task(
-        self, active: "Active", print_every_secs: int = 5
+        self, active: "ActionSession", print_every_secs: int = 5
     ) -> None:
         """Run the orchestrator's own ``wait`` action to completion."""
         return await self.run_lifecycle.dispatch_wait_task(
