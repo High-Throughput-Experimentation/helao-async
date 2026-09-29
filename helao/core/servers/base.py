@@ -15,9 +15,6 @@ import sys
 import traceback
 from collections.abc import Callable
 from copy import copy, deepcopy
-from glob import glob
-from importlib.machinery import SourceFileLoader
-from importlib.util import module_from_spec, spec_from_file_location
 from socket import gethostname
 from time import time
 from typing import Optional, Union
@@ -828,62 +825,6 @@ class Base:
                     "error finalizing an active action during estop", exc_info=True
                 )
         return finalized
-
-    def import_postprocessors(self, name_list, class_list, proc_class):
-        """Resolve and append post-processor classes from file paths or deployment names.
-
-        Args:
-            name_list: Sequence of file paths or processor-library names.
-            class_list: Output list mutated with matching ``proc_class`` subclasses.
-            proc_class: Base class that every loaded processor must subclass.
-        """
-        proc_class_type = (
-            proc_class.__name__.split("Post")[0].split("Processor")[0].lower()
-        )
-        for pplib in name_list:
-            mod_name = os.path.basename(pplib).split(".py")[0]
-            if pplib.endswith(".py") and os.path.exists(pplib):
-                LOGGER.info(f"Loading {proc_class_type} post-processor from {pplib}")
-                mod_name = os.path.basename(pplib).split(".py")[0]
-                ppclass = SourceFileLoader(mod_name, pplib).load_module().PostProcess
-                if issubclass(ppclass, proc_class):
-                    class_list.append(ppclass)
-            else:
-                script_path = None
-                LOGGER.info(f"Looking for {pplib} post-processor in deployments")
-                deploy_script_path = os.path.join(
-                    "helao",
-                    "deploy",
-                    config_loader.CONFIG["deployment"],
-                    "processors",
-                    f"{pplib}.py",
-                )
-                hte_path = os.path.join(
-                    "helao", "deploy", "hte", "processors", f"{pplib}.py"
-                )
-                any_paths = glob(
-                    os.path.join("helao", "deploy", "*", "processors", f"{pplib}.py")
-                )
-                if os.path.exists(deploy_script_path):
-                    script_path = deploy_script_path
-                elif os.path.exists(hte_path):
-                    script_path = hte_path
-                elif len(any_paths) > 0:
-                    script_path = any_paths[0]
-                if script_path is not None:
-                    LOGGER.info(
-                        f"Loading {proc_class_type} post-processor from {pplib} processors module"
-                    )
-                    proc_spec = spec_from_file_location(mod_name, script_path)
-                    proc_mod = module_from_spec(proc_spec)
-                    proc_spec.loader.exec_module(proc_mod)
-                    ppclass = proc_mod.PostProcess
-                    if issubclass(ppclass, proc_class):
-                        class_list.append(ppclass)
-                else:
-                    LOGGER.info(
-                        f"Post-processor {pplib} was not found in processors module"
-                    )
 
 
 class Active:
