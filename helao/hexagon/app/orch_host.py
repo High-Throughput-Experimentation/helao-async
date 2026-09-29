@@ -564,14 +564,14 @@ class OrchHost(ActionHost):
     def _register_orch_payload_routes(self) -> None:
         """The read-only payload routes and the global-param surface.
 
-        The three payload builders are imported from ``orch_api`` rather
-        than reimplemented: they shape what the operator UIs parse, and a
-        second implementation would drift from the one the Bokeh and Reflex
-        operators are written against. B7 deletes the importer.
+        The three payload builders are imported from ``orch_payloads``
+        rather than reimplemented: they shape what the operator UIs parse,
+        and ``orch_payloads`` is the one implementation -- legacy
+        ``orch_api`` re-exports it.
         """
         from typing import Optional as _Optional
 
-        from helao.core.servers.orch_api import (
+        from helao.hexagon.app.orch_payloads import (
             _histories_payload,
             _history_page_payload,
             _queue_object_payload,
@@ -1125,7 +1125,7 @@ class OrchHost(ActionHost):
         from fastapi import Body
 
         from helao.core.models.hlostatus import HloStatus
-        from helao.core.servers.orch_api import (
+        from helao.hexagon.app.orch_payloads import (
             _queue_counts,
             _set_step_flag,
             _status_summary_payload,
