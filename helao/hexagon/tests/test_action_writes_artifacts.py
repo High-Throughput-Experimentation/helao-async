@@ -27,7 +27,11 @@ import httpx
 import pytest
 
 
-def _app(root: str, postprocess_libs: list[str] | None = None):
+def _app(
+    root: str,
+    postprocess_libs: list[str] | None = None,
+    prefinish_hooks: dict | None = None,
+):
     from helao.deploy.test.servers.action.ws_simulator import makeApp
     from helao.helpers import config_loader
 
@@ -39,6 +43,8 @@ def _app(root: str, postprocess_libs: list[str] | None = None):
     }
     if postprocess_libs is not None:
         server["hlo_postprocess_libs"] = postprocess_libs
+    if prefinish_hooks is not None:
+        server["prefinish_hooks"] = prefinish_hooks
     config_loader.CONFIG = {
         "root": root,
         "dummy": True,
@@ -49,14 +55,18 @@ def _app(root: str, postprocess_libs: list[str] | None = None):
     return makeApp("SIM")
 
 
-async def _started_app(root: str, postprocess_libs: list[str] | None = None):
+async def _started_app(
+    root: str,
+    postprocess_libs: list[str] | None = None,
+    prefinish_hooks: dict | None = None,
+):
     """Build the host and run its startup handlers.
 
     ``httpx.ASGITransport`` does not run lifespan events, and the startup
     handler is what builds the driver and starts the status spine -- without
     it the action has nothing to acquire from.
     """
-    app = _app(root, postprocess_libs)
+    app = _app(root, postprocess_libs, prefinish_hooks)
     for handler in app.router.on_startup:
         # _rpc_startup binds the co-located ZMQ ROUTER on port+10000, which
         # collides with anything already serving that port (a running rig, a
@@ -87,9 +97,13 @@ def _run_files(root: str) -> list[Path]:
     return found
 
 
-async def _run_one_action(root: str, postprocess_libs: list[str] | None = None):
+async def _run_one_action(
+    root: str,
+    postprocess_libs: list[str] | None = None,
+    prefinish_hooks: dict | None = None,
+):
     """Start a host, run one acquire_data to completion, return its files."""
-    app = await _started_app(root, postprocess_libs)
+    app = await _started_app(root, postprocess_libs, prefinish_hooks)
 
     # The executor reads the live buffer on its first poll, and the buffer is
     # filled by live_buffer_task folding what the driver's 10 Hz loop

@@ -35,6 +35,7 @@ from typing import Optional
 from uuid import UUID
 
 from helao.core.error import ErrorCodes
+from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConn, FileConnParams
 from helao.core.models.hlostatus import HloStatus
@@ -389,23 +390,18 @@ class NativeActionFinalizer:
             save_root = str(self.active.base.helaodirs.save_root)
             if self.active.action.manual_action:
                 save_root = redirect_manual_dir(save_root)
-            try:
-                # call custom hlo post-processor if it exists
-                if self.active.base.hlo_postprocessors:
-                    for hpp, libname in zip(
-                        self.active.base.hlo_postprocessors, self.active.base.hlo_postprocess_libs
-                    ):
-                        LOGGER.info(
-                            f"Running custom HLO post-processor: {os.path.basename(libname).split('.py')[0]}"
-                        )
-                        loop = asyncio.get_running_loop()
-                        postprocessor = hpp(self.active.action, save_root)
-                        updated_file_list = await loop.run_in_executor(
-                            None, postprocessor.process
-                        )
-                        self.active.action.files = updated_file_list
-            except Exception:
-                LOGGER.error("Failed to run custom HLO post-processor", exc_info=True)
+            # Pre-finish hooks (finish-hooks spec §5.1): may rewrite
+            # action.files; a raising hook is recorded in prefinish_errors and
+            # the finish goes on. Only the current split is processed, as before.
+            await run_prefinish(
+                self.active.base.prefinish_hooks,
+                record=self.active.action,
+                name=str(self.active.action.action_name),
+                record_dir=os.path.join(
+                    save_root, str(self.active.action.action_output_dir)
+                ),
+                server=self.active.base,
+            )
             try:
                 l10 = self.active.base.actives.pop(self.active.active_uuid, None)
                 if l10 is not None:
