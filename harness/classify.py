@@ -11,6 +11,7 @@ so uuid-encoded links are checked, not ignored (§6.4).
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from enum import Enum
 from pathlib import PurePosixPath
 
@@ -57,6 +58,26 @@ RE_CAM_IMG = re.compile(r"^(cam_\d{6,})_\d{6}\.\d{6}\.jpg$")  # cam_N_%y%m%d.%H%
 
 TOP_IGNORED = {"LOGS", "STATES", "DATABASE", "USER_CONFIG"}
 
+#: What a ``%y.%U`` element normalizes to. Swapped for the duration of a
+#: ``--remap-legacy-layout`` parity run by :func:`fold_legacy_week_token`.
+_YYWW_TOKEN = "YY.WW"
+
+
+@contextmanager
+def fold_legacy_week_token():
+    """Make a ``YY.WW`` element normalize like a 4-digit year (``MMDD``).
+
+    ``26.39`` (legacy) and ``2026`` (unified) then agree everywhere
+    ``normalize_name`` / ``normalize_relpath`` is used, ``*_output_dir`` values
+    included. Restored on exit, exceptions too.
+    """
+    global _YYWW_TOKEN
+    saved, _YYWW_TOKEN = _YYWW_TOKEN, "MMDD"
+    try:
+        yield
+    finally:
+        _YYWW_TOKEN = saved
+
 
 def normalize_name(part: str) -> str:
     """Strip volatile timestamp components from ONE path element (§5.5).
@@ -66,7 +87,7 @@ def normalize_name(part: str) -> str:
     element (action dirs, hlo names, aux filenames) passes through unchanged.
     """
     if RE_YYWW.match(part):
-        return "YY.WW"
+        return _YYWW_TOKEN
     if RE_MMDD.match(part):
         return "MMDD"
     m = RE_META_YML.match(part)
