@@ -5,7 +5,7 @@
 (byte-for-byte) by ``test_orch_dispatch_golden_master.py --check`` via the
 dispatch loop's own end-of-run/end-of-experiment calls, but that harness
 shadows ``write_seq``/``write_exp``/``put_lbuf`` and rebinds
-``helao.core.servers.orch.move_dir`` for its whole run rather than asserting
+``helao.helpers.yml_tools.move_dir`` for its whole run rather than asserting
 on the resulting ``active_*``/``last_*``/history state directly. This module
 is the S6-specific behavior-preservation gate for that close-out state and
 for the two small ``write_active_*`` helpers.
@@ -19,7 +19,7 @@ FastAPI app, no disk I/O, no NTP), populated only with the attributes
 
 Hermetic: no network, no disk I/O -- ``write_seq``/``write_exp``/``put_lbuf``
 are recording no-ops bound directly on the fixture (mirrors the golden
-master's own stub technique), and ``helao.core.servers.orch.move_dir`` is
+master's own stub technique), and ``helao.helpers.yml_tools.move_dir`` is
 monkeypatched with a recording no-op for the duration of each check (restored
 in a ``finally``) since ``finish_active_sequence``/``finish_active_experiment``
 fire-and-forget a background task that calls it.
@@ -32,7 +32,7 @@ import tempfile
 import traceback
 from types import SimpleNamespace
 
-import helao.core.servers.orch as orch_module
+import helao.helpers.yml_tools as yml_tools_module
 from helao.core.hooks import FinishHook, HookSet
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
@@ -111,12 +111,12 @@ def _mk_experiment(name: str) -> Experiment:
 
 
 class _MoveDirRecorder:
-    """Context manager that patches ``helao.core.servers.orch.move_dir`` with a
+    """Context manager that patches ``helao.helpers.yml_tools.move_dir`` with a
     recording no-op, restoring the original in ``__exit__`` -- mirrors the
     dispatch golden-master harness's own ``move_dir`` rebind technique
-    (``finish_active_sequence``/``finish_active_experiment`` import it lazily
-    from ``helao.core.servers.orch`` specifically so this external patch
-    point keeps working post-extraction)."""
+    (``finish_active_sequence``/``finish_active_experiment`` read
+    ``yml_tools.move_dir`` at call time, so this module attribute is the
+    patch point -- B7a, D-B7a.2)."""
 
     def __init__(self):
         self.calls = []
@@ -127,12 +127,12 @@ class _MoveDirRecorder:
             self.calls.append(hobj)
             return None
 
-        self._orig = orch_module.move_dir
-        orch_module.move_dir = _fake_move_dir
+        self._orig = yml_tools_module.move_dir
+        yml_tools_module.move_dir = _fake_move_dir
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        orch_module.move_dir = self._orig
+        yml_tools_module.move_dir = self._orig
 
 
 async def _drain_tasks():

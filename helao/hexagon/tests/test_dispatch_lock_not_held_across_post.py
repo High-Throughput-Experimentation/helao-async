@@ -81,11 +81,11 @@ class _DispatchOrch:
 
 
 def _patch_dispatcher(monkeypatch, fn):
-    # _dispatch_action_locked imports the name from helao.core.servers.orch
-    # at call time, so that module's attribute is the seam.
-    import helao.core.servers.orch as orch_mod
+    # _dispatch_action_locked reads dispatcher.async_action_dispatcher at
+    # call time (B7a, D-B7a.2), so that module attribute is the seam.
+    import helao.helpers.dispatcher as dispatcher_mod
 
-    monkeypatch.setattr(orch_mod, "async_action_dispatcher", fn, raising=True)
+    monkeypatch.setattr(dispatcher_mod, "async_action_dispatcher", fn, raising=True)
 
 
 @pytest.mark.asyncio

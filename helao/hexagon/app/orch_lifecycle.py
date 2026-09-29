@@ -25,13 +25,11 @@ which correctly re-enters through the ``Orch`` delegator rather than calling
 this collaborator directly (internal callers never bypass the ``Orch``
 public surface).
 
-CIRCULAR-IMPORT / MONKEYPATCH NOTE: ``orch.py`` imports this module at
-module top, so ``move_dir`` is imported lazily inside
-``finish_active_sequence``/``finish_active_experiment`` from
-``helao.core.servers.orch`` (rather than bound once at this module's top)
--- this preserves the pre-existing external patch point
-(``helao.core.servers.orch.move_dir``, e.g. the dispatch golden-master
-harness's module-global rebind) exactly as it worked before extraction.
+PATCH-SEAM NOTE (B7a, D-B7a.2): ``move_dir`` is read at call time as
+``yml_tools.move_dir`` inside ``finish_active_sequence``/
+``finish_active_experiment`` and never bound to a name here, so
+``helao.helpers.yml_tools.move_dir`` is its one patch point -- the one the
+dispatch golden master and ``unit_test_orch_lifecycle`` rebind.
 """
 
 import asyncio
@@ -43,6 +41,7 @@ from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
+from helao.helpers import yml_tools
 from helao.helpers.run_state import record_active
 from helao.helpers.time_utils import set_time
 
@@ -62,7 +61,6 @@ class RunLifecycle:
     async def finish_active_sequence(self):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         orch = self.orch
-        from helao.core.servers.orch import move_dir
 
         await orch.orch_wait_for_all_actions()
         if orch.active_sequence is not None:
@@ -119,12 +117,11 @@ class RunLifecycle:
             orch.active_seq_exp_counter = 0
             orch.globalstatusmodel.counter_dispatched_actions = {}
             # DB server call to finish_yml if DB exists
-            orch.aloop.create_task(move_dir(orch.last_sequence, base=orch))
+            orch.aloop.create_task(yml_tools.move_dir(orch.last_sequence, base=orch))
 
     async def finish_active_experiment(self):
         """Finalize the active experiment after waiting for actions and stopping non-blockers."""
         orch = self.orch
-        from helao.core.servers.orch import move_dir
 
         # we need to wait for all actions to finish first
         await orch.orch_wait_for_all_actions()
@@ -216,7 +213,7 @@ class RunLifecycle:
             orch.active_experiment = None
 
             # DB server call to finish_yml if DB exists
-            orch.aloop.create_task(move_dir(orch.last_experiment, base=orch))
+            orch.aloop.create_task(yml_tools.move_dir(orch.last_experiment, base=orch))
 
     async def write_active_experiment_exp(self):
         """Persist the active experiment to disk after snapshotting initial global params."""
