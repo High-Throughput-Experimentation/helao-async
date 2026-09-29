@@ -17,6 +17,7 @@ import logging
 import pytest
 
 import helao.core.drivers.data.sync_driver as legacy_mod
+import helao.core.hooks.builtin.s3_upload as s3_upload_mod
 import helao.hexagon.adapters.native.sync_driver as native_mod
 from helao.hexagon.tests.sync_fixtures import (
     make_action,
@@ -32,7 +33,7 @@ HLO = "data-0.0.0.0__0.hlo"
 @pytest.mark.parametrize("mod", [legacy_mod, native_mod])
 @pytest.mark.asyncio
 async def test_uploaded_hlo_is_not_reported_missing(tmp_path, mod, monkeypatch, caplog):
-    monkeypatch.setattr(mod, "read_hlo", lambda fp: ({}, {}))
+    monkeypatch.setattr(s3_upload_mod, "read_hlo", lambda fp: ({}, {}))
     drv = make_sync_driver(tmp_path, mod.SyncDriver)
     try:
         act_yml = make_action(make_exp_tree(tmp_path, "RUNS", mk_uuid(1)), 0)
