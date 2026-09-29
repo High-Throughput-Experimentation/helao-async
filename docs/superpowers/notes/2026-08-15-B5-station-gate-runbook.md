@@ -175,10 +175,55 @@ scenario.
 With `unstable` checked out, launch the station normally, run the smoke
 sequence from step 5, let it drain, then snapshot the run tree:
 
+Copy **only the step-5 sequence**, keeping its path relative to the run tree.
+Records never move in the unified layout, so `<root>/RUNS` holds every run
+since the cut-over; copying all of it puts unrelated runs on one side of the
+diff. Let `<seq>` be the sequence directory, `<date>` its `%Y/%m%d` parent:
+
 ```
 git rev-parse HEAD                       # record it in the sign-off table
-cp -a <root>/RUNS_FINISHED  <goldens>/<station>/pre/RUNS_FINISHED
-cp -a <root>/RUNS_SYNCED    <goldens>/<station>/pre/RUNS_SYNCED   # if this station syncs
+mkdir -p <goldens>/<station>/pre/root/RUNS/<date>
+cp -a <root>/RUNS/<date>/<seq>*  <goldens>/<station>/pre/root/RUNS/<date>/
+```
+
+The trailing `*` picks up the synced `<seq>.zip` if the station has already
+synced it. A diagnostic sequence is written under `DIAG` instead: substitute
+`DIAG` for `RUNS` here **and** in step 6.
+
+**Legacy-layout golden** (a checkout older than 1df4ecf3, e.g.
+`freeze/pre-legacy-removal_2608`): the sequence sits under
+`RUNS_FINISHED/<yy.ww>/<mmdd>/` or, once synced, `RUNS_SYNCED/<yy.ww>/<mmdd>/`,
+and its process ymls are written outside the run tree, under `PROCESSES`. Copy
+those too, or every process in the candidate reports as extra. Only the ones
+this run wrote, selected by time:
+
+```
+mkdir -p <goldens>/<station>/pre/root
+cd <root>
+cp -a --parents RUNS_FINISHED/<yy.ww>/<mmdd>/<seq>*  <goldens>/<station>/pre/root/  # if not synced
+cp -a --parents RUNS_SYNCED/<yy.ww>/<mmdd>/<seq>*    <goldens>/<station>/pre/root/  # if synced
+find PROCESSES -name '*-prc.yml' -newermt '<sequence start, YYYY-MM-DD HH:MM:SS>' \
+     -exec cp -a --parents {} <goldens>/<station>/pre/root/ \;
+```
+
+Process ymls are keyed by filename alone, so where they sit does not matter.
+Diff this golden with `--remap-legacy-layout` (step 6).
+
+The golden side must be a golden **set**: `harness.parity` refuses a golden
+directory without `provenance.yml` beside `root/`. Write one by hand; all nine
+fields are required, the values are provenance only and are not compared:
+
+```yaml
+# <goldens>/<station>/pre/provenance.yml
+scenario: <station>-smoke
+config_prefix: <station>_hex
+config_path: helao/deploy/hte/configs/<station>_hex.py
+legacy_git_sha: <the rev recorded above>
+launch_cmd: python launch.py <station>_hex --no-hot-reload
+sequence_name: <smoke sequence name>
+sequence_params: {}
+capture_timestamp: <ISO timestamp>
+harness_version: <python -c "import harness; print(harness.HARNESS_VERSION)">
 ```
 
 Readiness probes must POST. Every HELAO private route is a POST, so a GET to
@@ -229,18 +274,32 @@ Queue the sequence this station is normally exercised with and let it drain to
 
 ### 6. Golden diff — the branch's tree against `unstable`'s
 
-Snapshot the run tree the step-5 sequence produced, exactly as in step 1:
+Snapshot the sequence step 5 produced, exactly as in step 1 (`DIAG` for a
+diagnostic sequence):
 
 ```
-cp -a <root>/RUNS_FINISHED  <goldens>/<station>/post/RUNS_FINISHED
-cp -a <root>/RUNS_SYNCED    <goldens>/<station>/post/RUNS_SYNCED
+mkdir -p <goldens>/<station>/post/RUNS/<date>
+cp -a <root>/RUNS/<date>/<seq>*  <goldens>/<station>/post/RUNS/<date>/
 python -m harness.parity --golden <goldens>/<station>/pre \
-                         --candidate <goldens>/<station>/post
+                         --candidate <goldens>/<station>/post \
+                         --report <goldens>/<station>/parity.json
 ```
 
 `harness.parity` accepts a bare capture root as the candidate, so the two
-snapshots compare directly. Expect **0 diffs** beyond the normalizations the
-differ already applies (uuids, timestamps, host names).
+snapshots compare directly.
+
+**A golden captured in the legacy layout** (`RUNS_{FINISHED,SYNCED,...}/%y.%U/%m%d`,
+e.g. on `freeze/pre-legacy-removal_2608`) against a candidate in the unified
+layout (`RUNS/%Y/%m%d`) needs `--remap-legacy-layout`. Without it every file
+reports missing on one side and extra on the other. The flag remaps the
+**golden only**, in the differ's temporary copy (the capture on disk is never
+touched), and folds the `%y.%U` week token onto the `%Y` year token, so
+`*_output_dir` values compare too. It does not relax the candidate: a
+candidate that still writes a legacy `RUNS_*` tree or a `%y.%U` directory or
+`*_output_dir` fails with a `candidate_legacy_layout` finding.
+
+Expect **0 diffs** beyond the normalizations the differ already applies (uuids,
+timestamps, host names).
 
 Both sides must come from the **same sequence on the same hardware**, run once
 on `unstable` and once on the branch. A difference in what was submitted makes
