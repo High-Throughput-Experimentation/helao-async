@@ -123,6 +123,9 @@ class OrchBackend(ABC):
     async def estop(self) -> None: ...
 
     @abstractmethod
+    async def clear_estop(self) -> None: ...
+
+    @abstractmethod
     async def clear_sequences(self) -> None: ...
 
     @abstractmethod
@@ -359,6 +362,9 @@ class RemoteBackend(OrchBackend):
 
     async def estop(self):
         await self._call("estop_orch")
+
+    async def clear_estop(self):
+        await self._call("clear_estop")
 
     async def clear_sequences(self):
         await self._call("clear_sequences")

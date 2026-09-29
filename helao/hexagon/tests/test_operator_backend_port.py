@@ -84,29 +84,29 @@ def test_the_port_and_the_abc_declare_the_same_members():
 
 
 def test_the_mirrored_surface_is_the_measured_one():
-    """29 abstract methods and 4 library attributes, counted not assumed.
+    """30 abstract methods and 4 library attributes, counted not assumed.
 
     The plan and Q8 both say "25-method ABC"; measured, it was 28 abstract
     methods (four of them synchronous) plus the four library dicts the class
     annotates. ``get_history_page`` made it 29 / 33 when the operator's history
-    tables were paginated. Pinning the count as well as the names catches a
+    tables were paginated, and ``clear_estop`` made it 30 / 34. Pinning the count as well as the names catches a
     change that swaps one member for another -- the names would differ, but
     only the count says at a glance that the surface grew or shrank.
     """
-    assert len(OrchBackend.__abstractmethods__) == 29
+    assert len(OrchBackend.__abstractmethods__) == 30
     assert set(OrchBackend.__annotations__) == {
         "sequence_lib",
         "experiment_lib",
         "sequence_codehash",
         "experiment_codehash",
     }
-    assert len(protocol_members(OperatorBackendPort)) == 33
+    assert len(protocol_members(OperatorBackendPort)) == 34
 
 
 def test_each_mirrored_method_keeps_its_async_ness():
     """A name-set pin cannot see ``async``, and awaiting a sync method is a bug.
 
-    Four of the 29 are synchronous -- ``unpack_sequence``, ``get_step_flags``,
+    Four of the 30 are synchronous -- ``unpack_sequence``, ``get_step_flags``,
     ``subscribe``, ``close`` -- because they touch no transport. If the mirror
     declared one of them ``async`` (or made an awaited method sync), every name
     would still match while a caller written against the port would either
@@ -166,6 +166,23 @@ def test_get_orch_state_through_the_port_reaches_the_configured_orch(backend):
     assert state == {"orch_state": "idle"}
     assert len(calls) == 1
     assert calls[0]["endpoint"] == "get_orch_state"
+    assert (calls[0]["orch_key"], calls[0]["host"], calls[0]["port"]) == (
+        "ORCH",
+        "127.0.0.1",
+        8001,
+    )
+
+
+def test_clear_estop_through_the_port_posts_to_the_orchestrator(backend):
+    """The orchestrator's ``/clear_estop`` route was reachable only by curl."""
+    calls = []
+    backend._dispatch = _fake_transport(calls, {})
+    port: OperatorBackendPort = backend
+
+    asyncio.run(port.clear_estop())
+
+    assert len(calls) == 1
+    assert calls[0]["endpoint"] == "clear_estop"
     assert (calls[0]["orch_key"], calls[0]["host"], calls[0]["port"]) == (
         "ORCH",
         "127.0.0.1",
