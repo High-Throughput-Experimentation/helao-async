@@ -48,10 +48,11 @@ from zipfile import ZipFile
 
 import boto3
 
+from helao.core.hooks.config import postfinish_config
+from helao.core.hooks.loader import load_hook_set
+from helao.core.hooks.postfinish import run_postfinish_chain
 from helao.core.models.action import ShortActionModel
-from helao.core.models.file import FileInfo
 from helao.core.models.helaodirs import HelaoDirs
-from helao.core.models.machine import MachineModel
 from helao.core.models.process import ProcessModel
 from helao.core.models.run_dir import (
     SYNC_PROGRESSION,
@@ -62,9 +63,6 @@ from helao.core.models.run_dir import (
 
 # from filelock import FileLock
 from helao.helpers import helao_logging as logging
-from helao.helpers.dispatcher import async_action_dispatcher
-from helao.helpers.hlo_data import hlo_to_parquet, read_hlo
-from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.run_state import (
     DONE,
     UNSYNCED,
@@ -84,20 +82,11 @@ ABR_MAP = {
     "seq": "sequence",
     "prc": "process",
 }
-MOD_MAP = {
-    "action": Action,
-    "experiment": Experiment,
-    "sequence": Sequence,
-    "process": ProcessModel,
-}
 PLURALS = {
     "action": "actions",
     "experiment": "experiments",
     "sequence": "sequences",
     "process": "processes",
-}
-MOD_PATCH = {
-    "exid": "exec_id",
 }
 
 
@@ -1152,17 +1141,33 @@ class SyncDriver:
     progress: dict[str, Progress]
     running_tasks: dict
 
-    def __init__(self, config: dict, helaodirs: HelaoDirs):
+    def __init__(
+        self,
+        config: dict,
+        helaodirs: HelaoDirs,
+        postfinish_hooks: Optional[dict] = None,
+    ):
         """Configure AWS access, queues, locks, and spawn the syncer workers.
 
         Args:
             config: Driver/server config dict; supplies AWS keys, bucket,
                 ``max_tasks``, and ``auto_analyze_sequences``.
             helaodirs: Resolved HELAO directory paths for this server.
+            postfinish_hooks: The SYNC entry's top-level hook config; ``None``
+                selects the default chain (finish-hooks spec §3.2).
         """
         self.config_dict = config
         self.helaodirs = helaodirs
-        self.auto_analyses = self.config_dict.get("auto_analyze_sequences", {})
+        # Post-finish chain per record level (finish-hooks spec §6). Built at
+        # startup so a bad hook config fails here, not on the first record.
+        self.postfinish = {
+            level: load_hook_set(hook_map, phase="postfinish", level=level)
+            for level, hook_map in postfinish_config(
+                postfinish_hooks,
+                self.config_dict.get("auto_analyze_sequences"),
+                "SYNC",
+            ).items()
+        }
         cparser = ConfigParser()
         if "AWS_CONFIG_PATH" in os.environ:
             with open(os.environ["AWS_CONFIG_PATH"]) as f:
@@ -1584,11 +1589,12 @@ class SyncDriver:
     ):
         """Run the full sync pipeline for a single yml file.
 
-        Steps: verify the yml is finished and its children are synced, upload
-        action HLO/misc files to S3 (or convert >1GB hlo to parquet first),
-        finalize any pending processes for an experiment, push the patched
-        metadata JSON to S3 and the API, and finally move the yml plus its
-        files to ``RUNS_SYNCED`` (zipping the sequence directory on success).
+        Steps: verify the yml is finished and its children are synced,
+        reconcile an experiment's processes, run the record's post-finish
+        chain (default: ``s3_upload`` then, for sequences,
+        ``dispatch_analysis``), and when every blocking hook is done record
+        ``DONE`` in the journal, drop lock files and re-queue the parent.
+        Nothing moves and nothing is zipped.
 
         Args:
             yml_path: yml file to sync.
@@ -1628,13 +1634,6 @@ class SyncDriver:
                 f"{str(yml_path)} does not exist, assume yml has moved to synced."
             )
             return True
-
-        meta = copy(prog.yml.meta)
-        # Own the files list: the upload loop renames entries to their S3 names
-        # (.hlo -> .hlo.json), and a shared list would leak that into
-        # prog.yml.meta, where warn_unregistered_files reads it as missing.
-        if "files" in meta:
-            meta["files"] = list(meta["files"] or [])
 
         if prog.yml.status == "synced":
             LOGGER.debug(
@@ -1727,278 +1726,62 @@ class SyncDriver:
 
         LOGGER.debug(f"{str(prog.yml.target)} children are synced, proceeding.")
 
-        # next push files to S3 (actions only)
-        if prog.yml.type == "action":
-            # re-check file lists
-            LOGGER.debug(f"Checking file lists for {prog.yml.target.name}")
-            # Recorded RELATIVE to the record directory: an absolute entry is
-            # only true for the root it was written under, and a later
-            # relocation of the run trees strands every one of them.
-            prog.dict["files_pending"] += [
-                rel
-                for rel in (
-                    prog.relpath(p)
-                    for p in prog.yml.upload_files
-                )
-                if rel not in prog.dict["files_pending"]
-                and rel not in prog.dict["files_s3"]
-            ]
-            # push files to S3
-            #
-            # Bounded, because ``to_s3`` returns False rather than raising once
-            # its own five retries are spent: an entry that can never upload
-            # kept this loop spinning in place forever, and the record never
-            # advanced -- one wedged worker per such file, visible only as the
-            # same failure repeating in the log. Two escapes now. A pending path
-            # that is not on disk is dropped outright: it is not data, it is a
-            # glob that landed on an atomic-write staging name (see
-            # ``_is_syncable_misc_file``) and was then persisted into the
-            # sidecar. And a pass that uploads nothing at all returns, leaving
-            # the rest pending for the next scan instead of retrying in place.
-            while prog.dict.get("files_pending", []):
-                pending_before = len(prog.dict["files_pending"])
-                # Iterate a copy: the body removes from the live list, which
-                # used to skip the entry after every successful upload and left
-                # the outer ``while`` to pick them up on a later pass.
-                for sp in list(prog.dict["files_pending"]):
-                    fp = prog.abspath(sp)
-                    if not fp.exists():
-                        LOGGER.error(
-                            f"Pending file {sp} for {prog.yml.target.name} is not on "
-                            "disk; dropping it from the upload list."
-                        )
-                        prog.dict["files_pending"].remove(sp)
-                        prog.write_dict()
-                        continue
-                    LOGGER.debug(f"Pushing {sp} to S3 for {prog.yml.target.name}")
-                    if fp.suffix == ".hlo":
-                        if fp.stat().st_size < 1024**3:  # 1GB
-                            file_s3_key = (
-                                f"raw_data/{meta['action_uuid']}/{fp.name}.json"
-                            )
-                            if compress:
-                                file_s3_key += ".gz"
-                            LOGGER.debug("Parsing hlo dicts.")
-                            try:
-                                # ``fp``, not ``sp``: the pending list holds the
-                                # record-RELATIVE form, which is what the S3 key
-                                # wants and what survives a relocated run tree,
-                                # but opening a file needs the absolute path.
-                                file_meta, file_data = await asyncio.to_thread(
-                                    read_hlo, fp
-                                )
-                            except Exception:
-                                # Do NOT fall through to an empty payload. An
-                                # unreadable hlo used to upload {"meta": {},
-                                # "data": {}} and be recorded in files_s3 as a
-                                # success, so the raw data never reached S3 and
-                                # nothing ever retried it -- silent data loss
-                                # that reads as a clean sync.
-                                LOGGER.error(
-                                    f"Failed to read hlo file {fp}; leaving it "
-                                    "pending rather than uploading an empty "
-                                    "payload.",
-                                    exc_info=True,
-                                )
-                                raise
-                            msg = {"meta": file_meta, "data": file_data}
-                        else:
-                            LOGGER.debug(
-                                "hlo file larger than 1GB, converting to parquet."
-                            )
-                            file_s3_key = (
-                                f"raw_data/{meta['action_uuid']}/{fp.stem}.parquet"
-                            )
-                            try:
-                                parquet_path = str(fp).replace(".hlo", ".parquet")
-                                await asyncio.to_thread(
-                                    hlo_to_parquet, fp, parquet_path
-                                )
-                                msg = Path(parquet_path)
-                            except Exception:
-                                LOGGER.error(
-                                    f"Failed to convert hlo file {fp} to parquet, skipping upload.",
-                                    exc_info=True,
-                                )
-                                msg = None
-                    else:
-                        # ``sp`` is already the record-relative POSIX form, which
-                        # is exactly what the S3 key wants. This used to recompute
-                        # it with ``fp.relative_to(prog.yml.targetdir)`` -- the
-                        # call that raised ValueError for every sidecar written
-                        # before the run trees were relocated.
-                        file_s3_key = f"raw_data/{meta['action_uuid']}/{sp}"
-                        msg = fp
-                    LOGGER.debug(f"Destination: {file_s3_key}")
-                    file_success = await self.to_s3(
-                        msg=msg,
-                        target=file_s3_key,
-                        compress=compress,
-                    )
-                    if file_success:
-                        LOGGER.debug("Removing file from pending list.")
-                        prog.dict["files_pending"].remove(sp)
-                        LOGGER.info(f"Adding file to S3 dict. {sp}: {file_s3_key}")
-                        prog.dict["files_s3"].update({sp: file_s3_key})
-                        LOGGER.debug(f"Updating progress: {prog.dict}")
-                        prog.write_dict()
-
-                        # update files list with uploaded filename
-                        if fp.name != os.path.basename(file_s3_key):
-                            file_idx = [
-                                i
-                                for i, x in enumerate(meta["files"])
-                                if x["file_name"]
-                                == str(fp.relative_to(prog.yml.targetdir))
-                            ][0]
-                            fileinfo = FileInfo.model_validate(
-                                meta["files"].pop(file_idx)
-                            )
-                            fileinfo.file_name = str(
-                                fp.relative_to(prog.yml.targetdir)
-                            ).replace("\\", "/")
-                            if "." in file_s3_key.split("/")[-1]:
-                                fileinfo.file_name = os.path.basename(file_s3_key)
-                            else:
-                                fileinfo.file_name = fileinfo.file_name.replace(
-                                    f"{fp.suffix}", ""
-                                )
-                            if fileinfo.file_type.endswith(
-                                "helao__file"
-                            ):  # generic file
-                                fileinfo.file_type = fileinfo.file_type.replace(
-                                    "helao__file",
-                                    f"helao__{file_s3_key.split('.')[-1]}_file",
-                                )
-                            meta["files"].append(fileinfo.model_dump())
-                if len(prog.dict["files_pending"]) == pending_before:
-                    LOGGER.error(
-                        f"No file uploaded for {prog.yml.target.name} in a full pass; "
-                        f"leaving {prog.dict['files_pending']} pending. The record "
-                        "stays in RUNS_FINISHED for the next scan rather than "
-                        "retrying in place."
-                    )
-                    return False
-
-        # if prog.yml is an experiment first check processes before pushing to API
         if prog.yml.type == "experiment":
-            LOGGER.debug(f"Finishing processes for {prog.yml.target.name}")
-            # Rebuild process metas from the on-disk action ymls before flushing.
-            # A reset/stale/cross-run .prg may have empty or partial
-            # process_metas even though every child action already synced; this
-            # recovers them so the experiment isn't stuck on "process index
-            # ... missing".
+            # Rebuild process metas from the on-disk action ymls before the
+            # chain flushes them (see reconcile_processes).
             prog = self.reconcile_processes(prog)
-            retry_count = 0
-            s3_unf, api_unf = prog.list_unfinished_procs()
-            while s3_unf or api_unf:
-                if retry_count == retries:
-                    break
-                await self.sync_process(prog, force=True)
-                s3_unf, api_unf = prog.list_unfinished_procs()
-                retry_count += 1
-            if s3_unf or api_unf:
-                LOGGER.info(
-                    f"Processes in {str(prog.yml.target)} did not sync after 3 tries."
-                )
-                return False
-            if prog.dict["process_metas"]:
-                meta["process_list"] = [
-                    d["process_uuid"]
-                    for _, d in sorted(prog.dict["process_metas"].items())
-                ]
 
-        LOGGER.debug(f"Patching model for {prog.yml.target.name}")
-        patched_meta = {MOD_PATCH.get(k, k): v for k, v in meta.items()}
-        meta = MOD_MAP[prog.yml.type](**patched_meta).clean_dict(strip_private=True)
-
-        # patch technique lists in meta
-        tech_name = meta.get("technique_name", "NA")
-        if isinstance(tech_name, list):
-            split_technique = tech_name[meta.get("action_split", 0)]
-            meta["technique_name"] = split_technique
-
-        # next push prog.yml to S3
-        if not prog.s3_done or force_s3:
-            LOGGER.debug(f"Pushing prog.yml->json to S3 for {prog.yml.target.name}")
-            uuid_key = patched_meta[f"{prog.yml.type}_uuid"]
-            meta_s3_key = f"{prog.yml.type}/{uuid_key}.json"
-            s3_success = await self.to_s3(meta, meta_s3_key)
-            if s3_success:
-                prog.dict["s3"] = True
-                prog.write_dict()
-
-        # The API leg is retired: the SQL database is offline and to_api() was a
-        # no-op stub. The flag is still set so the "s3_done and api_done" gate
-        # below can still close the record out.
-        if not prog.api_done or force_api:
-            prog.dict["api"] = True
-            prog.write_dict()
+        # The S3 leg and the analysis dispatch are post-finish hooks now
+        # (finish-hooks spec §6): s3_upload (blocking) and dispatch_analysis
+        # (non-blocking) by default, whatever `postfinish_hooks` names
+        # otherwise. The chain keeps its own state in the .prg.
+        synced = await run_postfinish_chain(
+            self,
+            prog,
+            opts={
+                "retries": retries,
+                "force_s3": force_s3,
+                "force_api": force_api,
+                "compress": compress,
+            },
+        )
+        if not synced:
+            LOGGER.info(
+                f"{str(prog.yml.target)} is not synced after this pass; it stays "
+                "in place for the next scan."
+            )
+            return False
 
         yml_target_name = prog.yml.target.name
         yml_type = prog.yml.type
 
-        # Both legs are in. Nothing moves and nothing is zipped: the record
-        # stays where it was written, and the .prg sidecar beside its yml --
-        # already holding "s3: true" and "api: true" -- is the receipt that it
-        # shipped, which is exactly what rebuild_from_tree reads back (spec
-        # 4.5 D8, D9).
-        if prog.s3_done and prog.api_done:
-            self._journal(yml_path, DONE)
-            for lock_path in prog.yml.lock_files:
-                lock_path.unlink()
-            prog.yml.warn_unregistered_files()
-            LOGGER.debug(f"{yml_target_name} synced in place.")
+        # Every blocking hook is done. Nothing moves and nothing is zipped: the
+        # record stays where it was written, and the .prg sidecar beside its
+        # yml -- now holding "synced: true" -- is the receipt that it shipped,
+        # which is exactly what rebuild_from_tree reads back (spec 4.5 D8, D9).
+        self._journal(yml_path, DONE)
+        for lock_path in prog.yml.lock_files:
+            lock_path.unlink()
+        prog.yml.warn_unregistered_files()
+        LOGGER.debug(f"{yml_target_name} synced in place.")
 
-            if yml_type == "sequence":
-                sequence_name = prog.yml.meta.get("sequence_name", "NA")
-                if sequence_name in self.auto_analyses:
-                    ana_config = self.auto_analyses[sequence_name]
-                    LOGGER.info(
-                        f"dispatching auto-analysis {ana_config['endpoint']} for {sequence_name}"
-                    )
-                    await async_action_dispatcher(
-                        world_config_dict={
-                            "servers": {ana_config["server_key"]: ana_config}
-                        },
-                        A=Action(
-                            action_name=ana_config["endpoint"],
-                            action_server=MachineModel(
-                                server_name=ana_config["server_key"],
-                            ),
-                            action_params={
-                                # A directory now, not a zip (spec D9). The
-                                # analysis endpoints declare `sequence_path`;
-                                # `sequence_zip_path` is still accepted there
-                                # as a deprecated alias for live configs.
-                                "sequence_path": str(prog.yml.target.parent),
-                                "params": ana_config.get("analysis_params", {}),
-                            },
-                        ),
-                    )
+        if yml_target_name in self.running_tasks:
+            LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
+            async with self.aiolock:
+                self.running_tasks.pop(yml_target_name)
 
-            if yml_target_name in self.running_tasks:
-                LOGGER.debug(f"Removing {yml_target_name} from running_tasks.")
-                async with self.aiolock:
-                    self.running_tasks.pop(yml_target_name)
-
-            # if action contributes processes, update processes
-            if yml_type == "action" and meta.get("process_contrib", False):
-                exp_prog = self.update_process(prog.yml, meta)
-                await self.sync_process(exp_prog)
-
-            # Re-queue the parent at its entry rank (finish_yml's ranks). A
-            # parent with unsynced children re-queues itself one rank lower per
-            # pass, and enqueue_yml drops it below rank_limit -- silently, at
-            # DEBUG. A sequence whose actions were still uploading spent that
-            # budget and never synced (so never dispatched its auto-analysis)
-            # until a restart swept it up. Shipping a child is the event the
-            # parent was waiting on, so hand it a fresh budget here.
-            if yml_type != "sequence":
-                parent_yml = prog.yml.parent_yml
-                if parent_yml is not None:
-                    parent_rank = 1 if yml_type == "action" else 2
-                    await self.enqueue_yml(parent_yml, parent_rank)
+        # Re-queue the parent at its entry rank (finish_yml's ranks). A
+        # parent with unsynced children re-queues itself one rank lower per
+        # pass, and enqueue_yml drops it below rank_limit -- silently, at
+        # DEBUG. A sequence whose actions were still uploading spent that
+        # budget and never synced (so never dispatched its auto-analysis)
+        # until a restart swept it up. Shipping a child is the event the
+        # parent was waiting on, so hand it a fresh budget here.
+        if yml_type != "sequence":
+            parent_yml = prog.yml.parent_yml
+            if parent_yml is not None:
+                parent_rank = 1 if yml_type == "action" else 2
+                await self.enqueue_yml(parent_yml, parent_rank)
 
         return_dict = {k: d for k, d in prog.dict.items() if k != "process_metas"}
         return return_dict
@@ -2733,3 +2516,4 @@ class SyncDriver:
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")
+
