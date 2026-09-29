@@ -23,6 +23,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from harness.classify import (
+    RE_MMDD,
+    RE_SEQ_ZIPDIR,
     RE_YYWW,
     ArtifactRow,
     classify_file,
@@ -159,12 +161,29 @@ def _remap_week_dirs(src_top: Path, dst_top: Path) -> None:
         _merge(child, dst_top / name)
 
 
+def _sequence_zipdirs(root: Path) -> list[Path]:
+    """Exploded sequence zips: ``<RUNS|DIAG>/<YYYY>/<MMDD>/<HHMMSS__*>.zipdir``.
+
+    Deliberately only that depth and name shape, so an action's own zip output
+    (``images.zip`` -> ``images.zipdir``) is never mistaken for a sequence.
+    """
+    return [
+        d
+        for top in ("RUNS", "DIAG")
+        for d in sorted((root / top).glob("*/*/*.zipdir"))
+        if d.is_dir()
+        and RE_MMDD.match(d.parent.parent.name)
+        and RE_MMDD.match(d.parent.name)
+        and RE_SEQ_ZIPDIR.match(d.name)
+    ]
+
+
 def remap_legacy_layout(root: Path) -> None:
     """Rewrite a legacy run layout to the unified one, in place.
 
     ``RUNS_{ACTIVE,FINISHED,SYNCED,NOSYNC}/%y.%U/...`` -> ``RUNS/%Y/...``,
-    ``RUNS_DIAG`` -> ``DIAG``, ``ANALYSES/%y.%U`` -> ``ANALYSES/%Y``. Only for an
-    exploded working copy, never a caller's capture. A no-op on a unified tree.
+    ``RUNS_DIAG`` -> ``DIAG``, ``ANALYSES/%y.%U`` -> ``ANALYSES/%Y``, sequence ``<seq>.zipdir`` -> ``<seq>``.
+    Only for an exploded working copy, never a caller's capture. A no-op on a unified tree.
     Raises ValueError rather than overwrite a file present in two legacy trees.
     """
     root = Path(root)
@@ -172,6 +191,10 @@ def remap_legacy_layout(root: Path) -> None:
         if (root / legacy).is_dir():
             _remap_week_dirs(root / legacy, root / unified)
             (root / legacy).rmdir()
+    # The legacy syncer zipped a fully synced sequence (explode_zips turns it
+    # into ``<seq>.zipdir``); the unified layout never zips. ``.origdir`` stays.
+    for zd in _sequence_zipdirs(root):
+        _merge(zd, zd.with_name(zd.name.removesuffix(".zipdir")))
     analyses = root / "ANALYSES"
     if analyses.is_dir():
         for child in sorted(analyses.iterdir()):
@@ -213,7 +236,8 @@ def candidate_legacy_layout(root: Path) -> list[dict]:
 
     Under ``--remap-legacy-layout`` only the golden is remapped, so a candidate
     that regressed to ``RUNS_*`` tops, ``%y.%U`` week dirs, or ``%y.%U``
-    ``*_output_dir`` values must fail rather than be folded into a pass. The
+    ``*_output_dir`` values, or a zipped sequence (the unified layout never zips,
+    spec D9), must fail rather than be folded into a pass. The
     ``*_output_dir`` scan covers every file the parity pass parses as metadata:
     meta ymls, .prg, hlo headers, parquet metadata and S3 json records.
     """
@@ -226,6 +250,10 @@ def candidate_legacy_layout(root: Path) -> list[dict]:
                 for c in sorted((root / top).iterdir())
                 if RE_YYWW.match(c.name)
             ]
+    problems += [
+        f"zipped sequence {d.relative_to(root).as_posix()}"
+        for d in _sequence_zipdirs(root)
+    ]
     for f in _iter_parity_files(root):
         rel = f.relative_to(root).as_posix()
         try:

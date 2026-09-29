@@ -301,6 +301,16 @@ candidate that still writes a legacy `RUNS_*` tree or a `%y.%U` directory or
 Expect **0 diffs** beyond the normalizations the differ already applies (uuids,
 timestamps, host names).
 
+**Scripted (Windows stations).** `helao\hexagon\tests\smoke\eche10_golden_diff.bat`
+wraps steps 1 and 6 for eche10 (`capture pre <seq>`, `capture post <seq>`,
+`diff`); the header documents the order. Its capture helper,
+`station_golden_capture.py`, is stdlib-only and run by path, so copy both files
+out of the repo before checking out the freeze branch for the pre run. `diff`
+must run from a checkout that has `--remap-legacy-layout`, and adds the flag
+itself when the pre capture is in the legacy layout. Let each sequence finish
+syncing (SYNC idle) before capturing it: a legacy golden is then the synced
+`.zip`, which the remap unpacks to match the unified candidate's directory.
+
 Both sides must come from the **same sequence on the same hardware**, run once
 on `unstable` and once on the branch. A difference in what was submitted makes
 the diff unreadable, and this is the only genuinely legacy-vs-native evidence
