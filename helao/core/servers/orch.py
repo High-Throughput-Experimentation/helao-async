@@ -42,10 +42,11 @@ from helao.helpers.dequedict import DequeDict
 from helao.helpers.dispatcher import (
     async_action_dispatcher,  # noqa: F401  re-export: EstopController + orch_dispatch import it from here so orch stays the single golden-master patch point
 )
+from helao.core.hooks.config import prefinish_config
+from helao.core.hooks.loader import load_hook_set
 from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
-from helao.helpers.processors import MetaProcessor
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.yml_tools import (
@@ -175,16 +176,28 @@ class Orch(Base):
         self.status_summary = {}
         self.global_params = {}
 
-        self.exp_postprocessors: list[MetaProcessor] = []
-        self.exp_postprocess_libs = self.server_cfg.get("exp_postprocess_libs", [])
-        self.import_postprocessors(
-            self.exp_postprocess_libs, self.exp_postprocessors, MetaProcessor
+        # Experiment/sequence pre-finish hooks (finish-hooks spec §3, §5.1);
+        # exp_/seq_postprocess_libs are the deprecated aliases.
+        label = str(self.server.server_name)
+        self.prefinish_experiment_hooks = load_hook_set(
+            prefinish_config(
+                self.server_cfg,
+                "prefinish_experiment_hooks",
+                "exp_postprocess_libs",
+                label,
+            ),
+            phase="prefinish",
+            level="experiment",
         )
-
-        self.seq_postprocessors: list[MetaProcessor] = []
-        self.seq_postprocess_libs = self.server_cfg.get("seq_postprocess_libs", [])
-        self.import_postprocessors(
-            self.seq_postprocess_libs, self.seq_postprocessors, MetaProcessor
+        self.prefinish_sequence_hooks = load_hook_set(
+            prefinish_config(
+                self.server_cfg,
+                "prefinish_sequence_hooks",
+                "seq_postprocess_libs",
+                label,
+            ),
+            phase="prefinish",
+            level="sequence",
         )
 
         self._init_collaborators()

@@ -42,17 +42,26 @@ def test_neither_present_is_none():
 
 
 def test_the_syncer_dispatches_the_new_name():
-    """The auto-analysis dispatch must fill the new key with a directory."""
+    """The auto-analysis dispatch must fill the new key with a directory.
+
+    The dispatch moved into the ``dispatch_analysis`` post-finish hook; it no
+    longer lives in either sync_driver twin. It keys the payload off the
+    record's own level (``f"{level}_path"``) rather than hardcoding
+    ``sequence_path``, so an experiment-level dispatch gets ``experiment_path``.
+    """
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[3]
+    dispatch_text = (root / "helao/core/hooks/builtin/dispatch_analysis.py").read_text()
+    assert 'f"{level}_path": str(ctx.yml.target.parent)' in dispatch_text
+
     for src in (
+        "helao/core/hooks/builtin/dispatch_analysis.py",
         "helao/core/drivers/data/sync_driver.py",
         "helao/hexagon/adapters/native/sync_driver.py",
     ):
         text = (root / src).read_text()
-        assert '"sequence_path": str(prog.yml.target.parent)' in text, src
-        assert '"sequence_zip_path": str(' not in text, src
+        assert "sequence_zip_path" not in text, src
 
 
 def test_the_executor_still_accepts_the_old_key():

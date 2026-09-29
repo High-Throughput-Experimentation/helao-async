@@ -13,6 +13,7 @@ from helao.helpers.run_state import (
     UNSYNCED,
     RunStateJournal,
     rebuild_from_tree,
+    _prg_is_complete,
 )
 
 UUID_A = "11111111-1111-1111-1111-111111111111"
@@ -382,3 +383,31 @@ async def test_replace_retries_while_the_target_is_held(tmp_path: Path, monkeypa
     with pytest.raises(PermissionError):
         await fu.replace_when_free(src, dst, timeout=0.1)
     assert not src.exists()
+
+
+def _prg(tmp_path: Path, text: str) -> Path:
+    p = tmp_path / "x.prg"
+    p.write_text(text)
+    return p
+
+
+def test_prg_synced_true_is_complete(tmp_path: Path):
+    assert _prg_is_complete(
+        _prg(
+            tmp_path,
+            "yml: /r/x.yml\napi: false\ns3: false\nhooks:\n  push_api:\n    state: done\nsynced: true\n",
+        )
+    )
+
+
+def test_prg_synced_false_is_incomplete_even_with_legacy_flags(tmp_path: Path):
+    """A record inside the new chain is judged by `synced`, never by s3+api
+    (settled decision A5): s3_upload sets both flags before later hooks run."""
+    assert not _prg_is_complete(
+        _prg(tmp_path, "yml: /r/x.yml\napi: true\ns3: true\nhooks: {}\nsynced: false\n")
+    )
+
+
+def test_prg_without_synced_key_uses_legacy_rule(tmp_path: Path):
+    assert _prg_is_complete(_prg(tmp_path, "yml: /r/x.yml\napi: true\ns3: true\n"))
+    assert not _prg_is_complete(_prg(tmp_path, "yml: /r/x.yml\napi: false\ns3: true\n"))

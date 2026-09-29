@@ -109,6 +109,7 @@ import helao.core.servers.orch as orch_module
 import helao.hexagon.app.orch_monitor as orch_monitor_module
 import helao.hexagon.app.orch_status_sync as orch_status_sync_module
 from helao.core.error import ErrorCodes
+from helao.core.hooks import HookSet
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
@@ -254,10 +255,8 @@ def _make_orch(tmp_root: Path) -> Orch:
     orch.status_summary = {}
     orch.global_params = {}
 
-    orch.exp_postprocessors = []
-    orch.exp_postprocess_libs = []
-    orch.seq_postprocessors = []
-    orch.seq_postprocess_libs = []
+    orch.prefinish_experiment_hooks = HookSet.empty()
+    orch.prefinish_sequence_hooks = HookSet.empty()
 
     orch._init_collaborators()
 

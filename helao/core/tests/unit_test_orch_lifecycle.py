@@ -28,9 +28,12 @@ fire-and-forget a background task that calls it.
 __all__ = ["orch_lifecycle_unit_test"]
 
 import asyncio
+import tempfile
 import traceback
+from types import SimpleNamespace
 
 import helao.core.servers.orch as orch_module
+from helao.core.hooks import FinishHook, HookSet
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import GlobalStatusModel
@@ -56,10 +59,9 @@ def _make_orch() -> Orch:
     orch.ntp_offset = 0.0
     orch.global_params = {}
 
-    orch.seq_postprocessors = []
-    orch.seq_postprocess_libs = []
-    orch.exp_postprocessors = []
-    orch.exp_postprocess_libs = []
+    orch.prefinish_sequence_hooks = HookSet.empty()
+    orch.prefinish_experiment_hooks = HookSet.empty()
+    orch.helaodirs = SimpleNamespace(save_root=tempfile.mkdtemp(prefix="orch_lc_"))
 
     orch.nonblocking = []
     orch.active_sequence = None
@@ -222,12 +224,76 @@ async def _check_write_active_sequence_seq() -> bool:
     ] == ["seq1"]
 
 
+class _ProbeHook(FinishHook):
+    """Records how many `finished` lbuf puts had happened when it ran, and the
+    record name it was handed."""
+
+    def __init__(self, recorded):
+        self.recorded = recorded
+        self.seen = []
+
+    async def run(self, ctx):
+        self.seen.append((len(self.recorded["put_lbuf"]), ctx.record.experiment_name))
+
+
+class _BoomHook(FinishHook):
+    async def run(self, ctx):
+        raise RuntimeError("exp hook boom")
+
+
+async def _check_experiment_hooks_run_before_finished_is_emitted() -> bool:
+    orch, recorded = _make_orch()
+    orch.aloop = asyncio.get_running_loop()
+    probe = _ProbeHook(recorded)
+    orch.prefinish_experiment_hooks = HookSet(
+        cfg={"probe": {"exp1": None}}, hooks={"probe": probe}
+    )
+    orch.active_sequence = _mk_sequence("seq1")
+    orch.active_experiment = _mk_experiment("exp1")
+    with _MoveDirRecorder():
+        await orch.finish_active_experiment()
+        await _drain_tasks()
+    # the hook saw ZERO finished puts (spec §5.1: put_lbuf moves after hooks),
+    # one put happened overall, and the experiment still finished and wrote.
+    return (
+        probe.seen == [(0, "exp1")]
+        and len(recorded["put_lbuf"]) == 1
+        and recorded["write_exp"] == ["exp1"]
+        and orch.last_experiment.prefinish_errors == []
+    )
+
+
+async def _check_failing_hooks_are_recorded_and_finish_goes_on() -> bool:
+    orch, recorded = _make_orch()
+    orch.aloop = asyncio.get_running_loop()
+    orch.prefinish_experiment_hooks = HookSet(
+        cfg={"boom": {"*": None}}, hooks={"boom": _BoomHook()}
+    )
+    orch.prefinish_sequence_hooks = HookSet(
+        cfg={"boom": {"*": None}}, hooks={"boom": _BoomHook()}
+    )
+    orch.active_sequence = _mk_sequence("seq1")
+    orch.active_experiment = _mk_experiment("exp1")
+    with _MoveDirRecorder():
+        await orch.finish_active_experiment()
+        await orch.finish_active_sequence()
+        await _drain_tasks()
+    return (
+        [e["hook"] for e in orch.last_experiment.prefinish_errors] == ["boom"]
+        and [e["hook"] for e in orch.last_sequence.prefinish_errors] == ["boom"]
+        and recorded["write_exp"] == ["exp1"]
+        and recorded["write_seq"] == ["seq1", "seq1"]
+    )
+
+
 async def _run_checks() -> dict:
     return {
         "finish_active_sequence": await _check_finish_active_sequence(),
         "finish_active_experiment": await _check_finish_active_experiment(),
         "write_active_experiment_exp": await _check_write_active_experiment_exp(),
         "write_active_sequence_seq": await _check_write_active_sequence_seq(),
+        "exp_hooks_before_finished": await _check_experiment_hooks_run_before_finished_is_emitted(),
+        "failing_hooks_recorded": await _check_failing_hooks_are_recorded_and_finish_goes_on(),
     }
 
 
@@ -258,6 +324,16 @@ def orch_lifecycle_unit_test() -> bool:
     reporter.check(
         "snapshot initial_global_params (dropping _fast_samples_in) and persist",
         lambda: res["write_active_experiment_exp"] and res["write_active_sequence_seq"],
+    )
+
+    reporter.section("pre-finish hooks")
+    reporter.check(
+        "experiment hooks run BEFORE the finished lbuf put (spec 5.1 reorder)",
+        lambda: res["exp_hooks_before_finished"],
+    )
+    reporter.check(
+        "a raising exp/seq hook lands in prefinish_errors and the record still finishes",
+        lambda: res["failing_hooks_recorded"],
     )
 
     return reporter.success()

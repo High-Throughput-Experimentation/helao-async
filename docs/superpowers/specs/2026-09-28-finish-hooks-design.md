@@ -1,9 +1,36 @@
 # Config-defined pre-finish and post-finish hooks
 
 Date: 2026-09-28
-Status: design approved, plan not yet written
+Status: implemented on unstable (plan: docs/superpowers/plans/2026-09-28-finish-hooks.md); station gate (§8.1) pending
 Builds on: `2026-09-25-runs-layout-and-state-journal-design.md` (single RUNS tree, records finish and sync in place, `.prg` as sync receipt)
 Supersedes: `hlo_postprocess_libs`, `exp_postprocess_libs`, `seq_postprocess_libs`, `auto_analyze_sequences` (kept as aliases)
+
+## Amendments
+
+Decisions settled during implementation (see the plan's constraints for the
+full list); recorded here because they narrow this spec's open questions.
+
+- **A1.** `sync_process` stays whole -- it is parity-pinned as MUST-PRESERVE
+  and is called from the `s3_upload` hook, not split apart. Core keeps only
+  `reconcile_processes`; "process uploads" never became a separate core
+  responsibility.
+- **A5.** A `synced:` line in the `.prg` overrides the legacy `s3`+`api` pair
+  for completeness: `synced: true` is complete, any `synced:` line at all
+  (including `false`) means incomplete under the new rule, and only a sidecar
+  with no `synced:` line at all falls back to `s3: true` and `api: true`. The
+  post-finish runner writes `hooks: {}` and `synced: false` before running the
+  first hook, so a record that ever entered the new chain is never judged by
+  the legacy rule again.
+- **§6.2 re-arm correction.** Re-arming a failed non-blocking hook for retry
+  requires clearing its entry from `hooks:` *and* setting `synced: false` --
+  clearing the entry alone is not enough, because a `.prg` already carrying
+  `synced: true` is gated out of `sync_yml` before the hook chain is ever
+  reached.
+- **Ordering correction.** `dispatch_analysis` (a post-finish hook) now runs
+  *before* the `DONE` journal entry and lock removal, while the `.prg` still
+  says `synced: false` at that point -- previously the auto-analysis dispatch
+  ran after both. No reader depends on the relative order of the dispatch, the
+  journal entry, and the lock removal.
 
 ## 1. Problem
 

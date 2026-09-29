@@ -44,14 +44,18 @@ class NativeSyncer(SyncDriver):
 
     def __init__(self, action_serv: SyncerHost, sync_server_name: Optional[str] = None):
         self.host = action_serv
-        self.config_dict = action_serv.server_cfg.get("params", {})
+        entry = action_serv.server_cfg
+        self.config_dict = entry.get("params", {})
         self.world_config = action_serv.world_cfg
         resolved_key = resolve_sync_server_key(
             self.world_config, preferred=sync_server_name
         )
         if not self.config_dict.get("aws_config_path", False) and resolved_key:
-            self.config_dict = self.world_config["servers"][resolved_key].get(
-                "params", {}
-            )
+            entry = self.world_config["servers"][resolved_key]
+            self.config_dict = entry.get("params", {})
         LOGGER.info("initializing SyncDriver")
-        super().__init__(self.config_dict, self.host.helaodirs)
+        super().__init__(
+            self.config_dict,
+            self.host.helaodirs,
+            postfinish_hooks=entry.get("postfinish_hooks"),
+        )

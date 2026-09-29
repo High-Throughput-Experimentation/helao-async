@@ -149,6 +149,10 @@ class ActionModel(ShortActionModel):
     technique_name: Optional[Union[str, list]] = None
     process_finish: bool = False
     process_contrib: list[ProcessContrib] = Field(default=[])
+    # Pre-finish hook failures, {"hook", "error", "ts"} each (finish-hooks spec
+    # §5.2). clean_dict drops the empty default, so ymls without failures are
+    # byte-identical to before the field existed.
+    prefinish_errors: list[dict] = Field(default=[])
     error_code: Optional[ErrorCodes] = ErrorCodes.none
     process_uuid: Optional[UUID] = None
     data_request_id: Optional[UUID] = None

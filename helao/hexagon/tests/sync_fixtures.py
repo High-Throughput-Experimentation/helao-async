@@ -170,18 +170,26 @@ def assert_region_holds_no_imports() -> None:
     )
 
 
-def make_sync_driver(tmp_root, cls):
+def make_sync_driver(tmp_root, cls, cfg_extra=None, postfinish_hooks=None):
     """Bare sync driver on a tempdir tree; hermetic (s3/api unset).
 
     Must be called with a running event loop (SyncDriver.__init__ spawns the
-    syncer worker tasks). Callers are responsible for teardown_driver()."""
+    syncer worker tasks). Callers are responsible for teardown_driver().
+
+    ``cfg_extra`` is merged into the driver params (e.g. an
+    ``auto_analyze_sequences`` alias block); ``postfinish_hooks`` is the SYNC
+    entry's top-level hook config and is forwarded only when given, so this
+    fixture works against a constructor without that keyword."""
     hd = HelaoDirs(
         root=Path(tmp_root),
         save_root=Path(tmp_root) / RunDir.ACTIVE.value,
         process_root=Path(tmp_root) / "PROCESSES",
     )
     cfg = {"aws_bucket": "test-bucket", "max_tasks": 1}
-    return cls(cfg, hd)
+    cfg.update(cfg_extra or {})
+    if postfinish_hooks is None:
+        return cls(cfg, hd)
+    return cls(cfg, hd, postfinish_hooks=postfinish_hooks)
 
 
 async def teardown_driver(drv) -> None:
