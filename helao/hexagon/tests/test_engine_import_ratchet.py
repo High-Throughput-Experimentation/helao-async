@@ -145,7 +145,6 @@ def test_every_allowlisted_file_still_imports_the_engine() -> None:
     ), f"delete these from ALLOWLIST, they no longer import it: {stale}"
 
 
-@pytest.mark.xfail(strict=True, reason="B7a in progress; Task 12 deletes this marker")
 def test_nothing_outside_the_engine_imports_it() -> None:
     extra = {rel: sites for rel, sites in offenders().items() if rel not in ALLOWLIST}
     assert extra == {}, f"engine imports outside helao/core/servers/: {extra}"
@@ -221,7 +220,6 @@ def legacy() -> dict:
     return _probe("legacy")
 
 
-@pytest.mark.xfail(strict=True, reason="B7a in progress; Task 12 deletes this marker")
 def test_the_native_hosts_construct_without_the_engine(native) -> None:
     assert native["engine_modules"] == []
 
