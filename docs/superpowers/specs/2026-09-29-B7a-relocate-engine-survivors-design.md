@@ -346,3 +346,35 @@ B7a is done when:
   encoder left to clean up — no live code path in its way.
 
 Branch `feat/b7a-relocate-engine-survivors`, merged to `unstable` by PR.
+
+## Amendment 1 (2026-09-29): what planning measured
+
+The implementation plan (`docs/superpowers/plans/2026-09-29-B7a-relocate-engine-survivors.md`,
+"Spec deviations and open questions") dry-ran the whole change on `415c0bb2` and found points
+where this spec was wrong, or could not be carried out as written. The plan's defaults are
+adopted. Where the two disagree, the plan governs, and these are the changes that alter a
+decision or a gate:
+
+- **Gate 2 (golden master) becomes "unchanged", not "green".** The dispatch golden master is
+  already red on `415c0bb2`: 7 PASS, and deterministic DELTAs on S2 and S7, which predate this
+  branch (recorded at `658c94dc` too). The gate is now that the `--check` output and all nine
+  fresh traces are byte-identical to a capture taken on `415c0bb2`.
+- **The §5 red step hangs rather than failing.** With the patch left on the old seam, the real
+  dispatcher retries against `127.0.0.1:8001-8003`. Every red run is wrapped in `timeout` and
+  counts as red on rc≠0 with output that differs from the reference. Ports 8000–8003 must be
+  free before a red run.
+- **A fifth test moves.** `unit_test_orch_unpack.py` patches `PLATE_API` by plain assignment.
+  The §2 grep missed it because it looked only for `setattr`/`patch`.
+- **The `orch_unpack` re-export carries five names**, `seq_unpacker` included.
+- **D-B7a.3 adds two pyright errors in legacy `orch.py`.** Legacy `Orch` passes an `Active` into
+  the shared `RunLifecycle`. The user approved suppressing both with
+  `# pyright: ignore[reportArgumentType]` on the two engine argument lines. B7b deletes those
+  lines anyway.
+- **Gate 4's baseline is re-measured, not assumed.** A worktree has no private deployments,
+  so its failing set is 3 files, not 12.
+- **Gate 3 is an exact set of five failing checklist test IDs** (andor, biologic and nidaqmx
+  drift), not "andor only".
+- **Gate 6 stops the group with SIGTERM**, which runs the same `teardown_group()` as CTRL-x. A
+  finished sequence may be found in `RUNS_SYNCED`.
+- **The §8 route-class assertion checks `APIRoute` instances only.** The legacy hosts are
+  probed in a separate subprocess, because building them loads the engine.
