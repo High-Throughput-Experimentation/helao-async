@@ -133,6 +133,43 @@ async def test_empty_chain_is_synced(tmp_path, mod):
 
 @pytest.mark.parametrize("mod", [legacy_mod, native_mod])
 @pytest.mark.asyncio
+async def test_syncer_without_postfinish_raises_rather_than_reporting_synced(
+    tmp_path, mod
+):
+    """A syncer lacking ``.postfinish`` must fail loudly, not report synced.
+
+    The old code shrugged a missing ``postfinish`` attribute into an empty
+    chain via ``getattr(syncer, "postfinish", None) or {}``, so a
+    misconfigured syncer silently uploaded nothing while the record was
+    still marked synced and journaled DONE.
+    """
+    syncer = SimpleNamespace()  # no .postfinish at all
+    prog = _prog(tmp_path, mod)
+    with pytest.raises(AttributeError):
+        await run_postfinish_chain(syncer, prog, opts={})
+
+
+@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.asyncio
+async def test_hooks_null_in_prg_runs_the_chain_normally(tmp_path, mod):
+    """A ``.prg`` whose ``hooks:`` line loaded as ``None`` must not crash.
+
+    ``prog.dict.setdefault("hooks", {})`` returns ``None`` (not the default)
+    when the key is already present with a null value, so the first
+    ``states.get(...)`` call below used to raise ``AttributeError``.
+    """
+    a = _Hook()
+    syncer = _syncer({"a": a}, {"a": {"*": None}})
+    prog = _prog(tmp_path, mod)
+    prog.dict["hooks"] = None
+    prog.write_dict()
+    prog = mod.Progress(prog.prg)
+    assert await run_postfinish_chain(syncer, prog, opts={}) is True
+    assert mod.Progress(prog.prg).dict["hooks"]["a"]["state"] == "done"
+
+
+@pytest.mark.parametrize("mod", [legacy_mod, native_mod])
+@pytest.mark.asyncio
 async def test_context_carries_yml_prg_syncer_args_opts(tmp_path, mod):
     seen = {}
 

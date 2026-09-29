@@ -2516,4 +2516,3 @@ class SyncDriver:
                 os.makedirs(tp, exist_ok=True)
                 shutil.move(fp, tp)
         LOGGER.warning(f"Successfully reverted {sync_dir}")
-
