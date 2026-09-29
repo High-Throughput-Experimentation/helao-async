@@ -4,7 +4,7 @@ extracted from ``Orch`` (CARDS P5, Stage S6).
 ``Orch.finish_active_sequence``/``finish_active_experiment``/
 ``write_active_experiment_exp``/``write_active_sequence_seq``/``start_wait``/
 ``dispatch_wait_task`` implement the orchestrator's run-lifecycle cluster:
-finalizing the active sequence/experiment (status transition, postprocessors,
+finalizing the active sequence/experiment (status transition, pre-finish hooks,
 disk write, roll-over to ``last_*``, DB move), the two small
 ``initial_global_params``-then-write helpers used mid-run, and the wait-action
 background-task machinery. This module moves those 6 method bodies into a
@@ -39,6 +39,7 @@ import os
 import time
 from copy import deepcopy
 
+from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
@@ -75,17 +76,17 @@ class RunLifecycle:
                 k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
             }
 
-            # post-process experiment object
-            if orch.seq_postprocessors:
-                for spp, libname in zip(
-                    orch.seq_postprocessors, orch.seq_postprocess_libs
-                ):
-                    LOGGER.info(
-                        f"Running custom SEQ post-processor: {os.path.basename(libname).split('.py')[0]}"
-                    )
-                    loop = asyncio.get_running_loop()
-                    postprocessor = spp(orch.active_sequence, orch)
-                    await loop.run_in_executor(None, postprocessor.process)
+            # pre-finish hooks (spec §5.1); may mutate the sequence
+            await run_prefinish(
+                orch.prefinish_sequence_hooks,
+                record=orch.active_sequence,
+                name=str(orch.active_sequence.sequence_name),
+                record_dir=os.path.join(
+                    str(orch.helaodirs.save_root),
+                    orch.active_sequence.get_sequence_dir(),
+                ),
+                server=orch,
+            )
 
             await orch.write_seq(orch.active_sequence)
             orch.last_sequence = deepcopy(orch.active_sequence)
@@ -137,14 +138,6 @@ class RunLifecycle:
             LOGGER.info(
                 f"finished exp uuid is: {orch.active_experiment.experiment_uuid}, adding matching acts to it"
             )
-            await orch.put_lbuf(
-                {
-                    orch.active_experiment.experiment_uuid: {
-                        "experiment_name": orch.active_experiment.experiment_name,
-                        "status": HloStatus.finished.value,
-                    }
-                }
-            )
 
             # orch.active_experiment.dispatched_actions = []
 
@@ -162,17 +155,29 @@ class RunLifecycle:
                 offset=orch.ntp_offset
             )
 
-            # post-process experiment object
-            if orch.exp_postprocessors:
-                for epp, libname in zip(
-                    orch.exp_postprocessors, orch.exp_postprocess_libs
-                ):
-                    LOGGER.info(
-                        f"Running custom EXP post-processor: {os.path.basename(libname).split('.py')[0]}"
-                    )
-                    loop = asyncio.get_running_loop()
-                    postprocessor = epp(orch.active_experiment, orch)
-                    await loop.run_in_executor(None, postprocessor.process)
+            # pre-finish hooks (spec §5.1); may mutate the experiment
+            await run_prefinish(
+                orch.prefinish_experiment_hooks,
+                record=orch.active_experiment,
+                name=str(orch.active_experiment.experiment_name),
+                record_dir=os.path.join(
+                    str(orch.helaodirs.save_root),
+                    orch.active_experiment.get_experiment_dir(),
+                ),
+                server=orch,
+            )
+
+            # `finished` is emitted only after the hooks have had their say
+            # (spec §5.1: this used to sit above them, unlike actions and
+            # sequences).
+            await orch.put_lbuf(
+                {
+                    orch.active_experiment.experiment_uuid: {
+                        "experiment_name": orch.active_experiment.experiment_name,
+                        "status": HloStatus.finished.value,
+                    }
+                }
+            )
 
             # add finished exp to seq
             # !!! add to dispatched_experiments

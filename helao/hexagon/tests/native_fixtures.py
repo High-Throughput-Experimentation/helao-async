@@ -13,6 +13,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from uuid import UUID
 
+from helao.core.hooks import HookSet
 from helao.core.models.file import FileConnParams, HloFileGroup
 from helao.core.models.machine import MachineModel
 from helao.core.servers.base import Active, Base
@@ -42,8 +43,7 @@ def make_base(save_root: str) -> Base:
     base.actives = {}
     base.history = {}  # type: ignore[reportAttributeAccessIssue]
     base.local_action_task_queue = []
-    base.hlo_postprocessors = []
-    base.hlo_postprocess_libs = []
+    base.prefinish_hooks = HookSet.empty()
     base._init_collaborators()
     return base
 

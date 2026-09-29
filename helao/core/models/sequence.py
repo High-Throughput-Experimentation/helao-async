@@ -130,6 +130,10 @@ class SequenceModel(ShortSequenceModel):
     manual_action: bool = False
     initial_global_params: dict = Field(default={})
     finished_global_params: dict = Field(default={})
+    # Pre-finish hook failures, {"hook", "error", "ts"} each (finish-hooks spec
+    # §5.2). clean_dict drops the empty default, so ymls without failures are
+    # byte-identical to before the field existed.
+    prefinish_errors: list[dict] = Field(default=[])
 
     def append_sequence_status(self, s: HloStatus) -> None:
         """Guarded append onto ``sequence_status`` (see status_transitions.guarded_append)."""
