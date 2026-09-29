@@ -651,7 +651,7 @@ class OrchHost(ActionHost):
         ``stop()``/``skip()``. All three are B3b members. The plan put all
         nine action routes in B3a; that was wrong, and this is the seam.
         """
-        from helao.core.servers.orch_api import WaitExec, checkcond
+        from helao.hexagon.app.orch_wait import WaitExec, checkcond
         from helao.hexagon.app.action_context import ActionContext, action_version
 
         @self.action()
