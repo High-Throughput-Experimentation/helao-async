@@ -830,7 +830,9 @@ class Orch(Base):
 
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
-        return self.run_lifecycle.start_wait(active)
+        return self.run_lifecycle.start_wait(
+            active,  # pyright: ignore[reportArgumentType]  legacy Active; B7b deletes this
+        )
 
     async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
         """Run a long wait action off the HTTP handler so the client doesn't time out.
@@ -843,7 +845,8 @@ class Orch(Base):
             The finished action returned by ``active.finish()``.
         """
         return await self.run_lifecycle.dispatch_wait_task(
-            active, print_every_secs=print_every_secs
+            active,  # pyright: ignore[reportArgumentType]  legacy Active; B7b deletes this
+            print_every_secs=print_every_secs,
         )
 
     async def active_action_monitor(self):
