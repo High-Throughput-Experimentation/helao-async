@@ -395,6 +395,27 @@ class GamryComAdapter(HelaoDriver):
         fut = self._require_thread().submit(lambda: asyncio.run(self._driver.stop()))
         return await asyncio.wrap_future(fut)
 
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Run the legacy driver's ``estop`` on the owning COM thread.
+
+        Same marshalling as :meth:`stop`. Never raises: an adapter that is not
+        connected has no cell to turn off, so that is logged and the E-STOP goes on.
+        """
+        import asyncio
+
+        thread, driver = self._thread, self._driver
+        if not switch:
+            return switch
+        if thread is None or not thread.running or driver is None:
+            LOGGER.warning("PSTAT estop: adapter not connected, nothing to turn off")
+            return switch
+        fut = thread.submit(lambda: asyncio.run(driver.estop(switch)))
+        # Shielded: the route bounds this call with ``wait_for``, and cancelling
+        # a bare ``wrap_future`` cancels the ``concurrent.futures.Future`` too.
+        # The COM worker skips a cancelled item it has not started, so CellOff
+        # would never run. Shielded, a timeout abandons the wait, not the estop.
+        return await asyncio.shield(asyncio.wrap_future(fut))
+
     def cleanup(self, *args, **kwargs):
         resp = self._require_thread().call(self._driver.cleanup, *args, **kwargs)
         self._active = None

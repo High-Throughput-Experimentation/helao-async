@@ -27,6 +27,7 @@ idiom :mod:`helao.core.servers.orch_dispatch` and
 module-global patch point the dispatch golden master rebinds.
 """
 
+import asyncio
 import traceback
 from copy import deepcopy
 
@@ -39,6 +40,12 @@ from helao.helpers.premodels import Action
 from helao.helpers.time_utils import set_time
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Per-server bound on the E-STOP dispatch. Above the server route's 2 s driver
+#: bound plus the dispatcher's 3 s RPC probe. A server whose event loop is frozen
+#: hangs its dispatch forever (the HTTP fallback has no total timeout), and
+#: without this the finalization and alert after the fan-out never run.
+ESTOP_SEND_TIMEOUT_S = 10.0
 
 
 class EstopController:
@@ -114,12 +121,35 @@ class EstopController:
         from helao.core.servers.orch import async_action_dispatcher
 
         orch = self.orch
-        LOGGER.info("estopping all servers")
+        LOGGER.info(
+            "estopping all servers" if switch else "releasing E-STOP on all servers"
+        )
 
-        for (
-            action_server_key,
-            actionservermodel,
-        ) in orch.globalstatusmodel.server_dict.items():
+        async def _send(name: str, A: Action) -> None:
+            try:
+                # pass switch as an explicit query/RPC param so it reliably
+                # reaches the endpoint's `switch` parameter
+                _ = await asyncio.wait_for(
+                    async_action_dispatcher(
+                        orch.world_cfg, A, params={"switch": switch}
+                    ),
+                    ESTOP_SEND_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError:
+                LOGGER.error(
+                    f"estop for {name} timed out after {ESTOP_SEND_TIMEOUT_S}s; "
+                    f"continuing without it"
+                )
+            except Exception as e:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                # no estop endpoint for this action server?
+                LOGGER.error(f"estop for {name} failed with: {repr(e), tb,}")
+
+        # Concurrent: one server that never answers must not starve the servers
+        # after it of their E-STOP. The send lines are logged first, in
+        # ``server_dict`` order.
+        sends = []
+        for actionservermodel in orch.globalstatusmodel.server_dict.values():
             # A minimal estop action -- the endpoint ignores the action payload
             # entirely now (it operates on whatever actions were already running),
             # so no experiment/sequence identity needs to be attached.
@@ -129,21 +159,10 @@ class EstopController:
                 action_params={"switch": switch},
                 start_condition=ActionStartCondition.no_wait,
             )
-            LOGGER.info(
-                f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}"
-            )
-            try:
-                # pass switch as an explicit query/RPC param so it reliably
-                # reaches the endpoint's `switch` parameter
-                _ = await async_action_dispatcher(
-                    orch.world_cfg, A, params={"switch": switch}
-                )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                # no estop endpoint for this action server?
-                LOGGER.error(
-                    f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}"
-                )
+            name = actionservermodel.action_server.disp_name()
+            LOGGER.info(f"Sending estop={switch} request to {name}")
+            sends.append(_send(name, A))
+        await asyncio.gather(*sends, return_exceptions=True)
 
     async def estop_finish_active(self):
         """Finalize the active experiment and sequence with estopped status on e-stop.
