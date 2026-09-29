@@ -18,10 +18,10 @@ servers:
     fast: async_orch2
     deployment: hexagon
     params: {}
-    exp_postprocess_libs:
-      - append_params
-    seq_postprocess_libs:
-      - append_params
+    prefinish_experiment_hooks:
+      append_params: ["*"]
+    prefinish_sequence_hooks:
+      append_params: ["*"]
   SIM:
     host: 127.0.0.1
     port: 8002
@@ -29,8 +29,8 @@ servers:
     fast: ws_simulator
     live_vis: wssim_live_vis
     params: {}
-    hlo_postprocess_libs:
-      - hlo_to_csv
+    prefinish_hooks:
+      hlo_to_csv: ["*"]
   SYNC:
     host: 127.0.0.1
     port: 8010
