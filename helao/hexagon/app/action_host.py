@@ -44,9 +44,10 @@ from fastapi import Body, WebSocket, WebSocketDisconnect
 from websockets.exceptions import ConnectionClosedOK
 
 from helao.core.drivers.helao_driver import DriverPoller, DriverStatus, HelaoDriver
+from helao.core.hooks.config import prefinish_config
+from helao.core.hooks.loader import load_hook_set
 from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.helpers import helao_logging as logging
-from helao.helpers.processors import HloPostProcessor
 from helao.core.error import ErrorCodes
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.dispatcher import async_private_dispatcher
@@ -232,10 +233,15 @@ class ActionHost(HelaoFastAPI):
         #: Recently contained actions, newest first. Bounded exactly as legacy.
         self.history = DequeDict(maxlen=200)
 
-        self.hlo_postprocessors: list = []
-        self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
-        self.import_postprocessors(
-            self.hlo_postprocess_libs, self.hlo_postprocessors, HloPostProcessor
+        # Pre-finish hooks for this server's actions (finish-hooks spec §3,
+        # §5.1). `hlo_postprocess_libs` is the deprecated alias; a bad config
+        # raises here rather than degrading to "no hooks".
+        self.prefinish_hooks = load_hook_set(
+            prefinish_config(
+                self.server_cfg, "prefinish_hooks", "hlo_postprocess_libs", server_key
+            ),
+            phase="prefinish",
+            level="action",
         )
 
         # Legacy declares these defaults (base.py:210-211) and then overwrites

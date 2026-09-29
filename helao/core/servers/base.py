@@ -30,6 +30,8 @@ from fastapi import WebSocket
 from pydantic import ValidationError
 
 from helao.core.error import ErrorCodes
+from helao.core.hooks.config import prefinish_config
+from helao.core.hooks.loader import load_hook_set
 from helao.core.models.action import ActionModel
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.file import (
@@ -82,7 +84,6 @@ from helao.helpers.helao_dirs import helao_dirs
 from helao.helpers.helao_logging import print_message
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
-from helao.helpers.processors import HloPostProcessor
 from helao.helpers.run_state import RunStateJournal, record_active
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.time_utils import (
@@ -224,11 +225,15 @@ class Base:
         self.local_action_queue = zdeque([])
         self.fast_urls = []
 
-        self.hlo_postprocessors: list[HloPostProcessor] = []
-        self.hlo_postprocess_libs = self.server_cfg.get("hlo_postprocess_libs", [])
-
-        self.import_postprocessors(
-            self.hlo_postprocess_libs, self.hlo_postprocessors, HloPostProcessor
+        self.prefinish_hooks = load_hook_set(
+            prefinish_config(
+                self.server_cfg,
+                "prefinish_hooks",
+                "hlo_postprocess_libs",
+                str(self.server.server_name),
+            ),
+            phase="prefinish",
+            level="action",
         )
 
         self.ntp_last_sync, self.ntp_offset = read_saved_offset(

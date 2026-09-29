@@ -110,6 +110,7 @@ import helao.core.servers.active_finalizer as finalizer_module
 import helao.core.servers.base as base_module
 import helao.helpers.premodels as premodels_module
 from helao.core.error import ErrorCodes
+from helao.core.hooks import HookSet
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConnParams, HloFileGroup
 from helao.core.models.hlostatus import HloStatus
@@ -518,8 +519,7 @@ def _make_base(save_root: Path, trace: list) -> Base:
     base.history = DequeDict(maxlen=200)
     base.executors = {}
     base.local_action_task_queue = []
-    base.hlo_postprocessors = []
-    base.hlo_postprocess_libs = []
+    base.prefinish_hooks = HookSet.empty()
     base.live_q = MultisubscriberQueue()
     base.live_buffer = {}
     base._init_collaborators()

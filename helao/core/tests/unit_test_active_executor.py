@@ -39,6 +39,7 @@ from uuid import UUID
 
 import helao.core.servers.base as base_module
 from helao.core.error import ErrorCodes
+from helao.core.hooks import HookSet
 from helao.core.models.file import FileConnParams, HloFileGroup
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
@@ -80,8 +81,7 @@ def _make_base(save_root: str) -> Base:
     base.history = DequeDict(maxlen=200)
     base.executors = {}
     base.local_action_task_queue = []
-    base.hlo_postprocessors = []
-    base.hlo_postprocess_libs = []
+    base.prefinish_hooks = HookSet.empty()
     base.live_q = MultisubscriberQueue()
     base.live_buffer = {}
     base._init_collaborators()
