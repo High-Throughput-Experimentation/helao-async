@@ -378,3 +378,30 @@ decision or a gate:
   finished sequence may be found in `RUNS_SYNCED`.
 - **The §8 route-class assertion checks `APIRoute` instances only.** The legacy hosts are
   probed in a separate subprocess, because building them loads the engine.
+
+## Amendment 2 (2026-09-29): what the final review found for B7b
+
+The final whole-branch review verified the branch as behaviour-neutral. What follows is
+planning fact for B7b, not defects in B7a.
+
+- **§10's "no live code path in its way" is not true of two paths.** Both sit outside B7a's
+  scope, and nothing B7a added catches either, because the import ratchet excludes test
+  modules and its runtime half builds hosts directly rather than launching servers.
+  1. `launch.py` runs `run_unit_tests.py` before launching (`launch.py:1831-1834`). That
+     script imports 14 `helao/core/tests/unit_test_*` modules that import `helao.core.servers`
+     (for example `unit_test_base_api` and `unit_test_orch_lifecycle`), and 12 tracked
+     configs set `run_unit_tests: true`. If B7b deletes the engine and those tests without
+     editing `run_unit_tests.py` in the same change, those configs fail at `ImportError`
+     before anything launches.
+  2. `helao/hexagon/app/factory.py:122` imports `active_graft` at the top of `makeActionApp`,
+     and `active_graft.py:26` imports `helao.core.servers.base.Active`; importing
+     `active_graft` loads 12 engine modules. So every launched `deployment: hexagon` action
+     server still loads the engine, even a native one. The ratchet's runtime half builds
+     hosts directly, so "native hosts construct without the engine" is true there and not of
+     a launched server. Both files are allowlisted as B7b's; B7b must make that import
+     conditional or delete it.
+- **The orch parameter checklist cannot see enum changes.** `harness/openapi_capture.py`'s
+  `_params` keeps only name/in/required/type/default and drops `$ref`, so the checklist
+  records enum parameters as `type: null`. Renaming, adding or removing an enum member would
+  pass `test_parameter_schemas_match_the_live_legacy_orchestrator`. This is pre-existing and
+  not a B7a defect; B7b re-freezes the checklists and is the place to close it.
