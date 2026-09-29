@@ -275,11 +275,11 @@ async def test_estop_cascade_commands():
     runner, spy = _runner(orch)
     await runner.execute(ClearActiveRunId())
     assert orch.active_run_id is None
-    await runner.execute(EstopFanout(switch=False))
+    await runner.execute(EstopFanout(switch=True))
     await runner.execute(FinishActiveEstopped())
     await runner.execute(SetStopMessage(message="E-STOP unit"))
     await runner.execute(AlertOperator(message="E-STOP unit"))
-    assert orch.calls == ["estop_actions:False", "estop_finish_active"]
+    assert orch.calls == ["estop_actions:True", "estop_finish_active"]
     assert orch.current_stop_message == "E-STOP unit"
     assert spy.alerts == ["E-STOP unit"]  # AlertOperator consumes the Logging PORT
 

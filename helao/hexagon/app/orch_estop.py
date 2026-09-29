@@ -70,7 +70,10 @@ class EstopController:
         # directly) so this matches the original ``self.estop_actions`` /
         # ``self.estop_finish_active`` calls on ``Orch`` -- an instance-level
         # patch of ``orch.estop_actions`` stays observable here.
-        await orch.estop_actions(switch=False)  # don't latch actionserver model
+        # switch=True: every driver's ``estop(switch)`` acts only on True (stop
+        # axes, motors off, outputs low), and the server latches its estop flag.
+        # ``clear_estop`` sends switch=False to release the latch.
+        await orch.estop_actions(switch=True)
 
         # reset loop intend
         await orch.intend_none()
@@ -90,17 +93,21 @@ class EstopController:
     async def estop_actions(self, switch: bool):
         """Signal every registered action server to emergency-stop (or release).
 
-        Each server's ``/estop`` endpoint stops its executors and finalizes any
-        in-flight actions with ``estopped`` status (finished in place via their
-        normal lifecycle -- nothing moves). No placeholder ``estop``
-        action artifact is generated -- an idle server writes nothing, and estop
-        is recorded purely through the ``*_status`` fields of the actions (and,
-        orch-side, the experiment/sequence) that were actually running.
+        With ``switch=True`` each server's ``/estop`` endpoint calls the driver's
+        estop, latches the server's estop flag, stops its executors and finalizes
+        any in-flight actions with ``estopped`` status (finished in place via
+        their normal lifecycle -- nothing moves). With ``switch=False`` it only
+        calls the driver's release and clears the latch: it stops nothing and
+        finalizes nothing, so work started after the E-STOP is left running. No
+        placeholder ``estop`` action artifact is generated -- an idle server
+        writes nothing, and estop is recorded purely through the ``*_status``
+        fields of the actions (and, orch-side, the experiment/sequence) that were
+        actually running.
 
         Args:
-            switch: ``True`` to latch the per-server estop flag, ``False`` to
-                release it. Finalization of in-flight actions happens regardless;
-                on release there are simply none left to finalize.
+            switch: ``True`` to latch the per-server estop flag and let the
+                driver act (``estop_loop`` sends this), ``False`` to release the
+                latch (``clear_estop`` sends this).
         """
         # Lazy import so ``orch`` remains the single module-global patch point
         # the dispatch golden master rebinds (see module docstring).
@@ -215,6 +222,18 @@ class EstopController:
             orch.active_sequence = None
             orch.active_seq_exp_counter = 0
             orch.globalstatusmodel.counter_dispatched_actions = {}
+            # The queued experiments (unpacked from this sequence only; other
+            # sequences wait in ``sequence_dq``) and their expanded actions
+            # belong to the sequence just finalized. With ``active_sequence``
+            # gone they can never dispatch, and would crash the next start.
+            n_exps, n_acts = len(orch.experiment_dq), len(orch.action_dq)
+            orch.experiment_dq.clear()
+            orch.action_dq.clear()
+            if n_exps or n_acts:
+                LOGGER.warning(
+                    f"E-STOP dropped {n_exps} queued experiment(s) and {n_acts} "
+                    "queued action(s) belonging to the estopped sequence"
+                )
 
         # Hand off in a background task, experiment before sequence, so the
         # child record is journalled done (and enqueued) before its parent.
