@@ -168,6 +168,37 @@ async def test_constructor_override_wins_and_bad_hook_fails_in_start(
 
 
 @pytest.mark.asyncio
+async def test_run_experiment_survives_unreachable_sync(tmp_path, monkeypatch):
+    """Fix round 1: an unreachable SYNC must not crash run_experiment/run_sequence.
+
+    yml_finisher only catches asyncio.TimeoutError; a connector-style exception
+    (stand-in: OSError) must be caught in _notify_sync, logged, and swallowed so
+    the already-written record is still loaded and tracked.
+    """
+
+    async def raising(yml_path, sync_config={}, retry=3):
+        raise OSError("connection refused")  # stands in for ClientConnectorError
+
+    monkeypatch.setattr(micro_mod, "yml_finisher", raising)
+    orch = _orch(tmp_path, servers={"SYNC": SYNC})
+
+    def _no_actions(experiment):
+        return []
+
+    # a non-manual experiment (parented under a real sequence) so _notify_sync
+    # actually reaches yml_finisher instead of returning early on manual=True
+    seq = Sequence(sequence_name="seq1", sequence_label="lbl")
+    seq.init_seq(time_offset=0)
+    loaded = await orch.run_experiment(
+        _no_actions,
+        experiment=Experiment(experiment_name="unreachable_sync"),
+        _sequence=seq,
+    )
+    assert loaded.experiment_name == "unreachable_sync"
+    assert any(r["type"] == "experiment" for r in orch.runs)
+
+
+@pytest.mark.asyncio
 async def test_track_run_state_is_runs_or_diag(tmp_path):
     orch = _orch(tmp_path)
     yml = (

@@ -971,13 +971,29 @@ class MicroOrch:
         A no-op when the world config has no SYNC server (``get_sync_server_cfg``
         returns ``{}``), and skipped for a manual record exactly as
         ``move_dir`` skips it (spec §7.4, decision A11).
+
+        Called inline (a short-lived runner has no detached task to fire this
+        off from, unlike the orchestrator's ``move_dir``), so an unreachable
+        SYNC must not abort the caller: ``yml_finisher`` only catches
+        ``asyncio.TimeoutError`` internally, so a connection failure
+        (``aiohttp.ClientConnectorError`` and friends) would otherwise
+        propagate out of an already-written, already-finished record and
+        crash ``run_experiment``/``run_sequence`` before it's loaded or
+        tracked. Caught, logged, and swallowed instead; the yml stays on disk
+        for the next sync pass to pick up.
         """
         if manual:
             return
         sync_cfg = get_sync_server_cfg(self.world_cfg)
         if not sync_cfg:
             return
-        await yml_finisher(yml_path, sync_config=sync_cfg)
+        try:
+            await yml_finisher(yml_path, sync_config=sync_cfg)
+        except Exception as exc:
+            LOGGER.warning(
+                f"finish_yml handoff failed for {yml_path!r}: "
+                f"{type(exc).__name__}: {exc}"
+            )
 
     def _record_root(self, manual: bool = False) -> str:
         """``<root>/RUNS``, or ``<root>/DIAG`` for a manual run (run_dir.py).
