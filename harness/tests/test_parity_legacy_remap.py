@@ -1,6 +1,8 @@
 """--remap-legacy-layout: a legacy-layout golden diffed against a unified capture."""
 
 import json
+import shutil
+import zipfile
 
 import pytest
 
@@ -33,6 +35,9 @@ def _write_extra(root, act_dir, kind, first):
             "%%\n"
             '{"t_s": 0.0}\n'
         )
+    elif kind == "images_zip":  # an action's own zip output, not a sequence zip
+        with zipfile.ZipFile(act_dir / "images.zip", "w") as zf:
+            zf.writestr("a.txt", "frame")
     elif kind == "parquet":
         import pyarrow as pa
         import pyarrow.parquet as pq
@@ -51,6 +56,8 @@ def _write_run(
     duration="2.0",
     yml_dirs=None,
     extra=None,
+    mmdd="0929",
+    seq_name=SEQ_NAME,
 ):
     """One seq/exp/act run under ``<root>/<top>/<week_or_year>/0929``.
 
@@ -58,10 +65,10 @@ def _write_run(
     real capture does, unless ``yml_dirs`` overrides that first level.
     """
     yml_first = yml_dirs or week_or_year
-    rel_seq = f"{week_or_year}/0929/{SEQ_NAME}"
+    rel_seq = f"{week_or_year}/{mmdd}/{seq_name}"
     rel_exp = f"{rel_seq}/260929.131420__TEST_exp"
     rel_act = f"{rel_exp}/0__0__SIM__acquire_data"
-    y_seq = f"{yml_first}/0929/{SEQ_NAME}"
+    y_seq = f"{yml_first}/{mmdd}/{seq_name}"
     y_exp = f"{y_seq}/260929.131420__TEST_exp"
     y_act = f"{y_exp}/0__0__SIM__acquire_data"
     seq_dir = root / top / rel_seq
@@ -101,9 +108,9 @@ def make_legacy_golden(base, extra=None):
     return gdir
 
 
-def make_unified_candidate(base, seed=100, duration="2.0"):
+def make_unified_candidate(base, seed=100, duration="2.0", extra=None):
     cdir = base / "cand"
-    _write_run(cdir, "RUNS", "2026", seed=seed, duration=duration)
+    _write_run(cdir, "RUNS", "2026", seed=seed, duration=duration, extra=extra)
     return cdir
 
 
@@ -286,3 +293,139 @@ def test_candidate_only_unparsable_file_fails_and_report_is_written(
         if c.get("check") == "candidate_legacy_layout"
     ]
     assert f"unparsable {rel}:" in finding["detail"]
+
+
+# --- zipped legacy sequences ---------------------------------------------------
+# The legacy syncer zips a fully synced sequence (members relative to the
+# sequence dir) into RUNS_SYNCED/<yy.ww>/<mmdd>/<seq>.zip and removes the dir;
+# the unified layout never zips.
+PRC_IN, PRC_OUT = "0__0__t-prc.yml", "1__0__u-prc.yml"
+
+
+def _prc(seed):
+    return (
+        "file_type: process\n"
+        f"sequence_uuid: {_u(seed + 1)}\n"
+        "process_name: acquire_data\n"
+    )
+
+
+def _zip_seq(seq_dir):
+    shutil.make_archive(str(seq_dir), "zip", root_dir=seq_dir)
+    shutil.rmtree(seq_dir)
+
+
+def make_zipped_golden(base, week="26.39", mmdd="0929"):
+    """Zipped RUNS_SYNCED sequence with a prc inside the zip and one outside."""
+    gdir = base / "golden"
+    root = gdir / "root"
+    act_dir = _write_run(root, "RUNS_SYNCED", week, mmdd=mmdd)
+    seq = root / "RUNS_SYNCED" / week / mmdd / SEQ_NAME
+    (act_dir.parent / PRC_IN).write_text(_prc(0))
+    _zip_seq(seq)
+    proc = root / "PROCESSES" / week / mmdd / SEQ_NAME
+    proc.mkdir(parents=True)
+    (proc / PRC_OUT).write_text(_prc(0))
+    attach_manifest(gdir)
+    return gdir
+
+
+def make_dir_candidate(base, year="2026", mmdd="0929"):
+    cdir = base / "cand"
+    act_dir = _write_run(cdir, "RUNS", year, seed=100, mmdd=mmdd)
+    (act_dir.parent / PRC_IN).write_text(_prc(100))
+    (act_dir.parent / PRC_OUT).write_text(_prc(100))
+    return cdir
+
+
+def test_i_zipped_legacy_golden_passes_against_unified_dir(tmp_path):
+    report = run_parity(
+        make_zipped_golden(tmp_path),
+        make_dir_candidate(tmp_path),
+        remap_legacy_layout=True,
+    )
+    assert report["status"] == "pass", report
+    assert report["n_diffs"] == 0
+
+
+def test_ii_zipped_legacy_golden_fails_without_the_flag(tmp_path):
+    report = run_parity(make_zipped_golden(tmp_path), make_dir_candidate(tmp_path))
+    assert report["status"] == "fail"
+    assert report["tree_diffs"]
+
+
+def test_iii_zip_and_leftover_dir_with_overlapping_file_raises(tmp_path):
+    gdir = make_zipped_golden(tmp_path)
+    _write_run(gdir / "root", "RUNS_SYNCED", "26.39")  # leftover <seq>/ dir
+    with pytest.raises(ValueError) as exc:
+        run_parity(gdir, make_dir_candidate(tmp_path), remap_legacy_layout=True)
+    seq_yml = "260929.131415123456-seq.yml"
+    assert f"RUNS/2026/0929/{SEQ_NAME}.zipdir/{seq_yml}" in str(exc.value)
+    assert f"RUNS/2026/0929/{SEQ_NAME}/{seq_yml}" in str(exc.value)
+
+
+def test_iv_year_boundary_zipped_golden_passes_against_dir(tmp_path):
+    # %U week 00: the first days of a year sit in ``26.00``, not ``26.01``
+    report = run_parity(
+        make_zipped_golden(tmp_path, week="26.00", mmdd="0101"),
+        make_dir_candidate(tmp_path, mmdd="0101"),
+        remap_legacy_layout=True,
+    )
+    assert report["status"] == "pass", report
+
+
+def test_origdir_and_non_sequence_zipdirs_are_left_alone(tmp_path):
+    day = tmp_path / "RUNS/2026/0929"
+    (day / "131415__S__l.origdir").mkdir(parents=True)
+    (day / "131415__S__l.zipdir").mkdir()
+    (day / "131415__S__l/260929.131420__E/0__0__A__x/images.zipdir").mkdir(parents=True)
+    (day / "notaseq.zipdir").mkdir()  # right depth, wrong name shape
+    remap_legacy_layout(tmp_path)
+    assert (day / "131415__S__l.origdir").is_dir()
+    assert (day / "131415__S__l").is_dir()
+    assert not (day / "131415__S__l.zipdir").exists()
+    assert (day / "131415__S__l/260929.131420__E/0__0__A__x/images.zipdir").is_dir()
+    assert (day / "notaseq.zipdir").is_dir()
+
+
+def test_z1_action_level_zip_is_not_collapsed(tmp_path):
+    """An action's images.zip is not a sequence zip: it stays ``images.zipdir``
+    on both sides. Also proves Z2 does not fire on an action-level zip."""
+    extra = ("images_zip", None)
+    report = run_parity(
+        make_legacy_golden(tmp_path, extra=extra),
+        make_unified_candidate(tmp_path, extra=extra),
+        remap_legacy_layout=True,
+    )
+    assert report["status"] == "pass", report
+    assert report["n_diffs"] == 0
+
+
+def test_z2_zipped_sequence_in_the_candidate_fails(tmp_path):
+    cand = make_dir_candidate(tmp_path)
+    _zip_seq(cand / "RUNS" / "2026" / "0929" / SEQ_NAME)
+    report = run_parity(make_zipped_golden(tmp_path), cand, remap_legacy_layout=True)
+    assert report["status"] == "fail"
+    (finding,) = [
+        c
+        for c in report["consistency_diffs"]
+        if c.get("check") == "candidate_legacy_layout"
+    ]
+    assert f"zipped sequence RUNS/2026/0929/{SEQ_NAME}.zipdir" in finding["detail"]
+
+
+def test_two_zipped_sequences_across_the_year_boundary(tmp_path):
+    a = ("26.52", "1231", "131415__GMTEST__golden")
+    b = ("27.00", "0101", "141516__OTHER__golden")
+    gdir = tmp_path / "golden"
+    for i, (week, mmdd, name) in enumerate((a, b)):
+        _write_run(
+            gdir / "root", "RUNS_SYNCED", week, seed=10 * i, mmdd=mmdd, seq_name=name
+        )
+        _zip_seq(gdir / "root" / "RUNS_SYNCED" / week / mmdd / name)
+    attach_manifest(gdir)
+    cand = tmp_path / "cand"
+    for i, (year, (_, mmdd, name)) in enumerate((("2026", a), ("2027", b))):
+        _write_run(cand, "RUNS", year, seed=100 + 10 * i, mmdd=mmdd, seq_name=name)
+    report = run_parity(gdir, cand, remap_legacy_layout=True)
+    assert report["status"] == "pass", report
