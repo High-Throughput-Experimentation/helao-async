@@ -423,7 +423,7 @@ class ActionHost(HelaoFastAPI):
 
     def replace_status(self, status_list, old_status, new_status):
         """Swap one status for another in place, guarding an absent old value."""
-        from helao.core.servers.base_status import guarded_replace
+        from helao.core.models.status_transitions import guarded_replace
 
         return guarded_replace(status_list, old_status, new_status)
 
