@@ -866,7 +866,7 @@ def test_prepend_button_enable_gate():
 
 
 def test_sanitize_sequence_label():
-    from helao.core.servers.orch import sanitize_sequence_label
+    from helao.hexagon.app.orch_queues import sanitize_sequence_label
 
     assert sanitize_sequence_label("a b__c d") == "a_b_c_d"
     assert sanitize_sequence_label("a_b") == "a_b"  # single underscore preserved
