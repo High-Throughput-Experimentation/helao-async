@@ -5,7 +5,7 @@ instrument frames using only numpy matrix algebra, with no Base/Active/
 gclib/Bokeh/file-IO coupling, so it is Linux-testable and reusable by P4's
 ThorlabsMotor. LOGGER is stdlib ``logging.getLogger(__name__)`` per the
 domain allow-list (``helao.helpers.helao_logging`` is outside it, mirroring
-``global_params.py``/``dispatch_policy.py``); log wording is otherwise
+``dispatch_policy.py``); log wording is otherwise
 unchanged from the original driver-hosted class.
 """
 
