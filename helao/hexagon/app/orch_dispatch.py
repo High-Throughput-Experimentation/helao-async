@@ -115,7 +115,7 @@ from helao.core.error import ErrorCodes
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopIntent, LoopStatus, OrchStatus
-from helao.core.servers.orch_global_params import (
+from helao.hexagon.app.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )

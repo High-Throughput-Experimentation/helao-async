@@ -1,6 +1,6 @@
-"""Fold-in/fold-out semantics (orch_global_params.py, byte-identical port)."""
+"""Fold-in/fold-out semantics of ``helao/hexagon/app/orch_global_params.py``."""
 
-from helao.hexagon.domain.global_params import (
+from helao.hexagon.app.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )
