@@ -32,7 +32,6 @@ from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopIntent, LoopStatus
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
-from helao.core.servers import orch_unpack
 from helao.helpers import helao_logging as logging
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.import_autolibs import import_autolibs
@@ -43,6 +42,7 @@ from helao.helpers.zdeque import zdeque
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from helao.core.servers.base import Active
+from helao.hexagon.app import orch_unpack
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring
 from helao.hexagon.domain.orchestration import (

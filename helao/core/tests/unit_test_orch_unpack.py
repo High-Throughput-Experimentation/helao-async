@@ -21,7 +21,7 @@ __all__ = ["orch_unpack_unit_test"]
 
 from types import SimpleNamespace
 
-from helao.core.servers import orch_unpack
+from helao.hexagon.app import orch_unpack
 from helao.core.tests._test_utils import TestReporter
 
 
