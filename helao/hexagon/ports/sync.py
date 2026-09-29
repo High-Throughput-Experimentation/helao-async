@@ -4,10 +4,13 @@ Semantics carried by the P1b adapter (documented here as the contract):
 hierarchical seq-RW/exp-mutex locks; children gate with
 estopped-children-terminal rule; priority re-enqueue with rank floor -5;
 file push; process reconcile+flush writing -prc.yml; patched meta JSON;
-.lock cleanup; move-to-SYNCED; empty-dir pruning; destructive sequence zip;
-optional auto-analysis dispatch; .prg sidecar lifecycle; reset_sync reversal.
-S3: retries <=5 x 30 s via asyncio.to_thread; unset S3 config => local-only
-success. The Sim DB server (P0) implements S3FacePort with a recording sink.
+.lock cleanup; records sync in place (no move-to-SYNCED, no zipping) --
+a config-defined post-finish hook chain (built-in s3_upload,
+dispatch_analysis; see docs/superpowers/specs/2026-09-28-finish-hooks-design.md)
+runs after the local gates and reconcile, tracked via the .prg `hooks`/
+`synced` sidecar state; reset_sync reversal. S3: retries <=5 x 30 s via
+asyncio.to_thread; unset S3 config => local-only success. The Sim DB
+server (P0) implements S3FacePort with a recording sink.
 """
 
 from pathlib import Path
