@@ -1,3 +1,7 @@
+# Copy of test.yml kept on the pre-hooks config keys (hlo_postprocess_libs,
+# exp_postprocess_libs, seq_postprocess_libs) so the alias path stays exercised.
+# Launch with `python launch.py test-hookalias`. Every other config uses the
+# prefinish_hooks / prefinish_experiment_hooks / prefinish_sequence_hooks keys.
 dummy: true
 simulation: true
 show_debug: true
@@ -16,10 +20,10 @@ servers:
     group: orchestrator
     fast: async_orch2
     params: {}
-    prefinish_experiment_hooks:
-      append_params: ["*"]
-    prefinish_sequence_hooks:
-      append_params: ["*"]
+    exp_postprocess_libs:
+      - append_params
+    seq_postprocess_libs:
+      - append_params
   OPERATOR:
     group: operator
     bokeh: standalone_operator
@@ -48,8 +52,8 @@ servers:
         Thorlab_led: 7
         cell_valve: 2
         purge_valve: 3
-    prefinish_hooks:
-      hlo_to_csv: ["*"]
+    hlo_postprocess_libs:
+      - hlo_to_csv
   LIVE:
     host: 127.0.0.1
     port: 5002
