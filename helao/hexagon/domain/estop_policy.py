@@ -235,7 +235,7 @@ class EstopPolicy:
         # State flip / run-id clear / stop message stay with the reducer's
         # own transition -- this policy owns only the wire cascade tail.
         assert isinstance(trigger, (StatusEstopIngested, OrchEstopRequest))
-        return (EstopFanout(switch=False), FinishActiveEstopped())
+        return (EstopFanout(switch=True), FinishActiveEstopped())
 
 
 def mark_estopped(status_list: list[HloStatus]) -> list[HloStatus]:

@@ -119,7 +119,7 @@ def test_orch_estop_request_full_sequence():
     cmds = p.commands_for(ep.OrchEstopRequest(reason="operator"))
     assert [type(c) for c in cmds] == [EstopFanout, FinishActiveEstopped]
     assert isinstance(cmds[0], EstopFanout)
-    assert cmds[0].switch is False
+    assert cmds[0].switch is True  # drivers act only on switch=True
 
 
 def test_status_ingested_matches_orch_request():

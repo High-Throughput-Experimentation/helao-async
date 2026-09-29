@@ -235,22 +235,30 @@ async def test_item3b_estop_between_decision_and_finish_then_dispatch(tmp_path):
         await asyncio.wait_for(reached.wait(), timeout=120)
         n_exp_dq_at_gate = len(orch.experiment_dq)  # the not-yet-dispatched 2nd exp
 
+        staged = []
+        orig_stage = orch.dispatch_runner._stage_experiment
+
+        async def spy_stage(*a, **k):
+            staged.append(1)
+            return await orig_stage(*a, **k)
+
+        orch.dispatch_runner._stage_experiment = spy_stage
         await orch_call("estop_orch")  # lands INSIDE the decision->effect window
         assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
         window.set()
         await asyncio.sleep(2.0)
         assert len(estop_finishes) == 1
         assert len(clean_finishes) == 0  # re-check bailed; no clean finish ever
-        # make the bailed re-check OBSERVABLE: if it had NOT bailed, the released
-        # effect would fall through to loop_task_dispatch_experiment(), which
-        # unconditionally pops experiment_dq and re-stages a NEW active_experiment
-        # (dispatch_experiment()/_stage_experiment(), orch_dispatch.py:993-1025) --
-        # regardless of estop_finish_active() having already cleared
-        # active_experiment to None. Confirmed via fault injection (temporarily
-        # neutering re-check #2 in orch_effects.py): experiment_dq goes 1->0 and
-        # active_experiment gets repopulated with a fresh experiment when the
-        # re-check is broken, vs. staying 1->1 / None when it works.
-        assert len(orch.experiment_dq) == n_exp_dq_at_gate  # no extra exp dispatch
+        # make the bailed re-check OBSERVABLE: had it NOT bailed, the released
+        # effect would fall through to loop_task_dispatch_experiment() and
+        # _stage_experiment() would pop a new active_experiment. estop_finish_active
+        # now drops the finalized sequence's queued experiments (they can never
+        # dispatch), so the deque length no longer distinguishes the two cases --
+        # count the staging calls instead. (dispatch_experiment also refuses under
+        # estop now, which is a second, independent guard on the same path.)
+        assert n_exp_dq_at_gate == 1  # there WAS a queued exp to (not) dispatch
+        assert len(orch.experiment_dq) == 0  # orphan of the estopped sequence
+        assert staged == []  # nothing was staged post-estop
         assert orch.active_experiment is None  # nothing re-staged post-estop
         assert orch.globalstatusmodel.loop_state == LoopStatus.estopped
         _assert_estopped_exp_yml(tmp_path)
