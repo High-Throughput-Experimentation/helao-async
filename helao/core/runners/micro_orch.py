@@ -40,17 +40,22 @@ from uuid import UUID
 import aiofiles
 import zmq
 
+from helao.core.hooks import HookSet
+from helao.core.hooks.config import find_orchestrator_entry, prefinish_config
+from helao.core.hooks.loader import load_hook_set
+from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.models.run_dir import RunDir
+from helao.core.models.run_dir import diag_root, run_root
 from helao.core.models.server import ActionServerModel
 from helao.core.rpc import RPCClient, RPCDispatcher, RPCError, derive_rpc_port
 from helao.helpers import helao_logging as logging
-from helao.helpers.file_utils import staging_path
+from helao.helpers.file_utils import replace_when_free, staging_path
 from helao.helpers.premodels import Action, Experiment, Sequence
+from helao.helpers.server_keys import get_sync_server_cfg
 from helao.helpers.time_utils import gen_uuid, set_time
-from helao.helpers.yml_tools import yml_dumps
+from helao.helpers.yml_tools import yml_dumps, yml_finisher
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -105,6 +110,8 @@ class MicroOrch:
         finished_timeout: float = 60.0,
         poll_interval: float = 0.5,
         loader_factory: Optional[Callable[[str], Any]] = None,
+        prefinish_experiment_hooks: Optional[dict] = None,
+        prefinish_sequence_hooks: Optional[dict] = None,
     ) -> None:
         """Initialize the micro-orchestrator and register the status handler.
 
@@ -116,6 +123,12 @@ class MicroOrch:
             world_cfg: Optional world configuration providing peer server
                 host/port information under the ``servers`` key.
             default_timeout: Default RPC timeout in seconds.
+            prefinish_experiment_hooks: Override the world config's
+                orchestrator entry for experiment/sequence pre-finish hooks;
+                same shape as the config key.
+            prefinish_sequence_hooks: Override the world config's
+                orchestrator entry for experiment/sequence pre-finish hooks;
+                same shape as the config key.
         """
         self.server_key = server_key
         self.host = host
@@ -158,13 +171,46 @@ class MicroOrch:
         # Run tracking (Task 4 populates this).
         self.runs: list[dict] = []
 
+        # Experiment/sequence pre-finish hooks (finish-hooks spec §7.3): from
+        # the world config's orchestrator entry, or the constructor override of
+        # the same name. Resolved and validated in start(); empty until then.
+        self._prefinish_overrides = {
+            "prefinish_experiment_hooks": prefinish_experiment_hooks,
+            "prefinish_sequence_hooks": prefinish_sequence_hooks,
+        }
+        self.experiment_hooks: HookSet = HookSet.empty()
+        self.sequence_hooks: HookSet = HookSet.empty()
+
     # ------------------------------------------------------------------
     # lifecycle
     # ------------------------------------------------------------------
 
     async def start(self) -> None:
-        """Bind the RPC dispatcher on ``derive_rpc_port(self.port)``."""
+        """Validate and load the pre-finish hooks, then bind the RPC dispatcher.
+
+        Hooks first: a bad hook config must fail here, before any port is
+        bound, and never degrade to "no hooks" (spec §3.3).
+        """
+        self.experiment_hooks = self._load_prefinish(
+            "prefinish_experiment_hooks", "exp_postprocess_libs", "experiment"
+        )
+        self.sequence_hooks = self._load_prefinish(
+            "prefinish_sequence_hooks", "seq_postprocess_libs", "sequence"
+        )
         await self.dispatcher.serve(self.host, derive_rpc_port(self.port))
+
+    def _load_prefinish(self, key: str, alias: str, level: str) -> HookSet:
+        override = self._prefinish_overrides[key]
+        source = (
+            {key: override}
+            if override is not None
+            else find_orchestrator_entry(self.world_cfg)
+        )
+        return load_hook_set(
+            prefinish_config(source, key, alias, self.server_key),
+            phase="prefinish",
+            level=level,
+        )
 
     async def stop(self) -> None:
         """Close the dispatcher and every cached RPC client.
@@ -636,9 +682,7 @@ class MicroOrch:
 
         if not actions:
             if await_completion:
-                experiment.reset_experiment_status(HloStatus.finished)
-                experiment.experiment_finished_timestamp = set_time(offset=0)
-                yml_path = await self._write_exp(experiment)
+                yml_path = await self._finish_experiment(experiment)
                 loaded = await self._load_finished(
                     experiment.get_experiment_dir(), "exp"
                 )
@@ -687,9 +731,7 @@ class MicroOrch:
                 except Exception:
                     LOGGER.exception("could not rebuild Action from terminal dump")
 
-        experiment.reset_experiment_status(HloStatus.finished)
-        experiment.experiment_finished_timestamp = set_time(offset=0)
-        yml_path = await self._write_exp(experiment)
+        yml_path = await self._finish_experiment(experiment)
         loaded = await self._load_finished(experiment.get_experiment_dir(), "exp")
         self._track_run(
             "experiment",
@@ -718,9 +760,10 @@ class MicroOrch:
         ``seq_func`` returns ``list[ShortExperimentModel]`` (via
         ``ExperimentPlanMaker``); ``experiment_lib`` maps each plan's
         ``experiment_name`` to its experiment function. Each experiment runs
-        under this sequence's identity. The finished sequence is written to
-        ``RUNS_FINISHED`` and returned loader-wrapped (or, when
-        ``await_completion`` is False, the per-experiment raw dump lists).
+        under this sequence's identity. The finished sequence is written
+        under ``RUNS`` (``DIAG`` for a manual run) and returned
+        loader-wrapped (or, when ``await_completion`` is False, the
+        per-experiment raw dump lists).
         """
         if sequence is None:
             sequence = Sequence()
@@ -780,9 +823,7 @@ class MicroOrch:
         if not await_completion:
             return raw_results
 
-        sequence.reset_sequence_status(HloStatus.finished)
-        sequence.sequence_finished_timestamp = set_time(offset=0)
-        yml_path = await self._write_seq(sequence)
+        yml_path = await self._finish_sequence(sequence)
         loaded = await self._load_finished(sequence.get_sequence_dir(), "seq")
         self._track_run(
             "sequence", sequence.sequence_uuid, sequence.sequence_name, yml_path
@@ -888,8 +929,58 @@ class MicroOrch:
     # artifact persistence (mirrors Base.write_exp / write_seq)
     # ------------------------------------------------------------------
 
-    def _finished_root(self, manual: bool = False) -> str:
-        """Return ``<root>/RUNS_FINISHED`` (or ``RUNS_DIAG`` for manual runs).
+    async def _finish_experiment(self, experiment: Experiment) -> str:
+        """Mark finished, run pre-finish hooks, write the yml, hand it to SYNC."""
+        experiment.reset_experiment_status(HloStatus.finished)
+        experiment.experiment_finished_timestamp = set_time(offset=0)
+        manual = bool(experiment.manual_action)
+        await run_prefinish(
+            self.experiment_hooks,
+            record=experiment,
+            name=str(experiment.experiment_name),
+            record_dir=os.path.join(
+                self._record_root(manual), experiment.get_experiment_dir()
+            ),
+            server=self,
+        )
+        yml_path = await self._write_exp(experiment)
+        await self._notify_sync(yml_path, manual)
+        return yml_path
+
+    async def _finish_sequence(self, sequence: Sequence) -> str:
+        """Sequence twin of :meth:`_finish_experiment`."""
+        sequence.reset_sequence_status(HloStatus.finished)
+        sequence.sequence_finished_timestamp = set_time(offset=0)
+        manual = bool(sequence.manual_action)
+        await run_prefinish(
+            self.sequence_hooks,
+            record=sequence,
+            name=str(sequence.sequence_name),
+            record_dir=os.path.join(
+                self._record_root(manual), sequence.get_sequence_dir()
+            ),
+            server=self,
+        )
+        yml_path = await self._write_seq(sequence)
+        await self._notify_sync(yml_path, manual)
+        return yml_path
+
+    async def _notify_sync(self, yml_path: str, manual: bool) -> None:
+        """The same ``finish_yml`` POST the orchestrator's ``move_dir`` makes.
+
+        A no-op when the world config has no SYNC server (``get_sync_server_cfg``
+        returns ``{}``), and skipped for a manual record exactly as
+        ``move_dir`` skips it (spec §7.4, decision A11).
+        """
+        if manual:
+            return
+        sync_cfg = get_sync_server_cfg(self.world_cfg)
+        if not sync_cfg:
+            return
+        await yml_finisher(yml_path, sync_config=sync_cfg)
+
+    def _record_root(self, manual: bool = False) -> str:
+        """``<root>/RUNS``, or ``<root>/DIAG`` for a manual run (run_dir.py).
 
         Raises:
             RuntimeError: If ``world_cfg`` has no ``root`` key.
@@ -899,12 +990,10 @@ class MicroOrch:
             raise RuntimeError(
                 "world_cfg['root'] is required to persist or read back artifacts"
             )
-        return os.path.join(
-            root, RunDir.DIAG.value if manual else RunDir.FINISHED.value
-        )
+        return str(diag_root(root) if manual else run_root(root))
 
     async def _write_meta_atomic(self, output_file: str, output_str: str) -> None:
-        """Atomically write ``output_str`` to ``output_file`` (temp + os.replace)."""
+        """Atomically write ``output_str`` to ``output_file`` (temp + replace_when_free)."""
         if not output_str.endswith("\n"):
             output_str += "\n"
         output_path = os.path.dirname(output_file)
@@ -912,12 +1001,12 @@ class MicroOrch:
         tmp_file = staging_path(output_file)
         async with aiofiles.open(tmp_file, mode="w") as f:
             await f.write(output_str)
-        os.replace(tmp_file, output_file)
+        await replace_when_free(tmp_file, output_file)
 
     async def _write_exp(self, experiment: Experiment) -> str:
-        """Write ``<finished_root>/<exp_dir>/<ts>-exp.yml`` and return its path."""
+        """Write ``<record_root>/<exp_dir>/<ts>-exp.yml`` and return its path."""
         exp_dict = experiment.get_exp().clean_dict()
-        root = self._finished_root(manual=bool(experiment.manual_action))
+        root = self._record_root(manual=bool(experiment.manual_action))
         output_path = os.path.join(root, experiment.get_experiment_dir())
         output_file = os.path.join(
             output_path,
@@ -933,9 +1022,9 @@ class MicroOrch:
         return output_file
 
     async def _write_seq(self, sequence: Sequence) -> str:
-        """Write ``<finished_root>/<seq_dir>/<ts>-seq.yml`` and return its path."""
+        """Write ``<record_root>/<seq_dir>/<ts>-seq.yml`` and return its path."""
         seq_dict = sequence.get_seq().clean_dict()
-        root = self._finished_root(manual=bool(sequence.manual_action))
+        root = self._record_root(manual=bool(sequence.manual_action))
         output_path = os.path.join(root, sequence.get_sequence_dir())
         output_file = os.path.join(
             output_path,
@@ -956,19 +1045,19 @@ class MicroOrch:
     _LOADER_GETTERS = {"act": "get_act", "exp": "get_exp", "seq": "get_seq"}
 
     def _candidate_yml(self, rel_dir: str, suffix: str) -> Optional[str]:
-        """Return the first matching ``*-<suffix>.yml`` under FINISHED or DIAG."""
+        """Return the first matching ``*-<suffix>.yml`` under RUNS or DIAG."""
         root = self.world_cfg.get("root")
         if not root:
             raise RuntimeError("world_cfg['root'] is required to read back artifacts")
-        for state in (RunDir.FINISHED.value, RunDir.DIAG.value):
-            pattern = os.path.join(root, state, rel_dir, f"*-{suffix}.yml")
+        for state_root in (run_root(root), diag_root(root)):
+            pattern = os.path.join(str(state_root), rel_dir, f"*-{suffix}.yml")
             matches = sorted(glob_module.glob(pattern))
             if matches:
                 return matches[0]
         return None
 
     async def _await_finished(self, rel_dir: str, suffix: str) -> str:
-        """Poll until ``*-<suffix>.yml`` exists under ``rel_dir`` in FINISHED/DIAG.
+        """Poll until ``*-<suffix>.yml`` exists under ``rel_dir`` in RUNS/DIAG.
 
         Raises:
             TimeoutError: If nothing appears within ``self.finished_timeout``.
@@ -982,7 +1071,7 @@ class MicroOrch:
             if loop.time() >= deadline:
                 raise TimeoutError(
                     f"timed out after {self.finished_timeout}s waiting for "
-                    f"*-{suffix}.yml under {rel_dir!r} in RUNS_FINISHED/RUNS_DIAG"
+                    f"*-{suffix}.yml under {rel_dir!r} in RUNS/DIAG"
                 )
             await asyncio.sleep(self.poll_interval)
 
@@ -1012,17 +1101,19 @@ class MicroOrch:
     def _track_run(self, run_type: str, uuid: Any, name: str, yml_path: str) -> dict:
         """Append a RunRecord for a finished artifact and return it.
 
-        ``state`` (RUNS_FINISHED/RUNS_DIAG) and ``rel_dir`` (the artifact's
-        directory relative to that state root) are derived from ``yml_path``.
+        ``state`` (RUNS/DIAG) and ``rel_dir`` (the artifact's directory
+        relative to that state root) are derived from ``yml_path``.
         """
         norm = os.path.normpath(yml_path)
         parts = norm.split(os.sep)
-        state = RunDir.FINISHED.value
-        for candidate in (RunDir.FINISHED.value, RunDir.DIAG.value):
-            if candidate in parts:
-                state = candidate
-                break
-        state_idx = parts.index(state)
+        # Choose whichever of RUNS/DIAG has the deepest LAST occurrence in the
+        # path, so a path segment literally named RUNS elsewhere (e.g. the
+        # station root) can never outrank the real state root.
+        state = max(
+            ("RUNS", "DIAG"),
+            key=lambda c: (len(parts) - 1 - parts[::-1].index(c) if c in parts else -1),
+        )
+        state_idx = len(parts) - 1 - parts[::-1].index(state)
         # rel_dir = directory of the yml, relative to <root>/<state>
         rel_dir = (
             os.path.join(*parts[state_idx + 1 : -1])
@@ -1045,17 +1136,17 @@ class MicroOrch:
     # ------------------------------------------------------------------
 
     def zip_runs(self, zip_path: str, include_diag: bool = True) -> str:
-        """Zip every tracked artifact, preserving structure relative to RUNS_FINISHED.
+        """Zip every tracked artifact, preserving structure relative to RUNS.
 
         Each file's archive name is its path relative to its state root
-        (RUNS_FINISHED or RUNS_DIAG), so the archive reproduces the on-disk
-        seq/exp/act tree without the ``RUNS_*`` prefix. Overlapping records
+        (RUNS or DIAG), so the archive reproduces the on-disk seq/exp/act
+        tree without the ``RUNS``/``DIAG`` prefix. Overlapping records
         (a sequence dir contains its experiment/action dirs) are deduplicated
         by archive name. ``.lock`` files are skipped.
 
         Args:
             zip_path: Destination ``.zip`` path.
-            include_diag: When False, skip RUNS_DIAG (manual) artifacts.
+            include_diag: When False, skip DIAG (manual) artifacts.
 
         Returns:
             ``zip_path``.
@@ -1068,7 +1159,7 @@ class MicroOrch:
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for record in self.runs:
                 state = record["state"]
-                if state == RunDir.DIAG.value and not include_diag:
+                if state == "DIAG" and not include_diag:
                     continue
                 state_root = os.path.join(root, state)
                 rec_dir = os.path.join(state_root, record["rel_dir"])
