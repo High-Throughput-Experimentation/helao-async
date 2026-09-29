@@ -111,6 +111,16 @@ class KinesisMotorExec(Executor):
             Dict with ``error`` indicating success, motor-limit refusal, or
             a critical motor error.
         """
+        # An E-STOP that landed after ``kmove`` passed its gate but before this
+        # executor registered (so the route's executor sweep missed it) must
+        # still stop the move.
+        if self.base.actionservermodel.estop:
+            LOGGER.error("KMOTOR is in estop.")
+            # Also set it on the action: for a polling executor the runner
+            # overwrites ``_exec``'s returned error with ``_poll``'s, so the
+            # returned dict alone would leave the action ending error 'none'.
+            self.active.action.error_code = ErrorCodes.estop
+            return {"error": ErrorCodes.estop}
         LOGGER.info("KinesisMotorExec validating move mode & limit.")
         move_mode = self.action_params.get("move_mode", "relative")
         move_value = self.action_params.get("value_mm", 0.0)
@@ -207,6 +217,13 @@ async def kinesis_dyn_endpoints(app: ActionHost):
             Returns:
                 The active action dictionary from ``start_executor``.
             """
+            # E-STOP latched: refuse BEFORE any session or executor exists, so a
+            # rejected call writes no artifact (same as PAL's _pal_reject_busy).
+            A = ctx.action
+            if app.actionservermodel.estop:
+                LOGGER.error("KMOTOR is in estop.")
+                A.error_code = ErrorCodes.estop
+                return A.as_dict()
             active = await ctx.begin()
             active.action.action_abbr = "kmove"
             executor = KinesisMotorExec(
@@ -355,6 +372,9 @@ async def kinesis_dyn_endpoints(app: ActionHost):
                 conversion, so it has no count to report and will not invent
                 a plausible-looking one.
             """
+            if app.actionservermodel.estop:
+                LOGGER.error("KMOTOR is in estop.")
+                return ErrorCodes.estop, {}
             running = _running_actions(app)
             if running:
                 LOGGER.info(
@@ -390,9 +410,11 @@ async def kinesis_dyn_endpoints(app: ActionHost):
             ``KinesisMotor.stop`` only, never a de-energize: a vertical axis
             that lost its holding current would drop under gravity, so a panel
             stop that cut it would be more dangerous than the motion it
-            interrupted. That is also why this route is **not** named for an
-            estop -- an estop must de-energize, and a halt-only route wearing
-            that name would under-stop whatever cascade adopted it.
+            interrupted. The E-STOP is the same: ``KinesisMotor.estop`` is a
+            send-only immediate stop and deliberately does **not** de-energize,
+            because a vertical axis would drop. This route stays separate from
+            the estop because it is an unlatched panel halt: it neither latches
+            the server nor stops executors or finalizes actions.
 
             **Unconditional, including mid-sequence, and the consequence is
             accepted rather than hidden.** A running action is not cancelled,

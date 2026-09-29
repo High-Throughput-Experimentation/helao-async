@@ -335,13 +335,22 @@ async def test_estop_loop_latches_and_clear_estop_releases(monkeypatch):
     from helao.hexagon.app import orch_estop
 
     monkeypatch.setattr(orch_estop, "Action", lambda **kw: SimpleNamespace(**kw))
+    logged = []
+    monkeypatch.setattr(
+        orch_estop.LOGGER, "info", lambda msg, *a, **k: logged.append(msg)
+    )
 
     await orch.estop_controller.estop_loop()
     assert sent == [True]  # drivers act only on switch=True
+    assert "estopping all servers" in logged
 
     sent.clear()
+    logged.clear()
     await orch.estop_controller.clear_estop()
     assert sent == [False]
+    # a release must not read as an E-STOP in the station log
+    assert "releasing E-STOP on all servers" in logged
+    assert "estopping all servers" not in logged
 
 
 # --- B2: the unpacker must not refill after E-STOP ------------------------------
@@ -851,3 +860,166 @@ async def test_launch_action_drops_the_head_action_when_no_experiment_is_active(
     assert any(
         "no active experiment for head action next; dropping it" in m for m in warned
     ), warned
+
+
+# --- Round 7: the route leaves evidence that the E-STOP happened ----------------
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("switch,word", [(True, "latch"), (False, "release")])
+async def test_estop_route_logs_one_evidence_line(tmp_path, monkeypatch, switch, word):
+    """A drill found MOTOR/KMOTOR logged nothing at the E-STOP, so nothing showed
+    the stop had happened. The line names the driver's reply and what was finalized."""
+    import helao.hexagon.app.action_host as ah
+
+    host = _host(tmp_path)  # built first: its constructor logs too
+    host.driver = _RecordingDriver()
+    logged = []
+    monkeypatch.setattr(ah.LOGGER, "info", lambda msg, *a, **k: logged.append(msg))
+
+    await _estop_route(host).endpoint(switch=switch)
+
+    assert logged == [
+        f"E-STOP {word} on SIM: driver={switch!r}, estopped_actions=[]"
+    ], logged
+
+
+@pytest.mark.asyncio
+async def test_estop_evidence_line_follows_a_driver_failure(tmp_path, monkeypatch):
+    import helao.hexagon.app.action_host as ah
+
+    host = _host(tmp_path)
+    host.driver = _RaisingEstopDriver()
+    logged = []
+    monkeypatch.setattr(ah.LOGGER, "info", lambda msg, *a, **k: logged.append(msg))
+    monkeypatch.setattr(ah.LOGGER, "exception", lambda *a, **k: None)
+
+    await _estop_route(host).endpoint(switch=True)
+
+    assert len(logged) == 1 and logged[0].startswith("E-STOP latch on SIM: driver=")
+    assert "axis Y unplugged" in logged[0]
+
+
+# --- Round 8: a hung driver must not stop the E-STOP ---------------------------
+
+
+class _HangingEstopDriver:
+    async def estop(self, switch):
+        await asyncio.sleep(3600)
+
+
+@pytest.mark.asyncio
+async def test_a_hanging_driver_estop_is_bounded_and_the_latch_still_lands(
+    tmp_path, monkeypatch
+):
+    """A wedged driver (e.g. a stuck GamryCOM thread) used to block the route
+    before it latched. The bound is on the awaited call; a driver blocking the
+    loop synchronously cannot be interrupted by it (accepted)."""
+    from helao.helpers.premodels import Action
+    from helao.hexagon.app.action_session import ActionSession
+    import helao.hexagon.app.action_host as ah
+
+    host = _host(tmp_path)
+    host.driver = _HangingEstopDriver()
+    session = await ActionSession.open(host, Action(action_name="move"))
+    executor = _Session()
+    host.executors["exec-1"] = executor
+    errors, logged = [], []
+    monkeypatch.setattr(ah, "ESTOP_DRIVER_TIMEOUT_S", 0.05)
+    monkeypatch.setattr(ah.LOGGER, "error", lambda msg, *a, **k: errors.append(msg))
+    monkeypatch.setattr(ah.LOGGER, "info", lambda msg, *a, **k: logged.append(msg))
+
+    body = await asyncio.wait_for(_estop_route(host).endpoint(switch=True), 2.0)
+
+    assert body["driver"] == {"error": "timeout"}
+    assert host.actionservermodel.estop is True
+    assert executor.stopped
+    assert body["estopped_actions"] == [str(session.action.action_uuid)]
+    assert any("SIM" in m and "timed out" in m for m in errors), errors
+    assert any(m.startswith("E-STOP latch on SIM") for m in logged), logged
+
+
+def test_the_driver_bound_stays_under_the_dispatcher_rpc_probe():
+    import helao.hexagon.app.action_host as ah
+
+    assert ah.ESTOP_DRIVER_TIMEOUT_S == 2.0  # dispatcher's RPC probe is 3 s
+
+
+def _fanout_orch(monkeypatch, names, hang):
+    import helao.core.servers.orch as orch_mod
+    from helao.hexagon.app import orch_estop
+
+    received, logged = [], []
+
+    async def fake_dispatch(world_cfg, A, params=None, **kw):
+        name = A.action_server
+        received.append(name)
+        if name == hang:
+            await asyncio.sleep(3600)
+        if name == "BOOM":
+            raise RuntimeError("no estop endpoint")
+
+    monkeypatch.setattr(orch_mod, "async_action_dispatcher", fake_dispatch)
+    monkeypatch.setattr(orch_estop, "Action", lambda **kw: SimpleNamespace(**kw))
+    monkeypatch.setattr(
+        orch_estop.LOGGER, "info", lambda msg, *a, **k: logged.append(msg)
+    )
+    monkeypatch.setattr(
+        orch_estop.LOGGER, "error", lambda msg, *a, **k: logged.append(msg)
+    )
+    orch = _EstopOrch()
+    orch.globalstatusmodel.server_dict = {
+        (n, "m", 1): SimpleNamespace(
+            action_server=SimpleNamespace(
+                as_dict=lambda n=n: n, disp_name=lambda n=n: n
+            )
+        )
+        for n in names
+    }
+    return orch, received, logged
+
+
+@pytest.mark.asyncio
+async def test_a_server_whose_estop_never_returns_does_not_starve_the_others(
+    monkeypatch,
+):
+    orch, received, logged = _fanout_orch(monkeypatch, ["A", "B", "C"], hang="A")
+    task = asyncio.ensure_future(orch.estop_controller.estop_actions(True))
+    try:
+
+        async def _all_received():
+            while set(received) != {"A", "B", "C"}:
+                await asyncio.sleep(0.01)
+
+        await asyncio.wait_for(_all_received(), 1.0)
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+    sends = [m for m in logged if m.startswith("Sending estop=")]
+    assert sends == [f"Sending estop=True request to {n}" for n in "ABC"]
+
+
+@pytest.mark.asyncio
+async def test_a_failing_server_is_logged_and_the_others_still_get_the_estop(
+    monkeypatch,
+):
+    orch, received, logged = _fanout_orch(monkeypatch, ["BOOM", "B"], hang=None)
+    await orch.estop_controller.estop_actions(True)
+    assert received == ["BOOM", "B"]
+    assert any("estop for BOOM failed" in m for m in logged), logged
+
+
+@pytest.mark.asyncio
+async def test_estop_actions_returns_when_a_server_never_answers(monkeypatch):
+    """A server with a frozen loop hangs its dispatch forever (the HTTP fallback
+    has no total timeout). Unbounded, ``estop_actions`` never returned, so the
+    stop message and the alert after it never ran."""
+    from helao.hexagon.app import orch_estop
+
+    monkeypatch.setattr(orch_estop, "ESTOP_SEND_TIMEOUT_S", 0.2)
+    orch, received, logged = _fanout_orch(monkeypatch, ["A", "B", "C"], hang="A")
+
+    await asyncio.wait_for(orch.estop_controller.estop_actions(True), 2.0)
+
+    assert set(received) == {"A", "B", "C"}
+    assert any("estop for A" in m and "timed out" in m for m in logged), logged

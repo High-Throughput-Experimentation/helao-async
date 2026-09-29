@@ -65,6 +65,11 @@ from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
+#: Bound on the driver's ``estop`` inside ``/estop``. Kept under the dispatcher's
+#: 3 s RPC probe so a hung driver cannot make the orchestrator time out and fall
+#: back to HTTP before the latch, executor stop and finalization have run.
+ESTOP_DRIVER_TIMEOUT_S = 2.0
+
 #: Keys that belong on the Action itself rather than in action_params when a
 #: queued action is rebuilt from query/path params. Same list as legacy's.
 ACTION_PARAM_KEYS = [
@@ -1226,8 +1231,20 @@ class ActionHost(HelaoFastAPI):
                 # A driver that raises (one unplugged axis) must not stop the
                 # latch, the executor stop or the finalization below: those are
                 # the parts of an E-STOP that do not depend on the hardware.
+                # ``wait_for`` only bounds an *awaiting* driver (a wedged COM
+                # thread, a stuck executor future). It cannot interrupt a
+                # synchronous blocking call made on the loop itself; that is
+                # accepted.
                 try:
-                    driver_resp = await driver_estop(switch=switch)
+                    driver_resp = await asyncio.wait_for(
+                        driver_estop(switch=switch), ESTOP_DRIVER_TIMEOUT_S
+                    )
+                except asyncio.TimeoutError:
+                    LOGGER.error(
+                        f"driver estop on {server_key} timed out after "
+                        f"{ESTOP_DRIVER_TIMEOUT_S}s; latching without it"
+                    )
+                    driver_resp = {"error": "timeout"}
                 except Exception as e:
                     LOGGER.exception("driver estop failed")
                     driver_resp = {"error": repr(e)}
@@ -1240,6 +1257,10 @@ class ActionHost(HelaoFastAPI):
                 for executor_id in list(self.executors):
                     self.stop_executor_by_id(executor_id)
                 estopped = await self.estop_actives()
+            LOGGER.info(
+                f"E-STOP {'latch' if switch else 'release'} on {server_key}: "
+                f"driver={driver_resp!r}, estopped_actions={estopped}"
+            )
             return {
                 "estop": switch,
                 "estopped_actions": estopped,
