@@ -653,6 +653,8 @@ class BaseAPI(HelaoFastAPI):
             description=description,
             version=str(version),
         )
+        # Before any route: HelaoFastAPI no longer installs this (B7a, D-B7a.4).
+        self.router.route_class = ActionAPIRoute
         self.drivers: Any = tuple()
         self.driver: Any = None
         self.poller = None

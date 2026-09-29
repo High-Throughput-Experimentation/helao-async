@@ -20,6 +20,7 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.models.server import ActionServerModel
 from helao.core.servers.base_api import (
+    ActionAPIRoute,
     _add_default_head_endpoints,
     _make_app_entry_middleware,
     _make_http_exception_handler,
@@ -92,6 +93,8 @@ class OrchAPI(HelaoFastAPI):
             description=description,
             version=str(version),
         )
+        # Before any route: HelaoFastAPI no longer installs this (B7a, D-B7a.4).
+        self.router.route_class = ActionAPIRoute
         self.drivers = tuple()
         self.driver = None
         self.poller = None

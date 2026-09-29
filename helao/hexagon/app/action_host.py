@@ -24,11 +24,10 @@ UI rather than a failure.
 ``host.base is host``. Twenty-one hte action modules reach ``app.base.<member>``;
 rather than invent an indirection, the host answers to both names.
 
-**One B7 follow-up, recorded not fixed:** ``HelaoFastAPI.__init__`` imports
-``ActionAPIRoute`` from ``helao.core.servers.base_api`` unconditionally
-(``server_api.py:71``). Nothing here uses it — Task 4 replaces the router's route
-class — but the *import* still runs, so ``server_api.py`` must be made lazy or
-parameterised before B7 can delete the engine.
+``HelaoFastAPI`` installs no route class of its own (B7a, D-B7a.4): each host
+installs the one it needs before its first route. This one installs a
+``BoundActionRoute`` bound to itself; legacy ``BaseAPI``/``OrchAPI`` install
+``ActionAPIRoute``.
 """
 
 import asyncio
@@ -142,11 +141,9 @@ class ActionHost(HelaoFastAPI):
             version=str(version),
             helao_cfg=helao_cfg,
         )
-        # HelaoFastAPI installs the legacy ActionAPIRoute; replace it with a
-        # subclass bound to THIS host before any route is registered, so no
-        # legacy wrapping is ever applied and two hosts in one process do not
-        # share a binding. See the module docstring for the B7 follow-up on the
-        # import itself, which still runs.
+        # Install a route class bound to THIS host before any route is
+        # registered, so every action route is wrapped by it and two hosts in
+        # one process do not share a binding. HelaoFastAPI installs none.
         from helao.hexagon.app.action_route import bind_action_route
 
         self.router.route_class = bind_action_route(self)
