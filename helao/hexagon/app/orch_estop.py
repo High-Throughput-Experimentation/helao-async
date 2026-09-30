@@ -202,57 +202,63 @@ class EstopController:
         exp_to_move = None
         seq_to_move = None
 
-        if orch.active_experiment is not None:
-            _mark_estopped(
-                orch.active_experiment.experiment_status, owner="experiment_status"
-            )
-            orch.active_experiment.experiment_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
-            orch.active_experiment.finished_global_params = {
-                k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
-            }
-            try:
-                if orch.active_sequence is not None:
-                    orch.active_sequence.dispatched_experiments.append(
-                        deepcopy(orch.active_experiment.get_exp())
-                    )
-                    await orch.write_active_sequence_seq()
-                await orch.write_exp(orch.active_experiment)
-            except Exception:
-                LOGGER.error("error writing estopped experiment", exc_info=True)
-            orch.last_experiment = deepcopy(orch.active_experiment)
-            exp_to_move = orch.last_experiment
-            orch.active_experiment = None
+        # Serialized with the clean finish paths; see ``RunLifecycle``. Nothing
+        # inside awaits the clean paths, so the non-reentrant lock cannot deadlock.
+        async with orch.finalize_lock:
+            exp = orch.active_experiment
+            seq = orch.active_sequence
 
-        if orch.active_sequence is not None:
-            _mark_estopped(
-                orch.active_sequence.sequence_status, owner="sequence_status"
-            )
-            orch.active_sequence.sequence_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
-            try:
-                await orch.write_seq(orch.active_sequence)
-            except Exception:
-                LOGGER.error("error writing estopped sequence", exc_info=True)
-            orch.last_sequence = deepcopy(orch.active_sequence)
-            seq_to_move = orch.last_sequence
-            orch.active_sequence = None
-            orch.active_seq_exp_counter = 0
-            orch.globalstatusmodel.counter_dispatched_actions = {}
-            # The queued experiments (unpacked from this sequence only; other
-            # sequences wait in ``sequence_dq``) and their expanded actions
-            # belong to the sequence just finalized. With ``active_sequence``
-            # gone they can never dispatch, and would crash the next start.
-            n_exps, n_acts = len(orch.experiment_dq), len(orch.action_dq)
-            orch.experiment_dq.clear()
-            orch.action_dq.clear()
-            if n_exps or n_acts:
-                LOGGER.warning(
-                    f"E-STOP dropped {n_exps} queued experiment(s) and {n_acts} "
-                    "queued action(s) belonging to the estopped sequence"
-                )
+            if exp is not None:
+                _mark_estopped(exp.experiment_status, owner="experiment_status")
+                exp.experiment_finished_timestamp = set_time(offset=orch.ntp_offset)
+                exp.finished_global_params = {
+                    k: v
+                    for k, v in orch.global_params.items()
+                    if k != "_fast_samples_in"
+                }
+                try:
+                    if seq is not None:
+                        # replace, don't duplicate, an entry a clean finish
+                        # that died part-way already appended
+                        ids = [e.experiment_uuid for e in seq.dispatched_experiments]
+                        if exp.experiment_uuid in ids:
+                            seq.dispatched_experiments[
+                                ids.index(exp.experiment_uuid)
+                            ] = deepcopy(exp.get_exp())
+                        else:
+                            seq.dispatched_experiments.append(deepcopy(exp.get_exp()))
+                        await orch.write_active_sequence_seq()
+                    await orch.write_exp(exp)
+                except Exception:
+                    LOGGER.error("error writing estopped experiment", exc_info=True)
+                orch.last_experiment = deepcopy(exp)
+                exp_to_move = orch.last_experiment
+                orch.active_experiment = None
+
+            if seq is not None:
+                _mark_estopped(seq.sequence_status, owner="sequence_status")
+                seq.sequence_finished_timestamp = set_time(offset=orch.ntp_offset)
+                try:
+                    await orch.write_seq(seq)
+                except Exception:
+                    LOGGER.error("error writing estopped sequence", exc_info=True)
+                orch.last_sequence = deepcopy(seq)
+                seq_to_move = orch.last_sequence
+                orch.active_sequence = None
+                orch.active_seq_exp_counter = 0
+                orch.globalstatusmodel.counter_dispatched_actions = {}
+                # The queued experiments (unpacked from this sequence only; other
+                # sequences wait in ``sequence_dq``) and their expanded actions
+                # belong to the sequence just finalized. With ``active_sequence``
+                # gone they can never dispatch, and would crash the next start.
+                n_exps, n_acts = len(orch.experiment_dq), len(orch.action_dq)
+                orch.experiment_dq.clear()
+                orch.action_dq.clear()
+                if n_exps or n_acts:
+                    LOGGER.warning(
+                        f"E-STOP dropped {n_exps} queued experiment(s) and {n_acts} "
+                        "queued action(s) belonging to the estopped sequence"
+                    )
 
         # Hand off in a background task, experiment before sequence, so the
         # child record is journalled done (and enqueued) before its parent.
