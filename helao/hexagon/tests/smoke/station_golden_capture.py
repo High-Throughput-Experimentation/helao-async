@@ -85,7 +85,10 @@ def main():
     if not matches:
         die(f"{seq} not found under {a.root}")
 
-    text = seq_text(sorted(matches, key=lambda p: p.suffix == ".zip")[0])
+    # first match that holds a -seq.yml: a sync_data=False sequence also leaves
+    # a same-name RUNS_NOSYNC dir with only .hlo files, which sorts first
+    ordered = sorted(matches, key=lambda p: p.suffix == ".zip")
+    text = next((t for m in ordered if (t := seq_text(m))), "")
     for m in matches:
         dst = a.out / "root" / m.relative_to(a.root)
         dst.parent.mkdir(parents=True, exist_ok=True)
