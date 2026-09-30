@@ -183,3 +183,17 @@ def test_cr_separated_seq_yml_in_zip_and_full_path_seq(tmp_path):
     r = capture(root, tmp_path / "out", seq=str(seq) + ".zip")
     assert r.returncode == 0, r.stderr
     assert "prc=1" in r.stdout
+
+
+def test_nosync_dir_without_seq_yml_does_not_hide_the_zip(tmp_path):
+    """eche10, 2026-09-30: a sync_data=False sequence leaves a same-name
+    RUNS_NOSYNC dir holding only .hlo files; it sorted ahead of the zip and its
+    missing -seq.yml read as "no sequence_uuid"."""
+    root = legacy_root(tmp_path, zipped=True)
+    nosync = root / "RUNS_NOSYNC/26.39/0929" / SEQ_NAME / "exp" / "act"
+    nosync.mkdir(parents=True)
+    (nosync / "data.hlo").write_text("x")
+    r = capture(root, tmp_path / "out")
+    assert r.returncode == 0, r.stderr
+    assert "prc=1" in r.stdout
+    assert (tmp_path / "out/root/RUNS_NOSYNC/26.39/0929" / SEQ_NAME).is_dir()
