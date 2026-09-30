@@ -22,13 +22,14 @@ library maps through ``orch`` at call time, so a reassignment made between
 construction and a call (e.g. ``import_queues`` reassigning the deques) is
 always observed. Behavior is byte-identical to the original inline methods.
 
-``sanitize_sequence_label`` stays a module-level function on ``orch.py`` (its
-single home); ``_prep_sequence_meta`` and ``add_split_sequences`` reach it via
-a lazy import inside the method body to avoid a circular import (``orch.py``
-imports this module at module top).
+``sanitize_sequence_label`` lives here, moved from ``orch.py`` by B7a (its
+only native consumers are ``_prep_sequence_meta`` and
+``add_split_sequences``); ``orch.py`` re-exports it until B7b deletes the
+engine.
 """
 
 import asyncio
+import re
 from copy import deepcopy
 from itertools import islice
 from typing import Optional
@@ -41,6 +42,13 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.time_utils import gen_uuid
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+
+def sanitize_sequence_label(label):
+    """Collapse whitespace/underscore runs to single underscores (None-safe)."""
+    if not label:
+        return label
+    return re.sub(r"[\s_]+", "_", label)
 
 
 def _dq_page(dq, limit: Optional[int], offset: int, render):
@@ -131,7 +139,6 @@ class RunQueues:
     def _prep_sequence_meta(self, sequence: Sequence) -> None:
         """Populate uuid/codehash/codepath/funcname metadata on ``sequence`` in place."""
         orch = self.orch
-        from helao.core.servers.orch import sanitize_sequence_label
 
         if sequence.sequence_uuid is None:
             sequence.sequence_uuid = gen_uuid()
@@ -192,7 +199,6 @@ class RunQueues:
             if no split parameter applied.
         """
         orch = self.orch
-        from helao.core.servers.orch import sanitize_sequence_label
 
         possible_splits = [
             x

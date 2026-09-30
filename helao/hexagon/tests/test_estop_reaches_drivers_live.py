@@ -21,9 +21,9 @@ from helao.hexagon.tests.live_group import (
 
 @pytest.mark.asyncio
 async def test_estop_fans_out_true_and_clear_fans_out_false(tmp_path, monkeypatch):
-    import helao.core.servers.orch as orch_mod
+    import helao.helpers.dispatcher as dispatcher_mod  # B7a: the seam lives here
 
-    real = orch_mod.async_action_dispatcher
+    real = dispatcher_mod.async_action_dispatcher
     sent = []
 
     async def spy(world_cfg, A, *args, **kwargs):
@@ -32,7 +32,7 @@ async def test_estop_fans_out_true_and_clear_fans_out_false(tmp_path, monkeypatc
         sent.append((A.action_params.get("switch"), (kwargs.get("params") or {})))
         return None
 
-    monkeypatch.setattr(orch_mod, "async_action_dispatcher", spy)
+    monkeypatch.setattr(dispatcher_mod, "async_action_dispatcher", spy)
 
     async with live_group(str(tmp_path)) as g:
         orch = g.orch

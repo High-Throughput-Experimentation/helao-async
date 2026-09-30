@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import helao.core.servers.orch as orch_module
+import helao.helpers.yml_tools as yml_tools_module  # B7a: move_dir seam owner
 from helao.core.hooks import HookSet
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
@@ -94,7 +94,7 @@ def move_dir_noop(monkeypatch):
     async def _move_dir(hobj, base=None, retry_delay=5):
         return None
 
-    monkeypatch.setattr(orch_module, "move_dir", _move_dir)
+    monkeypatch.setattr(yml_tools_module, "move_dir", _move_dir)
 
 
 async def _settle():

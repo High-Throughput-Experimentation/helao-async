@@ -24,7 +24,7 @@ What is REAL (driven, unmodified, byte-identical to the shipped orchestrator):
 What is FAKED/STUBBED (the harness surface, per spec :sec:`5.3`):
 
 * ``async_action_dispatcher`` (module-global rebind on
-  ``helao.core.servers.orch``) -- records every call as ``(server,
+  ``helao.helpers.dispatcher``) -- records every call as ``(server,
   action_name, ordered params, start_condition, submit_order)`` and returns a
   canned active/finished action dict per the scenario's script. For each
   successful blocking dispatch it also schedules a background "status ping"
@@ -36,10 +36,10 @@ What is FAKED/STUBBED (the harness surface, per spec :sec:`5.3`):
 * ``async_private_dispatcher`` -- no-op recorder returning ``({}, none)``.
 * ``HelaoSyncer.to_s3`` -- no-op recorder (``self.syncer.to_s3``).
 * ``PLATE_API.has_access`` -- forced ``False`` for the harness's duration
-  (module-global on ``helao.core.servers.orch``), so the plate-verification
+  (module-global on ``helao.hexagon.app.orch_unpack``), so the plate-verification
   gate is a no-op in every scenario, matching spec's fake list.
-* ``move_dir`` (module-global rebind) -- recording no-op (no real file
-  moves).
+* ``move_dir`` (module-global rebind on ``helao.helpers.yml_tools``) --
+  recording no-op (no real file moves).
 * ``write_seq`` / ``write_exp`` / ``put_lbuf`` / ``put_lbuf_nowait`` --
   recording no-ops bound directly on the ``Orch`` instance (shadowing the
   ``Base`` methods, which need real ``helaodirs``/disk paths this harness
@@ -105,7 +105,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 
-import helao.core.servers.orch as orch_module
+import helao.helpers.dispatcher as dispatcher_module
+import helao.helpers.yml_tools as yml_tools_module
+import helao.hexagon.app.orch_unpack as orch_unpack_module
 import helao.hexagon.app.orch_monitor as orch_monitor_module
 import helao.hexagon.app.orch_status_sync as orch_status_sync_module
 from helao.core.error import ErrorCodes
@@ -421,12 +423,12 @@ def _install_all_spies(orch: Orch, trace: list) -> None:
 
 
 # ---------------------------------------------------------------------------
-# fake module-global dispatchers (patched onto helao.core.servers.orch)
+# fake module-global seams (patched onto the modules that own them, B7a)
 # ---------------------------------------------------------------------------
 
 
 class _PatchedOrchGlobals:
-    """Context manager patching the module-globals ``orch.py`` imports by name."""
+    """Context manager patching each seam on the module that owns it (D-B7a.2)."""
 
     def __init__(self, action_dispatcher, private_dispatcher, move_dir_fn):
         self._action_dispatcher = action_dispatcher
@@ -438,30 +440,30 @@ class _PatchedOrchGlobals:
         self._orig_plate_api = None
 
     def __enter__(self):
-        self._orig_action_dispatcher = orch_module.async_action_dispatcher
+        self._orig_action_dispatcher = dispatcher_module.async_action_dispatcher
         # CARDS P5 relocated the private-dispatch callers out of ``orch``; the
         # symbol now lives in the ServerMonitor / StatusIngester collaborator
         # modules (677c6ca5 dropped the unused ``orch`` import). Patch both so
         # any private dispatch a scenario triggers is stubbed, matching the
         # original network-isolation intent.
         self._orig_private_dispatcher = orch_status_sync_module.async_private_dispatcher
-        self._orig_move_dir = orch_module.move_dir
-        self._orig_plate_api = orch_module.PLATE_API
-        orch_module.async_action_dispatcher = self._action_dispatcher
+        self._orig_move_dir = yml_tools_module.move_dir
+        self._orig_plate_api = orch_unpack_module.PLATE_API
+        dispatcher_module.async_action_dispatcher = self._action_dispatcher
         orch_status_sync_module.async_private_dispatcher = self._private_dispatcher
         orch_monitor_module.async_private_dispatcher = self._private_dispatcher
-        orch_module.move_dir = self._move_dir_fn
+        yml_tools_module.move_dir = self._move_dir_fn
         # HTEPlateAPI.has_access is a read-only property; rebind the whole
         # module-global to a minimal fake rather than mutating the singleton.
-        orch_module.PLATE_API = SimpleNamespace(has_access=False)
+        orch_unpack_module.PLATE_API = SimpleNamespace(has_access=False)
         return self
 
     def __exit__(self, *exc):
-        orch_module.async_action_dispatcher = self._orig_action_dispatcher
+        dispatcher_module.async_action_dispatcher = self._orig_action_dispatcher
         orch_status_sync_module.async_private_dispatcher = self._orig_private_dispatcher
         orch_monitor_module.async_private_dispatcher = self._orig_private_dispatcher
-        orch_module.move_dir = self._orig_move_dir
-        orch_module.PLATE_API = self._orig_plate_api
+        yml_tools_module.move_dir = self._orig_move_dir
+        orch_unpack_module.PLATE_API = self._orig_plate_api
         return False
 
 

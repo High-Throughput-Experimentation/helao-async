@@ -52,14 +52,11 @@ remains on ``Orch``, cluster B); it never touches ``globstat_q`` directly --
 that queue is owned end-to-end by ``StatusIngester`` in
 ``orch_status_sync.py``.
 
-CIRCULAR-IMPORT / MONKEYPATCH NOTE: this module must NOT import
-``helao.core.servers.orch`` at module top (import-cycle rule). The two
-module-globals the dispatch golden-master harness rebinds
-(``helao.core.servers.orch.async_action_dispatcher`` and
-``helao.core.servers.orch.PLATE_API``) are imported lazily inside the effect
-methods that use them, so the external patch points keep working exactly as
-they did before extraction (the same technique ``orch_lifecycle.py`` uses for
-``move_dir``).
+PATCH-SEAM NOTE (B7a, D-B7a.2): ``async_action_dispatcher`` and
+``PLATE_API`` are read at call time from the modules that own them --
+``dispatcher.async_action_dispatcher`` and ``orch_unpack.PLATE_API`` -- and
+never bound to a name here. Those two module attributes are the only patch
+points; the dispatch golden master rebinds exactly them.
 
 BEHAVIOR NOTE (driver-health fall-through): the design's inner-loop sketch
 re-asked ``next_step`` after a ``DriverHealthWait`` (``continue``). That would
@@ -118,14 +115,16 @@ from helao.core.error import ErrorCodes
 from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopIntent, LoopStatus, OrchStatus
-from helao.core.servers.orch_global_params import (
+from helao.hexagon.app.orch_global_params import (
     apply_from_globals,
     collect_to_globals,
 )
+from helao.helpers import dispatcher
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Action, Experiment
 from helao.helpers.time_utils import gen_uuid
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.app import orch_unpack
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -908,7 +907,6 @@ class DispatchRunner:
         which the self-registration below has to account for.
         """
         orch = self.orch
-        from helao.core.servers.orch import async_action_dispatcher
 
         result_actiondict = None
         error_code = ErrorCodes.none
@@ -932,8 +930,8 @@ class DispatchRunner:
         # mutation below, not the network wait.
         if not estopped:
             try:
-                result_actiondict, error_code = await async_action_dispatcher(
-                    orch.world_cfg, A
+                result_actiondict, error_code = (
+                    await dispatcher.async_action_dispatcher(orch.world_cfg, A)
                 )
             except Exception as e:
                 LOGGER.info(f"Error while dispatching action {A.action_name}: {e}")
@@ -1286,9 +1284,8 @@ class DispatchRunner:
     async def _verify_experiment_plate(self) -> Optional[ErrorCodes]:
         """Gate on plate verification (:748-763); returns ``not_available`` on failure."""
         orch = self.orch
-        from helao.core.servers.orch import PLATE_API
 
-        if orch.verify_plates and PLATE_API.has_access:
+        if orch.verify_plates and orch_unpack.PLATE_API.has_access:
             plate_found = orch.verify_plate_in_params(
                 orch.active_experiment.experiment_params
             )
@@ -1318,7 +1315,6 @@ class DispatchRunner:
         if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
             LOGGER.info("orchestrator estopped, not dispatching sequence")
             return ErrorCodes.estop
-        from helao.core.servers.orch import PLATE_API
 
         if orch.sequence_dq:
             LOGGER.info("getting new sequence from sequence_dq")
@@ -1419,7 +1415,7 @@ class DispatchRunner:
                         f"Error uploading initial active sequence json to s3: {e}"
                     )
 
-            if orch.verify_plates and PLATE_API.has_access:
+            if orch.verify_plates and orch_unpack.PLATE_API.has_access:
                 plate_found = orch.verify_plate_in_params(
                     orch.active_sequence.sequence_params
                 )

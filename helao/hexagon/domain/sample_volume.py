@@ -11,8 +11,8 @@ itself was always domain-shaped: it mutates a sample model in place and does no
 I/O.
 
 LOGGER note: domain modules log through stdlib `logging`, not
-`helao.helpers.helao_logging` (outside the allow-list) -- the same tradeoff
-`global_params.py` documents. That matters here, because `helao_logging`
+`helao.helpers.helao_logging` (outside the allow-list) -- the domain
+allow-list's standing tradeoff. That matters here, because `helao_logging`
 attaches its handlers to a module-named logger and sets `propagate = False`,
 so a stdlib logger in this module reaches ROOT, which has no HELAO handlers:
 records would effectively disappear. Legacy callers must therefore keep their
