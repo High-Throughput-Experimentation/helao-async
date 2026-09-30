@@ -3,6 +3,10 @@
 Golden-set layout: <set>/provenance.yml + <set>/root/{RUNS_*,PROCESSES,S3_SIM}.
 The candidate may be another golden set or a bare capture root. Any
 unnormalized difference fails; phase gates cite the printed run_id.
+
+--remap-legacy-layout diffs a legacy-layout golden (RUNS_*/%y.%U) against a
+unified-layout capture (RUNS/%Y): the golden is remapped in the temp copy, and
+a candidate still carrying the legacy layout fails (candidate_legacy_layout).
 """
 
 from __future__ import annotations
@@ -12,18 +16,21 @@ import json
 import sys
 import tempfile
 import uuid
+from contextlib import nullcontext
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 from harness import HARNESS_VERSION
-from harness.classify import ArtifactRow
+from harness.classify import ArtifactRow, fold_legacy_week_token
 from harness.hlo_pass import diff_hlo
 from harness.manifest import ManifestMissingError, ProvenanceManifest, content_mask_mode
 from harness.s3_pass import diff_s3_record, internal_s3_checks
 from harness.treepass import (
     diff_member_sets,
     explode_zips,
+    candidate_legacy_layout,
+    remap_legacy_layout as remap_tree,
     seed_mapper,
     snapshot,
 )
@@ -152,15 +159,19 @@ def run_parity(
     golden_set: Path,
     candidate: Path,
     report_path: Optional[Path] = None,
+    remap_legacy_layout: bool = False,
 ) -> dict:
     golden_set, candidate = Path(golden_set), Path(candidate)
     manifest = ProvenanceManifest.load(golden_set)  # hard-fails when missing (F1)
     golden_root = golden_set / "root"
     cand_root = _resolve_root(candidate)
     run_id = uuid.uuid4().hex[:12]
-    with tempfile.TemporaryDirectory(prefix="parity_") as td:
+    fold = fold_legacy_week_token() if remap_legacy_layout else nullcontext()
+    with fold, tempfile.TemporaryDirectory(prefix="parity_") as td:
         g_ex = explode_zips(golden_root, Path(td) / "g")
         c_ex = explode_zips(cand_root, Path(td) / "c")
+        if remap_legacy_layout:
+            remap_tree(g_ex)  # golden only: the candidate must already be unified
         mg, mc = UuidMapper(), UuidMapper()
         seed_mapper(g_ex, mg)
         seed_mapper(c_ex, mc)
@@ -193,6 +204,9 @@ def run_parity(
             consistency, manifest.accepted_consistency_divergences
         )
         consistency.extend(stale)
+        if remap_legacy_layout:
+            # After partition_accepted on purpose: never acceptable.
+            consistency.extend(candidate_legacy_layout(c_ex))
     n_diffs = (
         len(tree_diffs) + sum(len(v) for v in file_diffs.values()) + len(consistency)
     )
@@ -203,6 +217,7 @@ def run_parity(
         "scenario": manifest.scenario,
         "golden": str(golden_set),
         "candidate": str(candidate),
+        "remap_legacy_layout": remap_legacy_layout,
         "status": "pass" if n_diffs == 0 else "fail",
         "n_diffs": n_diffs,
         "tree_diffs": tree_diffs,
@@ -222,9 +237,12 @@ def main(argv=None) -> int:
     parser.add_argument("--golden", required=True, type=Path)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--report", type=Path, default=None)
+    parser.add_argument("--remap-legacy-layout", action="store_true")
     args = parser.parse_args(argv)
     try:
-        report = run_parity(args.golden, args.candidate, args.report)
+        report = run_parity(
+            args.golden, args.candidate, args.report, args.remap_legacy_layout
+        )
     except ManifestMissingError as e:
         print(f"REFUSED: {e}", file=sys.stderr)
         return 2
