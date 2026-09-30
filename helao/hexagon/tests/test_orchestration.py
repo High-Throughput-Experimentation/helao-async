@@ -107,7 +107,7 @@ def test_t9_estop_transition_state_and_command_order(event):
     ]
     fanout = cmds[1]
     assert isinstance(fanout, fsm.EstopFanout)
-    assert fanout.switch is False
+    assert fanout.switch is True  # drivers act only on switch=True
 
 
 def test_estopped_uuid_when_loop_not_started_is_noop():

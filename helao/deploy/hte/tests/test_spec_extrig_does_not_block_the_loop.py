@@ -146,3 +146,22 @@ async def test_poll_does_not_stack_a_second_read_thread():
     # Every poll used to submit another blocking read; at poll_rate 0.01 that
     # is 100 parked pool workers a second.
     assert driver.reads == 1, f"{driver.reads} reads were submitted"
+
+
+@pytest.mark.asyncio
+async def test_post_exec_leaves_the_channel_open_while_a_read_is_parked():
+    # eche10 2026-09-21 and 2026-09-29: the illumination cycle ended before
+    # the acquisition window, so the last read was still parked waiting on a
+    # trigger. spCloseGivenChannel then hung behind it and held the DLL, and
+    # the next acquire_spec_extrig timed out on every setter. Legacy's
+    # IOloop skipped the close in exactly this case (wait_for timeout ->
+    # pass); a parked read is released by the next action's first trigger.
+    driver = _Driver(block_s=0.0)
+    ex = _exec_with(driver)
+    ex._read_future = asyncio.get_running_loop().create_future()
+
+    result = await ex._post_exec()
+
+    assert result["error"] == spec_server.ErrorCodes.none
+    assert driver.spec.closed == 0 and driver.unset_calls == 0
+    ex._read_future.cancel()

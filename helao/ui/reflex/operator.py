@@ -146,6 +146,7 @@ CONTROL_METHODS = frozenset(
         "start",
         "stop",
         "estop",
+        "clear_estop",
         "skip",
         "clear_sequences",
         "clear_experiments",
@@ -3406,6 +3407,13 @@ def build_page():
             "E-STOP",
             class_name="bg-red-900 hover:bg-red-950 text-white",
             on_click=OperatorQueueState.control("estop"),
+        ),
+        # Outline, not solid: it must not read as a second E-STOP. Always
+        # clickable; the orchestrator only acts from the estopped state.
+        rx.button(
+            "Clear E-STOP",
+            variant="outline",
+            on_click=OperatorQueueState.control("clear_estop"),
         ),
         spacing="3",
         align="center",

@@ -775,6 +775,17 @@ class DispatchRunner:
         if rc is not None:
             return rc
 
+        # The wait above can span an E-STOP: ``estop_finish_active`` then clears
+        # ``active_experiment``, which staging dereferences.
+        if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+            LOGGER.info("orchestrator estopped, not dispatching action")
+            return ErrorCodes.estop
+        if orch.active_experiment is None:
+            LOGGER.warning(
+                f"no active experiment for head action {A.action_name}; dropping it"
+            )
+            return ErrorCodes.estop
+
         self._stage_action_for_dispatch(A)  # :795
 
         rc, result_actiondict = await self._dispatch_action_locked(A)  # :797-799
@@ -1063,6 +1074,24 @@ class DispatchRunner:
     async def dispatch_experiment(self) -> ErrorCodes:
         """Pop the next experiment, expand its actions, push onto action_dq (:536-567)."""
         orch = self.orch
+        # E-STOP can land while a caller is parked in ``finish_active_*``:
+        # ``estop_finish_active`` then clears the active sequence/experiment,
+        # and staging the next one would dereference None. Every caller routes
+        # through here, so this is the one place to refuse -- before anything
+        # is popped from any deque.
+        if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+            LOGGER.info("orchestrator estopped, not dispatching experiment")
+            return ErrorCodes.estop
+        # Experiments queued for a sequence that is no longer active (an E-STOP
+        # finalized it while the unpacker was still appending) can never
+        # dispatch, and ``_stage_experiment`` dereferences ``active_sequence``.
+        if orch.active_sequence is None and orch.experiment_dq:
+            LOGGER.warning(
+                f"dropping {len(orch.experiment_dq)} orphaned experiment(s): "
+                "no active sequence"
+            )
+            orch.experiment_dq.clear()
+            return ErrorCodes.none
         # check again if experiment_dq is empty
         if not orch.experiment_dq:
             LOGGER.info("experiment_dq is empty, cannot dispatch experiments")
@@ -1278,10 +1307,19 @@ class DispatchRunner:
     async def dispatch_sequence(self) -> ErrorCodes:
         """Pop the next sequence, activate/validate it, spawn its unpacker (:405-534), verbatim."""
         orch = self.orch
+        # E-STOP can land while a caller is parked in ``finish_active_*``:
+        # ``estop_finish_active`` then clears the active sequence/experiment,
+        # and staging the next one would dereference None. Every caller routes
+        # through here, so this is the one place to refuse -- before anything
+        # is popped from any deque.
+        if orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+            LOGGER.info("orchestrator estopped, not dispatching sequence")
+            return ErrorCodes.estop
 
         if orch.sequence_dq:
             LOGGER.info("getting new sequence from sequence_dq")
             orch.active_sequence = orch.sequence_dq.popleft()
+            activated = orch.active_sequence
 
             LOGGER.info(f"new active sequence is {orch.active_sequence.sequence_name}")
             await orch.put_lbuf(
@@ -1390,9 +1428,26 @@ class DispatchRunner:
                     await orch.intend_none()
                     return ErrorCodes.not_available
 
-            orch.aloop.create_task(orch.seq_unpacker())
+            unpacker = orch.aloop.create_task(orch.seq_unpacker())
             LOGGER.info("waiting for experiment queue to populate")
             while len(orch.experiment_dq) == 0:
+                # The unpacker may give up without appending (E-STOP, or its
+                # sequence replaced), so an empty queue is not always "still
+                # coming".
+                if (
+                    orch.globalstatusmodel.loop_state == LoopStatus.estopped
+                    or orch.active_sequence is not activated
+                ):
+                    LOGGER.info("orchestrator estopped, not waiting for unpacker")
+                    return ErrorCodes.estop
+                if unpacker.done():
+                    exc = None if unpacker.cancelled() else unpacker.exception()
+                    if exc is not None:
+                        LOGGER.error(f"sequence unpacker raised: {exc!r}", exc_info=exc)
+                    LOGGER.warning(
+                        "sequence unpacker finished without queuing an experiment"
+                    )
+                    return ErrorCodes.none
                 await asyncio.sleep(0.1)
 
         else:

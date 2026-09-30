@@ -312,6 +312,9 @@ class _MockBackend:
     async def clear_experiments(self): ...
     async def clear_actions(self): ...
 
+    async def clear_estop(self):
+        self.cleared_estop = True
+
     async def move_sequence(self, from_idx, to_idx):
         self.queue_calls.append(("move_sequence", from_idx, to_idx))
 
@@ -826,6 +829,25 @@ def test_stop_callback_forwards_reset_run_id():
     assert be.stop_reset is True
     op.cleanup_session(None)
     print("test_stop_callback_forwards_reset_run_id PASS")
+
+
+def test_clear_estop_button_schedules_the_backend_call():
+    """Clear E-STOP sits beside ESTOP and reaches ``backend.clear_estop``."""
+    from bokeh.document import Document
+
+    from helao.ui.bokeh.operator import BokehOperator
+
+    be = _MockBackend()
+    op = BokehOperator(_FakeVisOp(Document()), be)
+    _drain_callbacks(op.vis.doc)
+
+    assert op.button_clear_estop_orch.label == "Clear E-STOP"
+    assert op.button_clear_estop_orch.button_type != "danger"
+    assert getattr(be, "cleared_estop", False) is False
+    op.callback_clear_estop_orch(None)
+    _drain_callbacks(op.vis.doc)
+    assert be.cleared_estop is True
+    op.cleanup_session(None)
 
 
 def test_prepend_plan_callback_clears_and_dispatches():

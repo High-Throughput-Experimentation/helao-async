@@ -390,10 +390,12 @@ class SM303(HelaoDriver):
         Returns:
             The vendor result code (``1`` on success).
         """
-        self._data = (ctypes.c_long * 1056)()
+        # Local buffer: a read parked on a trigger can finish after the next
+        # read has replaced self._data, and must copy its own spectrum.
+        buf = self._data = (ctypes.c_long * 1056)()
         if self.n_avg != 1 or self.fft != 0:
             result = self.spec.spReadDataAdvEx(
-                ctypes.byref(self._data),
+                ctypes.byref(buf),
                 ctypes.c_short(self.n_avg),
                 ctypes.c_short(self.fft),
                 ctypes.c_short(0),
@@ -402,11 +404,11 @@ class SM303(HelaoDriver):
             )
         else:
             result = self.spec.spReadDataEx(
-                ctypes.byref(self._data),
+                ctypes.byref(buf),
                 self.dev_num,
             )
         if result == 1:
-            self.data = list(self._data)[10:1034]
+            self.data = list(buf)[10:1034]
         else:
             self.data = []
         return result
