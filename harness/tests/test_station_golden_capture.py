@@ -168,3 +168,18 @@ def test_seq_is_not_a_glob(tmp_path):
     r = capture(unified_root(tmp_path), tmp_path / "o", seq="*")
     _refused(r, "not found")
     assert not (tmp_path / "o").exists()
+
+
+def test_cr_separated_seq_yml_in_zip_and_full_path_seq(tmp_path):
+    """eche10, 2026-09-30: the zip's -seq.yml plainly held sequence_uuid, but a
+    `^...$` re.M search only knows "\\n" and missed it; a full path was also
+    globbed verbatim and crashed pathlib."""
+    root = legacy_root(tmp_path)
+    seq = root / "RUNS_SYNCED/26.39/0929" / SEQ_NAME
+    yml = next(seq.glob("*-seq.yml"))
+    yml.write_bytes(yml.read_bytes().replace(b"\n", b"\r"))
+    shutil.make_archive(str(seq), "zip", root_dir=seq)
+    shutil.rmtree(seq)
+    r = capture(root, tmp_path / "out", seq=str(seq) + ".zip")
+    assert r.returncode == 0, r.stderr
+    assert "prc=1" in r.stdout

@@ -50,8 +50,12 @@ def seq_text(match):
 
 
 def scalar(text, key):
-    m = re.search(rf"^{key}:[ \t]*(.*?)[ \t]*$", text, re.M)
-    return m.group(1).strip("'\"") if m and m.group(1) else None
+    # splitlines, not re.M: `$` only knows "\n", so a "\r"-, "\x85"- or
+    # " "-separated yml hid a key that was plainly there (eche10, 2026-09-30)
+    for line in text.lstrip("﻿").splitlines():
+        if line.startswith(f"{key}:"):
+            return line[len(key) + 1 :].strip().strip("'\"") or None
+    return None
 
 
 def main():
@@ -63,7 +67,8 @@ def main():
     ap.add_argument("--launch-cmd")
     a = ap.parse_args()
 
-    seq = a.seq[:-4] if a.seq.endswith(".zip") else a.seq
+    seq = re.split(r"[\\/]", a.seq.rstrip("\\/"))[-1]  # a full path works too
+    seq = seq[:-4] if seq.endswith(".zip") else seq
     names = tuple(glob.escape(n) for n in (seq, seq + ".zip"))
     if a.out.exists():
         die(f"--out {a.out} already exists; refusing to overwrite")
@@ -96,9 +101,8 @@ def main():
             die(f"no sequence_uuid in the sequence's *-seq.yml under {legacy[0]}")
         proc = a.root / "PROCESSES"
         # the process's own top-level line, not a mention in its params
-        own = re.compile(rf"^sequence_uuid:\s*['\"]?{re.escape(uuid)}['\"]?\s*$", re.M)
         for p in sorted(proc.rglob("*-prc.yml")) if proc.is_dir() else []:
-            if own.search(p.read_text(errors="replace")):
+            if scalar(p.read_text(errors="replace"), "sequence_uuid") == uuid:
                 dst = a.out / "root" / "PROCESSES" / p.relative_to(proc)
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(p, dst)
