@@ -48,6 +48,7 @@ from helao.core.hooks.loader import load_hook_set
 from helao.core.models.server import ActionServerModel, EndpointModel
 from helao.helpers import helao_logging as logging
 from helao.core.error import ErrorCodes
+from helao.core.models.hlostatus import HloStatus
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.dispatcher import async_private_dispatcher
 from helao.helpers.helao_dirs import helao_dirs
@@ -62,6 +63,11 @@ from helao.helpers.zdeque import zdeque
 from helao.hexagon.app.wiring import ACTION_REQUIRED, PortWiring
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Bound on the driver's ``estop`` inside ``/estop``. Kept under the dispatcher's
+#: 3 s RPC probe so a hung driver cannot make the orchestrator time out and fall
+#: back to HTTP before the latch, executor stop and finalization have run.
+ESTOP_DRIVER_TIMEOUT_S = 2.0
 
 #: Keys that belong on the Action itself rather than in action_params when a
 #: queued action is rebuilt from query/path params. Same list as legacy's.
@@ -813,18 +819,33 @@ class ActionHost(HelaoFastAPI):
     async def estop_actives(self) -> list:
         """Finalize every in-flight action with ``estopped`` status.
 
-        Iterates the live session registry, which is empty until Task 5 opens
-        sessions — an idle server estops with nothing to finalize, which is the
-        correct outcome and is what an idle legacy server does too.
+        Iterates the live session registry, so an idle server estops with nothing
+        to finalize, which is what an idle legacy server does too.
+
+        Each action is marked estopped (``set_estop`` is synchronous) and then the
+        whole session is finished, which moves it out of ``actives``. The executor
+        stop that precedes this in ``/estop`` cannot stand in for the finish: an
+        action with no executor (a MOTOR ``move``) has nothing to stop, and a
+        stopped executor's own finish is not guaranteed to run.
+
+        Returns:
+            The finalized ``action_uuid`` strings.
         """
-        estopped = []
-        for action_uuid, session in list(self.actives.items()):
+        finalized = []
+        for session in list(self.actives.values()):
             try:
-                await session.set_estop()
-                estopped.append(str(action_uuid))
+                for action in session.action_list:
+                    if HloStatus.estopped not in action.action_status:
+                        session.set_estop(action=action)
+                # ``finish(None)`` is the session's finish-all; the finalizer's
+                # ``finish_all`` is exactly this call.
+                await session.finish()
+                finalized.extend(str(a.action_uuid) for a in session.action_list)
             except Exception:
-                LOGGER.exception(f"failed to estop active action {action_uuid}")
-        return estopped
+                LOGGER.error(
+                    "error finalizing an active action during estop", exc_info=True
+                )
+        return finalized
 
     # -- route registration --------------------------------------------------
 
@@ -1200,15 +1221,43 @@ class ActionHost(HelaoFastAPI):
 
         @self.post(f"/{server_key}/estop", tags=["action"])
         async def estop(switch: bool = True):
-            """Latch E-STOP, stop executors, finalize in-flight actions."""
+            """Latch (or release) E-STOP; on latch, stop executors and finalize actives."""
             driver_estop = getattr(self.driver, "estop", None)
             driver_resp = None
             if driver_estop is not None and callable(driver_estop):
-                driver_resp = await driver_estop(switch=switch)
+                # A driver that raises (one unplugged axis) must not stop the
+                # latch, the executor stop or the finalization below: those are
+                # the parts of an E-STOP that do not depend on the hardware.
+                # ``wait_for`` only bounds an *awaiting* driver (a wedged COM
+                # thread, a stuck executor future). It cannot interrupt a
+                # synchronous blocking call made on the loop itself; that is
+                # accepted.
+                try:
+                    driver_resp = await asyncio.wait_for(
+                        driver_estop(switch=switch), ESTOP_DRIVER_TIMEOUT_S
+                    )
+                except asyncio.TimeoutError:
+                    LOGGER.error(
+                        f"driver estop on {server_key} timed out after "
+                        f"{ESTOP_DRIVER_TIMEOUT_S}s; latching without it"
+                    )
+                    driver_resp = {"error": "timeout"}
+                except Exception as e:
+                    LOGGER.exception("driver estop failed")
+                    driver_resp = {"error": repr(e)}
             self.actionservermodel.estop = switch
-            for executor_id in list(self.executors):
-                self.stop_executor_by_id(executor_id)
-            estopped = await self.estop_actives()
+            estopped: list = []
+            # Only a latch ends work. Release must leave alone whatever started
+            # after the E-STOP (background batch/analysis actions), which
+            # finalizing as estopped would kill.
+            if switch:
+                for executor_id in list(self.executors):
+                    self.stop_executor_by_id(executor_id)
+                estopped = await self.estop_actives()
+            LOGGER.info(
+                f"E-STOP {'latch' if switch else 'release'} on {server_key}: "
+                f"driver={driver_resp!r}, estopped_actions={estopped}"
+            )
             return {
                 "estop": switch,
                 "estopped_actions": estopped,

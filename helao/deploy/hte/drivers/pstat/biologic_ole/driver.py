@@ -38,6 +38,7 @@ to keep in mind when editing it:
   written straight into the action directory would be uploaded torn.
 """
 
+import asyncio
 import concurrent.futures
 import shutil
 import time
@@ -635,6 +636,48 @@ class BiologicOleDriver(HelaoDriver):
                 message=str(exc),
                 status=DriverStatus.error,
             )
+
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Stop every channel that has a technique set up on E-STOP; a no-op
+        on release.
+
+        The channels ``stop()`` stops when given none, and its ``StopChannel``
+        call, but each channel independently and without ``stop()``'s
+        ``stopping`` re-entry guard. No reset, no disconnect. Release touches
+        no hardware.
+
+        Every COM call belongs on the ``olecom`` pool thread, so the stops are
+        one job submitted to it (calling ``_bounded`` from that thread would
+        wait on itself). The wait is shielded: the route bounds this call with
+        ``wait_for``, and cancelling the wrapped future would make the pool
+        skip a job it has not started, so a busy COM thread would never stop
+        the channel.
+        """
+        if not switch:
+            return switch
+        if self.client is None or self.device_number is None:
+            LOGGER.warning("BIOLOGIC estop: not connected, nothing to stop")
+            return switch
+        channels = [k for k, v in self.channels.items() if v is not None]
+        LOGGER.info(f"BIOLOGIC estop: stopping channels {channels}")
+        try:
+            future = self._pool.submit(
+                self._estop_stop, self.client, self.device_number, channels
+            )
+        except Exception:
+            LOGGER.exception("estop: could not queue the StopChannel calls")
+            return switch
+        await asyncio.shield(asyncio.wrap_future(future))
+        return switch
+
+    @staticmethod
+    def _estop_stop(client: OleComClient, device: int, channels: list) -> None:
+        """Runs on the COM thread. One failure skips no other channel."""
+        for channel in channels:
+            try:
+                client.stop_channel(device, channel)
+            except Exception:
+                LOGGER.exception(f"estop: StopChannel({channel}) failed")
 
     def _ship_artifacts(self, channel: int) -> None:
         """Move the run's ``.mps`` and ``.mpr`` into the action directory.

@@ -131,6 +131,14 @@ class SM303Exec(Executor):
         is still parked on a trigger that never arrived.
         """
         self.driver.trigger_duration = 0
+        if self._read_future is not None and not self._read_future.done():
+            # The trigger source stopped before the window closed, so the
+            # last read is still parked in the DLL. spCloseGivenChannel hangs
+            # behind it and holds the DLL, failing the next action's arming
+            # (eche10, 2026-09-21 and 09-29). Legacy's IOloop skipped the close
+            # in this case too; the next action's first trigger frees the read.
+            LOGGER.warning("read still waiting on a trigger; leaving channel open")
+            return {"error": ErrorCodes.none, "data": {}}
         if self.driver.spec is not None:
             await device_call(
                 "unset_external_trigger", self.driver.unset_external_trigger

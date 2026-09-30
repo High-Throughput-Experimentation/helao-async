@@ -25,6 +25,14 @@ which correctly re-enters through the ``Orch`` delegator rather than calling
 this collaborator directly (internal callers never bypass the ``Orch``
 public surface).
 
+``finish_active_sequence``/``finish_active_experiment`` and
+``EstopController.estop_finish_active`` all finalize the same active
+experiment/sequence, so each runs its mutation under ``orch.finalize_lock``
+(one ``asyncio.Lock`` per orchestrator, created beside the collaborators) on a
+local reference, and a caller that finds the record already gone or closed out
+returns without writing. The lock is not reentrant: none of the three calls
+another, and ``write_active_sequence_seq`` (which they do call) does not take it.
+
 PATCH-SEAM NOTE (B7a, D-B7a.2): ``move_dir`` is read at call time as
 ``yml_tools.move_dir`` inside ``finish_active_sequence``/
 ``finish_active_experiment`` and never bound to a name here, so
@@ -40,6 +48,7 @@ from typing import TYPE_CHECKING
 
 from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.hlostatus import HloStatus
+from helao.core.models.orchstatus import LoopStatus
 from helao.helpers import helao_logging as logging
 from helao.helpers import yml_tools
 from helao.helpers.run_state import record_active
@@ -65,54 +74,59 @@ class RunLifecycle:
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         orch = self.orch
 
+        # Waiting is outside ``finalize_lock``: an E-STOP exists to finalize
+        # while actions are stuck, and must not queue behind this wait.
         await orch.orch_wait_for_all_actions()
-        if orch.active_sequence is not None:
-            orch.active_sequence.replace_sequence_status(
-                HloStatus.active, HloStatus.finished
-            )
-            orch.active_sequence.sequence_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
-            orch.active_sequence.finished_global_params = {
+        async with orch.finalize_lock:
+            seq = orch.active_sequence
+            # None: ``estop_finish_active`` finalized it while we waited.
+            # ``finished``: already closed out (marker set below and by estop).
+            # estopped: ``estop_finish_active`` is the sole finalizer (the loop
+            # flips to estopped before its fan-out, so this can win the lock).
+            if (
+                seq is None
+                or HloStatus.finished in seq.sequence_status
+                or orch.globalstatusmodel.loop_state == LoopStatus.estopped
+            ):
+                return
+            seq.replace_sequence_status(HloStatus.active, HloStatus.finished)
+            seq.sequence_finished_timestamp = set_time(offset=orch.ntp_offset)
+            seq.finished_global_params = {
                 k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
             }
 
             # pre-finish hooks (spec §5.1); may mutate the sequence
             await run_prefinish(
                 orch.prefinish_sequence_hooks,
-                record=orch.active_sequence,
-                name=str(orch.active_sequence.sequence_name),
+                record=seq,
+                name=str(seq.sequence_name),
                 record_dir=os.path.join(
                     str(orch.helaodirs.save_root),
-                    orch.active_sequence.get_sequence_dir(),
+                    seq.get_sequence_dir(),
                 ),
                 server=orch,
             )
 
-            await orch.write_seq(orch.active_sequence)
-            orch.last_sequence = deepcopy(orch.active_sequence)
+            await orch.write_seq(seq)
+            orch.last_sequence = deepcopy(seq)
             await orch.put_lbuf(
                 {
-                    orch.active_sequence.sequence_uuid: {
-                        "sequence_name": orch.active_sequence.sequence_name,
+                    seq.sequence_uuid: {
+                        "sequence_name": seq.sequence_name,
                         "status": HloStatus.finished.value,
                     }
                 }
             )
             orch.register_obj_uuid(
-                orch.active_sequence.sequence_uuid,
+                seq.sequence_uuid,
                 {
-                    "sequence_name": orch.active_sequence.sequence_name,
-                    "sequence_params": orch.active_sequence.sequence_params,
-                    "sequence_timestamp": f"{orch.active_sequence.sequence_timestamp: %m-%d %H:%M:%S}",
-                    "sequence_finished_timestamp": f"{orch.active_sequence.sequence_finished_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_name": seq.sequence_name,
+                    "sequence_params": seq.sequence_params,
+                    "sequence_timestamp": f"{seq.sequence_timestamp: %m-%d %H:%M:%S}",
+                    "sequence_finished_timestamp": f"{seq.sequence_finished_timestamp: %m-%d %H:%M:%S}",
                     "sequence_status": HloStatus.finished.value,
-                    "sequence_label": orch.active_sequence.sequence_label,
-                    "campaign_name": (
-                        orch.active_sequence.campaign_name
-                        if orch.active_sequence.campaign_name
-                        else None
-                    ),
+                    "sequence_label": seq.sequence_label,
+                    "campaign_name": (seq.campaign_name if seq.campaign_name else None),
                 },
                 "sequence",
             )
@@ -127,6 +141,7 @@ class RunLifecycle:
         orch = self.orch
 
         # we need to wait for all actions to finish first
+        # (outside ``finalize_lock``: see ``finish_active_sequence``)
         await orch.orch_wait_for_all_actions()
         while len(orch.nonblocking) > 0:
             LOGGER.info(
@@ -134,9 +149,15 @@ class RunLifecycle:
             )
             await orch.clear_nonblocking()
             await asyncio.sleep(1)
-        if orch.active_experiment is not None:
+        async with orch.finalize_lock:
+            exp = orch.active_experiment
+            seq = orch.active_sequence
+            # None: ``estop_finish_active`` finalized it while we waited.
+            # estopped: it is the sole finalizer (see ``finish_active_sequence``).
+            if exp is None or orch.globalstatusmodel.loop_state == LoopStatus.estopped:
+                return
             LOGGER.info(
-                f"finished exp uuid is: {orch.active_experiment.experiment_uuid}, adding matching acts to it"
+                f"finished exp uuid is: {exp.experiment_uuid}, adding matching acts to it"
             )
 
             # orch.active_experiment.dispatched_actions = []
@@ -148,21 +169,17 @@ class RunLifecycle:
             #     )
             # )
             # set exp status to finished
-            orch.active_experiment.replace_experiment_status(
-                HloStatus.active, HloStatus.finished
-            )
-            orch.active_experiment.experiment_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
+            exp.replace_experiment_status(HloStatus.active, HloStatus.finished)
+            exp.experiment_finished_timestamp = set_time(offset=orch.ntp_offset)
 
             # pre-finish hooks (spec §5.1); may mutate the experiment
             await run_prefinish(
                 orch.prefinish_experiment_hooks,
-                record=orch.active_experiment,
-                name=str(orch.active_experiment.experiment_name),
+                record=exp,
+                name=str(exp.experiment_name),
                 record_dir=os.path.join(
                     str(orch.helaodirs.save_root),
-                    orch.active_experiment.get_experiment_dir(),
+                    exp.get_experiment_dir(),
                 ),
                 server=orch,
             )
@@ -172,8 +189,8 @@ class RunLifecycle:
             # sequences).
             await orch.put_lbuf(
                 {
-                    orch.active_experiment.experiment_uuid: {
-                        "experiment_name": orch.active_experiment.experiment_name,
+                    exp.experiment_uuid: {
+                        "experiment_name": exp.experiment_name,
                         "status": HloStatus.finished.value,
                     }
                 }
@@ -181,35 +198,33 @@ class RunLifecycle:
 
             # add finished exp to seq
             # !!! add to dispatched_experiments
-            orch.active_sequence.dispatched_experiments.append(
-                deepcopy(orch.active_experiment.get_exp())
-            )
+            # (skipped if an earlier clean finish appended it, then died)
+            if exp.experiment_uuid not in (
+                e.experiment_uuid for e in seq.dispatched_experiments
+            ):
+                seq.dispatched_experiments.append(deepcopy(exp.get_exp()))
 
             # write new updated seq
             await orch.write_active_sequence_seq()
 
             # write final exp
-            orch.active_experiment.finished_global_params = {
+            exp.finished_global_params = {
                 k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
             }
-            await orch.write_exp(orch.active_experiment)
+            await orch.write_exp(exp)
 
-            orch.last_experiment = deepcopy(orch.active_experiment)
+            orch.last_experiment = deepcopy(exp)
 
             orch.register_obj_uuid(
-                orch.active_experiment.experiment_uuid,
+                exp.experiment_uuid,
                 {
-                    "experiment_name": orch.active_experiment.experiment_name,
-                    "experiment_params": orch.active_experiment.experiment_params,
-                    "experiment_timestamp": f"{orch.active_experiment.experiment_timestamp: %m-%d %H:%M:%S}",
-                    "experiment_finished_timestamp": f"{orch.active_experiment.experiment_finished_timestamp: %m-%d %H:%M:%S}",
+                    "experiment_name": exp.experiment_name,
+                    "experiment_params": exp.experiment_params,
+                    "experiment_timestamp": f"{exp.experiment_timestamp: %m-%d %H:%M:%S}",
+                    "experiment_finished_timestamp": f"{exp.experiment_finished_timestamp: %m-%d %H:%M:%S}",
                     "experiment_status": HloStatus.finished.value,
-                    "sequence_label": orch.active_sequence.sequence_label,
-                    "campaign_name": (
-                        orch.active_sequence.campaign_name
-                        if orch.active_sequence.campaign_name
-                        else None
-                    ),
+                    "sequence_label": seq.sequence_label,
+                    "campaign_name": (seq.campaign_name if seq.campaign_name else None),
                 },
                 "experiment",
             )
