@@ -70,13 +70,45 @@ def get_sequence_codehash(sequence_name: str, sequence_codehash_lib) -> UUID:
 
 async def seq_unpacker(orch) -> None:
     """Push every planned experiment from the active sequence onto the experiment deque."""
-    for i, experimentmodel in enumerate(orch.active_sequence.planned_experiments):
+    seq_uuid = orch.active_sequence.sequence_uuid
+    planned = orch.active_sequence.planned_experiments
+
+    def still_active() -> bool:
+        """False once E-STOPped or once another sequence (or none) is active."""
+        active = orch.active_sequence
+        return (
+            orch.globalstatusmodel.loop_state != LoopStatus.estopped
+            and active is not None
+            and active.sequence_uuid == seq_uuid
+        )
+
+    for i, experimentmodel in enumerate(planned):
+        # An E-STOP can land at any await: ``estop_finish_active`` clears
+        # ``experiment_dq`` and ``active_sequence``, and appending after that
+        # would refill the queue with experiments that can never dispatch.
+        # The guard runs before each append and again after it, because
+        # ``add_experiment`` yields before it appends: an E-STOP landing inside
+        # it must not be overwritten by ``started`` below. (The one experiment
+        # that append may still drop into the queue is removed by
+        # ``dispatch_experiment``'s no-active-sequence check.)
+        if not still_active():
+            LOGGER.warning(
+                f"sequence {seq_uuid} is no longer active (estopped or replaced); "
+                f"stopped unpacking at experiment {i} of {len(planned)}"
+            )
+            return
         # self.print_message(
         #     f"unpack experiment {experimentmodel.experiment_name}"
         # )
         if orch.seq_model.data_request_id is not None:
             experimentmodel.data_request_id = orch.seq_model.data_request_id
         await orch.add_experiment(seq=orch.seq_model, experimentmodel=experimentmodel)
+        if not still_active():
+            LOGGER.warning(
+                f"sequence {seq_uuid} is no longer active (estopped or replaced); "
+                f"stopped unpacking after experiment {i} of {len(planned)}"
+            )
+            return
         if i == 0:
             orch.globalstatusmodel.loop_state = LoopStatus.started
 

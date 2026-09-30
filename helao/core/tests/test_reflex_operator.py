@@ -89,6 +89,10 @@ class FakeBackend:
         self._boom()
         self.calls.append("estop")
 
+    async def clear_estop(self):
+        self._boom()
+        self.calls.append("clear_estop")
+
     async def skip(self):
         self._boom()
         self.calls.append("skip")
@@ -475,7 +479,15 @@ def test_page_size_rejects_a_value_that_is_not_offered():
 
 @pytest.mark.parametrize(
     "name",
-    ["start", "stop", "estop", "skip", "clear_sequences", "clear_experiments"],
+    [
+        "start",
+        "stop",
+        "estop",
+        "clear_estop",
+        "skip",
+        "clear_sequences",
+        "clear_experiments",
+    ],
 )
 def test_dispatch_control_calls_the_backend(name):
     backend = FakeBackend()
@@ -1785,6 +1797,16 @@ def test_the_page_renders_with_both_refreshes_on_one_tick():
     text = _rendered_page()
     assert "poll_once" in text
     assert "refresh_history" in text
+
+
+def test_the_clear_estop_button_follows_the_estop_button():
+    """Neither UI could call the orchestrator's /clear_estop before; the page
+    now has a button for it, bound to the allow-listed control."""
+    assert "clear_estop" in opx.CONTROL_METHODS
+    text = _rendered_page()
+    assert "Clear E-STOP" in text
+    assert text.index("E-STOP") < text.index("Clear E-STOP")
+    assert '"clear_estop"' in text
 
 
 def test_the_history_subtabs_are_sequence_first_and_carry_counts():

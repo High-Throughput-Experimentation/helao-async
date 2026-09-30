@@ -554,6 +554,29 @@ class GamryDriver(HelaoDriver):
             self.counter = 0
         return response
 
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Cell off and every TTL line low on E-STOP; a no-op on release.
+
+        The two calls ``cleanup()`` makes, and nothing else: no ``dtaq.Run``, no
+        close, no reset. Release does not turn the cell back on. E-STOP does not
+        know which TTL line the running technique asserted, so every ``TTL_OFF``
+        entry is cleared (each clears only its own bit to 0, the idle level).
+        Must run on the thread that owns the pstat; ``GamryComAdapter.estop``
+        arranges that. Each call is tried independently and nothing raises.
+        """
+        if switch and self.pstat is not None:
+            LOGGER.info("PSTAT estop: cell off")
+            try:
+                self.pstat.SetCell(self.GamryCOM.CellOff)
+            except Exception:
+                LOGGER.exception("estop: SetCell(CellOff) failed")
+            for ttl, args_off in TTL_OFF.items():
+                try:
+                    self.pstat.SetDigitalOut(*args_off)
+                except Exception:
+                    LOGGER.exception(f"estop: clearing TTL {ttl} failed")
+        return switch
+
     def disconnect(self) -> DriverResponse:
         """Turn the cell off and close the GamryCOM pstat handle."""
         try:

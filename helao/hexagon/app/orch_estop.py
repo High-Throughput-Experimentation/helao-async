@@ -27,6 +27,7 @@ idiom :mod:`helao.core.servers.orch_dispatch` and
 module-global patch point the dispatch golden master rebinds.
 """
 
+import asyncio
 import traceback
 from copy import deepcopy
 
@@ -39,6 +40,12 @@ from helao.helpers.premodels import Action
 from helao.helpers.time_utils import set_time
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
+
+#: Per-server bound on the E-STOP dispatch. Above the server route's 2 s driver
+#: bound plus the dispatcher's 3 s RPC probe. A server whose event loop is frozen
+#: hangs its dispatch forever (the HTTP fallback has no total timeout), and
+#: without this the finalization and alert after the fan-out never run.
+ESTOP_SEND_TIMEOUT_S = 10.0
 
 
 class EstopController:
@@ -70,7 +77,10 @@ class EstopController:
         # directly) so this matches the original ``self.estop_actions`` /
         # ``self.estop_finish_active`` calls on ``Orch`` -- an instance-level
         # patch of ``orch.estop_actions`` stays observable here.
-        await orch.estop_actions(switch=False)  # don't latch actionserver model
+        # switch=True: every driver's ``estop(switch)`` acts only on True (stop
+        # axes, motors off, outputs low), and the server latches its estop flag.
+        # ``clear_estop`` sends switch=False to release the latch.
+        await orch.estop_actions(switch=True)
 
         # reset loop intend
         await orch.intend_none()
@@ -90,29 +100,56 @@ class EstopController:
     async def estop_actions(self, switch: bool):
         """Signal every registered action server to emergency-stop (or release).
 
-        Each server's ``/estop`` endpoint stops its executors and finalizes any
-        in-flight actions with ``estopped`` status (finished in place via their
-        normal lifecycle -- nothing moves). No placeholder ``estop``
-        action artifact is generated -- an idle server writes nothing, and estop
-        is recorded purely through the ``*_status`` fields of the actions (and,
-        orch-side, the experiment/sequence) that were actually running.
+        With ``switch=True`` each server's ``/estop`` endpoint calls the driver's
+        estop, latches the server's estop flag, stops its executors and finalizes
+        any in-flight actions with ``estopped`` status (finished in place via
+        their normal lifecycle -- nothing moves). With ``switch=False`` it only
+        calls the driver's release and clears the latch: it stops nothing and
+        finalizes nothing, so work started after the E-STOP is left running. No
+        placeholder ``estop`` action artifact is generated -- an idle server
+        writes nothing, and estop is recorded purely through the ``*_status``
+        fields of the actions (and, orch-side, the experiment/sequence) that were
+        actually running.
 
         Args:
-            switch: ``True`` to latch the per-server estop flag, ``False`` to
-                release it. Finalization of in-flight actions happens regardless;
-                on release there are simply none left to finalize.
+            switch: ``True`` to latch the per-server estop flag and let the
+                driver act (``estop_loop`` sends this), ``False`` to release the
+                latch (``clear_estop`` sends this).
         """
         # Lazy import so ``orch`` remains the single module-global patch point
         # the dispatch golden master rebinds (see module docstring).
         from helao.core.servers.orch import async_action_dispatcher
 
         orch = self.orch
-        LOGGER.info("estopping all servers")
+        LOGGER.info(
+            "estopping all servers" if switch else "releasing E-STOP on all servers"
+        )
 
-        for (
-            action_server_key,
-            actionservermodel,
-        ) in orch.globalstatusmodel.server_dict.items():
+        async def _send(name: str, A: Action) -> None:
+            try:
+                # pass switch as an explicit query/RPC param so it reliably
+                # reaches the endpoint's `switch` parameter
+                _ = await asyncio.wait_for(
+                    async_action_dispatcher(
+                        orch.world_cfg, A, params={"switch": switch}
+                    ),
+                    ESTOP_SEND_TIMEOUT_S,
+                )
+            except asyncio.TimeoutError:
+                LOGGER.error(
+                    f"estop for {name} timed out after {ESTOP_SEND_TIMEOUT_S}s; "
+                    f"continuing without it"
+                )
+            except Exception as e:
+                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
+                # no estop endpoint for this action server?
+                LOGGER.error(f"estop for {name} failed with: {repr(e), tb,}")
+
+        # Concurrent: one server that never answers must not starve the servers
+        # after it of their E-STOP. The send lines are logged first, in
+        # ``server_dict`` order.
+        sends = []
+        for actionservermodel in orch.globalstatusmodel.server_dict.values():
             # A minimal estop action -- the endpoint ignores the action payload
             # entirely now (it operates on whatever actions were already running),
             # so no experiment/sequence identity needs to be attached.
@@ -122,21 +159,10 @@ class EstopController:
                 action_params={"switch": switch},
                 start_condition=ActionStartCondition.no_wait,
             )
-            LOGGER.info(
-                f"Sending estop={switch} request to {actionservermodel.action_server.disp_name()}"
-            )
-            try:
-                # pass switch as an explicit query/RPC param so it reliably
-                # reaches the endpoint's `switch` parameter
-                _ = await async_action_dispatcher(
-                    orch.world_cfg, A, params={"switch": switch}
-                )
-            except Exception as e:
-                tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-                # no estop endpoint for this action server?
-                LOGGER.error(
-                    f"estop for {actionservermodel.action_server.disp_name()} failed with: {repr(e), tb,}"
-                )
+            name = actionservermodel.action_server.disp_name()
+            LOGGER.info(f"Sending estop={switch} request to {name}")
+            sends.append(_send(name, A))
+        await asyncio.gather(*sends, return_exceptions=True)
 
     async def estop_finish_active(self):
         """Finalize the active experiment and sequence with estopped status on e-stop.
@@ -176,45 +202,63 @@ class EstopController:
         exp_to_move = None
         seq_to_move = None
 
-        if orch.active_experiment is not None:
-            _mark_estopped(
-                orch.active_experiment.experiment_status, owner="experiment_status"
-            )
-            orch.active_experiment.experiment_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
-            orch.active_experiment.finished_global_params = {
-                k: v for k, v in orch.global_params.items() if k != "_fast_samples_in"
-            }
-            try:
-                if orch.active_sequence is not None:
-                    orch.active_sequence.dispatched_experiments.append(
-                        deepcopy(orch.active_experiment.get_exp())
-                    )
-                    await orch.write_active_sequence_seq()
-                await orch.write_exp(orch.active_experiment)
-            except Exception:
-                LOGGER.error("error writing estopped experiment", exc_info=True)
-            orch.last_experiment = deepcopy(orch.active_experiment)
-            exp_to_move = orch.last_experiment
-            orch.active_experiment = None
+        # Serialized with the clean finish paths; see ``RunLifecycle``. Nothing
+        # inside awaits the clean paths, so the non-reentrant lock cannot deadlock.
+        async with orch.finalize_lock:
+            exp = orch.active_experiment
+            seq = orch.active_sequence
 
-        if orch.active_sequence is not None:
-            _mark_estopped(
-                orch.active_sequence.sequence_status, owner="sequence_status"
-            )
-            orch.active_sequence.sequence_finished_timestamp = set_time(
-                offset=orch.ntp_offset
-            )
-            try:
-                await orch.write_seq(orch.active_sequence)
-            except Exception:
-                LOGGER.error("error writing estopped sequence", exc_info=True)
-            orch.last_sequence = deepcopy(orch.active_sequence)
-            seq_to_move = orch.last_sequence
-            orch.active_sequence = None
-            orch.active_seq_exp_counter = 0
-            orch.globalstatusmodel.counter_dispatched_actions = {}
+            if exp is not None:
+                _mark_estopped(exp.experiment_status, owner="experiment_status")
+                exp.experiment_finished_timestamp = set_time(offset=orch.ntp_offset)
+                exp.finished_global_params = {
+                    k: v
+                    for k, v in orch.global_params.items()
+                    if k != "_fast_samples_in"
+                }
+                try:
+                    if seq is not None:
+                        # replace, don't duplicate, an entry a clean finish
+                        # that died part-way already appended
+                        ids = [e.experiment_uuid for e in seq.dispatched_experiments]
+                        if exp.experiment_uuid in ids:
+                            seq.dispatched_experiments[
+                                ids.index(exp.experiment_uuid)
+                            ] = deepcopy(exp.get_exp())
+                        else:
+                            seq.dispatched_experiments.append(deepcopy(exp.get_exp()))
+                        await orch.write_active_sequence_seq()
+                    await orch.write_exp(exp)
+                except Exception:
+                    LOGGER.error("error writing estopped experiment", exc_info=True)
+                orch.last_experiment = deepcopy(exp)
+                exp_to_move = orch.last_experiment
+                orch.active_experiment = None
+
+            if seq is not None:
+                _mark_estopped(seq.sequence_status, owner="sequence_status")
+                seq.sequence_finished_timestamp = set_time(offset=orch.ntp_offset)
+                try:
+                    await orch.write_seq(seq)
+                except Exception:
+                    LOGGER.error("error writing estopped sequence", exc_info=True)
+                orch.last_sequence = deepcopy(seq)
+                seq_to_move = orch.last_sequence
+                orch.active_sequence = None
+                orch.active_seq_exp_counter = 0
+                orch.globalstatusmodel.counter_dispatched_actions = {}
+                # The queued experiments (unpacked from this sequence only; other
+                # sequences wait in ``sequence_dq``) and their expanded actions
+                # belong to the sequence just finalized. With ``active_sequence``
+                # gone they can never dispatch, and would crash the next start.
+                n_exps, n_acts = len(orch.experiment_dq), len(orch.action_dq)
+                orch.experiment_dq.clear()
+                orch.action_dq.clear()
+                if n_exps or n_acts:
+                    LOGGER.warning(
+                        f"E-STOP dropped {n_exps} queued experiment(s) and {n_acts} "
+                        "queued action(s) belonging to the estopped sequence"
+                    )
 
         # Hand off in a background task, experiment before sequence, so the
         # child record is journalled done (and enqueued) before its parent.

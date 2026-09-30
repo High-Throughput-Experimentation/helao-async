@@ -270,6 +270,25 @@ class KinesisMotor(HelaoDriver):
             )
         return response
 
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Halt every axis on E-STOP; a no-op on release.
+
+        Send-only: ``stop(immediate=True, sync=False)`` is the same MOT_MOVE_STOP
+        ``stop()`` sends, without the status polling ``sync=True`` does on the
+        shared FTDI handle. It is called directly on the event-loop thread, where
+        the poller and the ``kmove`` executor also touch that handle, so it never
+        interleaves with their reads. Each axis is tried independently and nothing
+        raises: one dead axis must not leave the others moving.
+        """
+        if switch:
+            LOGGER.info("Kinesis estop")
+            for ax, motor in self.motors.items():
+                try:
+                    motor.stop(immediate=True, sync=False)
+                except Exception:
+                    LOGGER.exception(f"estop: immediate stop failed on axis {ax}")
+        return switch
+
     def reset(self) -> DriverResponse:
         """Disconnect every motor and reconnect; report failure if reconnect errors."""
         try:
