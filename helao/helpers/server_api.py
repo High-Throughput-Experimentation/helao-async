@@ -13,9 +13,9 @@ from helao.helpers import helao_logging as logging
 """FastAPI and Bokeh application base classes used by every HELAO server.
 
 Provides :class:`HelaoFastAPI`, a FastAPI subclass that wires in the HELAO
-config, logger, machine model, action-aware route class, and co-located ZMQ
-RPC dispatcher; and :class:`HelaoBokehAPI`, the equivalent helper for Bokeh
-visualizer/operator apps.
+config, logger, machine model, and co-located ZMQ RPC dispatcher; and
+:class:`HelaoBokehAPI`, the equivalent helper for Bokeh visualizer/operator
+apps.
 """
 
 __all__ = ["HelaoBokehAPI", "HelaoFastAPI"]
@@ -33,9 +33,8 @@ TAGS = [
 class HelaoFastAPI(FastAPI):
     """FastAPI app preconfigured for a HELAO server group entry.
 
-    Installs the action-aware ``ActionAPIRoute`` route class, attaches the
-    server's HELAO config slice, builds a :class:`MachineModel`, ensures the
-    process-wide logger is initialized, and creates a co-located ZMQ
+    Attaches the server's HELAO config slice, builds a :class:`MachineModel`,
+    ensures the process-wide logger is initialized, and creates a co-located ZMQ
     :class:`RPCDispatcher` that mirrors every POST route at startup.
 
     Attributes:
@@ -64,13 +63,6 @@ class HelaoFastAPI(FastAPI):
             **kwargs: Forwarded to :class:`fastapi.FastAPI`.
         """
         super().__init__(*args, **kwargs, openapi_tags=TAGS)
-        # Install the action-aware route class so endpoints tagged
-        # "action" are auto-wrapped to populate the per-request
-        # ActionInvocation ContextVar. Defer the import to avoid
-        # circular imports (base_api -> base -> server_api).
-        from helao.core.servers.base_api import ActionAPIRoute
-
-        self.router.route_class = ActionAPIRoute
         self.helao_cfg = helao_cfg if helao_cfg is not None else config_loader.CONFIG
         self.helao_srv = helao_srv
         self.server_cfg = self.helao_cfg["servers"][self.helao_srv]

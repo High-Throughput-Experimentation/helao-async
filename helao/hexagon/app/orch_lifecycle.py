@@ -33,27 +33,29 @@ local reference, and a caller that finds the record already gone or closed out
 returns without writing. The lock is not reentrant: none of the three calls
 another, and ``write_active_sequence_seq`` (which they do call) does not take it.
 
-CIRCULAR-IMPORT / MONKEYPATCH NOTE: ``orch.py`` imports this module at
-module top, so ``move_dir`` is imported lazily inside
-``finish_active_sequence``/``finish_active_experiment`` from
-``helao.core.servers.orch`` (rather than bound once at this module's top)
--- this preserves the pre-existing external patch point
-(``helao.core.servers.orch.move_dir``, e.g. the dispatch golden-master
-harness's module-global rebind) exactly as it worked before extraction.
+PATCH-SEAM NOTE (B7a, D-B7a.2): ``move_dir`` is read at call time as
+``yml_tools.move_dir`` inside ``finish_active_sequence``/
+``finish_active_experiment`` and never bound to a name here, so
+``helao.helpers.yml_tools.move_dir`` is its one patch point -- the one the
+dispatch golden master and ``unit_test_orch_lifecycle`` rebind.
 """
 
 import asyncio
 import os
 import time
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 from helao.core.hooks.prefinish import run_prefinish
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopStatus
-from helao.core.servers.base import Active
 from helao.helpers import helao_logging as logging
+from helao.helpers import yml_tools
 from helao.helpers.run_state import record_active
 from helao.helpers.time_utils import set_time
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from helao.hexagon.app.action_session import ActionSession
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
@@ -71,7 +73,6 @@ class RunLifecycle:
     async def finish_active_sequence(self):
         """Finalize the active sequence: mark finished, run postprocessors, persist, and roll over."""
         orch = self.orch
-        from helao.core.servers.orch import move_dir
 
         # Waiting is outside ``finalize_lock``: an E-STOP exists to finalize
         # while actions are stuck, and must not queue behind this wait.
@@ -133,12 +134,11 @@ class RunLifecycle:
             orch.active_seq_exp_counter = 0
             orch.globalstatusmodel.counter_dispatched_actions = {}
             # DB server call to finish_yml if DB exists
-            orch.aloop.create_task(move_dir(orch.last_sequence, base=orch))
+            orch.aloop.create_task(yml_tools.move_dir(orch.last_sequence, base=orch))
 
     async def finish_active_experiment(self):
         """Finalize the active experiment after waiting for actions and stopping non-blockers."""
         orch = self.orch
-        from helao.core.servers.orch import move_dir
 
         # we need to wait for all actions to finish first
         # (outside ``finalize_lock``: see ``finish_active_sequence``)
@@ -231,7 +231,7 @@ class RunLifecycle:
             orch.active_experiment = None
 
             # DB server call to finish_yml if DB exists
-            orch.aloop.create_task(move_dir(orch.last_experiment, base=orch))
+            orch.aloop.create_task(yml_tools.move_dir(orch.last_experiment, base=orch))
 
     async def write_active_experiment_exp(self):
         """Persist the active experiment to disk after snapshotting initial global params."""
@@ -278,12 +278,14 @@ class RunLifecycle:
             ),
         )
 
-    def start_wait(self, active: Active):
+    def start_wait(self, active: "ActionSession"):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
         orch = self.orch
         orch.wait_task = asyncio.create_task(orch.dispatch_wait_task(active))
 
-    async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
+    async def dispatch_wait_task(
+        self, active: "ActionSession", print_every_secs: int = 5
+    ):
         """Run a long wait action off the HTTP handler so the client doesn't time out.
 
         Args:

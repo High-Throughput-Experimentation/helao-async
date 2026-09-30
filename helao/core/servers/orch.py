@@ -32,15 +32,18 @@ from helao.hexagon.app.orch_estop import EstopController
 from helao.hexagon.app.orch_lifecycle import RunLifecycle
 from helao.hexagon.app.orch_monitor import ServerMonitor
 from helao.hexagon.app.orch_persist import QueuePersister
-from helao.hexagon.app.orch_queues import RunQueues
+from helao.hexagon.app.orch_queues import (
+    RunQueues,
+    sanitize_sequence_label,  # noqa: F401  re-export: moved to orch_queues by B7a
+)
 from helao.hexagon.app.orch_status_sync import StatusIngester
 from helao.core.servers.orch_unpack import (
     PLATE_API,
-)  # noqa: F401  re-export: preserves monkeypatch point helao.core.servers.orch.PLATE_API
+)  # noqa: F401  back-compat re-export only; the patch point is helao.hexagon.app.orch_unpack.PLATE_API (D-B7a.2)
 from helao.helpers import helao_logging as logging
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.dispatcher import (
-    async_action_dispatcher,  # noqa: F401  re-export: EstopController + orch_dispatch import it from here so orch stays the single golden-master patch point
+    async_action_dispatcher,  # noqa: F401  back-compat re-export only; the patch point is helao.helpers.dispatcher.async_action_dispatcher (D-B7a.2)
 )
 from helao.core.hooks.config import prefinish_config
 from helao.core.hooks.loader import load_hook_set
@@ -50,18 +53,11 @@ from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_api import HelaoFastAPI
 from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.yml_tools import (
-    move_dir,  # noqa: F401  re-export: EstopController + orch_lifecycle import it from here so orch stays the single golden-master patch point
+    move_dir,  # noqa: F401  back-compat re-export only; the patch point is helao.helpers.yml_tools.move_dir (D-B7a.2)
 )
 from helao.helpers.zdeque import zdeque
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
-
-
-def sanitize_sequence_label(label):
-    """Collapse whitespace/underscore runs to single underscores (None-safe)."""
-    if not label:
-        return label
-    return re.sub(r"[\s_]+", "_", label)
 
 
 # ANSI color codes converted to the Windows versions
@@ -837,7 +833,9 @@ class Orch(Base):
 
     def start_wait(self, active: Active):
         """Schedule :meth:`dispatch_wait_task` for ``active`` as a background task."""
-        return self.run_lifecycle.start_wait(active)
+        return self.run_lifecycle.start_wait(
+            active,  # pyright: ignore[reportArgumentType]  legacy Active; B7b deletes this
+        )
 
     async def dispatch_wait_task(self, active: Active, print_every_secs: int = 5):
         """Run a long wait action off the HTTP handler so the client doesn't time out.
@@ -850,7 +848,8 @@ class Orch(Base):
             The finished action returned by ``active.finish()``.
         """
         return await self.run_lifecycle.dispatch_wait_task(
-            active, print_every_secs=print_every_secs
+            active,  # pyright: ignore[reportArgumentType]  legacy Active; B7b deletes this
+            print_every_secs=print_every_secs,
         )
 
     async def active_action_monitor(self):

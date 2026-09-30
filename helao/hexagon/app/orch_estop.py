@@ -21,10 +21,11 @@ calls, e.g. by ``import_queues``) is always observed. Behavior is identical to
 the original inline methods, including log wording and finalize/promote timing.
 
 ``async_action_dispatcher`` (estop fan-out) and ``move_dir`` (promotion) are
-imported LAZILY from :mod:`helao.core.servers.orch` at call time -- the same
-idiom :mod:`helao.core.servers.orch_dispatch` and
-:mod:`helao.core.servers.orch_lifecycle` use -- so ``orch`` stays the single
-module-global patch point the dispatch golden master rebinds.
+read at call time from the modules that own them --
+``dispatcher.async_action_dispatcher`` and ``yml_tools.move_dir`` (B7a,
+D-B7a.2) -- the same rule :mod:`helao.hexagon.app.orch_dispatch` and
+:mod:`helao.hexagon.app.orch_lifecycle` follow, so those module attributes
+are the only patch points the dispatch golden master rebinds.
 """
 
 import asyncio
@@ -35,6 +36,7 @@ from helao.core.models.action_start_condition import ActionStartCondition
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.models.status_transitions import guarded_append, guarded_replace
+from helao.helpers import dispatcher, yml_tools
 from helao.helpers import helao_logging as logging
 from helao.helpers.premodels import Action
 from helao.helpers.time_utils import set_time
@@ -116,10 +118,6 @@ class EstopController:
                 driver act (``estop_loop`` sends this), ``False`` to release the
                 latch (``clear_estop`` sends this).
         """
-        # Lazy import so ``orch`` remains the single module-global patch point
-        # the dispatch golden master rebinds (see module docstring).
-        from helao.core.servers.orch import async_action_dispatcher
-
         orch = self.orch
         LOGGER.info(
             "estopping all servers" if switch else "releasing E-STOP on all servers"
@@ -130,7 +128,7 @@ class EstopController:
                 # pass switch as an explicit query/RPC param so it reliably
                 # reaches the endpoint's `switch` parameter
                 _ = await asyncio.wait_for(
-                    async_action_dispatcher(
+                    dispatcher.async_action_dispatcher(
                         orch.world_cfg, A, params={"switch": switch}
                     ),
                     ESTOP_SEND_TIMEOUT_S,
@@ -298,12 +296,8 @@ class EstopController:
         Returns:
             True if the record was handed off, False if ``move_dir`` raised.
         """
-        # Lazy import so ``orch`` remains the single module-global patch point
-        # the dispatch golden master rebinds (see module docstring).
-        from helao.core.servers.orch import move_dir
-
         try:
-            await move_dir(hobj, base=self.orch)
+            await yml_tools.move_dir(hobj, base=self.orch)
             return True
         except Exception:
             LOGGER.error(f"error handing estopped {kind} to the syncer", exc_info=True)

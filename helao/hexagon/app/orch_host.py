@@ -32,7 +32,6 @@ from helao.core.models.experiment import ExperimentModel, ShortExperimentModel
 from helao.core.error import ErrorCodes
 from helao.core.models.orchstatus import LoopIntent, LoopStatus
 from helao.core.models.server import ActionServerModel, GlobalStatusModel
-from helao.core.servers import orch_unpack
 from helao.helpers import helao_logging as logging
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.import_autolibs import import_autolibs
@@ -42,7 +41,8 @@ from helao.helpers.server_keys import resolve_sync_server_key
 from helao.helpers.zdeque import zdeque
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from helao.core.servers.base import Active
+    from helao.hexagon.app.action_session import ActionSession
+from helao.hexagon.app import orch_unpack
 from helao.hexagon.app.action_host import ActionHost
 from helao.hexagon.app.wiring import ORCH_REQUIRED, PortWiring
 from helao.hexagon.domain.orchestration import (
@@ -406,7 +406,7 @@ class OrchHost(ActionHost):
         return await self.run_lifecycle.write_active_sequence_seq()
 
     async def dispatch_wait_task(
-        self, active: "Active", print_every_secs: int = 5
+        self, active: "ActionSession", print_every_secs: int = 5
     ) -> None:
         """Run the orchestrator's own ``wait`` action to completion."""
         return await self.run_lifecycle.dispatch_wait_task(
@@ -567,14 +567,14 @@ class OrchHost(ActionHost):
     def _register_orch_payload_routes(self) -> None:
         """The read-only payload routes and the global-param surface.
 
-        The three payload builders are imported from ``orch_api`` rather
-        than reimplemented: they shape what the operator UIs parse, and a
-        second implementation would drift from the one the Bokeh and Reflex
-        operators are written against. B7 deletes the importer.
+        The three payload builders are imported from ``orch_payloads``
+        rather than reimplemented: they shape what the operator UIs parse,
+        and ``orch_payloads`` is the one implementation -- legacy
+        ``orch_api`` re-exports it.
         """
         from typing import Optional as _Optional
 
-        from helao.core.servers.orch_api import (
+        from helao.hexagon.app.orch_payloads import (
             _histories_payload,
             _history_page_payload,
             _queue_object_payload,
@@ -654,7 +654,7 @@ class OrchHost(ActionHost):
         ``stop()``/``skip()``. All three are B3b members. The plan put all
         nine action routes in B3a; that was wrong, and this is the seam.
         """
-        from helao.core.servers.orch_api import WaitExec, checkcond
+        from helao.hexagon.app.orch_wait import WaitExec, checkcond
         from helao.hexagon.app.action_context import ActionContext, action_version
 
         @self.action()
@@ -1128,7 +1128,7 @@ class OrchHost(ActionHost):
         from fastapi import Body
 
         from helao.core.models.hlostatus import HloStatus
-        from helao.core.servers.orch_api import (
+        from helao.hexagon.app.orch_payloads import (
             _queue_counts,
             _set_step_flag,
             _status_summary_payload,

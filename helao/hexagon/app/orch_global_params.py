@@ -1,15 +1,26 @@
-"""Pure global-params fold functions — hexagon domain copy (spec §4.2.2).
+"""Pure global-params fold functions extracted from ``Orch`` (CARDS P5, Stage S1).
 
-Ported byte-identically from helao/core/servers/orch_global_params.py
-(CARDS P5 Stage S1) per Q6. Behavior including log wording, list-vs-dict
-to_global_params handling, and key iteration order is preserved. The only
-change: LOGGER is stdlib logging (helao.helpers.helao_logging is outside the
-domain allow-list).
+``Orch.loop_task_dispatch_{sequence,experiment,action}`` each carried an inline
+"fold-in" block that copies requested ``global_params`` entries into that
+level's params dict (``from_global_seq_params`` / ``from_global_exp_params`` /
+``from_global_act_params``), and ``loop_task_dispatch_action`` additionally
+carried a "fold-out" block that copies a finished action's requested
+``to_global_params`` back into ``global_params``. This module de-duplicates
+the three near-identical fold-in copies and the fold-out block into pure,
+unit-testable free functions.
+
+Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 3): these
+functions cache no shared mutable state -- every caller passes the concrete
+dict(s) to mutate/read at call time, so ``import_queues`` reassigning
+``global_params`` (or any other attribute) cannot leave a stale reference
+behind here. Behavior is byte-identical to the original inline blocks,
+including log message wording, list-vs-dict ``to_global_params`` handling,
+and key iteration order.
 """
 
-import logging
+from helao.helpers import helao_logging as logging
 
-LOGGER = logging.getLogger(__name__)
+LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def apply_from_globals(

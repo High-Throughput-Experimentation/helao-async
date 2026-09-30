@@ -315,14 +315,14 @@ async def test_estop_finish_active_without_an_active_sequence_leaves_queues():
 
 @pytest.mark.asyncio
 async def test_estop_loop_latches_and_clear_estop_releases(monkeypatch):
-    import helao.core.servers.orch as orch_mod
+    import helao.helpers.dispatcher as dispatcher_mod  # B7a: the seam lives here
 
     sent = []
 
     async def fake_dispatch(world_cfg, A, params=None, **kw):
         sent.append(params["switch"])
 
-    monkeypatch.setattr(orch_mod, "async_action_dispatcher", fake_dispatch)
+    monkeypatch.setattr(dispatcher_mod, "async_action_dispatcher", fake_dispatch)
 
     orch = _EstopOrch()
     server = SimpleNamespace(
@@ -948,7 +948,7 @@ def test_the_driver_bound_stays_under_the_dispatcher_rpc_probe():
 
 
 def _fanout_orch(monkeypatch, names, hang):
-    import helao.core.servers.orch as orch_mod
+    import helao.helpers.dispatcher as dispatcher_mod  # B7a: the seam lives here
     from helao.hexagon.app import orch_estop
 
     received, logged = [], []
@@ -961,7 +961,7 @@ def _fanout_orch(monkeypatch, names, hang):
         if name == "BOOM":
             raise RuntimeError("no estop endpoint")
 
-    monkeypatch.setattr(orch_mod, "async_action_dispatcher", fake_dispatch)
+    monkeypatch.setattr(dispatcher_mod, "async_action_dispatcher", fake_dispatch)
     monkeypatch.setattr(orch_estop, "Action", lambda **kw: SimpleNamespace(**kw))
     monkeypatch.setattr(
         orch_estop.LOGGER, "info", lambda msg, *a, **k: logged.append(msg)
