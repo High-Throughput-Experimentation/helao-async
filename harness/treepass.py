@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import zipfile
 from collections.abc import Iterator
@@ -22,13 +23,18 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from harness.classify import (
+    RE_MMDD,
+    RE_SEQ_ZIPDIR,
+    RE_YYWW,
     ArtifactRow,
     classify_file,
     normalize_name,
     normalize_relpath,
 )
+from harness.s3_pass import _load_bytes
 from harness.uuidmap import RE_UUID, UuidMapper
 from harness.yaml_pass import load_yml_plain
+from helao.helpers.hlo_data import read_helao_metadata, read_hlo
 
 #: Top-level directories a capture snapshots and a parity run compares.
 #:
@@ -120,6 +126,147 @@ def explode_zips(root: Path, workdir: Path) -> Path:
             zf.extractall(target)
         opath.unlink()
     return dest
+
+
+#: Legacy run trees -> the unified tree they merge into.
+_LEGACY_RUN_TREES = (
+    ("RUNS_ACTIVE", "RUNS"),
+    ("RUNS_FINISHED", "RUNS"),
+    ("RUNS_SYNCED", "RUNS"),
+    ("RUNS_NOSYNC", "RUNS"),
+    ("RUNS_DIAG", "DIAG"),
+)
+
+
+def _merge(src: Path, dst: Path) -> None:
+    """Move ``src`` onto ``dst``: directories merge, a file collision raises."""
+    if src.is_dir() and not src.is_symlink():
+        if dst.exists() and not dst.is_dir():
+            raise ValueError(f"legacy remap collision: {src} -> {dst}")
+        dst.mkdir(exist_ok=True)
+        for child in sorted(src.iterdir()):
+            _merge(child, dst / child.name)
+        src.rmdir()
+    elif dst.exists() or dst.is_symlink():
+        raise ValueError(f"legacy remap collision: {src} -> {dst}")
+    else:
+        src.rename(dst)
+
+
+def _remap_week_dirs(src_top: Path, dst_top: Path) -> None:
+    """Merge ``src_top`` into ``dst_top``, renaming ``YY.WW`` children to ``20YY``."""
+    dst_top.mkdir(exist_ok=True)
+    for child in sorted(src_top.iterdir()):
+        name = "20" + child.name[:2] if RE_YYWW.match(child.name) else child.name
+        _merge(child, dst_top / name)
+
+
+def _sequence_zipdirs(root: Path) -> list[Path]:
+    """Exploded sequence zips: ``<RUNS|DIAG>/<YYYY>/<MMDD>/<HHMMSS__*>.zipdir``.
+
+    Deliberately only that depth and name shape, so an action's own zip output
+    (``images.zip`` -> ``images.zipdir``) is never mistaken for a sequence.
+    """
+    return [
+        d
+        for top in ("RUNS", "DIAG")
+        for d in sorted((root / top).glob("*/*/*.zipdir"))
+        if d.is_dir()
+        and RE_MMDD.match(d.parent.parent.name)
+        and RE_MMDD.match(d.parent.name)
+        and RE_SEQ_ZIPDIR.match(d.name)
+    ]
+
+
+def remap_legacy_layout(root: Path) -> None:
+    """Rewrite a legacy run layout to the unified one, in place.
+
+    ``RUNS_{ACTIVE,FINISHED,SYNCED,NOSYNC}/%y.%U/...`` -> ``RUNS/%Y/...``,
+    ``RUNS_DIAG`` -> ``DIAG``, ``ANALYSES/%y.%U`` -> ``ANALYSES/%Y``, sequence ``<seq>.zipdir`` -> ``<seq>``.
+    Only for an exploded working copy, never a caller's capture. A no-op on a unified tree.
+    Raises ValueError rather than overwrite a file present in two legacy trees.
+    """
+    root = Path(root)
+    for legacy, unified in _LEGACY_RUN_TREES:
+        if (root / legacy).is_dir():
+            _remap_week_dirs(root / legacy, root / unified)
+            (root / legacy).rmdir()
+    # The legacy syncer zipped a fully synced sequence (explode_zips turns it
+    # into ``<seq>.zipdir``); the unified layout never zips. ``.origdir`` stays.
+    for zd in _sequence_zipdirs(root):
+        _merge(zd, zd.with_name(zd.name.removesuffix(".zipdir")))
+    analyses = root / "ANALYSES"
+    if analyses.is_dir():
+        for child in sorted(analyses.iterdir()):
+            if RE_YYWW.match(child.name):
+                _merge(child, analyses / ("20" + child.name[:2]))
+
+
+def _output_dir_values(doc) -> Iterator[str]:
+    if isinstance(doc, dict):
+        for k, v in doc.items():
+            if str(k).endswith("_output_dir") and isinstance(v, str):
+                yield v
+            else:
+                yield from _output_dir_values(v)
+    elif isinstance(doc, list):
+        for v in doc:
+            yield from _output_dir_values(v)
+
+
+def _meta_doc(f: Path, row: ArtifactRow):
+    """The metadata ``compare_file`` parses for ``f`` (same loaders), or None."""
+    if row in ROW_SEED_ORDER or row is ArtifactRow.PRG:
+        return load_yml_plain(f)
+    if row is ArtifactRow.HLO:
+        return read_hlo(str(f))[0]
+    if row is ArtifactRow.PARQUET:
+        return read_helao_metadata(str(f))
+    if row is ArtifactRow.S3_RECORD:
+        name = f.name
+        if ".hlo.json" in name:
+            return json.loads(_load_bytes(f)).get("meta", {})
+        if name.endswith((".json", ".json.gz")):
+            return json.loads(_load_bytes(f))
+    return None  # AUX_FILE, LOCK, MICRO_MANIFEST, S3 manifest.jsonl: no metadata
+
+
+def candidate_legacy_layout(root: Path) -> list[dict]:
+    """Findings when an exploded candidate still carries the legacy layout.
+
+    Under ``--remap-legacy-layout`` only the golden is remapped, so a candidate
+    that regressed to ``RUNS_*`` tops, ``%y.%U`` week dirs, or ``%y.%U``
+    ``*_output_dir`` values, or a zipped sequence (the unified layout never zips,
+    spec D9), must fail rather than be folded into a pass. The
+    ``*_output_dir`` scan covers every file the parity pass parses as metadata:
+    meta ymls, .prg, hlo headers, parquet metadata and S3 json records.
+    """
+    root = Path(root)
+    problems = [f"legacy top {t}" for t, _ in _LEGACY_RUN_TREES if (root / t).exists()]
+    for top in ("RUNS", "DIAG", "ANALYSES"):
+        if (root / top).is_dir():
+            problems += [
+                f"week dir {top}/{c.name}"
+                for c in sorted((root / top).iterdir())
+                if RE_YYWW.match(c.name)
+            ]
+    problems += [
+        f"zipped sequence {d.relative_to(root).as_posix()}"
+        for d in _sequence_zipdirs(root)
+    ]
+    for f in _iter_parity_files(root):
+        rel = f.relative_to(root).as_posix()
+        try:
+            doc = _meta_doc(f, classify_file(rel))
+        except Exception as e:  # unverifiable is a failure, not a crash
+            problems.append(f"unparsable {rel}: {type(e).__name__}")
+            continue
+        for v in _output_dir_values(doc):
+            if any(RE_YYWW.match(e) for e in re.split(r"[/\\]", v)):
+                problems.append(f"{rel}: output_dir {v}")
+    if not problems:
+        return []
+    return [{"check": "candidate_legacy_layout", "detail": "; ".join(problems)}]
 
 
 def _analysis_tiebreak(row: ArtifactRow, doc, mapper: UuidMapper) -> str:
