@@ -216,6 +216,9 @@ class Orch(Base):
         the orchestrator inherits and delegates those status/live-buffer methods.
         """
         super()._init_collaborators()
+        # serializes RunLifecycle's finish_active_* with EstopController's
+        # estop_finish_active (both finalize the same active exp/seq)
+        self.finalize_lock = asyncio.Lock()
         self.queue_persister = QueuePersister(self)
         self.server_monitor = ServerMonitor(self)
         self.status_ingester = StatusIngester(self)

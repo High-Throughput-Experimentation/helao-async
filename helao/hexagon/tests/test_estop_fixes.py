@@ -238,9 +238,10 @@ class _Obj:
         self.experiment_finished_timestamp = None
         self.sequence_finished_timestamp = None
         self.dispatched_experiments = []
+        self.experiment_uuid = "exp-uuid"
 
     def get_exp(self):
-        return "exp-model"
+        return self
 
 
 class _EstopOrch:
@@ -248,6 +249,7 @@ class _EstopOrch:
         from helao.hexagon.app.orch_estop import EstopController
 
         self.estop_controller = EstopController(self)
+        self.finalize_lock = asyncio.Lock()
         self.globalstatusmodel = SimpleNamespace(
             loop_state=LoopStatus.started,
             counter_dispatched_actions={"x": 1},
