@@ -764,6 +764,39 @@ class BiologicDriver(HelaoDriver):
                 message=str(exc),
             )
 
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Stop the claimed channel on E-STOP; a no-op on release.
+
+        The same ``BL_StopChannel`` call and the same channel ``stop()`` uses
+        (this driver holds one claim at a time), and nothing else: no reset,
+        no disconnect. The vendor documents nothing further about the output
+        state after a stop. Release touches no hardware.
+
+        The call goes through the client's worker thread like every other, and
+        runs in a helper thread so a busy worker (``BL_GetData`` in flight)
+        cannot block the event loop. The wait is shielded: the route bounds
+        this call with ``wait_for``, and a cancelled wait must not drop the
+        stop.
+        """
+        client, channel = self._client, self.channel
+        if not switch:
+            return switch
+        if client is None or channel is None:
+            LOGGER.warning("BIOLOGIC estop: no claimed channel, nothing to stop")
+            return switch
+        LOGGER.info(f"BIOLOGIC estop: stopping channels [{channel}]")
+        await asyncio.shield(asyncio.to_thread(self._estop_stop, client, [channel]))
+        return switch
+
+    @staticmethod
+    def _estop_stop(client: EclibClient, channels: list) -> None:
+        """Stop each channel, independently: one failure skips none."""
+        for channel in channels:
+            try:
+                client.stop_channel(channel)
+            except Exception:
+                LOGGER.exception(f"estop: BL_StopChannel({channel}) failed")
+
     def cleanup(self, channel: int) -> DriverResponse:
         """Release the claim on `channel`, refusing while it is still running.
 

@@ -522,6 +522,12 @@ class BokehOperator:
             # own, which is what keeps this the only sheet here.
             stylesheets=[estop_button_stylesheet()],
         )
+        self.button_clear_estop_orch = self._make_button(
+            "Clear E-STOP",
+            "warning",
+            int(self.max_width * 0.25),
+            self.callback_clear_estop_orch,
+        )
         self.button_add_expplan = self._make_button(
             "Add plan", "default", 100, self.callback_add_expplan
         )
@@ -1002,7 +1008,10 @@ class BokehOperator:
                             ),
                             Spacer(height=10),
                             row(
-                                column(self.button_estop_orch),
+                                column(
+                                    self.button_estop_orch,
+                                    self.button_clear_estop_orch,
+                                ),
                                 column(
                                     Div(
                                         text="<b>Error message:</b>",
@@ -1971,6 +1980,10 @@ class BokehOperator:
     def callback_estop_orch(self, event):
         LOGGER.info("estop orch")
         self.vis.doc.add_next_tick_callback(partial(self.backend.estop))
+
+    def callback_clear_estop_orch(self, event):
+        LOGGER.info("clear estop orch")
+        self.vis.doc.add_next_tick_callback(partial(self.backend.clear_estop))
 
     def callback_start_orch(self, event):
         LOGGER.info("starting orch")

@@ -280,9 +280,13 @@ class AlertOperator:
 class EstopFanout:
     """Fan a minimal estop Action (params={'switch': switch}) to every server
     in server_dict; servers finalize their own in-flight actions; NO
-    fabricated placeholder artifacts (post-bd8b83ab semantics)."""
+    fabricated placeholder artifacts (post-bd8b83ab semantics).
 
-    switch: bool = False
+    ``switch`` is required: every driver's ``estop(switch)`` acts only on True,
+    so an E-STOP must construct ``switch=True``. Release is a different command
+    (:class:`ReleaseServersEstop`, ``switch=False``)."""
+
+    switch: bool
 
 
 @dataclass(frozen=True)
@@ -400,7 +404,7 @@ def _estop_transition(state: OrchestrationState, reason: str) -> StepResult:
     )
     return new, (
         ClearActiveRunId(),
-        EstopFanout(switch=False),
+        EstopFanout(switch=True),
         FinishActiveEstopped(),
         SetStopMessage(message=reason),
         AlertOperator(message=reason),

@@ -71,6 +71,8 @@ class ActionSession:
         self.num_data_written = 0
         self.data_logger = None
         self.finish_lock = asyncio.Lock()
+        #: Set once the all-finished tail has run; see :meth:`_finish`.
+        self._tail_done = False
         #: Executor loop state, owned by the session and driven by the runner.
         self.action_task = None
         self.action_loop_running = False
@@ -482,7 +484,17 @@ class ActionSession:
         return await self.action_finalizer.finish(finish_uuid_list=finish_uuid_list)
 
     async def _finish(self, finish_uuid_list=None) -> Action:
-        return await self.action_finalizer._finish(finish_uuid_list=finish_uuid_list)
+        # The all-finished tail (prefinish hooks, final write_act, status put,
+        # move_dir) must run once per session. /estop finishes an executor-backed
+        # action and the executor loop later finishes it again; the finalizer
+        # re-enters the tail whenever every action is already finished. Called
+        # under ``finish_lock``, so the flag needs no lock of its own.
+        if self._tail_done:
+            return self.action
+        result = await self.action_finalizer._finish(finish_uuid_list=finish_uuid_list)
+        if all(HloStatus.finished in a.action_status for a in self.action_list):
+            self._tail_done = True
+        return result
 
     async def finish_manual_action(self):
         return await self.action_finalizer.finish_manual_action()

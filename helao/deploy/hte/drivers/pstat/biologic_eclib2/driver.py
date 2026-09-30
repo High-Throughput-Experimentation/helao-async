@@ -491,6 +491,40 @@ class BiologicEclib2Driver(HelaoDriver):
                 status=DriverStatus.error,
             )
 
+    async def estop(self, switch: bool, *args, **kwargs) -> bool:
+        """Stop every channel that has a technique set up on E-STOP; a no-op
+        on release.
+
+        The channels ``stop()`` stops when given none, and its ``BL_StopChannel``
+        call, but each channel independently (``stop()`` gives up at the first
+        failure) and without its ``stopping`` re-entry guard, which would turn
+        an E-STOP into a no-op whenever an ordinary stop is in flight. No
+        reset, no disconnect. Release touches no hardware.
+
+        The SDK client marshals every call onto its one worker thread; this
+        runs in a helper thread so a busy worker cannot block the event loop,
+        and the wait is shielded so the route's timeout cannot drop the stop.
+        """
+        if not switch:
+            return switch
+        client = self._client
+        if not self.ready or client is None:
+            LOGGER.warning("BIOLOGIC estop: not connected, nothing to stop")
+            return switch
+        channels = [i for i, name in self.channel_technique.items() if name is not None]
+        LOGGER.info(f"BIOLOGIC estop: stopping channels {channels}")
+        await asyncio.shield(asyncio.to_thread(self._estop_stop, client, channels))
+        return switch
+
+    @staticmethod
+    def _estop_stop(client, channels: list) -> None:
+        """Stop each channel, independently: one failure skips none."""
+        for channel in channels:
+            try:
+                client.stop(channel)
+            except Exception:
+                LOGGER.exception(f"eclib2 estop: BL_StopChannel({channel}) failed")
+
     def cleanup(self, channel: int = 0) -> DriverResponse:
         """Clear per-channel plan and parameters, without disconnecting."""
         try:
