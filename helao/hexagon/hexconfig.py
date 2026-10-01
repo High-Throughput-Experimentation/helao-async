@@ -29,8 +29,8 @@ this is the same station writing to the same tree.
   `deployment: hexagon`, and a `legacy_module:` naming the real target. This is
   the only route available to a deployment whose name may not appear in this
   public repo, and it is equally correct for public ones.
-* An `orchestrator` entry needs no legacy target at all -- its shim calls
-  `makeOrchApp`, which is core rather than deployment-specific -- so it gains
+* An `orchestrator` entry needs no legacy target at all -- its shim builds
+  an `OrchHost`, which is core rather than deployment-specific -- so it gains
   only `deployment: hexagon`.
 * A `reflex:` value names a *bundle*, not a module, so it likewise gains only
   `deployment: hexagon`; the launcher routes it through

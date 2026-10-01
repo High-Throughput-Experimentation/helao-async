@@ -1,5 +1,5 @@
 """§10.3 mandatory concurrency suite — in-process real-transport items
-(1, 3, 5). Real hexagon ORCH (makeOrchApp graft) + real SIM (ws_simulator)
+(1, 3, 5). Real hexagon ORCH (native OrchHost) + real SIM (ws_simulator)
 over real ZMQ RPC + HTTP; races injected via HexRuntime.handle from
 concurrent tasks (DD-3). Launched-group items (2, 4, 6, 7) live in
 helao/hexagon/tests/smoke/conc_items.py."""

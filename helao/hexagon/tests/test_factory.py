@@ -1,8 +1,7 @@
-"""Composition factory: fail-loud wiring, OrchAPI construction with graft
-hooks, action-app wrap, vis deferral, launcher shim delegation. Construction
-level only — full lifecycle is the Task 12 launched smoke."""
+"""Composition factory: fail-loud wiring, the native-only action-app wrap and
+its WS bridge hook, vis deferral, launcher shim delegation. Construction level
+only — full lifecycle is the Task 12 launched smoke."""
 
-import inspect
 import os
 
 import pytest
@@ -89,28 +88,6 @@ def test_build_wiring_produces_real_adapters(installed_config):
     w.require("config", "logging", "clock", "transport", "state_persistence")
 
 
-def test_make_orch_app_constructs_with_graft_hooks(installed_config):
-    from helao.core.servers.orch_api import OrchAPI
-    from helao.hexagon.app.factory import makeOrchApp
-
-    app = makeOrchApp("ORCH")
-    assert isinstance(app, OrchAPI)
-    assert app.hexagon_wiring is not None  # type: ignore[attr-defined]
-    routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
-    # BaseAPI/OrchAPI system surface present (spec §8.2 spot checks)
-    for path in (
-        "/start",
-        "/stop",
-        "/estop_orch",
-        "/clear_estop",
-        "/append_sequence",
-        "/global_status",
-        "/update_status",
-    ):
-        assert path in routes, path
-    assert app.rpc_dispatcher is not None  # co-located RPC registry exists
-
-
 def test_orchestrator_exposes_loaded_modules(installed_config):
     """An orchestrator must answer /loaded_modules, like every other `fast:` server.
 
@@ -122,25 +99,19 @@ def test_orchestrator_exposes_loaded_modules(installed_config):
     process is running the hexagon shim or the legacy module, because neither
     launcher logs the deployment when a config sets it explicitly.
 
-    `OrchAPI` is a sibling of `BaseAPI`, not a subclass, so this is asserted on
-    a real constructed app rather than on the shared registrar -- a registrar
-    test would still pass if `OrchAPI` stopped calling it.
+    Asserted on the app the orchestrator shim really builds (an ``OrchHost``),
+    not on the shared registrar: a registrar test would still pass if the host
+    stopped calling it.
     """
-    from helao.core.servers.base_api import BaseAPI
-    from helao.hexagon.app.factory import makeOrchApp
+    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import makeApp
 
-    app = makeOrchApp("ORCH")
+    app = makeApp("ORCH")
     routes = {r.path for r in app.routes}  # type: ignore[attr-defined]
     assert "/loaded_modules" in routes
 
-    # Registered exactly once. It used to live on BaseAPI's __init__ as well;
-    # hoisting it to the shared registrar without removing that would leave two
-    # handlers on one path, where FastAPI silently serves the first.
+    # Registered exactly once: a second handler on one path is accepted
+    # silently by FastAPI, which then serves the first.
     assert [r.path for r in app.routes].count("/loaded_modules") == 1  # type: ignore[attr-defined]
-    assert not any(
-        "/loaded_modules" in line
-        for line in inspect.getsource(BaseAPI.__init__).splitlines()
-    ), "duplicate /loaded_modules registration reintroduced on BaseAPI.__init__"
 
     # The payload is the watcher's contract: {abs repo .py path: sha1}. An empty
     # dict would satisfy a presence-only check while mapping nothing.
@@ -301,7 +272,8 @@ def test_launcher_shims_delegate():
     # scoped to makeApp, not the module: the docstring names makeOrchApp
     # precisely to explain why it is no longer called.
     assert "makeOrchApp" not in inspect.getsource(orch_shim.makeApp)
-    assert callable(factory.makeOrchApp)  # still there for unported compositions
+    # B7b deleted makeOrchApp outright: no composition grafts a legacy Orch.
+    assert not hasattr(factory, "makeOrchApp")
 
 
 def test_build_wiring_status_port_carries_own_identity(installed_config):
@@ -372,52 +344,55 @@ def test_build_wiring_wires_native_write_adapters(installed_config):
     w.require(*ACTION_REQUIRED)  # fail-loud stays satisfiable
 
 
-def test_make_action_app_registers_graft_hooks(installed_config):
+def test_make_action_app_registers_the_ws_bridge_hook(installed_config):
     from helao.hexagon.app.factory import makeActionApp
 
     app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
     assert app.hexagon_wiring.artifact_store is not None
-    assert app.hexagon_active_graft is None  # applied at startup, not build
+    assert not hasattr(app, "hexagon_active_graft")
     startup_names = [h.__name__ for h in app.router.on_startup]
     shutdown_names = [h.__name__ for h in app.router.on_shutdown]
-    assert "_hexagon_active_graft_startup" in startup_names
-    assert "_hexagon_active_graft_shutdown" in shutdown_names
-    # ours must be registered AFTER the legacy BaseAPI startup that creates
-    # app.base (Starlette preserves registration order)
-    assert startup_names[-1] == "_hexagon_active_graft_startup"
+    # ours must be registered AFTER ActionHost's own startup handler
+    # (Starlette preserves registration order)
+    assert startup_names[-1] == "_hexagon_ws_bridge_startup"
+    assert not any("graft" in name for name in startup_names + shutdown_names)
+
+
+def test_make_action_app_refuses_a_module_that_is_not_native(
+    installed_config, monkeypatch
+):
+    """D-B7b.2: a non-ActionHost is refused while the app is built, naming the
+    module, instead of failing inside the startup event as SystemExit(3)."""
+    from types import SimpleNamespace
+
+    from fastapi import FastAPI
+
+    from helao.hexagon.app import factory
+
+    monkeypatch.setattr(
+        factory,
+        "import_module",
+        lambda name: SimpleNamespace(makeApp=lambda server_key: FastAPI()),
+    )
+    with pytest.raises(TypeError) as ei:
+        factory.makeActionApp("SIM", "some.legacy.module")
+    assert str(ei.value) == (
+        "some.legacy.module.makeApp returned FastAPI, not an ActionHost"
+    )
 
 
 @pytest.mark.asyncio
-async def test_action_app_startup_binds_ws_publish_bridge(
-    installed_config, monkeypatch
-):
-    """P2b-2 D3: the existing _hexagon_active_graft_startup hook constructs
-    WsPublishBridge over the live base's queues and binds it into the status
-    adapter (ACTION apps only; makeOrchApp is untouched, Q1)."""
-    import helao.hexagon.app.active_graft as active_graft_mod
+async def test_action_app_startup_binds_ws_publish_bridge(installed_config):
+    """P2b-2 D3: the _hexagon_ws_bridge_startup hook constructs WsPublishBridge
+    over the host's own fan-out queues and binds it into the status adapter
+    (ACTION apps only; an OrchHost serves its own relays)."""
     from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
     from helao.hexagon.app.factory import makeActionApp
 
-    class _StubGraft:
-        def close(self):
-            pass
-
-    # isolate the bind from the P2b-1 write graft (its own tests cover it)
-    monkeypatch.setattr(
-        active_graft_mod,
-        "graft_active_write_path",
-        lambda base, wiring: _StubGraft(),
-    )
     app = makeActionApp("SIM", "helao.deploy.test.servers.action.ws_simulator")
     assert app.hexagon_ws_bridge is None  # bound at startup, not at build
-    # No injected `base` any more: makeActionApp returns an ActionHost, which
-    # owns the three fan-out queues itself and answers to `app.base is app`.
-    # Assigning one here raised AttributeError once `base` became a read-only
-    # property, and the assertions below read the real queues regardless.
     hook = [
-        h
-        for h in app.router.on_startup
-        if h.__name__ == "_hexagon_active_graft_startup"
+        h for h in app.router.on_startup if h.__name__ == "_hexagon_ws_bridge_startup"
     ][0]
     await hook()
     assert isinstance(app.hexagon_ws_bridge, WsPublishBridge)
@@ -431,12 +406,11 @@ async def test_action_app_startup_binds_ws_publish_bridge(
 async def test_status_adapter_unbound_is_fail_loud(installed_config):
     """Controller hardening 3 (Q1/D3 underpinning): a DispatcherStatusAdapter
     is unbound by default and stays fail-loud (UnwiredPortError on
-    publish_status). This is what makes "makeOrchApp never binds" SAFE — only
-    makeActionApp's startup hook binds the bridge (see
-    test_action_app_startup_binds_ws_publish_bridge); makeOrchApp adds no bind
-    call, verified by code review, so an orch composition's status adapter
-    keeps this default-unbound fail-loud behavior. (Bare-adapter check; not a
-    makeOrchApp integration test.)"""
+    publish_status). Only makeActionApp's startup hook binds the bridge (see
+    test_action_app_startup_binds_ws_publish_bridge); the composed orchestrator
+    side is pinned by
+    test_vis_hexagon_producer_parity::test_no_hexagon_orch_ws_producer_exists.
+    (Bare-adapter check.)"""
     from helao.hexagon.adapters.errors import UnwiredPortError
     from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
 

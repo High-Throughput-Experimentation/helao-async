@@ -249,6 +249,25 @@ def test_the_host_owns_the_reducer_rather_than_being_grafted():
         assert "_hex_runtime" in src, f"{method.__name__} bypasses the reducer"
 
 
+def test_the_host_binds_its_health_adapter_and_starts_no_legacy_heartbeat():
+    """OrchHost binds its own health adapter; no graft does it any more.
+
+    Moved from test_dispatch_loop's graft health test (B7b, D-B7b.6). The graft
+    used to bind the adapter to a legacy Orch and cancel that Orch's heartbeat
+    task. The host now binds the adapter to itself in ``_build_reducer``,
+    builds the hexagon health monitor, and never creates the legacy heartbeat
+    task at all. The no-health case has no native form: ``health`` is in
+    ORCH_REQUIRED, so OrchHost cannot be built without it
+    (test_adapter_health::test_orch_required_includes_health_and_wiring_has_slot).
+    """
+    from helao.hexagon.app.ingestion import HexHealthMonitor
+
+    host = _host()
+    assert host.hexagon_wiring.health._orch is host  # type: ignore[attr-defined]
+    assert isinstance(host._hex_health, HexHealthMonitor)
+    assert host.heartbeat_monitor is None
+
+
 def test_estop_wakes_the_interrupt_queue():
     """DD-5 item 6, and it is not decorative.
 
@@ -264,14 +283,3 @@ def test_estop_wakes_the_interrupt_queue():
 
     src = inspect.getsource(OrchHost.estop_loop)
     assert "interrupt_q.put" in src, "estop_loop must wake the interrupt queue"
-
-
-def test_a_native_orch_host_is_not_grafted():
-    """Two dispatch loops on one set of queues would break the
-    single-drainer property the reducer exists to guarantee."""
-    import inspect
-
-    from helao.hexagon.app import factory
-
-    src = inspect.getsource(factory.makeOrchApp)
-    assert "_is_native_host" in src, "makeOrchApp must skip the graft for a native host"

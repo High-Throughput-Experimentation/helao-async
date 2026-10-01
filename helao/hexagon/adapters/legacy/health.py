@@ -8,7 +8,7 @@ ports/auxiliary.py) — P2a.
 and unchanged). ``ping_action_servers``/``status_summary`` need the live
 ``Orch``'s ``ServerMonitor`` and ``status_summary`` attribute, which do not
 exist at ``build_wiring`` time — the adapter is constructed unbound and
-``graft_hexagon_loop`` binds the orch at startup (fail loud before that;
+``OrchHost._build_reducer`` binds the host to it (fail loud before that;
 same late-binding rationale as ``_LazyServerLogger``). ``status_summary``
 values on the orch are ``(status_str, driver_status)`` tuples; the port
 wants the driver status string ('unknown' gates dispatch), so the adapter
@@ -32,7 +32,7 @@ class LegacyHealthAdapter:
         if self._orch is None:
             raise RuntimeError(
                 "LegacyHealthAdapter is not bound to a live Orch yet "
-                "(graft_hexagon_loop binds it at startup)"
+                "(OrchHost._build_reducer binds it at construction)"
             )
         return self._orch
 
