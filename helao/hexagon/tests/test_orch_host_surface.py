@@ -63,9 +63,13 @@ def test_estop_is_registered_exactly_once():
     assert len(estops) == 1, f"expected exactly one /ORCH/estop, got {len(estops)}"
 
 
-CHECKLIST = (
-    Path(__file__).resolve().parents[1] / "tests/checklists/orch_openapi_legacy.json"
-)
+#: Frozen from a live OrchHost by B7b (77 routes). Its params and bodies on
+#: the 74 routes legacy OrchAPI also served were first shown equal to an
+#: in-process OrchAPI capture while the engine still existed, and legacy's
+#: own capture matched the launched-server checklist this file replaced.
+#: Q10: /prepend_sequences' response shape differs from legacy (live since B3b,
+#: no reader); recorded on purpose, not fixed.
+CHECKLIST = Path(__file__).resolve().parents[1] / "tests/checklists/orch_openapi.json"
 
 
 #: Routes still registered as raising stubs. EMPTY as of B3b: every loop
@@ -78,46 +82,49 @@ def _by_key(doc: dict) -> dict:
     return {(r["path"], r["method"]): r for r in doc["routes"]}
 
 
-def test_the_route_surface_matches_the_live_legacy_orchestrator():
-    """Captured from a LAUNCHED legacy orchestrator, not hand-written.
+def test_the_route_surface_matches_the_frozen_orchestrator_surface():
+    """Exact both ways: no frozen route missing, no unfrozen route added.
 
-    B1 measured its hand-written surface checklist stale: 9 routes listed
-    with 5 marked GET where the live server had 19, every one POST. A
-    decorator scan is no better here -- orch_api also calls
-    _register_utility_endpoints, whose routes it cannot see.
+    Captured live, not hand-written: B1 measured its hand-written surface
+    checklist stale, 9 routes listed with 5 marked GET where the live
+    server had 19, every one POST. An added route is a surface change too,
+    and the legacy-era version of this test could not see one.
 
     WebSockets are absent from openapi.json entirely, so this says nothing
-    about ws_status/ws_data/ws_live. Those are B3b's, and they need a
-    connect test rather than a schema diff.
+    about ws_status/ws_data/ws_live; test_ws_consumer_parity covers those.
     """
     from harness import openapi_capture
 
-    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    frozen = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
     current = _by_key(openapi_capture.normalize(_host().openapi()))
 
-    missing = sorted(k for k in legacy if k not in current)
-    assert (
-        missing == []
-    ), f"routes the live legacy orchestrator has, OrchHost lacks: {missing}"
+    missing = sorted(k for k in frozen if k not in current)
+    extra = sorted(k for k in current if k not in frozen)
+    assert missing == [], f"frozen routes OrchHost no longer serves: {missing}"
+    assert extra == [], f"routes OrchHost serves that are not frozen: {extra}"
 
 
-def test_parameter_schemas_match_the_live_legacy_orchestrator():
+def test_parameter_schemas_match_the_frozen_orchestrator_surface():
     """A route can be present, correctly tagged, and still reject every
     request its predecessor accepted -- a renamed parameter, a lost
-    default, a changed type. None of that shows in a path-set diff."""
+    default, a changed type, a renamed enum member, a renamed body field.
+    None of that shows in a path-set diff."""
     from harness import openapi_capture
 
-    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    frozen = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
     current = _by_key(openapi_capture.normalize(_host().openapi()))
 
     drifted = {
-        key: {"legacy": legacy[key]["params"], "host": current[key]["params"]}
-        for key in legacy
-        if key in current
-        and key[0] not in STUB_ROUTES
-        and legacy[key]["params"] != current[key]["params"]
+        key: {
+            field: {"frozen": frozen[key].get(field), "host": current[key].get(field)}
+            for field in ("tags", "params", "body")
+            if frozen[key].get(field) != current[key].get(field)
+        }
+        for key in frozen
+        if key in current and key[0] not in STUB_ROUTES
     }
-    assert drifted == {}, f"parameter drift on {len(drifted)} route(s): {drifted}"
+    drifted = {key: fields for key, fields in drifted.items() if fields}
+    assert drifted == {}, f"schema drift on {len(drifted)} route(s): {drifted}"
 
 
 def test_the_stub_exemption_list_is_exactly_the_routes_that_still_raise():
