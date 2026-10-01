@@ -91,7 +91,7 @@ PRG_MEMBER = "251003.120155695637-seq.prg"
 def _build_zip(tmp_path: Path, *, run_use: str = "ref") -> Path:
     day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
     day.mkdir(parents=True, exist_ok=True)
-    z = day / "120155__XRDS_generic_scan__CoO-100034.zip"
+    z = day / "120155__XRDS_generic_scan__CoO-987655.zip"
     with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr(SEQ_MEMBER, _seq_yml())
         zf.writestr(EXP_MEMBER, _exp_yml())
@@ -107,7 +107,7 @@ def _build_processes(tmp_path: Path, *, sequence_uuid: str = SEQ_UUID) -> Path:
         / "PROCESSES"
         / "25.39"
         / "1003"
-        / "120155__XRDS_generic_scan__CoO-100034"
+        / "120155__XRDS_generic_scan__CoO-987655"
         / EXP_DIR
     )
     d.mkdir(parents=True, exist_ok=True)
@@ -223,7 +223,7 @@ def test_process_dir_mirrors_the_run_tree(tmp_path):
         / "PROCESSES"
         / "25.39"
         / "1003"
-        / "120155__XRDS_generic_scan__CoO-100034"
+        / "120155__XRDS_generic_scan__CoO-987655"
     )
     assert process_dir_for(tmp_path / "loose.zip") is None
 
@@ -297,7 +297,7 @@ def _finished_dir(tmp_path: Path) -> Path:
         / "RUNS_FINISHED"
         / "25.39"
         / "1003"
-        / "120155__XRDS_generic_scan__CoO-100034"
+        / "120155__XRDS_generic_scan__CoO-987655"
     )
 
 
@@ -357,7 +357,7 @@ def test_a_record_carrying_no_prg_at_all_is_still_handed_back(tmp_path):
     SyncDriver.reset_sync refuses them; this must not."""
     day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
     day.mkdir(parents=True)
-    z = day / "120155__XRDS_generic_scan__CoO-100034.zip"
+    z = day / "120155__XRDS_generic_scan__CoO-987655.zip"
     with zipfile.ZipFile(z, "w") as zf:
         zf.writestr(SEQ_MEMBER, _seq_yml())
         zf.writestr(ACT_MEMBER, _act_yml("ref"))
@@ -375,7 +375,7 @@ def test_a_zip_with_no_seq_yml_is_reported_as_not_reset(tmp_path):
     here to hand back, and the retag has nothing to identify either."""
     day = tmp_path / "RUNS_SYNCED" / "25.39" / "1003"
     day.mkdir(parents=True)
-    z = day / "120155__XRDS_generic_scan__CoO-100034.zip"
+    z = day / "120155__XRDS_generic_scan__CoO-987655.zip"
     with zipfile.ZipFile(z, "w") as zf:
         zf.writestr(ACT_MEMBER, _act_yml("ref"))
 
@@ -412,3 +412,26 @@ def test_a_zip_outside_runs_synced_is_not_reset(tmp_path):
     assert not ok
     assert dest is None
     assert "RUNS_SYNCED" in note
+
+
+def test_reset_refuses_a_non_empty_runs_finished_twin(tmp_path):
+    """``extractall`` would merge into whatever already sits in the twin -- an
+    earlier record synced in place, or a crashed extraction -- so a non-empty
+    twin is refused, nothing is extracted and the zip stays where it is."""
+    z = _build_zip(tmp_path)
+    twin = _finished_dir(tmp_path)
+    twin.mkdir(parents=True)
+    (twin / "earlier-record.txt").write_text("synced in place")
+    before = z.read_bytes()
+
+    ok, dest, note = reset_to_finished(z)
+
+    assert not ok
+    assert dest == twin
+    assert "not empty" in note and str(twin) in note
+    assert sorted(p.name for p in twin.iterdir()) == ["earlier-record.txt"]
+    assert z.read_bytes() == before
+    assert not z.with_suffix(".orig").exists()
+    # An empty twin is not a collision.
+    (twin / "earlier-record.txt").unlink()
+    assert reset_to_finished(z)[0]
