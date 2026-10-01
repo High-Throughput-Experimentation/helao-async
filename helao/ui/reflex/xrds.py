@@ -26,12 +26,12 @@ LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LO
 DEFAULT_RUN_USE = "data"
 
 
-def select_records(records, run_use: str, sequence: str, file_type: str) -> list:
-    """The records matching run_use, sequence and file type."""
+def select_records(records, run_use: str, sequence: str, file_types) -> list:
+    """The records matching run_use, sequence and any of *file_types*."""
     return [
         r
         for r in grouping.filter_records(records, run_use=run_use, sequence=sequence)
-        if r.file_type == file_type
+        if r.file_type in file_types
     ]
 
 
@@ -126,15 +126,17 @@ class XrdsState(SpectraPageState, rx.State):
         async with self:
             self.error = ""
             self._clear_charts()
-            file_type = xrds.FILE_TYPES.get(self.file_type_choice, "")
+            file_types = xrds.FILE_TYPES.get(self.file_type_choice, ())
             chosen = select_records(
-                self._records, self.run_use_choice, self.sequence_choice, file_type
+                self._records, self.run_use_choice, self.sequence_choice, file_types
             )
             if not chosen:
                 self.status = "nothing matches this run_use, sequence and type"
                 return
             self.status = f"loading {len(chosen)} patterns..."
-        await self._load_and_draw(chosen, api.get_client(), file_type)
+        # Each record is fetched by its own file type (`spectra.load_spectra`);
+        # this is only the fallback for a record that carries none.
+        await self._load_and_draw(chosen, api.get_client(), file_types[0])
 
 
 def build_page():
