@@ -65,4 +65,4 @@ class BiologicBackend(Protocol):
         """Disconnect and reconnect."""
 
     def shutdown(self) -> None:
-        """Stop everything and disconnect. Called by ``BaseAPI`` at exit."""
+        """Stop everything and disconnect. Called by ``ActionHost`` at exit."""

@@ -29,13 +29,13 @@ Design (roadmap ``2026-07-18-P3a-special-splits-roadmap.md`` §"galil slice 3"):
 
 CUT-OVER CHECKLIST (resolve before repointing ``app.driver`` at this adapter):
 
-- ``shutdown`` await seam: ``base_api.py``'s shutdown handler calls
+- ``shutdown`` await seam: ``ActionHost.shutdown`` calls
   ``driver.shutdown()`` **synchronously** and only ``await``\\s a separate
   ``async_shutdown``. This adapter's ``shutdown`` is ``async`` (HardwarePort
   is async-first, and the sibling ``LegacyDriverHardwareAdapter`` has the same
   shape), so a naive cut-over would leave the coroutine un-awaited and skip
   ``GClose()``. The cut-over must resolve this for the whole native-adapter
-  family (expose ``async_shutdown``, or make ``base_api`` await a coroutine
+  family (expose ``async_shutdown``, or make ``ActionHost`` await a coroutine
   ``shutdown``) — it is a framework seam, not a per-driver fix. The
   ``disconnect()`` path is unaffected (it thread-offloads legacy ``disconnect``
   -> sync ``shutdown``).
@@ -170,7 +170,7 @@ class GalilMotionHardwareAdapter:
         The legacy ``estop`` performs the stop + motor-off and returns the
         ``switch`` bool; the HardwarePort contract returns a ``DriverResponse``,
         so the bool is wrapped (the device side-effect is unchanged). Server
-        estop-flag bookkeeping stays owned by ``base_api.py``'s ``/estop``.
+        estop-flag bookkeeping stays owned by ``ActionHost``'s ``/estop``.
         """
         await self._driver.estop(switch)
         return DriverResponse(

@@ -75,7 +75,7 @@ class NativeGalilMotion(HelaoDriver):
     """Galil motion driver implemented directly over a GalilCommandChannel.
 
     A ``HelaoDriver`` so the action server can construct it via
-    ``driver_classes=[NativeGalilMotion]`` (BaseAPI calls ``(config=...)``); the
+    ``driver_classes=[NativeGalilMotion]`` (ActionHost calls ``(config=...)``); the
     command channel defaults to the real gclib-backed channel when none is
     injected (tests inject a fake).
     """

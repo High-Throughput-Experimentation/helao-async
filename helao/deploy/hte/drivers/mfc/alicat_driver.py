@@ -78,9 +78,10 @@ class AliCatMFC(HelaoDriver):
 
         self.polling = True
         self.last_state = "unknown"
-        # Open the Alicat serial connections at construction. BaseAPI builds the
-        # AliCatMFCPoller immediately after the driver and the poller AUTO-STARTS
-        # its poll loop in __init__ -- but BaseAPI never calls connect(), so
+        # Open the Alicat serial connections at construction. ActionHost builds
+        # the AliCatMFCPoller immediately after the driver and the poller
+        # AUTO-STARTS its poll loop in __init__ -- but ActionHost never calls
+        # connect(), so
         # deferring the serial open left self.fcs empty: the poller produced no
         # data, the live buffer key never appeared, and acquire_flowrate's
         # MfcExec._poll (get_lbuf) never advanced -> the capture hung. Connect

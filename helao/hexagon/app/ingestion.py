@@ -1,9 +1,10 @@
 """Hexagon status ingestion (P2a): native replacement for the legacy
-``StatusIngester`` short-circuit (helao/core/servers/orch_status_sync.py).
+``StatusIngester`` short-circuit (helao/hexagon/app/orch_status_sync.py).
 
 ``HexStatusIngestion.update_status``/``update_nonblocking`` own the endpoint
-bodies once ``graft_hexagon_loop`` rebinds them onto the live legacy ``Orch``
-(instance rebind — the sanctioned wrap seam; NO legacy source edit). The
+bodies: ``OrchHost``'s ``/update_status`` and ``/update_nonblocking`` routes
+call them (``graft_hexagon_loop`` rebound them onto a legacy ``Orch`` until
+B7b deleted it). The
 fold still lands in the legacy ``GlobalStatusModel`` via
 ``update_global_with_acts`` (replacing the status model is NOT P2a); the
 inline estop/error/idle/busy REACTION (orch_status_sync.py:265-285) moves

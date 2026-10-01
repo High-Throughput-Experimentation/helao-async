@@ -590,8 +590,7 @@ class OrchHost(ActionHost):
 
         The three payload builders are imported from ``orch_payloads``
         rather than reimplemented: they shape what the operator UIs parse,
-        and ``orch_payloads`` is the one implementation -- legacy
-        ``orch_api`` re-exports it.
+        and ``orch_payloads`` is the one implementation.
         """
         from typing import Optional as _Optional
 

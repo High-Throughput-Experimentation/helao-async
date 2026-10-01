@@ -1,8 +1,8 @@
 """MicroOrch equivalent of the TEST scheduling library (TEST_seq / TEST_exp).
 
 The TEST library's actions all target the ``ORCH`` server (``wait``,
-``add_global_param``, ``conditional_stop``). Because ``OrchAPI`` inherits
-``BaseAPI``, the running orchestrator exposes those as ordinary RPC action
+``add_global_param``, ``conditional_stop``). Because ``OrchHost`` subclasses
+``ActionHost``, the running orchestrator exposes those as ordinary RPC action
 endpoints, so MicroOrch treats ``ORCH`` exactly like any other action server
 and dispatches to it directly.
 

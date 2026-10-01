@@ -20,12 +20,9 @@ def _bound(tmp_path):
     return base, active, dflt, NativeDataSinkAdapter().for_action(active)
 
 
-def test_port_conformance_and_no_base_inheritance():
-    from helao.core.servers.base import Base
-
+def test_port_conformance():
     sink = NativeDataSinkAdapter()
     assert isinstance(sink, DataSinkPort)
-    assert not isinstance(sink, Base)
 
 
 def test_unbound_raises():

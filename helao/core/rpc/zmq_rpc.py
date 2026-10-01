@@ -1,6 +1,6 @@
 """ZeroMQ + msgspec RPC layer that runs alongside FastAPI on each HELAO server.
 
-Each ``BaseAPI`` / ``OrchAPI`` instance binds a ``zmq.ROUTER`` socket on
+Each ``HelaoFastAPI`` app (``ActionHost`` / ``OrchHost``) binds a ``zmq.ROUTER`` socket on
 ``http_port + RPC_PORT_OFFSET`` at startup. Every FastAPI POST route on the
 app is auto-mirrored into the dispatcher under the route's path (sans leading
 slash) so callers can reach the same handler over either HTTP or a ``DEALER``

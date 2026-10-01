@@ -9,9 +9,7 @@ itself rather than a wrap around the engine, exactly as B1's ported action
 modules construct an ``ActionHost`` instead of going through
 ``makeActionApp``.
 
-``makeOrchApp`` is left in place and still grafts, for any composition that
-has not moved. It skips the graft when handed a native host, so the two
-cannot both drive one set of queues.
+``makeOrchApp`` and the graft it drove were deleted by B7b.
 """
 
 from helao.hexagon.app.orch_host import OrchHost

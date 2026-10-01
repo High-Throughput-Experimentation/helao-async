@@ -67,9 +67,10 @@ class SprintIR(HelaoDriver):
         self.last_rec_time = 0
         self.recording_duration = 0
         self.recording_rate = 0.1  # seconds per acquisition
-        # Open the serial port at construction. BaseAPI builds the DriverPoller
-        # (SprintIRPoller) immediately after the driver and the poller AUTO-STARTS
-        # its poll loop in __init__ -- but BaseAPI never calls connect(), so
+        # Open the serial port at construction. ActionHost builds the
+        # DriverPoller (SprintIRPoller) immediately after the driver and the
+        # poller AUTO-STARTS its poll loop in __init__ -- but ActionHost never
+        # calls connect(), so
         # deferring the serial open left self.com=None and the poller spammed
         # "'NoneType' object has no attribute 'flush'" every cycle. Connecting
         # here (like the biologic/andor drivers) opens the port before the first

@@ -1073,5 +1073,5 @@ class AndorDriver(HelaoDriver):
         return response
 
     def shutdown(self) -> None:
-        """BaseAPI shutdown hook; disconnects the camera."""
+        """ActionHost shutdown hook; disconnects the camera."""
         self.disconnect()

@@ -8,7 +8,6 @@ itself, so no test swaps one in.
 
 Tests layer — may import anything (boundary rule)."""
 
-import inspect
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -147,16 +146,3 @@ def _make_active_for_journal(tmp_path, manual_action: bool = False):
     action = mk_action(manual_action=manual_action, save_act=True)
     session, _ = mk_active(base, json_data_keys=["t", "v"], action=action)
     return base, session
-
-
-def assert_source_parity(native_cls, legacy_cls, methods):
-    """Byte-parity pin: each relocated method's source must be identical to
-    its legacy counterpart (methods contain no class-name references, so
-    straight equality holds for a verbatim copy)."""
-    diffs = []
-    for name in methods:
-        n_src = inspect.getsource(getattr(native_cls, name))
-        l_src = inspect.getsource(getattr(legacy_cls, name))
-        if n_src != l_src:
-            diffs.append(name)
-    assert not diffs, f"native methods drifted from legacy source: {diffs}"

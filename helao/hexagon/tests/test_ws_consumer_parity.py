@@ -34,8 +34,8 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 
-BASE_API_PATH = Path("helao/core/servers/base_api.py")
-ORCH_API_PATH = Path("helao/core/servers/orch_api.py")
+ACTION_HOST_PATH = Path("helao/hexagon/app/action_host.py")
+ORCH_HOST_PATH = Path("helao/hexagon/app/orch_host.py")
 
 
 @pytest.mark.asyncio
@@ -178,15 +178,15 @@ async def test_reflex_normalize_per_channel():
 
 
 def test_ws_globstat_is_dead():
-    """No route registration for /ws_globstat exists on either API class --
+    """No route registration for /ws_globstat exists on either native host --
     Corrections §C1b. Uses the repo's own static AST route extractor
     (harness.endpoints), not a hand-rolled grep, so a future dynamic-route
     addition is exactly as visible here as to the endpoint-parity checklist
     that tool already gates."""
-    base_routes = extract_routes(BASE_API_PATH)
-    orch_routes = extract_routes(ORCH_API_PATH)
-    assert base_routes, "extractor found nothing in base_api.py -- inert glob?"
-    assert orch_routes, "extractor found nothing in orch_api.py -- inert glob?"
+    base_routes = extract_routes(ACTION_HOST_PATH)
+    orch_routes = extract_routes(ORCH_HOST_PATH)
+    assert base_routes, "extractor found nothing in action_host.py -- inert glob?"
+    assert orch_routes, "extractor found nothing in orch_host.py -- inert glob?"
 
     base_paths = {r["path"] for r in base_routes}
     orch_paths = {r["path"] for r in orch_routes}

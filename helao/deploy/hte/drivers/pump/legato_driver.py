@@ -129,7 +129,7 @@ class KDS100(HelaoDriver):
         self.present_volume_ul = 0.0
         self.last_state = "unknown"
 
-        # Open the serial connection now. BaseAPI never calls connect(), and
+        # Open the serial connection now. ActionHost never calls connect(), and
         # KDS100Poller begins polling as soon as it is constructed, so a present
         # pump must be connected here to be readable on the first poll. An
         # absent COM port leaves self.sio = None (connect() logs the failure);
