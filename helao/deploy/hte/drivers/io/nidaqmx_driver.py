@@ -102,7 +102,7 @@ class cNIMAX(HelaoDriver):
         self.config_dict = self.config
 
         # set by the server's dyn_endpoints startup hook (mirrors the
-        # DriverPoller._base_hook wiring in base_api.py); used only for the
+        # DriverPoller._base_hook wiring in action_host.py); used only for the
         # synchronous estop/live-buffer reads the NI-DAQmx hardware callback
         # needs (that callback fires on a nidaqmx-internal thread, so it
         # cannot await anything -- see streamIV_callback). Always accessed
@@ -832,7 +832,7 @@ class cNIMAX(HelaoDriver):
 
         Server-side estop-flag bookkeeping (`actionservermodel.estop`) and
         marking in-flight actions as estopped are owned by the action-server
-        framework (`base_api.py`'s `/estop` endpoint and `estop_actives()`),
+        framework (`ActionHost`'s `/estop` endpoint and `estop_actives()`),
         not the driver.
 
         Args:

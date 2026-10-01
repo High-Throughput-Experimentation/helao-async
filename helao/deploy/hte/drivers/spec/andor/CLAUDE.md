@@ -32,7 +32,7 @@ selected by the action server's `wl_source` param (`spectrograph` | `calibration
   lamp too** and compare the fit against `GetCalibration` without changing its live
   axis. The response's `applied` field says which happened. On the lamp-calibrated
   variant the fit becomes the live axis immediately, with no restart.
-- **`base_api` names the driver namedtuple field from the class name**, so
+- **`ActionHost` names the driver namedtuple field from the class name**, so
   `app.drivers.AndorSpectrographDriver` and `app.drivers.AndorCalibratedDriver`
   differ per station. Use `app.driver`.
 - Persisted calibration: `<STATES>/<host>_<server_key>_andor_wl_calib.json`,

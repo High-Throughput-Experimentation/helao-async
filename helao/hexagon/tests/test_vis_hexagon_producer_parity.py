@@ -529,29 +529,27 @@ async def test_hexagon_hosted_document_ingest_can_fail(real_config, tmp_path):
 async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     """THE RESIDUAL for Amendment 1 gate item 1, pinned rather than papered over.
 
-    ``ws_publish.py`` concedes it in prose ("orch WS stays on legacy relays,
-    Q1"); this is the executable form. A hexagon-composed ORCHESTRATOR has a
-    status adapter with no publish bridge bound, so every ``publish_*`` on it
-    raises. Its ``/ws_status`` and ``/ws_data`` therefore have no hexagon
-    producer at all -- they are served by the untouched legacy
-    ``StatusBroadcaster._ws_relay``, which sends a DIFFERENT payload shape
-    (dicts, not models) from the one the action-server bridge sends.
+    The orchestrator the shim builds (an ``OrchHost``) has a status adapter
+    with no publish bridge bound, so every ``publish_*`` on it raises. Its
+    ``/ws_status`` and ``/ws_data`` are served by the host's own relays
+    (``OrchHost._register_orch_ws_routes``), which send a DIFFERENT payload
+    shape (dicts, not models) from the one the action-server bridge sends.
 
     ``test_factory.test_status_adapter_unbound_is_fail_loud`` asserts this of a
-    bare adapter and says in its own docstring that the makeOrchApp side is
-    "verified by code review"; this closes that with the composed app.
+    bare adapter; this closes it with the composed app.
 
     The day a hexagon orch producer lands, this test fails -- deliberately.
-    Binding a bridge in ``makeOrchApp`` breaks the two assertions below, and
-    that failure is the signal to re-run the orch half of gate item 1 (the
+    Binding a bridge on the orchestrator breaks the assertions below, and that
+    failure is the signal to re-run the orch half of gate item 1 (the
     consumers of the dict shape -- ``RemoteBackend._ws_loop`` and every
     ``/ws_status`` subscriber -- have never been conformance-tested against a
     model-shaped frame).
     """
+    from helao.deploy.hexagon.servers.orchestrator.async_orch2 import makeApp
     from helao.helpers import config_loader
     from helao.hexagon.adapters.errors import UnwiredPortError
     from helao.hexagon.adapters.legacy.status import DispatcherStatusAdapter
-    from helao.hexagon.app import factory
+    from helao.hexagon.app import factory, orch_host
 
     (tmp_path / "LOGS").mkdir()
     monkeypatch.setattr(
@@ -573,8 +571,8 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
         },
     )
 
-    app = factory.makeOrchApp("ORCH")
-    status = app.hexagon_wiring.status  # type: ignore[attr-defined]
+    app = makeApp("ORCH")
+    status = app.hexagon_wiring.status
     assert isinstance(status, DispatcherStatusAdapter)
     assert status._publish_bridge is None, (
         "a hexagon orch composition now binds a WS publish bridge -- the orch "
@@ -582,14 +580,13 @@ async def test_no_hexagon_orch_ws_producer_exists(tmp_path, monkeypatch):
     )
     assert not hasattr(
         app, "hexagon_ws_bridge"
-    ), "makeOrchApp now carries a ws bridge attribute; see this test's docstring"
+    ), "the orchestrator now carries a ws bridge attribute; see this test's docstring"
     with pytest.raises(UnwiredPortError):
         await status.publish_status(wf.build_status_payload().as_dict())
 
     # And the source-level twin, so the hole is visible without constructing an
-    # app: the ONLY bind_publish_bridge call site in the composition root is in
-    # makeActionApp.
-    assert "bind_publish_bridge" not in inspect.getsource(factory.makeOrchApp)
+    # app: the ONLY bind_publish_bridge call site is in makeActionApp.
+    assert "bind_publish_bridge" not in inspect.getsource(orch_host)
     assert "bind_publish_bridge" in inspect.getsource(factory.makeActionApp)
 
 

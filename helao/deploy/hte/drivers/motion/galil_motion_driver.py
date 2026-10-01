@@ -342,7 +342,7 @@ class Galil(HelaoDriver):
 
         Delegates to `shutdown` -- the action server's FastAPI shutdown
         event still looks up `shutdown`/`async_shutdown` by duck-typed
-        `getattr` (`base_api.py`'s `shutdown_event`) regardless of
+        `getattr` (`ActionHost.shutdown`) regardless of
         `HelaoDriver` status, so both call paths close the same connection
         identically.
         """
@@ -1041,7 +1041,7 @@ class Galil(HelaoDriver):
         """Read the server's estop flag via the safe base hook.
 
         Server-side estop-flag bookkeeping (`actionservermodel.estop`) is
-        owned by the action-server framework (`base_api.py`'s `/estop`
+        owned by the action-server framework (`ActionHost`'s `/estop`
         endpoint sets it directly), so this driver only reads it -- and only
         through `self._base_hook` (never a live `self.base`), defaulting to
         `False` if the hook isn't wired up yet.
@@ -1072,7 +1072,7 @@ class Galil(HelaoDriver):
             switch: True stops every axis and disables its motor, False is
                 a no-op (server-side estop-flag bookkeeping is owned by the
                 action-server framework, not the driver -- see
-                `base_api.py`'s `/estop` endpoint, which calls this hook
+                `ActionHost`'s `/estop` endpoint, which calls this hook
                 and then sets `actionservermodel.estop` itself).
 
         Returns:

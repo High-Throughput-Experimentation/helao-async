@@ -4,33 +4,38 @@ Six WS routes, two producer families, different payload types under the same
 route names (measured, see docs/superpowers/plans/2026-08-05-P7-UI-both-stacks.md
 §P7b):
 
-- ``base_api`` family: ``BaseAPI`` registers ``/ws_status`` / ``/ws_data`` /
-  ``/ws_live`` directly over ``WsPublisher.broadcast``
-  (``helao/core/servers/base_api.py:679-708``), which pickles the message
-  object as-is (identity ``xform_func``) -- status carries an ``ActionModel``,
-  data an ``DataPackageModel``, live a plain dict.
-- ``orch_api`` family: ``OrchAPI`` (a *sibling* of ``BaseAPI``, not a subclass)
-  registers the same three routes over ``Base.ws_status``/``ws_data``/``ws_live``
-  -> ``StatusBroadcaster._ws_relay`` (``helao/core/servers/base_status.py``),
-  which calls ``msg.as_dict()`` before pickling for status/data (live stays a
-  dict either way).
+- ``base_api`` family: every action server (``ActionHost._register_websockets``)
+  serves ``/ws_status`` / ``/ws_data`` / ``/ws_live`` over
+  ``WsPublisher.broadcast`` with the identity ``xform_func``, which pickles
+  the message object as-is -- status carries an ``ActionModel``, data a
+  ``DataPackageModel``, live a plain dict.
+- ``orch_api`` family: the orchestrator (``OrchHost._register_orch_ws_routes``)
+  replaces those three routes with the publishers
+  :func:`~helao.hexagon.app.orch_host.orch_ws_publishers` builds, which call
+  ``msg.as_dict()`` before pickling for status/data (live stays a dict
+  either way).
+
+The family names are the legacy hosts' (``BaseAPI`` and its sibling
+``OrchAPI``). Both were deleted by B7b; before that, B7b compared the
+``orch_api`` encoder here byte for byte against the legacy
+``StatusBroadcaster._ws_relay`` on all three channels.
 
 A third *producer* -- not a third encoder family -- is
 :func:`encode_hexagon`: the hexagon composition's own publish path,
-``DispatcherStatusAdapter.publish_*`` -> ``WsPublishBridge`` -> the legacy
+``DispatcherStatusAdapter.publish_*`` -> ``WsPublishBridge`` -> the host's
 fan-out queue -> the same ``WsPublisher.broadcast``. It is deliberately NOT a
 member of :data:`FAMILIES`, because it introduces no encoder of its own: the
 whole point of the bridge (``adapters/native/ws_publish.py``) is that frame
-bytes keep coming off the untouched legacy encoder. What it does introduce is
-a *dict-typed port boundary* -- ``StatusPort.publish_*`` takes dicts, and the
-bridge ``model_validate``s each one back to its channel's wire type -- so a
-frame produced this way has passed through one extra lossy-looking hop that
-the legacy path does not have. :data:`PRODUCERS` is the full set every
-:func:`frame` caller may name.
+bytes keep coming off the ``base_api`` family's encoder. What it does
+introduce is a *dict-typed port boundary* -- ``StatusPort.publish_*`` takes
+dicts, and the bridge ``model_validate``s each one back to its channel's wire
+type -- so a frame produced this way has passed through one extra
+lossy-looking hop that the direct path does not have. :data:`PRODUCERS` is
+the full set every :func:`frame` caller may name.
 
-Frames here are produced by driving the REAL production coroutines --
-``WsPublisher.broadcast`` and ``StatusBroadcaster.ws_status``/``ws_data``/
-``ws_live`` -- against a :class:`FakeWebSocket` that only fakes the transport
+Frames here are produced by driving the REAL production coroutine --
+``WsPublisher.broadcast``, with the ``xform_func`` each host installs --
+against a :class:`FakeWebSocket` that only fakes the transport
 (``accept``/``send_bytes``); the ``pyzstd.compress(pickle.dumps(...))`` (or
 ``msg.as_dict()`` then the same) encode step is the actual production code
 path, not a hand-rolled copy (the dd31c36f trap this repo has hit before,
@@ -85,7 +90,6 @@ from fastapi import FastAPI, WebSocket
 
 from helao.core.models.action import ActionModel
 from helao.core.models.data import DataModel, DataPackageModel
-from helao.core.servers.base_status import StatusBroadcaster
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher, WsSubscriber, WsSyncClient
 
@@ -181,9 +185,9 @@ _PAYLOAD_BUILDERS = {
 class FakeWebSocket:
     """Records ``send_bytes`` calls; ``accept`` is a no-op.
 
-    Not a network socket -- it exists so :class:`WsPublisher.broadcast` and
-    :class:`StatusBroadcaster`'s relay methods can run to completion and
-    perform their real ``pyzstd.compress(pickle.dumps(...))`` encode step
+    Not a network socket -- it exists so :class:`WsPublisher.broadcast` can
+    run to completion and perform its real
+    ``pyzstd.compress(pickle.dumps(...))`` encode step
     against something matching the tiny subset of the FastAPI ``WebSocket``
     surface they actually call, without opening a socket per frame.
     """
@@ -196,16 +200,6 @@ class FakeWebSocket:
 
     async def send_bytes(self, data: bytes):
         self.frames.append(data)
-
-
-class _FakeBase:
-    """Stand-in for ``Base``/``Orch`` exposing only the three fan-out queues
-    ``StatusBroadcaster`` reads via ``self.base.<queue>`` at call time."""
-
-    def __init__(self):
-        self.status_q = MultisubscriberQueue()
-        self.data_q = MultisubscriberQueue()
-        self.live_q = MultisubscriberQueue()
 
 
 async def _drain_one(
@@ -269,7 +263,12 @@ async def encode_base_api(channel: str, payload: Any = None) -> bytes:
 
 
 async def encode_orch_api(channel: str, payload: Any = None) -> bytes:
-    """Encode one frame through the real ``OrchAPI``/``StatusBroadcaster`` path.
+    """Encode one frame through the orchestrator's own WS publishers.
+
+    Drives ``publisher.broadcast`` for the publisher
+    :func:`~helao.hexagon.app.orch_host.orch_ws_publishers` builds for
+    ``channel`` -- the same function ``OrchHost`` serves ``/ws_status``,
+    ``/ws_data`` and ``/ws_live`` from.
 
     Args:
         channel: One of :data:`CHANNELS`.
@@ -277,36 +276,19 @@ async def encode_orch_api(channel: str, payload: Any = None) -> bytes:
             ``channel``.
 
     Returns:
-        The exact bytes ``StatusBroadcaster._ws_relay`` would send over the
-        wire (``msg.as_dict()`` for status/data, the dict as-is for live).
+        The exact bytes the orchestrator would send over the wire
+        (``msg.as_dict()`` for status/data, the dict as-is for live).
     """
     if channel not in CHANNELS:
         raise ValueError(f"unknown channel {channel!r}")
+    # Imported here so importing this harness does not load the orchestrator.
+    from helao.hexagon.app.orch_host import orch_ws_publishers
+
     if payload is None:
         payload = _PAYLOAD_BUILDERS[channel]()
-    base = _FakeBase()
-    broadcaster = StatusBroadcaster(base)
-    queue = {
-        "ws_status": base.status_q,
-        "ws_data": base.data_q,
-        "ws_live": base.live_q,
-    }[channel]
-    # StatusBroadcaster.ws_status/ws_data/ws_live are thin wrappers that call
-    # ``self.base._ws_relay(...)`` -- Base's own delegator back to
-    # ``self.status_broadcaster._ws_relay`` (base.py:562). _FakeBase doesn't
-    # carry that indirection layer (it is pass-through, not encoding logic),
-    # so call the real relay implementation directly with the same
-    # per-channel label/use_as_dict the wrappers pass it
-    # (base_status.py:262-273).
-    use_as_dict = channel != "ws_live"
-    label = {"ws_status": "status", "ws_data": "data", "ws_live": "live_buffer"}[
-        channel
-    ]
-
-    async def relay_coro(ws):
-        await broadcaster._ws_relay(ws, queue, label, use_as_dict=use_as_dict)
-
-    return await _drain_one(queue, relay_coro, payload)
+    queue = MultisubscriberQueue()
+    publisher = orch_ws_publishers(queue, queue, queue)[CHANNELS.index(channel)]
+    return await _drain_one(queue, publisher.broadcast, payload)
 
 
 async def encode_hexagon(channel: str, payload: Any = None) -> bytes:

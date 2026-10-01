@@ -252,7 +252,7 @@ class BiologicEclib2Driver(HelaoDriver):
     def shutdown(self) -> None:
         """Stop every running channel, clean up, disconnect, stop the worker.
 
-        Called by ``BaseAPI`` at server exit. Returns None, matching the
+        Called by ``ActionHost`` at server exit. Returns None, matching the
         ``BiologicBackend`` protocol and both sibling backends. Stopping the
         worker thread is the last step and is not recoverable, which is why
         this is separate from :meth:`disconnect`.

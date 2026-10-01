@@ -963,13 +963,14 @@ def test_no_route_was_added_renamed_or_removed(tmp_path, monkeypatch):
     app = _app(tmp_path, monkeypatch)
     # Everything this module contributes to an app with an empty ``analyses``
     # list: exactly the two private routes priv's checklist froze. Compared as a
-    # set difference against ``BaseAPI``'s own surface so the assertion stays
-    # exact -- ``/list_executors`` and friends come from BaseAPI, not from here.
-    from helao.core.servers.base_api import BaseAPI
+    # set difference against a bare ``ActionHost``'s own surface so the assertion
+    # stays exact -- ``/list_executors`` and friends come from ActionHost, not
+    # from here.
+    from helao.hexagon.app.action_host import ActionHost
 
     baseline = {
         getattr(route, "path", "")
-        for route in BaseAPI(
+        for route in ActionHost(
             server_key="ANA", server_title="ANA", description="", version=1.0
         ).routes
     }

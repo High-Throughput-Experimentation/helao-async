@@ -77,21 +77,6 @@ def test_the_derivation_is_not_vacuous() -> None:
     assert "file_conn_dict" in derived
 
 
-def test_the_legacy_active_satisfies_the_port() -> None:
-    """The collaborators must keep working against a grafted legacy Active.
-
-    Until B7 the graft is what production runs, so re-pointing the collaborators
-    at the Protocol must not break the object they are bound to today.
-    """
-    from helao.core.servers.base import Active
-
-    missing = [m for m in _protocol_members() if not hasattr(Active, m)]
-    # Instance attributes set in __init__ are not class attributes; only the
-    # methods are checkable this way, which is what matters for the binding.
-    missing = [m for m in missing if callable(getattr(ActionSessionPort, m, None))]
-    assert missing == [], f"legacy Active lacks port members: {missing}"
-
-
 # ---------------------------------------------------------------------------
 # ActionSession against the port (B1 Task 5)
 # ---------------------------------------------------------------------------

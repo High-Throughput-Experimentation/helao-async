@@ -5,26 +5,22 @@ Verbatim re-body of the CARDS-P6 ``MetaFileWriter`` collaborator
 temp-file-then-``os.replace`` write, the three ``write_act``/``write_exp``/
 ``write_seq`` writers (``file_type`` first key, trailing newline,
 manual runs resolved to the ``DIAG`` tree), and the file-connection-key
-helpers. Method bodies are byte-identical to legacy (source-parity-pinned by
-``test_native_meta_writer.py``); only this docstring, the class name, and
-``__all__`` differ.
+helpers. Method bodies were byte-identical to the legacy engine
+(source-parity-pinned by ``test_native_meta_writer.py``) when B7b deleted it;
+black left them unchanged.
 
 Holds only the ``base`` back-reference and reads ``helaodirs`` etc. through
-it at call time (cache-nothing rule). Installed per-Base by
-``helao.hexagon.app.active_graft.graft_active_write_path`` as a drop-in for
-``base.meta_writer`` -- the ``Base`` delegators (``base.py:666-716``) resolve
-``self.meta_writer`` at call time, so the swap reroutes ``write_act``/
-``write_exp``/``write_seq``/``_write_meta_atomic``/``new_file_conn_key``/
-``dflt_file_conn_key`` in one assignment.
+it at call time (cache-nothing rule). ``ActionHost`` constructs it as its
+``meta_writer`` (``NativeArtifactStoreAdapter.meta_writer_for``).
 """
 
 # The three latent Optional-narrowing diagnostics below (join()/strftime() on
 # a nominally-Optional experiment/sequence/action timestamp or output dir)
 # are pre-existing in the legacy body this module re-bodies verbatim
 # (confirmed: `pyright helao/core/servers/base_meta_writer.py` reports the
-# same 5 errors on the unmodified legacy file). Source-parity pins the method
-# bodies byte-identical to legacy, so they cannot be touched here; suppressed
-# at file scope instead of inline to avoid perturbing `inspect.getsource`.
+# same 5 errors on the unmodified legacy file). The bodies were pinned
+# byte-identical to legacy until B7b deleted that pin; the diagnostics stay
+# suppressed at file scope rather than fixed in the bodies.
 # pyright: reportCallIssue=false, reportArgumentType=false, reportOptionalMemberAccess=false
 
 import hashlib

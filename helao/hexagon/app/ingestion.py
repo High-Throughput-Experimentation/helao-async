@@ -1,9 +1,10 @@
 """Hexagon status ingestion (P2a): native replacement for the legacy
-``StatusIngester`` short-circuit (helao/core/servers/orch_status_sync.py).
+``StatusIngester`` short-circuit (helao/hexagon/app/orch_status_sync.py).
 
 ``HexStatusIngestion.update_status``/``update_nonblocking`` own the endpoint
-bodies once ``graft_hexagon_loop`` rebinds them onto the live legacy ``Orch``
-(instance rebind — the sanctioned wrap seam; NO legacy source edit). The
+bodies: ``OrchHost``'s ``/update_status`` and ``/update_nonblocking`` routes
+call them (``graft_hexagon_loop`` rebound them onto a legacy ``Orch`` until
+B7b deleted it). The
 fold still lands in the legacy ``GlobalStatusModel`` via
 ``update_global_with_acts`` (replacing the status model is NOT P2a); the
 inline estop/error/idle/busy REACTION (orch_status_sync.py:265-285) moves
@@ -19,10 +20,9 @@ the dispatch critical section — nobody else; events are emitted INSIDE the
 lock exactly where the legacy inline block ran, so the interleaving
 guarantees (and the estop cascade running under the lock, as legacy
 ``estop_loop`` did) are unchanged. ``interrupt_q`` is written here (the
-unconditional trailing ``globalstatusmodel`` put) and by the health monitor;
-``globstat_q`` stays on the legacy broadcaster (``ws_globstat``/
-``globstat_broadcast_task`` are NOT rebound). ``clear_nonblocking`` is NOT
-rebound either — its wire behavior is untouched.
+unconditional trailing ``globalstatusmodel`` put) and by the health monitor.
+``clear_nonblocking`` stays on ``StatusIngester``; its wire behavior is
+untouched.
 
 Wire quirks reproduced, not fixed (spec §7.4): ``update_nonblocking``'s
 %-format f-string raises ``TypeError`` on a ``None`` ``action_timestamp``

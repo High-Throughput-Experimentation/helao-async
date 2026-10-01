@@ -4,11 +4,17 @@ The ONLY layer that constructs FastAPI objects and wires adapters into
 ports. Fail loud (F2b): build_wiring raises without an installed CONFIG;
 each makeApp requires its composition's consumed port set BEFORE building
 the app — a missing adapter aborts startup, never a silent fake. The
-co-located RPC mirror (spec §7.1) is inherited from legacy HelaoFastAPI's
-startup hook (ROUTER on http_port+10000, configured-host bind with 0.0.0.0
-fallback). Launcher routing: helao/deploy/hexagon/ shim modules call these
-factories via the per-server `deployment: hexagon` config key — zero
-launcher edits, per-config atomic cut-over/rollback."""
+co-located RPC mirror (spec §7.1) is inherited from HelaoFastAPI's startup
+hook (ROUTER on http_port+10000, configured-host bind with 0.0.0.0
+fallback). Launcher routing: the helao/deploy/hexagon/ action and visualizer
+shims call makeActionApp / makeVisApp via the per-server
+`deployment: hexagon` config key — zero launcher edits, per-config atomic
+cut-over/rollback. The orchestrator shims construct an OrchHost directly and
+do not come through here.
+
+makeActionApp composes native hosts only: the module it names must return an
+ActionHost from makeApp, and anything else is refused when the app is built
+(B7b, D-B7b.2)."""
 
 import os
 from importlib import import_module
@@ -27,23 +33,20 @@ from helao.hexagon.adapters.native.data_sink import NativeDataSinkAdapter
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 from helao.hexagon.app.wiring import (
     ACTION_REQUIRED,
-    ORCH_REQUIRED,
     VIS_REQUIRED,
     PortWiring,
 )
 
-__all__ = ["build_wiring", "makeActionApp", "makeOrchApp", "makeVisApp"]
+__all__ = ["build_wiring", "makeActionApp", "makeVisApp"]
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
 def _is_native_host(app) -> bool:
-    """True when ``app`` is a native host rather than a legacy API object.
+    """True when ``app`` is a native host (an ``ActionHost`` or a subclass).
 
-    Covers ``OrchHost`` too, because it subclasses ``ActionHost`` the way
-    legacy ``Orch`` subclasses ``Base``. One check answers both grafts:
-    neither the write-path graft nor the loop graft has anything to rebind
-    on a host that already owns the behaviour.
+    ``makeActionApp`` refuses anything else at build time. ``OrchHost``
+    subclasses ``ActionHost``, so it passes too.
 
     Imported inside the function: ``action_host`` imports this module's
     siblings, and a module-level import here closes that cycle.
@@ -69,86 +72,38 @@ def build_wiring(server_key: str) -> PortWiring:
             server_key, own_host=scfg["host"], own_port=scfg["port"]
         ),
         health=LegacyHealthAdapter(),
-        # P2b-1 native write runtime (base bound later by the active graft)
+        # P2b-1 native write runtime; ActionHost binds itself to it
+        # (artifact_store.meta_writer_for(host)) when it is constructed.
         artifact_store=NativeArtifactStoreAdapter(config=config, clock=clock),
         data_sink=NativeDataSinkAdapter(),
     )
 
 
-def makeOrchApp(server_key: str):
-    from helao.core.servers.orch_api import OrchAPI
-    from helao.hexagon.app.dispatch_loop import graft_hexagon_loop
-
-    wiring = build_wiring(server_key)
-    wiring.require(*ORCH_REQUIRED)
-
-    app = OrchAPI(
-        server_key,
-        server_key,
-        "Hexagon-composed orchestrator (wrapped legacy Orch + reducer loop)",
-        version=3.0,
-        driver_classes=None,
-    )
-    app.hexagon_wiring = wiring  # type: ignore[attr-defined]
-    app.hexagon_graft = None  # type: ignore[attr-defined]
-
-    # Registered AFTER OrchAPI.__init__'s own startup handler, so it runs
-    # AFTER `self.orch = Orch(fastapp=self)` + myinit (Starlette preserves
-    # registration order): the graft sees the live legacy Orch.
-    @app.on_event("startup")
-    async def _hexagon_graft_startup():
-        # An OrchHost drives the reducer itself (D-B3.2) -- it built the
-        # runtime in __init__ and starts the loop in its own startup hook.
-        # Grafting on top would rebind nine methods that are already the
-        # reducer's, and start a SECOND dispatch loop against the same
-        # queues: the single-drainer property the reducer exists to
-        # guarantee is exactly what a double graft breaks.
-        if _is_native_host(app):
-            LOGGER.info(
-                f"{server_key}: native OrchHost, skipping the hexagon loop graft"
-            )
-            return
-        app.hexagon_graft = graft_hexagon_loop(app.orch, wiring)  # type: ignore[attr-defined]
-
-    @app.on_event("shutdown")
-    async def _hexagon_graft_shutdown():
-        if app.hexagon_graft is not None:  # type: ignore[attr-defined]
-            await app.hexagon_graft.close()  # type: ignore[attr-defined]
-
-    return app
-
-
 def makeActionApp(server_key: str, legacy_module: str):
-    from helao.hexagon.app.active_graft import graft_active_write_path
+    """Build ``legacy_module.makeApp(server_key)`` under a composed wiring.
 
+    The module must return a native host. The check runs here, while the app
+    is being built, rather than in the startup event: a failure there reaches
+    uvicorn only as ``SystemExit(3)``, so the server never binds and nothing
+    names the module. ``legacy_module`` keeps its name until B7c.
+    """
     wiring = build_wiring(server_key)
     wiring.require(*ACTION_REQUIRED)
     app = import_module(legacy_module).makeApp(server_key)
+    if not _is_native_host(app):
+        raise TypeError(
+            f"{legacy_module}.makeApp returned {type(app).__name__}, not an ActionHost"
+        )
     app.hexagon_wiring = wiring
-    app.hexagon_active_graft = None
     app.hexagon_ws_bridge = None
 
-    # Registered AFTER the legacy BaseAPI's own startup handler (which sets
-    # self.base = Base(app=self, ...), base_api.py:646; Starlette preserves
-    # registration order): the graft sees the live app.base and rebinds
-    # contain_action + meta_writer before any action can be contained.
+    # Registered AFTER ActionHost's own startup handler (Starlette preserves
+    # registration order), so the host's fan-out queues are live when the
+    # bridge is bound to them.
     @app.on_event("startup")
-    async def _hexagon_active_graft_startup():
-        # A module that has been ported to ActionHost needs no write graft:
-        # it has no contain_action to rebind (the explicit ActionContext
-        # replaced it) and its writes already run on the native runtime.
-        # Grafting anyway is not a no-op -- it raises AttributeError inside
-        # the startup event, which uvicorn reports only as SystemExit(3), so
-        # the server never binds and the launch reads as a mystery.
-        if _is_native_host(app):
-            LOGGER.info(
-                f"{server_key}: native ActionHost, skipping the active write graft"
-            )
-        else:
-            app.hexagon_active_graft = graft_active_write_path(app.base, wiring)
-        # P2b-2 (D3): the WS publish bridge needs the live Base's fan-out
-        # queues — construct and bind it now, ACTION apps only (orch WS
-        # stays on legacy relays, Q1: makeOrchApp never binds).
+    async def _hexagon_ws_bridge_startup():
+        # P2b-2 (D3): the WS publish bridge publishes onto the host's fan-out
+        # queues. ACTION apps only: an OrchHost serves its own /ws_* relays.
         if not isinstance(wiring.status, DispatcherStatusAdapter):
             raise UnwiredPortError(
                 "WS publish bridge requires DispatcherStatusAdapter status wiring"
@@ -157,11 +112,6 @@ def makeActionApp(server_key: str, legacy_module: str):
         bridge = WsPublishBridge(app.base.status_q, app.base.data_q, app.base.live_q)
         status_adapter.bind_publish_bridge(bridge)
         app.hexagon_ws_bridge = bridge
-
-    @app.on_event("shutdown")
-    async def _hexagon_active_graft_shutdown():
-        if app.hexagon_active_graft is not None:
-            app.hexagon_active_graft.close()
 
     return app
 

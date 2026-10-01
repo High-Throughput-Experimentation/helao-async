@@ -19,7 +19,9 @@ Measured here: **136 members**, of which 24 come free from ``ActionHost``
 and 112 are B3a's and B3b's to supply. The spec says 135 -- that figure
 came from a one-off scan that counted ``self.orch.<name>`` in ``orch_api``
 but not the bare ``orch.<name>`` alias, and missed one. This extraction is
-the authority; the spec's number is the stale one.
+the authority; the spec's number is the stale one. By B7b it had grown
+to 138, and B7b froze that set into ``checklists/orch_member_contract.json``
+before deleting the engine, whose ``orch_api`` supplied 35 of them.
 
 Ratchet semantics, unchanged from B1's version because they worked: fail
 when the gap GROWS, not while it merely persists. A permanently red test
@@ -27,22 +29,29 @@ teaches people to ignore it.
 """
 
 import ast
+import json
 from pathlib import Path
 from typing import Final
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
-#: Where a consumer module may live. B3a MOVES four of them from the first
-#: directory to the second, and the contract must not notice.
+#: Where a consumer module lives. Until B7b this also listed
+#: ``helao/core/servers``, and the contract must not notice its deletion.
 #:
 #: It did notice, once. With only ``helao/core/servers`` listed, moving
 #: orch_queues/orch_persist/orch_estop/orch_lifecycle dropped the measured
 #: contract from 136 members to 115 -- the ratchet quietly got weaker at
 #: exactly the moment work progressed, and 21 members it was tracking
-#: turned into "already done" without anyone implementing them.
-SEARCH_DIRS: Final[tuple[Path, ...]] = (
-    REPO_ROOT / "helao/core/servers",
-    REPO_ROOT / "helao/hexagon/app",
+#: turned into "already done" without anyone implementing them. Deleting
+#: the engine would have done the same to 35 members, which is why the
+#: contract measured with it present is frozen in FROZEN_CONTRACT.
+SEARCH_DIRS: Final[tuple[Path, ...]] = (REPO_ROOT / "helao/hexagon/app",)
+
+#: The 138-member contract B7b measured while ``orch_api`` and the engine
+#: collaborators still existed. It shrinks only when a member is retired on
+#: purpose; the live extraction below can add to it but never subtract.
+FROZEN_CONTRACT: Final[Path] = (
+    REPO_ROOT / "helao/hexagon/tests/checklists/orch_member_contract.json"
 )
 
 #: Modules whose sole back-reference is the orchestrator.
@@ -67,12 +76,17 @@ CONSUMERS: Final[tuple[str, ...]] = (
     "orch_monitor",
     "orch_global_params",
     "orch_unpack",
-    "orch_api",
 )
 
 
 def orch_contract() -> set[str]:
-    """Every ``Orch`` member a collaborator or the API layer reaches for.
+    """The frozen B7b contract, plus anything the native consumers now reach for."""
+    frozen = json.loads(FROZEN_CONTRACT.read_text(encoding="utf-8"))["members"]
+    return set(frozen) | live_contract()
+
+
+def live_contract() -> set[str]:
+    """Every orchestrator member the native consumer modules reach for today.
 
     Two shapes, because the collaborators alias the back-reference before
     use (``orch = self.orch`` appears 21 times in orch_dispatch alone):
@@ -84,9 +98,9 @@ def orch_contract() -> set[str]:
             (d / f"{mod}.py" for d in SEARCH_DIRS if (d / f"{mod}.py").exists()), None
         )
         assert path is not None, (
-            f"consumer module {mod!r} found in neither {SEARCH_DIRS[0]} nor "
-            f"{SEARCH_DIRS[1]}. Skipping it silently would shrink the contract "
-            "and weaken this ratchet, which is the one failure it cannot afford."
+            f"consumer module {mod!r} not found in {SEARCH_DIRS}. Skipping it "
+            "silently would shrink the contract and weaken this ratchet, which "
+            "is the one failure it cannot afford."
         )
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -188,6 +202,10 @@ def test_the_contract_extraction_is_not_vacuous() -> None:
     assert len(contract) > 130, f"only {len(contract)} members found; walk is inert"
     for known in ("action_dq", "globalstatusmodel", "_ensure_run_id", "add_sequence"):
         assert known in contract, f"{known} missing from the extraction"
+    # The frozen half alone would clear the floor above, so the live walk
+    # needs its own: 103 members when B7b froze, 96 once it removed the graft.
+    live = live_contract()
+    assert len(live) > 90, f"only {len(live)} live members found; walk is inert"
 
 
 def test_every_tracked_name_is_actually_in_the_contract() -> None:

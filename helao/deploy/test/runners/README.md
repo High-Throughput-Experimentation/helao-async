@@ -15,7 +15,7 @@ all from a plain Python script with no `Orch` queue/operator stack.
 
 ## `ORCH` is just another action server
 
-`OrchAPI` inherits `BaseAPI`, so the running orchestrator exposes its
+`OrchHost` subclasses `ActionHost`, so the running orchestrator exposes its
 orchestrator primitives — `ORCH/wait`, `ORCH/add_global_param`,
 `ORCH/conditional_stop` — as ordinary RPC action endpoints. MicroOrch dispatches
 to `ORCH` exactly like any driver-backed server; nothing special is required

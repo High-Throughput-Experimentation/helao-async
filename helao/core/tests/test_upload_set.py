@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from helao.core.drivers.data.sync_driver import HelaoYml
-from helao.core.servers.active_data_file import _relative_file_name
+from helao.helpers.file_utils import _relative_file_name
 
 
 def test_file_in_record_root_is_a_bare_name(tmp_path: Path):

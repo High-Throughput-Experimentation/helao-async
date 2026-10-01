@@ -15,7 +15,7 @@ covers HTTP fallback behaviour from :mod:`helao.helpers.dispatcher`:
 * :func:`async_action_dispatcher` end-to-end over the RPC fast path,
   driving a real ``wrap_action_endpoint``-wrapped handler (mirrors what
   ``server_api._rpc_startup`` registers for a ``tags=["action"]`` route) so
-  ``ACTION_CTX``/``action_params`` are asserted to be populated server-side
+  the injected ``ctx``/``action_params`` are asserted to be populated server-side
   -- not the generic echo handlers used by ``_exercise_rpc``. Covers the
   regression where an action param literally named ``timeout`` (e.g.
   ANDOR/acquire's ``timeout: float = 5000``) collided with
@@ -40,7 +40,6 @@ from helao.core.rpc import (
     derive_rpc_port,
 )
 from helao.core.rpc.zmq_rpc import RPC_PORT_OFFSET
-from helao.core.servers.base_api import ACTION_CTX, wrap_action_endpoint
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.dispatcher import (
     _query_safe,
@@ -51,6 +50,8 @@ from helao.helpers.dispatcher import (
     endpoints_available,
 )
 from helao.helpers.premodels import Action
+from helao.hexagon.app.action_context import ActionContext
+from helao.hexagon.app.action_route import wrap_action_endpoint
 
 
 def _free_port() -> int:
@@ -214,9 +215,9 @@ async def _exercise_action_dispatcher_rpc(reporter: TestReporter) -> None:
       paired HTTP port at all, so any HTTP fallback would fail outright;
       ``ErrorCodes.none`` therefore proves the RPC leg (not a fallback)
       produced the result.
-    * ``ACTION_CTX`` was populated with the REAL action (not a blank
+    * The injected ``ctx`` carries the REAL action (not a blank
       ``Action()``) and ``action.action_params`` reached the handler --
-      the mechanism ``_build_action_from_kwargs`` implements.
+      the mechanism ``action_context.build_action`` implements.
     * An action param literally named ``timeout`` (mirroring ANDOR/acquire's
       ``timeout: float = 5000``) round-trips correctly instead of colliding
       with ``RPCClient.call``'s own ``timeout`` control kwarg (4d11afe3).
@@ -226,11 +227,11 @@ async def _exercise_action_dispatcher_rpc(reporter: TestReporter) -> None:
     captured: dict = {}
 
     async def acquire_like(
+        ctx: ActionContext,
         external_trigger: bool = True,
         duration: float = 10.0,
         timeout: float = 5000,
     ) -> dict:
-        ctx = ACTION_CTX.get()
         captured["ctx_is_none"] = ctx is None
         if ctx is not None:
             captured["action_params"] = dict(ctx.action.action_params)
@@ -239,10 +240,11 @@ async def _exercise_action_dispatcher_rpc(reporter: TestReporter) -> None:
         captured["timeout"] = timeout
         return {"ok": True}
 
-    # Mirrors ActionAPIRoute.__init__: a tags=["action"] endpoint is wrapped
+    # Mirrors ActionRoute.__init__: a tags=["action"] endpoint is wrapped
     # with wrap_action_endpoint before it is ever registered anywhere --
-    # including into the RPC dispatcher's method table.
-    wrapped = wrap_action_endpoint(acquire_like)
+    # including into the RPC dispatcher's method table. host=None: this check
+    # is about the transport; host-derived fields are test_action_context's.
+    wrapped = wrap_action_endpoint(acquire_like, None)
 
     dispatcher = RPCDispatcher(server_key=server_name)
     http_port = _free_http_port()
@@ -284,7 +286,7 @@ async def _exercise_action_dispatcher_rpc(reporter: TestReporter) -> None:
             lambda: elapsed < 3.0,
         )
         reporter.check(
-            "ACTION_CTX was populated with the real Action, not left as None",
+            "the injected ctx carried the real Action, not None",
             lambda: captured.get("ctx_is_none") is False,
         )
         reporter.check(

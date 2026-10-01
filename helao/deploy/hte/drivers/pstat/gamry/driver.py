@@ -677,7 +677,7 @@ class GamryDriver(HelaoDriver):
     def shutdown(self) -> None:
         """Clean up technique state, disconnect, and kill GamryCOM.
 
-        Invoked by ``BaseAPI`` when the action server is shutting down.
+        Invoked by ``ActionHost`` when the action server is shutting down.
         """
         self.cleanup()
         self.disconnect()

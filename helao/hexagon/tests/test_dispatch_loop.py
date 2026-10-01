@@ -1,6 +1,6 @@
 """Single-drainer loop: park/unpark, ladder-to-park mini-run, refusals,
-estop funnel + race seed (DD-3), graft rebinding. Uses the Task 8 stub orch
-extended with a scripted dispatch that drains its own queues."""
+estop funnel + race seed (DD-3), driver-health exhaustion. Uses the Task 8
+stub orch extended with a scripted dispatch that drains its own queues."""
 
 import asyncio
 from typing import Optional
@@ -8,11 +8,7 @@ from typing import Optional
 import pytest
 
 from helao.core.error import ErrorCodes
-from helao.hexagon.app.dispatch_loop import (
-    HexDispatchLoop,
-    HexRuntime,
-    graft_hexagon_loop,
-)
+from helao.hexagon.app.dispatch_loop import HexDispatchLoop, HexRuntime
 from helao.hexagon.app.orch_effects import OrchCommandRunner
 from helao.hexagon.app.wiring import PortWiring
 from helao.hexagon.domain.models import LoopStatus
@@ -137,120 +133,6 @@ async def test_estop_funnel_race_seed_single_finalizer():
     assert orch.calls.count("finish_active_experiment") == 0
     assert orch.globalstatusmodel.loop_state == LoopStatus.estopped  # parked estopped
     await loop.close()
-
-
-@pytest.mark.asyncio
-async def test_graft_rebinds_control_methods():
-    orch = _ScriptedOrch(n_acts=1)
-
-    async def _noop():  # legacy originals to capture
-        return None
-
-    for name in (
-        "start",
-        "start_loop",
-        "stop",
-        "skip",
-        "estop_loop",
-        "clear_estop",
-        "clear_error",
-    ):
-        setattr(orch, name, _noop)
-    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy()))
-    try:
-        assert set(graft.originals) == {
-            "start",
-            "start_loop",
-            "stop",
-            "skip",
-            "estop_loop",
-            "clear_estop",
-            "clear_error",
-            # P2a DD-2: ingestion rebind set grafted onto the same originals
-            # dict; this stub never defined them, so both capture None
-            # (tolerant getattr(..., None) — see graft_hexagon_loop).
-            "update_status",
-            "update_nonblocking",
-        }
-        await orch.start()  # type: ignore[attr-defined]  # rebound by the graft
-        for _ in range(200):
-            if not orch.action_dq:
-                break
-            await asyncio.sleep(0.01)
-        assert not orch.action_dq
-        assert orch.current_stop_message == ""  # legacy start() clears banner
-        # skip while parked mirrors legacy: clears action_dq only
-        orch.action_dq = ["x"]
-        await orch.skip()  # type: ignore[attr-defined]  # rebound by the graft
-        assert orch.action_dq == []
-    finally:
-        await graft.loop.close()
-
-
-@pytest.mark.asyncio
-async def test_graft_rebinds_status_ingestion_endpoints():
-    """P2a: graft_hexagon_loop extends the instance-rebind set with
-    update_status/update_nonblocking (DD-2 atomic hand-off)."""
-    orch = _ScriptedOrch()
-    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy()))
-    assert graft.ingestion is not None
-    assert (
-        orch.update_status.__func__  # type: ignore[attr-defined]  # rebound by the graft
-        is type(graft.ingestion).update_status
-    )
-    assert (
-        orch.update_nonblocking.__func__  # type: ignore[attr-defined]  # rebound by the graft
-        is type(graft.ingestion).update_nonblocking
-    )
-    assert "update_status" in graft.originals
-    await graft.close()
-
-
-@pytest.mark.asyncio
-async def test_graft_swaps_heartbeat_task_when_health_wired():
-    class _FakeHealth:
-        def __init__(self):
-            self.bound = None
-
-        def bind_orch(self, orch):
-            self.bound = orch
-
-        async def endpoints_available(self, urls):
-            return [(u, True) for u in urls]
-
-        async def ping_action_servers(self):
-            return {}
-
-        def status_summary(self):
-            return {}
-
-    async def _forever():
-        await asyncio.sleep(3600)
-
-    orch = _ScriptedOrch()
-    orch.heartbeat_interval = 3600  # type: ignore[attr-defined]
-    orch.ignore_heartbeats = []  # type: ignore[attr-defined]
-    orch.heartbeat_monitor = (  # type: ignore[attr-defined]
-        asyncio.get_running_loop().create_task(_forever())
-    )
-    health = _FakeHealth()
-    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy(), health=health))
-    await asyncio.sleep(0.05)
-    assert health.bound is orch
-    assert (
-        orch.heartbeat_monitor.cancelled()  # type: ignore[attr-defined]
-        or orch.heartbeat_monitor.done()  # type: ignore[attr-defined]
-    )
-    assert graft.health_monitor is not None
-    await graft.close()
-
-
-@pytest.mark.asyncio
-async def test_graft_without_health_skips_monitor():
-    orch = _ScriptedOrch()
-    graft = graft_hexagon_loop(orch, PortWiring(logging=_AlertSpy()))
-    assert graft.health_monitor is None
-    await graft.close()
 
 
 @pytest.mark.asyncio

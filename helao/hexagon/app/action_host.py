@@ -1,8 +1,8 @@
 """Hexagon-native action-server host — route surface and construction (B1 Task 3a).
 
 Replaces ``BaseAPI``/``Base`` as the object a deployment action module builds.
-Where the graft imports a legacy module and rebinds methods onto the ``Base`` it
-constructs, an ``ActionHost`` *is* the server.
+Where the graft imported a legacy module and rebound methods onto the ``Base``
+it constructed, an ``ActionHost`` *is* the server.
 
 **Scope of this module as it stands.** Task 3 split in two once the first attempt
 showed the seam: the host's *route surface and construction* (here) are gateable
@@ -26,8 +26,8 @@ rather than invent an indirection, the host answers to both names.
 
 ``HelaoFastAPI`` installs no route class of its own (B7a, D-B7a.4): each host
 installs the one it needs before its first route. This one installs a
-``BoundActionRoute`` bound to itself; legacy ``BaseAPI``/``OrchAPI`` install
-``ActionAPIRoute``.
+``BoundActionRoute`` bound to itself; legacy ``BaseAPI``/``OrchAPI`` installed
+``ActionAPIRoute`` until B7b deleted them.
 """
 
 import asyncio
@@ -189,7 +189,7 @@ class ActionHost(HelaoFastAPI):
         #: Route descriptors; populated by init_endpoint_status at startup.
         self.fast_urls: list = []
         #: Captured at startup; the executor runner's create_task target.
-        self.aloop = None
+        self.aloop: asyncio.AbstractEventLoop | None = None
         #: Running executors, keyed by executor id. Empty until Task 6.
         self.executors: dict = {}
         #: Live action sessions, keyed by action uuid. Named `actives` because the
@@ -268,7 +268,7 @@ class ActionHost(HelaoFastAPI):
         self.live_publisher = WsPublisher(self.live_q)
         #: Remote status subscribers, as (server_key, host, port) tuples.
         #: ONE registry, on the host. The status *port* adapter keeps its own
-        #: client list for the graft compositions; routing the host's
+        #: client list for the makeActionApp compositions; routing the host's
         #: attach_client through that adapter while log_status_task fans out
         #: over this set would mean a server that accepts every subscription
         #: and broadcasts to nobody, with both halves logging success.
@@ -756,10 +756,11 @@ class ActionHost(HelaoFastAPI):
                             f"Failed to push status message to {client_servkey} "
                             f"after {retry_limit} attempts."
                         )
-                    # Blocking, and deliberately so until parity is signed
-                    # off: legacy paces subscribers with time.sleep here, and
-                    # swapping in asyncio.sleep reorders this loop against
-                    # every other coroutine on the server.
+                    # Blocking, deliberately, and deferred past B7: this is
+                    # the pacing legacy used, and asyncio.sleep would reorder
+                    # this loop against every other coroutine on the server.
+                    # That is a behaviour change with its own station check,
+                    # not part of deleting the engine.
                     time.sleep(0.3)
 
                 # delete errored and finished statuses only after every
@@ -1021,7 +1022,7 @@ class ActionHost(HelaoFastAPI):
 
         Encodings are the ``BaseAPI`` family's and are frozen (Amendment 2 §3):
         a pickled ``ActionModel`` on ws_status, a pickled ``DataPackageModel`` on
-        ws_data, a ``{datalab: (value, epoch)}`` dict on ws_live. ``OrchAPI``
+        ws_data, a ``{datalab: (value, epoch)}`` dict on ws_live. ``OrchHost``
         puts dicts under the same three names; converging the families would
         blank every subscriber of whichever one moved, with no error on either
         side.

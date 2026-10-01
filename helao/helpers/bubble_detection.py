@@ -5,7 +5,7 @@ import statistics
 import pandas as pd
 from scipy.signal import find_peaks
 
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.helpers import helao_logging as logging  # LOGGER is set by fast_launcher
 
 global LOGGER
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
