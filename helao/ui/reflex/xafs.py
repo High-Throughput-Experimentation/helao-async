@@ -287,6 +287,7 @@ def build_page():
             rx.checkbox("read from S3", checked=S.read_s3, on_change=S.set_read_s3),
             spacing="3",
             align="center",
+            flex_wrap="wrap",
         ),
         rx.hstack(
             spectra_page._muted("x"),

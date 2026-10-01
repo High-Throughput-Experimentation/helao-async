@@ -5,6 +5,7 @@ validates shapes, isolates xy — not xy's rendering, which is xy's concern.
 """
 
 import hashlib
+import importlib.metadata
 import json
 
 import numpy as np
@@ -498,6 +499,11 @@ def test_underlay_is_trace_zero_a_truecolor_heatmap_spanning_the_extent():
     # heatmaps (_hoverAt needs _cpuHeatmap, built only for non-truecolor), so
     # the figure-level tooltip never labels photo pixels as the measurement.
     # Re-check on any xy upgrade.
+    assert importlib.metadata.version("xy") == "0.0.7", (
+        "xy was upgraded: re-check that hover skips truecolor heatmaps (hover a "
+        "photo-only region, then a sample point); see the plate-photo note in "
+        "helao/ui/reflex/CLAUDE.md"
+    )
     assert first["style"]["truecolor"] is True
     assert first["style"]["opacity"] == pytest.approx(plots.UNDERLAY_OPACITY)
     assert first["heatmap"]["x_range"] == pytest.approx([-50.0, 50.0])
@@ -505,6 +511,18 @@ def test_underlay_is_trace_zero_a_truecolor_heatmap_spanning_the_extent():
     assert payload.spec["traces"][1]["kind"] == "scatter"
     # The colour scale still describes the points, not the photo.
     assert payload.spec["colorbar"]["domain"] == pytest.approx([1.0, 2.0])
+
+
+def test_underlay_opacity_reaches_the_photo_mark():
+    payload = plots.scatter_map(
+        [0.0],
+        [0.0],
+        underlay=(top_row_red(), EXTENT),
+        underlay_opacity=0.3,
+        panel_id="u-opacity",
+        version=1,
+    )
+    assert payload.spec["traces"][0]["style"]["opacity"] == pytest.approx(0.3)
 
 
 def test_underlay_rows_are_flipped_so_the_image_top_lands_at_y_max():

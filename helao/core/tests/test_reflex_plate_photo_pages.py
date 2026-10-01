@@ -40,6 +40,17 @@ def test_each_page_renders_photo_controls_and_no_extra_chart(name):
     assert ("Slider", "on_value_commit", "set_photo_opacity") in bound
     nodes = render_nodes(page)
     assert sum(type(n).__name__ == "XYChart" for n in nodes) == 3
+    # Exactly one photo select: a duplicated control row would double it.
+    chosen = [
+        n
+        for n in nodes
+        if any(
+            e.handler.fn.__name__ == "set_photo_choice"
+            for chain in (getattr(n, "event_triggers", {}) or {}).values()
+            for e in getattr(chain, "events", None) or []
+        )
+    ]
+    assert len(chosen) == 1
 
 
 @pytest.mark.parametrize("name", PAGES)

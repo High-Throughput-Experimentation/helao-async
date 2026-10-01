@@ -118,6 +118,7 @@ class PlatePhotoState(rx.State, mixin=True):
             LOGGER.warning(f"could not read wafer photo {chosen.image_s3_uri}: {exc}")
             self.photo_note = f"wafer photo '{chosen.label}' could not be read: {exc}"
             return None
+        self.photo_note = ""
         return rgba, chosen.extent
 
     @rx.event
@@ -156,7 +157,7 @@ def photo_controls(S):
         rx.text("opacity", size="1", class_name=reflex_muted_text_class()),
         # Commit, not change: each value republishes the whole photo.
         rx.slider(
-            default_value=[plots.UNDERLAY_OPACITY],
+            default_value=[S.photo_opacity],
             min=0.0,
             max=1.0,
             step=0.05,
