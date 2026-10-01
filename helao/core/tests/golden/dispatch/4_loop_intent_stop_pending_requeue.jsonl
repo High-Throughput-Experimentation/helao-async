@@ -1,0 +1,23 @@
+{
+  "final": {
+    "act_dq_front_is_pending": true,
+    "act_dq_len": 2,
+    "loop_intent": "stop",
+    "wait_for_interrupt_result": false
+  },
+  "scenario": "4_loop_intent_stop_pending_requeue",
+  "trace": [
+    {
+      "event": "intent_call",
+      "method": "intend_stop"
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": true
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": false
+    }
+  ]
+}

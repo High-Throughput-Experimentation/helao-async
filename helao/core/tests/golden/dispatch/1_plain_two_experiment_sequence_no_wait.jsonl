@@ -1,0 +1,379 @@
+{
+  "final": {
+    "act_dq": 0,
+    "dispatch_calls": [
+      {
+        "action_name": "act_a",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "x": 1
+        },
+        "server": "SRV1",
+        "start_condition": 0,
+        "submit_order": 0
+      },
+      {
+        "action_name": "act_b",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "y": 2
+        },
+        "server": "SRV1",
+        "start_condition": 0,
+        "submit_order": 1
+      },
+      {
+        "action_name": "act_c",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "z": 3
+        },
+        "server": "SRV2",
+        "start_condition": 0,
+        "submit_order": 0
+      }
+    ],
+    "exp_dq": 0,
+    "loop_state": "stopped",
+    "seq_dq": 0
+  },
+  "scenario": "1_plain_two_experiment_sequence_no_wait",
+  "trace": [
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 1
+    },
+    {
+      "entries": [
+        {
+          "sequence_name": "generic_seq",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 2,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 2,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 2,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 2,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_a",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "x": 1
+      },
+      "server": "SRV1",
+      "start_condition": 0,
+      "submit_order": 0
+    },
+    {
+      "entries": [
+        {
+          "action_name": "act_a",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_a",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_b",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "y": 2
+      },
+      "server": "SRV1",
+      "start_condition": 0,
+      "submit_order": 1
+    },
+    {
+      "entries": [
+        {
+          "action_name": "act_b",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_b",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_c",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "z": 3
+      },
+      "server": "SRV2",
+      "start_condition": 0,
+      "submit_order": 0
+    },
+    {
+      "entries": [
+        {
+          "action_name": "act_c",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "move_dir",
+      "kind": "experiment"
+    },
+    {
+      "action_name": "act_c",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "entries": [
+        {
+          "sequence_name": "generic_seq",
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_none"
+    },
+    {
+      "event": "move_dir",
+      "kind": "experiment"
+    },
+    {
+      "event": "move_dir",
+      "kind": "sequence"
+    }
+  ]
+}

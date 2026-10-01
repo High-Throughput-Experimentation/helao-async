@@ -26,7 +26,39 @@ from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
 from helao.hexagon.app.active_graft import ActiveWriteGraft, graft_active_write_path
 from helao.hexagon.app.wiring import PortWiring
-from helao.hexagon.tests.native_fixtures import make_base, mk_action
+from helao.hexagon.tests.native_fixtures import mk_action
+
+
+def make_base(save_root: str) -> Base:
+    """The legacy bare-``Base`` fixture ``native_fixtures`` provided before
+    B7b rebuilt it on ``ActionHost``. Kept here, verbatim, for the one commit
+    this file outlives it: B7b commit 2 deletes the graft and this file."""
+    from types import SimpleNamespace
+
+    from helao.core.hooks import HookSet
+    from helao.core.models.machine import MachineModel
+    from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+
+    base = Base.__new__(Base)
+    base.app = SimpleNamespace(driver=None)  # type: ignore[reportAttributeAccessIssue]
+    base.server = MachineModel(
+        server_name="ACTSRV",
+        machine_name="test-machine",
+        hostname="127.0.0.1",
+        port=8000,
+    )
+    base.world_cfg = {"dummy": False, "simulation": False}
+    base.ntp_offset = 0.0
+    base.helaodirs = SimpleNamespace(save_root=save_root)  # type: ignore[reportAttributeAccessIssue]
+    base.status_q = MultisubscriberQueue()
+    base.data_q = MultisubscriberQueue()
+    base.actives = {}
+    base.history = {}  # type: ignore[reportAttributeAccessIssue]
+    base.local_action_task_queue = []
+    base.prefinish_hooks = HookSet.empty()
+    base._init_collaborators()
+    return base
+
 
 # ---------------------------------------------------------------------------
 # drift pin (Q1): the graft reproduces this body verbatim (+ swap lines).

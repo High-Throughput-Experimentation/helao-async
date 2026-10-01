@@ -1,6 +1,20 @@
 {
  "routes": [
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -36,6 +50,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -52,6 +80,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -68,6 +110,26 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ],
+     [
+      "conditional_experiment_params",
+      {
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -79,10 +141,18 @@
     },
     {
      "default": "equals",
+     "enum": [
+      "above",
+      "below",
+      "equals",
+      "isnot",
+      "uncond"
+     ],
      "in": "query",
      "name": "check_condition",
+     "ref": "checkcond",
      "required": false,
-     "type": null
+     "type": "string"
     },
     {
      "default": "",
@@ -119,6 +189,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -137,10 +221,18 @@
     },
     {
      "default": "equals",
+     "enum": [
+      "above",
+      "below",
+      "equals",
+      "isnot",
+      "uncond"
+     ],
      "in": "query",
      "name": "skip_condition",
+     "ref": "checkcond",
      "required": false,
-     "type": null
+     "type": "string"
     },
     {
      "default": "",
@@ -185,6 +277,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -210,10 +316,18 @@
     },
     {
      "default": "equals",
+     "enum": [
+      "above",
+      "below",
+      "equals",
+      "isnot",
+      "uncond"
+     ],
      "in": "query",
      "name": "stop_condition",
+     "ref": "checkcond",
      "required": false,
-     "type": null
+     "type": "string"
     },
     {
      "default": "",
@@ -244,6 +358,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -267,6 +395,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -290,6 +432,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "action",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -337,6 +493,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "experiment",
+      {
+       "ref": "Experiment",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/append_experiment",
@@ -345,6 +515,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "sequence",
+      {
+       "ref": "Sequence",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/append_sequence",
@@ -353,6 +537,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "sequence",
+      {
+       "ref": "Sequence",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/append_split_sequences",
@@ -471,6 +669,15 @@
    ]
   },
   {
+   "body": {
+    "items": {
+     "type": "integer"
+    },
+    "properties": [],
+    "required": true,
+    "required_props": [],
+    "type": "array"
+   },
    "method": "post",
    "params": [],
    "path": "/drop_experiment_inds",
@@ -682,6 +889,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "experiment",
+      {
+       "ref": "Experiment",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -908,6 +1129,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "experiment",
+      {
+       "ref": "Experiment",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/prepend_experiment",
@@ -916,6 +1151,19 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "sequences",
+      {
+       "type": "array"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/prepend_sequences",
@@ -1054,6 +1302,21 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "text",
+      {
+       "type": "string"
+      }
+     ]
+    ],
+    "required": true,
+    "required_props": [
+     "text"
+    ],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/test_receive",
@@ -1062,6 +1325,12 @@
    ]
   },
   {
+   "body": {
+    "properties": [],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [],
    "path": "/update_global_params",
@@ -1070,6 +1339,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "actionmodel",
+      {
+       "ref": "Action",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {
@@ -1093,6 +1376,20 @@
    ]
   },
   {
+   "body": {
+    "properties": [
+     [
+      "actionservermodel",
+      {
+       "ref": "ActionServerModel",
+       "type": "object"
+      }
+     ]
+    ],
+    "required": false,
+    "required_props": [],
+    "type": "object"
+   },
    "method": "post",
    "params": [
     {

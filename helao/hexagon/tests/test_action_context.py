@@ -203,3 +203,38 @@ def test_fast_samples_in_is_converted_into_samples_in() -> None:
     assert "fast_samples_in" not in got.action_params
     assert len(got.samples_in) == 1
     assert got.samples_in[0].action_uuid == [got.action_uuid]
+
+
+# -- moved from helao/core/tests/unit_test_base_api.py (B7b) -----------------
+
+
+def test_active_params_round_trips_its_file_conn_params() -> None:
+    from helao.core.models.file import FileConnParams
+    from helao.core.models.machine import MachineModel
+    from helao.helpers.active_params import ActiveParams
+    from helao.helpers.premodels import Action as PremodelAction
+
+    action = PremodelAction(
+        action_name="do_stuff", action_server=MachineModel(server_name="S")
+    )
+    action.init_act()
+    key = action.action_uuid
+    assert key is not None, "init_act did not mint an action_uuid"
+    ap = ActiveParams(
+        action=action,
+        file_conn_params_dict={
+            key: FileConnParams(file_conn_key=key, json_data_keys=["t_s", "v"])
+        },
+    )
+    assert ap.action is action
+    (entry,) = ap.as_dict()["file_conn_params_dict"].values()
+    assert entry["json_data_keys"] == ["t_s", "v"]
+
+
+def test_a_loose_kwarg_absent_from_the_envelope_is_merged_into_it() -> None:
+    """The envelope wins a conflict, but must not swallow a new parameter."""
+    envelope = Action(action_name="x")
+    envelope.action_params["duration"] = 9.0
+    got = build_action({"action": envelope, "rate": 0.5}, {}, None)
+    assert got is envelope
+    assert got.action_params == {"duration": 9.0, "rate": 0.5}

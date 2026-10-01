@@ -2,8 +2,8 @@
 partial/estopped runs stay syncable.
 
 Covers:
-  1. Base.estop_actives finalizes only actions that were actually in-flight
-     (appending HloStatus.estopped and calling the active's finish path); an idle
+  1. ActionHost.estop_actives finalizes only actions that were actually in-flight
+     (appending HloStatus.estopped and calling the session's finish path); an idle
      server finalizes nothing and therefore writes no artifact.
   2. HelaoYml.is_estopped reads the yml meta *_status list (robust to both the
      bare "estopped" value and the "HloStatus.estopped" repr form).
@@ -11,8 +11,9 @@ Covers:
      RUNS_ACTIVE as terminal (non-blocking), while a genuinely-running
      (non-estopped) active child still blocks the parent.
 
-Hermetic: no AWS/API configured; no network. Base.estop_actives is exercised
+Hermetic: no AWS/API configured; no network. ActionHost.estop_actives is exercised
 against a lightweight fake so no full server needs to be constructed.
+Ported from legacy ``Base.estop_actives`` by B7b.
 """
 
 __all__ = ["estop_sync_unit_test"]
@@ -27,12 +28,12 @@ from pathlib import Path
 from helao.core.drivers.data.sync_driver import HelaoYml
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.run_dir import RunDir
-from helao.core.servers.base import Base
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.yml_tools import yml_dumps
+from helao.hexagon.app.action_host import ActionHost
 
 
-# ---- fakes for Base.estop_actives (avoids constructing a full server) --------
+# ---- fakes for ActionHost.estop_actives (avoids constructing a full server) --
 class _FakeAction:
     def __init__(self, uuid):
         self.action_uuid = uuid
@@ -47,7 +48,7 @@ class _FakeActive:
     def set_estop(self, action=None):
         action.action_status.append(HloStatus.estopped)
 
-    async def finish_all(self):
+    async def finish(self):
         self.finished = True
         return self.action_list[-1]
 
@@ -110,12 +111,14 @@ def _make_active_child(root: Path, order: int, status: list) -> Path:
 async def _run_checks() -> dict:
     out = {}
 
-    # --- 1. Base.estop_actives ------------------------------------------------
-    out["estop_actives_idle_empty"] = (await Base.estop_actives(_FakeBase({}))) == []
+    # --- 1. ActionHost.estop_actives ------------------------------------------
+    out["estop_actives_idle_empty"] = (
+        await ActionHost.estop_actives(_FakeBase({}))
+    ) == []
 
     act = _FakeAction("00000000-0000-0000-0000-000000000abc")
     active = _FakeActive([act])
-    res = await Base.estop_actives(_FakeBase({act.action_uuid: active}))
+    res = await ActionHost.estop_actives(_FakeBase({act.action_uuid: active}))
     out["estop_actives_finalized"] = active.finished is True
     out["estop_actives_marked"] = HloStatus.estopped in act.action_status
     out["estop_actives_returns_uuid"] = res == [str(act.action_uuid)]
@@ -124,7 +127,7 @@ async def _run_checks() -> dict:
     a1 = _FakeAction("00000000-0000-0000-0000-000000000a01")
     a2 = _FakeAction("00000000-0000-0000-0000-000000000a02")
     multi = _FakeActive([a1, a2])
-    res2 = await Base.estop_actives(_FakeBase({a1.action_uuid: multi}))
+    res2 = await ActionHost.estop_actives(_FakeBase({a1.action_uuid: multi}))
     out["estop_actives_multi_all_marked"] = (
         HloStatus.estopped in a1.action_status
         and HloStatus.estopped in a2.action_status
@@ -177,7 +180,7 @@ def estop_sync_unit_test() -> bool:
         if saved_aws is not None:
             os.environ["AWS_CONFIG_PATH"] = saved_aws
 
-    reporter.section("Base.estop_actives finalizes only in-flight actions")
+    reporter.section("ActionHost.estop_actives finalizes only in-flight actions")
     reporter.check(
         "idle server finalizes nothing (no artifact)",
         lambda: res["estop_actives_idle_empty"],

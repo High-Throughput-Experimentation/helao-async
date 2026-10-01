@@ -189,7 +189,7 @@ class ActionHost(HelaoFastAPI):
         #: Route descriptors; populated by init_endpoint_status at startup.
         self.fast_urls: list = []
         #: Captured at startup; the executor runner's create_task target.
-        self.aloop = None
+        self.aloop: asyncio.AbstractEventLoop | None = None
         #: Running executors, keyed by executor id. Empty until Task 6.
         self.executors: dict = {}
         #: Live action sessions, keyed by action uuid. Named `actives` because the

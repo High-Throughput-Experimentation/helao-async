@@ -1,7 +1,7 @@
 """NativeActionFinalizer (P2b-1): verbatim re-body of legacy ActionFinalizer
 (helao/core/servers/active_finalizer.py) — the ce846da1 join-drain-close
 chain. Source-parity pin + behavior on real tmp trees with a full native
-collaborator set (mini-graft): finish drains queued data BEFORE closing
+collaborator set: finish drains queued data BEFORE closing
 handles, closes every file, cancels data_logger, writes the final -act.yml,
 schedules move_dir (manual included -- it is the journal eviction
 point), pops base.actives into history;
@@ -19,9 +19,8 @@ import pytest
 import helao.hexagon.adapters.native.finalizer as native_finalizer_mod
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
+from helao.core.models.hlostatus import HloStatus
 from helao.core.servers.active_finalizer import ActionFinalizer
-from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
-from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
 from helao.hexagon.tests.native_fixtures import make_base, mk_action, mk_active
@@ -46,15 +45,13 @@ def test_source_parity_with_legacy():
 
 
 def _grafted_active(tmp_path, **action_over):
-    """Full mini-graft: all three per-Active collaborators + meta writer
-    native, base.actives registration, data_logger running."""
+    """A session over a bare host (native collaborators and meta writer by
+    construction), registered in base.actives, data_logger running."""
     base = make_base(str(tmp_path / "RUNS_ACTIVE"))
-    base.meta_writer = NativeMetaFileWriter(base)  # type: ignore[reportAttributeAccessIssue]
     action = mk_action(**action_over) if action_over else None
     active, dflt = mk_active(base, action=action)
-    active.data_stream = NativeDataStreamer(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
-    active.data_file_writer = NativeDataFileWriter(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
-    active.action_finalizer = NativeActionFinalizer(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
+    assert isinstance(active.action_finalizer, NativeActionFinalizer)
+    assert isinstance(base.meta_writer, NativeMetaFileWriter)
     action_uuid = active.action.action_uuid
     assert action_uuid is not None
     base.actives[action_uuid] = active
@@ -146,7 +143,7 @@ async def test_substitute_closes_open_streams(tmp_path):
     await active.enqueue_data(DataModel(data={dflt: {"t_s": 1}}, errors=[]))
     await asyncio.sleep(0.1)
     assert active.file_conn_dict[dflt].file is not None
-    await active.substitute()
+    await active.action_finalizer.substitute()  # ActionSession has no substitute
     # aiofiles handle closed: writing now raises ValueError on closed file
     with pytest.raises(ValueError):
         await active.file_conn_dict[dflt].file.write("x")
@@ -175,6 +172,52 @@ async def test_split_forks_conns_and_resets_counters(tmp_path, monkeypatch):
     assert active.action.parent_action_uuid == prev_uuid
     active.data_logger.cancel()
     await asyncio.sleep(0.05)
+
+
+@pytest.mark.asyncio
+async def test_split_keep_active_then_finish_all_finishes_the_chain(
+    tmp_path, monkeypatch
+):
+    """Moved from unit_test_active_finalizer (split_keep_active_then_finish_all):
+    split(uuid_list=[]) forks a child with fresh file conns and marks the
+    parent split but leaves it open; finish_all then finishes both, and a row
+    streamed to the child's new conn lands on disk."""
+
+    async def fake_move_dir(action, base=None):
+        pass
+
+    monkeypatch.setattr(native_finalizer_mod, "move_dir", fake_move_dir)
+    base, active, dflt = _grafted_active(tmp_path)
+    await _start_logger(base, active)
+    await active.enqueue_data(DataModel(data={dflt: {"t_s": 0}}, errors=[]))
+    await asyncio.sleep(0.1)
+    parent_uuid = active.action.action_uuid
+
+    new_keys = await active.split(uuid_list=[])
+    assert active.action.action_uuid != parent_uuid
+    assert len(active.action_list) == 2
+    parent = active.action_list[1]
+    assert parent.action_uuid == parent_uuid
+    assert HloStatus.split in parent.action_status
+    assert HloStatus.finished not in parent.action_status
+    assert new_keys and all(k in active.file_conn_dict for k in new_keys)
+
+    await active.enqueue_data(DataModel(data={new_keys[0]: {"t_s": 999}}, errors=[]))
+    await asyncio.sleep(0.1)
+    await active.action_finalizer.finish_all()  # ActionSession has no finish_all
+    await asyncio.sleep(0.1)
+    assert all(HloStatus.finished in a.action_status for a in active.action_list)
+    rows = []
+    for dirpath, _dirs, files in os.walk(str(base.helaodirs.save_root)):
+        for fn in files:
+            if fn.endswith(".hlo"):
+                rows += (
+                    open(os.path.join(dirpath, fn))
+                    .read()
+                    .split("%%\n", 1)[1]
+                    .splitlines()
+                )
+    assert '{"t_s":999}' in rows
 
 
 @pytest.mark.asyncio

@@ -1,34 +1,37 @@
-"""Dispatch-decision golden-master harness for the legacy ``Orch`` orchestrator
-(CARDS P5, Stage S0 of S0-S9 -- the verification foundation for the full
-in-place decomposition specced in ``CARDS_REFACTOR_P5.md``).
+"""Dispatch-decision golden-master harness for the native ``OrchHost``
+orchestrator (CARDS P5 Stage S0 harness, re-pointed at native code by B7b).
 
 Mirrors the PAL call-trace golden master
 (``helao/deploy/hte/tests/test_pal_golden_master.py`` -- ``__new__`` bypass +
 fakes + pinned/deterministic timing + recorded ordered JSON-lines trace +
 double-capture determinism check) but targets the orchestrator's dispatch
-state-machine (spec :sec:`5.3`) instead of the PAL driver.
+state-machine instead of the PAL driver.
 
-What is REAL (driven, unmodified, byte-identical to the shipped orchestrator):
+What is REAL (driven, unmodified, the shipped orchestrator code):
 
-* ``Orch.dispatch_loop_task`` / ``loop_task_dispatch_sequence`` /
+* ``OrchHost.dispatch_loop_task`` / ``loop_task_dispatch_sequence`` /
   ``loop_task_dispatch_experiment`` / ``loop_task_dispatch_action`` /
   ``wait_for_interrupt`` / the intent methods (``intend_skip`` /
   ``intend_stop`` / ``intend_estop`` / ``intend_none``) / the global-param
   fold-in and fold-out blocks / ``estop_loop`` / ``estop_actions`` /
   ``finish_active_experiment`` / ``finish_active_sequence`` /
-  ``update_status`` / ``update_nonblocking`` / ``GlobalStatusModel``.
-* ``Orch`` is constructed via ``Orch.__new__`` + a minimal attribute fixture
-  that bypasses ``Base.__init__`` entirely (no FastAPI app, no disk I/O
-  paths, no NTP) -- the same bypass strategy the PAL harness uses for ``PAL``.
+  ``update_status`` / ``update_nonblocking`` / ``GlobalStatusModel``, and
+  the seven collaborators plus the reducer runtime those methods delegate to.
+* ``OrchHost`` is constructed via ``OrchHost.__new__`` + a minimal attribute
+  fixture that bypasses ``__init__`` entirely (no FastAPI app, no disk I/O
+  paths, no NTP), then ``_init_orch_collaborators()`` and ``_build_reducer()``
+  over a ``PortWiring`` carrying ``LegacyLoggingAdapter`` and
+  ``LegacyHealthAdapter`` -- the same bypass strategy the PAL harness uses
+  for ``PAL``.
 
-What is FAKED/STUBBED (the harness surface, per spec :sec:`5.3`):
+What is FAKED/STUBBED (the harness surface):
 
 * ``async_action_dispatcher`` (module-global rebind on
   ``helao.helpers.dispatcher``) -- records every call as ``(server,
   action_name, ordered params, start_condition, submit_order)`` and returns a
   canned active/finished action dict per the scenario's script. For each
   successful blocking dispatch it also schedules a background "status ping"
-  that drives the REAL ``Orch.update_status`` with a canned finished
+  that drives the REAL ``OrchHost.update_status`` with a canned finished
   ``ActionServerModel`` a couple of event-loop ticks later -- this is what
   unblocks ``dispatch_loop_task``'s own ``action_history`` wait-loop and the
   ``ActionStartCondition`` wait predicates using the REAL status-ingestion
@@ -37,16 +40,15 @@ What is FAKED/STUBBED (the harness surface, per spec :sec:`5.3`):
 * ``HelaoSyncer.to_s3`` -- no-op recorder (``self.syncer.to_s3``).
 * ``PLATE_API.has_access`` -- forced ``False`` for the harness's duration
   (module-global on ``helao.hexagon.app.orch_unpack``), so the plate-verification
-  gate is a no-op in every scenario, matching spec's fake list.
+  gate is a no-op in every scenario.
 * ``move_dir`` (module-global rebind on ``helao.helpers.yml_tools``) --
   recording no-op (no real file moves).
 * ``write_seq`` / ``write_exp`` / ``put_lbuf`` / ``put_lbuf_nowait`` --
-  recording no-ops bound directly on the ``Orch`` instance (shadowing the
-  ``Base`` methods, which need real ``helaodirs``/disk paths this harness
-  does not set up).
+  recording no-ops bound directly on the ``OrchHost`` instance (shadowing the
+  host methods, which need real ``helaodirs``/disk paths this harness does
+  not set up).
 
-No production code (``helao/core/servers/orch.py`` or any other module under
-``helao/core`` or ``helao/helpers``) is modified by this file.
+No production code is modified by this file.
 
 Determinism notes: every trace entry is built from harness-controlled,
 deterministic inputs (server/action names, scripted params, submit_order
@@ -54,23 +56,37 @@ counters, enum values). Real ``gen_uuid()``/``set_time()`` calls inside the
 driven production code (e.g. stamping ``action_uuid``/``action_timestamp`` on
 newly unpacked actions) are deliberately never captured verbatim into the
 trace -- the harness only ever records fields it authored or that are
-structurally deterministic (counts, enum names, ordered dict keys), exactly
-as the "ordered decision trace" in spec :sec:`5.3` describes. This avoids
-needing to patch ``gen_uuid``/``time.time`` globally the way the PAL harness
-pins ``time.time``/``asyncio.sleep`` -- nothing genuinely random ever reaches
-``json.dumps``.
+structurally deterministic (counts, enum names, ordered dict keys). This
+avoids needing to patch ``gen_uuid``/``time.time`` globally the way the PAL
+harness pins ``time.time``/``asyncio.sleep`` -- nothing genuinely random ever
+reaches ``json.dumps``.
 
-One genuine pre-existing quirk (not a harness bug, not to be fixed here; see
-spec :sec:`3.1` rule 5 "no behavior fixes ride along"): ``ActionStartCondition
-.wait_for_previous`` compares ``self.last_action_uuid`` (a bare *string*,
-stamped from the dispatcher's returned JSON dict) against
+One genuine pre-existing quirk (not a harness bug, not to be fixed here):
+``ActionStartCondition.wait_for_previous`` compares ``self.last_action_uuid``
+(a bare *string*, stamped from the dispatcher's returned JSON dict) against
 ``self.globalstatusmodel.active_dict.keys()`` (*UUID* objects) -- the type
 mismatch means this predicate can never observe a match and therefore never
 actually blocks in the current code. Scenario 2 drives this branch and
 records the (structurally guaranteed) immediate pass-through faithfully
 rather than fabricating a block that cannot occur.
 
-Run (conda env ``helao``; no pytest harness in this repo -- run as a script)::
+Provenance of the frozen reference (B7b, D-B7b.5). The nine traces under
+``helao/core/tests/golden/dispatch/`` are native captures. Each was accepted
+only after a byte comparison with a capture of the same scenario script
+driving the legacy ``Orch`` (``helao/core/servers/orch.py``), taken on the
+same commit while that engine still existed. Scenarios 1-6, 8 and 9 were
+byte-identical. Scenario 7 differed by exactly one trace block, the
+``{"event": "intent_call", "method": "intend_none"}`` entry: legacy
+``Orch.estop_loop`` delegated to ``EstopController.estop_loop``, which calls
+``intend_none()``, while ``OrchHost.estop_loop`` latches E-STOP through the
+reducer and wakes ``interrupt_q`` directly (DD-5 item 6), so the spy on
+``intend_none`` never fires. That one block is
+the only accepted delta. The older ``.omc/artifacts/p5/baseline_S0/``
+reference is retired: it predates the stop-requeue fix (scenario 2) and the
+E-STOP-reaches-drivers change (scenario 7), and this file no longer reads it.
+
+Run (conda env ``helao``; not a pytest module -- run as a script, from the
+repo root, with the repo root on ``PYTHONPATH``)::
 
     conda run -n helao --no-capture-output python \\
         helao/core/tests/test_orch_dispatch_golden_master.py [--check]
@@ -81,18 +97,19 @@ Two modes:
   ``_run_and_check`` assertions plus a byte-identical double-capture
   determinism check, and (re)writes scratch traces to
   ``.omc/artifacts/p5/baseline/<scenario>.jsonl`` (gitignored) for local
-  inspection. This mode never touches ``baseline_S0/``.
-* ``--check`` -- the hard per-stage gate run by every downstream stage
-  (S1-S9): captures all 9 scenarios to a temp dir and byte-diffs each
-  against the FROZEN reference at ``.omc/artifacts/p5/baseline_S0/``,
-  printing per-scenario PASS/DELTA and exiting non-zero on any byte
-  difference or missing/extra file. It never writes to ``baseline_S0/``.
+  inspection, plus a ``queues.pck`` export/import round-trip fixture at
+  ``.omc/artifacts/p5/queues.pck``. This mode never touches
+  ``golden/dispatch/``.
+* ``--check`` -- the hard gate: captures all 9 scenarios to a temp dir and
+  byte-diffs each against the FROZEN reference at
+  ``helao/core/tests/golden/dispatch/``, printing per-scenario PASS/DELTA and
+  exiting non-zero on any byte difference or missing/extra file. It never
+  writes to ``golden/dispatch/``.
 
-``.omc/artifacts/p5/baseline_S0/`` is the frozen S0 reference: it was
-captured once, on unmodified ``orch.py`` (verified via ``git diff`` against
-the S0 commit), and must never be regenerated during S1-S9 -- doing so would
-let a stage silently redefine its own gate. A ``queues.pck`` export/import
-round-trip fixture is written to ``.omc/artifacts/p5/queues.pck``.
+``golden/dispatch/`` is tracked and must never be regenerated to make a
+change pass -- doing so would let a change silently redefine its own gate.
+A deliberate behaviour change re-freezes it in its own commit, with the
+argued trace diff in the commit message.
 """
 
 import asyncio
@@ -117,18 +134,23 @@ from helao.core.models.experiment import ShortExperimentModel
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.server import ActionServerModel, EndpointModel, GlobalStatusModel
-from helao.core.servers.orch import Orch
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.zdeque import zdeque
+from helao.hexagon.adapters.legacy.health import LegacyHealthAdapter
+from helao.hexagon.adapters.legacy.logging_adapter import LegacyLoggingAdapter
+from helao.hexagon.app.orch_host import OrchHost
+from helao.hexagon.app.wiring import PortWiring
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+# Scratch outputs of the default mode (gitignored).
 ARTIFACT_DIR = REPO_ROOT / ".omc" / "artifacts" / "p5"
-# Frozen S0 reference (captured once, on unmodified orch.py). Never write to
-# this directory outside of the one-time freeze step -- it is the hard gate
-# every S1-S9 stage's `--check` run diffs against.
-BASELINE_S0_DIR = ARTIFACT_DIR / "baseline_S0"
+# Frozen, tracked reference (native captures, accepted by B7b against a legacy
+# capture of the same script; see the module docstring). Never write to this
+# directory from the harness -- it is the hard gate every `--check` run diffs
+# against.
+BASELINE_S0_DIR = Path(__file__).resolve().parent / "golden" / "dispatch"
 BASELINE_DIR = ARTIFACT_DIR / "baseline"
 
 ORCH_SERVER_NAME = "ORCH"
@@ -156,13 +178,13 @@ def _json_safe(obj):
 
 
 # ---------------------------------------------------------------------------
-# Orch fixture construction (Base.__init__ bypass, mirrors PAL's PAL.__new__)
+# OrchHost fixture construction (__init__ bypass, mirrors PAL's PAL.__new__)
 # ---------------------------------------------------------------------------
 
 
-def _make_orch(tmp_root: Path) -> Orch:
-    """Build a bare ``Orch`` with every attribute the dispatch cluster touches."""
-    orch = Orch.__new__(Orch)
+def _make_orch(tmp_root: Path) -> OrchHost:
+    """Build a bare ``OrchHost`` with every attribute the dispatch cluster touches."""
+    orch = OrchHost.__new__(OrchHost)
     os.makedirs(str(tmp_root / "STATES"), exist_ok=True)
 
     orch.server = MachineModel(
@@ -260,7 +282,12 @@ def _make_orch(tmp_root: Path) -> Orch:
     orch.prefinish_experiment_hooks = HookSet.empty()
     orch.prefinish_sequence_hooks = HookSet.empty()
 
-    orch._init_collaborators()
+    orch._init_orch_collaborators()
+    orch.hexagon_wiring = PortWiring(
+        logging=LegacyLoggingAdapter(), health=LegacyHealthAdapter()
+    )
+    orch._build_reducer()
+    assert type(orch) is OrchHost
 
     return orch
 
@@ -272,7 +299,7 @@ def _make_fake_to_s3():
     return _to_s3
 
 
-def _install_recording_stubs(orch: Orch, trace: list) -> None:
+def _install_recording_stubs(orch: OrchHost, trace: list) -> None:
     """Shadow Base's disk/live-buffer methods with recording no-ops (spec :sec:`5.3`)."""
 
     # Note: live_dict is keyed by a real (random) action/experiment/sequence
@@ -313,7 +340,7 @@ def _install_recording_stubs(orch: Orch, trace: list) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _status_snapshot(orch: Orch) -> dict:
+def _status_snapshot(orch: OrchHost) -> dict:
     return {
         "loop_state": _enum_val(orch.globalstatusmodel.loop_state),
         "loop_intent": _enum_val(orch.globalstatusmodel.loop_intent),
@@ -324,7 +351,7 @@ def _status_snapshot(orch: Orch) -> dict:
     }
 
 
-def _wrap_phase(orch: Orch, name: str, trace: list) -> None:
+def _wrap_phase(orch: OrchHost, name: str, trace: list) -> None:
     orig = getattr(orch, name)
 
     async def _spy():
@@ -343,7 +370,7 @@ def _wrap_phase(orch: Orch, name: str, trace: list) -> None:
     setattr(orch, name, _spy)
 
 
-def _wrap_intent(orch: Orch, name: str, trace: list) -> None:
+def _wrap_intent(orch: OrchHost, name: str, trace: list) -> None:
     orig = getattr(orch, name)
 
     async def _spy():
@@ -353,7 +380,7 @@ def _wrap_intent(orch: Orch, name: str, trace: list) -> None:
     setattr(orch, name, _spy)
 
 
-def _wrap_estop_loop(orch: Orch, trace: list) -> None:
+def _wrap_estop_loop(orch: OrchHost, trace: list) -> None:
     orig = orch.estop_loop
 
     async def _spy(reason=""):
@@ -363,7 +390,7 @@ def _wrap_estop_loop(orch: Orch, trace: list) -> None:
     orch.estop_loop = _spy
 
 
-def _wrap_stop(orch: Orch, trace: list) -> None:
+def _wrap_stop(orch: OrchHost, trace: list) -> None:
     orig = orch.stop
 
     async def _spy(reset_run_id=False):
@@ -373,7 +400,7 @@ def _wrap_stop(orch: Orch, trace: list) -> None:
     orch.stop = _spy
 
 
-def _wrap_wait_for_interrupt(orch: Orch, trace: list) -> None:
+def _wrap_wait_for_interrupt(orch: OrchHost, trace: list) -> None:
     orig = orch.wait_for_interrupt
 
     async def _spy(pending_action=None):
@@ -390,7 +417,7 @@ def _wrap_wait_for_interrupt(orch: Orch, trace: list) -> None:
     orch.wait_for_interrupt = _spy
 
 
-def _wrap_update_nonblocking(orch: Orch, trace: list) -> None:
+def _wrap_update_nonblocking(orch: OrchHost, trace: list) -> None:
     orig = orch.update_nonblocking
 
     async def _spy(actionmodel, server_host, server_port):
@@ -407,7 +434,7 @@ def _wrap_update_nonblocking(orch: Orch, trace: list) -> None:
     orch.update_nonblocking = _spy
 
 
-def _install_all_spies(orch: Orch, trace: list) -> None:
+def _install_all_spies(orch: OrchHost, trace: list) -> None:
     for phase in (
         "loop_task_dispatch_sequence",
         "loop_task_dispatch_experiment",
@@ -507,7 +534,7 @@ def _make_fake_move_dir(trace: list):
 
 
 async def _deliver_finish_status(
-    orch: Orch,
+    orch: OrchHost,
     finished_action: Action,
     server_host: str,
     server_port: int,
@@ -541,7 +568,9 @@ async def _deliver_finish_status(
         )
 
 
-def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] = None):
+def make_fake_action_dispatcher(
+    orch: OrchHost, trace: list, script: Optional[dict] = None
+):
     """Build the scripted ``async_action_dispatcher`` fake (spec :sec:`5.3`).
 
     ``script`` maps ``action_name -> directive dict``:
@@ -638,7 +667,7 @@ def make_fake_action_dispatcher(orch: Orch, trace: list, script: Optional[dict] 
 # ---------------------------------------------------------------------------
 
 
-def _seed_server_dict(orch: Orch, pairs) -> None:
+def _seed_server_dict(orch: OrchHost, pairs) -> None:
     """Pre-register an empty ``ActionServerModel``/``EndpointModel`` per (server, action_name)."""
     for server_name, action_name in pairs:
         key = (server_name, ORCH_MACHINE)
@@ -657,7 +686,7 @@ def _seed_server_dict(orch: Orch, pairs) -> None:
 
 
 def _seed_active_action(
-    orch: Orch, server_name: str, endpoint_name: str, tag: str
+    orch: OrchHost, server_name: str, endpoint_name: str, tag: str
 ) -> Action:
     """Insert a fake 'currently active' action to make a start-condition wait genuinely block."""
     import uuid as _uuid_mod
@@ -688,7 +717,7 @@ def _seed_active_action(
 
 
 def _schedule_clear_active(
-    orch: Orch, seeded: Action, trace: list, ticks: int = 2
+    orch: OrchHost, seeded: Action, trace: list, ticks: int = 2
 ) -> None:
     """Background task: deliver a 'finished' status for a previously-seeded fake active action."""
 
@@ -779,7 +808,7 @@ def _generic_sequence(experiments_spec=None):
     return out
 
 
-def _install_generic_libs(orch: Orch) -> None:
+def _install_generic_libs(orch: OrchHost) -> None:
     orch.experiment_lib = {"generic_exp": _generic_experiment}
     orch.experiment_codehash_lib = {"generic_exp": "deadbeef"}
     orch.experiment_codepath_lib = {"generic_exp": "harness://generic_exp"}
@@ -797,7 +826,7 @@ def _mk_sequence(experiments_spec) -> Sequence:
 
 
 def _bare_action(
-    orch: Orch, server_name: str, action_name: str, action_params: dict, **kwargs
+    orch: OrchHost, server_name: str, action_name: str, action_params: dict, **kwargs
 ) -> Action:
     """Directly-constructed standalone action (bypasses experiment unpacking) for scenarios
     that drive ``loop_task_dispatch_action``/``wait_for_interrupt`` directly."""
@@ -821,7 +850,7 @@ async def _run_all_ticks(n: int = 3) -> None:
         await asyncio.sleep(0)
 
 
-async def _drain(orch: Orch) -> None:
+async def _drain(orch: OrchHost) -> None:
     """Await dispatch_loop_task; also let any trailing background tasks flush."""
     await orch.dispatch_loop_task()
     await _run_all_ticks(5)
@@ -1454,11 +1483,10 @@ SCENARIOS = {
 
 
 async def run_all_scenarios(base_dir: Path, tmp_root: Path) -> dict:
-    # Guard rail: nothing in this harness may write into the frozen S0
-    # reference. It is captured exactly once (on unmodified orch.py) and
-    # every subsequent run only ever reads it for comparison.
+    # Guard rail: nothing in this harness may write into the frozen
+    # reference. Every run only ever reads it for comparison.
     assert base_dir.resolve() != BASELINE_S0_DIR.resolve(), (
-        "refusing to write into the frozen baseline_S0/ reference; "
+        "refusing to write into the frozen golden/dispatch/ reference; "
         "use a scratch directory instead"
     )
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -1546,7 +1574,7 @@ async def capture_queues_pck_fixture(tmp_root: Path) -> dict:
     imported_path = orch2.import_queues(pck_path=export_path)
     restored_ok = len(orch2.sequence_dq) == len(orch.sequence_dq) == 2
 
-    # persist a canonical copy under the artifact dir for the S1-S9 gates
+    # persist a scratch copy under the (gitignored) artifact dir
     artifact_pck = ARTIFACT_DIR / "queues.pck"
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
     with open(export_path, "rb") as src, open(artifact_pck, "wb") as dst:
@@ -1573,9 +1601,9 @@ def _check(cond, msg, failures):
 
 def _diff_against_baseline_s0(captured: dict) -> list:
     """Byte-diff each freshly captured scenario trace against the frozen
-    ``baseline_S0/`` reference. Returns a list of (scenario_name, status,
+    ``golden/dispatch/`` reference. Returns a list of (scenario_name, status,
     detail) tuples; status is one of PASS / DELTA / MISSING_S0_REFERENCE.
-    Also reports any extra ``*.jsonl`` files under baseline_S0/ that no
+    Also reports any extra ``*.jsonl`` files under golden/dispatch/ that no
     longer correspond to a current scenario (stale reference)."""
     expected_files = {f"{name}.jsonl" for name in SCENARIOS}
     s0_files = (
@@ -1616,14 +1644,14 @@ def _diff_against_baseline_s0(captured: dict) -> list:
 
 
 def run_check_mode() -> int:
-    """Hard gate for S1-S9: capture fresh traces to a throwaway temp dir
-    (never overwriting baseline_S0/) and byte-diff every scenario against
-    the frozen ``baseline_S0/`` reference. Returns a process exit code
+    """Hard gate: capture fresh traces to a throwaway temp dir
+    (never overwriting golden/dispatch/) and byte-diff every scenario against
+    the frozen ``golden/dispatch/`` reference. Returns a process exit code
     (0 == all scenarios byte-identical, 1 == any divergence/missing/extra)."""
     import tempfile
 
     if not BASELINE_S0_DIR.is_dir():
-        print(f"FATAL: frozen S0 reference dir missing: {BASELINE_S0_DIR}")
+        print(f"FATAL: frozen reference dir missing: {BASELINE_S0_DIR}")
         return 1
 
     with (
@@ -1820,10 +1848,9 @@ def main():
         action="store_true",
         help=(
             "Hard gate mode: byte-diff freshly captured scenario traces "
-            "against the frozen .omc/artifacts/p5/baseline_S0/ reference. "
-            "Never overwrites baseline_S0/. Exits non-zero on any "
-            "divergence/missing/extra file. This is the mode run by "
-            "every S1-S9 downstream stage."
+            "against the frozen helao/core/tests/golden/dispatch/ reference. "
+            "Never overwrites golden/dispatch/. Exits non-zero on any "
+            "divergence/missing/extra file."
         ),
     )
     args = parser.parse_args()
@@ -1832,7 +1859,7 @@ def main():
         raise SystemExit(run_check_mode())
 
     # --- default: record/dev mode. Writes scratch traces to baseline/ for
-    # local inspection only; NEVER touches the frozen baseline_S0/ reference
+    # local inspection only; NEVER touches the frozen golden/dispatch/ reference
     # (enforced by the assertion in run_all_scenarios). ---
     with tempfile.TemporaryDirectory() as check_root:
         failures = asyncio.run(_run_and_check(Path(check_root)))
@@ -1849,7 +1876,7 @@ def main():
             run_all_scenarios(BASELINE_DIR, Path(baseline_tmp))
         )
     print(
-        f"Dev/record-mode scratch traces written to: {BASELINE_DIR} (NOT the frozen gate -- see baseline_S0/, run with --check to verify against it)"
+        f"Dev/record-mode scratch traces written to: {BASELINE_DIR} (NOT the frozen gate -- see golden/dispatch/, run with --check to verify against it)"
     )
 
     with (

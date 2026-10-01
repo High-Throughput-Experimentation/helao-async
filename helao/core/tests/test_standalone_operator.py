@@ -25,28 +25,26 @@ class _FakeGlobalStatus:
 
 
 def _bare_orch():
-    """A real ``Orch`` with ``__init__`` bypassed but its collaborators wired.
+    """A real ``OrchHost`` with ``__init__`` bypassed but ``RunQueues`` wired.
 
-    ``Orch.__init__`` does far more than these tests need (config, network,
+    ``OrchHost.__init__`` does far more than these tests need (config, network,
     queue files), so they build the object with ``__new__`` and set only the
     attributes under test.
 
-    The CARDS P5 decomposition moved the queue-CRUD and run-id bodies out of
-    ``Orch`` into the ``RunQueues`` collaborator, which ``__init__`` assigns at
-    orch.py:209 -- the one line ``__new__`` skips. Every ``Orch.__new__`` test
-    therefore started failing with ``'Orch' object has no attribute
-    'run_queues'`` even though production is fine. Wiring it here (rather than
-    at each of the eight call sites) is deliberate: the duplicated
-    hand-construction is exactly why all of them rotted together.
+    The queue-CRUD and run-id bodies live in the ``RunQueues`` collaborator,
+    which ``_init_orch_collaborators`` assigns -- a step ``__new__`` skips.
+    Wiring it here (rather than at each call site) is deliberate: the
+    duplicated hand-construction is exactly why all of them once rotted
+    together.
 
     Sufficient because RunQueues holds only the back-reference and resolves
     orch state at call time -- never caching a deque or attribute -- so the
     per-test attribute assignments that follow still take effect.
     """
-    from helao.core.servers.orch import Orch
+    from helao.hexagon.app.orch_host import OrchHost
     from helao.hexagon.app.orch_queues import RunQueues
 
-    orch = Orch.__new__(Orch)
+    orch = OrchHost.__new__(OrchHost)
     orch.run_queues = RunQueues(orch)
     return orch
 
@@ -108,23 +106,23 @@ class _FakeVisOp:
 
 def test_endpoint_helpers_shapes():
     # Endpoint handler bodies are extracted as module-level helpers for testability.
-    from helao.core.servers import orch_api
+    from helao.hexagon.app import orch_payloads
 
     orch = _FakeOrch()
-    assert orch_api._histories_payload(orch) == {
+    assert orch_payloads._histories_payload(orch) == {
         "action": [("a1", {"action_name": "noop", "action_server": "motor"})],
         "experiment": [("e1", {"experiment_name": "exp0"})],
         "sequence": [("s1", {"sequence_name": "seq0"})],
     }
-    assert orch_api._status_summary_payload(orch) == {"motor": ["idle", "ok"]}
-    assert orch_api._step_flags_payload(orch) == {
+    assert orch_payloads._status_summary_payload(orch) == {"motor": ["idle", "ok"]}
+    assert orch_payloads._step_flags_payload(orch) == {
         "actions": False,
         "experiments": False,
         "sequences": False,
     }
-    orch_api._set_step_flag(orch, "actions", True)
+    orch_payloads._set_step_flag(orch, "actions", True)
     assert orch.step_thru_actions is True
-    assert orch_api._queue_counts(orch) == {
+    assert orch_payloads._queue_counts(orch) == {
         "n_sequences": 3,
         "n_experiments": 1,
         "n_actions": 0,
@@ -479,7 +477,8 @@ def test_orch_split_run_id():
     seq = Sequence(sequence_name="seq0")
     seq.sequence_params = {"plate_sample_no": [1, 2, 3]}
     uuids = asyncio.run(orch.add_split_sequences(seq))
-    assert len(uuids) == 3, uuids
+    # OrchHost.add_split_sequences is annotated -> None but returns the uuids
+    assert len(uuids) == 3, uuids  # pyright: ignore[reportArgumentType]
     run_ids = {s.run_id for s in orch.sequence_dq}
     assert len(run_ids) == 1 and None not in run_ids, run_ids
     print("test_orch_split_run_id PASS")
@@ -520,7 +519,7 @@ def test_orch_prepend_order_and_run_id():
 
 
 def test_queue_object_payload():
-    from helao.core.servers import orch_api
+    from helao.hexagon.app import orch_payloads
 
     class _Item:
         def __init__(self, name):
@@ -537,32 +536,13 @@ def test_queue_object_payload():
             self.action_dq = []
 
     orch = _O()
-    assert orch_api._queue_object_payload(orch, "sequence", 1) == {
+    assert orch_payloads._queue_object_payload(orch, "sequence", 1) == {
         "sequence_name": "B",
         "sequence_params": {"x": 1},
     }
-    assert orch_api._queue_object_payload(orch, "sequence", 9) == {}
-    assert orch_api._queue_object_payload(orch, "bogus", 0) == {}
+    assert orch_payloads._queue_object_payload(orch, "sequence", 9) == {}
+    assert orch_payloads._queue_object_payload(orch, "bogus", 0) == {}
     print("test_queue_object_payload PASS")
-
-
-def test_prepend_sequences_helper():
-    from helao.core.servers import orch_api
-
-    class _O(_FakeOrch):
-        async def prepend_sequences(self, sequences):
-            self.prepended = sequences
-            return ["u1", "u2"]
-
-    orch = _O()
-    uuids = asyncio.run(orch_api._prepend_sequences(orch, [{}, {}]))
-    assert uuids == ["u1", "u2"]
-    assert len(orch.prepended) == 2
-    # dict inputs are coerced to Sequence instances
-    from helao.helpers.premodels import Sequence
-
-    assert all(isinstance(s, Sequence) for s in orch.prepended)
-    print("test_prepend_sequences_helper PASS")
 
 
 def test_remote_backend_prepend():
@@ -975,7 +955,7 @@ def test_orch_stop_reset_run_id():
     class _GSM:
         loop_state = LoopStatus.stopped
 
-    orch.globalstatusmodel = _GSM()
+    orch.globalstatusmodel = _GSM()  # type: ignore[assignment]
 
     # stop without reset leaves the run_id intact
     asyncio.run(orch.stop())
@@ -1718,7 +1698,6 @@ def run_all():
     test_orch_move_and_remove_sequence()
     test_orch_move_and_remove_experiment_action()
     test_orch_stop_reset_run_id()
-    test_prepend_sequences_helper()
     test_queue_object_payload()
     test_remote_backend_prepend()
     test_remote_backend_move_remove()

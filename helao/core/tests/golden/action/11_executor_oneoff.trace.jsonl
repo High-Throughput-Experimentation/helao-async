@@ -1,0 +1,56 @@
+[
+  {
+    "action_name": "oexec",
+    "action_status": [
+      "active"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_name": "oexec",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "oexec",
+    "action_uuid": "<UUID:0>",
+    "data_keys": [
+      "t",
+      "v"
+    ],
+    "event": "data_packet",
+    "file_conn_keys": [
+      "<UUID:1>"
+    ],
+    "status": "active"
+  },
+  {
+    "action_name": "oexec",
+    "action_status": [
+      "finished"
+    ],
+    "action_uuid": "<UUID:0>",
+    "event": "status_packet"
+  },
+  {
+    "action_uuid": "<UUID:0>",
+    "event": "move_dir"
+  },
+  {
+    "action_loop_running": false,
+    "action_status": [
+      "finished"
+    ],
+    "event": "post_oneoff_executor",
+    "returned_action": true
+  }
+]

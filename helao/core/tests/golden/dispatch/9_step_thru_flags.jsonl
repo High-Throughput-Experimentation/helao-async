@@ -1,0 +1,401 @@
+{
+  "final": {
+    "step_thru_actions": {
+      "act_dq": 1,
+      "dispatch_calls_count": 1,
+      "loop_state": "stopped"
+    },
+    "step_thru_experiments": {
+      "act_dq": 1,
+      "dispatch_calls_count": 1,
+      "exp_dq": 0,
+      "loop_state": "stopped"
+    }
+  },
+  "scenario": "9_step_thru_flags",
+  "trace": [
+    {
+      "event": "section",
+      "name": "step_thru_actions"
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 1
+    },
+    {
+      "entries": [
+        {
+          "sequence_name": "generic_seq",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 2,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 2,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_step_1",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {},
+      "server": "SRV1",
+      "start_condition": 0,
+      "submit_order": 0
+    },
+    {
+      "entries": [
+        {
+          "action_name": "act_step_1",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_step_1",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "stop_call",
+      "reset_run_id": false
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_stop"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "stop",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_none"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "stop_call",
+      "reset_run_id": false
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_none"
+    },
+    {
+      "event": "section",
+      "name": "step_thru_experiments"
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 1
+    },
+    {
+      "entries": [
+        {
+          "sequence_name": "generic_seq",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 2,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_sequence",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 2,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_exp1",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {},
+      "server": "SRV1",
+      "start_condition": 0,
+      "submit_order": 0
+    },
+    {
+      "entries": [
+        {
+          "action_name": "act_exp1",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 1,
+      "loop_intent": "none",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "act_exp1",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "stop_call",
+      "reset_run_id": false
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_stop"
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_seq",
+      "sequence_name": "generic_seq"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 0,
+      "event": "phase_enter",
+      "exp_dq": 1,
+      "loop_intent": "stop",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "entries": [
+        {
+          "experiment_name": "generic_exp",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "write_exp",
+      "experiment_name": "generic_exp"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "stop",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_experiment",
+      "seq_dq": 0
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "stop",
+      "loop_state": "started",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_none"
+    },
+    {
+      "act_dq": 1,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "intent_call",
+      "method": "intend_none"
+    },
+    {
+      "event": "move_dir",
+      "kind": "experiment"
+    }
+  ]
+}

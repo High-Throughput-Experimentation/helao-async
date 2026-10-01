@@ -382,7 +382,7 @@ class _UnpackOrch:
 
 @pytest.mark.asyncio
 async def test_unpacker_stops_appending_when_estop_lands_mid_unpack():
-    from helao.core.servers.orch_unpack import seq_unpacker
+    from helao.hexagon.app.orch_unpack import seq_unpacker
 
     orch = _UnpackOrch()
 
@@ -399,7 +399,7 @@ async def test_unpacker_stops_appending_when_estop_lands_mid_unpack():
 
 @pytest.mark.asyncio
 async def test_unpacker_stops_when_a_different_sequence_became_active():
-    from helao.core.servers.orch_unpack import seq_unpacker
+    from helao.hexagon.app.orch_unpack import seq_unpacker
 
     orch = _UnpackOrch()
 
@@ -416,7 +416,7 @@ async def test_unpacker_stops_when_a_different_sequence_became_active():
 
 @pytest.mark.asyncio
 async def test_unpacker_unpacks_everything_when_nothing_intervenes():
-    from helao.core.servers.orch_unpack import seq_unpacker
+    from helao.hexagon.app.orch_unpack import seq_unpacker
 
     orch = _UnpackOrch()
     await seq_unpacker(orch)
@@ -543,7 +543,7 @@ async def test_dispatch_experiment_keeps_the_queue_when_a_sequence_is_active(
 
 @pytest.mark.asyncio
 async def test_unpacker_does_not_erase_an_estop_that_lands_in_the_first_add():
-    from helao.core.servers.orch_unpack import seq_unpacker
+    from helao.hexagon.app.orch_unpack import seq_unpacker
 
     orch = _UnpackOrch()
 
@@ -566,7 +566,7 @@ class _SeqOrch:
 
     def __init__(self, flip_in=None, n_planned=3):
         from helao.core.models.machine import MachineModel
-        from helao.core.servers.orch_unpack import seq_unpacker
+        from helao.hexagon.app.orch_unpack import seq_unpacker
         from helao.helpers.premodels import Experiment, Sequence
         from helao.hexagon.app.orch_dispatch import DispatchRunner
 

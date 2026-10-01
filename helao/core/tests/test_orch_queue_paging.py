@@ -15,7 +15,7 @@ paging arrived as ``get_history_page`` beside it.
 from collections import deque
 from types import SimpleNamespace
 
-from helao.core.servers.orch_api import _histories_payload, _history_page_payload
+from helao.hexagon.app.orch_payloads import _histories_payload, _history_page_payload
 from helao.hexagon.app.orch_queues import _dq_page
 from helao.helpers.dequedict import DequeDict
 
@@ -63,10 +63,10 @@ def test_the_ten_row_default_is_gone_from_every_layer():
     the chain re-truncates every operator table at ten rows."""
     import inspect
 
-    from helao.core.servers.orch import Orch
+    from helao.hexagon.app.orch_host import OrchHost
     from helao.hexagon.app.orch_queues import RunQueues
 
-    for owner in (Orch, RunQueues):
+    for owner in (OrchHost, RunQueues):
         for name in ("list_sequences", "list_experiments", "list_actions"):
             params = inspect.signature(getattr(owner, name)).parameters
             assert params["limit"].default is None, f"{owner.__name__}.{name}"
