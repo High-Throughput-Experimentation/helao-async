@@ -6,14 +6,15 @@ coverage (§10.1(3)'s named insufficiency) with:
 
 1. The hexagon's `WsPublishBridge` produces byte-identical frames to the
    legacy `WsPublisher` for identical inputs.
-2. The orch `_ws_relay` encoding (no wire test at all before this slice) is
-   pinned: it carries dicts, never the typed model `BaseAPI` sends.
+2. The orchestrator's `orch_ws_publishers` encoding (no wire test at all
+   before this slice) is pinned: it carries dicts, never the typed model
+   `ActionHost` sends.
 3. The Reflex ingest normalizers are proven correct per-channel AND proven to
    yield nothing when handed the *other* channel's frame -- the emptiness is
    asserted explicitly, not inferred from a right-pair pass (the plan's named
    vacuity trap: "returns empty" must never read as a pass on its own).
-4. `/ws_globstat` has no route registration on either API class (Corrections
-   §C1b) -- extracted statically via `harness.endpoints`, the same tool the
+4. `/ws_globstat` has no route registration on either host, and the sender is
+   deleted (Corrections §C1b) -- extracted statically via `harness.endpoints`, the same tool the
    repo already uses for its endpoint-parity checklist, so this isn't a
    hand-rolled route scan either.
 5. The operator's `RemoteBackend._ws_loop` is shape-blind: it fires the same

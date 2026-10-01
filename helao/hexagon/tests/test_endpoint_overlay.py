@@ -1,8 +1,8 @@
 """Endpoint override composition (P4b step 1). Exercises
-``overlay_dyn_endpoints`` against a synthetic ``BaseAPI``-shaped app -- a
-plain ``FastAPI`` instance with a ``.base.server.server_name`` stand-in,
-mirroring the bare-``Base`` fixture pattern in ``native_fixtures.py`` -- so
-no legacy driver/config machinery is needed."""
+``overlay_dyn_endpoints`` against a synthetic app -- a plain ``FastAPI``
+instance with a ``.base.server.server_name`` stand-in rather than a real
+``ActionHost`` (``native_fixtures.py`` builds the bare-host fixture) -- so no
+driver/config machinery is needed."""
 
 from types import SimpleNamespace
 

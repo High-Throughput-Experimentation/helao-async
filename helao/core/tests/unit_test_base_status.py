@@ -7,7 +7,7 @@ remote-subscriber registry or ``replace_status`` directly -- those are
 normally orchestrator-driven. This module is the gate for that surface.
 Ported from the legacy ``Base``/``StatusBroadcaster`` fixture by B7b; the
 legacy ``_ws_relay`` check went with the engine, because the native WS
-encoding is pinned by ``harness/tests/test_ws_frames.py``.
+encoding is pinned by ``helao/hexagon/tests/test_ws_frames.py``.
 
 A bare ``ActionHost`` built with ``__new__`` (no FastAPI app, no disk I/O, no
 NTP), populated only with the attributes these methods touch.
