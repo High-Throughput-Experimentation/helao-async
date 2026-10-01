@@ -184,36 +184,58 @@ def encode_buffers(buffers) -> bytes:
 #: the first mount could not land a frame. 64 frames covers about a second of
 #: publishing at 60 Hz.
 #:
-#: The memory this costs is bounded by the *reduced* payload, not the window: xy
-#: downsamples to roughly pixel resolution before publishing, so a frame is tens
-#: of KB even for a million-point window.
-#:
 #: What has to be covered is how far a client may fall behind, and at the 60 Hz
 #: of ``state.DEFAULT_UPDATE_RATE`` 64 frames is barely one second: a station
 #: logged a chart asking for version 118 while 152-215 were retained, 34
 #: versions past the window, and a client that far behind misses *every* fetch
 #: and holds its last frame -- a chart whose axes scroll with no line on it.
-#: 512 frames is ~8.5 s at 60 Hz, generous for a hiccup and still bounded at
-#: order 10 MB per chart. Not derived from DEFAULT_UPDATE_RATE, which lives in
-#: state -- state imports plots imports this module, so reading it back would
-#: close an import cycle.
+#: 512 frames is ~8.5 s at 60 Hz, generous for a hiccup. Not derived from
+#: DEFAULT_UPDATE_RATE, which lives in state -- state imports plots imports
+#: this module, so reading it back would close an import cycle.
+#:
+#: This is a count cap only. Memory is bounded by :data:`FRAME_BUDGET_BYTES`:
+#: xy downsamples to roughly pixel resolution before publishing, so a live
+#: frame is tens of KB and 512 of them are a few MB, but a plate map with a
+#: photo underlay publishes about 4 MiB per redraw, and 512 of those per panel
+#: per browser tab is 2 GiB.
 FRAME_HISTORY = 512
+
+#: Encoded bytes retained per panel. After each put the oldest frames go while
+#: the panel is over budget, so a live stream (tens of KB a frame) still keeps
+#: all :data:`FRAME_HISTORY` frames, and a photo-underlay map (about 4 MiB a
+#: frame) keeps about 7. Its redraws follow clicks, not a 60 Hz tick, so a
+#: client is never that many versions behind.
+FRAME_BUDGET_BYTES = 32 * 1024 * 1024
+
+#: Frames kept whatever their size: a fetch of version N is in flight while
+#: N+1 is published, so a panel whose single frame tops the budget must still
+#: serve the frame the browser is asking for.
+FRAME_MIN_KEEP = 4
 
 
 class BufferStore:
     """Process-wide ``panel_id -> recent (version, buffers)`` map behind the route.
 
-    A few recent versions are retained per panel, newest last; see
-    :data:`FRAME_HISTORY`. An unknown panel or a version older than the
+    A few recent versions are retained per panel, newest last: at most
+    :data:`FRAME_HISTORY` of them, within :data:`FRAME_BUDGET_BYTES`, and never
+    fewer than :data:`FRAME_MIN_KEEP`. An unknown panel or a version older than the
     retained window yields ``None`` (404 at the route), and the component keeps
     its last good frame rather than blanking — a refetch racing a panel
     teardown must not clear a live chart.
     """
 
-    def __init__(self, history: int = FRAME_HISTORY):
-        """Create an empty store retaining ``history`` frames per panel."""
+    def __init__(
+        self,
+        history: int = FRAME_HISTORY,
+        budget_bytes: int = FRAME_BUDGET_BYTES,
+        min_keep: int = FRAME_MIN_KEEP,
+    ):
+        """Create an empty store retaining at most ``history`` frames per panel,
+        within ``budget_bytes``, and never fewer than ``min_keep``."""
         self._lock = threading.Lock()
         self._history = max(1, int(history))
+        self._budget = int(budget_bytes)
+        self._min_keep = max(1, int(min_keep))
         self._frames: dict = {}
 
     def put(self, panel_id: str, version: int, buffers) -> None:
@@ -224,6 +246,11 @@ class BufferStore:
             frames.append((int(version), encoded))
             while len(frames) > self._history:
                 frames.popleft()
+            # ponytail: O(frames) per put, at most FRAME_HISTORY; keep a running
+            # total per panel if put ever shows up in a profile.
+            size = sum(len(payload) for _, payload in frames)
+            while len(frames) > self._min_keep and size > self._budget:
+                size -= len(frames.popleft()[1])
 
     def get(self, panel_id: str, version: int):
         """Return the encoded frame, or ``None`` if unknown or evicted."""

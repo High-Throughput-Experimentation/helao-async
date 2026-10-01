@@ -90,6 +90,55 @@ def test_store_retains_several_frames_by_default():
     assert store.get("panel-a", 1) is not None
 
 
+def _frame_of(nbytes: int) -> list:
+    """Column buffers carrying *nbytes* of payload."""
+    return [memoryview(np.zeros(nbytes // 8, dtype=np.float64).tobytes())]
+
+
+def test_store_keeps_every_frame_of_a_live_sized_stream():
+    """Live frames are tens of KB: 512 of them fit the budget, so the byte
+    budget never shortens the window the 60 Hz panels need."""
+    store = xc.BufferStore()
+    bufs = _frame_of(32 * 1024)
+    for version in range(1, xc.FRAME_HISTORY + 89):
+        store.put("panel-a", version, bufs)
+    assert store.versions("panel-a") == list(range(89, xc.FRAME_HISTORY + 89))
+
+
+def test_store_keeps_only_a_budget_of_4_mib_photo_frames():
+    """A photo-underlay map frame is about 4 MiB. 512 of them would be 2 GiB
+    per panel; the budget keeps floor(32 MiB / frame) of the newest."""
+    store = xc.BufferStore()
+    bufs = _frame_of(4 * 1024 * 1024)
+    frame = len(xc.encode_buffers(bufs))
+    for version in range(1, 21):
+        store.put("panel-a", version, bufs)
+    kept = xc.FRAME_BUDGET_BYTES // frame
+    assert kept == 7  # 4 MiB of columns plus the frame header tops 4 MiB
+    assert store.versions("panel-a") == list(range(21 - kept, 21))
+    assert store.get("panel-a", 20 - kept) is None  # evicted
+    assert store.get("panel-a", 20) is not None  # newest
+
+
+def test_store_keeps_the_newest_few_frames_even_over_budget():
+    """The browser fetches version N while N+1 is published, so a panel whose
+    every frame is over budget still serves its newest FRAME_MIN_KEEP."""
+    store = xc.BufferStore(budget_bytes=1000)
+    bufs = _frame_of(2000)
+    for version in range(1, 11):
+        store.put("panel-a", version, bufs)
+    assert store.versions("panel-a") == list(range(11 - xc.FRAME_MIN_KEEP, 11))
+    assert xc.FRAME_MIN_KEEP == 4
+
+
+def test_store_always_serves_the_newest_version():
+    store = xc.BufferStore(budget_bytes=100_000)
+    sizes = [10, 200_000, 50, 90_000, 300_000, 8, 60_000]
+    for version, nbytes in enumerate(sizes, start=1):
+        store.put("panel-a", version, _frame_of(max(nbytes, 8)))
+        assert store.get("panel-a", version) is not None
+
+
 def test_store_history_is_per_panel():
     store = xc.BufferStore(history=1)
     store.put("panel-a", 1, _bufs())
