@@ -194,6 +194,33 @@ def test_helao_data_reads_the_new_layout(tmp_path: Path):
     assert [Path(p).name for p in hd.data_files] == ["data-0.0.0.0__0.hlo"]
 
 
+@pytest.mark.parametrize(
+    "root, expected",
+    [
+        (("RUNS", "2026", "1001"), ("2026", "1001")),
+        (("DIAG", "2026", "1001"), ("2026", "1001")),
+        (("RUNS_FINISHED", "26.40", "1001"), ("26.40", "1001")),
+        (("PROCESSES", "26.40", "1001"), ("26.40", "1001")),
+        (
+            ("RUNS_SUPERSEDED", "260818.091656", "RUNS_FINISHED", "26.25", "0624"),
+            ("26.25", "0624"),
+        ),
+    ],
+)
+def test_helao_data_runs_relpath_strips_every_run_root(tmp_path: Path, root, expected):
+    """A post-processor reading a RUNS or DIAG record raised StopIteration here.
+
+    ``read_hlo`` passes every on-disk path through ``_runs_relpath``; matching
+    only ``RUNS_*``/``PROCESSES`` made each read of the new layout fail, and
+    the hook saw an action with no data.
+    """
+    from helao.helpers.helao_data import HelaoData
+
+    tail = ("seqdir", "expdir", "0__0__ANDOR__acquire", "ANDORSPEC-0.0.0.0__0.hlo")
+    p = Path(tmp_path, *root, *tail)
+    assert HelaoData._runs_relpath(str(p)) == str(Path(*expected, *tail))
+
+
 def test_helao_data_widens_the_inner_run_root_only(tmp_path: Path):
     """Widening the OUTER root of a nested archive reaches a second archive.
 

@@ -22,7 +22,7 @@ from tempfile import TemporaryDirectory
 import orjson
 import pandas as pd
 
-from helao.core.models.run_dir import RunDir, is_legacy_path
+from helao.core.models.run_dir import RunDir, is_legacy_path, is_run_root
 
 from .file_mapper import FileMapper
 from .hlo_data import read_hlo_bytes
@@ -264,21 +264,22 @@ class HelaoData:
 
     @staticmethod
     def _runs_relpath(p: str) -> str:
-        """Return ``p`` relative to its ``RUNS_<state>``/``PROCESSES`` root.
+        """Return ``p`` relative to its run root.
 
-        ``FileMapper.read_*`` expect a path relative to the run-state root so
-        they can try each state (and the synced sequence zip) in turn.
+        ``FileMapper.read_*`` expect a path relative to the run root so they
+        can try each state (and the synced sequence zip) in turn. The root is
+        whatever :func:`is_run_root` names -- ``RUNS``, ``DIAG``, a legacy
+        ``RUNS_<state>`` or ``PROCESSES`` -- and the LAST such segment, as in
+        ``FileMapper``, because a superseded record nests a whole legacy tree.
 
         Args:
-            p: An absolute path inside a ``RUNS_<state>`` or ``PROCESSES`` tree.
+            p: An absolute path inside a run tree.
 
         Returns:
-            The path with the run-state root and everything above it stripped.
+            The path with the run root and everything above it stripped.
         """
         parts = Path(p).parts
-        runpos = next(
-            i for i, v in enumerate(parts) if v.startswith("RUNS_") or v == "PROCESSES"
-        )
+        runpos = [i for i, v in enumerate(parts) if is_run_root(v)][-1]
         return os.path.join(*parts[runpos + 1 :])
 
     @property
