@@ -1124,18 +1124,25 @@ finish re-walks its children and re-enqueues the last one *after* that child's
 `sync_yml` has already appended its `DONE`. The later `UNSYNCED` re-opens a
 record that has already shipped, and nothing appends `DONE` again because
 `sync_yml` short-circuits on a complete `.prg`. **The entry is in the working
-set permanently**, and `has_pending_work()` reads exactly that set — so the
-hot-reload idle gate never clears. Observed at rest on a real launch: the last
-action of *every* experiment sat `unsynced` beside a `.prg` reading
-`api: true` / `s3: true`.
+set permanently.** Observed at rest on a real launch: the last action of
+*every* experiment sat `unsynced` beside a `.prg` reading `api: true` /
+`s3: true`.
+
+**Corrected 2026-10-01 — this does not wedge the hot-reload idle gate.** An
+earlier revision of this amendment said `has_pending_work()` reads the journal
+working set. It does not: it returns
+`self.task_queue.qsize() > 0 or bool(self.running_tasks)`. The error was
+transferring A1's reasoning, which is correct about `task_queue`, onto the
+journal. See A39 for what the journal actually is.
 
 **D-C — the finalizer skipped `move_dir` for manual actions.** *Not introduced
 by this branch* — the branch predates the merge-base and was **correct** while
 `move_dir` copied a tree, because a manual run is already written where it
 belongs. Task 9 emptied `move_dir` and made it the eviction point; the skip then
 silently became a skip of the eviction. A latent defect **activated by a change
-elsewhere**, which is why no diff shows it. Same consequence as D-B: one
-diagnostic action wedges the idle gate for the life of the station.
+elsewhere**, which is why no diff shows it. Same consequence as D-B: the
+record is never evicted, so the journal's working set is wrong for the life of
+the station. (Not an idle-gate wedge — see the correction above and A39.)
 
 **D-C has no pytest coverage.** It is pinned by the frozen golden master —
 which `run_tests.py` reports as `NOTESTS`, and which exits green vacuously
@@ -1182,9 +1189,12 @@ Established, not assumed:
   estopped experiment or sequence stays `active` in the ORCH journal
   **permanently**.
 
-`has_pending_work()` reads that set, so one estop wedges the hot-reload idle
-gate for the life of the station — and an estop is exactly when a station most
-needs a clean restart.
+So the journal's working set is permanently wrong after any estop.
+
+**Corrected 2026-10-01:** an earlier revision said this wedges the hot-reload
+idle gate. It does not, for the reason given in A34's correction —
+`has_pending_work()` reads `task_queue`, not the journal. The second
+consequence below is the one that actually costs data, and it stands.
 
 **Second consequence, worse than the first:** the skipped call also skipped
 `yml_finisher`, so **the estopped run was never handed to the syncer at all.**
@@ -1309,6 +1319,62 @@ a live archive record and compared: identical members and bytes, but
 **`os.walk` order ≠ `namelist()` order**, leaving `refusals` nondeterministic.
 Fixed and pinned (`6cb05e9`). A test written against the shape the code
 produces cannot detect an ordering assumption; only a real artifact can.
+
+### A39 — Nothing reads the journal. `.prg` is the state authority.
+
+Established 2026-10-01, post-merge, by enumerating every consumer repo-wide
+(parent + all four deployments, each swept with an explicit path because
+`grep` here honours `.gitignore` — A29):
+
+```
+helao/core/drivers/data/sync_driver.py:1247   self.run_journal.working_set()
+helao/hexagon/adapters/native/sync_driver.py:1250   (the byte-pinned mirror)
+```
+
+Two call sites, and **both discard the result.** It is a parse check: if
+`working_set()` raises `ValueError` the journal is corrupt and gets rebuilt
+from the run tree. Nothing anywhere branches on its contents.
+
+So the journal is **written but never read** — an audit log, not a state
+authority. What actually decides state:
+
+| Decision | Source |
+|---|---|
+| is this record pending? | a complete sibling `.prg` (A1's filter) |
+| what does a rebuild re-enqueue? | a missing or incomplete `.prg` (A12) |
+| is the syncer busy? | `task_queue` + `running_tasks` |
+| what does recovery clean? | the `processing/` checkpoint sidecar |
+
+**This is a gap between the spec and the code, not a defect in either.**
+Spec §4 describes the journal as where lifecycle state lives, and §4.5 calls
+it "an index, not the source of truth" — the second is what shipped, and the
+first is not yet true. D-B, D-C and the estop defect (A34, A35) are all real
+and their fixes all correct, but they fix *bookkeeping*: a wrong journal has
+no live consequence today because nothing consults it.
+
+Two honest options, and this plan does not choose:
+
+1. **Build the reader.** The journal becomes load-bearing: `has_pending_work`
+   consults it, `list_pending*` is driven by it rather than by globbing plus a
+   `.prg` filter, and the post-finish hooks deferred earlier get the
+   substrate they were going to need. Then A34/A35's defects become live, and
+   the three fixes are what make the reader safe to add.
+2. **Say what it is.** Amend §4 to state that `.prg` is the authority and the
+   journal is an append-only audit log — useful for a human diagnosing a
+   station, and for a rebuild to shortcut, but not consulted for a decision.
+
+Option 1 is the design as written; option 2 is the design as built. Leaving
+them divergent is the one choice that costs something, because the next person
+to read §4 will assume a reader exists.
+
+**Worth noting how this surfaced.** It came from a question about batch
+recovery, not from reviewing the journal. Three amendments asserted a
+consequence ("wedges the hot-reload idle gate") that was never checked against
+`has_pending_work`'s two-line body, and it survived a 13-task plan, 24
+amendments and a merge. The claim was plausible because A1 says something
+almost identical and *is* correct — A1 is about `task_queue`, which
+`has_pending_work` really does read. A true neighbouring claim is the easiest
+kind of wrong one to keep.
 
 ---
 
