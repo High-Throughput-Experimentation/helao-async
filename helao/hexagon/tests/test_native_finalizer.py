@@ -1,6 +1,6 @@
 """NativeActionFinalizer (P2b-1): verbatim re-body of legacy ActionFinalizer
-(helao/core/servers/active_finalizer.py) — the ce846da1 join-drain-close
-chain. Source-parity pin + behavior on real tmp trees with a full native
+(helao/core/servers/active_finalizer.py, deleted by B7b) — the ce846da1
+join-drain-close chain. Behavior on real tmp trees with a full native
 collaborator set: finish drains queued data BEFORE closing
 handles, closes every file, cancels data_logger, writes the final -act.yml,
 schedules move_dir (manual included -- it is the journal eviction
@@ -20,28 +20,9 @@ import helao.hexagon.adapters.native.finalizer as native_finalizer_mod
 from helao.core.error import ErrorCodes
 from helao.core.models.data import DataModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.active_finalizer import ActionFinalizer
 from helao.hexagon.adapters.native.finalizer import NativeActionFinalizer
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
 from helao.hexagon.tests.native_fixtures import make_base, mk_action, mk_active
-
-METHODS = [
-    "__init__",
-    "split_and_keep_active",
-    "split_and_finish_prev_uuids",
-    "finish_all",
-    "split",
-    "substitute",
-    "finish",
-    "_finish",
-    "finish_manual_action",
-]
-
-
-def test_source_parity_with_legacy():
-    from helao.hexagon.tests.native_fixtures import assert_source_parity
-
-    assert_source_parity(NativeActionFinalizer, ActionFinalizer, METHODS)
 
 
 def _grafted_active(tmp_path, **action_over):

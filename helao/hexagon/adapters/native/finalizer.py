@@ -9,18 +9,18 @@ handle and cancel ``data_logger`` (late data beyond the bounded retries is
 dropped exactly as legacy drops it); HLO post-processors may rewrite
 ``files[]``; final ``write_act`` per action; fire-and-forget ``move_dir``
 promotion for non-manual actions only; ``finish_manual_action`` synthesizes
-the ``exp--``/``seq--`` metas. Method bodies are byte-identical to legacy
-(source-parity-pinned by ``test_native_finalizer.py``); only this docstring,
-the class name, and ``__all__`` differ.
+the ``exp--``/``seq--`` metas. Method bodies were byte-identical to the legacy
+engine (source-parity-pinned by ``test_native_finalizer.py``) until B7b
+deleted it; they have since been reformatted by black.
 
 Per-Active collaborator: holds only the ``active`` back-reference; the drain
 counters (``num_data_queued``/``num_data_written``), ``action_list``,
 ``file_conn_dict``, ``data_logger`` and ``finish_lock`` are read live off
 ``Active`` at call time -- caching ANY of them here recreates the exact
 ce846da1 failure class (a finish that closes before late data lands, a
-leaked handle -> WinError 32 -> permanent promotion failure). Swapped in for
-``active.action_finalizer`` by ``graft_active_write_path`` between
-``Active.__init__`` and ``myinit()``.
+leaked handle -> WinError 32 -> permanent promotion failure).
+``ActionSession`` constructs it as its ``action_finalizer``
+(``NativeArtifactStoreAdapter.collaborators_for``).
 
 Module-global functions ``set_time`` / ``move_dir`` /
 ``async_private_dispatcher`` are imported here exactly as the legacy module
@@ -59,11 +59,11 @@ class NativeActionFinalizer:
     state), per the call-time state resolution rule -- see module docstring.
 
     The back-reference is declared at class level rather than annotated on the
-    ``__init__`` parameter: ``__init__`` is byte-pinned against its legacy twin
-    by ``assert_source_parity`` (see ``native_fixtures``), and an annotation in
-    the signature would change ``inspect.getsource(__init__)`` and break the
-    pin. A class-level annotation gives static checking without touching the
-    pinned method source.
+    ``__init__`` parameter: until B7b deleted the engine, ``__init__`` was
+    byte-pinned against its legacy twin, and an annotation in the signature
+    would have changed ``inspect.getsource(__init__)`` and broken the pin. A
+    class-level annotation gives static checking without touching the method
+    source.
     """
 
     active: ActionSessionPort
@@ -123,7 +123,9 @@ class NativeActionFinalizer:
 
             # now re-init current action
             # force action init (new action uuid and timestamp)
-            self.active.action.init_act(time_offset=self.active.base.ntp_offset, force=True)
+            self.active.action.init_act(
+                time_offset=self.active.base.ntp_offset, force=True
+            )
             self.active.action_list += prev_action_list
             # add new action uuid to listen_uuids
             self.active.add_new_listen_uuid(self.active.action.action_uuid)
@@ -168,7 +170,9 @@ class NativeActionFinalizer:
 
                 new_file_conn_keys.append(new_file_conn_key)
                 # add the new one to active file conn dict
-                self.active.file_conn_dict[new_file_conn.params.file_conn_key] = new_file_conn
+                self.active.file_conn_dict[new_file_conn.params.file_conn_key] = (
+                    new_file_conn
+                )
                 # and add the new file_conn_uuid to the new split action
                 self.active.action.file_conn_keys = [
                     new_file_conn.params.file_conn_key
@@ -190,7 +194,9 @@ class NativeActionFinalizer:
             if uuid_list is None:
                 # default: finish all except current one
                 await self.active.finish(
-                    finish_uuid_list=[act.action_uuid for act in self.active.action_list[1:]]
+                    finish_uuid_list=[
+                        act.action_uuid for act in self.active.action_list[1:]
+                    ]
                 )
 
             else:
@@ -237,7 +243,9 @@ class NativeActionFinalizer:
     ) -> Action:
         """Finalization body for :meth:`finish`; must be called under ``finish_lock``."""
         if finish_uuid_list is None:
-            finish_uuid_list = [action.action_uuid for action in self.active.action_list]
+            finish_uuid_list = [
+                action.action_uuid for action in self.active.action_list
+            ]
 
         for action in self.active.action_list:
             if action.action_uuid not in finish_uuid_list:
@@ -249,7 +257,9 @@ class NativeActionFinalizer:
                 # set status to finish
                 # (replace active with finish)
                 action.replace_action_status(HloStatus.active, HloStatus.finished)
-                action.action_finished_timestamp = set_time(offset=self.active.base.ntp_offset)
+                action.action_finished_timestamp = set_time(
+                    offset=self.active.base.ntp_offset
+                )
 
                 if action.error_code != ErrorCodes.none:
                     if HloStatus.errored not in action.action_status:
@@ -442,7 +452,9 @@ class NativeActionFinalizer:
                 # syncer handoff for a manual record; the branch belongs there,
                 # not here.
                 try:
-                    self.active.base.aloop.create_task(move_dir(action, base=self.active.base))
+                    self.active.base.aloop.create_task(
+                        move_dir(action, base=self.active.base)
+                    )
                     # pop from local action task queue
                 except Exception:
                     LOGGER.error(

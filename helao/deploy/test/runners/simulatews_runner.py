@@ -5,7 +5,7 @@ Reproduces the action series of
 ``wait, acquire_data, wait, acquire_data`` -- without the full orchestrator.
 
 Both servers are treated as plain action servers. The ``wait`` action is hosted
-by ``ORCH`` itself (``OrchAPI`` inherits ``BaseAPI``, so the orchestrator
+by ``ORCH`` itself (``OrchHost`` subclasses ``ActionHost``, so the orchestrator
 exposes ``/ORCH/wait`` as an RPC action endpoint just like any driver), and
 ``acquire_data`` is hosted by the ``SIM`` websocket simulator. MicroOrch
 dispatches to both directly.

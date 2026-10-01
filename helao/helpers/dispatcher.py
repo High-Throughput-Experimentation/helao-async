@@ -132,7 +132,7 @@ async def async_action_dispatcher(
     attempts a ZMQ RPC call to ``<server>/<action>``, and on any RPC error
     or timeout retries over HTTP. The HTTP fallback is the legacy path
     that runs through the action-queuing middleware in
-    :class:`BaseAPI`; the RPC fast path bypasses that middleware and
+    :class:`ActionHost`; the RPC fast path bypasses that middleware and
     relies on orchestrator-side endpoint coordination instead.
 
     Args:

@@ -6,8 +6,9 @@ at one of its awaits, finalized the SAME experiment and cleared
 ``orch.active_experiment.experiment_uuid`` and the experiment was written twice
 and listed twice in ``dispatched_experiments``.
 
-Both orchestrators route through ``RunLifecycle`` / ``EstopController``, so each
-test runs against the legacy ``Orch`` and the hexagon ``OrchHost``.
+The tests drive the hexagon ``OrchHost`` through ``RunLifecycle`` /
+``EstopController``. Until B7b each one also ran against the legacy ``Orch``,
+which B7b deleted.
 """
 
 import asyncio
@@ -23,7 +24,6 @@ from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
 from helao.core.models.orchstatus import LoopStatus
 from helao.core.models.server import GlobalStatusModel
-from helao.core.servers.orch import Orch
 from helao.hexagon.app.orch_host import OrchHost
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.premodels import Experiment, Sequence
@@ -84,7 +84,6 @@ def _make_orch(cls, init_collaborators: str):
 
 
 FLAVOURS = [
-    pytest.param(Orch, "_init_collaborators", id="legacy"),
     pytest.param(OrchHost, "_init_orch_collaborators", id="hexagon"),
 ]
 

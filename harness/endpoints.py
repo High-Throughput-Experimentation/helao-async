@@ -8,7 +8,7 @@ phase's composition is diffed against.
 
 Limits (by design, documented): decorator paths built from anything other
 than constants and simple f-string ``{name}`` substitutions extract as
-``{?}``; routes registered dynamically at runtime (BaseAPI system surface,
+``{?}``; routes registered dynamically at runtime (ActionHost system surface,
 config-shaped dyn endpoints) are NOT visible statically — §8.3 pairs this
 static pass with the runtime /openapi.json cross-check at preflight (P1+).
 """

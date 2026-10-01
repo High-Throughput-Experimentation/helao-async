@@ -1,11 +1,9 @@
 """Read-only payload builders behind the orchestrator's queue and history routes.
 
 Moved verbatim from ``helao/core/servers/orch_api.py`` by B7a. Each takes the
-orchestrator -- ``OrchHost`` natively, legacy ``Orch`` through ``orch_api``'s
-re-export -- and reads its queues, histories, ``status_summary`` and
-``step_thru_*`` flags at call time. They shape what the Bokeh and Reflex
-operators parse, so there is one implementation, here; ``orch_api`` re-exports
-these names until B7b deletes it.
+orchestrator (``OrchHost``) and reads its queues, histories,
+``status_summary`` and ``step_thru_*`` flags at call time. They shape what
+the Bokeh and Reflex operators parse, so there is one implementation, here.
 """
 
 from typing import Optional

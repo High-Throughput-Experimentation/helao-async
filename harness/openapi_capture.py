@@ -1,8 +1,8 @@
 """Capture a live server's route surface to a normalized, diffable form.
 
 The static extractor in :mod:`harness.endpoints` sees only ``@app.<method>(...)``
-decorators on a module's own functions; it cannot see the routes ``BaseAPI``/
-``Base`` register at runtime, which is exactly the surface a host replacement has
+decorators on a module's own functions; it cannot see the routes ``ActionHost``/
+``OrchHost`` register at runtime, which is exactly the surface a host replacement has
 to reproduce. This module reads them off a launched server instead.
 
 **WebSockets are deliberately out of scope here.** They do not appear in

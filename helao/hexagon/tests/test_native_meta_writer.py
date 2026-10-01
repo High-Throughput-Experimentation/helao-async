@@ -1,5 +1,5 @@
 """NativeMetaFileWriter (P2b-1): verbatim re-body of legacy MetaFileWriter
-(helao/core/servers/base_meta_writer.py). Source-parity-pinned + behavior
+(helao/core/servers/base_meta_writer.py, deleted by B7b). Behavior
 checks on a real tmp tree (atomic tmp+os.replace, trailing newline,
 file_type first key, RUNS_ACTIVE->RUNS_DIAG manual swap, md5 conn keys)."""
 
@@ -10,27 +10,8 @@ from uuid import UUID
 import pytest
 
 from helao.core.models.run_dir import RunDir
-from helao.core.servers.base_meta_writer import MetaFileWriter
 from helao.hexagon.adapters.native.meta_writer import NativeMetaFileWriter
-from helao.hexagon.tests.native_fixtures import (
-    assert_source_parity,
-    make_base,
-    mk_action,
-)
-
-METHODS = [
-    "__init__",
-    "_write_meta_atomic",
-    "write_act",
-    "write_exp",
-    "write_seq",
-    "new_file_conn_key",
-    "dflt_file_conn_key",
-]
-
-
-def test_source_parity_with_legacy():
-    assert_source_parity(NativeMetaFileWriter, MetaFileWriter, METHODS)
+from helao.hexagon.tests.native_fixtures import make_base, mk_action
 
 
 def _swap(base, tmp_path):

@@ -1,4 +1,4 @@
-# helao/core/servers — dispatch loop traps
+# helao/hexagon/app — dispatch loop and host traps
 
 <!-- Split out of the root CLAUDE.md. Loaded when work touches this directory. -->
 

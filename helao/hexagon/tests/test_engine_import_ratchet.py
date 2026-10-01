@@ -140,29 +140,20 @@ from helao.helpers import config_loader
 cfg = yaml.safe_load(open(sys.argv[1], encoding="utf-8"))
 cfg["root"] = tempfile.mkdtemp(prefix="b7a_ratchet_")
 config_loader.CONFIG = cfg
-if sys.argv[2] == "native":
-    from helao.hexagon.app.action_host import ActionHost
-    from helao.hexagon.app.factory import makeActionApp
-    from helao.hexagon.app.orch_host import OrchHost
+from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.factory import makeActionApp
+from helao.hexagon.app.orch_host import OrchHost
 
-    hosts = {
-        "ActionHost": ActionHost("SIM", "SIM", "ratchet", 1.0, helao_cfg=cfg),
-        "OrchHost": OrchHost("ORCH", "ORCH", "ratchet", version=3.0, helao_cfg=cfg),
-        # B7b: the composition every `deployment: hexagon` action server is
-        # built through. Until B7b it imported active_graft, and with it
-        # twelve engine modules, though no target needed the graft.
-        "makeActionApp": makeActionApp(
-            "SIM", "helao.deploy.test.servers.action.ws_simulator"
-        ),
-    }
-else:
-    from helao.core.servers.base_api import BaseAPI
-    from helao.core.servers.orch_api import OrchAPI
-
-    hosts = {
-        "BaseAPI": BaseAPI("SIM", "SIM", "ratchet", 1.0),
-        "OrchAPI": OrchAPI("ORCH", "ORCH", "ratchet", 3.0),
-    }
+hosts = {
+    "ActionHost": ActionHost("SIM", "SIM", "ratchet", 1.0, helao_cfg=cfg),
+    "OrchHost": OrchHost("ORCH", "ORCH", "ratchet", version=3.0, helao_cfg=cfg),
+    # B7b: the composition every `deployment: hexagon` action server is
+    # built through. Until B7b it imported active_graft, and with it
+    # twelve engine modules, though no target needed the graft.
+    "makeActionApp": makeActionApp(
+        "SIM", "helao.deploy.test.servers.action.ws_simulator"
+    ),
+}
 report = {
     "engine_modules": sorted(
         m for m in sys.modules
@@ -182,9 +173,9 @@ print("B7A-PROBE " + json.dumps(report))
 """
 
 
-def _probe(mode: str) -> dict:
+def _probe() -> dict:
     proc = subprocess.run(
-        [sys.executable, "-c", _PROBE, str(CONFIG), mode],
+        [sys.executable, "-c", _PROBE, str(CONFIG)],
         cwd=REPO_ROOT,
         env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
         capture_output=True,
@@ -194,18 +185,13 @@ def _probe(mode: str) -> dict:
     lines = [ln for ln in proc.stdout.splitlines() if ln.startswith("B7A-PROBE ")]
     assert (
         proc.returncode == 0 and len(lines) == 1
-    ), f"{mode} probe failed (rc={proc.returncode}):\n{proc.stderr[-4000:]}"
+    ), f"native probe failed (rc={proc.returncode}):\n{proc.stderr[-4000:]}"
     return json.loads(lines[0][len("B7A-PROBE ") :])
 
 
 @pytest.fixture(scope="module")
 def native() -> dict:
-    return _probe("native")
-
-
-@pytest.fixture(scope="module")
-def legacy() -> dict:
-    return _probe("legacy")
+    return _probe()
 
 
 def test_the_native_hosts_construct_without_the_engine(native) -> None:
@@ -215,15 +201,6 @@ def test_the_native_hosts_construct_without_the_engine(native) -> None:
 def test_every_native_route_is_built_by_the_host_bound_class(native) -> None:
     for name, host in native["hosts"].items():
         assert host["installed"] == "helao.hexagon.app.action_route.BoundActionRoute", (
-            name,
-            host["installed"],
-        )
-        assert host["api_routes"] > 0 and host["wrong_class"] == [], (name, host)
-
-
-def test_every_legacy_route_is_built_by_action_api_route(legacy) -> None:
-    for name, host in legacy["hosts"].items():
-        assert host["installed"] == "helao.core.servers.base_api.ActionAPIRoute", (
             name,
             host["installed"],
         )

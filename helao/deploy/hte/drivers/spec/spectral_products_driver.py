@@ -448,7 +448,7 @@ class SM303(HelaoDriver):
 
         Server-side estop-flag bookkeeping (``actionservermodel.estop``) and
         terminating/finalizing in-flight actions are owned by the action-server
-        framework (``base_api.py``'s ``/estop`` endpoint), not the driver.
+        framework (``ActionHost``'s ``/estop`` endpoint), not the driver.
 
         Args:
             switch: ``True`` to engage e-stop, ``False`` to clear it.

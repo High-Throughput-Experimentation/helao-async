@@ -1,5 +1,5 @@
 """NativeDataStreamer (P2b-1): verbatim re-body of legacy DataStreamer
-(helao/core/servers/active_data_stream.py). Source-parity pin + drain-loop
+(helao/core/servers/active_data_stream.py, deleted by B7b). Drain-loop
 behavior on a real MultisubscriberQueue + tmp tree: lazy open on first
 matching packet, json_data_keys inference, %% exactly once, non-serializable
 -> error line, string payload raw, listen_uuids filter, queued/written
@@ -13,30 +13,9 @@ import pytest
 
 from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.active_data_stream import DataStreamer
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.tests.native_fixtures import make_base, mk_active
-
-METHODS = [
-    "__init__",
-    "get_realtime",
-    "get_realtime_nowait",
-    "write_live_data",
-    "enqueue_data_dflt",
-    "_build_data_package",
-    "enqueue_data",
-    "enqueue_data_nowait",
-    "assemble_data_msg",
-    "add_new_listen_uuid",
-    "log_data_task",
-]
-
-
-def test_source_parity_with_legacy():
-    from helao.hexagon.tests.native_fixtures import assert_source_parity
-
-    assert_source_parity(NativeDataStreamer, DataStreamer, METHODS)
 
 
 def _native_active(tmp_path):

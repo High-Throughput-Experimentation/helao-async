@@ -1,5 +1,5 @@
 """NativeDataFileWriter (P2b-1): verbatim re-body of legacy DataFileWriter
-(helao/core/servers/active_data_file.py). Source-parity pin + real-tmp-tree
+(helao/core/servers/active_data_file.py, deleted by B7b). Real-tmp-tree
 behavior checks for the §5.4 quirks: w+ truncate-on-create, filename autogen
 format, one-shot a+ header+%%+payload, save_data gate, posix
 PureWindowsPath+.strip("\\\\") path quirk, FileInfo recording."""
@@ -10,30 +10,8 @@ import pytest
 
 from helao.core.models.file import HloFileGroup
 from helao.helpers.premodels import Action
-from helao.core.servers.active_data_file import DataFileWriter
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
-from helao.hexagon.tests.native_fixtures import (
-    assert_source_parity,
-    make_base,
-    mk_action,
-    mk_active,
-)
-
-METHODS = [
-    "__init__",
-    "update_act_file",
-    "init_datafile",
-    "finish_hlo_header",
-    "log_data_set_output_file",
-    "_resolve_output_path",
-    "write_file",
-    "write_file_nowait",
-    "track_file",
-]
-
-
-def test_source_parity_with_legacy():
-    assert_source_parity(NativeDataFileWriter, DataFileWriter, METHODS)
+from helao.hexagon.tests.native_fixtures import make_base, mk_action, mk_active
 
 
 def _native_active(tmp_path, **action_over):

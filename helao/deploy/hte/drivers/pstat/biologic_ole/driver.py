@@ -94,7 +94,7 @@ class BiologicOleDriver(HelaoDriver):
     def __init__(self, config: dict = {}):
         """Store configuration. Opens nothing -- ``connect()`` does that.
 
-        ``BaseAPI`` constructs drivers before the server is serving, and the
+        ``ActionHost`` constructs drivers before the server is serving, and the
         eclib sibling was changed in P3a-2 to stop opening the instrument
         here. This one never did.
         """
@@ -765,7 +765,7 @@ class BiologicOleDriver(HelaoDriver):
             self.connect()
 
     def shutdown(self) -> None:
-        """Stop every running channel, clean up, disconnect. Called by BaseAPI."""
+        """Stop every running channel, clean up, disconnect. Called by ActionHost."""
         try:
             states = self.get_status().data
             for channel, state in states.items():
