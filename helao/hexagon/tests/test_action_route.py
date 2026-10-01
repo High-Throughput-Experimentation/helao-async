@@ -216,3 +216,38 @@ async def test_a_raising_private_route_does_not_estop():
         await client.post("/nonexistent_private_route", json={})
 
     assert not session.estopped, "a private-route error estopped the station"
+
+
+# -- moved from helao/core/tests/unit_test_base_api.py (B7b) -----------------
+
+
+def test_a_sync_handler_is_wrapped_synchronously_and_gets_its_context() -> None:
+    """The wrapper keeps a sync endpoint sync; awaiting its result would 500."""
+    seen = {}
+
+    def handler(ctx: ActionContext, payload: str = "p"):
+        seen["ctx"] = ctx
+        return payload
+
+    wrapped = wrap_action_endpoint(handler, _host())
+    assert not inspect.iscoroutinefunction(wrapped)
+    assert wrapped(payload="hello", action_version=1) == "hello"
+    assert seen["ctx"].action.action_params["payload"] == "hello"
+
+
+def test_the_envelope_keys_are_split_from_action_params() -> None:
+    """The queuing middleware rebuilds a queued action from query params; a key
+    missing here lands in action_params instead of on the Action."""
+    from helao.hexagon.app.action_host import ACTION_PARAM_KEYS
+
+    for key in (
+        "start_condition",
+        "from_global_act_params",
+        "to_global_params",
+        "manual_action",
+        "process_finish",
+        "save_act",
+        "save_data",
+        "campaign_uuid",
+    ):
+        assert key in ACTION_PARAM_KEYS, key

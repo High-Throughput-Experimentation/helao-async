@@ -1,20 +1,17 @@
-"""Unit tests for the ``LiveBuffer`` collaborator extracted from ``Base``
-(CARDS P6, Stage S1): the live-buffer cluster (``live_buffer_task``/
+"""Unit tests for ``ActionHost``'s live-buffer surface (``live_buffer_task``/
 ``_stamp_lbuf_dict``/``put_lbuf``/``put_lbuf_nowait``/``get_lbuf``/
 ``get_realtime``/``get_realtime_nowait``).
 
-``test_active_golden_master.py --check`` drives ``Base.get_realtime``/
-``get_realtime_nowait`` (via ``Active``'s forwarders) but never exercises
-``put_lbuf``/``get_lbuf``/``live_buffer_task`` -- those are normally
+The action golden master drives ``get_realtime``/``get_realtime_nowait`` but
+never ``put_lbuf``/``get_lbuf``/``live_buffer_task`` -- those are normally
 executor-driven (a driver's poller pushes readings into the live buffer).
-This module is the S1-specific behavior-preservation gate for that surface.
+This module is the gate for that surface. Ported from the legacy ``Base``
+fixture by B7b.
 
-Mirrors the ``Base.__new__`` bypass fixture used by
-``test_active_golden_master.py``'s ``_make_base``: a bare ``Base`` built
-without ``Base.__init__`` (no FastAPI app, no disk I/O, no NTP), populated
-only with the attributes ``LiveBuffer`` methods touch, then
-``_init_collaborators()`` is called so ``base.live_buffer_mgr`` exists exactly
-as it would after the real ``__init__``.
+A bare ``ActionHost`` built with ``__new__`` (no FastAPI app, no disk I/O, no
+NTP), populated only with the attributes these methods touch. The clock is
+the production ``LegacyClockAdapter``: ``get_realtime_nowait`` reads its time
+and offset through the clock port, not a cached ``ntp_offset``.
 
 Hermetic: no network, no disk I/O; a real ``MultisubscriberQueue`` so the
 ``live_buffer_task`` drain is checked against genuine fan-out behavior, not a
@@ -27,24 +24,25 @@ import asyncio
 import traceback
 
 from helao.core.models.machine import MachineModel
-from helao.core.servers.base import Base
 from helao.core.tests._test_utils import TestReporter
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
+from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
+from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.wiring import PortWiring
 
 SERVER_NAME = "LBUFSRV"
 MACHINE = "test-machine"
 
 
-def _make_base() -> Base:
-    """Build a bare ``Base`` with every attribute ``LiveBuffer`` methods touch."""
-    base = Base.__new__(Base)
+def _make_base(offset_s: float = 0.0) -> ActionHost:
+    """Build a bare ``ActionHost`` with every attribute the live-buffer methods touch."""
+    base = ActionHost.__new__(ActionHost)
     base.server = MachineModel(
         server_name=SERVER_NAME, machine_name=MACHINE, hostname="127.0.0.1", port=8000
     )
-    base.ntp_offset = 0.0
+    base.hexagon_wiring = PortWiring(clock=LegacyClockAdapter(offset_s))
     base.live_q = MultisubscriberQueue()
     base.live_buffer = {}
-    base._init_collaborators()
     return base
 
 
@@ -121,12 +119,13 @@ def _check_get_realtime_nowait() -> bool:
         2.0 * 1e9
     )
 
-    # offset=None defaults to base.ntp_offset
-    base.ntp_offset = 3.0
-    default_offset_ok = base.get_realtime_nowait(epoch_ns=1000) == 1000 + int(3.0 * 1e9)
+    # offset=None defaults to the clock port's offset
+    offset_base = _make_base(3.0)
+    default_offset_ok = offset_base.get_realtime_nowait(epoch_ns=1000) == 1000 + int(
+        3.0 * 1e9
+    )
 
-    # no epoch_ns -> real wall-clock via Timer, should be a plausible epoch-ns value
-    base.ntp_offset = 0.0
+    # no epoch_ns -> the clock port's wall clock, a plausible epoch-ns value
     now_ns = base.get_realtime_nowait()
     now_ok = isinstance(now_ns, int) and now_ns > 10**18
 
@@ -182,8 +181,8 @@ def base_live_buffer_unit_test() -> bool:
 
     reporter.section("get_realtime_nowait / get_realtime")
     reporter.check(
-        "epoch_ns passthrough, explicit offset, default-to-ntp_offset, and "
-        "Timer-derived wall clock all compute the expected nanosecond value",
+        "epoch_ns passthrough, explicit offset, default-to-clock-offset, and "
+        "clock-port wall clock all compute the expected nanosecond value",
         lambda: res["get_realtime_nowait"],
     )
     reporter.check(

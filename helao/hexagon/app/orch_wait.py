@@ -2,8 +2,7 @@
 
 Moved verbatim from ``helao/core/servers/orch_api.py`` by B7a. ``OrchHost``
 runs its ``wait`` action on :class:`WaitExec` and types its conditional
-endpoints with :class:`checkcond`; ``orch_api`` re-exports both names for the
-legacy ``OrchAPI`` until B7b deletes it.
+endpoints with :class:`checkcond`.
 """
 
 import asyncio

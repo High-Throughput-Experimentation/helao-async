@@ -1,8 +1,8 @@
 """Orchestrator-access backend for the Bokeh operator UI.
 
 The :class:`BokehOperator` UI talks only to an :class:`OrchBackend`.
-:class:`RemoteBackend` drives a remote orchestrator over OrchAPI HTTP/RPC
-endpoints and the Base status WebSocket.
+:class:`RemoteBackend` drives a remote orchestrator (``OrchHost``) over its
+HTTP/RPC endpoints and its status WebSocket.
 
 List/state methods return *normalized plain dicts* so the UI never has to
 branch on object-vs-JSON. See the method docstrings for the contract.
@@ -168,7 +168,7 @@ def _page(limit: Optional[int], offset: int) -> dict:
 
 
 class RemoteBackend(OrchBackend):
-    """Backend that drives a remote orchestrator over OrchAPI endpoints.
+    """Backend that drives a remote orchestrator over its HTTP endpoints.
 
     Libraries are loaded locally (identical config -> identical libs as the
     orch), so param panels and sequence unpacking run in-process; all queue

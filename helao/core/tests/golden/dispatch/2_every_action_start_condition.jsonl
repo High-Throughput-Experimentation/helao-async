@@ -1,0 +1,649 @@
+{
+  "final": {
+    "act_dq": 0,
+    "dispatch_calls": [
+      {
+        "action_name": "cond_no_wait",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_no_wait"
+        },
+        "server": "SRV1",
+        "start_condition": 0,
+        "submit_order": 0
+      },
+      {
+        "action_name": "cond_wait_endpoint",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_wait_endpoint"
+        },
+        "server": "SRV1",
+        "start_condition": 1,
+        "submit_order": 1
+      },
+      {
+        "action_name": "cond_wait_server",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_wait_server"
+        },
+        "server": "SRV1",
+        "start_condition": 2,
+        "submit_order": 2
+      },
+      {
+        "action_name": "cond_wait_orch",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_wait_orch"
+        },
+        "server": "ORCH",
+        "start_condition": 4,
+        "submit_order": 3
+      },
+      {
+        "action_name": "cond_wait_previous",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_wait_previous"
+        },
+        "server": "SRV2",
+        "start_condition": 5,
+        "submit_order": 4
+      },
+      {
+        "action_name": "cond_wait_all",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_wait_all"
+        },
+        "server": "SRV2",
+        "start_condition": 3,
+        "submit_order": 5
+      },
+      {
+        "action_name": "cond_unsupported",
+        "event": "dispatch_call",
+        "extra_params": {},
+        "nonblocking": false,
+        "params": {
+          "n": "cond_unsupported"
+        },
+        "server": "SRV3",
+        "start_condition": 99,
+        "submit_order": 6
+      }
+    ]
+  },
+  "scenario": "2_every_action_start_condition",
+  "trace": [
+    {
+      "action_name": "cond_no_wait",
+      "condition": 99,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_no_wait",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_no_wait"
+      },
+      "server": "SRV1",
+      "start_condition": 0,
+      "submit_order": 0
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_no_wait",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_no_wait",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_wait_endpoint",
+      "condition": 1,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": true
+    },
+    {
+      "action_name": "cond_no_wait",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "action_name": "cond_wait_endpoint",
+      "event": "status_ping",
+      "phase": "seed_cleared"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_wait_endpoint",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_wait_endpoint"
+      },
+      "server": "SRV1",
+      "start_condition": 1,
+      "submit_order": 1
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_wait_endpoint",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_wait_endpoint",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_wait_server",
+      "condition": 2,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": true
+    },
+    {
+      "action_name": "cond_wait_endpoint",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "action_name": "cond_wait_server",
+      "event": "status_ping",
+      "phase": "seed_cleared"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_wait_server",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_wait_server"
+      },
+      "server": "SRV1",
+      "start_condition": 2,
+      "submit_order": 2
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_wait_server",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_wait_server",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_wait_orch",
+      "condition": 4,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": true
+    },
+    {
+      "action_name": "cond_wait_server",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "action_name": "wait",
+      "event": "status_ping",
+      "phase": "seed_cleared"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_wait_orch",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_wait_orch"
+      },
+      "server": "ORCH",
+      "start_condition": 4,
+      "submit_order": 3
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_wait_orch",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_wait_orch",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_wait_previous",
+      "condition": 5,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": true
+    },
+    {
+      "action_name": "cond_wait_orch",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_wait_previous",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_wait_previous"
+      },
+      "server": "SRV2",
+      "start_condition": 5,
+      "submit_order": 4
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_wait_previous",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_wait_previous",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_wait_all",
+      "condition": 3,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": false
+    },
+    {
+      "action_name": "cond_wait_previous",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "action_name": "cond_wait_all",
+      "event": "status_ping",
+      "phase": "seed_cleared"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_wait_all",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_wait_all"
+      },
+      "server": "SRV2",
+      "start_condition": 3,
+      "submit_order": 5
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_wait_all",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_wait_all",
+      "error_code": "none",
+      "event": "scenario2_result"
+    },
+    {
+      "action_name": "cond_unsupported",
+      "condition": 99,
+      "event": "scenario2_condition"
+    },
+    {
+      "act_dq": 1,
+      "event": "phase_enter",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "event": "wait_for_interrupt_enter",
+      "has_pending": false
+    },
+    {
+      "action_name": "cond_wait_all",
+      "event": "status_ping",
+      "phase": "finished"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "action_name": "cond_unsupported",
+      "event": "status_ping",
+      "phase": "seed_cleared"
+    },
+    {
+      "entries": [
+        {
+          "status": "finished"
+        }
+      ],
+      "event": "put_lbuf"
+    },
+    {
+      "event": "wait_for_interrupt_exit",
+      "result": true
+    },
+    {
+      "action_name": "cond_unsupported",
+      "event": "dispatch_call",
+      "extra_params": {},
+      "nonblocking": false,
+      "params": {
+        "n": "cond_unsupported"
+      },
+      "server": "SRV3",
+      "start_condition": 99,
+      "submit_order": 6
+    },
+    {
+      "entries": [
+        {
+          "action_name": "cond_unsupported",
+          "status": "active"
+        }
+      ],
+      "event": "put_lbuf_nowait"
+    },
+    {
+      "act_dq": 0,
+      "error_code": "none",
+      "event": "phase_exit",
+      "exp_dq": 0,
+      "loop_intent": "none",
+      "loop_state": "stopped",
+      "orch_state": "idle",
+      "phase": "loop_task_dispatch_action",
+      "seq_dq": 0
+    },
+    {
+      "action_name": "cond_unsupported",
+      "error_code": "none",
+      "event": "scenario2_result"
+    }
+  ]
+}

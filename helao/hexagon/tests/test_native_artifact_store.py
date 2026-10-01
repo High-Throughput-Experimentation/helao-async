@@ -24,12 +24,9 @@ def _store():
     return NativeArtifactStoreAdapter(config=None, clock=None)
 
 
-def test_port_conformance_and_no_base_inheritance():
-    from helao.core.servers.base import Base
-
+def test_port_conformance():
     store = _store()
     assert isinstance(store, ArtifactStorePort)  # runtime_checkable Protocol
-    assert not isinstance(store, Base)
 
 
 def test_factory_members(tmp_path):

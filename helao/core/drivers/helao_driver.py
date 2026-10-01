@@ -163,8 +163,8 @@ class DriverPoller:
     polling: bool
     poll_signal_task: "asyncio.Task[None]"
     polling_task: "asyncio.Task[None]"
-    # the owning Base (set by BaseAPI after construction); Any avoids a
-    # core->servers import cycle and keeps `await _base_hook.put_lbuf(...)` typed
+    # the owning host (ActionHost sets it after construction); Any avoids a
+    # core->hexagon import cycle and keeps `await _base_hook.put_lbuf(...)` typed
     _base_hook: Any
 
     def __init__(self, driver: HelaoDriver, wait_time: float = 0.05) -> None:

@@ -8,8 +8,9 @@ members are WIRED (P2b-2 — DD-7 discharged): they delegate to a
 WsPublishBridge bound at makeActionApp startup, which model-validates each
 payload back to its channel's wire type and puts it on the legacy fan-out
 queues (adapter-local drift fix D1, like the three drifts below). Before
-binding they raise UnwiredPortError loudly. Orch compositions never bind
-the bridge — their live WS channels stay on legacy Base relays (Q1).
+binding they raise UnwiredPortError loudly. ``OrchHost`` never binds the
+bridge — it publishes its three WS channels through its own
+``WsPublisher``s (Q1).
 
 Drift fixed against the brief's sketch: the real ``/update_nonblocking``
 endpoint (helao/core/servers/orch_api.py) takes ``server_host``/``server_port``
@@ -65,10 +66,9 @@ class DispatcherStatusAdapter:
 
     def bind_publish_bridge(self, bridge: WsPublishBridge) -> None:
         """Late-bind the WS publish bridge (P2b-2 D3): the fan-out queues
-        live on the legacy Base, which only exists once the app has started,
-        so makeActionApp's startup hook constructs the bridge and binds it
-        here (mirror of the P2b-1 NativeArtifactStoreAdapter.bind_base
-        pattern)."""
+        live on the ``ActionHost`` that ``makeApp`` returns, so
+        makeActionApp's startup hook constructs the bridge over them and
+        binds it here."""
         self._publish_bridge = bridge
 
     async def attach_client(
@@ -144,7 +144,7 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_status before bind_publish_bridge (bound at "
-                "makeActionApp startup; orch compositions stay on legacy WS)"
+                "makeActionApp startup; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_status(payload)
 
@@ -152,7 +152,7 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_data before bind_publish_bridge (bound at "
-                "makeActionApp startup; orch compositions stay on legacy WS)"
+                "makeActionApp startup; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_data(payload)
 
@@ -160,6 +160,6 @@ class DispatcherStatusAdapter:
         if self._publish_bridge is None:
             raise UnwiredPortError(
                 "publish_live before bind_publish_bridge (bound at "
-                "makeActionApp startup; orch compositions stay on legacy WS)"
+                "makeActionApp startup; OrchHost publishes on its own WS)"
             )
         await self._publish_bridge.publish_live(payload)

@@ -9,17 +9,17 @@ matching packet (json_data_keys inferred from the first row when unset),
 ``%%`` separator exactly once via ``added_hlo_separator``, ``hlo_json_dumps``
 rows, non-serializable payload -> ``{"error": "data was not serializable"}``,
 string payloads written raw, ``num_data_written`` bump per data-bearing
-packet, subscription removal on cancel. Method bodies are byte-identical to
-legacy (source-parity-pinned by ``test_native_data_stream.py``); only this
-docstring, the class name, and ``__all__`` differ.
+packet, subscription removal on cancel. Method bodies were byte-identical to
+the legacy engine (source-parity-pinned by ``test_native_data_stream.py``)
+until B7b deleted it; they have since been reformatted by black.
 
 Per-Active collaborator: holds only the ``active`` back-reference; all
 counters/uuid lists/queues stay on ``Active``/``Base`` and are resolved at
-call time (cache-nothing rule -- the ce846da1 failure class). Swapped in for
-``active.data_stream`` by ``graft_active_write_path`` between
-``Active.__init__`` and ``myinit()`` -- BEFORE ``myinit`` creates the
-``data_logger`` task (``base.py:1014``), so the drain loop only ever runs
-native code. Cross-collaborator hops stay routed through the ``Active``
+call time (cache-nothing rule -- the ce846da1 failure class).
+``ActionSession`` constructs it as its ``data_stream``
+(``NativeArtifactStoreAdapter.collaborators_for``) before the
+``data_logger`` task exists, so the drain loop only ever runs native code.
+Cross-collaborator hops stay routed through the session
 surface (``self.active.write_live_data`` / ``self.active.log_data_set_output_file``),
 exactly as legacy.
 """
@@ -29,9 +29,9 @@ exactly as legacy.
 # attribute, before its `action_uuid`/`action_name` are read) are
 # pre-existing in the legacy body this module re-bodies verbatim (confirmed:
 # `pyright helao/core/servers/active_data_stream.py` reports the same
-# rule-types on the unmodified legacy file). Source-parity pins the method
-# bodies byte-identical to legacy, so they cannot be touched here; suppressed
-# at file scope instead of inline to avoid perturbing `inspect.getsource`.
+# rule-types on the unmodified legacy file). The bodies were pinned
+# byte-identical to legacy until B7b deleted that pin; the diagnostics stay
+# suppressed at file scope rather than fixed in the bodies.
 # pyright: reportArgumentType=false, reportOptionalMemberAccess=false
 
 import asyncio
@@ -60,11 +60,11 @@ class NativeDataStreamer:
     state), per the call-time state resolution rule -- see module docstring.
 
     The back-reference is declared at class level rather than annotated on the
-    ``__init__`` parameter: ``__init__`` is byte-pinned against its legacy twin
-    by ``assert_source_parity`` (see ``native_fixtures``), and an annotation in
-    the signature would change ``inspect.getsource(__init__)`` and break the
-    pin. A class-level annotation gives static checking without touching the
-    pinned method source.
+    ``__init__`` parameter: until B7b deleted the engine, ``__init__`` was
+    byte-pinned against its legacy twin, and an annotation in the signature
+    would have changed ``inspect.getsource(__init__)`` and broken the pin. A
+    class-level annotation gives static checking without touching the method
+    source.
     """
 
     active: ActionSessionPort
@@ -83,7 +83,9 @@ class NativeDataStreamer:
     ) -> int:
         """Return NTP-corrected nanoseconds from the base controller (non-async)."""
         return int(
-            np.floor(self.active.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset))
+            np.floor(
+                self.active.base.get_realtime_nowait(epoch_ns=epoch_ns, offset=offset)
+            )
         )
 
     async def write_live_data(self, output_str: str, file_conn_key: UUID):
@@ -114,7 +116,9 @@ class NativeDataStreamer:
         """Return ``(DataPackageModel, has_data)`` derived from ``datamodel`` and ``action``."""
         if action is None:
             action = self.active.action
-        return self.active.assemble_data_msg(datamodel=datamodel, action=action), bool(datamodel.data)
+        return self.active.assemble_data_msg(datamodel=datamodel, action=action), bool(
+            datamodel.data
+        )
 
     async def enqueue_data(self, datamodel: DataModel, action: Optional[Action] = None):
         """Publish ``datamodel`` onto the data queue and bump the queued counter if it had data."""
@@ -211,28 +215,34 @@ class NativeDataStreamer:
 
                     # check if we need to create the file first
                     if self.active.file_conn_dict[file_conn_key].file is None:
-                        if not self.active.file_conn_dict[file_conn_key].params.json_data_keys:
+                        if not self.active.file_conn_dict[
+                            file_conn_key
+                        ].params.json_data_keys:
                             jsonkeys = [key for key in sample_data.keys()]
                             LOGGER.debug(
                                 "no json_data_keys defined, using keys from first data message: {jsonkeys[:10]}"
                             )
 
-                            self.active.file_conn_dict[file_conn_key].params.json_data_keys = (
-                                jsonkeys
-                            )
+                            self.active.file_conn_dict[
+                                file_conn_key
+                            ].params.json_data_keys = jsonkeys
 
                         LOGGER.debug(f"creating output file for {file_conn_key}")
                         # create the file for this data stream
-                        await self.active.log_data_set_output_file(file_conn_key=file_conn_key)
+                        await self.active.log_data_set_output_file(
+                            file_conn_key=file_conn_key
+                        )
 
                     # write only data if the file connection is open
                     if self.active.file_conn_dict[file_conn_key].file:
                         # check if separator was already written
                         # else add it
-                        if not self.active.file_conn_dict[file_conn_key].added_hlo_separator:
-                            self.active.file_conn_dict[file_conn_key].added_hlo_separator = (
-                                True
-                            )
+                        if not self.active.file_conn_dict[
+                            file_conn_key
+                        ].added_hlo_separator:
+                            self.active.file_conn_dict[
+                                file_conn_key
+                            ].added_hlo_separator = True
                             await self.active.write_live_data(
                                 output_str="%%\n",
                                 file_conn_key=file_conn_key,

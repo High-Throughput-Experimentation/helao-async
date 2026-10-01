@@ -20,18 +20,23 @@ completeness:
   deleting it from this list; that edit is the point, because it makes progress
   visible and stops a member being quietly forgotten.
 
-The test fails when the gap **grows** — a new ``Base`` member, or a host member
-removed — rather than while it merely persists. A test that is permanently red
-teaches people to ignore it; this repo already has one such case in
-``test_palette``'s stale "EXPECTED TO FAIL" docstring.
+The test fails when the gap **grows** — a host member removed — rather than
+while it merely persists. ``Base`` itself is gone (B7b deleted the engine); its
+member surface was frozen first, into ``checklists/base_member_surface.json``,
+and that snapshot shrinks only when a member is retired on purpose. A test
+that is permanently red teaches people to ignore it; this repo already has
+one such case in ``test_palette``'s stale "EXPECTED TO FAIL" docstring.
 """
 
 import ast
+import json
 from pathlib import Path
 from typing import Final
 
 REPO_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
-BASE_PY: Final[Path] = REPO_ROOT / "helao/core/servers/base.py"
+BASE_SURFACE: Final[Path] = (
+    REPO_ROOT / "helao/hexagon/tests/checklists/base_member_surface.json"
+)
 
 #: Members B1 deliberately does not reproduce, grouped by why.
 DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
@@ -96,42 +101,16 @@ DELIBERATELY_ABSENT: Final[frozenset[str]] = frozenset(
 NOT_YET_PORTED: Final[frozenset[str]] = frozenset()
 
 
-#: Underscore-prefixed ``Base`` members that a COLLABORATOR calls back through
-#: ``self.base.<name>``. Private by name, contractual in fact -- and invisible
-#: to a public-members-only scan, which is how ``_write_meta_atomic`` was
-#: missed: every ``write_act`` raised AttributeError inside a caught block, so
-#: an action returned 200 and wrote no meta file. Derived by grepping
-#: ``self\.base\._`` across helao/core/servers and helao/hexagon.
-CONTRACTUAL_PRIVATE: Final[frozenset[str]] = frozenset(
-    {
-        "_write_meta_atomic",
-        "_dispatch_queued_action",
-        "_ws_relay",
-    }
-)
-
-
 def _base_public_members() -> set[str]:
-    """Every public method, contractual private, and ``self.x`` on ``Base``."""
-    tree = ast.parse(BASE_PY.read_text(encoding="utf-8"))
-    members: set[str] = set()
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.ClassDef) and node.name == "Base"):
-            continue
-        for item in node.body:
-            if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if not item.name.startswith("_") or item.name in CONTRACTUAL_PRIVATE:
-                    members.add(item.name)
-        for sub in ast.walk(node):
-            if (
-                isinstance(sub, ast.Attribute)
-                and isinstance(sub.value, ast.Name)
-                and sub.value.id == "self"
-                and isinstance(sub.ctx, ast.Store)
-                and not sub.attr.startswith("_")
-            ):
-                members.add(sub.attr)
-    return members
+    """Every public method, contractual private, and ``self.x`` on ``Base``.
+
+    Read from the snapshot B7b froze from ``helao/core/servers/base.py``
+    before deleting it. The contractual privates (``_write_meta_atomic``,
+    ``_dispatch_queued_action``, ``_ws_relay``) are in it: a collaborator
+    calls them back through ``self.base.<name>``, and missing
+    ``_write_meta_atomic`` once made every ``write_act`` fail silently.
+    """
+    return set(json.loads(BASE_SURFACE.read_text(encoding="utf-8"))["members"])
 
 
 def _self_assigned(path: Path) -> set[str]:

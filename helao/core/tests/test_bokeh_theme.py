@@ -552,7 +552,6 @@ def test_no_bokeh_input_widget_sets_styles():
         {
             *repo_root.glob("helao/deploy/*/servers/**/*.py"),
             *repo_root.glob("helao/deploy/*/layouts/**/*.py"),
-            *repo_root.glob("helao/core/servers/**/*.py"),
             *repo_root.glob("helao/ui/**/*.py"),
         }
     )

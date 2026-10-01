@@ -6,17 +6,15 @@ header + ``FileInfo`` builder, the streamed-file opener (``w+``
 truncate-on-create), the one-shot writers (``a+``, header + ``%%\\n`` +
 payload, FileInfo appended at write, ``save_data`` gate), the
 nt/posix ``_resolve_output_path`` quirk (incl. ``.strip("\\\\")`` -- byte-copied,
-not "fixed"), and the aux-file trackers/relocators. Method bodies are
-byte-identical to legacy (source-parity-pinned by
-``test_native_data_file.py``); only this docstring, the class name, and
-``__all__`` differ.
+not "fixed"), and the aux-file trackers/relocators. Method bodies were
+byte-identical to the legacy engine (source-parity-pinned by
+``test_native_data_file.py``) when B7b deleted it; black left them
+unchanged.
 
 Per-Active collaborator: holds only the ``active`` back-reference and reads
 ``file_conn_dict``/``action``/``action_list``/``base`` at call time
-(cache-nothing rule). Swapped in for ``active.data_file_writer`` by
-``graft_active_write_path`` between ``Active.__init__`` and ``myinit()``;
-the ``Active`` delegators (``base.py:1208-1299,1432-1455``) resolve the
-attribute at call time, so the swap reroutes every file-init/one-shot call.
+(cache-nothing rule). ``ActionSession`` constructs it as its
+``data_file_writer`` (``NativeArtifactStoreAdapter.collaborators_for``).
 """
 
 # The Optional-narrowing / join-overload diagnostics below (action attrs
@@ -24,9 +22,9 @@ attribute at call time, so the swap reroutes every file-init/one-shot call.
 # Optional `Path`, a `str` appended to a `list[Path]`) are pre-existing in
 # the legacy body this module re-bodies verbatim (confirmed: `pyright
 # helao/core/servers/active_data_file.py` reports the same rule-types on the
-# unmodified legacy file). Source-parity pins the method bodies byte-identical
-# to legacy, so they cannot be touched here; suppressed at file scope instead
-# of inline to avoid perturbing `inspect.getsource`.
+# unmodified legacy file). The bodies were pinned byte-identical to legacy
+# until B7b deleted that pin; the diagnostics stay suppressed at file scope
+# rather than fixed in the bodies.
 # pyright: reportOptionalMemberAccess=false, reportCallIssue=false, reportArgumentType=false
 
 import os
@@ -63,11 +61,11 @@ class NativeDataFileWriter:
     per the call-time state resolution rule -- see module docstring.
 
     The back-reference is declared at class level rather than annotated on the
-    ``__init__`` parameter: ``__init__`` is byte-pinned against its legacy twin
-    by ``assert_source_parity`` (see ``native_fixtures``), and an annotation in
-    the signature would change ``inspect.getsource(__init__)`` and break the
-    pin. A class-level annotation gives static checking without touching the
-    pinned method source.
+    ``__init__`` parameter: until B7b deleted the engine, ``__init__`` was
+    byte-pinned against its legacy twin, and an annotation in the signature
+    would have changed ``inspect.getsource(__init__)`` and broken the pin. A
+    class-level annotation gives static checking without touching the method
+    source.
     """
 
     active: ActionSessionPort
@@ -432,4 +430,3 @@ class NativeDataFileWriter:
 
         action.files.append(file_info)
         LOGGER.info(f"{file_info.file_name} added to files_technique / aux_files list.")
-

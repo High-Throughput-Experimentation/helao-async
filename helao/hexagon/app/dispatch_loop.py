@@ -1,42 +1,32 @@
-"""Single-drainer dispatch loop + legacy-Orch graft (spec §4.5, KEEP #2/#3).
+"""Single-drainer dispatch loop (spec §4.5, KEEP #2/#3).
 
 ONE long-lived asyncio task parked on an Event owns every queue-draining
 command (DispatchHeadAction / FinishThenDispatch* / CloseOut* arise only
 from LoopIterate, which only this task feeds): double-drain (F2b) is
 structurally impossible. Control events run at their trigger site through
-the same pure reducer (DD-3): E-STOP is concurrent with the loop exactly as
-legacy's ingester-task estop_loop is, and the marked commands' live
-re-checks are the race guard. In-process self-ops (KEEP #3): nothing here
-ever dispatches an RPC/HTTP request to its own server — every effect is a
-direct method call on the wrapped legacy Orch."""
+the same pure reducer (DD-3): E-STOP is concurrent with the loop, and the
+marked commands' live re-checks are the race guard. In-process self-ops
+(KEEP #3): nothing here ever dispatches an RPC/HTTP request to its own
+server — every effect is a direct method call on the ``OrchHost`` that
+builds this runtime (``OrchHost._build_reducer``)."""
 
 import asyncio
-from collections.abc import Callable
-from dataclasses import dataclass, field, replace
-from typing import Optional
+from dataclasses import replace
 
-from helao.hexagon.app.ingestion import HexHealthMonitor, HexStatusIngestion
 from helao.hexagon.app.orch_effects import (
     OrchCommandRunner,
     _LazyServerLogger,
     apply_state_delta,
     derive_state,
 )
-from helao.hexagon.app.wiring import PortWiring
 from helao.hexagon.domain.dispatch_policy import DispatchPolicy, ExitLoop
-from helao.hexagon.domain.models import ErrorCodes, LoopStatus
+from helao.hexagon.domain.models import ErrorCodes
 from helao.hexagon.domain.orchestration import (
-    ClearErrorRequested,
-    ClearEstopRequested,
     CreateDispatchLoopTask,
     DriverHealthUnrecovered,
-    EstopRequested,
     Event,
     LoopIterate,
     RetryDriverHealth,
-    SkipRequested,
-    StartRequested,
-    StopRequested,
     UncaughtLoopException,
     WaitAllActionsIdle,
     step,
@@ -45,7 +35,7 @@ from helao.hexagon.domain.orchestration import (
 LOGGER = _LazyServerLogger()  # see orch_effects.py for the call-time-resolution
 _POLICY = DispatchPolicy()
 
-__all__ = ["HexDispatchLoop", "HexRuntime", "HexagonGraft", "graft_hexagon_loop"]
+__all__ = ["HexDispatchLoop", "HexRuntime"]
 
 
 class HexRuntime:
@@ -152,117 +142,3 @@ class HexDispatchLoop:
                 )
             except Exception:
                 LOGGER.error("estop after loop exception failed", exc_info=True)
-
-
-@dataclass
-class HexagonGraft:
-    runtime: HexRuntime
-    loop: HexDispatchLoop
-    effects: OrchCommandRunner
-    originals: dict[str, Optional[Callable]] = field(default_factory=dict)
-    ingestion: Optional[HexStatusIngestion] = None
-    health_monitor: Optional[HexHealthMonitor] = None
-
-    async def close(self) -> None:
-        if self.health_monitor is not None:
-            await self.health_monitor.close()
-        await self.loop.close()
-
-
-def graft_hexagon_loop(orch, wiring: PortWiring) -> HexagonGraft:
-    """Rebind the legacy Orch's control methods onto the reducer runtime and
-    start the single-drainer loop. Instance-level rebinding is the sanctioned
-    wrap seam (orch_estop.py docstring: instance patches stay observable);
-    NO legacy source is modified."""
-    effects = OrchCommandRunner(orch, wiring)
-    runtime = HexRuntime(orch, effects)
-    loop = HexDispatchLoop(runtime)
-    ingestion = HexStatusIngestion(orch, runtime)
-    graft = HexagonGraft(
-        runtime=runtime, loop=loop, effects=effects, ingestion=ingestion
-    )
-    for name in (
-        "start",
-        "start_loop",
-        "stop",
-        "skip",
-        "estop_loop",
-        "clear_estop",
-        "clear_error",
-        "update_status",
-        "update_nonblocking",
-    ):
-        graft.originals[name] = getattr(orch, name, None)
-
-    async def hex_start():
-        await runtime.handle(StartRequested())
-        orch.current_stop_message = ""  # legacy start() clears the banner
-
-    async def hex_start_loop():
-        await runtime.handle(StartRequested())
-        return orch.globalstatusmodel.loop_state
-
-    async def hex_stop(reset_run_id: bool = False):
-        # guard structure mirrors orch.py:541-556 verbatim
-        if orch.globalstatusmodel.loop_state == LoopStatus.started:
-            await runtime.handle(StopRequested())
-        elif orch.globalstatusmodel.loop_state == LoopStatus.estopped:
-            LOGGER.info("orchestrator E-STOP flag was raised; nothing to stop")
-        else:
-            LOGGER.info("orchestrator is not running")
-        if reset_run_id:
-            LOGGER.info("resetting active_run_id on stop")
-            orch.active_run_id = None
-
-    async def hex_skip():
-        # mirrors orch.py:528-534
-        if orch.globalstatusmodel.loop_state == LoopStatus.started:
-            await runtime.handle(SkipRequested())
-        else:
-            LOGGER.info("orchestrator not running, clearing action queue")
-            orch.action_dq.clear()
-
-    async def hex_estop_loop(reason: str = ""):
-        # legacy estop_loop message shape ("E-STOP" + optional suffix);
-        # cascade runs HERE at the trigger site through the reducer (DD-3)
-        msg = f"E-STOP{' ' + reason if reason else ''}"
-        await runtime.handle(EstopRequested(reason=msg))
-        # legacy estop_loop's intend_none() wakes the interrupt queue; the
-        # reducer's none->none intent delta skips that call, so wake
-        # explicitly (a dispatch effect parked in wait_for_interrupt must
-        # re-check and observe the estop) — DD-5 item 6
-        await orch.interrupt_q.put("estop")
-
-    async def hex_clear_estop():
-        await runtime.handle(ClearEstopRequested())
-
-    async def hex_clear_error():
-        await runtime.handle(ClearErrorRequested())
-
-    orch.start = hex_start
-    orch.start_loop = hex_start_loop
-    orch.stop = hex_stop
-    orch.skip = hex_skip
-    orch.estop_loop = hex_estop_loop
-    orch.clear_estop = hex_clear_estop
-    orch.clear_error = hex_clear_error
-    # P2a DD-2 atomic hand-off: this rebind removes the legacy
-    # StatusIngester's inline orch_state writes at the same instant the
-    # reducer's apply_state_delta write-back takes them — no double-writer
-    # window. clear_nonblocking / ws_globstat / globstat_broadcast_task stay
-    # legacy (out of P2a scope).
-    orch.update_status = ingestion.update_status
-    orch.update_nonblocking = ingestion.update_nonblocking
-    if wiring.health is not None:
-        bind = getattr(wiring.health, "bind_orch", None)
-        if bind is not None:
-            bind(orch)
-        # instance-level task swap (not a source edit): the legacy
-        # heartbeat task was created by myinit before this graft runs
-        legacy_hb = getattr(orch, "heartbeat_monitor", None)
-        if legacy_hb is not None:
-            legacy_hb.cancel()
-        graft.health_monitor = HexHealthMonitor(orch, runtime, wiring.health)
-        graft.health_monitor.start()
-    loop.start()
-    return graft

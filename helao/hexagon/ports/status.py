@@ -1,10 +1,9 @@
-"""Status port (spec §4.3.6): push + dual WS stacks + three consumer faces.
+"""Status port (spec §4.3.6): push + one WS mechanism, two producers + three consumer faces.
 
-Both parallel WS mechanisms survive (consumers exist for each): the
-WsPublisher-backed /ws_status /ws_data /ws_live routes AND the _ws_relay
-zstd-compressed-pickle streams. Serialization happens ONLY in the adapter
-(KEEP #4: _json_clean at the relay). The legacy blocking 0.3 s per-client
-pacing is preserved behavior until post-parity.
+One WS mechanism, two producers: ``ActionHost`` and ``OrchHost`` both serve
+/ws_status /ws_data /ws_live through ``WsPublisher``, which sends each
+message as a zstd-compressed pickle. Serialization happens ONLY in
+``WsPublisher.broadcast``.
 
 `StatusPort` above is publish-side. Amendment §8 requires this port to also
 enumerate the **consumer** side, because the third consumer class
@@ -12,10 +11,11 @@ distinguishes payloads the first two do not:
 
 1. ``bokeh_ws_subscriber`` -- Bokeh visualizers read the WsPublisher routes
    through ``helao.helpers.ws_utils.WsSubscriber``.
-2. ``relay_pickle_stream`` -- remote subscribers read the ``_ws_relay``
+2. ``relay_pickle_stream`` -- remote subscribers read the orchestrator's
    zstd-compressed-pickle streams. Same transport decode as (1); a *different
    producer*, so the same route name carries a plain dict here and a typed
-   model there (``OrchAPI`` is a sibling of ``BaseAPI``, not a subclass).
+   model there (``OrchHost``'s publishers apply ``as_dict``; ``ActionHost``'s
+   do not).
    Faces 1 and 2 therefore share one seam, :class:`StatusStreamPort`.
 3. ``reflex_ingest_normalizer`` -- the Reflex stack's
    ``helao/ui/reflex/ingest.py`` normalizers, selected **by

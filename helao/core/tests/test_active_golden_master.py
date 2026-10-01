@@ -1,28 +1,44 @@
-"""Output golden-master harness for the legacy ``Active`` action wrapper
-(CARDS P6, Stage S0a -- the behaviour-preservation foundation for the full
-``Base``/``Active`` decomposition specced in ``CARDS_REFACTOR_P6.md``).
+"""Output golden master for the native action session.
 
-This is the P6 analog of ``test_orch_dispatch_golden_master.py`` (P5): it
-FREEZES the observable output of :class:`helao.core.servers.base.Active`
-*before* any refactoring, so every later P6 stage can gate against a
-byte/multiset-stable reference. Test/harness code only -- no production module
-is modified by this file.
+Freezes the observable output of :class:`helao.hexagon.app.action_session.ActionSession`
+over an :class:`helao.hexagon.app.action_host.ActionHost` -- the side-effect
+trace and every file the session writes -- so any change to the native write
+path that alters what lands on disk or on the status/data queues fails
+``--check``. Test/harness code only: no production module is modified here.
 
-What is REAL (driven, unmodified, byte-identical to the shipped server):
+Provenance. Until B7b this harness drove the legacy ``Active`` over a legacy
+``Base`` (CARDS P6 S0a) against a gitignored ``.omc/`` reference. B7b re-pointed
+it before deleting the engine. On the B7b commit, with the engine still
+present, the same script was captured twice with the legacy fixture and twice
+with this native one; each pair was byte-identical, and the native capture
+matched the legacy one on all 13 scenarios under this file's own rules
+(below). Only then was the native capture frozen as the tracked reference in
+``golden/action/``. A red-check (patching the engine module globals instead of
+the native ones) failed 13 of 13 scenarios, proving the patch list intercepts.
+One scenario was edited first, on both sides: ``5_error_estop`` no longer calls
+``set_error`` or records ``post_set_error``. ``set_error`` existed only on the
+legacy ``Active`` and died with it; no native or deployment code calls it.
 
-* ``Active.__init__`` / ``myinit`` / ``enqueue_data`` / ``enqueue_data_dflt`` /
-  ``log_data_task`` (the async data-stream file writer) /
-  ``log_data_set_output_file`` / ``write_file`` / ``split`` /
-  ``split_and_keep_active`` / ``finish_all`` / ``substitute`` / ``finish`` /
-  ``_finish`` / ``set_error`` / ``set_estop`` / ``append_sample`` /
-  ``finish_manual_action`` and their transitive calls into the REAL
-  ``Base.write_act`` / ``write_exp`` / ``write_seq`` / ``get_realtime`` /
-  ``new_file_conn_key`` / ``dflt_file_conn_key``.
-* ``Base`` is built via ``Base.__new__`` + a minimal attribute fixture that
-  bypasses ``Base.__init__`` entirely (no FastAPI app, no NTP, no WebSockets) --
-  the same ``__new__``-bypass strategy the P5 harness uses for ``Orch``. The
-  attribute set was discovered by running and filling AttributeErrors; every
-  attribute the driven code path touches is set in ``_make_base``.
+What is REAL (driven, unmodified):
+
+* ``ActionSession.__init__`` / ``myinit`` / ``enqueue_data`` /
+  ``enqueue_data_dflt`` / ``enqueue_data_nowait`` / ``log_data_task`` /
+  ``write_file`` / ``split`` / ``set_estop`` / ``finish`` /
+  ``send_nonblocking_status`` / ``start_executor`` / ``oneoff_executor``, and
+  ``NativeActionFinalizer.substitute`` / ``finish_all`` (reached through
+  ``session.action_finalizer``; the session exposes neither), with their
+  transitive calls into the native data streamer, data-file writer, finalizer
+  and meta writer, and into ``ActionHost.write_act`` / ``write_exp`` /
+  ``write_seq`` / ``get_realtime`` / ``new_file_conn_key`` /
+  ``dflt_file_conn_key``.
+* The host's ports are the production composition's classes
+  (``LegacyClockAdapter``, ``NativeArtifactStoreAdapter``), wired through a
+  ``PortWiring``.
+* ``ActionHost`` is built via ``ActionHost.__new__`` plus a minimal attribute
+  fixture (``_make_host``), bypassing ``__init__`` -- the strategy the dispatch
+  golden master uses for ``OrchHost``. Real construction would add a
+  ``gethostname()`` machine name, scaffold directories, a run-state journal and
+  a log file under the snapshotted root, none of which the reference has.
 
 What is FAKED/STUBBED (the harness surface):
 
@@ -36,63 +52,55 @@ What is FAKED/STUBBED (the harness surface):
   retry loop re-enqueues one until the data logger flips the stream status,
   which depends on event-loop scheduling relative to a real ``sleep(0.1)``).
   The .hlo file bytes remain the authoritative record of streamed data.
-* ``move_dir`` / ``async_private_dispatcher`` / ``async_copy`` (module-globals
-  on ``helao.core.servers.base``) -- recording no-ops (no real directory
-  moves, no network RPC for global-param export, no aux-file copies).
-* ``base.app.driver`` -- ``None`` (stored by ``Active.__init__`` but never
-  exercised by the driven, executor-free lifecycle).
+* ``move_dir`` / ``async_private_dispatcher`` / ``set_time`` -- recording
+  no-ops or a fixed clock, rebound on every module in ``_PATCH_TARGETS``. Each
+  of those binds the name at import, so patching only the helper module that
+  defines it would intercept nothing.
+* ``host.driver`` -- ``None`` (stored by the session but never exercised by the
+  driven lifecycle).
 
-Determinism -- the whole game (see brief). Two independent nondeterminism
-sources reach ``Active``'s output and are handled as follows:
+Determinism. Two independent nondeterminism sources reach the output and are
+handled as follows:
 
 1. UUIDs, wall-clock timestamps, epoch-ns header stamps, and the git-SHA
-   ``hlo_version`` token. ``Active.split`` force-reinits a fresh action (new
-   ``gen_uuid``/``set_time``), ``finish`` stamps ``action_finished_timestamp``
-   from the wall clock, and HLO headers stamp ``epoch_ns`` from ``Base``'s
-   ``Timer``. These cannot be pinned without editing ``base.py`` (forbidden
-   this stage), so every captured artifact is NORMALIZED with a P3-style
-   scrubber (copied from ``.omc/artifacts/p3/normalize_runs_tree.py``): each
+   ``hlo_version`` token. ``split`` force-reinits a fresh action (new
+   ``gen_uuid``), and HLO headers stamp ``epoch_ns`` from the clock port. Every
+   captured artifact is therefore NORMALIZED with a P3-style scrubber: each
    distinct uuid/timestamp/epoch token is mapped to a stable per-run,
    per-artifact sequential placeholder (``<UUID:0>``, ``<ISOTS:0>``,
    ``<EPOCHNS:0>`` ...) by first-appearance order, and ``hlo_version`` /
-   ``*codehash`` values are elided to fixed placeholders. Structurally
-   identical runs then normalize to identical text even though the underlying
-   ids differ. Construction ids/timestamps are also seeded deterministically
-   (``_mk_action``) for baseline readability, but correctness does not depend
-   on that -- only on structural stability, which the normalizer captures.
-2. Async flush/chunk boundaries in streamed ``.hlo`` data. The ``--check``
-   gate compares ``.hlo`` files by (a) NORMALIZED header bytes (exact),
-   (b) per-data-key VALUE MULTISETS of the JSON data lines (copied from
-   ``.omc/artifacts/p3/compare_runs.py``), and (c) a WHOLE-RECORD MULTISET
-   that explodes each parallel-list data line into position-paired per-index
-   records and multisets the entire record dict -- never raw-line equality, so
-   a chunk split at a different offset still compares equal. The whole-record
-   check (added in S6) catches a cross-key transpose / split / regroup that
-   leaves the per-key pools of (b) unchanged; both are kept because neither
-   strictly subsumes the other. Non-``.hlo`` files (``-act.yml`` /
-   ``-exp.yml`` / ``-seq.yml``) and the side-effect trace are compared as exact
-   normalized bytes.
+   ``*codehash`` values are elided to fixed placeholders. Construction
+   ids/timestamps are also seeded deterministically (``_mk_action``) for
+   readability, but correctness depends only on structural stability.
+2. Async flush/chunk boundaries in streamed ``.hlo`` data. ``--check`` compares
+   ``.hlo`` files by (a) NORMALIZED header bytes (exact), (b) per-data-key VALUE
+   MULTISETS of the JSON data lines, and (c) a WHOLE-RECORD MULTISET that
+   explodes each parallel-list data line into position-paired per-index records
+   -- never raw-line equality, so a chunk split at a different offset still
+   compares equal. Non-``.hlo`` files (``-act.yml`` / ``-exp.yml`` /
+   ``-seq.yml``) and the side-effect trace are compared as exact normalized
+   bytes.
 
-Frozen reference: ``.omc/artifacts/p6/baseline_S0a/`` holds one
+The ``hlo_version`` trap. ``hlo_version`` resolves through ``git rev-parse`` in
+the CURRENT directory (``helao/core/version.py``). Run from anywhere that is
+not a git checkout it comes back empty and drops out of every ``-act.yml`` and
+``.hlo`` header, and all 13 scenarios report DELTA. Always run this file from
+the repository root.
+
+Reference: ``golden/action/`` (next to this file) holds one
 ``<scenario>.trace.jsonl`` (normalized side-effect trace) and one
 ``<scenario>.runs.norm`` (normalized snapshot of every file written under the
-scenario's ``save_root``) per scenario. It is captured once (``--freeze``, on
-unmodified ``base.py``) and must never be regenerated during later stages --
-``run_freeze`` refuses to overwrite a non-empty ``baseline_S0a/`` and
-``_write_baseline`` asserts against it, mirroring the P5 freeze guard.
+scenario's root) per scenario. ``run_freeze`` refuses to overwrite a non-empty
+reference and ``_write_baseline`` asserts against it.
 
-Run (conda env ``helao``; no pytest harness in this repo -- run as a script)::
+Run from the repository root, in the ``helao`` conda env::
 
-    conda run -n helao --no-capture-output python \\
-        helao/core/tests/test_active_golden_master.py            # determinism self-test
-    conda run -n helao --no-capture-output python \\
-        helao/core/tests/test_active_golden_master.py --freeze   # one-time baseline freeze
-    conda run -n helao --no-capture-output python \\
-        helao/core/tests/test_active_golden_master.py --check     # hard gate for later P6 stages
+    python helao/core/tests/test_active_golden_master.py            # determinism self-test
+    python helao/core/tests/test_active_golden_master.py --check    # the gate
+    python helao/core/tests/test_active_golden_master.py --freeze   # one-time; refuses if frozen
 
-Because it does real (temp-dir) file I/O and is not instantaneous, this module
-is a standalone ``--check`` script and is intentionally NOT registered in
-``run_unit_tests.py`` (matching the P5 golden master).
+It does real (temp-dir) file I/O, so it is a standalone script: ``run_tests.py``
+reports it as NOTESTS and ``run_unit_tests.py`` does not register it.
 """
 
 import argparse
@@ -106,28 +114,33 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
-import helao.core.servers.active_finalizer as finalizer_module
-import helao.core.servers.base as base_module
 import helao.helpers.premodels as premodels_module
+import helao.hexagon.adapters.legacy.clock as clock_module
+import helao.hexagon.adapters.native.artifact_store as artifact_store_module
+import helao.hexagon.adapters.native.finalizer as finalizer_module
+import helao.hexagon.app.action_host as action_host_module
 from helao.core.error import ErrorCodes
 from helao.core.hooks import HookSet
 from helao.core.models.data import DataModel
 from helao.core.models.file import FileConnParams, HloFileGroup
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.machine import MachineModel
-from helao.core.servers.base import Active, Base
 from helao.helpers.active_params import ActiveParams
 from helao.helpers.dequedict import DequeDict
 from helao.helpers.executor import Executor
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action
+from helao.hexagon.adapters.legacy.clock import LegacyClockAdapter
+from helao.hexagon.adapters.native.artifact_store import NativeArtifactStoreAdapter
+from helao.hexagon.app.action_host import ActionHost
+from helao.hexagon.app.action_session import ActionSession
+from helao.hexagon.app.wiring import PortWiring
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-ARTIFACT_DIR = REPO_ROOT / ".omc" / "artifacts" / "p6"
-# Frozen S0a reference (captured once, on unmodified base.py). Never write here
-# outside the one-time --freeze step -- it is the hard gate later P6 stages diff
-# against.
-BASELINE_S0A_DIR = ARTIFACT_DIR / "baseline_S0a"
+# Tracked native reference (B7b): frozen once with --freeze from a native
+# capture that was first compared, scenario by scenario, against a legacy
+# capture of the same script on the same commit. Never regenerate it to make a
+# delta go away -- it is the hard gate.
+BASELINE_S0A_DIR = Path(__file__).resolve().parent / "golden" / "action"
 
 SERVER_NAME = "ACTSRV"
 MACHINE = "test-machine"
@@ -491,48 +504,77 @@ def _data_record(datapackage):
 
 
 # ---------------------------------------------------------------------------
-# Base fixture (Base.__init__ bypass, mirrors P5's Orch.__new__)
+# host fixture (ActionHost.__init__ bypass, mirrors the dispatch golden
+# master's OrchHost.__new__)
 # ---------------------------------------------------------------------------
 
 
-def _make_base(save_root: Path, trace: list) -> Base:
-    """Build a bare ``Base`` with every attribute the ``Active`` path touches."""
-    base = Base.__new__(Base)
-    base.app = SimpleNamespace(driver=None)
-    base.server = MachineModel(
+def _make_host(save_root: Path, trace: list) -> ActionHost:
+    """Build a bare ``ActionHost`` with every attribute the session path touches.
+
+    ``ActionHost.__init__`` is bypassed on purpose: real construction resolves
+    the machine name from ``gethostname()``, creates the run-root scaffold
+    directories and a run-state journal under ``root``, and starts a file logger
+    there. The snapshot walks that same tree, so each of those would show up as
+    a delta against the legacy reference, which never had them.
+    """
+    host = ActionHost.__new__(ActionHost)
+    host.driver = None
+    host.server = MachineModel(
         server_name=SERVER_NAME, machine_name=MACHINE, hostname="127.0.0.1", port=8000
     )
-    base.world_cfg = {
+    host.world_cfg = {
         "dummy": False,
         "simulation": False,
         "root": str(save_root.parent),
     }
-    base.ntp_offset = NTP_OFFSET
-    base.helaodirs = SimpleNamespace(save_root=str(save_root))
-    base.aloop = asyncio.get_running_loop()
+    host.ntp_offset = NTP_OFFSET
+    host.helaodirs = SimpleNamespace(save_root=str(save_root))
+    host.aloop = asyncio.get_running_loop()
 
-    base.status_q = _RecordingMSQ(_status_record, trace)
-    base.data_q = _RecordingMSQ(_data_record, trace)
-    base.status_clients = set()
+    # The production composition's clock and artifact store (factory.py
+    # build_wiring); the store is what hands each session its native
+    # collaborators and the host its meta writer.
+    clock = LegacyClockAdapter(NTP_OFFSET)
+    store = NativeArtifactStoreAdapter(clock=clock)
+    host.hexagon_wiring = PortWiring(clock=clock, artifact_store=store)
+    host.meta_writer = store.meta_writer_for(host)
 
-    base.actives = {}
-    base.history = DequeDict(maxlen=200)
-    base.executors = {}
-    base.local_action_task_queue = []
-    base.prefinish_hooks = HookSet.empty()
-    base.live_q = MultisubscriberQueue()
-    base.live_buffer = {}
-    base._init_collaborators()
-    return base
+    host.status_q = _RecordingMSQ(_status_record, trace)
+    host.data_q = _RecordingMSQ(_data_record, trace)
+    host.status_clients = set()
+
+    host.actives = {}
+    host.history = DequeDict(maxlen=200)
+    host.executors = {}
+    host.local_action_task_queue = []
+    host.prefinish_hooks = HookSet.empty()
+    host.live_q = MultisubscriberQueue()
+    host.live_buffer = {}
+    return host
 
 
 # ---------------------------------------------------------------------------
-# module-global patches on helao.core.servers.base
+# module-global patches on the native modules that bind the seams at import
 # ---------------------------------------------------------------------------
+
+#: Every (module, name) the patch rebinds. Each native module below binds the
+#: seam at import (``from ... import name``), so patching the defining helper
+#: module alone would intercept nothing. Re-grep before editing:
+#: ``grep -rn "import.*\(move_dir\|async_private_dispatcher\|set_time\)" helao/hexagon``.
+_PATCH_TARGETS = (
+    (finalizer_module, "move_dir"),
+    (finalizer_module, "async_private_dispatcher"),
+    (finalizer_module, "set_time"),
+    (artifact_store_module, "move_dir"),
+    (action_host_module, "async_private_dispatcher"),
+    (clock_module, "set_time"),
+    (premodels_module, "set_time"),
+)
 
 
 class _PatchedBaseGlobals:
-    """Patch the disk/network module-globals ``base.py`` calls in finalization."""
+    """Patch the disk/network/clock module-globals the session path calls."""
 
     def __init__(self, trace: list):
         self._trace = trace
@@ -577,40 +619,14 @@ class _PatchedBaseGlobals:
             )
             return {}, ErrorCodes.none
 
-        async def _fake_async_copy(src, dst, **kwargs):
-            self._trace.append({"event": "async_copy"})
-            return None
-
-        self._orig = {
-            (base_module, "move_dir"): base_module.move_dir,
-            (
-                base_module,
-                "async_private_dispatcher",
-            ): base_module.async_private_dispatcher,
-            (base_module, "async_copy"): base_module.async_copy,
-            (base_module, "set_time"): base_module.set_time,
-            (premodels_module, "set_time"): premodels_module.set_time,
-            # The finish/split close-out (move_dir / async_private_dispatcher /
-            # set_time) was extracted to ``active_finalizer`` in P6 S8; the moved
-            # ``_finish`` resolves these three from the finalizer module's own
-            # namespace, so they must be patched there too (else the real
-            # disk-move/RPC/wall-clock would run and the finish trace + fixed
-            # timestamps would diverge from the frozen baseline).
-            (finalizer_module, "move_dir"): finalizer_module.move_dir,
-            (
-                finalizer_module,
-                "async_private_dispatcher",
-            ): finalizer_module.async_private_dispatcher,
-            (finalizer_module, "set_time"): finalizer_module.set_time,
+        fakes = {
+            "move_dir": _fake_move_dir,
+            "async_private_dispatcher": _fake_private_dispatcher,
+            "set_time": _fixed_set_time,
         }
-        base_module.move_dir = _fake_move_dir
-        base_module.async_private_dispatcher = _fake_private_dispatcher
-        base_module.async_copy = _fake_async_copy
-        base_module.set_time = _fixed_set_time
-        premodels_module.set_time = _fixed_set_time
-        finalizer_module.move_dir = _fake_move_dir
-        finalizer_module.async_private_dispatcher = _fake_private_dispatcher
-        finalizer_module.set_time = _fixed_set_time
+        for mod, name in _PATCH_TARGETS:
+            self._orig[(mod, name)] = getattr(mod, name)
+            setattr(mod, name, fakes[name])
         return self
 
     def __exit__(self, *exc):
@@ -640,7 +656,7 @@ def _mk_action(action_name: str, manual: bool = False, **overrides) -> Action:
     """Construct an ``Action`` with deterministic identity seeded from the name.
 
     When ``manual`` is True the sequence/experiment timestamps are left unset so
-    ``Active.__init__`` -> ``init_act`` promotes the action to a manual run.
+    ``ActionSession.__init__`` -> ``init_act`` promotes the action to a manual run.
     """
     fields = dict(
         action_name=action_name,
@@ -665,7 +681,7 @@ def _mk_action(action_name: str, manual: bool = False, **overrides) -> Action:
     return Action.model_validate(fields)
 
 
-def _active_params(base: Base, action: Action, aux_uuids=None) -> ActiveParams:
+def _active_params(base: ActionHost, action: Action, aux_uuids=None) -> ActiveParams:
     """Build ActiveParams with one file connection on the default conn key."""
     dflt = base.dflt_file_conn_key()
     return ActiveParams(
@@ -687,7 +703,7 @@ async def _ticks(n: int = 6):
         await asyncio.sleep(0)
 
 
-async def _drain_data(active: Active, timeout_s: float = 5.0):
+async def _drain_data(active: ActionSession, timeout_s: float = 5.0):
     """Block (with real sleeps) until the async data logger has consumed every
     enqueued data packet, i.e. every lazy HLO-file open + write is complete.
 
@@ -707,7 +723,7 @@ async def _drain_data(active: Active, timeout_s: float = 5.0):
 
 
 # ---------------------------------------------------------------------------
-# fake Executor (GAP#1: the Active lifecycle is executor-free in scenarios 1-9,
+# fake Executor (GAP#1: the session lifecycle is executor-free in scenarios 1-9,
 # so start_executor / action_loop_task / oneoff_executor are otherwise
 # unexercised by the golden master).
 # ---------------------------------------------------------------------------
@@ -768,10 +784,10 @@ class _FakeExecutor(Executor):
 
 async def _scenario_basic(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("basic")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
         trace.append(
@@ -801,10 +817,10 @@ async def _scenario_basic(save_root: Path) -> dict:
 
 async def _scenario_save_data_false(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("nosave", save_data=False)
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
         trace.append(
@@ -827,10 +843,10 @@ async def _scenario_save_data_false(save_root: Path) -> dict:
 
 async def _scenario_split(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("split")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -864,7 +880,7 @@ async def _scenario_split(save_root: Path) -> dict:
             )
             await _drain_data(active)
 
-        await active.finish_all()
+        await active.action_finalizer.finish_all()
         await _ticks(10)
         trace.append(
             {
@@ -878,10 +894,10 @@ async def _scenario_split(save_root: Path) -> dict:
 
 async def _scenario_substitute(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("subst")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -896,7 +912,7 @@ async def _scenario_substitute(save_root: Path) -> dict:
             }
         )
 
-        await active.substitute()
+        await active.action_finalizer.substitute()
         await _ticks()
         trace.append(
             {
@@ -917,24 +933,16 @@ async def _scenario_substitute(save_root: Path) -> dict:
 
 async def _scenario_error_estop(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("errst")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
         await active.enqueue_data_dflt({"t": 0, "v": 0})
         await _drain_data(active)
 
-        await active.set_error(ErrorCodes.critical_error)
-        trace.append(
-            {
-                "event": "post_set_error",
-                "action_status": _status_list(active.action),
-                "error_code": _json_safe(active.action.error_code),
-            }
-        )
         active.set_estop()
         trace.append(
             {"event": "post_set_estop", "action_status": _status_list(active.action)}
@@ -950,10 +958,10 @@ async def _scenario_error_estop(save_root: Path) -> dict:
 
 async def _scenario_manual(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("manual", manual=True)
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
         trace.append(
@@ -977,7 +985,7 @@ async def _scenario_manual(save_root: Path) -> dict:
 
 async def _scenario_multifile_aux(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("multi")
 
@@ -1000,7 +1008,7 @@ async def _scenario_multifile_aux(save_root: Path) -> dict:
             },
             aux_listen_uuids=[aux_uuid],
         )
-        active = Active(base, ap)
+        active = ActionSession(base, ap)
         await active.myinit()
         await _ticks()
         trace.append(
@@ -1038,14 +1046,14 @@ async def _scenario_multifile_aux(save_root: Path) -> dict:
 
 async def _scenario_finalizer_global_params(save_root: Path) -> dict:
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action(
             "gparm",
             to_global_params=["produced_key"],
             action_output={"produced_key": "PRODUCED_VALUE"},
         )
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -1071,14 +1079,14 @@ async def _scenario_finalizer_global_params_dict(save_root: Path) -> dict:
     fold-out that a broken rename (wrong key, dropped value) would silently
     change."""
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action(
             "gpdict",
             to_global_params={"src_key": "dest_key"},
             action_output={"src_key": "RENAMED_VALUE"},
         )
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -1098,10 +1106,11 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
 
     Every other scenario drains each enqueued packet (``_drain_data``) before the
     next lifecycle step, so ``num_data_queued == num_data_written`` at finish
-    entry and the finished-packet write-drain loop in ``_finish`` (roughly
-    base.py:1618-1645 -- the retry+``sleep(0.1)`` that lets the threadpool file
-    writes complete BEFORE the file connections are closed) never has anything to
-    flush: its late-data-vs-file-close race is unobservable.
+    entry and the finished-packet write-drain loops in ``_finish``
+    (``adapters/native/finalizer.py``, the two capped retry+``sleep(0.1)`` loops
+    that let the threadpool file writes complete BEFORE the file connections are
+    closed) never have anything to flush: the late-data-vs-file-close race is
+    unobservable.
 
     Here we open the file with one drained packet, then enqueue a SECOND packet
     with ``enqueue_data_nowait`` and IMMEDIATELY call ``finish()`` with NO drain
@@ -1115,10 +1124,10 @@ async def _scenario_finish_late_data_drain(save_root: Path) -> dict:
     the row would vanish from the ``.hlo`` whole-record multiset, and ``--check``
     would fail (the BITE)."""
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("fdrain")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -1158,7 +1167,7 @@ async def _scenario_nonblocking(save_root: Path) -> dict:
     (every ``add_status`` call is suppressed because ``action.nonblocking`` is
     True), and (2) the ``nbstatus_packet`` records emitted per status client."""
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
 
     # >=1 status subscriber (single entry -> deterministic set iteration order)
     base.status_clients.add(("NBCLIENT", "127.0.0.1", 9000))
@@ -1180,13 +1189,12 @@ async def _scenario_nonblocking(save_root: Path) -> dict:
         )
         return {"success": True}, ErrorCodes.none
 
-    # instance-attribute override shadows the (later delegator) Base method, so
-    # this baseline is stable across the S2 extraction.
+    # instance-attribute override shadows the ActionHost method.
     base.send_nbstatuspackage = _fake_send_nbstatuspackage
 
     with _PatchedBaseGlobals(trace):
         action = _mk_action("nonblock", nonblocking=True)
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         # myinit() ends in add_status(); nonblocking suppresses the status_q put
         await active.myinit()
         await _ticks()
@@ -1231,10 +1239,10 @@ async def _scenario_executor_concurrent(save_root: Path) -> dict:
     ``action_loop_running`` transitions + the finish/status trace + streamed
     ``.hlo`` bytes."""
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("cexec")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -1273,10 +1281,10 @@ async def _scenario_executor_oneoff(save_root: Path) -> dict:
     packet) -> ``finish``. Freezes the enqueued data + terminal state + trace +
     streamed ``.hlo`` bytes."""
     trace: list = []
-    base = _make_base(save_root, trace)
+    base = _make_host(save_root, trace)
     with _PatchedBaseGlobals(trace):
         action = _mk_action("oexec")
-        active = Active(base, _active_params(base, action))
+        active = ActionSession(base, _active_params(base, action))
         await active.myinit()
         await _ticks()
 
@@ -1328,7 +1336,7 @@ async def _capture_scenario(name: str, tmp_root: Path) -> "tuple[str, str]":
     )
     # Snapshot the scenario dir (not just RUNS_ACTIVE): manual actions write to a
     # sibling RUNS_DIAG tree (save_root .replace("RUNS_ACTIVE","RUNS_DIAG")), so
-    # the whole run tree must be walked to capture every file Active produced.
+    # the whole run tree must be walked to capture every file the session produced.
     runs_norm = _normalize_runs_tree(scenario_dir)
     return trace_text, runs_norm
 
@@ -1346,7 +1354,7 @@ def _write_baseline(target: Path, captured: dict) -> None:
     assert target.resolve() != BASELINE_S0A_DIR.resolve() or not any(
         BASELINE_S0A_DIR.glob("*")
     ), (
-        "refusing to overwrite a non-empty frozen baseline_S0a/ reference; "
+        "refusing to overwrite a non-empty frozen golden/action/ reference; "
         "delete it deliberately first if a re-freeze is truly intended"
     )
     target.mkdir(parents=True, exist_ok=True)
@@ -1372,14 +1380,14 @@ def run_freeze() -> int:
 
 
 def run_check() -> int:
-    """Hard gate: recapture every scenario and diff against the frozen S0a
+    """Hard gate: recapture every scenario and diff against the frozen
     reference (trace bytes exact; runs manifest+text exact; .hlo header exact +
     data multiset)."""
     import tempfile
 
     if not BASELINE_S0A_DIR.is_dir() or not any(BASELINE_S0A_DIR.glob("*")):
-        print(f"FATAL: frozen S0a reference missing/empty: {BASELINE_S0A_DIR}")
-        print("run with --freeze first (on unmodified base.py).")
+        print(f"FATAL: frozen reference missing/empty: {BASELINE_S0A_DIR}")
+        print("the reference is tracked in git; restore it, do not re-freeze.")
         return 1
 
     with tempfile.TemporaryDirectory() as tmp_root:
@@ -1418,7 +1426,7 @@ def run_check() -> int:
         any_fail = True
 
     if any_fail:
-        print(f"CHECK FAILED: Active output diverged from {BASELINE_S0A_DIR}")
+        print(f"CHECK FAILED: ActionSession output diverged from {BASELINE_S0A_DIR}")
         return 1
     print(f"CHECK PASSED: all {len(SCENARIOS)} scenarios match {BASELINE_S0A_DIR}")
     return 0
@@ -1459,20 +1467,20 @@ def run_determinism_selftest() -> int:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="CARDS P6 S0a Active output golden-master harness."
+        description="ActionSession output golden-master harness."
     )
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
         "--freeze",
         action="store_true",
-        help="One-time capture of the frozen .omc/artifacts/p6/baseline_S0a/ reference "
+        help="One-time capture of the tracked golden/action/ reference "
         "(refuses if it already exists).",
     )
     group.add_argument(
         "--check",
         action="store_true",
-        help="Hard gate: diff freshly captured Active output against the frozen "
-        "baseline_S0a/ reference. Exit non-zero on any divergence.",
+        help="Hard gate: diff freshly captured ActionSession output against the "
+        "tracked golden/action/ reference. Exit non-zero on any divergence.",
     )
     args = parser.parse_args()
 

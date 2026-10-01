@@ -1782,7 +1782,6 @@ def test_no_raw_color_literals_anywhere() -> None:
     targets = sorted(
         {
             *REPO_ROOT.glob("helao/deploy/*/servers/**/*.py"),
-            *REPO_ROOT.glob("helao/core/servers/**/*.py"),
             *REPO_ROOT.glob("helao/ui/**/*.py"),
             *REPO_ROOT.glob("helao/hexagon/**/*.py"),
         }

@@ -1,5 +1,5 @@
 """NativeDataStreamer (P2b-1): verbatim re-body of legacy DataStreamer
-(helao/core/servers/active_data_stream.py). Source-parity pin + drain-loop
+(helao/core/servers/active_data_stream.py, deleted by B7b). Drain-loop
 behavior on a real MultisubscriberQueue + tmp tree: lazy open on first
 matching packet, json_data_keys inference, %% exactly once, non-serializable
 -> error line, string payload raw, listen_uuids filter, queued/written
@@ -7,45 +7,24 @@ counters live on Active, cancel removes the data_q subscription."""
 
 import asyncio
 import os
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
-from helao.core.models.data import DataModel
+from helao.core.models.data import DataModel, DataPackageModel
 from helao.core.models.hlostatus import HloStatus
-from helao.core.servers.active_data_stream import DataStreamer
 from helao.hexagon.adapters.native.data_file import NativeDataFileWriter
 from helao.hexagon.adapters.native.data_stream import NativeDataStreamer
 from helao.hexagon.tests.native_fixtures import make_base, mk_active
-
-METHODS = [
-    "__init__",
-    "get_realtime",
-    "get_realtime_nowait",
-    "write_live_data",
-    "enqueue_data_dflt",
-    "_build_data_package",
-    "enqueue_data",
-    "enqueue_data_nowait",
-    "assemble_data_msg",
-    "add_new_listen_uuid",
-    "log_data_task",
-]
-
-
-def test_source_parity_with_legacy():
-    from helao.hexagon.tests.native_fixtures import assert_source_parity
-
-    assert_source_parity(NativeDataStreamer, DataStreamer, METHODS)
 
 
 def _native_active(tmp_path):
     base = make_base(str(tmp_path / "RUNS_ACTIVE"))
     active, dflt = mk_active(base)
-    # mini-graft: both write collaborators native (the drain loop hops
-    # active.log_data_set_output_file -> data_file_writer)
-    active.data_stream = NativeDataStreamer(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
-    active.data_file_writer = NativeDataFileWriter(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
+    # both write collaborators are native by construction (the drain loop
+    # hops active.log_data_set_output_file -> data_file_writer)
+    assert isinstance(active.data_stream, NativeDataStreamer)
+    assert isinstance(active.data_file_writer, NativeDataFileWriter)
     return base, active, dflt
 
 
@@ -56,6 +35,10 @@ async def test_enqueue_counts_only_data_bearing(tmp_path):
     await active.enqueue_data(DataModel(data={}, errors=[], status=HloStatus.finished))
     active.enqueue_data_nowait(DataModel(data={dflt: {"t_s": 2}}, errors=[]))
     assert active.num_data_queued == 2  # empty-data packet doesn't count
+    # moved from unit_test_active_data_stream (enqueue_nowait_counts): the
+    # nowait path skips an empty-data packet too
+    active.enqueue_data_nowait(DataModel(data={}, errors=[]))
+    assert active.num_data_queued == 2
 
 
 @pytest.mark.asyncio
@@ -129,6 +112,45 @@ async def test_save_data_false_no_logger(tmp_path):
     base = make_base(str(tmp_path / "RUNS_ACTIVE"))
     active, _ = mk_active(base)
     active.action.save_data = False
-    active.data_stream = NativeDataStreamer(active)  # type: ignore[reportAttributeAccessIssue]  # the swap under test
     await active.log_data_task()  # returns immediately, no subscription
     assert len(base.data_q.subscribers) == 0
+
+
+@pytest.mark.asyncio
+async def test_realtime_forwarding(tmp_path):
+    """Moved from unit_test_active_data_stream: offset 0 + explicit epoch_ns
+    passes straight through both realtime forms."""
+    _, active, _ = _native_active(tmp_path)
+    assert active.get_realtime_nowait(epoch_ns=123456789) == 123456789
+    assert await active.get_realtime(epoch_ns=123456789) == 123456789
+
+
+def test_add_new_listen_uuid_mutates_the_session(tmp_path):
+    """Moved from unit_test_active_data_stream: listen_uuids lives on the
+    session (seeded with the action uuid at construction) and the streamer
+    mutates that same list."""
+    _, active, _ = _native_active(tmp_path)
+    before = list(active.listen_uuids)
+    new = UUID("00000000-0000-0000-0000-0000000000ff")
+    active.add_new_listen_uuid(new)
+    assert active.action.action_uuid in before
+    assert new in active.listen_uuids
+    assert active.data_stream.active.listen_uuids is active.listen_uuids
+
+
+def test_assemble_and_build_package(tmp_path):
+    """Moved from unit_test_active_data_stream."""
+    _, active, dflt = _native_active(tmp_path)
+    dm = DataModel(
+        data={dflt: {"t_s": 1, "value": 2}}, errors=[], status=HloStatus.active
+    )
+    pkg = active.assemble_data_msg(datamodel=dm)
+    assert isinstance(pkg, DataPackageModel)
+    assert pkg.action_uuid == active.action.action_uuid
+    assert pkg.action_name == active.action.action_name
+    built, has_data = active._build_data_package(dm)
+    _, empty_has = active._build_data_package(
+        DataModel(data={}, errors=[], status=HloStatus.active)
+    )
+    assert isinstance(built, DataPackageModel)
+    assert has_data is True and empty_has is False

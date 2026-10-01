@@ -4,8 +4,8 @@ Two things live here, one per port declared in ``ports/status.py``:
 
 - :class:`WsConsumer` -- :class:`~helao.hexagon.ports.status.StatusStreamPort`
   over the real :class:`~helao.helpers.ws_utils.WsSubscriber`. It covers
-  consumer faces 1 *and* 2 (Bokeh's WsPublisher routes and the ``_ws_relay``
-  streams): the transport decode is one and the same
+  consumer faces 1 *and* 2 (Bokeh's WsPublisher routes and the orchestrator's
+  ``WsPublisher`` streams): the transport decode is one and the same
   ``pickle.loads(pyzstd.decompress(...))``, and only the producer differs.
   Nothing is re-implemented here -- wrapping the real subscriber is the point,
   since a second decoder is exactly the drift this slice's frames test for.

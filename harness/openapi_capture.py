@@ -1,8 +1,8 @@
 """Capture a live server's route surface to a normalized, diffable form.
 
 The static extractor in :mod:`harness.endpoints` sees only ``@app.<method>(...)``
-decorators on a module's own functions; it cannot see the routes ``BaseAPI``/
-``Base`` register at runtime, which is exactly the surface a host replacement has
+decorators on a module's own functions; it cannot see the routes ``ActionHost``/
+``OrchHost`` register at runtime, which is exactly the surface a host replacement has
 to reproduce. This module reads them off a launched server instead.
 
 **WebSockets are deliberately out of scope here.** They do not appear in
@@ -31,26 +31,101 @@ def normalize(doc: dict[str, Any]) -> dict[str, Any]:
         doc: A parsed ``openapi.json`` document.
 
     Returns:
-        ``{"routes": [{"path", "method", "tags"}, ...]}`` sorted by
-        ``(path, method)`` with tags sorted, so two captures of the same server
-        compare equal regardless of dict ordering.
+        ``{"routes": [{"path", "method", "tags", "params"[, "body"]}, ...]}``
+        sorted by ``(path, method)`` with tags sorted, so two captures of the
+        same server compare equal regardless of dict ordering. ``body`` is
+        present only on a route that declares a request body.
     """
+    schemas = (doc.get("components") or {}).get("schemas") or {}
     routes = []
     for path, ops in (doc.get("paths") or {}).items():
         for method, op in ops.items():
-            routes.append(
-                {
-                    "path": path,
-                    "method": method.lower(),
-                    "tags": sorted((op or {}).get("tags") or []),
-                    "params": _params(op or {}),
-                }
-            )
+            route = {
+                "path": path,
+                "method": method.lower(),
+                "tags": sorted((op or {}).get("tags") or []),
+                "params": _params(op or {}, schemas),
+            }
+            body = _body(op or {}, schemas)
+            if body is not None:
+                route["body"] = body
+            routes.append(route)
     routes.sort(key=lambda r: (r["path"], r["method"]))
     return {"routes": routes}
 
 
-def _params(op: dict[str, Any]) -> list[dict[str, Any]]:
+def _ref_name(schema: dict[str, Any]) -> Any:
+    """The component a schema points at, directly or through one ``anyOf`` arm.
+
+    ``Optional[SomeEnum]`` renders as ``anyOf: [{$ref}, {type: null}]`` and a
+    bare enum parameter as ``{$ref}``; both name the component that holds the
+    members a caller may send.
+    """
+    for variant in (schema, *(schema.get("anyOf") or [])):
+        if "$ref" in variant:
+            return variant["$ref"].rsplit("/", 1)[-1]
+    return None
+
+
+def _describe(schema: dict[str, Any], schemas: dict[str, Any]) -> dict[str, Any]:
+    """``type``, plus ``ref`` and ``enum`` when the schema points at a component.
+
+    A ``$ref`` schema has no ``type`` of its own, so before this every enum
+    parameter recorded ``type: null`` and two different enums compared equal.
+    The component's name is kept because FastAPI takes it from the Python
+    class name, which is part of the contract; the enum members are what a
+    caller actually sends.
+    """
+    out = {"type": schema.get("type") or _any_of_type(schema)}
+    ref = _ref_name(schema)
+    if ref is not None:
+        component = schemas.get(ref) or {}
+        out["ref"] = ref
+        if out["type"] is None:
+            out["type"] = component.get("type")
+        if "enum" in component:
+            out["enum"] = sorted(component["enum"], key=str)
+    return out
+
+
+def _name_of(pair: list[Any]) -> str:
+    """Sort key for a ``[name, description]`` pair: the name."""
+    return pair[0]
+
+
+def _body(op: dict[str, Any], schemas: dict[str, Any]) -> Any:
+    """A route's request body, resolved one level into its component.
+
+    Returns None for a route without one, so those routes keep their shape.
+    The body component's own name is NOT recorded: FastAPI derives it from the
+    handler's function name (``Body_<func>_<path>_post``), which differs
+    between two correct implementations for the same reason ``title`` does.
+    """
+    request_body = op.get("requestBody")
+    if not request_body:
+        return None
+    content = request_body.get("content") or {}
+    schema = (next(iter(content.values()), None) or {}).get("schema") or {}
+    ref = _ref_name(schema)
+    target = (schemas.get(ref) or {}) if ref is not None else schema
+    body = {
+        "required": bool(request_body.get("required", False)),
+        "type": target.get("type") or _any_of_type(target),
+        "properties": sorted(
+            (
+                [name, _describe(prop, schemas)]
+                for name, prop in (target.get("properties") or {}).items()
+            ),
+            key=_name_of,
+        ),
+        "required_props": sorted(target.get("required") or []),
+    }
+    if "items" in target:
+        body["items"] = _describe(target["items"], schemas)
+    return body
+
+
+def _params(op: dict[str, Any], schemas: dict[str, Any]) -> list[dict[str, Any]]:
     """The query/path parameters a route accepts, reduced to what callers see.
 
     Paths and methods alone are too weak a gate for a host replacement: a
@@ -59,10 +134,11 @@ def _params(op: dict[str, Any]) -> list[dict[str, Any]]:
     default, or changed type. That is invisible to a path-set comparison
     and immediate to a caller.
 
-    Only ``name``/``in``/``required``/``type``/``default`` are kept. The
-    full JSON Schema carries generated ``title`` strings derived from the
-    handler's own function name, which differ between two correct
-    implementations and would make every route diff.
+    Only ``name``/``in``/``required``/``type``/``default`` are kept, plus
+    ``ref``/``enum`` for a parameter whose schema is a component
+    (:func:`_describe`). The full JSON Schema carries generated ``title``
+    strings derived from the handler's own function name, which differ
+    between two correct implementations and would make every route diff.
     """
     out = []
     for prm in op.get("parameters") or []:
@@ -71,7 +147,7 @@ def _params(op: dict[str, Any]) -> list[dict[str, Any]]:
             "name": prm.get("name"),
             "in": prm.get("in"),
             "required": bool(prm.get("required", False)),
-            "type": schema.get("type") or _any_of_type(schema),
+            **_describe(schema, schemas),
         }
         if "default" in schema:
             entry["default"] = schema["default"]

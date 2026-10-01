@@ -38,6 +38,7 @@ from helao.helpers.import_autolibs import import_autolibs
 from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.premodels import Action, Experiment, Sequence
 from helao.helpers.server_keys import resolve_sync_server_key
+from helao.helpers.ws_utils import WsPublisher
 from helao.helpers.zdeque import zdeque
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -56,7 +57,27 @@ from helao.hexagon.domain.orchestration import (
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
-__all__ = ["OrchHost"]
+__all__ = ["OrchHost", "orch_ws_publishers"]
+
+
+def orch_ws_publishers(
+    status_q: MultisubscriberQueue,
+    data_q: MultisubscriberQueue,
+    live_q: MultisubscriberQueue,
+) -> tuple[WsPublisher, WsPublisher, WsPublisher]:
+    """The ORCH family's three WS publishers, in ``(status, data, live)`` order.
+
+    Status and data pickle ``msg.as_dict()``; the live buffer is dict-native
+    and is pickled as-is. ``OrchHost._register_orch_ws_routes`` serves its
+    routes from these, and ``harness.ws_frames.encode_orch_api`` encodes the
+    ``orch_api`` fixture family through the same function, so the harness
+    cannot drift from the host.
+    """
+    return (
+        WsPublisher(status_q, lambda m: m.as_dict()),
+        WsPublisher(data_q, lambda m: m.as_dict()),
+        WsPublisher(live_q),
+    )
 
 
 class OrchHost(ActionHost):
@@ -170,14 +191,11 @@ class OrchHost(ActionHost):
         # --- orch.py:155-176: task handles and wait state ---------------
         self.loop_task = None
         self.status_subscriber = None
-        self.globstat_broadcaster = None
         self.heartbeat_monitor = None
         self.driver_monitor = None
         self.wait_task = None
         self.current_wait_ts = 0
         self.last_wait_ts = 0
-        self.globstat_q = MultisubscriberQueue()
-        self.globstat_clients = set()
         self.current_stop_message = ""
         self.aiolock = asyncio.Lock()
 
@@ -569,8 +587,7 @@ class OrchHost(ActionHost):
 
         The three payload builders are imported from ``orch_payloads``
         rather than reimplemented: they shape what the operator UIs parse,
-        and ``orch_payloads`` is the one implementation -- legacy
-        ``orch_api`` re-exports it.
+        and ``orch_payloads`` is the one implementation.
         """
         from typing import Optional as _Optional
 
@@ -953,17 +970,6 @@ class OrchHost(ActionHost):
         """Subscribe to every action server's status stream."""
         return await self.server_monitor.subscribe_all(retry_limit=retry_limit)
 
-    async def globstat_broadcast_task(self):
-        """Drain globstat_q so subscribers can read eagerly."""
-        return await self.status_ingester.globstat_broadcast_task()
-
-    async def ws_globstat(self, websocket):
-        """Stream global status. NOT registered as a route -- no decorator
-        for it exists anywhere in the tree, on legacy or here. It is the
-        dead sender already recorded in the post-parity backlog, and
-        reproducing legacy means not inventing a route legacy never served."""
-        return await self.status_ingester.ws_globstat(websocket)
-
     async def active_action_monitor(self):
         """Legacy heartbeat monitor. Superseded by HexHealthMonitor when the
         reducer runs, exactly as the graft superseded it."""
@@ -999,7 +1005,6 @@ class OrchHost(ActionHost):
             interrupt = await self.interrupt_q.get()
             if isinstance(interrupt, GlobalStatusModel):
                 self.incoming = interrupt
-                await self.globstat_q.put(interrupt.as_json())
         if (
             pending_action is not None
             and self.globalstatusmodel.loop_intent == LoopIntent.stop
@@ -1325,15 +1330,16 @@ class OrchHost(ActionHost):
         """Re-register the three WS routes with the ORCH family's encoding.
 
         This is the one family difference no surface gate can see:
-        WebSockets do not appear in ``openapi.json`` at all, so the 74-route
+        WebSockets do not appear in ``openapi.json`` at all, so the route
         diff that covers every parameter schema says nothing here.
 
         The two families genuinely differ on the wire. ``base_api`` streams
         through ``WsPublisher``, whose default ``xform_func`` is the
         IDENTITY -- it pickles the model object. ``orch_api`` streams
-        through ``Base._ws_relay``, which pickles ``msg.as_dict()`` for
-        status and data, and the raw message for the live buffer
-        (``use_as_dict=False``). So on ``/ws_status`` the action family
+        through the publishers :func:`orch_ws_publishers` builds, which
+        pickle ``msg.as_dict()`` for status and data, and the raw message for
+        the live buffer -- the bytes the legacy ``Base._ws_relay`` sent,
+        compared byte for byte by B7b. So on ``/ws_status`` the action family
         delivers an ``ActionModel`` and the orchestrator a plain dict.
 
         Inheriting ActionHost's registration would send objects to every
@@ -1350,13 +1356,11 @@ class OrchHost(ActionHost):
 
         from fastapi import WebSocketDisconnect
 
-        from helao.helpers.ws_utils import WsPublisher
-
-        # as_dict for status and data; the live buffer is dict-native and
-        # legacy passes use_as_dict=False for it.
-        self.status_publisher = WsPublisher(self.status_q, lambda m: m.as_dict())
-        self.data_publisher = WsPublisher(self.data_q, lambda m: m.as_dict())
-        self.live_publisher = WsPublisher(self.live_q)
+        (
+            self.status_publisher,
+            self.data_publisher,
+            self.live_publisher,
+        ) = orch_ws_publishers(self.status_q, self.data_q, self.live_q)
 
         for path in ("/ws_status", "/ws_data", "/ws_live"):
             self._replace_inherited_route(path)
@@ -1436,9 +1440,6 @@ class OrchHost(ActionHost):
                     action_serv=self, sync_server_name=self._sync_server_key
                 )
             self.status_subscriber = asyncio.create_task(self.subscribe_all())
-            self.globstat_broadcaster = asyncio.create_task(
-                self.globstat_broadcast_task()
-            )
             self.driver_monitor = asyncio.create_task(self.action_server_monitor())
             # health is in ORCH_REQUIRED and wiring.require() runs in
             # __init__, so an unwired health port cannot reach here -- a
@@ -1488,7 +1489,6 @@ class OrchHost(ActionHost):
         self._orch_shutdown_done = True
         for task in (
             self.status_subscriber,
-            self.globstat_broadcaster,
             self.driver_monitor,
             self.heartbeat_monitor,
         ):

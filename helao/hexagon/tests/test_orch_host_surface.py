@@ -50,56 +50,6 @@ def test_construction_populates_the_three_queues_and_the_status_model():
     assert host.active_sequence is None
 
 
-def _legacy_orch_api_routes() -> set[str]:
-    """Every route ``orch_api`` declares by decorator, paths substituted.
-
-    Static, and knowingly incomplete: ``orch_api`` also calls
-    ``_register_utility_endpoints(self)``, whose routes no decorator scan
-    can see. That is why the real gate (B3a Task 7) diffs a LIVE
-    /openapi.json instead -- B1 measured its hand-written surface
-    checklist stale, at 9 routes with 5 GETs where the live server had 19,
-    all POST. This function is the cheap lower bound, not the gate.
-    """
-    import ast
-    from pathlib import Path
-
-    src = Path(__file__).resolve().parents[3] / "helao/core/servers/orch_api.py"
-    tree = ast.parse(src.read_text(encoding="utf-8"))
-    found: set[str] = set()
-    for node in ast.walk(tree):
-        for dec in getattr(node, "decorator_list", []):
-            if not (
-                isinstance(dec, ast.Call)
-                and isinstance(dec.func, ast.Attribute)
-                and dec.func.attr in {"post", "get", "websocket"}
-                and dec.args
-            ):
-                continue
-            arg = dec.args[0]
-            if isinstance(arg, ast.Constant):
-                found.add(arg.value)
-            elif isinstance(arg, ast.JoinedStr):
-                found.add(
-                    "".join(
-                        v.value if isinstance(v, ast.Constant) else "ORCH"
-                        for v in arg.values
-                    )
-                )
-    return found
-
-
-def test_every_orch_api_route_exists_on_the_host():
-    """No route may be missing, including the nine action endpoints.
-
-    The 24 loop routes are PRESENT and raise; absence would read as a
-    missing server and send a caller looking at config and ports.
-    """
-    host = _host()
-    paths = {getattr(r, "path", "") for r in host.routes}
-    missing = sorted(_legacy_orch_api_routes() - paths)
-    assert missing == [], f"routes orch_api declares that OrchHost lacks: {missing}"
-
-
 def test_estop_is_registered_exactly_once():
     """ActionHost already registers /{server_key}/estop with the same body.
 
@@ -113,9 +63,13 @@ def test_estop_is_registered_exactly_once():
     assert len(estops) == 1, f"expected exactly one /ORCH/estop, got {len(estops)}"
 
 
-CHECKLIST = (
-    Path(__file__).resolve().parents[1] / "tests/checklists/orch_openapi_legacy.json"
-)
+#: Frozen from a live OrchHost by B7b (77 routes). Its params and bodies on
+#: the 74 routes legacy OrchAPI also served were first shown equal to an
+#: in-process OrchAPI capture while the engine still existed, and legacy's
+#: own capture matched the launched-server checklist this file replaced.
+#: Q10: /prepend_sequences' response shape differs from legacy (live since B3b,
+#: no reader); recorded on purpose, not fixed.
+CHECKLIST = Path(__file__).resolve().parents[1] / "tests/checklists/orch_openapi.json"
 
 
 #: Routes still registered as raising stubs. EMPTY as of B3b: every loop
@@ -128,46 +82,49 @@ def _by_key(doc: dict) -> dict:
     return {(r["path"], r["method"]): r for r in doc["routes"]}
 
 
-def test_the_route_surface_matches_the_live_legacy_orchestrator():
-    """Captured from a LAUNCHED legacy orchestrator, not hand-written.
+def test_the_route_surface_matches_the_frozen_orchestrator_surface():
+    """Exact both ways: no frozen route missing, no unfrozen route added.
 
-    B1 measured its hand-written surface checklist stale: 9 routes listed
-    with 5 marked GET where the live server had 19, every one POST. A
-    decorator scan is no better here -- orch_api also calls
-    _register_utility_endpoints, whose routes it cannot see.
+    Captured live, not hand-written: B1 measured its hand-written surface
+    checklist stale, 9 routes listed with 5 marked GET where the live
+    server had 19, every one POST. An added route is a surface change too,
+    and the legacy-era version of this test could not see one.
 
     WebSockets are absent from openapi.json entirely, so this says nothing
-    about ws_status/ws_data/ws_live. Those are B3b's, and they need a
-    connect test rather than a schema diff.
+    about ws_status/ws_data/ws_live; test_ws_consumer_parity covers those.
     """
     from harness import openapi_capture
 
-    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    frozen = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
     current = _by_key(openapi_capture.normalize(_host().openapi()))
 
-    missing = sorted(k for k in legacy if k not in current)
-    assert (
-        missing == []
-    ), f"routes the live legacy orchestrator has, OrchHost lacks: {missing}"
+    missing = sorted(k for k in frozen if k not in current)
+    extra = sorted(k for k in current if k not in frozen)
+    assert missing == [], f"frozen routes OrchHost no longer serves: {missing}"
+    assert extra == [], f"routes OrchHost serves that are not frozen: {extra}"
 
 
-def test_parameter_schemas_match_the_live_legacy_orchestrator():
+def test_parameter_schemas_match_the_frozen_orchestrator_surface():
     """A route can be present, correctly tagged, and still reject every
     request its predecessor accepted -- a renamed parameter, a lost
-    default, a changed type. None of that shows in a path-set diff."""
+    default, a changed type, a renamed enum member, a renamed body field.
+    None of that shows in a path-set diff."""
     from harness import openapi_capture
 
-    legacy = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
+    frozen = _by_key(json.loads(CHECKLIST.read_text(encoding="utf-8")))
     current = _by_key(openapi_capture.normalize(_host().openapi()))
 
     drifted = {
-        key: {"legacy": legacy[key]["params"], "host": current[key]["params"]}
-        for key in legacy
-        if key in current
-        and key[0] not in STUB_ROUTES
-        and legacy[key]["params"] != current[key]["params"]
+        key: {
+            field: {"frozen": frozen[key].get(field), "host": current[key].get(field)}
+            for field in ("tags", "params", "body")
+            if frozen[key].get(field) != current[key].get(field)
+        }
+        for key in frozen
+        if key in current and key[0] not in STUB_ROUTES
     }
-    assert drifted == {}, f"parameter drift on {len(drifted)} route(s): {drifted}"
+    drifted = {key: fields for key, fields in drifted.items() if fields}
+    assert drifted == {}, f"schema drift on {len(drifted)} route(s): {drifted}"
 
 
 def test_the_stub_exemption_list_is_exactly_the_routes_that_still_raise():
@@ -249,6 +206,25 @@ def test_the_host_owns_the_reducer_rather_than_being_grafted():
         assert "_hex_runtime" in src, f"{method.__name__} bypasses the reducer"
 
 
+def test_the_host_binds_its_health_adapter_and_starts_no_legacy_heartbeat():
+    """OrchHost binds its own health adapter; no graft does it any more.
+
+    Moved from test_dispatch_loop's graft health test (B7b, D-B7b.6). The graft
+    used to bind the adapter to a legacy Orch and cancel that Orch's heartbeat
+    task. The host now binds the adapter to itself in ``_build_reducer``,
+    builds the hexagon health monitor, and never creates the legacy heartbeat
+    task at all. The no-health case has no native form: ``health`` is in
+    ORCH_REQUIRED, so OrchHost cannot be built without it
+    (test_adapter_health::test_orch_required_includes_health_and_wiring_has_slot).
+    """
+    from helao.hexagon.app.ingestion import HexHealthMonitor
+
+    host = _host()
+    assert host.hexagon_wiring.health._orch is host  # type: ignore[attr-defined]
+    assert isinstance(host._hex_health, HexHealthMonitor)
+    assert host.heartbeat_monitor is None
+
+
 def test_estop_wakes_the_interrupt_queue():
     """DD-5 item 6, and it is not decorative.
 
@@ -264,14 +240,3 @@ def test_estop_wakes_the_interrupt_queue():
 
     src = inspect.getsource(OrchHost.estop_loop)
     assert "interrupt_q.put" in src, "estop_loop must wake the interrupt queue"
-
-
-def test_a_native_orch_host_is_not_grafted():
-    """Two dispatch loops on one set of queues would break the
-    single-drainer property the reducer exists to guarantee."""
-    import inspect
-
-    from helao.hexagon.app import factory
-
-    src = inspect.getsource(factory.makeOrchApp)
-    assert "_is_native_host" in src, "makeOrchApp must skip the graft for a native host"

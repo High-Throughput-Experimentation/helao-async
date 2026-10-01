@@ -6,14 +6,15 @@ coverage (§10.1(3)'s named insufficiency) with:
 
 1. The hexagon's `WsPublishBridge` produces byte-identical frames to the
    legacy `WsPublisher` for identical inputs.
-2. The orch `_ws_relay` encoding (no wire test at all before this slice) is
-   pinned: it carries dicts, never the typed model `BaseAPI` sends.
+2. The orchestrator's `orch_ws_publishers` encoding (no wire test at all
+   before this slice) is pinned: it carries dicts, never the typed model
+   `ActionHost` sends.
 3. The Reflex ingest normalizers are proven correct per-channel AND proven to
    yield nothing when handed the *other* channel's frame -- the emptiness is
    asserted explicitly, not inferred from a right-pair pass (the plan's named
    vacuity trap: "returns empty" must never read as a pass on its own).
-4. `/ws_globstat` has no route registration on either API class (Corrections
-   §C1b) -- extracted statically via `harness.endpoints`, the same tool the
+4. `/ws_globstat` has no route registration on either host, and the sender is
+   deleted (Corrections §C1b) -- extracted statically via `harness.endpoints`, the same tool the
    repo already uses for its endpoint-parity checklist, so this isn't a
    hand-rolled route scan either.
 5. The operator's `RemoteBackend._ws_loop` is shape-blind: it fires the same
@@ -34,8 +35,8 @@ from helao.helpers.multisubscriber_queue import MultisubscriberQueue
 from helao.helpers.ws_utils import WsPublisher
 from helao.hexagon.adapters.native.ws_publish import WsPublishBridge
 
-BASE_API_PATH = Path("helao/core/servers/base_api.py")
-ORCH_API_PATH = Path("helao/core/servers/orch_api.py")
+ACTION_HOST_PATH = Path("helao/hexagon/app/action_host.py")
+ORCH_HOST_PATH = Path("helao/hexagon/app/orch_host.py")
 
 
 @pytest.mark.asyncio
@@ -177,26 +178,38 @@ async def test_reflex_normalize_per_channel():
     assert cross_cols2 == {} and cross_rows2 == []
 
 
-def test_ws_globstat_is_dead():
-    """No route registration for /ws_globstat exists on either API class --
-    Corrections §C1b. Uses the repo's own static AST route extractor
-    (harness.endpoints), not a hand-rolled grep, so a future dynamic-route
-    addition is exactly as visible here as to the endpoint-parity checklist
-    that tool already gates."""
-    base_routes = extract_routes(BASE_API_PATH)
-    orch_routes = extract_routes(ORCH_API_PATH)
-    assert base_routes, "extractor found nothing in base_api.py -- inert glob?"
-    assert orch_routes, "extractor found nothing in orch_api.py -- inert glob?"
+def test_ws_globstat_channel_is_gone():
+    """No /ws_globstat route exists on either host, and the sender that fed it
+    is deleted (B7b, spec §6.1). The route half uses the repo's own static AST
+    route extractor (harness.endpoints), not a hand-rolled grep, so a future
+    route addition is exactly as visible here as to the endpoint-parity
+    checklist that tool already gates."""
+    from helao.hexagon.app.orch_host import OrchHost
+    from helao.hexagon.app.orch_status_sync import StatusIngester
+    from helao.hexagon.tests.test_orch_host_surface import _host
+
+    base_routes = extract_routes(ACTION_HOST_PATH)
+    orch_routes = extract_routes(ORCH_HOST_PATH)
+    assert base_routes, f"extractor found nothing in {ACTION_HOST_PATH} -- inert glob?"
+    assert orch_routes, f"extractor found nothing in {ORCH_HOST_PATH} -- inert glob?"
 
     base_paths = {r["path"] for r in base_routes}
     orch_paths = {r["path"] for r in orch_routes}
     # The three routes that DO carry a live producer, as a sanity check that
-    # the extractor is actually seeing this file's websocket decorators.
+    # the extractor is actually seeing each file's websocket decorators.
     for expected in ("/ws_status", "/ws_data", "/ws_live"):
+        assert expected in base_paths, (expected, base_paths)
         assert expected in orch_paths, (expected, orch_paths)
 
     assert "/ws_globstat" not in base_paths
     assert "/ws_globstat" not in orch_paths
+
+    # The sender is gone, not merely unrouted.
+    assert not hasattr(OrchHost, "ws_globstat")
+    assert not hasattr(OrchHost, "globstat_broadcast_task")
+    assert not hasattr(StatusIngester, "ws_globstat")
+    assert not hasattr(StatusIngester, "globstat_broadcast_task")
+    assert not hasattr(_host(), "globstat_q")
 
 
 def test_operator_ws_face_is_shape_blind():

@@ -265,7 +265,7 @@ class MeerstetterTECPoller(DriverPoller):
     """Background poller that reads TEC telemetry (``tec_vals``) from the driver.
 
     Legacy ``poll_sensor_loop`` hardcoded ``frequency=1`` (i.e. 1 Hz / 1.0s
-    sleep). ``BaseAPI`` constructs this poller with
+    sleep). ``ActionHost`` constructs this poller with
     ``server_cfg.get("polling_time", 0.1)`` (10 Hz absent an explicit
     ``polling_time`` config key) -- construction-proof scope defers tuning
     that cadence back to 1.0s.

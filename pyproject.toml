@@ -27,32 +27,26 @@ requires-python = ">=3.14"
 # helao/). Keeping the target at py312 holds the formatting baseline steady
 # and keeps the source readable on older interpreters.
 target-version = ["py312"]
-# Five native re-body modules under helao/hexagon/adapters/native/ are
-# VERBATIM, byte-identical copies of legacy code: four CARDS-P6 write
-# collaborators (helao/core/servers/active_data_*.py, base_meta_writer.py) and
-# the P2c sync driver (helao/core/drivers/data/sync_driver.py), pinned per-method
-# by inspect.getsource source-parity tests for byte-parity. Several legacy
-# collaborator modules are NOT black-formatted at line-length 88, so running
-# black on either side of a pinned pair would reformat it and break the
-# source-parity byte-identity. The hand-written native adapters
-# (artifact_store, data_sink, ws_publish) are black-enforced like the rest of
-# the repo (P2b-2 D2). (No other black config: line length stays the default
-# 88.) sync_driver.py is the P2c re-body of
-# helao/core/drivers/data/sync_driver.py (D1); its hand-written
-# NativeSyncAdapter sibling (sync_adapter.py) stays black-enforced.
+# One native re-body module under helao/hexagon/adapters/native/ is a
+# VERBATIM, byte-identical copy of legacy code: sync_driver.py is the P2c
+# re-body of helao/core/drivers/data/sync_driver.py (D1), pinned per-method by
+# inspect.getsource source-parity tests (sync_fixtures.assert_source_parity).
+# The legacy side is NOT black-formatted at line-length 88, so running black
+# on either side of the pair would reformat it and break the byte-identity.
+# BOTH SIDES are excluded: the invariant is "never reformatted", not
+# "currently matches black's output", and a future black release can change
+# its mind about either file. Every other native adapter, including its
+# hand-written NativeSyncAdapter sibling (sync_adapter.py), is black-enforced
+# like the rest of the repo. (No other black config: line length stays the
+# default 88.)
 #
-# BOTH SIDES of every pinned pair are excluded. This used to cover only the
-# five native copies, which is half a guard: `black <changed-files>` during an
-# import-sort sweep reformatted the LEGACY originals active_data_stream.py
-# (32 lines) and active_finalizer.py (27 lines) and broke parity from the
-# other direction. Two of the five legacy twins happen to be black-clean
-# today, but they are listed anyway -- the invariant is "never reformatted",
-# not "currently matches black's output", and a future black release can
-# change its mind about any of them.
+# Until B7b this list also held four CARDS-P6 write collaborators
+# (meta_writer, data_file, data_stream, finalizer) and their legacy twins
+# under helao/core/servers/. B7b deleted the twins with the engine, and their
+# source-parity pins with them, so those four are black-formatted now.
 #
 # Import SORTING is a different matter and is deliberately NOT excluded:
-# `ruff check --select I` only moves import statements, which for these ten
-# files all sit above the pinned region. Measured across all ten: every member
-# body byte-identical, 8 of 10 at zero line delta. sync_fixtures'
-# assert_region_holds_no_imports fails loud if that stops being true.
-force-exclude = 'helao/(hexagon/adapters/native/(meta_writer|data_file|data_stream|finalizer|sync_driver)|core/servers/(base_meta_writer|active_data_file|active_data_stream|active_finalizer)|core/drivers/data/sync_driver)\.py'
+# `ruff check --select I` only moves import statements, which for this pair
+# sit above the pinned region. sync_fixtures' assert_region_holds_no_imports
+# fails loud if that stops being true.
+force-exclude = 'helao/(hexagon/adapters/native/sync_driver|core/drivers/data/sync_driver)\.py'

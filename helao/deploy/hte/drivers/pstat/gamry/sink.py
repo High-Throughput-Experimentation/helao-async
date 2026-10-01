@@ -9,7 +9,7 @@ no measurement is in progress.
 from dataclasses import dataclass, field
 from typing import Optional
 
-from helao.helpers import helao_logging as logging  # get LOGGER from BaseAPI instance
+from helao.helpers import helao_logging as logging  # LOGGER is set by fast_launcher
 
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 

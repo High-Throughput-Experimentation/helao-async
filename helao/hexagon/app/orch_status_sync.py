@@ -1,19 +1,18 @@
-"""Status ingestion + WS broadcast collaborator extracted from ``Orch`` (CARDS
-P5, Stage S4).
+"""Status ingestion collaborator extracted from ``Orch`` (CARDS P5, Stage S4).
 
-``Orch.update_status``/``Orch.update_nonblocking``/``Orch.clear_nonblocking``/
-``Orch.ws_globstat``/``Orch.globstat_broadcast_task`` implement the
-orchestrator's status-ingestion "cluster C": merging every reported
-``ActionServerModel`` into the ``GlobalStatusModel``, tracking non-blocking
-executors, reacting to e-stop/error conditions, and streaming the resulting
-status over the ``globstat_q``/websocket fan-out to the Bokeh operator UI.
-This module moves those five method bodies into a ``StatusIngester``
-collaborator that ``Orch`` delegates to.
+``Orch.update_status``/``Orch.update_nonblocking``/``Orch.clear_nonblocking``
+implement the orchestrator's status-ingestion "cluster C": merging every
+reported ``ActionServerModel`` into the ``GlobalStatusModel``, tracking
+non-blocking executors, and reacting to e-stop/error conditions. This module
+moves those method bodies into a ``StatusIngester`` collaborator that the
+orchestrator delegates to. (It also held ``ws_globstat`` and
+``globstat_broadcast_task``, a ``/ws_globstat`` sender that never had a
+route; B7b deleted both with ``globstat_q``.)
 
 Per the P5 constraints (:doc:`CARDS_REFACTOR_P5.md` sec 3.1 rule 3):
 ``StatusIngester`` caches no shared mutable state -- it holds only the
 ``orch`` back-reference and reads/writes ``globalstatusmodel``, ``nonblocking``,
-``active_experiment``/``active_sequence``, ``interrupt_q`` and ``globstat_q``
+``active_experiment``/``active_sequence`` and ``interrupt_q``
 through it at call time, so a reassignment made between construction and a
 call (e.g. ``import_queues`` reassigning ``globalstatusmodel``) is always
 observed. Behavior is byte-identical to the original inline methods,
@@ -27,33 +26,18 @@ Lock/queue ownership (rule 4) -- full map (also duplicated verbatim in
   ``DispatchRunner`` (the dispatch critical section).
 - ``interrupt_q`` -- written by ``StatusIngester`` / ``ServerMonitor`` /
   e-stop; read by ``DispatchRunner``.
-- ``globstat_q`` -- written by ``StatusIngester``; drained by its own
-  broadcast task.
 
 Concretely here: ``aiolock`` is acquired inside ``update_status`` exactly
 where the original method acquired it (no await added or removed);
 ``interrupt_q`` is written by ``update_status`` and ``update_nonblocking``
 (read by ``Orch.wait_for_interrupt``, which ``DispatchRunner`` calls from its
 dispatch loop -- ``wait_for_interrupt`` itself remains an ``Orch`` method,
-cluster B, not yet extracted); ``globstat_q`` is only read/drained here
-(``ws_globstat`` subscribes, ``globstat_broadcast_task`` drains) -- it is
-also written by ``wait_for_interrupt`` as it forwards queued
-``GlobalStatusModel``s. ``update_status`` can trigger ``orch.estop_loop``
+cluster B, not yet extracted). ``update_status`` can trigger ``orch.estop_loop``
 (cluster E, stays on ``Orch``) when an action's status carries
 ``HloStatus.estopped``.
-
-Task-creation semantics are unchanged: ``Orch.myinit`` still does
-``asyncio.create_task(self.globstat_broadcast_task())`` via the thin
-delegator on ``Orch`` -- this module only relocates the method bodies, not
-when/where the background task is started.
 """
 
-import asyncio
-import json
-import traceback
 from typing import Optional
-
-from fastapi import WebSocket
 
 from helao.core.models.hlostatus import HloStatus
 from helao.core.models.orchstatus import LoopStatus, OrchStatus
@@ -291,29 +275,5 @@ class StatusIngester:
 
             # now push it to the interrupt_q
             await orch.interrupt_q.put(orch.globalstatusmodel)
-            # await orch.globstat_q.put(orch.globalstatusmodel.as_json())
 
             return True
-
-    async def ws_globstat(self, websocket: WebSocket):
-        """Stream global status updates over ``websocket`` until the client disconnects."""
-        orch = self.orch
-        LOGGER.info("got new global status subscriber")
-        await websocket.accept()
-        gs_sub = orch.globstat_q.subscribe()
-        try:
-            async for globstat_msg in gs_sub:
-                await websocket.send_text(json.dumps(globstat_msg.as_dict()))
-        except Exception as e:
-            tb = "".join(traceback.format_exception(type(e), e, e.__traceback__))
-            LOGGER.warning(
-                f"Data websocket client {websocket.client[0]}:{websocket.client[1]} disconnected. {repr(e), tb,}"
-            )
-            if gs_sub in orch.globstat_q.subscribers:
-                orch.globstat_q.remove(gs_sub)
-
-    async def globstat_broadcast_task(self):
-        """Drain ``globstat_q`` indefinitely so subscribers can read messages eagerly."""
-        orch = self.orch
-        async for _ in orch.globstat_q.subscribe():
-            await asyncio.sleep(0.01)

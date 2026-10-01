@@ -5,11 +5,11 @@ port surface and the same for_action/bound-handle pattern, but every write
 body is the hexagon-native re-body (meta_writer/data_file/data_stream/
 finalizer modules in this package) instead of a wrap of live legacy
 collaborators. Constructible from ConfigPort+ClockPort at ``build_wiring``
-time — no live ``Base`` exists yet; ``bind_base`` is called by the active
-graft at startup (the late-binding pattern the status adapter documents for
-its queues). It is also the composition's collaborator FACTORY:
-``graft_active_write_path`` obtains the per-Active native collaborators via
-``collaborators_for`` and the per-Base meta writer via ``meta_writer_for``,
+time — no live host exists yet; ``bind_base`` late-binds one (only tests
+call it since B7b deleted the active graft). It is also the composition's
+collaborator FACTORY: ``ActionSession`` obtains its native collaborators via
+``collaborators_for`` and ``ActionHost`` its meta writer via
+``meta_writer_for``,
 so the fail-loud wired port is exactly what carries the rerouted traffic
 (honesty: an unwired artifact_store aborts startup via ACTION_REQUIRED).
 
@@ -47,9 +47,9 @@ class NativeArtifactStoreAdapter:
         self._base = base
         self._active = active
 
-    # --- graft-time binding + collaborator factory ---
+    # --- late binding + collaborator factory ---
     def bind_base(self, base) -> None:
-        """Late base binding (graft startup); build_wiring has no Base yet."""
+        """Late base binding; build_wiring has no host yet."""
         self._base = base
 
     def meta_writer_for(self, base) -> NativeMetaFileWriter:
@@ -67,7 +67,7 @@ class NativeArtifactStoreAdapter:
         )
 
     def for_action(self, active) -> "NativeArtifactStoreAdapter":
-        """Per-action handle bound to a live (grafted) legacy Active."""
+        """Per-action handle bound to a live ``ActionSession``."""
         return NativeArtifactStoreAdapter(
             config=self._config, clock=self._clock, base=self._base, active=active
         )
@@ -75,8 +75,8 @@ class NativeArtifactStoreAdapter:
     def _require_base(self):
         if self._base is None:
             raise UnwiredPortError(
-                "meta members need a bound Base; the active graft calls "
-                "bind_base(base) at startup"
+                "meta members need a bound base; call bind_base(base) "
+                "before using them"
             )
         return self._base
 
@@ -89,7 +89,7 @@ class NativeArtifactStoreAdapter:
         return self._active
 
     # --- meta ymls (native bodies, resolved through the bound base's
-    # meta_writer — the graft has already swapped it native) ---
+    # meta_writer, which is native) ---
     async def write_act(self, action: Action) -> None:
         await self._require_base().write_act(action)
 
