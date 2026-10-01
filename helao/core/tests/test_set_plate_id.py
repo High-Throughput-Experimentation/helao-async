@@ -717,3 +717,42 @@ def test_analyses_an_unreadable_s3_body_fails_that_analysis_and_the_run_goes_on(
     assert yml_load(yml)["global_sample_label"] == NEW_LABEL  # the run went on
     assert loader.uploads == 1
     assert lost_uuid in capsys.readouterr().err
+
+
+def test_analyses_parse_only_ymls_whose_header_names_this_sequence(
+    tmp_path, monkeypatch, capsys
+):
+    """A station's ANALYSES tree holds ~10^5 ymls; only this sequence's are parsed."""
+    pdir, _yml, ana_dir, _loader = build_analysis(tmp_path, monkeypatch)
+    foreign = ana_dir.parent / "101011__GRID_normalize__X-1234550"
+    foreign.mkdir()
+    for i in range(5):
+        other = dict(
+            _ana_yml(), process_uuid=f"00000000-0000-0000-0000-00000000{i:04d}"
+        )
+        (foreign / f"other{i}.yml").write_text(yml_dumps(other))
+    parsed = []
+    real_load = set_plate_id.yml_load
+
+    def counting_load(path, *a, **k):
+        parsed.append(Path(path).name)
+        return real_load(path, *a, **k)
+
+    monkeypatch.setattr(set_plate_id, "yml_load", counting_load)
+    assert _ana(pdir, tmp_path, "--dry-run") == 0
+    assert not any(name.startswith("other") for name in parsed)
+    assert f"{ANA_UUID}.yml" in parsed
+
+
+def test_analyses_still_parse_a_yml_whose_header_lacks_process_uuid(
+    tmp_path, monkeypatch, capsys
+):
+    pdir, yml, _ana_dir, _loader = build_analysis(tmp_path, monkeypatch)
+    doc = _ana_yml()
+    uuid = doc.pop("process_uuid")
+    padded = {"zz_padding": "x" * (set_plate_id._HEADER_BYTES + 100), **doc}
+    padded["process_uuid"] = uuid  # last, beyond the header window
+    yml.write_text(yml_dumps(padded))
+    assert _ana(pdir, tmp_path, "--dry-run") == 0
+    out = capsys.readouterr().out
+    assert len([ln for ln in out.splitlines() if ln.startswith("  yml ")]) == 2
