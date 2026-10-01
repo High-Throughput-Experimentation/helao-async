@@ -4,9 +4,14 @@
 ``legacy_plateid_threshold`` (10000 by default), and transparently delegates
 to ``HTELegacyAPI`` for older ids. Authentication and S3 access are
 provided by a ``HelaoLoader`` constructed from an environment file.
+
+A 404 from the live service means "no such plate". An outage (no credentials,
+a transport error, or any status other than 200/404) is a different thing:
+``lookup_plate`` raises ``PlateAPIUnavailable`` for it, while ``get_info``
+folds both into ``None``.
 """
 
-__all__ = ["HTEPlateAPI"]
+__all__ = ["HTEPlateAPI", "PlateAPIUnavailable"]
 
 import os
 
@@ -21,8 +26,16 @@ from helao.helpers.legacy_api import HTELegacyAPI
 LOGGER = logging.make_logger(__file__) if logging.LOGGER is None else logging.LOGGER
 
 
+class PlateAPIUnavailable(RuntimeError):
+    """The live plate API could not answer (as opposed to "plate not found")."""
+
+
 class HTEPlateAPI:
     """Combined live + legacy accessor for HTE plate data.
+
+    A 404 from the live service means the plate does not exist: ``get_info``
+    returns ``None`` for it, so the ``check_*`` helpers answer ``False`` (or
+    consult the legacy API for ids below ``legacy_plateid_threshold``).
 
     Attributes:
         loader: Optional ``HelaoLoader`` providing AWS/S3 credentials.
@@ -68,6 +81,48 @@ class HTEPlateAPI:
             LOGGER.error("No access to AWS services", exc_info=True)
             return False
 
+    def lookup_plate(self, plateid: int) -> dict | None:
+        """Look a plate up in the live Plate API, telling absent from unreachable.
+
+        Args:
+            plateid: Numeric plate identifier.
+
+        Returns:
+            The plate record, or ``None`` when the API says the plate does not
+            exist (404, or a 200 whose ``plate_id`` is not ``plateid``).
+
+        Raises:
+            PlateAPIUnavailable: No credentials, a transport error, or any
+                status other than 200 and 404.
+        """
+        if self.loader is None:
+            raise PlateAPIUnavailable("no plate API credentials loaded")
+        try:
+            resp = httpx.get(
+                f"{self.loader.hcred.PLATE_API}/live/plate/id/{plateid}",
+                headers={"X-Api-Key": self.loader.hcred.PLATE_API_KEY},
+                timeout=30,
+            )
+        except (httpx.HTTPError, AttributeError) as exc:
+            # AttributeError: a loader whose credentials lack PLATE_API[_KEY]
+            raise PlateAPIUnavailable(f"{type(exc).__name__}: {exc}") from exc
+        if resp.status_code == 404:
+            return None
+        if resp.status_code != 200:
+            raise PlateAPIUnavailable(f"HTTP {resp.status_code}")
+        try:
+            rec = resp.json()
+        except ValueError as exc:
+            raise PlateAPIUnavailable("HTTP 200 with a non-JSON body") from exc
+        try:
+            found = isinstance(rec, dict) and int(rec["plate_id"]) == int(plateid)
+        except (KeyError, TypeError, ValueError):
+            found = False
+        if not found:
+            LOGGER.warning(f"plate API answered 200 without plate_id {plateid}")
+            return None
+        return rec
+
     def get_info(self, plateid: int) -> dict | None:
         """Fetch the plate info record from the live Plate API.
 
@@ -75,17 +130,13 @@ class HTEPlateAPI:
             plateid: Numeric plate identifier.
 
         Returns:
-            The decoded JSON info dict, or ``None`` on error.
+            The decoded JSON info dict, or ``None`` when the plate does not
+            exist (404) or the API cannot be reached. Use ``lookup_plate`` to
+            tell those apart.
         """
         try:
-            headers = {"X-Api-Key": self.loader.hcred.PLATE_API_KEY}
-            resp = httpx.get(
-                f"{self.loader.hcred.PLATE_API}/live/plate/id/{plateid}",
-                headers=headers,
-                timeout=30,
-            )
-            return resp.json()
-        except Exception:
+            return self.lookup_plate(plateid)
+        except PlateAPIUnavailable:
             LOGGER.error("Cannot find plateid info.", exc_info=True)
             return None
 
